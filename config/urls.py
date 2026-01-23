@@ -20,9 +20,11 @@ urlpatterns = [
     path('pages/', include('apps.content.urls_pages')),
 ]
 
-# Serve media files in development
+# Serve media files (needed on Railway for demo)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Serve static files via Django only in DEBUG (prod uses WhiteNoise)
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])
 
 # Admin site customization

@@ -42,6 +42,27 @@ INSTALLED_APPS = [
     'apps.comments',
 ]
 
+# Media files - Cloudinary for production, local fallback for development
+CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL')
+
+if CLOUDINARY_URL:
+    # Production: Use Cloudinary for media storage
+    # cloudinary_storage must be before django.contrib.staticfiles
+    staticfiles_index = INSTALLED_APPS.index('django.contrib.staticfiles')
+    INSTALLED_APPS.insert(staticfiles_index, 'cloudinary_storage')
+    INSTALLED_APPS.append('cloudinary')
+    
+    # Log Cloudinary configuration (only in DEBUG mode to avoid exposing secrets)
+    if DEBUG:
+        import logging
+        logger = logging.getLogger(__name__)
+        # Extract cloud name from URL for logging (format: cloudinary://KEY:SECRET@CLOUD_NAME)
+        try:
+            cloud_name = CLOUDINARY_URL.split('@')[-1] if '@' in CLOUDINARY_URL else 'unknown'
+            logger.info(f"Cloudinary configured for cloud: {cloud_name}")
+        except Exception:
+            logger.warning("Cloudinary URL format may be incorrect")
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -111,13 +132,9 @@ STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 # Fallback: allow WhiteNoise to use finders if collectstatic didn't run (demo safety)
 WHITENOISE_USE_FINDERS = True
 
-# Media files - Cloudinary for production, local fallback for development
-CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL')
-
+# Configure media storage (Cloudinary setup is done above in INSTALLED_APPS)
 if CLOUDINARY_URL:
     # Production: Use Cloudinary for media storage
-    INSTALLED_APPS.insert(0, 'cloudinary_storage')
-    INSTALLED_APPS.append('cloudinary')
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     MEDIA_URL = '/media/'  # Cloudinary returns absolute URLs; MEDIA_URL value is ignored
 else:

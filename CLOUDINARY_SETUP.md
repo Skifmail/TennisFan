@@ -49,9 +49,50 @@ cloudinary://12345678901234:abcdefghijklmnop@my_cloud
 
 ## Если что-то не работает
 
-Проверь:
-1. `CLOUDINARY_URL` установлен в Railway Variables
-2. Формат URL правильный: `cloudinary://KEY:SECRET@CLOUD_NAME`
-3. Логи Rails на Deploy → Deploy Logs видят ошибку подключения
+### Диагностика
+
+Запусти скрипт проверки конфигурации:
+```bash
+python check_cloudinary.py
+```
+
+Скрипт покажет:
+- Установлена ли переменная `CLOUDINARY_URL`
+- Правильный ли формат URL
+- Правильно ли настроены приложения в Django
+- Работает ли подключение к Cloudinary
+
+### Проверка вручную
+
+1. **Проверь переменную окружения:**
+   ```bash
+   echo $CLOUDINARY_URL
+   ```
+   Должна быть в формате: `cloudinary://API_KEY:API_SECRET@CLOUD_NAME`
+
+2. **Проверь настройки Django:**
+   - `CLOUDINARY_URL` установлен в Railway Variables (для продакшена)
+   - Формат URL правильный: `cloudinary://KEY:SECRET@CLOUD_NAME`
+   - `cloudinary_storage` должен быть в `INSTALLED_APPS` ПЕРЕД `django.contrib.staticfiles`
+   - `DEFAULT_FILE_STORAGE` должен быть `cloudinary_storage.storage.MediaCloudinaryStorage`
+
+3. **Проверь логи:**
+   - Railway: Deploy → Deploy Logs
+   - Локально: вывод `python manage.py runserver`
+
+4. **Проверь права доступа:**
+   - Убедись, что API Key и API Secret правильные
+   - Проверь, что аккаунт Cloudinary активен
+
+### Частые проблемы
+
+**Проблема:** Файлы сохраняются локально вместо Cloudinary
+- **Решение:** Убедись, что `CLOUDINARY_URL` установлена и доступна при запуске Django
+
+**Проблема:** Ошибка "cloudinary_storage is not installed"
+- **Решение:** Проверь, что `cloudinary_storage` добавлен в `INSTALLED_APPS` ПЕРЕД `django.contrib.staticfiles`
+
+**Проблема:** Ошибка подключения к Cloudinary
+- **Решение:** Проверь правильность API Key, API Secret и Cloud Name в URL
 
 Если логи чистые — значит всё работает! Просто загрузи фото и проверь в админке.

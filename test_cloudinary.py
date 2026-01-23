@@ -23,7 +23,15 @@ print("=" * 60)
 
 # Проверка настроек
 print(f"\n1. CLOUDINARY_URL: {'✅ Установлена' if settings.CLOUDINARY_URL else '❌ НЕ установлена'}")
-print(f"2. DEFAULT_FILE_STORAGE: {settings.DEFAULT_FILE_STORAGE}")
+
+# Check Django 4.2+ STORAGES configuration
+if hasattr(settings, 'STORAGES'):
+    default_storage_backend = settings.STORAGES.get('default', {}).get('BACKEND', 'NOT SET')
+    print(f"2. STORAGES['default']['BACKEND']: {default_storage_backend}")
+elif hasattr(settings, 'DEFAULT_FILE_STORAGE'):
+    print(f"2. DEFAULT_FILE_STORAGE: {settings.DEFAULT_FILE_STORAGE}")
+else:
+    print(f"2. Storage config: NOT FOUND")
 
 if hasattr(settings, 'MEDIA_ROOT'):
     print(f"3. MEDIA_ROOT: {settings.MEDIA_ROOT} ⚠️  (не должен быть установлен при использовании Cloudinary)")
@@ -40,12 +48,20 @@ print(f"   Модуль: {type(default_storage).__module__}")
 if settings.CLOUDINARY_URL:
     print(f"\n6. Тест загрузки файла в Cloudinary...")
     try:
-        # Создаем тестовый файл
-        test_content = b"Test file content for Cloudinary"
-        test_file = ContentFile(test_content, name='test_cloudinary.txt')
+        # Создаем тестовое изображение вместо текстового файла
+        from PIL import Image
+        from io import BytesIO
+        
+        # Создать простое тестовое изображение
+        img = Image.new('RGB', (100, 100), color='blue')
+        img_io = BytesIO()
+        img.save(img_io, 'PNG')
+        img_io.seek(0)
+        
+        test_file = ContentFile(img_io.read(), name='test_cloudinary.png')
         
         # Пытаемся сохранить
-        saved_path = default_storage.save('test/test_cloudinary.txt', test_file)
+        saved_path = default_storage.save('test/test_cloudinary.png', test_file)
         print(f"   ✅ Файл сохранен: {saved_path}")
         
         # Проверяем URL

@@ -125,18 +125,14 @@ WHITENOISE_USE_FINDERS = True
 if CLOUDINARY_URL:
     # Production: Use Cloudinary for media storage
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    MEDIA_URL = '/media/'  # Cloudinary returns absolute URLs, but MEDIA_URL is still used for some operations
+    # Do NOT set MEDIA_ROOT when using Cloudinary - it will cause files to be saved locally
 else:
     # Development: Use local storage
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
-
-# Cloudinary settings - additional configuration
-if CLOUDINARY_URL:
-    import cloudinary
-    cloudinary.config(secure=True)
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
+    MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

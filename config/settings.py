@@ -124,6 +124,27 @@ WHITENOISE_USE_FINDERS = True
 # Configure media storage
 if CLOUDINARY_URL:
     # Production: Use Cloudinary for media storage
+    # According to Cloudinary Django documentation: https://cloudinary.com/documentation/django_integration
+    # Configure Cloudinary explicitly (django-cloudinary-storage will use CLOUDINARY_URL automatically)
+    import cloudinary
+    # Parse CLOUDINARY_URL: cloudinary://api_key:api_secret@cloud_name
+    try:
+        url_parts = CLOUDINARY_URL.replace('cloudinary://', '').split('@')
+        if len(url_parts) == 2:
+            credentials = url_parts[0].split(':')
+            cloud_name = url_parts[1]
+            if len(credentials) == 2:
+                api_key, api_secret = credentials
+                cloudinary.config(
+                    cloud_name=cloud_name,
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    secure=True
+                )
+    except Exception:
+        # If parsing fails, cloudinary_storage will use CLOUDINARY_URL directly
+        pass
+    
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     MEDIA_URL = '/media/'  # Cloudinary returns absolute URLs, but MEDIA_URL is still used for some operations
     # Do NOT set MEDIA_ROOT when using Cloudinary - it will cause files to be saved locally

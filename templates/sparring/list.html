@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block title %}Спарринг{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Спарринг</h1>
+    <p class="page-subtitle">Найдите партнёра для игры</p>
+</div>
+
+<div class="container">
+    <div class="d-flex mb-4" style="justify-content: space-between; align-items: center;">
+        <form method="get" class="filter-bar" style="flex: 1; margin-bottom: 0;">
+            <select name="city" class="form-control" onchange="this.form.submit()">
+                <option value="">Все города</option>
+                <option value="moscow" {% if current_city == 'moscow' %}selected{% endif %}>Москва</option>
+                <option value="spb" {% if current_city == 'spb' %}selected{% endif %}>Санкт-Петербург</option>
+            </select>
+            <select name="category" class="form-control" onchange="this.form.submit()">
+                <option value="">Все категории</option>
+                <option value="futures" {% if current_category == 'futures' %}selected{% endif %}>Futures</option>
+                <option value="base" {% if current_category == 'base' %}selected{% endif %}>Base</option>
+                <option value="tour" {% if current_category == 'tour' %}selected{% endif %}>Tour</option>
+                <option value="hard" {% if current_category == 'hard' %}selected{% endif %}>Hard</option>
+                <option value="challenger" {% if current_category == 'challenger' %}selected{% endif %}>Challenger</option>
+            </select>
+        </form>
+        <a href="{% url 'sparring_create' %}" class="btn btn-primary" style="margin-left: var(--spacing-lg);">Создать заявку</a>
+    </div>
+
+    <div class="grid grid-2">
+        {% for sparring_request in sparring_requests %}
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex gap-3" style="align-items: flex-start;">
+                    {% if sparring_request.player.avatar %}
+                    <img src="{{ sparring_request.player.avatar.url }}" alt="" class="player-avatar" style="width: 56px; height: 56px;">
+                    {% else %}
+                    <div class="player-avatar" style="width: 56px; height: 56px;"></div>
+                    {% endif %}
+                    <div style="flex: 1;">
+                        <a href="{% url 'profile' pk=sparring_request.player.pk %}" class="card-title" style="display: block;">{{ sparring_request.player }}</a>
+                        <div class="d-flex gap-1 mt-1 mb-2">
+                            <span class="player-category">{{ sparring_request.player.get_category_display }}</span>
+                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ sparring_request.get_city_display }}</span>
+                        </div>
+                        <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ sparring_request.description }}</p>
+                        {% if sparring_request.preferred_days or sparring_request.preferred_time %}
+                        <p class="text-muted mt-2" style="font-size: var(--font-size-xs);">
+                            {% if sparring_request.preferred_days %}{{ sparring_request.preferred_days }}{% endif %}
+                            {% if sparring_request.preferred_time %} • {{ sparring_request.preferred_time }}{% endif %}
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mt-3">
+                    {% if sparring_request.player.telegram %}
+                    <a href="https://t.me/{{ sparring_request.player.telegram }}" class="btn btn-outline" target="_blank">Telegram</a>
+                    {% endif %}
+                    {% if sparring_request.player.whatsapp %}
+                    <a href="https://wa.me/{{ sparring_request.player.whatsapp }}" class="btn btn-outline" target="_blank">WhatsApp</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-secondary">Заявок на спарринг пока нет. <a href="{% url 'sparring_create' %}" class="text-primary">Создайте первую!</a></p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

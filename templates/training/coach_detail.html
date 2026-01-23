@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ coach.name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="mb-4">
+        <a href="{% url 'coach_list' %}" class="text-secondary">&larr; Все тренеры</a>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 300px 1fr; gap: var(--spacing-xl);">
+        <div class="card" style="height: fit-content;">
+            <div class="card-body text-center">
+                {% if coach.photo %}
+                <img src="{{ coach.photo.url }}" alt="" class="player-avatar"
+                    style="width: 150px; height: 150px; margin: 0 auto var(--spacing-lg);">
+                {% else %}
+                <div class="player-avatar" style="width: 150px; height: 150px; margin: 0 auto var(--spacing-lg);"></div>
+                {% endif %}
+
+                <h1 style="font-size: var(--font-size-xl);">{{ coach.name }}</h1>
+                <p class="text-secondary">{{ coach.specialization }}</p>
+                <p class="text-muted mt-2">Опыт: {{ coach.experience_years }} лет</p>
+
+                {% if coach.telegram or coach.whatsapp or coach.phone %}
+                <div class="d-flex gap-2 mt-3" style="justify-content: center; flex-wrap: wrap;">
+                    {% if coach.phone %}
+                    <a href="tel:{{ coach.phone }}" class="btn btn-outline">Позвонить</a>
+                    {% endif %}
+                    {% if coach.telegram %}
+                    <a href="https://t.me/{{ coach.telegram }}" class="btn btn-outline" target="_blank">Telegram</a>
+                    {% endif %}
+                    {% if coach.whatsapp %}
+                    <a href="https://wa.me/{{ coach.whatsapp }}" class="btn btn-outline" target="_blank">WhatsApp</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div>
+            {% if coach.bio %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h3 class="mb-2">О тренере</h3>
+                    {{ coach.bio|linebreaks }}
+                </div>
+            </div>
+            {% endif %}
+
+            <h2 class="section-title mb-3">Тренировки</h2>
+            <div class="grid grid-2">
+                {% for training in trainings %}
+                <a href="{% url 'training_detail' slug=training.slug %}" class="card">
+                    <div class="card-body">
+                        <span class="player-category mb-2">{{ training.get_training_type_display }}</span>
+                        <h3 class="card-title">{{ training.title }}</h3>
+                        {% if training.price %}
+                        <p class="text-primary mt-2" style="font-weight: 600;">{{ training.price }} ₽</p>
+                        {% endif %}
+                    </div>
+                </a>
+                {% empty %}
+                <p class="text-secondary">У тренера пока нет активных программ.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ news.title }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl); max-width: 800px;">
+    <div class="mb-4">
+        <a href="{% url 'news_list' %}" class="text-secondary">&larr; Все новости</a>
+    </div>
+
+    {% if news.image %}
+    <img src="{{ news.image.url }}" alt=""
+        style="width: 100%; border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl);">
+    {% endif %}
+
+    <h1 style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-md);">{{ news.title }}</h1>
+    <p class="text-muted mb-4">{{ news.created_at|date:"d.m.Y H:i" }} • {{ news.views_count }} просмотров</p>
+
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            {{ news.content|safe|linebreaks }}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Страница не найдена - TennisFan</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body>
+    <div class="error-page">
+        <video autoplay muted loop playsinline class="error-video">
+            <source src="{% static 'video/video_404.mp4' %}" type="video/mp4">
+        </video>
+        <div class="error-overlay"></div>
+        <div class="error-content">
+            <!-- <h1 class="error-code">404</h1> Removed as per request -->
+            <p class="error-text">Страница не найдена</p>
+            <p class="error-desc">Похоже, мяч улетел в аут. Давайте вернёмся на корт.</p>
+            <a href="{% url 'home' %}" class="btn btn-primary btn-lg">На главную</a>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}Тренеры{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Наши тренеры</h1>
+    <p class="page-subtitle">Профессиональные тренеры TennisFan</p>
+</div>
+
+<div class="container">
+    <div class="grid grid-3">
+        {% for coach in coaches %}
+        <a href="{% url 'coach_detail' slug=coach.slug %}" class="card" style="text-align: center;">
+            <div class="card-body">
+                {% if coach.photo %}
+                <img src="{{ coach.photo.url }}" alt="" class="player-avatar"
+                    style="width: 100px; height: 100px; margin: 0 auto var(--spacing-lg);">
+                {% else %}
+                <div class="player-avatar" style="width: 100px; height: 100px; margin: 0 auto var(--spacing-lg);"></div>
+                {% endif %}
+                <h3 class="card-title">{{ coach.name }}</h3>
+                <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ coach.specialization }}</p>
+                <p class="text-muted mt-2" style="font-size: var(--font-size-sm);">Опыт: {{ coach.experience_years }}
+                    лет</p>
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-secondary">Тренеры пока не добавлены.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

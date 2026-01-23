@@ -51,26 +51,6 @@ if CLOUDINARY_URL:
     staticfiles_index = INSTALLED_APPS.index('django.contrib.staticfiles')
     INSTALLED_APPS.insert(staticfiles_index, 'cloudinary_storage')
     INSTALLED_APPS.append('cloudinary')
-    
-    # Use Django 4.2+ STORAGES configuration
-    STORAGES = {
-        'default': {
-            'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
-        },
-    }
-else:
-    # Development: Use local filesystem storage
-    STORAGES = {
-        'default': {
-            'BACKEND': 'django.core.files.storage.FileSystemStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
-        },
-    }
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -141,12 +121,22 @@ STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 # Fallback: allow WhiteNoise to use finders if collectstatic didn't run (demo safety)
 WHITENOISE_USE_FINDERS = True
 
-# Media files configuration
+# Django 4.2+ STORAGES configuration (must be defined always)
 if CLOUDINARY_URL:
-    # Configure Cloudinary explicitly
-    import cloudinary
-    # Parse CLOUDINARY_URL: cloudinary://api_key:api_secret@cloud_name
+    # Production: Use Cloudinary for media storage
+    STORAGES = {
+        'default': {
+            'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
+    
+    # Configure Cloudinary explicitly (after apps are added to INSTALLED_APPS)
     try:
+        import cloudinary
+        # Parse CLOUDINARY_URL: cloudinary://api_key:api_secret@cloud_name
         url_parts = CLOUDINARY_URL.replace('cloudinary://', '').split('@')
         if len(url_parts) == 2:
             credentials = url_parts[0].split(':')
@@ -160,16 +150,26 @@ if CLOUDINARY_URL:
                     secure=True
                 )
     except Exception:
+        # If cloudinary import fails, django-cloudinary-storage will use CLOUDINARY_URL
         pass
     
     # Cloudinary returns absolute URLs
     MEDIA_URL = '/media/'
     # Do NOT set MEDIA_ROOT when using Cloudinary
 else:
-    # Development: Use local storage
+    # Development: Use local filesystem storage
     MEDIA_URL = '/media/'
     MEDIA_ROOT = BASE_DIR / 'media'
     MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+    
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

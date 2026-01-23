@@ -112,11 +112,14 @@ STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 WHITENOISE_USE_FINDERS = True
 
 # Media files - Cloudinary for production, local fallback for development
-if os.environ.get('CLOUDINARY_URL'):
+CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL')
+
+if CLOUDINARY_URL:
     # Production: Use Cloudinary for media storage
     INSTALLED_APPS.insert(0, 'cloudinary_storage')
     INSTALLED_APPS.append('cloudinary')
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    MEDIA_URL = '/media/'  # Cloudinary returns absolute URLs; MEDIA_URL value is ignored
 else:
     # Development: Use local storage
     MEDIA_URL = '/media/'

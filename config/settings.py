@@ -14,7 +14,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-tennison-dev-key-chan
 
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# ALLOWED_HOSTS - default includes localhost for dev and Railway domain for prod
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,*.up.railway.app').split(',')
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
     'https://*.railway.app'
@@ -70,9 +71,9 @@ else:
 # Now modify INSTALLED_APPS AFTER STORAGES is configured
 if CLOUDINARY_URL:
     # Production: Use Cloudinary for media storage
-    # cloudinary_storage must be before django.contrib.staticfiles
-    staticfiles_index = INSTALLED_APPS.index('django.contrib.staticfiles')
-    INSTALLED_APPS.insert(staticfiles_index, 'cloudinary_storage')
+    # NOTE: Only add 'cloudinary' app, NOT 'cloudinary_storage' 
+    # cloudinary_storage has compatibility issues with Django 4.2+ STORAGES
+    # We configure cloudinary_storage backend directly in STORAGES instead
     INSTALLED_APPS.append('cloudinary')
 
 MIDDLEWARE = [

@@ -97,6 +97,12 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# Ensure static root exists in ephemeral environments (Railway) to avoid missing-dir warnings
+STATIC_ROOT.mkdir(parents=True, exist_ok=True)
+
+# Fallback: allow WhiteNoise to use finders if collectstatic didn't run (demo safety)
+WHITENOISE_USE_FINDERS = True
+
 # Media files
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'

@@ -21,6 +21,7 @@ git commit -m "Initial commit"
 - `DEBUG` = False
 - `ALLOWED_HOSTS` = yourdomain.railway.app
 - `PYTHON_VERSION` = 3.12.3
+- `CSRF_TRUSTED_ORIGINS` = https://yourdomain.railway.app,https://*.railway.app
 
 ### 4. Статические файлы
 - В Procfile добавлен шаг `collectstatic` в release: миграции + сборка статики

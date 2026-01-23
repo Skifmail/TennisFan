@@ -77,7 +77,7 @@
                             {% for participant in tournament.participants.all|slice:":10" %}
                             <div style="display: flex; align-items: center; gap: var(--spacing-xs); background: var(--color-bg-elevated); padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--radius-md); min-width: 0;">
                                 {% if participant.avatar %}
-                                <img src="{{ participant.avatar.url }}" alt="" class="player-avatar" style="width: 24px; height: 24px; flex-shrink: 0;">
+                                <img src="{{ participant.avatar.url|default:'/static/images/avatar-placeholder.png' }}" alt="" class="player-avatar" style="width: 24px; height: 24px; flex-shrink: 0;">
                                 {% else %}
                                 <div class="player-avatar" style="width: 24px; height: 24px; flex-shrink: 0;"></div>
                                 {% endif %}

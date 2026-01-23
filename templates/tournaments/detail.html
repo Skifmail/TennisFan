@@ -45,7 +45,7 @@
                 {% for participant in participants %}
                 <a href="{% url 'profile' pk=participant.pk %}" style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md); transition: all var(--transition-fast); text-decoration: none;">
                     {% if participant.avatar %}
-                    <img src="{{ participant.avatar.url }}" alt="" class="player-avatar" style="width: 48px; height: 48px;">
+                    <img src="{{ participant.avatar.url|default:'/static/images/avatar-placeholder.png' }}" alt="" class="player-avatar" style="width: 48px; height: 48px;">
                     {% else %}
                     <div class="player-avatar" style="width: 48px; height: 48px;"></div>
                     {% endif %}

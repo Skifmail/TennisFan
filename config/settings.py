@@ -45,6 +45,29 @@ INSTALLED_APPS = [
 # Cloudinary configuration - MUST be set BEFORE any Django initialization
 CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL')
 
+# Configure STORAGES FIRST - this must be done before any other imports
+if CLOUDINARY_URL:
+    # Production: Use Cloudinary for media storage
+    STORAGES = {
+        'default': {
+            'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
+else:
+    # Development: Use local filesystem storage
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
+
+# Now modify INSTALLED_APPS AFTER STORAGES is configured
 if CLOUDINARY_URL:
     # Production: Use Cloudinary for media storage
     # cloudinary_storage must be before django.contrib.staticfiles
@@ -121,19 +144,9 @@ STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 # Fallback: allow WhiteNoise to use finders if collectstatic didn't run (demo safety)
 WHITENOISE_USE_FINDERS = True
 
-# Django 4.2+ STORAGES configuration (must be defined always)
+# Configure Cloudinary and Media files
 if CLOUDINARY_URL:
-    # Production: Use Cloudinary for media storage
-    STORAGES = {
-        'default': {
-            'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
-        },
-    }
-    
-    # Configure Cloudinary explicitly (after apps are added to INSTALLED_APPS)
+    # Configure Cloudinary explicitly
     try:
         import cloudinary
         # Parse CLOUDINARY_URL: cloudinary://api_key:api_secret@cloud_name
@@ -155,21 +168,13 @@ if CLOUDINARY_URL:
     
     # Cloudinary returns absolute URLs
     MEDIA_URL = '/media/'
-    # Do NOT set MEDIA_ROOT when using Cloudinary
+    # Do NOT set MEDIA_ROOT when using Cloudinary - set to None
+    MEDIA_ROOT = None
 else:
     # Development: Use local filesystem storage
     MEDIA_URL = '/media/'
     MEDIA_ROOT = BASE_DIR / 'media'
     MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
-    
-    STORAGES = {
-        'default': {
-            'BACKEND': 'django.core.files.storage.FileSystemStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
-        },
-    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

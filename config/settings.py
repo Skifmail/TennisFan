@@ -31,7 +31,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'storages',
     # Local apps
     'apps.core',
     'apps.users',
@@ -112,30 +111,20 @@ STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 # Fallback: allow WhiteNoise to use finders if collectstatic didn't run (demo safety)
 WHITENOISE_USE_FINDERS = True
 
-# AWS S3 Configuration for media storage (optional, on Railway)
-USE_S3 = os.environ.get('USE_S3') == 'True'
-
-if USE_S3:
-    # AWS settings
-    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
-    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
-    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
-    
-    # S3 static and media settings
-    STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
+# Media files - Cloudinary for production, local fallback for development
+if os.environ.get('CLOUDINARY_URL'):
+    # Production: Use Cloudinary for media storage
+    INSTALLED_APPS.insert(0, 'cloudinary_storage')
+    INSTALLED_APPS.append('cloudinary')
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 else:
-    # Media files (fallback to local when S3 not configured)
+    # Development: Use local storage
     MEDIA_URL = '/media/'
     MEDIA_ROOT = BASE_DIR / 'media'
     MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
 # Login/Logout URLs
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'

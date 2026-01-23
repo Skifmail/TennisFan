@@ -22,17 +22,19 @@ git commit -m "Initial commit"
 - `ALLOWED_HOSTS` = yourdomain.railway.app
 - `PYTHON_VERSION` = 3.12.3
 
-### 4. Файлы уже готовы
+### 4. Статические файлы
+- В Procfile добавлен шаг `collectstatic` в release: миграции + сборка статики
+- WhiteNoise раздаёт файлы из `staticfiles/`
+- Убедись, что `STATIC_URL` начинается с `/static/` (уже настроено)
+
+### 5. Файлы уже готовы
 ✅ `Procfile` - определяет как запустить приложение
 ✅ `runtime.txt` - указывает версию Python
 ✅ `requirements.txt` - обновлён с gunicorn и whitenoise
 ✅ `.railwayignore` - файлы для исключения при деплое
 
-### 5. База данных
+### 6. База данных
 Railway автоматически создаст SQLite базу. Миграции выполнятся автоматически в фазе `release`.
-
-### 6. Статические файлы
-WhiteNoise автоматически будет обслуживать статические файлы.
 
 ### 7. Проверка деплоя
 После деплоя проверь логи в Railway для ошибок.

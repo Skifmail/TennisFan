@@ -133,7 +133,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Note: STATICFILES_STORAGE is now configured in STORAGES dict above (Django 4.2+)
 
 # Ensure static root exists in ephemeral environments (Railway) to avoid missing-dir warnings
 STATIC_ROOT.mkdir(parents=True, exist_ok=True)

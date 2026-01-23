@@ -24,9 +24,6 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
-# Cloudinary configuration
-CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL')
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -45,7 +42,7 @@ INSTALLED_APPS = [
     'apps.comments',
 ]
 
-# Media files - Cloudinary for production, local fallback for development
+# Cloudinary configuration - MUST be set BEFORE checking if CLOUDINARY_URL exists
 CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL')
 
 if CLOUDINARY_URL:
@@ -54,17 +51,6 @@ if CLOUDINARY_URL:
     staticfiles_index = INSTALLED_APPS.index('django.contrib.staticfiles')
     INSTALLED_APPS.insert(staticfiles_index, 'cloudinary_storage')
     INSTALLED_APPS.append('cloudinary')
-    
-    # Log Cloudinary configuration (only in DEBUG mode to avoid exposing secrets)
-    if DEBUG:
-        import logging
-        logger = logging.getLogger(__name__)
-        # Extract cloud name from URL for logging (format: cloudinary://KEY:SECRET@CLOUD_NAME)
-        try:
-            cloud_name = CLOUDINARY_URL.split('@')[-1] if '@' in CLOUDINARY_URL else 'unknown'
-            logger.info(f"Cloudinary configured for cloud: {cloud_name}")
-        except Exception:
-            logger.warning("Cloudinary URL format may be incorrect")
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -135,16 +121,22 @@ STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 # Fallback: allow WhiteNoise to use finders if collectstatic didn't run (demo safety)
 WHITENOISE_USE_FINDERS = True
 
-# Configure media storage (Cloudinary setup is done above in INSTALLED_APPS)
+# Configure media storage
 if CLOUDINARY_URL:
     # Production: Use Cloudinary for media storage
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-    MEDIA_URL = '/media/'  # Cloudinary returns absolute URLs; MEDIA_URL value is ignored
 else:
     # Development: Use local storage
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'media'
-    MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+# Cloudinary settings - additional configuration
+if CLOUDINARY_URL:
+    import cloudinary
+    cloudinary.config(secure=True)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

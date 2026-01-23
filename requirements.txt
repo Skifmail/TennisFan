@@ -2,4 +2,5 @@ Django>=4.2
 Pillow>=10.0
 gunicorn>=21.2.0
 python-decouple>=3.8
-whitenoise>=6.6.0
+whitenoise>=6.6.0boto3>=1.26.0
+django-storages>=1.13.0

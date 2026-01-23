@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}Корты{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Теннисные корты</h1>
+    <p class="page-subtitle">Площадки для игры в Москве и Санкт-Петербурге</p>
+</div>
+
+<div class="container">
+    <form method="get" class="filter-bar">
+        <select name="city" class="form-control" onchange="this.form.submit()">
+            <option value="">Все города</option>
+            <option value="moscow" {% if current_city == 'moscow' %}selected{% endif %}>Москва</option>
+            <option value="spb" {% if current_city == 'spb' %}selected{% endif %}>Санкт-Петербург</option>
+        </select>
+        <select name="surface" class="form-control" onchange="this.form.submit()">
+            <option value="">Все покрытия</option>
+            <option value="hard" {% if current_surface == 'hard' %}selected{% endif %}>Хард</option>
+            <option value="clay" {% if current_surface == 'clay' %}selected{% endif %}>Грунт</option>
+            <option value="grass" {% if current_surface == 'grass' %}selected{% endif %}>Трава</option>
+            <option value="indoor" {% if current_surface == 'indoor' %}selected{% endif %}>Закрытый хард</option>
+        </select>
+    </form>
+
+    <div class="grid grid-3">
+        {% for court in courts %}
+        <a href="{% url 'court_detail' slug=court.slug %}" class="card">
+            {% if court.image %}
+            <img src="{{ court.image.url }}" alt="" class="card-image">
+            {% else %}
+            <div class="card-image" style="background: var(--color-bg-elevated);"></div>
+            {% endif %}
+            <div class="card-body">
+                <h3 class="card-title">{{ court.name }}</h3>
+                <p class="card-text">{{ court.address }}</p>
+                <div class="d-flex gap-1 mt-2">
+                    <span class="player-category">{{ court.get_surface_display }}</span>
+                    {% if court.is_indoor %}
+                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">Крытый</span>
+                    {% endif %}
+                </div>
+                {% if court.price_per_hour %}
+                <p class="text-primary mt-2" style="font-weight: 600;">{{ court.price_per_hour }} ₽/час</p>
+                {% endif %}
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-secondary">Корты не найдены.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

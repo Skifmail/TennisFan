@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Результаты матчей{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Результаты</h1>
+    <p class="page-subtitle">История завершённых матчей</p>
+</div>
+
+<div class="container">
+    <div class="grid grid-2">
+        {% for match in matches %}
+        <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
+            <div class="match-header">
+                <span class="match-tournament">{{ match.tournament.name }}</span>
+                <span class="match-date">{{ match.completed_datetime|date:"d.m.Y H:i" }}</span>
+            </div>
+            <div class="match-players">
+                <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
+                    {% if match.player1.avatar %}
+                    <img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">
+                    {% else %}
+                    <div class="player-avatar"></div>
+                    {% endif %}
+                    <span class="player-name">{{ match.player1 }}</span>
+                    <div class="match-score">
+                        {% if match.player1_set1 is not None %}
+                        <span class="set-score">{{ match.player1_set1 }}</span>
+                        {% endif %}
+                        {% if match.player1_set2 is not None %}
+                        <span class="set-score">{{ match.player1_set2 }}</span>
+                        {% endif %}
+                        {% if match.player1_set3 is not None %}
+                        <span class="set-score">{{ match.player1_set3 }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
+                    {% if match.player2.avatar %}
+                    <img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">
+                    {% else %}
+                    <div class="player-avatar"></div>
+                    {% endif %}
+                    <span class="player-name">{{ match.player2 }}</span>
+                    <div class="match-score">
+                        {% if match.player2_set1 is not None %}
+                        <span class="set-score">{{ match.player2_set1 }}</span>
+                        {% endif %}
+                        {% if match.player2_set2 is not None %}
+                        <span class="set-score">{{ match.player2_set2 }}</span>
+                        {% endif %}
+                        {% if match.player2_set3 is not None %}
+                        <span class="set-score">{{ match.player2_set3 }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-secondary text-center">Пока нет завершённых матчей.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

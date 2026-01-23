@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Лига Чемпионов{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Лига Чемпионов</h1>
+    <p class="page-subtitle">Элитный дивизион турниров TennisFan</p>
+</div>
+
+<div class="container">
+    <div class="grid grid-3">
+        {% for tournament in tournaments %}
+        <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card">
+            {% if tournament.image %}
+            <img src="{{ tournament.image.url }}" alt="" class="card-image">
+            {% else %}
+            <div class="card-image"
+                style="background: linear-gradient(135deg, var(--color-primary-transparent), var(--color-bg-elevated));">
+            </div>
+            {% endif %}
+            <div class="card-body">
+                <span class="player-category mb-2">{{ tournament.get_category_display }}</span>
+                <h3 class="card-title">{{ tournament.name }}</h3>
+                <p class="card-text">
+                    {{ tournament.get_city_display }} • {{ tournament.start_date|date:"d.m.Y" }}
+                </p>
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-secondary">Турниры Лиги Чемпионов пока не запланированы.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

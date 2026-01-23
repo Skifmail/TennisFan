@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="mb-4">
+        <a href="{% url 'tournament_list' %}" class="text-secondary">&larr; Все турниры</a>
+    </div>
+    
+    <div class="d-flex gap-2 mb-2">
+        <span class="player-category">{{ tournament.get_category_display }}</span>
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.points_winner }} очков</span>
+        {% if tournament.max_participants %}
+        <span class="player-category" style="background: {% if tournament.is_full %}rgba(255, 0, 0, 0.2){% else %}var(--color-bg-elevated){% endif %}; color: {% if tournament.is_full %}var(--color-error){% else %}var(--color-text-secondary){% endif %};">
+            Мест: {{ tournament.participants.count }} из {{ tournament.max_participants }}
+        </span>
+        {% endif %}
+        {% if tournament.status == 'active' %}
+        <span class="player-category" style="background: rgba(212, 255, 0, 0.2); color: var(--color-primary);">{{ tournament.get_status_display }}</span>
+        {% else %}
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_status_display }}</span>
+        {% endif %}
+    </div>
+    
+    <h1 class="page-title" style="text-align: left;">{{ tournament.name }}</h1>
+    <p class="text-secondary mb-4">
+        {{ tournament.get_city_display }} • {{ tournament.start_date|date:"d.m.Y" }}
+        {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
+    </p>
+    
+    {% if tournament.description %}
+    <div class="card mb-4">
+        <div class="card-body">
+            {{ tournament.description }}
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if participants %}
+    <h2 class="section-title mb-3">Участники ({{ participants.count }})</h2>
+    <div class="card mb-4">
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--spacing-md);">
+                {% for participant in participants %}
+                <a href="{% url 'profile' pk=participant.pk %}" style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md); transition: all var(--transition-fast); text-decoration: none;">
+                    {% if participant.avatar %}
+                    <img src="{{ participant.avatar.url }}" alt="" class="player-avatar" style="width: 48px; height: 48px;">
+                    {% else %}
+                    <div class="player-avatar" style="width: 48px; height: 48px;"></div>
+                    {% endif %}
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            {{ participant.user.first_name }} {{ participant.user.last_name }}
+                        </div>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                            {{ participant.get_category_display }} • {{ participant.total_points }} очков
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <h2 class="section-title mb-3">Матчи турнира</h2>
+    <div class="grid grid-2">
+        {% for match in matches %}
+        <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
+            <div class="match-header">
+                <span class="match-tournament">{{ match.round_name|default:"Матч" }}</span>
+                <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y H:i" }}</span>
+            </div>
+            <div class="match-players">
+                <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
+                    {% if match.player1.avatar %}
+                    <img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">
+                    {% else %}
+                    <div class="player-avatar"></div>
+                    {% endif %}
+                    <span class="player-name">{{ match.player1 }}</span>
+                    <div class="match-score">
+                        {% if match.player1_set1 is not None %}<span class="set-score">{{ match.player1_set1 }}</span>{% endif %}
+                        {% if match.player1_set2 is not None %}<span class="set-score">{{ match.player1_set2 }}</span>{% endif %}
+                        {% if match.player1_set3 is not None %}<span class="set-score">{{ match.player1_set3 }}</span>{% endif %}
+                    </div>
+                </div>
+                <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
+                    {% if match.player2.avatar %}
+                    <img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">
+                    {% else %}
+                    <div class="player-avatar"></div>
+                    {% endif %}
+                    <span class="player-name">{{ match.player2 }}</span>
+                    <div class="match-score">
+                        {% if match.player2_set1 is not None %}<span class="set-score">{{ match.player2_set1 }}</span>{% endif %}
+                        {% if match.player2_set2 is not None %}<span class="set-score">{{ match.player2_set2 }}</span>{% endif %}
+                        {% if match.player2_set3 is not None %}<span class="set-score">{{ match.player2_set3 }}</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-secondary">Матчи ещё не запланированы.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

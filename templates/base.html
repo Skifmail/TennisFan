@@ -1,0 +1,160 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TennisFan{% endblock %} - Любительские турниры по теннису</title>
+    <meta name="description"
+        content="{% block meta_description %}TennisFan - платформа любительских теннисных турниров в Москве и Санкт-Петербурге. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
+
+    <link rel="icon" type="image/png" sizes="64x64" href="{% static 'images/favicon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/favicon.png' %}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <nav class="nav">
+                <a href="{% url 'home' %}" class="logo">
+                    <span class="logo-text">Tennis<span class="logo-accent">Fan</span></span>
+                    <img src="{% static 'images/logo.svg' %}" class="coin-logo" alt="TennisFan логотип">
+                </a>
+
+                <div class="nav-items">
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle">
+                            Меню
+                            <svg class="nav-dropdown-arrow" width="10" height="6" viewBox="0 0 10 6" fill="none"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                        <ul class="nav-dropdown-content">
+                            <li><a href="{% url 'tournament_list' %}">Турниры</a></li>
+                            <li><a href="{% url 'rating' %}">Рейтинг</a></li>
+                            <li><a href="{% url 'champions_league' %}">Лига</a></li>
+                            <li><a href="{% url 'results' %}">Результаты</a></li>
+                            <li><a href="{% url 'sparring_list' %}">Спарринг</a></li>
+                            <li><a href="{% url 'training_list' %}">Тренировки</a></li>
+                            <li><a href="{% url 'legends' %}">Зал славы</a></li>
+                            <li><a href="{% url 'rules' %}">Правила</a></li>
+                            <li><a href="{% url 'court_list' %}">Корты</a></li>
+                            <li><a href="{% url 'gallery_list' %}">Фото</a></li>
+                            <li><a href="{% url 'news_list' %}">Новости</a></li>
+                        </ul>
+                    </div>
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'my_matches' %}" class="btn btn-primary">Мои матчи</a>
+                    <a href="{% url 'notifications' %}" class="btn btn-ghost nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a>
+                    {% if user.player %}
+                    <a href="{% url 'profile' pk=user.player.pk %}" class="btn btn-outline">{{ user.player }}</a>
+                    {% else %}
+                    <a href="{% url 'admin:index' %}" class="btn btn-outline">{{ user.email }}</a>
+                    {% endif %}
+                    <form action="{% url 'logout' %}" method="post" class="nav-logout">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-ghost">Выйти</button>
+                    </form>
+                    {% if user.is_staff or user.is_superuser %}
+                    <a href="{% url 'admin:index' %}" class="btn btn-admin">Админ панель</a>
+                    {% endif %}
+                    {% else %}
+                    <a href="{% url 'login' %}" class="btn btn-ghost">Войти</a>
+                    <a href="{% url 'register' %}" class="btn btn-primary">Регистрация</a>
+                    {% endif %}
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Messages -->
+    {% if messages %}
+    <div class="messages-container">
+        <div class="container">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+                <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main class="main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a href="{% url 'home' %}" class="logo">
+                        <span class="logo-text">Tennis<span class="logo-accent">Fan</span></span>
+                    </a>
+                    <p class="footer-desc">Платформа любительских теннисных турниров в Москве и Санкт-Петербурге</p>
+                </div>
+
+                <div class="footer-links">
+                    <h4>Навигация</h4>
+                    <ul>
+                        <li><a href="{% url 'tournament_list' %}">Турниры</a></li>
+                        <li><a href="{% url 'rating' %}">Рейтинг</a></li>
+                        <li><a href="{% url 'court_list' %}">Корты</a></li>
+                        <li><a href="{% url 'training_list' %}">Тренировки</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-links">
+                    <h4>Информация</h4>
+                    <ul>
+                        <li><a href="{% url 'rules' %}">Правила</a></li>
+                        <li><a href="{% url 'news_list' %}">Новости</a></li>
+                        <li><a href="{% url 'gallery_list' %}">Фото</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-social">
+                    <h4>Связаться</h4>
+                    <div class="social-links">
+                        <a href="#" class="social-link" aria-label="Telegram">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z" />
+                            </svg>
+                        </a>
+                        <a href="#" class="social-link" aria-label="VK">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C4.624 10.857 4 8.657 4 8.18c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.847 2.49 2.27 4.674 2.863 4.674.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.644v3.473c0 .372.17.508.271.508.22 0 .407-.136.813-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.644-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.492-.085.745-.576.745z" />
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2026 TennisFan. Все права защищены.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{% static 'js/main.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

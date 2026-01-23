@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Правила{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Правила</h1>
+    <p class="page-subtitle">Как устроены турниры и рейтинг TennisFan</p>
+</div>
+
+<div class="container">
+    <div class="card">
+        <div class="card-body" style="max-width: 800px; margin: 0 auto; padding: var(--spacing-2xl);">
+            {% if page %}
+            {{ page.content|safe }}
+            {% else %}
+            <p class="mb-4"><strong>TennisFan позволяет сражаться в турнирах без привязки к месту, дате и даже если у вас мало свободного времени.</strong> Сейчас в рейтинге любительских турниров серии TennisFan зарегистрировано более 1000 человек. Регулярно турниры проходят в Москве, Санкт-Петербурге и других городах.</p>
+
+            <p class="mb-4" style="background: var(--color-primary); color: white; padding: var(--spacing-lg); border-radius: var(--radius-md);"><strong>Для новых игроков участие в турнире "TennisFan" бесплатно!</strong></p>
+
+            <h2 class="mt-5 mb-4">Как это работает:</h2>
+
+            <div style="margin-bottom: var(--spacing-2xl);">
+                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">1. Регистрация</h3>
+                <p style="margin-bottom: var(--spacing-sm);">Зарегистрируйтесь на сайте tennison.ru, укажите ваш примерный уровень игры и игровой опыт.</p>
+                <p>А также время, когда вам было бы удобно принять участие в турнире.</p>
+            </div>
+
+            <div style="margin-bottom: var(--spacing-2xl);">
+                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">2. Выбор турнира</h3>
+                <p style="margin-bottom: var(--spacing-md);">После регистрации, зайдите в раздел "турниры", выберите ваш город и категорию турнира, которая соответствует вашему уровню:</p>
+                <ul style="list-style: disc; padding-left: var(--spacing-xl); margin-bottom: var(--spacing-sm);">
+                    <li><strong>«Profi»</strong> - Уровень мастерства от 5.5 до 7</li>
+                    <li><strong>«Hard»</strong> - Уровень мастерства от 4 до 5</li>
+                    <li><strong>«Tour»</strong> - Уровень мастерства 3.5</li>
+                    <li><strong>«Challenger»</strong> - Уровень мастерства 3</li>
+                    <li><strong>«Futures»</strong> - Уровень мастерства от 2.5 до 3</li>
+                    <li><strong>«Новички»</strong> - Уровень мастерства от 1 до 2</li>
+                </ul>
+                <p style="margin-top: var(--spacing-md);">После этого игроку нужно подождать заполнения сетки турнира.</p>
+            </div>
+
+            <div style="margin-bottom: var(--spacing-2xl);">
+                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">3. Уведомление о старте</h3>
+                <p style="margin-bottom: var(--spacing-sm);">Как только сетка турнира заполнилась, вам на электронную почту придет уведомление о том, что турнир стартовал, а также контакты соперника, с которым необходимо провести первый матч.</p>
+                <p>На каждую встречу с соперником отведен срок в одну неделю, и вы сами решаете, где и когда будет проведена игра.</p>
+            </div>
+
+            <div style="margin-bottom: var(--spacing-2xl);">
+                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">4. Проведение матча</h3>
+                <p>Встречаетесь с соперником и проводите матч.</p>
+            </div>
+
+            <div style="margin-bottom: var(--spacing-2xl);">
+                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">5. Внесение результатов</h3>
+                <p>Вносите результаты матчей в личном кабинете на сайте tennison.ru, либо отправляйте администратору Tennison.</p>
+            </div>
+
+            <div style="margin-bottom: var(--spacing-2xl);">
+                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">6. Рейтинг и развитие</h3>
+                <p style="margin-bottom: var(--spacing-sm);">Очень важно, что у теннисистов есть возможность следить за своей позицией в рейтинге в режиме реального времени, изучать статистику своих игр, пробовать свои силы в турнирах разного уровня. За каждое место игрок получает очки.</p>
+                <p>Игроки могут участвовать в неограниченном количестве турниров, тем самым зарабатывая больше очков, улучшая свои навыки и знакомясь с большим количеством интересных людей.</p>
+            </div>
+
+            <div style="background: var(--color-bg-elevated); padding: var(--spacing-lg); border-radius: var(--radius-md); border-left: 4px solid var(--color-primary); margin-bottom: var(--spacing-2xl);">
+                <p style="margin-bottom: var(--spacing-sm);"><strong>В течение всего турнира в режиме 24/7 игроков сопровождает администратор,</strong> который при необходимости помогает договориться с соперником и решить спорные вопросы.</p>
+                <p style="margin-bottom: 0;"><strong>Ну и, конечно же, победителей ждут призы от партнеров турниров TennisFan.</strong></p>
+            </div>
+
+            <p class="mt-5" style="font-size: 1.1em; text-align: center;">Приглашаем всех любителей тенниса попробовать свои силы в новом формате турниров!</p>
+            <p style="text-align: center; color: var(--color-text-secondary);">Подробнее о правилах Tennison в <a href="#" style="color: var(--color-primary);">регламенте турнира</a></p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

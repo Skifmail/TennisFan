@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ court.name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="mb-4">
+        <a href="{% url 'court_list' %}" class="text-secondary">&larr; Все корты</a>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 1fr 350px; gap: var(--spacing-xl);">
+        <div>
+            {% if court.image %}
+            <img src="{{ court.image.url }}" alt=""
+                style="width: 100%; border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl);">
+            {% endif %}
+
+            <h1 style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-md);">{{ court.name }}</h1>
+            <p class="text-secondary mb-4">{{ court.address }}</p>
+
+            {% if court.description %}
+            <div class="card mb-4">
+                <div class="card-body">{{ court.description }}</div>
+            </div>
+            {% endif %}
+
+            <h2 class="section-title mb-3">Последние матчи на этом корте</h2>
+            <div class="grid">
+                {% for match in recent_matches %}
+                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
+                    <div class="match-header">
+                        <span class="match-tournament">{{ match.tournament.name }}</span>
+                        <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y" }}</span>
+                    </div>
+                    <div class="match-players">
+                        <div class="match-player">
+                            <span class="player-name">{{ match.player1 }}</span>
+                            <span>{{ match.score_display }}</span>
+                        </div>
+                        <div class="match-player">
+                            <span class="player-name">{{ match.player2 }}</span>
+                        </div>
+                    </div>
+                </a>
+                {% empty %}
+                <p class="text-secondary">Матчи на этом корте пока не проводились.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card" style="height: fit-content;">
+            <div class="card-body">
+                <h3 class="mb-3">Информация</h3>
+
+                <div class="mb-3">
+                    <div class="text-muted" style="font-size: var(--font-size-xs);">Город</div>
+                    <div>{{ court.get_city_display }}</div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="text-muted" style="font-size: var(--font-size-xs);">Покрытие</div>
+                    <div>{{ court.get_surface_display }}</div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="text-muted" style="font-size: var(--font-size-xs);">Кортов</div>
+                    <div>{{ court.courts_count }}</div>
+                </div>
+
+                {% if court.price_per_hour %}
+                <div class="mb-3">
+                    <div class="text-muted" style="font-size: var(--font-size-xs);">Цена</div>
+                    <div class="text-primary" style="font-weight: 600;">{{ court.price_per_hour }} ₽/час</div>
+                </div>
+                {% endif %}
+
+                {% if court.phone or court.whatsapp or court.website %}
+                <hr style="border-color: var(--color-border); margin: var(--spacing-lg) 0;">
+                <h4 class="mb-2">Контакты</h4>
+
+                {% if court.phone %}
+                <p><a href="tel:{{ court.phone }}">{{ court.phone }}</a></p>
+                {% endif %}
+
+                <div class="d-flex gap-2 mt-3">
+                    {% if court.whatsapp %}
+                    <a href="https://wa.me/{{ court.whatsapp }}" class="btn btn-outline" target="_blank">WhatsApp</a>
+                    {% endif %}
+                    {% if court.website %}
+                    <a href="{{ court.website }}" class="btn btn-outline" target="_blank">Сайт</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

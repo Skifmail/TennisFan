@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ gallery.title }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="mb-4">
+        <a href="{% url 'gallery_list' %}" class="text-secondary">&larr; Все галереи</a>
+    </div>
+
+    <h1 class="page-title" style="text-align: left;">{{ gallery.title }}</h1>
+    {% if gallery.description %}
+    <p class="text-secondary mb-4">{{ gallery.description }}</p>
+    {% endif %}
+    <p class="text-muted mb-4">{{ gallery.photos_count }} фото • {{ gallery.created_at|date:"d.m.Y" }}</p>
+
+    <div class="grid grid-4">
+        {% for photo in gallery.photos.all %}
+        <a href="{{ photo.image.url }}" target="_blank" class="card" style="overflow: hidden;">
+            <img src="{{ photo.image.url }}" alt="{{ photo.caption }}"
+                style="width: 100%; aspect-ratio: 1; object-fit: cover;">
+            {% if photo.caption %}
+            <div class="card-body" style="padding: var(--spacing-sm);">
+                <p class="text-secondary" style="font-size: var(--font-size-xs);">{{ photo.caption }}</p>
+            </div>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

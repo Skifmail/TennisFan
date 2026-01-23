@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Вход{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Вход</h1>
+    <p class="page-subtitle">Войдите в свой аккаунт</p>
+</div>
+
+<div class="container" style="max-width: 400px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <form method="post">
+                {% csrf_token %}
+
+                {% if form.errors %}
+                <div class="alert alert-error mb-3">
+                    Неверный email или пароль
+                </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label class="form-label" for="id_username">Email</label>
+                    <input type="email" name="username" id="id_username" class="form-control" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="id_password">Пароль</label>
+                    <input type="password" name="password" id="id_password" class="form-control" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Войти</button>
+
+                <p class="text-center mt-3 text-secondary">
+                    Нет аккаунта? <a href="{% url 'register' %}" class="text-primary">Регистрация</a>
+                </p>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

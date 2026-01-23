@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Уведомления{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Уведомления</h1>
+</div>
+<div class="container" style="max-width: 700px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            {% if notifications %}
+            <div class="list" style="display: flex; flex-direction: column; gap: var(--spacing-md);">
+                {% for note in notifications %}
+                <div class="d-flex" style="justify-content: space-between; align-items: center; gap: var(--spacing-md);">
+                    <div>
+                        <div>{{ note.message }}</div>
+                        {% if note.url %}
+                        <a href="{{ note.url }}" class="text-primary" style="font-size: var(--font-size-sm);">Перейти</a>
+                        {% endif %}
+                        <div class="text-secondary" style="font-size: var(--font-size-xs);">{{ note.created_at|date:"d.m.Y H:i" }}</div>
+                    </div>
+                    {% if not note.is_read %}
+                    <span class="badge">Новый</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-secondary">Нет уведомлений.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

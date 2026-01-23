@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Рейтинг игроков{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Рейтинг игроков</h1>
+    <p class="page-subtitle">Топ игроков по количеству очков за текущий сезон</p>
+</div>
+
+<div class="container">
+    <!-- Filters -->
+    <form method="get" class="filter-bar">
+        <select name="city" class="form-control" onchange="this.form.submit()">
+            <option value="">Все города</option>
+            <option value="moscow" {% if current_city == 'moscow' %}selected{% endif %}>Москва</option>
+            <option value="spb" {% if current_city == 'spb' %}selected{% endif %}>Санкт-Петербург</option>
+        </select>
+        <select name="category" class="form-control" onchange="this.form.submit()">
+            <option value="">Все категории</option>
+            <option value="futures" {% if current_category == 'futures' %}selected{% endif %}>Futures</option>
+            <option value="base" {% if current_category == 'base' %}selected{% endif %}>Base</option>
+            <option value="tour" {% if current_category == 'tour' %}selected{% endif %}>Tour</option>
+            <option value="hard" {% if current_category == 'hard' %}selected{% endif %}>Hard</option>
+            <option value="challenger" {% if current_category == 'challenger' %}selected{% endif %}>Challenger</option>
+            <option value="masters" {% if current_category == 'masters' %}selected{% endif %}>Masters</option>
+        </select>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Поиск по имени..." class="form-control">
+        <button type="submit" class="btn btn-primary">Поиск</button>
+    </form>
+
+
+    <!-- Players List -->
+    <div class="grid">
+        {% for player in players %}
+        <a href="{% url 'profile' pk=player.pk %}" class="player-card">
+            <span class="player-rank">{{ forloop.counter }}</span>
+            {% if player.avatar %}
+            <img src="{{ player.avatar.url }}" alt="" class="player-avatar">
+            {% else %}
+            <div class="player-avatar"></div>
+            {% endif %}
+            <div class="player-info">
+                <div class="player-name" style="display:flex;align-items:center;gap:8px;">
+                    <span>{{ player }}</span>
+                    {% if not player.is_verified %}
+                    <span class="badge" style="background: var(--color-warning, #ffd24d); color: #000;">Неверифицирован</span>
+                    {% endif %}
+                </div>
+                <span class="player-category">{{ player.get_category_display }}</span>
+            </div>
+            <div class="player-stats">
+                <div>
+                    <div class="stat-value">{{ player.matches_played }}</div>
+                    <div class="stat-label">Матчей</div>
+                </div>
+                <div>
+                    <div class="stat-value">{{ player.matches_won }}</div>
+                    <div class="stat-label">Побед</div>
+                </div>
+                <div>
+                    <div class="stat-value">{{ player.win_rate }}%</div>
+                    <div class="stat-label">% побед</div>
+                </div>
+            </div>
+            <div class="player-points">
+                <span class="text-muted" style="font-size: var(--font-size-xs);">ОЧКИ</span><br>
+                <span class="text-primary">{{ player.total_points }}</span>
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-secondary text-center">Игроки не найдены.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

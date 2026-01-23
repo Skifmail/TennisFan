@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ player }} - Профиль{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="grid" style="grid-template-columns: 300px 1fr; gap: var(--spacing-xl);">
+        <!-- Profile Card -->
+        <div class="card" style="height: fit-content;">
+            <div class="card-body text-center">
+                {% if player.avatar %}
+                <img src="{{ player.avatar.url }}" alt="" class="player-avatar"
+                    style="width: 120px; height: 120px; margin: 0 auto var(--spacing-lg);">
+                {% else %}
+                <div class="player-avatar" style="width: 120px; height: 120px; margin: 0 auto var(--spacing-lg);"></div>
+                {% endif %}
+
+                <h1 style="font-size: var(--font-size-xl); margin-bottom: var(--spacing-sm);">{{ player }}</h1>
+                <span class="player-category">{{ player.get_category_display }}</span>
+
+                <div class="mt-3 text-secondary" style="font-size: var(--font-size-sm);">
+                    <p><strong>Город:</strong> {{ player.get_city_display }}</p>
+                    <p><strong>Уровень:</strong> {{ player.get_skill_level_display }}</p>
+                    <p><strong>Дата рождения:</strong> {{ player.birth_date|date:"d.m.Y" }}</p>
+                    {% if player.age %}<p><strong>Возраст:</strong> {{ player.age }} лет</p>{% endif %}
+                    <p><strong>Пол:</strong> {{ player.get_gender_display }}</p>
+                    <p><strong>Forehand:</strong> {{ player.get_forehand_display }}</p>
+                </div>
+
+                <div class="player-stats mt-3" style="justify-content: center;">
+                    <div>
+                        <div class="stat-value">{{ player.total_points }}</div>
+                        <div class="stat-label">Очков</div>
+                    </div>
+                    <div>
+                        <div class="stat-value">{{ player.matches_played }}</div>
+                        <div class="stat-label">Матчей</div>
+                    </div>
+                    <div>
+                        <div class="stat-value">{{ player.win_rate }}%</div>
+                        <div class="stat-label">Побед</div>
+                    </div>
+                </div>
+
+                {% if player.bio %}
+                <p class="mt-3 text-secondary" style="font-size: var(--font-size-sm);">{{ player.bio }}</p>
+                {% endif %}
+
+                {% if player.telegram or player.whatsapp %}
+                <div class="mt-3 d-flex gap-2" style="justify-content: center;">
+                    {% if player.telegram %}
+                    <a href="https://t.me/{{ player.telegram }}" class="btn btn-outline" target="_blank">Telegram</a>
+                    {% endif %}
+                    {% if player.whatsapp %}
+                    <a href="https://wa.me/{{ player.whatsapp }}" class="btn btn-outline" target="_blank">WhatsApp</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% if request.user == player.user %}
+                <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3" style="width: 100%;">Редактировать</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Matches -->
+        <div>
+            <h2 class="section-title mb-3">Последние матчи</h2>
+            <div class="grid">
+                {% for match in recent_matches %}
+                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
+                    <div class="match-header">
+                        <span class="match-tournament">{{ match.tournament.name }}</span>
+                        <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y" }}</span>
+                    </div>
+                    <div class="match-players">
+                        <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
+                            <span class="player-name">{{ match.player1 }}</span>
+                            <span>{{ match.player1_set1|default:"-" }} {{ match.player1_set2|default:"" }} {{
+                                match.player1_set3|default:"" }}</span>
+                        </div>
+                        <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
+                            <span class="player-name">{{ match.player2 }}</span>
+                            <span>{{ match.player2_set1|default:"-" }} {{ match.player2_set2|default:"" }} {{
+                                match.player2_set3|default:"" }}</span>
+                        </div>
+                    </div>
+                </a>
+                {% empty %}
+                <p class="text-secondary">Нет матчей.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

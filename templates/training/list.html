@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Тренировки для взрослых{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Тренировки для взрослых</h1>
+    <p class="page-subtitle">Индивидуальные и групповые занятия с профессиональными тренерами</p>
+</div>
+
+<div class="container">
+    <form method="get" class="filter-bar">
+        <select name="city" class="form-control" onchange="this.form.submit()">
+            <option value="">Все города</option>
+            <option value="moscow" {% if current_city == 'moscow' %}selected{% endif %}>Москва</option>
+            <option value="spb" {% if current_city == 'spb' %}selected{% endif %}>Санкт-Петербург</option>
+        </select>
+        <select name="type" class="form-control" onchange="this.form.submit()">
+            <option value="">Все типы</option>
+            <option value="individual" {% if current_type == 'individual' %}selected{% endif %}>Индивидуальные</option>
+            <option value="group" {% if current_type == 'group' %}selected{% endif %}>Групповые</option>
+            <option value="mini_group" {% if current_type == 'mini_group' %}selected{% endif %}>Мини-группы</option>
+        </select>
+        <select name="level" class="form-control" onchange="this.form.submit()">
+            <option value="">Все уровни</option>
+            <option value="beginner" {% if current_level == 'beginner' %}selected{% endif %}>Начинающий</option>
+            <option value="intermediate" {% if current_level == 'intermediate' %}selected{% endif %}>Средний</option>
+            <option value="advanced" {% if current_level == 'advanced' %}selected{% endif %}>Продвинутый</option>
+        </select>
+    </form>
+
+    <div class="d-flex gap-2 mb-4">
+        <a href="{% url 'coach_list' %}" class="btn btn-outline">Наши тренеры</a>
+    </div>
+
+    <div class="grid grid-3">
+        {% for training in trainings %}
+        <a href="{% url 'training_detail' slug=training.slug %}" class="card">
+            {% if training.image %}
+            <img src="{{ training.image.url }}" alt="" class="card-image">
+            {% else %}
+            <div class="card-image" style="background: linear-gradient(135deg, var(--color-primary-transparent), var(--color-bg-elevated));"></div>
+            {% endif %}
+            <div class="card-body">
+                <div class="d-flex gap-1 mb-2">
+                    <span class="player-category">{{ training.get_training_type_display }}</span>
+                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ training.get_skill_level_display }}</span>
+                </div>
+                <h3 class="card-title">{{ training.title }}</h3>
+                <p class="card-text">{{ training.short_description|default:training.description|truncatewords:15 }}</p>
+                {% if training.coach %}
+                <p class="text-secondary mt-2" style="font-size: var(--font-size-sm);">Тренер: {{ training.coach.name }}</p>
+                {% endif %}
+                {% if training.price %}
+                <p class="text-primary mt-2" style="font-weight: 600;">{{ training.price }} ₽</p>
+                {% endif %}
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-secondary">Тренировки пока не добавлены.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

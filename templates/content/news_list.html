@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}Новости{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Новости</h1>
+    <p class="page-subtitle">Последние новости теннисного сообщества</p>
+</div>
+
+<div class="container">
+    <div class="grid grid-3">
+        {% for news in news_list %}
+        <a href="{% url 'news_detail' slug=news.slug %}" class="card">
+            {% if news.image %}
+            <img src="{{ news.image.url }}" alt="" class="card-image">
+            {% else %}
+            <div class="card-image" style="background: var(--color-bg-elevated);"></div>
+            {% endif %}
+            <div class="card-body">
+                <h3 class="card-title">{{ news.title }}</h3>
+                <p class="card-text">{{ news.excerpt|default:news.content|truncatewords:20 }}</p>
+                <p class="text-muted mt-2" style="font-size: var(--font-size-xs);">
+                    {{ news.created_at|date:"d.m.Y" }} • {{ news.views_count }} просмотров
+                </p>
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-secondary">Новостей пока нет.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Зал славы{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Зал славы</h1>
+    <p class="page-subtitle">Легенды теннисного сообщества TennisFan</p>
+</div>
+
+<div class="container">
+    <div class="grid grid-3">
+        {% for legend in legends %}
+        <a href="{% url 'profile' pk=legend.pk %}" class="card" style="text-align: center;">
+            <div class="card-body">
+                {% if legend.avatar %}
+                <img src="{{ legend.avatar.url }}" alt="" class="player-avatar"
+                    style="width: 100px; height: 100px; margin: 0 auto var(--spacing-lg);">
+                {% else %}
+                <div class="player-avatar" style="width: 100px; height: 100px; margin: 0 auto var(--spacing-lg);"></div>
+                {% endif %}
+                <h3 class="card-title">{{ legend }}</h3>
+                <span class="player-category">{{ legend.get_category_display }}</span>
+                <div class="player-stats mt-3" style="justify-content: center;">
+                    <div>
+                        <div class="stat-value">{{ legend.matches_won }}</div>
+                        <div class="stat-label">Побед</div>
+                    </div>
+                    <div>
+                        <div class="stat-value">{{ legend.total_points }}</div>
+                        <div class="stat-label">Очков</div>
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-secondary text-center">Зал славы пока пуст.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

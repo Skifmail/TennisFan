@@ -1,0 +1,10 @@
+"""
+Courts app configuration.
+"""
+from django.apps import AppConfig
+
+
+class CourtsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "apps.courts"
+    verbose_name = "Корты"

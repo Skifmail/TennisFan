@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page.title }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl); max-width: 800px;">
+    <h1 class="page-title" style="text-align: left;">{{ page.title }}</h1>
+
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            {{ page.content|safe }}
+        </div>
+    </div>
+</div>
+{% endblock %}

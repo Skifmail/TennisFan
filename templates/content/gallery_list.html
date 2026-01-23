@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block title %}Фотогалерея{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Фотогалерея</h1>
+    <p class="page-subtitle">Фотографии с турниров TennisFan</p>
+</div>
+
+<div class="container">
+    <div class="grid grid-3">
+        {% for gallery in galleries %}
+        <a href="{% url 'gallery_detail' slug=gallery.slug %}" class="card">
+            {% if gallery.cover_image %}
+            <img src="{{ gallery.cover_image.url }}" alt="" class="card-image">
+            {% elif gallery.photos.first %}
+            <img src="{{ gallery.photos.first.image.url }}" alt="" class="card-image">
+            {% else %}
+            <div class="card-image" style="background: var(--color-bg-elevated);"></div>
+            {% endif %}
+            <div class="card-body">
+                <h3 class="card-title">{{ gallery.title }}</h3>
+                <p class="card-text">{{ gallery.photos_count }} фото</p>
+                <p class="text-muted mt-2" style="font-size: var(--font-size-xs);">{{ gallery.created_at|date:"d.m.Y" }}
+                </p>
+            </div>
+        </a>
+        {% empty %}
+        <p class="text-secondary">Галереи пока нет.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

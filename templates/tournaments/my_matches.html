@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}Мои матчи{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Мои матчи</h1>
+</div>
+<div class="container">
+    {% if matches %}
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--spacing-lg);">
+        {% for match in matches %}
+        <div class="card">
+            <div class="card-body" style="display: flex; flex-direction: column; gap: var(--spacing-md);">
+                <div class="d-flex" style="justify-content: space-between; align-items: center;">
+                    <div>
+                        <div class="text-secondary" style="font-size: var(--font-size-sm);">{{ match.tournament.name }}</div>
+                            <div style="font-size: var(--font-size-sm);">
+                                {% if match.scheduled_datetime %}
+                                    {{ match.scheduled_datetime|date:"d.m.Y H:i" }}
+                                {% else %}
+                                    Дата не установлена
+                                {% endif %}
+                            </div>
+                    <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
+                        <span class="player-name">{{ match.player1 }}</span>
+                    </div>
+                    <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
+                        <span class="player-name">{{ match.player2 }}</span>
+                    </div>
+                </div>
+
+                <div class="text-secondary" style="font-size: var(--font-size-sm);">
+                    Текущий счёт: {{ match.score_display }}
+                </div>
+
+                <div class="d-flex" style="justify-content: space-between; align-items: center;">
+                    <span class="badge">{{ match.get_status_display }}</span>
+                    <a href="{% url 'match_detail' pk=match.pk %}" class="btn btn-outline">Подробнее</a>
+                </div>
+
+                {% if match.pending_proposals %}
+                {% for proposal in match.pending_proposals %}
+                <div class="card" style="background: var(--color-bg-secondary);">
+                    <div class="card">
+                        <div class="card-body" style="display: flex; flex-direction: column; gap: var(--spacing-md);">
+                            <div>
+                                <div><strong>{{ proposal.proposer }}</strong> предложил: {{ proposal.get_result_display }}</div>
+                                <div class="text-secondary" style="font-size: var(--font-size-sm);">Счёт: 
+                                    {% if proposal.player1_set1 is not None %}{{ proposal.player1_set1 }}-{{ proposal.player2_set1 }}{% endif %}
+                                    {% if proposal.player1_set2 is not None %}{{ proposal.player1_set2 }}-{{ proposal.player2_set2 }}{% endif %}
+                                    {% if proposal.player1_set3 is not None %}{{ proposal.player1_set3 }}-{{ proposal.player2_set3 }}{% endif %}
+                                </div>
+                            </div>
+                            {% if proposal.proposer != player %}
+                            <form method="post" action="{% url 'confirm_proposal' proposal.pk %}" class="d-flex gap-1">
+                                {% csrf_token %}
+                                <div class="d-flex gap-2" style="align-items: center;">
+                                    <span class="badge">{{ match.get_status_display }}</span>
+                                    <a href="{% url 'match_detail' pk=match.pk %}" class="btn btn-outline">Подробнее</a>
+                                </div>
+                                <button type="submit" name="action" value="reject" class="btn btn-ghost">Отклонить</button>
+                            </form>
+                            {% else %}
+                            <span class="text-secondary" style="font-size: var(--font-size-sm);">Ожидание подтверждения</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                {% if match.status != 'completed' and match.status != 'walkover' and not match.winner %}
+                {% if not match.has_pending %}
+                <form method="post" action="{% url 'propose_result' match.pk %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label class="form-label">Результат</label>
+                        <select name="result" class="form-control">
+                            <option value="win">Победа</option>
+                            <option value="loss">Поражение</option>
+                            <option value="walkover_win">Тех. победа</option>
+                            <option value="walkover_loss">Тех. поражение</option>
+                        </select>
+                    </div>
+                    <div class="grid" style="grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--spacing-sm);">
+                        <div class="text-secondary" style="grid-column: span 3;">Счёт по сетам</div>
+                        <input class="form-control" name="p1s1" type="number" min="0" placeholder="П1 сет1">
+                        <input class="form-control" name="p1s2" type="number" min="0" placeholder="П1 сет2">
+                        <input class="form-control" name="p1s3" type="number" min="0" placeholder="П1 сет3">
+                        <input class="form-control" name="p2s1" type="number" min="0" placeholder="П2 сет1">
+                        <input class="form-control" name="p2s2" type="number" min="0" placeholder="П2 сет2">
+                        <input class="form-control" name="p2s3" type="number" min="0" placeholder="П2 сет3">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="margin-top: var(--spacing-md); width: 100%;">Отправить на подтверждение</button>
+                </form>
+                {% endif %}
+                {% else %}
+                <div class="text-secondary" style="font-size: var(--font-size-sm);">Матч завершён, изменение счёта недоступно.</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-secondary">Матчи не найдены.</p>
+    {% endif %}
+</div>
+{% endblock %}

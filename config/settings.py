@@ -104,8 +104,9 @@ STATIC_ROOT.mkdir(parents=True, exist_ok=True)
 WHITENOISE_USE_FINDERS = True
 
 # Media files
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

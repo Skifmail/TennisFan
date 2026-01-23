@@ -95,7 +95,12 @@ class Player(models.Model):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="player", verbose_name="Пользователь"
     )
-    avatar = models.ImageField("Аватар", upload_to="avatars/", blank=True)
+    avatar = models.ImageField(
+        "Аватар",
+        upload_to="avatars/",
+        blank=True,
+        storage=None,  # Use default storage from settings
+    )
     city = models.CharField(
         "Город", max_length=20, choices=City.choices, default=City.MOSCOW
     )

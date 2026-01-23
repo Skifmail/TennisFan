@@ -28,7 +28,6 @@ CSRF_COOKIE_SECURE = not DEBUG
 CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL')
 
 INSTALLED_APPS = [
-    'cloudinary_storage',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -44,7 +43,6 @@ INSTALLED_APPS = [
     'apps.training',
     'apps.content',
     'apps.comments',
-    'cloudinary'
 ]
 
 # Media files - Cloudinary for production, local fallback for development

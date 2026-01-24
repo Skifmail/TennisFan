@@ -16,7 +16,7 @@
     --color-primary-dark: #03110D;
     --color-primary-transparent: rgba(166, 130, 74, 0.15);
 
-    --color-text: #E9E9E9;
+    --color-text: #E0E0E0;
     --color-text-secondary: #A6824A;
     --color-text-muted: #16302B;
 
@@ -183,10 +183,7 @@ button {
 }
 
 .logo-accent {
-    background: var(--color-primary-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--color-primary);
 }
 
 /* Nav items container */
@@ -312,6 +309,21 @@ button {
 .btn-ghost:hover {
     color: var(--color-text);
     background: var(--color-bg-elevated);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(166, 130, 74, 0.7);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(166, 130, 74, 0);
+    }
+}
+
+.btn-pulse {
+    animation: pulse 2s infinite;
 }
 
 .btn-lg {
@@ -706,10 +718,7 @@ select.form-control {
 }
 
 .hero-title span {
-    background: var(--color-primary-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--color-primary);
 }
 
 .hero-text {

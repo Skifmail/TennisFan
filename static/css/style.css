@@ -16,7 +16,7 @@
     --color-primary-dark: #03110D;
     --color-primary-transparent: rgba(166, 130, 74, 0.15);
 
-    --color-text: #E0E0E0;
+    --color-text: silver;
     --color-text-secondary: #A6824A;
     --color-text-muted: #16302B;
 
@@ -133,7 +133,7 @@ button {
     width: 100%;
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0 var(--spacing-lg);
+    padding: 0 var(--spacing-md);
 }
 
 /* ==========================================================================
@@ -152,8 +152,8 @@ button {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing-md) 0;
-    gap: var(--spacing-md);
+    padding: var(--spacing-sm) 0;
+    gap: var(--spacing-sm);
     width: 100%;
     position: relative;
 }
@@ -162,7 +162,7 @@ button {
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
 }
 
 .coin-logo {
@@ -177,25 +177,30 @@ button {
 }
 
 .logo-text {
-    font-size: var(--font-size-xl);
+    font-size: var(--font-size-lg);
     font-weight: 800;
     letter-spacing: -0.5px;
 }
 
 .logo-accent {
-    background: var(--color-primary-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--color-primary);
 }
 
 /* Nav items container */
 .nav-items {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: 0.25rem;
     flex: 1;
     justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.nav-items .btn {
+    min-width: 0;
+    padding: 0.35rem 0.6rem;
+    font-size: 1rem;
+    white-space: nowrap;
 }
 
 .nav-logout {
@@ -211,7 +216,7 @@ button {
     top: -5px;
     right: -5px;
     background: var(--color-error);
-    color: white;
+    color: silver;
     border-radius: 50%;
     width: 20px;
     height: 20px;
@@ -222,48 +227,7 @@ button {
     font-weight: bold;
 }
 
-.nav-menu {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    flex-wrap: wrap;
-}
 
-.nav-menu a {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    transition: all var(--transition-fast);
-}
-
-.nav-menu a:hover {
-    background: var(--color-primary-transparent);
-    color: var(--color-primary);
-}
-
-.nav-auth {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    flex: 1;
-    justify-content: flex-end;
-}
-
-.nav-toggle {
-    display: none;
-    flex-direction: column;
-    gap: 4px;
-    padding: var(--spacing-sm);
-}
-
-.nav-toggle span {
-    width: 24px;
-    height: 2px;
-    background: var(--color-text);
-    border-radius: 2px;
-    transition: all var(--transition-fast);
-}
 
 /* ==========================================================================
    Buttons
@@ -272,26 +236,26 @@ button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-lg);
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
     font-size: var(--font-size-sm);
     font-weight: 600;
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
     white-space: nowrap;
-    min-width: 140px;
+    min-width: auto;
     text-align: center;
 }
 
 .btn-primary {
     background: #A6824A;
-    color: #ffffff;
+    color: silver;
     border: none;
 }
 
 .btn-primary:hover {
     background: #A6824A;
-    color: #ffffff;
+    color: silver;
     box-shadow: var(--shadow-glow);
 }
 
@@ -312,6 +276,21 @@ button {
 .btn-ghost:hover {
     color: var(--color-text);
     background: var(--color-bg-elevated);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(166, 130, 74, 0.7);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(166, 130, 74, 0);
+    }
+}
+
+.btn-pulse {
+    animation: pulse 2s infinite;
 }
 
 .btn-lg {
@@ -706,10 +685,7 @@ select.form-control {
 }
 
 .hero-title span {
-    background: var(--color-primary-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--color-primary);
 }
 
 .hero-text {
@@ -835,19 +811,6 @@ select.form-control {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .nav-menu {
-        display: none;
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: var(--color-bg-secondary);
-        padding: var(--spacing-lg);
-        border-bottom: 1px solid var(--color-border);
-        flex-direction: column;
-        align-items: stretch;
-    }
-
     .nav {
         flex-wrap: wrap;
         align-items: flex-start;
@@ -855,27 +818,8 @@ select.form-control {
         padding: var(--spacing-sm) 0;
     }
 
-    .nav-menu {
-        display: flex;
-        position: static;
-        width: 100%;
-        background: var(--color-bg);
-        padding: var(--spacing-sm);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-md);
-        flex-direction: column;
-        align-items: stretch;
-        box-shadow: none;
-    }
-
-    .nav-menu li,
-    .nav-menu a,
     .nav-dropdown-toggle {
         width: 100%;
-    }
-
-    .nav-menu a,
-    .nav-dropdown-toggle {
         justify-content: center;
         text-align: center;
         padding: var(--spacing-sm) var(--spacing-md);
@@ -899,10 +843,6 @@ select.form-control {
 
     .nav-dropdown.open .nav-dropdown-content {
         display: block;
-    }
-
-    .nav-toggle {
-        display: none;
     }
 
     .footer-grid {
@@ -1273,7 +1213,7 @@ select.form-control {
     position: relative;
     z-index: 2;
     text-align: center;
-    color: #fff;
+    color: silver;
     padding: var(--spacing-xl);
     max-width: 600px;
 }
@@ -1330,22 +1270,22 @@ select.form-control {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-lg);
-    font-size: var(--font-size-sm);
+    gap: var(--spacing-xs);
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    color: #ffffff;
+    color: silver;
     background: #A6824A;
     border: none;
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-fast);
-    min-width: 140px;
+    min-width: auto;
 }
 
 .nav-dropdown-toggle:hover {
     background: #A6824A;
-    color: #ffffff;
+    color: silver;
     box-shadow: var(--shadow-glow);
 }
 
@@ -1387,7 +1327,24 @@ select.form-control {
     border-radius: var(--radius-sm);
 }
 
+.nav-dropdown-content li form button {
+    display: block;
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--color-text);
+    background: transparent;
+    border: none;
+    text-align: left;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
 .nav-dropdown-content li a:hover {
+    background: var(--color-bg-secondary);
+    color: var(--color-primary);
+}
+
+.nav-dropdown-content li form button:hover {
     background: var(--color-bg-secondary);
     color: var(--color-primary);
 }
@@ -1397,12 +1354,12 @@ select.form-control {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: var(--spacing-sm) var(--spacing-lg);
-    font-size: var(--font-size-sm);
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
     font-weight: 600;
     border-radius: var(--radius-md);
     background: #A6824A;
-    color: #ffffff;
+    color: silver;
     border: none;
     transition: all var(--transition-fast);
     box-shadow: var(--shadow-glow);
@@ -1411,7 +1368,7 @@ select.form-control {
 .btn-admin:hover {
     transform: translateY(-1px);
     box-shadow: var(--shadow-glow);
-    color: #ffffff;
+    color: silver;
 }
 
 /* Анимация вращающегося логотипа */

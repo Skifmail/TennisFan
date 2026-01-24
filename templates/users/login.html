@@ -32,9 +32,10 @@
 
                 <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Войти</button>
 
-                <p class="text-center mt-3 text-secondary">
-                    Нет аккаунта? <a href="{% url 'register' %}" class="text-primary">Регистрация</a>
-                </p>
+                <div class="text-center mt-3">
+                    <p class="text-secondary" style="margin-bottom: var(--spacing-md);">Нет аккаунта?</p>
+                    <a href="{% url 'register' %}" class="btn btn-outline" style="width: 100%;">Зарегистрироваться</a>
+                </div>
             </form>
         </div>
     </div>

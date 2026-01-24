@@ -32,47 +32,47 @@
                 </a>
 
                 <div class="nav-items">
+                    <a href="{% url 'tournament_list' %}" class="btn btn-ghost">Турниры</a>
+                    <a href="{% url 'rating' %}" class="btn btn-ghost">Рейтинг</a>
+                    <a href="{% url 'champions_league' %}" class="btn btn-ghost">Лига</a>
+                    <a href="{% url 'results' %}" class="btn btn-ghost">Результаты</a>
+                    <a href="{% url 'sparring_list' %}" class="btn btn-ghost">Спарринг</a>
+                    <a href="{% url 'training_list' %}" class="btn btn-ghost">Тренировки</a>
+                    <a href="{% url 'legends' %}" class="btn btn-ghost">Зал славы</a>
+                    <a href="{% url 'rules' %}" class="btn btn-ghost">Правила</a>
+                    <a href="{% url 'court_list' %}" class="btn btn-ghost">Корты</a>
+                    <a href="{% url 'gallery_list' %}" class="btn btn-ghost">Фото</a>
+                    <a href="{% url 'news_list' %}" class="btn btn-ghost">Новости</a>
+                    
+                    {% if user.is_authenticated %}
                     <div class="nav-dropdown">
-                        <button class="nav-dropdown-toggle">
-                            Меню
-                            <svg class="nav-dropdown-arrow" width="10" height="6" viewBox="0 0 10 6" fill="none"
-                                xmlns="http://www.w3.org/2000/svg">
-                                <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                            </svg>
+                        <button type="button" class="nav-dropdown-toggle">
+                            {% if user.player %}
+                            {{ user.player }}
+                            {% else %}
+                            {{ user.email }}
+                            {% endif %}
+                            <span class="nav-dropdown-arrow">▼</span>
                         </button>
                         <ul class="nav-dropdown-content">
-                            <li><a href="{% url 'tournament_list' %}">Турниры</a></li>
-                            <li><a href="{% url 'rating' %}">Рейтинг</a></li>
-                            <li><a href="{% url 'champions_league' %}">Лига</a></li>
-                            <li><a href="{% url 'results' %}">Результаты</a></li>
-                            <li><a href="{% url 'sparring_list' %}">Спарринг</a></li>
-                            <li><a href="{% url 'training_list' %}">Тренировки</a></li>
-                            <li><a href="{% url 'legends' %}">Зал славы</a></li>
-                            <li><a href="{% url 'rules' %}">Правила</a></li>
-                            <li><a href="{% url 'court_list' %}">Корты</a></li>
-                            <li><a href="{% url 'gallery_list' %}">Фото</a></li>
-                            <li><a href="{% url 'news_list' %}">Новости</a></li>
+                            {% if user.player %}
+                            <li><a href="{% url 'profile' pk=user.player.pk %}">Профиль</a></li>
+                            {% endif %}
+                            <li><a href="{% url 'my_matches' %}">Мои матчи</a></li>
+                            <li><a href="{% url 'notifications' %}" class="nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a></li>
+                            {% if user.is_staff or user.is_superuser %}
+                            <li><a href="{% url 'admin:index' %}">Админ панель</a></li>
+                            {% endif %}
+                            <li>
+                                <form action="{% url 'logout' %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit">Выйти</button>
+                                </form>
+                            </li>
                         </ul>
                     </div>
-                    {% if user.is_authenticated %}
-                    <a href="{% url 'my_matches' %}" class="btn btn-primary">Мои матчи</a>
-                    <a href="{% url 'notifications' %}" class="btn btn-ghost nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a>
-                    {% if user.player %}
-                    <a href="{% url 'profile' pk=user.player.pk %}" class="btn btn-outline">{{ user.player }}</a>
                     {% else %}
-                    <a href="{% url 'admin:index' %}" class="btn btn-outline">{{ user.email }}</a>
-                    {% endif %}
-                    <form action="{% url 'logout' %}" method="post" class="nav-logout">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-ghost">Выйти</button>
-                    </form>
-                    {% if user.is_staff or user.is_superuser %}
-                    <a href="{% url 'admin:index' %}" class="btn btn-admin">Админ панель</a>
-                    {% endif %}
-                    {% else %}
-                    <a href="{% url 'login' %}" class="btn btn-ghost">Войти</a>
-                    <a href="{% url 'register' %}" class="btn btn-primary">Регистрация</a>
+                    <a href="{% url 'login' %}" class="btn btn-primary btn-pulse">Войти</a>
                     {% endif %}
                 </div>
             </nav>

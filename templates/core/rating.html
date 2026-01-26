@@ -11,27 +11,25 @@
 <div class="container">
     <!-- Filters -->
     <form method="get" class="filter-bar">
-        <select name="city" class="form-control" onchange="this.form.submit()">
-            <option value="">Все города</option>
-            <option value="moscow" {% if current_city == 'moscow' %}selected{% endif %}>Москва</option>
-            <option value="spb" {% if current_city == 'spb' %}selected{% endif %}>Санкт-Петербург</option>
-        </select>
-        <select name="category" class="form-control" onchange="this.form.submit()">
-            <option value="">Все категории</option>
-            <option value="futures" {% if current_category == 'futures' %}selected{% endif %}>Futures</option>
-            <option value="base" {% if current_category == 'base' %}selected{% endif %}>Base</option>
-            <option value="tour" {% if current_category == 'tour' %}selected{% endif %}>Tour</option>
-            <option value="hard" {% if current_category == 'hard' %}selected{% endif %}>Hard</option>
-            <option value="challenger" {% if current_category == 'challenger' %}selected{% endif %}>Challenger</option>
-            <option value="masters" {% if current_category == 'masters' %}selected{% endif %}>Masters</option>
+        <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}">
+        <select name="skill_level" class="form-control" onchange="this.form.submit()">
+            <option value="">Все уровни</option>
+            {% for value, label in skill_level_choices %}
+            <option value="{{ value }}" {% if current_skill_level == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
         </select>
         <input type="text" name="q" value="{{ search_query }}" placeholder="Поиск по имени..." class="form-control">
         <button type="submit" class="btn btn-primary">Поиск</button>
     </form>
 
+    <div class="rating-toggle">
+        <button type="button" class="btn btn-outline" id="rating-toggle-btn">Показать в виде диаграммы</button>
+    </div>
+
 
     <!-- Players List -->
-    <div class="grid">
+    <div class="rating-list" id="rating-list">
+        <div class="grid">
         {% for player in players %}
         <a href="{% url 'profile' pk=player.pk %}" class="player-card">
             <span class="player-rank">{{ forloop.counter }}</span>
@@ -43,11 +41,16 @@
             <div class="player-info">
                 <div class="player-name" style="display:flex;align-items:center;gap:8px;">
                     <span>{{ player }}</span>
+                    {% with tier=player.active_subscription_tier %}
+                        {% if tier and tier.has_badge %}
+                            <img src="/static/images/{{ tier.name }}.png" alt="{{ tier.name }}" title="{{ tier.get_name_display }}" style="width: 16px; height: 16px;">
+                        {% endif %}
+                    {% endwith %}
                     {% if not player.is_verified %}
                     <span class="badge" style="background: var(--color-warning, #ffd24d); color: #000;">Неверифицирован</span>
                     {% endif %}
                 </div>
-                <span class="player-category">{{ player.get_category_display }}</span>
+                <span class="player-category">{{ player.get_skill_level_display }}</span>
             </div>
             <div class="player-stats">
                 <div>
@@ -71,6 +74,66 @@
         {% empty %}
         <p class="text-secondary text-center">Игроки не найдены.</p>
         {% endfor %}
+        </div>
+    </div>
+
+    <div class="rating-chart hidden" id="rating-chart">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="section-title">Рейтинг в виде диаграммы</h2>
+                <div id="rating-chart-bars" class="rating-chart-bars"></div>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+    const ratingData = [
+        {% for player in players %}
+        { name: "{{ player|escapejs }}", points: {{ player.total_points|default:0 }} },
+        {% endfor %}
+    ];
+
+    const ratingToggleBtn = document.getElementById('rating-toggle-btn');
+    const ratingList = document.getElementById('rating-list');
+    const ratingChart = document.getElementById('rating-chart');
+    const ratingChartBars = document.getElementById('rating-chart-bars');
+
+    const renderChart = () => {
+        ratingChartBars.innerHTML = '';
+        if (!ratingData.length) {
+            ratingChartBars.innerHTML = '<p class="text-secondary">Игроки не найдены.</p>';
+            return;
+        }
+
+        const maxPoints = Math.max(...ratingData.map(item => item.points));
+        ratingData.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.className = 'rating-chart-row';
+            const width = maxPoints > 0 ? (item.points / maxPoints) * 100 : 0;
+            row.innerHTML = `
+                <div class="rating-chart-label">${index + 1}. ${item.name}</div>
+                <div class="rating-chart-bar">
+                    <span style="width:${width}%;"></span>
+                </div>
+                <div class="rating-chart-value">${item.points}</div>
+            `;
+            ratingChartBars.appendChild(row);
+        });
+    };
+
+    if (ratingToggleBtn) {
+        ratingToggleBtn.addEventListener('click', () => {
+            const isHidden = ratingChart.classList.contains('hidden');
+            ratingChart.classList.toggle('hidden');
+            ratingList.classList.toggle('hidden');
+            if (isHidden) {
+                renderChart();
+                ratingToggleBtn.textContent = 'Показать списком';
+            } else {
+                ratingToggleBtn.textContent = 'Показать в виде диаграммы';
+            }
+        });
+    }
+</script>
 {% endblock %}

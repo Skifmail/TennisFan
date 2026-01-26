@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     # Local apps
     'apps.core',
     'apps.users',
@@ -41,6 +42,8 @@ INSTALLED_APPS = [
     'apps.training',
     'apps.content',
     'apps.comments',
+    'apps.subscriptions',
+    'apps.payments',
 ]
 
 # Cloudinary configuration - MUST be set BEFORE any Django initialization

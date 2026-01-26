@@ -6,7 +6,15 @@
 <div class="container" style="padding-top: var(--spacing-2xl);">
     <div class="grid" style="grid-template-columns: 300px 1fr; gap: var(--spacing-xl);">
         <!-- Profile Card -->
-        <div class="card" style="height: fit-content;">
+        <div class="card" style="height: fit-content; position: relative;">
+            {% with tier=player.active_subscription_tier %}
+                {% if tier and tier.has_badge %}
+                <div class="subscription-badge" title="Подписка {{ tier.get_name_display }}" style="position: absolute; top: var(--spacing-sm); right: var(--spacing-sm); display: flex; align-items: center; gap: var(--spacing-xs); background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 12px;">
+                    <span style="font-size: 0.7rem; font-weight: bold; color: var(--color-primary);">{{ tier.name|upper }}</span>
+                    <img src="/static/images/{{ tier.name }}.png" alt="{{ tier.name }}" style="width: 20px; height: 20px;">
+                </div>
+                {% endif %}
+            {% endwith %}
             <div class="card-body text-center">
                 {% if player.avatar %}
                 <img src="{{ player.avatar.url }}" alt="" class="player-avatar"
@@ -16,13 +24,13 @@
                 {% endif %}
 
                 <h1 style="font-size: var(--font-size-xl); margin-bottom: var(--spacing-sm);">{{ player }}</h1>
-                <span class="player-category">{{ player.get_category_display }}</span>
+                <span class="player-category">{{ player.get_skill_level_display }}</span>
 
                 <div class="mt-3 text-secondary" style="font-size: var(--font-size-sm);">
-                    <p><strong>Город:</strong> {{ player.get_city_display }}</p>
+                    <p><strong>Город:</strong> {{ player.city }}</p>
                     <p><strong>Уровень:</strong> {{ player.get_skill_level_display }}</p>
                     <p><strong>Дата рождения:</strong> {{ player.birth_date|date:"d.m.Y" }}</p>
-                    {% if player.age %}<p><strong>Возраст:</strong> {{ player.age }} лет</p>{% endif %}
+                    {% if player.calculated_age %}<p><strong>Возраст:</strong> {{ player.calculated_age }} лет</p>{% endif %}
                     <p><strong>Пол:</strong> {{ player.get_gender_display }}</p>
                     <p><strong>Forehand:</strong> {{ player.get_forehand_display }}</p>
                 </div>
@@ -58,7 +66,52 @@
                 {% endif %}
 
                 {% if request.user == player.user %}
+                    {% if player.user.subscription %}
+                    <div class="subscription-info mt-3" style="text-align: left; background: var(--color-bg-secondary); padding: var(--spacing-sm); border-radius: var(--border-radius-md); font-size: 0.9em; border: 1px solid var(--color-border);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="color: var(--color-text-muted);">Тариф:</span>
+                            <strong style="color: var(--color-primary);">{{ player.user.subscription.tier.get_name_display }}</strong>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="color: var(--color-text-muted);">Статус:</span>
+                            {% if player.user.subscription.is_valid %}
+                                <span class="badge badge-success" style="background-color: var(--color-success); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">Активна</span>
+                            {% else %}
+                                <span class="badge badge-danger" style="background-color: var(--color-error); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">Истекла</span>
+                            {% endif %}
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="color: var(--color-text-muted);">Истекает:</span>
+                            <span>{{ player.user.subscription.end_date|date:"d.m.Y" }}</span>
+                        </div>
+
+                        {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.is_valid %}
+                        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-border-light);">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                <span style="color: var(--color-text-muted);">Лимит:</span>
+                                <span>{{ player.user.subscription.tournaments_registered_count }} / {{ player.user.subscription.tier.max_tournaments }}</span>
+                            </div>
+                            <div style="background: var(--color-border-light); height: 4px; border-radius: 2px; overflow: hidden;">
+                                <div style="background: var(--color-primary); height: 100%; width: {% widthratio player.user.subscription.tournaments_registered_count player.user.subscription.tier.max_tournaments 100 %}%;"></div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if not player.user.subscription.is_valid %}
+                            <a href="{% url 'pricing' %}" class="btn btn-sm btn-outline mt-2" style="width: 100%;">Продлить</a>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                     <div class="alert alert-warning mt-3" style="font-size: var(--font-size-sm); text-align: left;">
+                        У вас нет активной платной подписки. <a href="{% url 'pricing' %}">Купить</a>
+                    </div>
+                    {% endif %}
                 <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3" style="width: 100%;">Редактировать</a>
+                {% endif %}
+                {% if request.user == player.user %}
+                <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2" style="width: 100%;">Пройти NTRP тест</a>
                 {% endif %}
             </div>
         </div>
@@ -73,17 +126,45 @@
                         <span class="match-tournament">{{ match.tournament.name }}</span>
                         <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y" }}</span>
                     </div>
-                    <div class="match-players">
-                        <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
-                            <span class="player-name">{{ match.player1 }}</span>
-                            <span>{{ match.player1_set1|default:"-" }} {{ match.player1_set2|default:"" }} {{
-                                match.player1_set3|default:"" }}</span>
-                        </div>
-                        <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
-                            <span class="player-name">{{ match.player2 }}</span>
-                            <span>{{ match.player2_set1|default:"-" }} {{ match.player2_set2|default:"" }} {{
-                                match.player2_set3|default:"" }}</span>
-                        </div>
+                    <div class="match-score-table-wrap">
+                        <table class="match-score-table">
+                            <thead>
+                                <tr>
+                                    <th>Игрок</th>
+                                    <th>Сет 1</th>
+                                    <th>Сет 2</th>
+                                    <th>Сет 3</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="{% if match.winner == match.player1 %}winner-row{% endif %}">
+                                    <td class="player-cell">
+                                        <span class="player-name">{{ match.player1 }}</span>
+                                        {% if match.winner == match.player1 %}
+                                            {% if match.status == 'completed' or match.status == 'walkover' %}
+                                            <span class="win-badge">WIN</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ match.player1_set1|default:"—" }}</td>
+                                    <td>{{ match.player1_set2|default:"—" }}</td>
+                                    <td>{{ match.player1_set3|default:"—" }}</td>
+                                </tr>
+                                <tr class="{% if match.winner == match.player2 %}winner-row{% endif %}">
+                                    <td class="player-cell">
+                                        <span class="player-name">{{ match.player2 }}</span>
+                                        {% if match.winner == match.player2 %}
+                                            {% if match.status == 'completed' or match.status == 'walkover' %}
+                                            <span class="win-badge">WIN</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ match.player2_set1|default:"—" }}</td>
+                                    <td>{{ match.player2_set2|default:"—" }}</td>
+                                    <td>{{ match.player2_set3|default:"—" }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </a>
                 {% empty %}
@@ -93,4 +174,5 @@
         </div>
     </div>
 </div>
+
 {% endblock %}

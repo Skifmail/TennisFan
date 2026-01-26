@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Подтверждение оплаты{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; padding-top: var(--spacing-2xl);">
+    <div class="card">
+        <div class="card-header">
+            <h1 class="card-title">Подтверждение заказа</h1>
+        </div>
+        <div class="card-body">
+            <h2 class="mb-2" style="font-size: 1.25rem;">{{ title }}</h2>
+            <p class="text-secondary mb-4">{{ description }}</p>
+
+            <div class="order-details mb-4" style="background: var(--color-bg-secondary); padding: var(--spacing-md); border-radius: var(--border-radius-md);">
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for label, value in details %}
+                    <li style="display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid var(--color-border-light); padding-bottom: 8px;">
+                        <span class="text-secondary">{{ label }}</span>
+                        <span style="font-weight: 500;">{{ value }}</span>
+                    </li>
+                    {% endfor %}
+                    <li style="display: flex; justify-content: space-between; margin-top: 16px; font-size: 1.1em; font-weight: bold;">
+                        <span>Итого к оплате</span>
+                        <span style="color: var(--color-primary);">{{ amount|intcomma }} ₽</span>
+                    </li>
+                </ul>
+            </div>
+
+            <form action="{{ process_url }}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary w-100">Оплатить</button>
+                <div class="text-center mt-3">
+                    <a href="javascript:history.back()" class="text-secondary" style="font-size: 0.9em;">Назад</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

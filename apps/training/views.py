@@ -22,7 +22,7 @@ def training_list(request):
     if training_type:
         trainings = trainings.filter(training_type=training_type)
     if city:
-        trainings = trainings.filter(city=city)
+        trainings = trainings.filter(city__icontains=city)
 
     context = {
         'trainings': trainings,
@@ -72,7 +72,7 @@ def coach_list(request):
 
     coaches = Coach.objects.filter(is_active=True)
     if city:
-        coaches = coaches.filter(city=city)
+        coaches = coaches.filter(city__icontains=city)
 
     context = {'coaches': coaches, 'current_city': city}
     return render(request, 'training/coach_list.html', context)

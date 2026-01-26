@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}TennisFan{% endblock %} - Любительские турниры по теннису</title>
     <meta name="description"
-        content="{% block meta_description %}TennisFan - платформа любительских теннисных турниров в Москве и Санкт-Петербурге. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
+        content="{% block meta_description %}TennisFan - платформа любительских теннисных турниров по всей России. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
 
     <link rel="icon" type="image/png" sizes="64x64" href="{% static 'images/favicon.png' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon.png' %}">
@@ -58,6 +58,7 @@
                             {% if user.player %}
                             <li><a href="{% url 'profile' pk=user.player.pk %}">Профиль</a></li>
                             {% endif %}
+                            <li><a href="{% url 'pricing' %}">Купить подписку</a></li>
                             <li><a href="{% url 'my_matches' %}">Мои матчи</a></li>
                             <li><a href="{% url 'notifications' %}" class="nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a></li>
                             {% if user.is_staff or user.is_superuser %}
@@ -106,7 +107,11 @@
                     <a href="{% url 'home' %}" class="logo">
                         <span class="logo-text">Tennis<span class="logo-accent">Fan</span></span>
                     </a>
-                    <p class="footer-desc">Платформа любительских теннисных турниров в Москве и Санкт-Петербурге</p>
+                    <p class="footer-desc">Платформа любительских теннисных турниров по всей России</p>
+                    {% if not user.is_authenticated %}
+                    <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2">Пройти NTRP тест</a>
+                    {% endif %}
+                    <a href="{% url 'donate' %}" class="btn mt-2" style="background-color: #889b73; color: white; border: none;">ОТПРАВИТЬ ДОНАТ</a>
                 </div>
 
                 <div class="footer-links">

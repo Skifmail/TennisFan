@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}NTRP тест{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">NTRP тест</h1>
+    <p class="page-subtitle">Определите свой уровень и подберите турниры по уровню игры</p>
+</div>
+
+<div class="container">
+    {% if can_save %}
+    <div class="alert alert-info">
+        Результат теста будет автоматически сохранён в вашем профиле.
+    </div>
+    {% endif %}
+    {% include 'users/_ntrp_quiz.html' with can_save=can_save %}
+</div>
+{% endblock %}

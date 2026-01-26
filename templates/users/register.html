@@ -19,6 +19,7 @@
                 <div class="form-group">
                     <label class="form-label" for="id_email">{{ user_form.email.label }}</label>
                     {{ user_form.email }}
+                    <div class="field-error" id="email-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
                     {% if user_form.email.errors %}
                         {% for error in user_form.email.errors %}
                         <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
@@ -29,6 +30,12 @@
                 <div class="form-group">
                     <label class="form-label" for="id_phone">{{ user_form.phone.label }}</label>
                     {{ user_form.phone }}
+                    <div class="field-error" id="phone-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
+                    {% if user_form.phone.errors %}
+                        {% for error in user_form.phone.errors %}
+                        <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
+                        {% endfor %}
+                    {% endif %}
                 </div>
 
                 <div class="d-flex gap-2">
@@ -45,11 +52,13 @@
                 <div class="form-group">
                     <label class="form-label" for="id_password">{{ user_form.password.label }}</label>
                     {{ user_form.password }}
+                    <div class="field-error" id="password-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="id_password_confirm">{{ user_form.password_confirm.label }}</label>
                     {{ user_form.password_confirm }}
+                    <div class="field-error" id="password_confirm-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
                     {% if user_form.password_confirm.errors %}
                         {% for error in user_form.password_confirm.errors %}
                         <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
@@ -74,6 +83,7 @@
                 <div class="form-group">
                     <label class="form-label" for="id_birth_date">{{ player_form.birth_date.label }}</label>
                     {{ player_form.birth_date }}
+                    <div class="field-error" id="birth_date-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
                     {% if player_form.birth_date.errors %}
                         {% for error in player_form.birth_date.errors %}
                         <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
@@ -121,4 +131,267 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Получаем элементы формы
+    const emailField = document.getElementById('id_email');
+    const phoneField = document.getElementById('id_phone');
+    const passwordField = document.getElementById('id_password');
+    const passwordConfirmField = document.getElementById('id_password_confirm');
+    const birthDateField = document.getElementById('id_birth_date');
+    
+    // Получаем элементы для отображения ошибок
+    const emailError = document.getElementById('email-error');
+    const phoneError = document.getElementById('phone-error');
+    const passwordError = document.getElementById('password-error');
+    const passwordConfirmError = document.getElementById('password_confirm-error');
+    const birthDateError = document.getElementById('birth_date-error');
+    
+    // Скрытие серверных ошибок при вводе
+    document.querySelectorAll('.form-control').forEach(input => {
+        input.addEventListener('input', function() {
+            const group = this.closest('.form-group');
+            if (group) {
+                const serverErrors = group.querySelectorAll('.text-error');
+                serverErrors.forEach(err => err.remove());
+            }
+        });
+    });
+    
+    // Функция для валидации email
+    function validateEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+    
+    // Функция для валидации телефона
+    function validatePhone(phone) {
+        if (!phone || phone.trim() === '' || phone.trim() === '+7') {
+            return true; // Телефон необязательный
+        }
+        const phoneRegex = /^\+7\d{10}$/;
+        return phoneRegex.test(phone.trim());
+    }
+    
+    // Функция для валидации даты рождения
+    function validateBirthDate(date) {
+        if (!date) {
+            return false;
+        }
+        const selectedDate = new Date(date);
+        const today = new Date();
+        const minDate = new Date();
+        minDate.setFullYear(today.getFullYear() - 100); // Максимальный возраст 100 лет
+        const maxDate = new Date();
+        maxDate.setFullYear(today.getFullYear() - 5); // Минимальный возраст 5 лет
+        
+        return selectedDate >= minDate && selectedDate <= maxDate;
+    }
+    
+    // Функция для отображения ошибки
+    function showError(errorElement, message) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+        errorElement.previousElementSibling.style.borderColor = 'var(--color-error)';
+    }
+    
+    // Функция для скрытия ошибки
+    function hideError(errorElement, field) {
+        errorElement.style.display = 'none';
+        if (field) {
+            field.style.borderColor = '';
+        }
+    }
+    
+    // Валидация email
+    if (emailField) {
+        emailField.addEventListener('blur', function() {
+            const email = this.value.trim();
+            if (email === '') {
+                showError(emailError, 'Email обязателен для заполнения.');
+            } else if (!validateEmail(email)) {
+                showError(emailError, 'Введите корректный email адрес.');
+            } else {
+                hideError(emailError, this);
+            }
+        });
+        
+        emailField.addEventListener('input', function() {
+            const email = this.value.trim();
+            if (email && !validateEmail(email)) {
+                showError(emailError, 'Введите корректный email адрес.');
+            } else if (email && validateEmail(email)) {
+                hideError(emailError, this);
+            }
+        });
+    }
+    
+    // Валидация телефона
+    if (phoneField) {
+        phoneField.addEventListener('blur', function() {
+            const phone = this.value.trim();
+            if (phone && phone !== '+7' && !validatePhone(phone)) {
+                showError(phoneError, 'Введите телефон в формате +7XXXXXXXXXX (10 цифр после +7)');
+            } else {
+                hideError(phoneError, this);
+            }
+        });
+        
+        phoneField.addEventListener('input', function() {
+            const phone = this.value.trim();
+            if (phone && phone !== '+7' && !validatePhone(phone)) {
+                showError(phoneError, 'Введите телефон в формате +7XXXXXXXXXX (10 цифр после +7)');
+            } else {
+                hideError(phoneError, this);
+            }
+        });
+    }
+    
+    // Валидация пароля
+    if (passwordField) {
+        passwordField.addEventListener('blur', function() {
+            const password = this.value;
+            if (password === '') {
+                showError(passwordError, 'Пароль обязателен для заполнения.');
+            } else if (password.length < 8) {
+                showError(passwordError, 'Пароль должен содержать минимум 8 символов.');
+            } else {
+                hideError(passwordError, this);
+            }
+        });
+        
+        passwordField.addEventListener('input', function() {
+            const password = this.value;
+            if (password && password.length < 8) {
+                showError(passwordError, 'Пароль должен содержать минимум 8 символов.');
+            } else if (password && password.length >= 8) {
+                hideError(passwordError, this);
+                // Проверяем совпадение паролей, если поле подтверждения заполнено
+                if (passwordConfirmField && passwordConfirmField.value) {
+                    passwordConfirmField.dispatchEvent(new Event('input'));
+                }
+            }
+        });
+    }
+    
+    // Валидация подтверждения пароля
+    if (passwordConfirmField && passwordField) {
+        passwordConfirmField.addEventListener('blur', function() {
+            const password = passwordField.value;
+            const passwordConfirm = this.value;
+            if (passwordConfirm === '') {
+                showError(passwordConfirmError, 'Подтверждение пароля обязательно для заполнения.');
+            } else if (password !== passwordConfirm) {
+                showError(passwordConfirmError, 'Пароли не совпадают.');
+            } else {
+                hideError(passwordConfirmError, this);
+            }
+        });
+        
+        passwordConfirmField.addEventListener('input', function() {
+            const password = passwordField.value;
+            const passwordConfirm = this.value;
+            if (passwordConfirm && password !== passwordConfirm) {
+                showError(passwordConfirmError, 'Пароли не совпадают.');
+            } else if (passwordConfirm && password === passwordConfirm) {
+                hideError(passwordConfirmError, this);
+            }
+        });
+    }
+    
+    // Валидация даты рождения
+    if (birthDateField) {
+        birthDateField.addEventListener('change', function() {
+            const date = this.value;
+            if (!date) {
+                showError(birthDateError, 'Дата рождения обязательна для заполнения.');
+            } else if (!validateBirthDate(date)) {
+                const today = new Date();
+                const maxDate = new Date();
+                maxDate.setFullYear(today.getFullYear() - 5);
+                showError(birthDateError, 'Дата рождения должна быть не позднее ' + maxDate.toLocaleDateString('ru-RU') + ' и не ранее 100 лет назад.');
+            } else {
+                hideError(birthDateError, this);
+            }
+        });
+        
+        birthDateField.addEventListener('blur', function() {
+            const date = this.value;
+            if (!date) {
+                showError(birthDateError, 'Дата рождения обязательна для заполнения.');
+            } else if (!validateBirthDate(date)) {
+                const today = new Date();
+                const maxDate = new Date();
+                maxDate.setFullYear(today.getFullYear() - 5);
+                showError(birthDateError, 'Дата рождения должна быть не позднее ' + maxDate.toLocaleDateString('ru-RU') + ' и не ранее 100 лет назад.');
+            } else {
+                hideError(birthDateError, this);
+            }
+        });
+    }
+    
+    // Предотвращение отправки формы при наличии ошибок
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            let hasErrors = false;
+            
+            // Проверка email
+            if (emailField && (!emailField.value.trim() || !validateEmail(emailField.value.trim()))) {
+                showError(emailError, emailField.value.trim() ? 'Введите корректный email адрес.' : 'Email обязателен для заполнения.');
+                hasErrors = true;
+            }
+            
+            // Проверка телефона
+            if (phoneField && phoneField.value.trim() && phoneField.value.trim() !== '+7' && !validatePhone(phoneField.value.trim())) {
+                showError(phoneError, 'Введите телефон в формате +7XXXXXXXXXX (10 цифр после +7)');
+                hasErrors = true;
+            }
+            
+            // Проверка пароля
+            if (passwordField && (!passwordField.value || passwordField.value.length < 8)) {
+                showError(passwordError, passwordField.value ? 'Пароль должен содержать минимум 8 символов.' : 'Пароль обязателен для заполнения.');
+                hasErrors = true;
+            }
+            
+            // Проверка подтверждения пароля
+            if (passwordConfirmField && passwordField) {
+                if (!passwordConfirmField.value) {
+                    showError(passwordConfirmError, 'Подтверждение пароля обязательно для заполнения.');
+                    hasErrors = true;
+                } else if (passwordField.value !== passwordConfirmField.value) {
+                    showError(passwordConfirmError, 'Пароли не совпадают.');
+                    hasErrors = true;
+                }
+            }
+            
+            // Проверка даты рождения
+            if (birthDateField && (!birthDateField.value || !validateBirthDate(birthDateField.value))) {
+                showError(birthDateError, birthDateField.value ? 'Дата рождения некорректна.' : 'Дата рождения обязательна для заполнения.');
+                hasErrors = true;
+            }
+            
+            if (hasErrors) {
+                e.preventDefault();
+                // Прокрутка к первой ошибке
+                const firstError = document.querySelector('.field-error[style*="display: block"]');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        });
+    }
+});
+</script>
+
+<style>
+.form-control:invalid {
+    border-color: var(--color-error);
+}
+
+.form-control:valid {
+    border-color: var(--color-primary);
+}
+</style>
 {% endblock %}

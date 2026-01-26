@@ -4,6 +4,7 @@ Custom User model with phone and email authentication.
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -51,12 +52,12 @@ class User(AbstractUser):
 class PlayerCategory(models.TextChoices):
     """Player skill categories based on NTRP."""
 
-    FUTURES = "futures", "Futures"
-    BASE = "base", "Base"
-    TOUR = "tour", "Tour"
-    HARD = "hard", "Hard"
-    CHALLENGER = "challenger", "Challenger"
-    MASTERS = "masters", "Masters"
+    FUTURES = "futures", "Фьючерс"
+    BASE = "base", "База"
+    TOUR = "tour", "Тур"
+    HARD = "hard", "Хард"
+    CHALLENGER = "challenger", "Челленджер"
+    MASTERS = "masters", "Мастерс"
 
 
 class City(models.TextChoices):
@@ -83,10 +84,11 @@ class Forehand(models.TextChoices):
 class SkillLevel(models.TextChoices):
     """Player skill level."""
 
-    BEGINNER = "beginner", "Начинающий"
-    INTERMEDIATE = "intermediate", "Средний"
+    NOVICE = "novice", "Новичок"
+    AMATEUR = "amateur", "Любитель"
+    EXPERIENCED = "experienced", "Опытный"
     ADVANCED = "advanced", "Продвинутый"
-    EXPERT = "expert", "Эксперт"
+    PROFESSIONAL = "professional", "Профессионал"
 
 
 class Player(models.Model):
@@ -101,9 +103,7 @@ class Player(models.Model):
         blank=True,
         storage=None,  # Use default storage from settings
     )
-    city = models.CharField(
-        "Город", max_length=20, choices=City.choices, default=City.MOSCOW
-    )
+    city = models.CharField("Город", max_length=100)
     category = models.CharField(
         "Категория", max_length=20, choices=PlayerCategory.choices, default=PlayerCategory.BASE
     )
@@ -146,6 +146,34 @@ class Player(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.first_name} {self.user.last_name}".strip() or self.user.email
+
+    @property
+    def active_subscription_tier(self):
+        try:
+            sub = self.user.subscription
+            if sub.is_valid():
+                return sub.tier
+        except:
+            pass
+        return None
+
+    @staticmethod
+    def _calculate_age(birth_date):
+        if not birth_date:
+            return None
+        today = timezone.now().date()
+        years = today.year - birth_date.year
+        if (today.month, today.day) < (birth_date.month, birth_date.day):
+            years -= 1
+        return years
+
+    @property
+    def calculated_age(self):
+        return self._calculate_age(self.birth_date)
+
+    def save(self, *args, **kwargs):
+        self.age = self._calculate_age(self.birth_date)
+        super().save(*args, **kwargs)
 
     @property
     def win_rate(self) -> float:

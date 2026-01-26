@@ -17,7 +17,7 @@
             </h1>
             <p class="hero-text">
                 Аналог ATP Tour для любителей. Равные соперники, честная игра,
-                закрытое сообщество игроков в Москве и Санкт-Петербурге.
+                сообщество игроков по всей России.
             </p>
             <div class="hero-buttons">
                 {% if not user.is_authenticated %}
@@ -44,12 +44,7 @@
             <div class="card-body" style="display: grid; gap: var(--spacing-md); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
                 <div class="form-group" style="margin: 0;">
                     <label class="form-label">Город</label>
-                    <select name="city" class="form-control">
-                        <option value="">Все</option>
-                        {% for value, label in city_choices %}
-                        <option value="{{ value }}" {% if current_filters.city == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
+                    <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_filters.city }}">
                 </div>
                 <div class="form-group" style="margin: 0;">
                     <label class="form-label">Уровень</label>
@@ -97,7 +92,7 @@
                     
                     <div style="flex: 1; display: flex; flex-direction: column; gap: var(--spacing-sm);">
                         <div class="d-flex gap-1" style="flex-wrap: wrap;">
-                            <span class="badge">{{ tournament.get_city_display }}</span>
+                            <span class="badge">{{ tournament.city }}</span>
                             <span class="badge">{{ tournament.get_category_display }}</span>
                             <span class="badge">{{ tournament.get_gender_display }}</span>
                             <span class="badge">{{ tournament.get_duration_display }}</span>
@@ -187,7 +182,7 @@
                 {% endif %}
                 <div class="player-info">
                     <div class="player-name">{{ player }}</div>
-                    <span class="player-category">{{ player.get_category_display }}</span>
+                    <span class="player-category">{{ player.get_skill_level_display }}</span>
                 </div>
                 <div class="player-stats">
                     <div>
@@ -226,7 +221,7 @@
                     <span class="player-category mb-1">{{ tournament.get_category_display }}</span>
                     <h3 class="card-title">{{ tournament.name }}</h3>
                     <p class="card-text">
-                        {{ tournament.get_city_display }} • {{ tournament.start_date|date:"d.m.Y" }}
+                        {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
                     </p>
                 </div>
             </a>

@@ -7,7 +7,7 @@ from django.shortcuts import render
 
 from apps.content.models import News, Page
 from apps.tournaments.models import Match, Tournament, TournamentDuration, TournamentGender, TournamentStatus
-from apps.users.models import City, Player, PlayerCategory
+from apps.users.models import Player, PlayerCategory, SkillLevel
 
 
 def home(request):
@@ -27,7 +27,7 @@ def home(request):
     duration = request.GET.get('duration', '')
 
     if city:
-        tournaments = tournaments.filter(city=city)
+        tournaments = tournaments.filter(city__icontains=city)
     if category:
         tournaments = tournaments.filter(category=category)
     if gender:
@@ -48,7 +48,6 @@ def home(request):
             'gender': gender,
             'duration': duration,
         },
-        'city_choices': City.choices,
         'category_choices': PlayerCategory.choices,
         'gender_choices': TournamentGender.choices,
         'duration_choices': TournamentDuration.choices,
@@ -59,15 +58,15 @@ def home(request):
 def rating(request):
     """Player rating page."""
     city = request.GET.get('city', '')
-    category = request.GET.get('category', '')
+    skill_level = request.GET.get('skill_level', '') or request.GET.get('category', '')
     search = request.GET.get('q', '')
 
     players = Player.objects.select_related('user')
 
     if city:
-        players = players.filter(city=city)
-    if category:
-        players = players.filter(category=category)
+        players = players.filter(city__icontains=city)
+    if skill_level:
+        players = players.filter(skill_level=skill_level)
     if search:
         players = players.filter(
             Q(user__first_name__icontains=search) |
@@ -79,8 +78,9 @@ def rating(request):
     context = {
         'players': players,
         'current_city': city,
-        'current_category': category,
+        'current_skill_level': skill_level,
         'search_query': search,
+        'skill_level_choices': SkillLevel.choices,
     }
     return render(request, 'core/rating.html', context)
 

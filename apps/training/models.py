@@ -4,16 +4,17 @@ Training models for adult tennis training.
 
 from django.db import models
 
-from apps.users.models import City, PlayerCategory
+from apps.users.models import PlayerCategory
 
 
 class SkillLevel(models.TextChoices):
     """Training skill levels."""
 
-    BEGINNER = "beginner", "Начинающий"
-    INTERMEDIATE = "intermediate", "Средний"
+    NOVICE = "novice", "Новичок"
+    AMATEUR = "amateur", "Любитель"
+    EXPERIENCED = "experienced", "Опытный"
     ADVANCED = "advanced", "Продвинутый"
-    ALL = "all", "Все уровни"
+    PROFESSIONAL = "professional", "Профессионал"
 
 
 class TrainingType(models.TextChoices):
@@ -38,7 +39,7 @@ class Coach(models.Model):
     telegram = models.CharField("Telegram", max_length=100, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
 
-    city = models.CharField("Город", max_length=20, choices=City.choices, default=City.MOSCOW)
+    city = models.CharField("Город", max_length=100)
     is_active = models.BooleanField("Активен", default=True)
 
     created_at = models.DateTimeField("Создан", auto_now_add=True)
@@ -64,7 +65,7 @@ class Training(models.Model):
         "Тип тренировки", max_length=20, choices=TrainingType.choices, default=TrainingType.INDIVIDUAL
     )
     skill_level = models.CharField(
-        "Уровень", max_length=20, choices=SkillLevel.choices, default=SkillLevel.ALL
+        "Уровень", max_length=20, choices=SkillLevel.choices, default=SkillLevel.AMATEUR
     )
     target_category = models.CharField(
         "Целевая категория", max_length=20, choices=PlayerCategory.choices, blank=True
@@ -76,7 +77,7 @@ class Training(models.Model):
     court = models.ForeignKey(
         "courts.Court", on_delete=models.SET_NULL, null=True, blank=True, related_name="trainings", verbose_name="Корт"
     )
-    city = models.CharField("Город", max_length=20, choices=City.choices, default=City.MOSCOW)
+    city = models.CharField("Город", max_length=100)
 
     duration_minutes = models.PositiveSmallIntegerField("Длительность (мин)", default=60)
     max_participants = models.PositiveSmallIntegerField("Макс. участников", default=1)

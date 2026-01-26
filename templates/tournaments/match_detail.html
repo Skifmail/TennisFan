@@ -27,7 +27,7 @@
                     <div class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);"></div>
                     {% endif %}
                     <div class="{% if match.winner == match.player1 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.player1 }}</div>
-                    <div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.player1.get_category_display }}</div>
+                    <div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.player1.get_skill_level_display }}</div>
                 </a>
 
                 <!-- Score -->
@@ -67,7 +67,7 @@
                     <div class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);"></div>
                     {% endif %}
                     <div class="{% if match.winner == match.player2 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.player2 }}</div>
-                    <div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.player2.get_category_display }}</div>
+                    <div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.player2.get_skill_level_display }}</div>
                 </a>
             </div>
 

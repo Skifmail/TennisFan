@@ -1606,10 +1606,11 @@ body {
     box-shadow: 0 0 20px rgba(166, 130, 74, 0.2);
 }
 
-/* Hide Header on Scroll (Mobile) */
-@media (max-width: 768px) {
+/* Hide Header on Scroll (Mobile & Tablet) */
+@media (max-width: 1024px) {
     .header {
         transition: transform 0.3s ease;
+        will-change: transform;
     }
     
     .header.header-hidden {

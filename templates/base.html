@@ -26,12 +26,21 @@
     <header class="header">
         <div class="container">
             <nav class="nav">
+                <!-- Mobile Menu Button -->
+                <button class="nav-toggle" aria-label="Меню">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+
+                <!-- Logo -->
                 <a href="{% url 'home' %}" class="logo">
                     <span class="logo-text">Tennis<span class="logo-accent">Fan</span></span>
                     <img src="{% static 'images/logo.svg' %}" class="coin-logo" alt="TennisFan логотип">
                 </a>
 
-                <div class="nav-items">
+                <!-- Desktop Links / Mobile Dropdown -->
+                <div class="nav-menu">
                     <a href="{% url 'tournament_list' %}" class="btn btn-ghost">Турниры</a>
                     <a href="{% url 'rating' %}" class="btn btn-ghost">Рейтинг</a>
                     <a href="{% url 'champions_league' %}" class="btn btn-ghost">Лига</a>
@@ -43,7 +52,10 @@
                     <a href="{% url 'court_list' %}" class="btn btn-ghost">Корты</a>
                     <a href="{% url 'gallery_list' %}" class="btn btn-ghost">Фото</a>
                     <a href="{% url 'news_list' %}" class="btn btn-ghost">Новости</a>
-                    
+                </div>
+                
+                <!-- Auth Actions (Always visible) -->
+                <div class="nav-auth">
                     {% if user.is_authenticated %}
                     <div class="nav-dropdown">
                         <button type="button" class="nav-dropdown-toggle">

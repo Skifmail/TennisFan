@@ -48,56 +48,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300);
         }, 5000);
     });
-
-    // Hide header on scroll for mobile devices only
-    let lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const header = document.querySelector('.header');
-    let ticking = false;
-    
-    // Check if device is mobile
-    function isMobile() {
-        return window.innerWidth <= 992;
-    }
-    
-    if (header) {
-        function handleScroll() {
-            // Only work on mobile devices
-            if (!isMobile()) {
-                header.classList.remove('header-hidden');
-                return;
-            }
-            
-            let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            
-            // Avoid negative scroll values (iOS bounce)
-            if (scrollTop < 0) {
-                scrollTop = 0;
-            }
-
-            // Threshold of 10px to avoid micro-movements
-            if (Math.abs(lastScrollTop - scrollTop) <= 10) {
-                ticking = false;
-                return;
-            }
-
-            if (scrollTop > lastScrollTop && scrollTop > 100) {
-                // Scrolling down & passed threshold (100px from top)
-                header.classList.add('header-hidden');
-                // Close dropdowns if open when scrolling down
-                document.querySelectorAll('.nav-dropdown').forEach(dd => dd.classList.remove('open'));
-                const navMenu = document.querySelector('.nav-menu');
-                if (navMenu) navMenu.classList.remove('active');
-            } else if (scrollTop < lastScrollTop) {
-                // Scrolling up
-                header.classList.remove('header-hidden');
-            }
-            
-            lastScrollTop = scrollTop;
-            ticking = false;
-        }
-        
-        window.addEventListener('scroll', function() {
-            if (!ticking) {
                 window.requestAnimationFrame(handleScroll);
                 ticking = true;
             }

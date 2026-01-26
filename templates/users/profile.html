@@ -4,9 +4,8 @@
 
 {% block content %}
 <div class="container" style="padding-top: var(--spacing-2xl);">
-    <div class="grid" style="grid-template-columns: 300px 1fr; gap: var(--spacing-xl);">
-        <!-- Profile Card -->
-        <div class="card" style="height: fit-content; position: relative;">
+    <!-- Profile Card -->
+    <div class="card" style="max-width: 500px; margin: 0 auto var(--spacing-xl); position: relative;">
             {% with tier=player.active_subscription_tier %}
                 {% if tier and tier.has_badge %}
                 <div class="subscription-badge" title="Подписка {{ tier.get_name_display }}" style="position: absolute; top: var(--spacing-sm); right: var(--spacing-sm); display: flex; align-items: center; gap: var(--spacing-xs); background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 12px;">
@@ -114,12 +113,12 @@
                 <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2" style="width: 100%;">Пройти NTRP тест</a>
                 {% endif %}
             </div>
-        </div>
+    </div>
 
-        <!-- Recent Matches -->
-        <div>
-            <h2 class="section-title mb-3">Последние матчи</h2>
-            <div class="grid">
+    <!-- Recent Matches -->
+    <div>
+        <h2 class="section-title mb-3">Последние матчи</h2>
+        <div class="grid grid-2">
                 {% for match in recent_matches %}
                 <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
                     <div class="match-header">
@@ -167,12 +166,19 @@
                         </table>
                     </div>
                 </a>
-                {% empty %}
-                <p class="text-secondary">Нет матчей.</p>
-                {% endfor %}
-            </div>
+            {% empty %}
+            <p class="text-secondary">Нет матчей.</p>
+            {% endfor %}
         </div>
     </div>
 </div>
+
+<style>
+@media (max-width: 768px) {
+    .container > .card {
+        max-width: 100%;
+    }
+}
+</style>
 
 {% endblock %}

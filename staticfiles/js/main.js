@@ -48,18 +48,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300);
         }, 5000);
     });
-                window.requestAnimationFrame(handleScroll);
-                ticking = true;
-            }
-        }, { passive: true });
-        
-        // Handle window resize - show header if switching to desktop
-        window.addEventListener('resize', function() {
-            if (!isMobile()) {
-                header.classList.remove('header-hidden');
-            }
-        });
-    }
 
     // Form filter auto-submit
     const filterForms = document.querySelectorAll('.filter-bar');

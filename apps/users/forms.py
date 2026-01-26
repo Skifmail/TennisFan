@@ -4,8 +4,9 @@ User forms.
 
 from django import forms
 from django.contrib.auth import get_user_model
+from django.core.validators import RegexValidator
 
-from .models import Player
+from .models import Forehand, Gender, Player, SkillLevel
 
 User = get_user_model()
 
@@ -18,22 +19,46 @@ class PlayerRegistrationForm(forms.ModelForm):
         fields = ('skill_level', 'birth_date', 'gender', 'forehand', 'city')
         widgets = {
             'skill_level': forms.Select(attrs={'class': 'form-control'}),
-            'birth_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'birth_date': forms.DateInput(
+                attrs={'class': 'form-control', 'type': 'date'},
+                format='%Y-%m-%d',
+            ),
             'gender': forms.Select(attrs={'class': 'form-control'}),
             'forehand': forms.Select(attrs={'class': 'form-control'}),
-            'city': forms.Select(attrs={'class': 'form-control'}),
+            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Город'}),
         }
         labels = {
             'skill_level': 'Уровень мастерства *',
             'birth_date': 'Дата рождения *',
             'gender': 'Пол *',
-            'forehand': 'Forehand *',
+            'forehand': 'Ведущая рука *',
             'city': 'Город',
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['birth_date'].input_formats = ['%Y-%m-%d']
+        self.fields['skill_level'].initial = SkillLevel.NOVICE
+        self.fields['gender'].initial = Gender.MALE
+        self.fields['forehand'].initial = Forehand.RIGHT
+        for field_name in ('skill_level', 'gender', 'forehand'):
+            field = self.fields[field_name]
+            field.choices = [(value, label) for value, label in field.choices if value != '']
 
 
 class UserRegistrationForm(forms.ModelForm):
     """User registration form."""
+
+    email = forms.EmailField(
+        label='Email *',
+        widget=forms.EmailInput(attrs={'class': 'form-control'}),
+    )
+    phone = forms.CharField(
+        label='Телефон',
+        required=False,
+        initial='+7',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+7XXXXXXXXXX'}),
+    )
 
     password = forms.CharField(
         label='Пароль *',
@@ -49,17 +74,25 @@ class UserRegistrationForm(forms.ModelForm):
         model = User
         fields = ('email', 'phone', 'first_name', 'last_name')
         widgets = {
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
         }
         labels = {
-            'email': 'Email *',
-            'phone': 'Телефон',
             'first_name': 'Имя',
             'last_name': 'Фамилия',
         }
+
+    def clean_phone(self):
+        phone = self.cleaned_data.get('phone', '').strip()
+        # Если поле пустое или содержит только '+7', возвращаем пустую строку
+        if phone in {'', '+7'}:
+            return ''
+        # Если поле заполнено, проверяем формат
+        import re
+        phone_pattern = r'^\+7\d{10}$'
+        if not re.match(phone_pattern, phone):
+            raise forms.ValidationError('Введите телефон в формате +7XXXXXXXXXX (10 цифр после +7)')
+        return phone
 
     def clean_password_confirm(self):
         password = self.cleaned_data.get('password')
@@ -97,18 +130,19 @@ class PlayerProfileForm(forms.ModelForm):
             'gender',
             'forehand',
             'city',
-            'age',
             'bio',
             'telegram',
             'whatsapp',
         )
         widgets = {
             'skill_level': forms.Select(attrs={'class': 'form-control'}),
-            'birth_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'birth_date': forms.DateInput(
+                attrs={'class': 'form-control', 'type': 'date'},
+                format='%Y-%m-%d',
+            ),
             'gender': forms.Select(attrs={'class': 'form-control'}),
             'forehand': forms.Select(attrs={'class': 'form-control'}),
-            'city': forms.Select(attrs={'class': 'form-control'}),
-            'age': forms.NumberInput(attrs={'class': 'form-control'}),
+            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Город'}),
             'bio': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
             'telegram': forms.TextInput(attrs={'class': 'form-control'}),
             'whatsapp': forms.TextInput(attrs={'class': 'form-control'}),
@@ -117,9 +151,8 @@ class PlayerProfileForm(forms.ModelForm):
             'skill_level': 'Уровень мастерства',
             'birth_date': 'Дата рождения',
             'gender': 'Пол',
-            'forehand': 'Forehand',
+            'forehand': 'Ведущая рука',
             'city': 'Город',
-            'age': 'Возраст',
             'bio': 'О себе',
             'telegram': 'Telegram',
             'whatsapp': 'WhatsApp',
@@ -131,6 +164,7 @@ class PlayerProfileForm(forms.ModelForm):
         if user:
             self.fields['first_name'].initial = user.first_name
             self.fields['last_name'].initial = user.last_name
+        self.fields['birth_date'].input_formats = ['%Y-%m-%d']
 
     def save(self, commit=True):
         player = super().save(commit=False)

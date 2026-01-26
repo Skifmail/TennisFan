@@ -15,7 +15,7 @@ def court_list(request):
     courts = Court.objects.filter(is_active=True)
 
     if city:
-        courts = courts.filter(city=city)
+        courts = courts.filter(city__icontains=city)
     if surface:
         courts = courts.filter(surface=surface)
 

@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Тарифы и подписка{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Выбор подписки</h1>
+    <p class="page-subtitle">Получите максимум возможностей от TennisFan</p>
+</div>
+
+<div class="container">
+    <div class="pricing-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--spacing-xl); margin-top: var(--spacing-xl);">
+        
+        <!-- FREE TIER (Static) -->
+        <div class="pricing-card" style="background: var(--color-bg-card); border: 1px solid var(--color-border-light); padding: var(--spacing-xl); border-radius: var(--border-radius-lg); position: relative;">
+            <h3 style="color: var(--color-text); margin-bottom: var(--spacing-sm);">Free</h3>
+            <div class="price" style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg);">
+                0 ₽ <span style="font-size: var(--font-size-base); color: var(--color-text-muted); font-weight: 400;">/ месяц</span>
+            </div>
+            
+            <ul class="features-list" style="list-style: none; padding: 0; margin-bottom: var(--spacing-xl);">
+                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
+                    <i class="fas fa-trophy" style="color: var(--color-primary);"></i>
+                     Регистрации на турниры: <span style="font-weight: bold; color: var(--color-text);">0</span>
+                </li>
+                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
+                    <i class="fas fa-check" style="color: var(--color-success);"></i> Просмотр статистики и рейтингов
+                </li>
+                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
+                    <i class="fas fa-check" style="color: var(--color-success);"></i> Чтение комментариев
+                </li>
+                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm); opacity: 0.5;">
+                    <i class="fas fa-times" style="color: var(--color-error);"></i> Закрытый чат и спарринги
+                </li>
+            </ul>
+
+            {% if not user.is_authenticated or not current_tier_id %}
+                <button disabled class="btn btn-outline" style="width: 100%; opacity: 0.7;">Текущий план</button>
+            {% else %}
+                <button disabled class="btn btn-outline" style="width: 100%; opacity: 0.5;">Бесплатный тариф</button>
+            {% endif %}
+        </div>
+
+        {% for tier in tiers %}
+        <div class="pricing-card {% if tier.name == 'diamond' %}diamond{% endif %}">
+            <h3 style="color: var(--color-text); margin-bottom: var(--spacing-sm);">{{ tier.get_name_display }}</h3>
+            <div class="price" style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg);">
+                {{ tier.price|intcomma|cut:".00" }} ₽ <span style="font-size: var(--font-size-base); color: var(--color-text-muted); font-weight: 400;">/ месяц</span>
+            </div>
+            
+            <ul class="features-list" style="list-style: none; padding: 0; margin-bottom: var(--spacing-xl);">
+                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
+                    <i class="fas fa-trophy" style="color: var(--color-primary);"></i>
+                    {% if tier.is_unlimited %}
+                        Регистрации на турниры: <span style="font-weight: bold; color: var(--color-text); font-size: 1.25em;">∞</span>
+                    {% else %}
+                        Регистрации на турниры: <span style="font-weight: bold; color: var(--color-text);">{{ tier.max_tournaments }}</span>
+                    {% endif %}
+                </li>
+                {% if tier.one_day_tournament_discount > 0 %}
+                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
+                    <i class="fas fa-percent" style="color: var(--color-primary);"></i>
+                    Скидка {{ tier.one_day_tournament_discount }}% на однодневные турниры
+                </li>
+                {% endif %}
+                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
+                    <i class="fas fa-comments" style="color: var(--color-success);"></i> Доступ в закрытый чат
+                </li>
+                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
+                    <i class="fas fa-handshake" style="color: var(--color-success);"></i> Доступ к спаррингам
+                </li>
+                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
+                    <i class="fas fa-star" style="color: var(--color-success);"></i> Оценка соперников и комментирование
+                </li>
+                {% if tier.has_badge %}
+                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
+                    <i class="fas fa-certificate" style="color: var(--color-success);"></i>
+                    <span>Особый статус в профиле: </span>
+                    <span style="display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 8px; margin-left: 5px;">
+                        <span style="font-size: 0.7rem; font-weight: bold; color: var(--color-primary);">{{ tier.name|upper }}</span>
+                        <img src="/static/images/{{ tier.name }}.png" alt="{{ tier.name }}" style="width: 16px; height: 16px;">
+                    </span>
+                </li>
+                {% endif %}
+            </ul>
+
+            {% if current_tier_id == tier.id %}
+                <button disabled class="btn btn-outline" style="width: 100%; opacity: 0.7;">Текущий план</button>
+            {% else %}
+                <a href="{% url 'payment_preview' %}?type=subscription&id={{ tier.id }}" class="btn {% if tier.name == 'diamond' %}btn-primary{% else %}btn-outline{% endif %}" style="width: 100%;">Купить подписку</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

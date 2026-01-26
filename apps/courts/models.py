@@ -4,7 +4,6 @@ Courts models.
 
 from django.db import models
 
-from apps.users.models import City
 
 
 class CourtSurface(models.TextChoices):
@@ -21,7 +20,7 @@ class Court(models.Model):
 
     name = models.CharField("Название", max_length=200)
     slug = models.SlugField("URL", unique=True)
-    city = models.CharField("Город", max_length=20, choices=City.choices, default=City.MOSCOW)
+    city = models.CharField("Город", max_length=100)
     address = models.CharField("Адрес", max_length=255)
     description = models.TextField("Описание", blank=True)
 
@@ -52,4 +51,4 @@ class Court(models.Model):
         ordering = ["name"]
 
     def __str__(self) -> str:
-        return f"{self.name} ({self.get_city_display()})"
+        return f"{self.name} ({self.city})"

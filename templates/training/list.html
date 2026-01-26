@@ -10,11 +10,7 @@
 
 <div class="container">
     <form method="get" class="filter-bar">
-        <select name="city" class="form-control" onchange="this.form.submit()">
-            <option value="">Все города</option>
-            <option value="moscow" {% if current_city == 'moscow' %}selected{% endif %}>Москва</option>
-            <option value="spb" {% if current_city == 'spb' %}selected{% endif %}>Санкт-Петербург</option>
-        </select>
+        <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
         <select name="type" class="form-control" onchange="this.form.submit()">
             <option value="">Все типы</option>
             <option value="individual" {% if current_type == 'individual' %}selected{% endif %}>Индивидуальные</option>
@@ -23,9 +19,11 @@
         </select>
         <select name="level" class="form-control" onchange="this.form.submit()">
             <option value="">Все уровни</option>
-            <option value="beginner" {% if current_level == 'beginner' %}selected{% endif %}>Начинающий</option>
-            <option value="intermediate" {% if current_level == 'intermediate' %}selected{% endif %}>Средний</option>
+            <option value="novice" {% if current_level == 'novice' %}selected{% endif %}>Новичок</option>
+            <option value="amateur" {% if current_level == 'amateur' %}selected{% endif %}>Любитель</option>
+            <option value="experienced" {% if current_level == 'experienced' %}selected{% endif %}>Опытный</option>
             <option value="advanced" {% if current_level == 'advanced' %}selected{% endif %}>Продвинутый</option>
+            <option value="professional" {% if current_level == 'professional' %}selected{% endif %}>Профессионал</option>
         </select>
     </form>
 

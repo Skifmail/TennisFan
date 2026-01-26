@@ -5,16 +5,12 @@
 {% block content %}
 <div class="page-header">
     <h1 class="page-title">Теннисные корты</h1>
-    <p class="page-subtitle">Площадки для игры в Москве и Санкт-Петербурге</p>
+    <p class="page-subtitle">Площадки для игры по всей России</p>
 </div>
 
 <div class="container">
     <form method="get" class="filter-bar">
-        <select name="city" class="form-control" onchange="this.form.submit()">
-            <option value="">Все города</option>
-            <option value="moscow" {% if current_city == 'moscow' %}selected{% endif %}>Москва</option>
-            <option value="spb" {% if current_city == 'spb' %}selected{% endif %}>Санкт-Петербург</option>
-        </select>
+        <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
         <select name="surface" class="form-control" onchange="this.form.submit()">
             <option value="">Все покрытия</option>
             <option value="hard" {% if current_surface == 'hard' %}selected{% endif %}>Хард</option>

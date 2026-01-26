@@ -33,6 +33,15 @@ class TournamentAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
         (
+            "Стоимость и Тип",
+            {
+                "fields": (
+                    "entry_fee",
+                    "is_one_day",
+                )
+            },
+        ),
+        (
             "Категории",
             {
                 "fields": (

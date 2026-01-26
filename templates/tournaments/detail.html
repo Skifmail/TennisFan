@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block title %}{{ tournament.name }}{% endblock %}
 
@@ -11,6 +12,15 @@
     <div class="d-flex gap-2 mb-2">
         <span class="player-category">{{ tournament.get_category_display }}</span>
         <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.points_winner }} очков</span>
+        {% if tournament.is_one_day %}
+            {% if tournament.entry_fee > 0 %}
+                <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-success);">Взнос: {{ tournament.entry_fee|intcomma|cut:".00" }} ₽</span>
+            {% else %}
+                 <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-success);">Взнос: Бесплатно</span>
+            {% endif %}
+        {% else %}
+            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-info);">Многодневный</span>
+        {% endif %}
         {% if tournament.max_participants %}
         <span class="player-category" style="background: {% if tournament.is_full %}rgba(255, 0, 0, 0.2){% else %}var(--color-bg-elevated){% endif %}; color: {% if tournament.is_full %}var(--color-error){% else %}var(--color-text-secondary){% endif %};">
             Мест: {{ tournament.participants.count }} из {{ tournament.max_participants }}
@@ -25,7 +35,7 @@
     
     <h1 class="page-title" style="text-align: left;">{{ tournament.name }}</h1>
     <p class="text-secondary mb-4">
-        {{ tournament.get_city_display }} • {{ tournament.start_date|date:"d.m.Y" }}
+        {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
         {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
     </p>
     
@@ -54,7 +64,7 @@
                             {{ participant.user.first_name }} {{ participant.user.last_name }}
                         </div>
                         <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
-                            {{ participant.get_category_display }} • {{ participant.total_points }} очков
+                            {{ participant.get_skill_level_display }} • {{ participant.total_points }} очков
                         </div>
                     </div>
                 </a>
@@ -72,6 +82,13 @@
                 <span class="match-tournament">{{ match.round_name|default:"Матч" }}</span>
                 <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y H:i" }}</span>
             </div>
+            {% if match.winner is None and match.status != 'completed' and match.status != 'walkover' %}
+                {% if match.player1_set1 or match.player1_set2 or match.player1_set3 or match.player2_set1 or match.player2_set2 or match.player2_set3 %}
+                <div class="text-secondary" style="font-size: var(--font-size-xs);">
+                    Результат не подтверждён
+                </div>
+                {% endif %}
+            {% endif %}
             <div class="match-players">
                 <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
                     {% if match.player1.avatar %}
@@ -80,6 +97,11 @@
                     <div class="player-avatar"></div>
                     {% endif %}
                     <span class="player-name">{{ match.player1 }}</span>
+                    {% if match.winner == match.player1 %}
+                        {% if match.status == 'completed' or match.status == 'walkover' %}
+                        <span class="win-badge">WIN</span>
+                        {% endif %}
+                    {% endif %}
                     <div class="match-score">
                         {% if match.player1_set1 is not None %}<span class="set-score">{{ match.player1_set1 }}</span>{% endif %}
                         {% if match.player1_set2 is not None %}<span class="set-score">{{ match.player1_set2 }}</span>{% endif %}
@@ -93,6 +115,11 @@
                     <div class="player-avatar"></div>
                     {% endif %}
                     <span class="player-name">{{ match.player2 }}</span>
+                    {% if match.winner == match.player2 %}
+                        {% if match.status == 'completed' or match.status == 'walkover' %}
+                        <span class="win-badge">WIN</span>
+                        {% endif %}
+                    {% endif %}
                     <div class="match-score">
                         {% if match.player2_set1 is not None %}<span class="set-score">{{ match.player2_set1 }}</span>{% endif %}
                         {% if match.player2_set2 is not None %}<span class="set-score">{{ match.player2_set2 }}</span>{% endif %}

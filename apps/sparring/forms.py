@@ -14,7 +14,7 @@ class SparringRequestForm(forms.ModelForm):
         model = SparringRequest
         fields = ('city', 'desired_category', 'description', 'preferred_days', 'preferred_time')
         widgets = {
-            'city': forms.Select(attrs={'class': 'form-control'}),
+            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Город'}),
             'desired_category': forms.Select(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
             'preferred_days': forms.TextInput(attrs={'class': 'form-control'}),

@@ -4,7 +4,7 @@ Tournament models: Tournaments, Matches, Ratings.
 
 from django.db import models
 
-from apps.users.models import City, Player, PlayerCategory
+from apps.users.models import Player, PlayerCategory
 
 
 class TournamentType(models.TextChoices):
@@ -47,7 +47,12 @@ class Tournament(models.Model):
     name = models.CharField("Название", max_length=200)
     slug = models.SlugField("URL", unique=True)
     description = models.TextField("Описание", blank=True)
-    city = models.CharField("Город", max_length=20, choices=City.choices, default=City.MOSCOW)
+    city = models.CharField("Город", max_length=100)
+    
+    # Subscription & Entry Fee fields
+    entry_fee = models.DecimalField("Вступительный взнос (руб)", max_digits=10, decimal_places=2, default=0)
+    is_one_day = models.BooleanField("Однодневный турнир", default=False, help_text="Если отмечено, взнос платный для всех (с учетом скидок)")
+
     category = models.CharField(
         "Категория", max_length=20, choices=PlayerCategory.choices, default=PlayerCategory.BASE
     )
@@ -90,7 +95,7 @@ class Tournament(models.Model):
         ordering = ["-start_date"]
 
     def __str__(self) -> str:
-        return f"{self.name} ({self.get_city_display()})"
+        return f"{self.name} ({self.city})"
 
     def is_full(self) -> bool:
         """Check if tournament has reached max participants."""

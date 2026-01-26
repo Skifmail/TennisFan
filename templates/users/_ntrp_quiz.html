@@ -1,0 +1,290 @@
+<div class="card ntrp-card">
+    <div class="card-body">
+        <h2 class="section-title">Калькулятор NTRP</h2>
+        <p class="text-secondary ntrp-note">
+            Оценочный тест для самопроверки. Результат не заменяет официальный рейтинг.
+        </p>
+
+        <div id="ntrp-quiz" class="ntrp-quiz" data-can-save="{{ can_save|yesno:'true,false' }}">
+            <div class="ntrp-progress">
+                <span id="ntrp-step">Вопрос 1 из 11</span>
+                <span id="ntrp-score" class="text-secondary">Баллы: 0</span>
+            </div>
+
+            <h3 id="ntrp-question" class="ntrp-question"></h3>
+            <div id="ntrp-options" class="ntrp-options"></div>
+
+            <div class="ntrp-actions">
+                <button type="button" id="ntrp-back" class="btn btn-ghost" disabled>Назад</button>
+                <button type="button" id="ntrp-next" class="btn btn-outline" disabled>Далее</button>
+                <button type="button" id="ntrp-calc" class="btn btn-primary" disabled>Рассчитать</button>
+            </div>
+        </div>
+
+        <div id="ntrp-result" class="ntrp-result hidden">
+            <div class="ntrp-level">Ваш уровень: <span id="ntrp-level-value"></span></div>
+            <p id="ntrp-description" class="text-secondary"></p>
+            <p id="ntrp-score-total" class="text-secondary"></p>
+            <a href="{% url 'tournament_list' %}" class="btn btn-primary">Записаться в турнир</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ntrpQuestions = [
+        {
+            text: 'Как бы ты описал свой форхэнд (удар справа)?',
+            options: [
+                { label: 'Только учусь держать ракетку, часто промахиваюсь', score: 2 },
+                { label: 'Могу держать мяч в игре на малой скорости, но без контроля', score: 4 },
+                { label: 'Умеренный контроль направления, есть стабильность', score: 6 },
+                { label: 'Надежный удар с контролем направления и глубины', score: 8 },
+                { label: 'Развитая техника с вариациями скорости и спина', score: 10 },
+            ],
+        },
+        {
+            text: 'Как ты выполняешь подачу?',
+            options: [
+                { label: 'Еще учусь, часто не попадаю в сервис-бокс', score: 2 },
+                { label: 'Первая подача часто не заходит, часто двойные ошибки', score: 3 },
+                { label: 'Первая подача надежна, вторую еще развиваю', score: 5 },
+                { label: 'Стабильная первая и вторая подача', score: 7 },
+                { label: 'Вариативная подача с разными видами спина', score: 10 },
+            ],
+        },
+        {
+            text: 'Насколько комфортно ты чувствуешь себя у сетки?',
+            options: [
+                { label: 'Предпочитаю оставаться на базовой линии', score: 1 },
+                { label: 'Стараюсь не ходить, но иногда получается', score: 3 },
+                { label: 'Хожу редко, но базовый волей удается', score: 5 },
+                { label: 'Нормально чувствую себя, но нужна уверенность', score: 7 },
+                { label: 'Комфортно играю у сетки, агрессивная игра', score: 10 },
+            ],
+        },
+        {
+            text: 'Как ты справляешься с быстрыми мячами?',
+            options: [
+                { label: 'Теряюсь, часто не успеваю среагировать', score: 2 },
+                { label: 'Иногда успеваю, но нестабильно', score: 4 },
+                { label: 'Справляюсь, но требуется больше времени', score: 6 },
+                { label: 'Хорошо возвращаю быстрые мячи', score: 8 },
+                { label: 'Мне нравится тяжелый мяч, легко его контролирую', score: 10 },
+            ],
+        },
+        {
+            text: 'Насколько хорошо ты владеешь бэкхэндом (ударом слева)?',
+            options: [
+                { label: 'Избегаю эту сторону, очень слабо', score: 2 },
+                { label: 'Получается, но со слабым контролем', score: 4 },
+                { label: 'Надежный удар, но без вариаций', score: 6 },
+                { label: 'Хорошо развитый бэкхэнд с контролем', score: 8 },
+                { label: 'Доминантный бэкхэнд, часто выигрываю с этого удара', score: 10 },
+            ],
+        },
+        {
+            text: 'Как ты себя чувствуешь в длинных розыгрышах (10+ ударов)?',
+            options: [
+                { label: 'Не могу держать мяч больше нескольких ударов', score: 2 },
+                { label: 'Иногда получается, но редко', score: 4 },
+                { label: 'Могу сыграть 10-15 ударов, но требуется усилие', score: 6 },
+                { label: 'Стабильно держу в игре длинные розыгрыши', score: 8 },
+                { label: 'Комфортно играю длинные обмены, контролирую ритм', score: 10 },
+            ],
+        },
+        {
+            text: 'Насколько хорошо ты понимаешь тактику игры?',
+            options: [
+                { label: 'Просто стараюсь попасть мячом в площадку', score: 1 },
+                { label: 'Начинаю понимать базовые тактические ходы', score: 3 },
+                { label: 'Вижу открытую площадку, могу выбрать направление', score: 6 },
+                { label: 'Хорошо позиционируюсь, знаю про розыгрыши', score: 8 },
+                { label: 'Вариирую игру в зависимости от противника', score: 10 },
+            ],
+        },
+        {
+            text: 'Как ты играешь в парном разряде (дабл)?',
+            options: [
+                { label: 'Еще не играл или играю очень редко', score: 2 },
+                { label: 'Играю, но слабо координирую с партнером', score: 4 },
+                { label: 'Нормально чувствую себя, есть некоторая координация', score: 6 },
+                { label: 'Хорошо работаю в парах, знаю позиции', score: 8 },
+                { label: 'Отлично координирую, сильная сетевая игра в паре', score: 10 },
+            ],
+        },
+        {
+            text: 'Насколько ты физически готов к интенсивной игре?',
+            options: [
+                { label: 'Быстро устаю, нужно много перерывов', score: 2 },
+                { label: 'Устаю к концу матча', score: 4 },
+                { label: 'Держу темп в течение часа, потом падает', score: 6 },
+                { label: 'Хорошо держу физическую форму в матче', score: 8 },
+                { label: 'Физически подготовлен, без проблем держу темп', score: 10 },
+            ],
+        },
+        {
+            text: 'Как часто ты побеждаешь против других игроков?',
+            options: [
+                { label: 'Почти никогда не выигрываю', score: 2 },
+                { label: 'Редко, может 20-30% времени', score: 4 },
+                { label: 'Примерно половину матчей', score: 6 },
+                { label: 'Часто выигрываю, около 70-80% побед', score: 8 },
+                { label: 'Одерживаю большинство побед', score: 10 },
+            ],
+        },
+        {
+            text: 'Какой опыт игры у тебя есть?',
+            options: [
+                { label: 'Начинаю играть (менее 6 месяцев)', score: 1 },
+                { label: 'Играю менее года', score: 3 },
+                { label: 'Играю 1-3 года', score: 6 },
+                { label: 'Играю 3-5 лет', score: 8 },
+                { label: 'Серьезный опыт - более 5 лет', score: 10 },
+            ],
+        },
+    ];
+
+    const ntrpLevelGroups = [
+        { min: 1, max: 2, label: 'Новичок', text: 'Первые шаги в теннисе. Фокус на базовой технике и стабильности.' },
+        { min: 3, max: 4, label: 'Любитель', text: 'Уже уверенно держите мяч в игре и развиваете тактику.' },
+        { min: 5, max: 5, label: 'Опытный', text: 'Стабильная игра, контроль ритма и более сложных ударов.' },
+        { min: 6, max: 6, label: 'Продвинутый', text: 'Высокий уровень техники и уверенные тактические решения.' },
+        { min: 7, max: 7, label: 'Профессионал', text: 'Максимальная эффективность, вариативность и скорость.' },
+    ];
+
+    const getNtrpLevelFromScore = (score) => {
+        const minScore = ntrpQuestions.reduce(
+            (sum, question) => sum + Math.min(...question.options.map(option => option.score)),
+            0,
+        );
+        const maxScore = ntrpQuestions.reduce(
+            (sum, question) => sum + Math.max(...question.options.map(option => option.score)),
+            0,
+        );
+        const clampedScore = Math.min(Math.max(score, minScore), maxScore);
+        const normalized = Math.round(((clampedScore - minScore) / (maxScore - minScore)) * 6) + 1;
+        return Math.min(7, Math.max(1, normalized));
+    };
+
+    const getNtrpResult = (score) => {
+        const level = getNtrpLevelFromScore(score);
+        const group = ntrpLevelGroups.find(item => level >= item.min && level <= item.max);
+        if (!group) {
+            return null;
+        }
+        return { level, ...group };
+    };
+
+    const quizEl = document.getElementById('ntrp-quiz');
+    const stepEl = document.getElementById('ntrp-step');
+    const scoreEl = document.getElementById('ntrp-score');
+    const questionEl = document.getElementById('ntrp-question');
+    const optionsEl = document.getElementById('ntrp-options');
+    const backBtn = document.getElementById('ntrp-back');
+    const nextBtn = document.getElementById('ntrp-next');
+    const calcBtn = document.getElementById('ntrp-calc');
+    const resultEl = document.getElementById('ntrp-result');
+    const levelValueEl = document.getElementById('ntrp-level-value');
+    const descriptionEl = document.getElementById('ntrp-description');
+    const scoreTotalEl = document.getElementById('ntrp-score-total');
+
+    const answers = Array(ntrpQuestions.length).fill(null);
+    let currentIndex = 0;
+
+    const updateButtons = () => {
+        backBtn.disabled = currentIndex === 0;
+        const hasAnswer = answers[currentIndex] !== null;
+        nextBtn.disabled = currentIndex >= ntrpQuestions.length - 1 || !hasAnswer;
+        calcBtn.disabled = currentIndex < ntrpQuestions.length - 1 || !hasAnswer;
+    };
+
+    const renderQuestion = () => {
+        const question = ntrpQuestions[currentIndex];
+        stepEl.textContent = `Вопрос ${currentIndex + 1} из ${ntrpQuestions.length}`;
+        const totalScore = answers.reduce((sum, value) => sum + (value || 0), 0);
+        scoreEl.textContent = `Баллы: ${totalScore}`;
+        questionEl.textContent = question.text;
+        optionsEl.innerHTML = '';
+
+        question.options.forEach((option, idx) => {
+            const optionId = `ntrp-q${currentIndex}-o${idx}`;
+            const wrapper = document.createElement('label');
+            wrapper.className = 'ntrp-option';
+            wrapper.innerHTML = `
+                <input type="radio" name="ntrp" value="${option.score}" id="${optionId}" ${answers[currentIndex] === option.score ? 'checked' : ''}>
+                <span>${option.label}</span>
+            `;
+            optionsEl.appendChild(wrapper);
+        });
+
+        optionsEl.querySelectorAll('input[type="radio"]').forEach(input => {
+            input.addEventListener('change', (event) => {
+                answers[currentIndex] = Number(event.target.value);
+                updateButtons();
+            });
+        });
+
+        updateButtons();
+    };
+
+    const saveNtrpIfAllowed = async (level) => {
+        if (!quizEl || quizEl.dataset.canSave !== 'true') {
+            return;
+        }
+
+        const getCookie = (name) => {
+            const cookies = document.cookie ? document.cookie.split(';') : [];
+            for (let i = 0; i < cookies.length; i += 1) {
+                const cookie = cookies[i].trim();
+                if (cookie.startsWith(`${name}=`)) {
+                    return decodeURIComponent(cookie.substring(name.length + 1));
+                }
+            }
+            return null;
+        };
+
+        const csrftoken = getCookie('csrftoken');
+        try {
+            await fetch('{% url "save_ntrp" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken || '',
+                },
+                body: JSON.stringify({ ntrp_level: level }),
+            });
+        } catch (error) {
+            // silently ignore
+        }
+    };
+
+    backBtn.addEventListener('click', () => {
+        if (currentIndex > 0) {
+            currentIndex -= 1;
+            renderQuestion();
+        }
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (currentIndex < ntrpQuestions.length - 1) {
+            currentIndex += 1;
+            renderQuestion();
+        }
+    });
+
+    calcBtn.addEventListener('click', () => {
+        const totalScore = answers.reduce((sum, value) => sum + (value || 0), 0);
+        const result = getNtrpResult(totalScore);
+        if (!result) {
+            return;
+        }
+        levelValueEl.textContent = `${result.label} (NTRP ${result.level})`;
+        descriptionEl.textContent = result.text;
+        scoreTotalEl.textContent = `Ваш результат: ${totalScore} баллов теста`;
+        quizEl.classList.add('hidden');
+        resultEl.classList.remove('hidden');
+        saveNtrpIfAllowed(result.level);
+    });
+
+    renderQuestion();
+</script>

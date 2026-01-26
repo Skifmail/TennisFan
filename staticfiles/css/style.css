@@ -18,14 +18,14 @@
 
     --color-text: silver;
     --color-text-secondary: #A6824A;
-    --color-text-muted: #16302B;
+    --color-text-muted: silver;
 
     --color-border: #A6824A;
     --color-border-light: #16302B;
 
     --color-success: #A6824A;
     --color-warning: #16302B;
-    --color-error: #03110D;
+    --color-error: #FF4D4D;
     --color-info: #A6824A;
 
     /* Typography */
@@ -91,6 +91,10 @@ body {
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+.main {
+    padding-bottom: var(--spacing-3xl);
 }
 
 a {
@@ -337,6 +341,88 @@ button {
 }
 
 /* ==========================================================================
+   NTRP Calculator
+   ========================================================================== */
+.ntrp-card .section-title {
+    margin-bottom: var(--spacing-sm);
+}
+
+.ntrp-toggle {
+    margin-bottom: var(--spacing-md);
+}
+
+.ntrp-note {
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
+.ntrp-quiz {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.ntrp-progress {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--font-size-sm);
+}
+
+.ntrp-question {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+}
+
+.ntrp-options {
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.ntrp-option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.ntrp-option input {
+    accent-color: var(--color-primary);
+}
+
+.ntrp-option:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.ntrp-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.ntrp-actions .btn {
+    min-width: 140px;
+}
+
+.ntrp-result {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.ntrp-level {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+/* ==========================================================================
    Match Card
    ========================================================================== */
 .match-card {
@@ -400,12 +486,77 @@ button {
     gap: var(--spacing-sm);
 }
 
+.match-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
 .set-score {
     background: var(--color-bg-elevated);
     padding: var(--spacing-xs) var(--spacing-sm);
     border-radius: var(--radius-sm);
     font-weight: 600;
     font-size: var(--font-size-sm);
+}
+
+.match-score-table-wrap {
+    margin-top: var(--spacing-sm);
+}
+
+.match-score-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.match-score-table th,
+.match-score-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--color-border-light);
+    text-align: center;
+}
+
+.match-score-table th:first-child,
+.match-score-table td:first-child {
+    text-align: left;
+}
+
+.match-score-table thead th {
+    color: var(--color-text-secondary);
+    font-weight: 600;
+}
+
+.match-score-table .player-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.match-score-table .winner-row td {
+    color: var(--color-primary);
+}
+
+.win-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.my-matches-grid {
+    gap: var(--spacing-xl);
+}
+
+.match-card-item {
+    height: 100%;
 }
 
 /* ==========================================================================
@@ -479,6 +630,61 @@ button {
 .player-points {
     font-size: var(--font-size-2xl);
     font-weight: 800;
+}
+
+/* ==========================================================================
+   Rating Chart
+   ========================================================================== */
+.rating-toggle {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--spacing-lg);
+}
+
+.rating-chart {
+    margin-top: var(--spacing-lg);
+}
+
+.rating-chart-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.rating-chart-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 1.5fr) 3fr minmax(60px, 0.6fr);
+    gap: var(--spacing-md);
+    align-items: center;
+}
+
+.rating-chart-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+}
+
+.rating-chart-bar {
+    position: relative;
+    height: 12px;
+    background: var(--color-bg-elevated);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    border: 1px solid var(--color-border-light);
+}
+
+.rating-chart-bar span {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: var(--color-primary);
+    border-radius: var(--radius-full);
+}
+
+.rating-chart-value {
+    text-align: right;
+    font-weight: 600;
+    color: var(--color-primary);
 }
 
 /* ==========================================================================
@@ -601,10 +807,7 @@ select.form-control {
     font-size: var(--font-size-4xl);
     font-weight: 800;
     margin-bottom: var(--spacing-md);
-    background: var(--color-primary-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--color-primary);
 }
 
 .page-subtitle {
@@ -1222,9 +1425,7 @@ select.form-control {
     font-size: 8rem;
     font-weight: 800;
     line-height: 1;
-    background: var(--color-primary-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--color-primary);
     margin-bottom: var(--spacing-md);
 }
 
@@ -1384,4 +1585,34 @@ select.form-control {
 /* Перспектива для 3D эффекта */
 body {
     perspective: 1000px;
+}
+
+/* Pricing Cards */
+.pricing-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    padding: var(--spacing-xl);
+    border-radius: var(--border-radius-lg);
+    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.pricing-card:hover {
+    transform: translateY(-5px);
+}
+
+.pricing-card.diamond {
+    border-color: var(--color-text-secondary);
+    box-shadow: 0 0 20px rgba(166, 130, 74, 0.2);
+}
+
+/* Hide Header on Scroll (Mobile) */
+@media (max-width: 768px) {
+    .header {
+        transition: transform 0.3s ease;
+    }
+    
+    .header.header-hidden {
+        transform: translateY(-100%);
+    }
 }

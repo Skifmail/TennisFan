@@ -14,4 +14,6 @@ urlpatterns = [
     path('profile/<int:pk>/', views.profile, name='profile'),
     path('profile/edit/', views.profile_edit, name='profile_edit'),
     path('notifications/', views.notifications, name='notifications'),
+    path('ntrp-test/', views.ntrp_test, name='ntrp_test'),
+    path('ntrp/save/', views.save_ntrp, name='save_ntrp'),
 ]

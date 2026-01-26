@@ -11,19 +11,12 @@
 <div class="container">
     <!-- Filters -->
     <form method="get" class="filter-bar">
-        <select name="city" class="form-control" onchange="this.form.submit()">
-            <option value="">Все города</option>
-            <option value="moscow" {% if current_city == 'moscow' %}selected{% endif %}>Москва</option>
-            <option value="spb" {% if current_city == 'spb' %}selected{% endif %}>Санкт-Петербург</option>
-        </select>
+        <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
         <select name="category" class="form-control" onchange="this.form.submit()">
             <option value="">Все категории</option>
-            <option value="futures" {% if current_category == 'futures' %}selected{% endif %}>Futures</option>
-            <option value="base" {% if current_category == 'base' %}selected{% endif %}>Base</option>
-            <option value="tour" {% if current_category == 'tour' %}selected{% endif %}>Tour</option>
-            <option value="hard" {% if current_category == 'hard' %}selected{% endif %}>Hard</option>
-            <option value="challenger" {% if current_category == 'challenger' %}selected{% endif %}>Challenger</option>
-            <option value="masters" {% if current_category == 'masters' %}selected{% endif %}>Masters</option>
+            {% for value, label in category_choices %}
+            <option value="{{ value }}" {% if current_category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
         </select>
         <select name="status" class="form-control" onchange="this.form.submit()">
             <option value="">Все статусы</option>
@@ -45,7 +38,7 @@
                 
                 <div style="flex: 1; display: flex; flex-direction: column; gap: var(--spacing-sm);">
                     <div class="d-flex gap-1" style="flex-wrap: wrap;">
-                        <span class="badge">{{ tournament.get_city_display }}</span>
+                        <span class="badge">{{ tournament.city }}</span>
                         <span class="badge">{{ tournament.get_category_display }}</span>
                         <span class="badge">{{ tournament.get_gender_display }}</span>
                         <span class="badge">{{ tournament.get_duration_display }}</span>

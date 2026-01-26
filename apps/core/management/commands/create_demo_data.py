@@ -3,6 +3,7 @@ Management command to create demo data for TennisFan.
 """
 
 import random
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
@@ -13,7 +14,20 @@ from apps.courts.models import Court
 from apps.sparring.models import SparringRequest
 from apps.tournaments.models import Match, Tournament
 from apps.training.models import Coach, Training
-from apps.users.models import Player, PlayerCategory, User
+from apps.users.models import Player, PlayerCategory, SkillLevel, User
+
+
+def _map_ntrp_to_skill_level(level: Decimal) -> str:
+    normalized = int(level.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    if normalized <= 2:
+        return SkillLevel.NOVICE
+    if normalized <= 4:
+        return SkillLevel.AMATEUR
+    if normalized == 5:
+        return SkillLevel.EXPERIENCED
+    if normalized == 6:
+        return SkillLevel.ADVANCED
+    return SkillLevel.PROFESSIONAL
 
 
 class Command(BaseCommand):
@@ -51,11 +65,13 @@ class Command(BaseCommand):
                 user.set_password("demo12345")
                 user.save()
 
+            ntrp_level = Decimal(random.randint(1, 7))
             player, _ = Player.objects.get_or_create(
                 user=user,
                 defaults={
                     "category": category,
-                    "ntrp_level": random.uniform(2.5, 4.5),
+                    "ntrp_level": ntrp_level,
+                    "skill_level": _map_ntrp_to_skill_level(ntrp_level),
                     "total_points": points,
                     "matches_played": random.randint(10, 50),
                     "matches_won": random.randint(5, 30),

@@ -48,6 +48,35 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300);
         }, 5000);
     });
+
+    // Hide header on scroll for mobile
+    let lastScrollTop = 0;
+    const header = document.querySelector('.header');
+    
+    if (header) {
+        window.addEventListener('scroll', function() {
+            let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            
+            // Avoid negative scroll values (iOS bounce)
+            if (scrollTop < 0) {
+                scrollTop = 0;
+            }
+
+            if (scrollTop > lastScrollTop && scrollTop > 60) {
+                // Scrolling down & passed threshold
+                header.classList.add('header-hidden');
+                // Close dropdowns if open when scrolling down
+                document.querySelectorAll('.nav-dropdown').forEach(dd => dd.classList.remove('open'));
+                const navMenu = document.querySelector('.nav-menu');
+                 if (navMenu) navMenu.classList.remove('active');
+            } else {
+                // Scrolling up
+                header.classList.remove('header-hidden');
+            }
+            lastScrollTop = scrollTop;
+        });
+    }
+});
     
     // Form filter auto-submit
     const filterForms = document.querySelectorAll('.filter-bar');

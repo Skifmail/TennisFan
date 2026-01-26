@@ -6,25 +6,36 @@
 </div>
 <div class="container">
     {% if matches %}
-    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--spacing-lg);">
+    <div class="grid my-matches-grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
         {% for match in matches %}
-        <div class="card">
+        <div class="card match-card-item">
             <div class="card-body" style="display: flex; flex-direction: column; gap: var(--spacing-md);">
-                <div class="d-flex" style="justify-content: space-between; align-items: center;">
-                    <div>
-                        <div class="text-secondary" style="font-size: var(--font-size-sm);">{{ match.tournament.name }}</div>
-                            <div style="font-size: var(--font-size-sm);">
-                                {% if match.scheduled_datetime %}
-                                    {{ match.scheduled_datetime|date:"d.m.Y H:i" }}
-                                {% else %}
-                                    Дата не установлена
-                                {% endif %}
-                            </div>
+                <div class="match-meta">
+                    <div class="text-secondary" style="font-size: var(--font-size-sm);">{{ match.tournament.name }}</div>
+                    <div style="font-size: var(--font-size-sm);">
+                        {% if match.scheduled_datetime %}
+                            {{ match.scheduled_datetime|date:"d.m.Y H:i" }}
+                        {% else %}
+                            Дата не установлена
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="match-players">
                     <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
                         <span class="player-name">{{ match.player1 }}</span>
+                        {% if match.winner == match.player1 %}
+                            {% if match.status == 'completed' or match.status == 'walkover' %}
+                            <span class="win-badge">WIN</span>
+                            {% endif %}
+                        {% endif %}
                     </div>
                     <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
                         <span class="player-name">{{ match.player2 }}</span>
+                        {% if match.winner == match.player2 %}
+                            {% if match.status == 'completed' or match.status == 'walkover' %}
+                            <span class="win-badge">WIN</span>
+                            {% endif %}
+                        {% endif %}
                     </div>
                 </div>
 
@@ -57,6 +68,7 @@
                                     <span class="badge">{{ match.get_status_display }}</span>
                                     <a href="{% url 'match_detail' pk=match.pk %}" class="btn btn-outline">Подробнее</a>
                                 </div>
+                                <button type="submit" name="action" value="accept" class="btn btn-primary">Подтвердить</button>
                                 <button type="submit" name="action" value="reject" class="btn btn-ghost">Отклонить</button>
                             </form>
                             {% else %}

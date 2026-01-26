@@ -23,7 +23,17 @@
                     {% else %}
                     <div class="player-avatar"></div>
                     {% endif %}
-                    <span class="player-name">{{ match.player1 }}</span>
+                    <div class="player-name" style="display:flex;align-items:center;gap:5px;">
+                        {{ match.player1 }}
+                        {% with tier=match.player1.active_subscription_tier %}
+                            {% if tier and tier.has_badge %}
+                                <img src="/static/images/{{ tier.name }}.png" alt="{{ tier.name }}" title="{{ tier.get_name_display }}" style="width: 14px; height: 14px;">
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                    {% if match.winner == match.player1 %}
+                    <span class="win-badge">WIN</span>
+                    {% endif %}
                     <div class="match-score">
                         {% if match.player1_set1 is not None %}
                         <span class="set-score">{{ match.player1_set1 }}</span>
@@ -42,7 +52,17 @@
                     {% else %}
                     <div class="player-avatar"></div>
                     {% endif %}
-                    <span class="player-name">{{ match.player2 }}</span>
+                    <div class="player-name" style="display:flex;align-items:center;gap:5px;">
+                        {{ match.player2 }}
+                        {% with tier=match.player2.active_subscription_tier %}
+                            {% if tier and tier.has_badge %}
+                                <img src="/static/images/{{ tier.name }}.png" alt="{{ tier.name }}" title="{{ tier.get_name_display }}" style="width: 14px; height: 14px;">
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                    {% if match.winner == match.player2 %}
+                    <span class="win-badge">WIN</span>
+                    {% endif %}
                     <div class="match-score">
                         {% if match.player2_set1 is not None %}
                         <span class="set-score">{{ match.player2_set1 }}</span>

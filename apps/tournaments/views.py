@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from .models import Match, MatchResultProposal, Tournament, TournamentType
-from apps.users.models import Notification, Player
+from apps.users.models import Notification, Player, PlayerCategory
 
 
 def tournament_list(request):
@@ -21,7 +21,7 @@ def tournament_list(request):
     tournaments = Tournament.objects.all().prefetch_related('participants__user')
 
     if city:
-        tournaments = tournaments.filter(city=city)
+        tournaments = tournaments.filter(city__icontains=city)
     if category:
         tournaments = tournaments.filter(category=category)
     if status:
@@ -34,6 +34,7 @@ def tournament_list(request):
         'current_city': city,
         'current_category': category,
         'current_status': status,
+        'category_choices': PlayerCategory.choices,
     }
     return render(request, 'tournaments/list.html', context)
 
@@ -319,9 +320,49 @@ def tournament_register(request, slug):
     # Check if player is already registered
     if tournament.participants.filter(id=player.id).exists():
         messages.info(request, 'Вы уже зарегистрированы на этот турнир.')
-    else:
-        tournament.participants.add(player)
-        messages.success(request, 'Вы зарегистрированы на турнир.')
+        return redirect('tournament_detail', slug=tournament.slug)
 
-    next_url = request.GET.get('next') or request.META.get('HTTP_REFERER')
-    return redirect(next_url or reverse('tournament_detail', args=[tournament.slug]))
+    # SUBSCRIPTION CHECK
+    try:
+        sub = request.user.subscription
+        if not sub.is_valid():
+            sub = None
+    except:
+        sub = None
+
+    # Admin bypass
+    is_admin = request.user.is_superuser or request.user.is_staff
+
+    if is_admin:
+         messages.success(request, 'Регистрация администратора (бесплатно/безлимитно).')
+         tournament.participants.add(player)
+         return redirect('tournament_detail', slug=tournament.slug)
+
+    elif tournament.is_one_day:
+        # One-day tournament: Redirect to payment preview
+        from django.urls import reverse
+        from urllib.parse import urlencode
+        
+        params = {'type': 'tournament', 'id': tournament.id}
+        base_url = reverse('payment_preview')
+        query_string = urlencode(params)
+        return redirect(f'{base_url}?{query_string}')
+        
+    else:
+        # Multi-day tournament: Requires subscription quota
+        if not sub or not sub.is_active:
+             messages.error(request, 'Для участия в многодневных турнирах требуется подписка.')
+             return redirect('pricing')
+        
+        if not sub.can_register_for_tournament():
+             messages.error(request, 'Вы исчерпали лимит регистрации на турниры в этом месяце. Обновите подписку.')
+             return redirect('pricing')
+
+        # Increment usage
+        sub.increment_usage()
+        messages.success(request, f'Вы зарегистрированы! Осталось регистраций в этом месяце: {sub.get_remaining_slots()}')
+        tournament.participants.add(player)
+
+    
+    # next_url = request.GET.get('next') or request.META.get('HTTP_REFERER')
+    return redirect('tournament_detail', slug=tournament.slug)

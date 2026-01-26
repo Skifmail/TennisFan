@@ -20,7 +20,7 @@ def sparring_list(request):
     ).select_related('player__user')
 
     if city:
-        requests = requests.filter(city=city)
+        requests = requests.filter(city__icontains=city)
     if category:
         requests = requests.filter(desired_category=category)
 

@@ -4,7 +4,7 @@ Sparring models.
 
 from django.db import models
 
-from apps.users.models import City, Player, PlayerCategory
+from apps.users.models import Player, PlayerCategory
 
 
 class SparringRequest(models.Model):
@@ -17,7 +17,7 @@ class SparringRequest(models.Model):
     player = models.ForeignKey(
         Player, on_delete=models.CASCADE, related_name="sparring_requests", verbose_name="Игрок"
     )
-    city = models.CharField("Город", max_length=20, choices=City.choices, default=City.MOSCOW)
+    city = models.CharField("Город", max_length=100)
     desired_category = models.CharField(
         "Желаемая категория партнёра",
         max_length=20,

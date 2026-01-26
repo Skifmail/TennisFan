@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Hide header on scroll for mobile
-    let lastScrollTop = 0;
+    let lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const header = document.querySelector('.header');
     
     if (header) {
@@ -61,6 +61,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (scrollTop < 0) {
                 scrollTop = 0;
             }
+
+            // Threshold of 10px to avoid micro-movements
+            if (Math.abs(lastScrollTop - scrollTop) <= 5)
+                return;
 
             if (scrollTop > lastScrollTop && scrollTop > 60) {
                 // Scrolling down & passed threshold

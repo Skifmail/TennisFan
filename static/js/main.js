@@ -76,8 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
             lastScrollTop = scrollTop;
         });
     }
-});
-    
+
     // Form filter auto-submit
     const filterForms = document.querySelectorAll('.filter-bar');
     filterForms.forEach(function(form) {

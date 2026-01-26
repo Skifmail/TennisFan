@@ -357,33 +357,27 @@ button {
         padding: var(--spacing-sm) var(--spacing-md);
     }
 
-    /* Keep Auth on Right - Force position */
+    /* Keep Auth on Right */
     .nav-auth {
-        margin-left: auto;
-        display: flex; /* Ensure flex behavior is maintained */
-        justify-content: flex-end;
-        width: auto; /* Prevent full width */
-        z-index: 1002;
+        margin-left: auto; /* Push to right just in case */
+        display: flex;
+        align-items: center;
+        z-index: 1002; /* Ensure above logo */
     }
     
-    /* Make auth button smaller on mobile */
+    /* Make auth button smaller on mobile if needed */
     .nav-auth .btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem; /* Smaller font */
-        min-width: auto; /* Remove default min-width */
-        width: auto; /* Prevent full width */
-        line-height: 1.2;
-        height: auto;
-    }
-    
-    .nav-auth .btn-pulse {
-        animation: none; /* Remove pulse animation on mobile to save space/distraction */
+        padding: 0.35rem 0.5rem;
+        font-size: 0.9rem;
+        width: auto; /* Ensure it doesn't take full width */
+        white-space: nowrap;
     }
     
     .nav-dropdown-toggle {
-        max-width: 80px; /* even smaller max width */
-        font-size: 0.75rem;
-        padding: 0.25rem;
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 }
 

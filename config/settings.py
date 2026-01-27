@@ -1,9 +1,4 @@
-"""
-Django settings for TennisFan project.
-
-
-
-DATABASE_URL=ALLOWED_HOSTS=yourdomain.railway.app,www.yourdomain.railway.app"""
+"""Django settings for TennisFan project."""
 
 from pathlib import Path
 import os
@@ -14,12 +9,17 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-tennison-dev-key-chan
 
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-# ALLOWED_HOSTS - default includes localhost for dev and Railway domain for prod
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,*.up.railway.app').split(',')
-CSRF_TRUSTED_ORIGINS = os.environ.get(
+# ALLOWED_HOSTS — localhost for dev; .up.railway.app matches *.up.railway.app
+_allowed = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.up.railway.app')
+ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()]
+
+# CSRF: origins must match exactly or use leading-dot subdomain (e.g. https://.up.railway.app).
+# For custom domains set CSRF_TRUSTED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+_csrf_origins = os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
-    'https://*.railway.app,https://*.up.railway.app'
-).split(',')
+    'http://localhost:8000,http://127.0.0.1:8000,https://.up.railway.app,https://.railway.app'
+)
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = not DEBUG

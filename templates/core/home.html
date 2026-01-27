@@ -108,7 +108,10 @@
                 <div class="player-avatar"></div>
                 {% endif %}
                 <div class="player-info">
-                    <div class="player-name">{{ player }}</div>
+                    <div class="player-name-block">
+                        <span class="player-name">{{ player }}</span>
+                        {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
+                    </div>
                     <span class="player-category">{{ player.get_skill_level_display }}</span>
                 </div>
                 <div class="player-stats">

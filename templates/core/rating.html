@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Рейтинг игроков{% endblock %}
 
@@ -39,15 +40,11 @@
             <div class="player-avatar"></div>
             {% endif %}
             <div class="player-info">
-                <div class="player-name" style="display:flex;align-items:center;gap:8px;">
-                    <span>{{ player }}</span>
-                    {% with tier=player.active_subscription_tier %}
-                        {% if tier and tier.has_badge %}
-                            <img src="/static/images/{{ tier.name }}.png" alt="{{ tier.name }}" title="{{ tier.get_name_display }}" style="width: 16px; height: 16px;">
-                        {% endif %}
-                    {% endwith %}
+                <div class="player-name-block">
+                    <span class="player-name">{{ player }}</span>
+                    {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
                     {% if not player.is_verified %}
-                    <span class="badge" style="background: var(--color-warning, #ffd24d); color: #000;">Неверифицирован</span>
+                    <span class="badge badge-unverified">Неверифицирован</span>
                     {% endif %}
                 </div>
                 <span class="player-category">{{ player.get_skill_level_display }}</span>

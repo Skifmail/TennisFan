@@ -1,0 +1,13 @@
+{% load static %}
+{% if tier %}
+<span class="subscription-badge subscription-badge--{{ tier.name }}" title="Тариф {{ tier.get_name_display }}">
+    {% if tier.name == 'silver' %}
+        <img src="{% static 'images/silver.png' %}" alt="" class="subscription-badge__icon" width="16" height="16">
+    {% elif tier.name == 'gold' %}
+        <img src="{% static 'images/gold.png' %}" alt="" class="subscription-badge__icon" width="16" height="16">
+    {% elif tier.name == 'diamond' %}
+        <img src="{% static 'images/diamond.png' %}" alt="" class="subscription-badge__icon" width="16" height="16">
+    {% endif %}
+    <span class="subscription-badge__label">{{ tier.get_name_display }}</span>
+</span>
+{% endif %}

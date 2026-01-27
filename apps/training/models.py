@@ -28,6 +28,12 @@ class Coach(models.Model):
     phone = models.CharField("Телефон", max_length=20, blank=True)
     telegram = models.CharField("Telegram", max_length=100, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
+    max_contact = models.CharField(
+        "MAX",
+        max_length=500,
+        blank=True,
+        help_text="Ссылка на профиль в мессенджере MAX",
+    )
 
     city = models.CharField("Город", max_length=100)
     is_active = models.BooleanField("Активен", default=True)
@@ -41,6 +47,37 @@ class Coach(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def telegram_url(self) -> str | None:
+        if not self.telegram:
+            return None
+        u = self.telegram.strip().lstrip("@")
+        return f"https://t.me/{u}" if u else None
+
+    @property
+    def whatsapp_url(self) -> str | None:
+        if not self.whatsapp:
+            return None
+        phone = "".join(c for c in self.whatsapp if c.isdigit())
+        if phone.startswith("8") and len(phone) == 11:
+            phone = "7" + phone[1:]
+        elif phone.startswith("7") and len(phone) == 11:
+            pass
+        elif len(phone) == 10:
+            phone = "7" + phone
+        else:
+            return None
+        return f"https://wa.me/{phone}"
+
+    @property
+    def max_url(self) -> str | None:
+        if not self.max_contact:
+            return None
+        s = self.max_contact.strip()
+        if s.startswith(("http://", "https://")):
+            return s
+        return None
 
 
 class Training(models.Model):

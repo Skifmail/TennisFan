@@ -52,3 +52,18 @@ class Court(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.city})"
+
+    @property
+    def whatsapp_url(self) -> str | None:
+        if not self.whatsapp:
+            return None
+        phone = "".join(c for c in self.whatsapp if c.isdigit())
+        if phone.startswith("8") and len(phone) == 11:
+            phone = "7" + phone[1:]
+        elif phone.startswith("7") and len(phone) == 11:
+            pass
+        elif len(phone) == 10:
+            phone = "7" + phone
+        else:
+            return None
+        return f"https://wa.me/{phone}"

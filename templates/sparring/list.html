@@ -74,11 +74,14 @@
                     <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline">Редактировать</a>
                     <a href="{% url 'sparring_my_requests' %}" class="btn btn-ghost">Мои заявки</a>
                     {% elif has_sparring_access %}
+                        {% if req.player.telegram or req.player.whatsapp or req.player.max_url %}
                     <button type="button" class="btn btn-primary sparring-respond-btn" data-id="{{ req.pk }}"
                             data-has-telegram="{% if req.player.telegram %}1{% else %}0{% endif %}"
-                            data-has-whatsapp="{% if req.player.whatsapp %}1{% else %}0{% endif %}">
+                            data-has-whatsapp="{% if req.player.whatsapp %}1{% else %}0{% endif %}"
+                            data-has-max="{% if req.player.max_url %}1{% else %}0{% endif %}">
                         Откликнуться
                     </button>
+                        {% endif %}
                     {% endif %}
                 </div>
             </div>
@@ -98,9 +101,15 @@
         <h3 class="sparring-modal__title">Связаться с автором заявки</h3>
         <p class="text-secondary sparring-modal__sub">Выберите способ связи:</p>
         <div class="sparring-modal__buttons">
-            <a href="#" class="btn sparring-modal__link sparring-modal__link--tg" data-method="telegram" target="_blank" rel="noopener">Telegram</a>
-            <a href="#" class="btn sparring-modal__link sparring-modal__link--wa" data-method="whatsapp" target="_blank" rel="noopener">WhatsApp</a>
-            <a href="#" class="btn sparring-modal__link sparring-modal__link--max" data-method="max">Max</a>
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--tg messenger-btn" data-method="telegram" target="_blank" rel="noopener">
+                <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> Telegram
+            </a>
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--wa messenger-btn" data-method="whatsapp" target="_blank" rel="noopener">
+                <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> WhatsApp
+            </a>
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--max messenger-btn" data-method="max">
+                <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> MAX
+            </a>
         </div>
         <button type="button" class="btn btn-ghost sparring-modal__close" id="sparring-modal-close">Закрыть</button>
     </div>
@@ -122,7 +131,7 @@
         return prefix + '/sparring/' + id + '/respond/?method=' + method;
     }
 
-    function openModal(id, hasTg, hasWa) {
+    function openModal(id, hasTg, hasWa, hasMax) {
         currentId = id;
         var tg = modal.querySelector('.sparring-modal__link--tg');
         var wa = modal.querySelector('.sparring-modal__link--wa');
@@ -132,6 +141,7 @@
         wa.href = respondUrl(id, 'whatsapp');
         wa.style.display = hasWa === '1' ? '' : 'none';
         mx.href = respondUrl(id, 'max');
+        mx.style.display = (hasMax === '1' ? '' : 'none');
         modal.classList.remove('hidden');
     }
 
@@ -142,7 +152,7 @@
 
     respondBtns.forEach(function(btn) {
         btn.addEventListener('click', function() {
-            openModal(this.dataset.id, this.dataset.hasTelegram || '0', this.dataset.hasWhatsapp || '0');
+            openModal(this.dataset.id, this.dataset.hasTelegram || '0', this.dataset.hasWhatsapp || '0', this.dataset.hasMax || '0');
         });
     });
 

@@ -20,6 +20,7 @@ urlpatterns = [
     path('pages/', include('apps.content.urls_pages')),
     path('subscriptions/', include('apps.subscriptions.urls')),
     path('payments/', include('apps.payments.urls')),
+    path('legal/', include('apps.legal.urls')),
 ]
 
 # Serve media files (only if using local filesystem storage, not Cloudinary)

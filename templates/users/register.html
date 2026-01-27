@@ -122,6 +122,18 @@
                     {% endif %}
                 </div>
 
+                <div class="form-group form-group-consent">
+                    <label class="consent-label">
+                        {{ user_form.agree_legal }}
+                        <span class="consent-text">Я согласен на <a href="{% url 'legal_personal_data' %}" target="_blank" rel="noopener">обработку персональных данных</a> и <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политику конфиденциальности</a></span>
+                    </label>
+                    {% if user_form.agree_legal.errors %}
+                        {% for error in user_form.agree_legal.errors %}
+                        <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
                 <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--spacing-md);">Зарегистрироваться</button>
 
                 <p class="text-center mt-3 text-secondary">

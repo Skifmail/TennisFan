@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}Правовые документы{% endblock %}
+
+{% block content %}
+<div class="legal-page">
+    <div class="container container--legal">
+        <header class="legal-header">
+            <h1 class="page-title page-title--legal">Правовые документы</h1>
+            <p class="page-subtitle">Официальные документы TennisFan</p>
+        </header>
+        <div class="legal-list card">
+            <div class="card-body">
+                <ul class="legal-list__ul">
+                    {% for doc in documents %}
+                    <li>
+                        <a href="{% url doc.url_name %}" class="legal-list__link">{{ doc.title }}</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

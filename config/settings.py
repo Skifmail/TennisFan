@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'apps.comments',
     'apps.subscriptions',
     'apps.payments',
+    'apps.legal',
 ]
 
 # Cloudinary configuration - MUST be set BEFORE any Django initialization

@@ -4,7 +4,7 @@ Tournament models: Tournaments, Matches, Ratings.
 
 from django.db import models
 
-from apps.users.models import Player, PlayerCategory
+from apps.users.models import Player, SkillLevel
 
 
 class TournamentType(models.TextChoices):
@@ -54,7 +54,7 @@ class Tournament(models.Model):
     is_one_day = models.BooleanField("Однодневный турнир", default=False, help_text="Если отмечено, взнос платный для всех (с учетом скидок)")
 
     category = models.CharField(
-        "Категория", max_length=20, choices=PlayerCategory.choices, default=PlayerCategory.BASE
+        "Категория", max_length=20, choices=SkillLevel.choices, default=SkillLevel.AMATEUR
     )
     gender = models.CharField(
         "Категория по полу", max_length=10, choices=TournamentGender.choices, default=TournamentGender.MALE
@@ -268,7 +268,7 @@ class SeasonRating(models.Model):
     )
     season = models.CharField("Сезон", max_length=20)  # e.g., "2026"
     category = models.CharField(
-        "Категория", max_length=20, choices=PlayerCategory.choices
+        "Категория", max_length=20, choices=SkillLevel.choices
     )
     points = models.IntegerField("Очки", default=0)
     rank = models.PositiveIntegerField("Место", default=0)

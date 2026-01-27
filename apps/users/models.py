@@ -105,7 +105,7 @@ class Player(models.Model):
     )
     city = models.CharField("Город", max_length=100)
     category = models.CharField(
-        "Категория", max_length=20, choices=PlayerCategory.choices, default=PlayerCategory.BASE
+        "Категория", max_length=20, choices=SkillLevel.choices, default=SkillLevel.AMATEUR
     )
     ntrp_level = models.DecimalField(
         "NTRP уровень", max_digits=3, decimal_places=2, default=3.0

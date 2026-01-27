@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from .models import Match, MatchResultProposal, Tournament, TournamentType
-from apps.users.models import Notification, Player, PlayerCategory
+from apps.users.models import Notification, Player, SkillLevel
 
 
 def tournament_list(request):
@@ -34,7 +34,7 @@ def tournament_list(request):
         'current_city': city,
         'current_category': category,
         'current_status': status,
-        'category_choices': PlayerCategory.choices,
+        'category_choices': SkillLevel.choices,
     }
     return render(request, 'tournaments/list.html', context)
 
@@ -324,6 +324,14 @@ def tournament_register(request, slug):
         messages.error(request, 'Регистрация закрыта: все места заняты.')
         next_url = request.GET.get('next') or request.META.get('HTTP_REFERER')
         return redirect(next_url or reverse('tournament_detail', args=[tournament.slug]))
+
+    # Check gender compatibility
+    if tournament.gender != 'mixed':
+        if (tournament.gender == 'male' and player.gender != 'male') or \
+           (tournament.gender == 'female' and player.gender != 'female'):
+            gender_text = 'мужской' if tournament.gender == 'male' else 'женский'
+            messages.error(request, f'Этот турнир только для {gender_text} категории.')
+            return redirect('tournament_detail', slug=tournament.slug)
 
     # Check if player is already registered
     if tournament.participants.filter(id=player.id).exists():

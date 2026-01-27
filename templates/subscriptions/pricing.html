@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load humanize %}
+{% load static %}
 
 {% block title %}Тарифы и подписка{% endblock %}
 
@@ -10,10 +11,10 @@
 </div>
 
 <div class="container">
-    <div class="pricing-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--spacing-xl); margin-top: var(--spacing-xl);">
+    <div class="pricing-grid">
         
         <!-- FREE TIER (Static) -->
-        <div class="pricing-card" style="background: var(--color-bg-card); border: 1px solid var(--color-border-light); padding: var(--spacing-xl); border-radius: var(--border-radius-lg); position: relative;">
+        <div class="pricing-card pricing-card-free">
             <h3 style="color: var(--color-text); margin-bottom: var(--spacing-sm);">Free</h3>
             <div class="price" style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg);">
                 0 ₽ <span style="font-size: var(--font-size-base); color: var(--color-text-muted); font-weight: 400;">/ месяц</span>
@@ -74,13 +75,10 @@
                     <i class="fas fa-star" style="color: var(--color-success);"></i> Оценка соперников и комментирование
                 </li>
                 {% if tier.has_badge %}
-                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
+                <li class="pricing-feature pricing-feature-badge">
                     <i class="fas fa-certificate" style="color: var(--color-success);"></i>
-                    <span>Особый статус в профиле: </span>
-                    <span style="display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 8px; margin-left: 5px;">
-                        <span style="font-size: 0.7rem; font-weight: bold; color: var(--color-primary);">{{ tier.name|upper }}</span>
-                        <img src="/static/images/{{ tier.name }}.png" alt="{{ tier.name }}" style="width: 16px; height: 16px;">
-                    </span>
+                    <span>Особый статус в профиле:</span>
+                    {% include 'includes/subscription_badge.html' with tier=tier %}
                 </li>
                 {% endif %}
             </ul>

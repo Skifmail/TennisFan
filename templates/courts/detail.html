@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ court.name }}{% endblock %}
 
@@ -82,12 +83,14 @@
                 <p><a href="tel:{{ court.phone }}">{{ court.phone }}</a></p>
                 {% endif %}
 
-                <div class="d-flex gap-2 mt-3">
-                    {% if court.whatsapp %}
-                    <a href="https://wa.me/{{ court.whatsapp }}" class="btn btn-outline" target="_blank">WhatsApp</a>
+                <div class="d-flex gap-2 mt-3 flex-wrap">
+                    {% if court.whatsapp_url %}
+                    <a href="{{ court.whatsapp_url }}" class="btn btn-outline messenger-btn" target="_blank" rel="noopener">
+                        <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> WhatsApp
+                    </a>
                     {% endif %}
                     {% if court.website %}
-                    <a href="{{ court.website }}" class="btn btn-outline" target="_blank">Сайт</a>
+                    <a href="{{ court.website }}" class="btn btn-outline" target="_blank" rel="noopener">Сайт</a>
                     {% endif %}
                 </div>
                 {% endif %}

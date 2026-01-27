@@ -35,7 +35,7 @@ def _get_contact_url(player: Player, method: str) -> str | None:
             return None
         return f"https://wa.me/{phone}"
     if method == SparringResponse.ContactMethod.MAX:
-        return None  # No Max link; we just record the response
+        return player.max_url
     return None
 
 

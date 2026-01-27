@@ -2736,3 +2736,46 @@ select.form-control {
         justify-content: flex-start;
     }
 }
+
+/* ==========================================================================
+   Messenger buttons & logos (Telegram, WhatsApp, MAX)
+   ========================================================================== */
+.messenger-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.messenger-btn__icon {
+    flex-shrink: 0;
+    vertical-align: middle;
+    object-fit: contain;
+}
+
+.messenger-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+/* Form labels with messenger logos (profile edit) */
+.form-label-with-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.form-label__icon {
+    flex-shrink: 0;
+    vertical-align: middle;
+    object-fit: contain;
+}
+
+.form-group-messenger {
+    flex: 1;
+    min-width: 200px;
+}
+
+.sparring-modal__link.messenger-btn {
+    justify-content: center;
+}

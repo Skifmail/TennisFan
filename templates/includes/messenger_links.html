@@ -1,0 +1,20 @@
+{% load static %}
+{% if obj.telegram_url or obj.whatsapp_url or obj.max_url %}
+<div class="messenger-links d-flex gap-2 flex-wrap" style="justify-content: center;">
+    {% if obj.telegram_url %}
+    <a href="{{ obj.telegram_url }}" class="btn btn-outline messenger-btn" target="_blank" rel="noopener">
+        <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> Telegram
+    </a>
+    {% endif %}
+    {% if obj.whatsapp_url %}
+    <a href="{{ obj.whatsapp_url }}" class="btn btn-outline messenger-btn" target="_blank" rel="noopener">
+        <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> WhatsApp
+    </a>
+    {% endif %}
+    {% if obj.max_url %}
+    <a href="{{ obj.max_url }}" class="btn btn-outline messenger-btn" target="_blank" rel="noopener">
+        <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> MAX
+    </a>
+    {% endif %}
+</div>
+{% endif %}

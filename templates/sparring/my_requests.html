@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Мои заявки на спарринг{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Мои заявки</h1>
+    <p class="page-subtitle">Управление вашими заявками на спарринг</p>
+</div>
+
+<div class="container">
+    <div class="d-flex flex-wrap gap-2 mb-4" style="align-items: center;">
+        <a href="{% url 'sparring_list' %}" class="btn btn-ghost">← Все заявки</a>
+        {% if has_sparring_access %}
+        <a href="{% url 'sparring_create' %}" class="btn btn-primary">Создать заявку</a>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-2">
+        {% for req in sparring_requests %}
+        <div class="card sparring-card {% if req.status == 'closed' %}sparring-card--closed{% endif %}">
+            <div class="card-body">
+                <div class="sparring-card__flags">
+                    {% if req.status == 'active' %}
+                    <span class="sparring-flag sparring-flag--recruiting">Идёт набор</span>
+                    {% endif %}
+                    {% if req.has_responses %}
+                    <span class="sparring-flag sparring-flag--responses">Есть отклики</span>
+                    {% endif %}
+                    {% if req.status == 'closed' %}
+                    <span class="sparring-flag sparring-flag--closed">Закрыта</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex gap-3 mt-2" style="align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-xs);">
+                            {{ req.city }}{% if req.desired_category %} • {{ req.get_desired_category_display }}{% endif %}
+                        </p>
+                        <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ req.description|truncatewords:30 }}</p>
+                        {% if req.preferred_days or req.preferred_time %}
+                        <p class="text-muted mt-2" style="font-size: var(--font-size-xs);">
+                            {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
+                            {% if req.preferred_time %} • {{ req.preferred_time }}{% endif %}
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="sparring-card__actions mt-3">
+                    {% if req.status == 'active' %}
+                    <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline">Редактировать</a>
+                    <form action="{% url 'sparring_cancel' req.pk %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-ghost">Отменить</button>
+                    </form>
+                    {% endif %}
+                    <form action="{% url 'sparring_delete' req.pk %}" method="post" class="d-inline" onsubmit="return confirm('Удалить заявку?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-ghost text-error">Удалить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-secondary" style="grid-column: 1 / -1;">У вас пока нет заявок. {% if has_sparring_access %}<a href="{% url 'sparring_create' %}" class="text-primary">Создать заявку</a>{% else %}<a href="{% url 'pricing' %}" class="text-primary">Оформите подписку</a> для доступа.{% endif %}</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

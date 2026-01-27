@@ -7,7 +7,7 @@ from django.shortcuts import render
 
 from apps.content.models import News, Page
 from apps.tournaments.models import Match, Tournament, TournamentDuration, TournamentGender, TournamentStatus
-from apps.users.models import Player, PlayerCategory, SkillLevel
+from apps.users.models import Player, SkillLevel
 
 
 def home(request):
@@ -50,7 +50,7 @@ def home(request):
             'gender': gender,
             'duration': duration,
         },
-        'category_choices': PlayerCategory.choices,
+        'category_choices': SkillLevel.choices,
         'gender_choices': TournamentGender.choices,
         'duration_choices': TournamentDuration.choices,
     }

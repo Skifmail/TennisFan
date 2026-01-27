@@ -1895,6 +1895,10 @@ select.form-control {
     display: none !important;
 }
 
+.w-100 {
+    width: 100%;
+}
+
 .text-error {
     color: var(--color-error);
 }
@@ -2375,4 +2379,193 @@ select.form-control {
 .pricing-card.diamond {
     border-color: var(--color-text-secondary);
     box-shadow: 0 0 20px rgba(166, 130, 74, 0.2);
+}
+
+.pricing-card-free {
+    border-color: var(--color-border-light);
+}
+
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-xl);
+    margin-top: var(--spacing-xl);
+}
+
+.pricing-feature,
+.pricing-feature-badge {
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   Legal documents
+   ========================================================================== */
+.legal-page {
+    padding-top: var(--spacing-2xl);
+    padding-bottom: var(--spacing-3xl);
+}
+
+.container--legal {
+    max-width: 800px;
+}
+
+.legal-header {
+    margin-bottom: var(--spacing-xl);
+}
+
+.page-title--legal {
+    text-align: left;
+}
+
+.legal-doc__body {
+    padding: var(--spacing-2xl) !important;
+}
+
+.legal-doc__body h1,
+.legal-doc__body h2 {
+    margin-top: var(--spacing-xl);
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-xl);
+    color: var(--color-primary);
+}
+
+.legal-doc__body h1:first-child,
+.legal-doc__body h2:first-child {
+    margin-top: 0;
+}
+
+.legal-doc__body p {
+    margin-bottom: var(--spacing-md);
+    line-height: 1.7;
+}
+
+.legal-doc__body ul {
+    margin-bottom: var(--spacing-md);
+    padding-left: var(--spacing-xl);
+}
+
+.legal-doc__body li {
+    margin-bottom: var(--spacing-xs);
+    list-style: disc;
+}
+
+.legal-doc__body a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.legal-doc__body a:hover {
+    color: var(--color-text-secondary);
+}
+
+.legal-doc__body hr {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: var(--spacing-xl) 0;
+}
+
+.legal-doc__body strong {
+    color: var(--color-text);
+}
+
+.legal-list__ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.legal-list__ul li {
+    margin-bottom: var(--spacing-sm);
+    list-style: none;
+}
+
+.legal-list__link {
+    display: block;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.legal-list__link:hover {
+    background: var(--color-primary-transparent);
+    color: var(--color-primary);
+}
+
+/* ==========================================================================
+   Consent (registration) & offer consent (payments)
+   ========================================================================== */
+.form-group-consent {
+    margin-top: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+.consent-label {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+.form-checkbox {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+
+.consent-text a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.consent-text a:hover {
+    color: var(--color-text-secondary);
+}
+
+.offer-consent {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-md);
+    line-height: 1.5;
+}
+
+.offer-consent a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.offer-consent a:hover {
+    color: var(--color-text-secondary);
+}
+
+.btn-pay {
+    margin-top: var(--spacing-xs);
+}
+
+.order-details {
+    background: var(--color-bg-secondary);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+}
+
+@media (max-width: 768px) {
+    .legal-doc__body {
+        padding: var(--spacing-lg) !important;
+    }
+
+    .consent-label {
+        font-size: var(--font-size-xs);
+    }
+
+    .offer-consent {
+        font-size: var(--font-size-xs);
+    }
 }

@@ -69,6 +69,11 @@ class UserRegistrationForm(forms.ModelForm):
         label='Подтвердите пароль *',
         widget=forms.PasswordInput(attrs={'class': 'form-control'}),
     )
+    agree_legal = forms.BooleanField(
+        required=True,
+        label="",
+        widget=forms.CheckboxInput(attrs={"class": "form-checkbox"}),
+    )
 
     class Meta:
         model = User

@@ -4,17 +4,7 @@ Training models for adult tennis training.
 
 from django.db import models
 
-from apps.users.models import PlayerCategory
-
-
-class SkillLevel(models.TextChoices):
-    """Training skill levels."""
-
-    NOVICE = "novice", "Новичок"
-    AMATEUR = "amateur", "Любитель"
-    EXPERIENCED = "experienced", "Опытный"
-    ADVANCED = "advanced", "Продвинутый"
-    PROFESSIONAL = "professional", "Профессионал"
+from apps.users.models import SkillLevel
 
 
 class TrainingType(models.TextChoices):
@@ -68,7 +58,7 @@ class Training(models.Model):
         "Уровень", max_length=20, choices=SkillLevel.choices, default=SkillLevel.AMATEUR
     )
     target_category = models.CharField(
-        "Целевая категория", max_length=20, choices=PlayerCategory.choices, blank=True
+        "Целевой уровень (NTRP)", max_length=20, choices=SkillLevel.choices, blank=True
     )
 
     coach = models.ForeignKey(

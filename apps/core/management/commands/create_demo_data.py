@@ -14,7 +14,7 @@ from apps.courts.models import Court
 from apps.sparring.models import SparringRequest
 from apps.tournaments.models import Match, Tournament
 from apps.training.models import Coach, Training
-from apps.users.models import Player, PlayerCategory, SkillLevel, User
+from apps.users.models import Player, SkillLevel, User
 
 
 def _map_ntrp_to_skill_level(level: Decimal) -> str:
@@ -66,12 +66,13 @@ class Command(BaseCommand):
                 user.save()
 
             ntrp_level = Decimal(random.randint(1, 7))
+            skill = _map_ntrp_to_skill_level(ntrp_level)
             player, _ = Player.objects.get_or_create(
                 user=user,
                 defaults={
-                    "category": category,
+                    "category": skill,
                     "ntrp_level": ntrp_level,
-                    "skill_level": _map_ntrp_to_skill_level(ntrp_level),
+                    "skill_level": skill,
                     "total_points": points,
                     "matches_played": random.randint(10, 50),
                     "matches_won": random.randint(5, 30),

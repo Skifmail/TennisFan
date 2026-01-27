@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Спарринг{% endblock %}
 
@@ -9,59 +10,159 @@
 </div>
 
 <div class="container">
-    <div class="d-flex mb-4" style="justify-content: space-between; align-items: center;">
-        <form method="get" class="filter-bar" style="flex: 1; margin-bottom: 0;">
+    <div class="sparring-toolbar d-flex flex-wrap gap-2 mb-4">
+        <form method="get" class="filter-bar sparring-filters">
             <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
             <select name="category" class="form-control" onchange="this.form.submit()">
-                <option value="">Все категории</option>
-                <option value="futures" {% if current_category == 'futures' %}selected{% endif %}>Futures</option>
-                <option value="base" {% if current_category == 'base' %}selected{% endif %}>Base</option>
-                <option value="tour" {% if current_category == 'tour' %}selected{% endif %}>Tour</option>
-                <option value="hard" {% if current_category == 'hard' %}selected{% endif %}>Hard</option>
-                <option value="challenger" {% if current_category == 'challenger' %}selected{% endif %}>Challenger</option>
+                <option value="">Все уровни (NTRP)</option>
+                <option value="novice" {% if current_category == 'novice' %}selected{% endif %}>Новичок</option>
+                <option value="amateur" {% if current_category == 'amateur' %}selected{% endif %}>Любитель</option>
+                <option value="experienced" {% if current_category == 'experienced' %}selected{% endif %}>Опытный</option>
+                <option value="advanced" {% if current_category == 'advanced' %}selected{% endif %}>Продвинутый</option>
+                <option value="professional" {% if current_category == 'professional' %}selected{% endif %}>Профессионал</option>
             </select>
         </form>
-        <a href="{% url 'sparring_create' %}" class="btn btn-primary" style="margin-left: var(--spacing-lg);">Создать заявку</a>
+        <div class="sparring-toolbar__actions">
+            <a href="{% url 'sparring_my_requests' %}" class="btn btn-ghost">Мои заявки</a>
+            {% if has_sparring_access %}
+            <a href="{% url 'sparring_create' %}" class="btn btn-primary">Создать заявку</a>
+            {% else %}
+            <a href="{% url 'pricing' %}" class="btn btn-outline">Подписка для доступа</a>
+            {% endif %}
+        </div>
     </div>
 
     <div class="grid grid-2">
-        {% for sparring_request in sparring_requests %}
-        <div class="card">
+        {% for req in sparring_requests %}
+        <div class="card sparring-card">
             <div class="card-body">
-                <div class="d-flex gap-3" style="align-items: flex-start;">
-                    {% if sparring_request.player.avatar %}
-                    <img src="{{ sparring_request.player.avatar.url }}" alt="" class="player-avatar" style="width: 56px; height: 56px;">
-                    {% else %}
-                    <div class="player-avatar" style="width: 56px; height: 56px;"></div>
+                <div class="sparring-card__flags">
+                    <span class="sparring-flag sparring-flag--recruiting">Идёт набор</span>
+                    {% if req.has_responses %}
+                    <span class="sparring-flag sparring-flag--responses">Есть отклики</span>
                     {% endif %}
-                    <div style="flex: 1;">
-                        <a href="{% url 'profile' pk=sparring_request.player.pk %}" class="card-title" style="display: block;">{{ sparring_request.player }}</a>
-                        <div class="d-flex gap-1 mt-1 mb-2">
-                            <span class="player-category">{{ sparring_request.player.get_skill_level_display }}</span>
-                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ sparring_request.city }}</span>
+                </div>
+                <div class="d-flex gap-3 sparring-card__main" style="align-items: flex-start;">
+                    {% if req.player.avatar %}
+                    <img src="{{ req.player.avatar.url }}" alt="" class="player-avatar sparring-card__avatar">
+                    {% else %}
+                    <div class="player-avatar sparring-card__avatar"></div>
+                    {% endif %}
+                    <div class="sparring-card__content">
+                        <div class="player-name-block">
+                            <a href="{% url 'profile' pk=req.player.pk %}" class="player-name">{{ req.player }}</a>
+                            {% include 'includes/subscription_badge.html' with tier=req.player.paid_subscription_tier %}
                         </div>
-                        <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ sparring_request.description }}</p>
-                        {% if sparring_request.preferred_days or sparring_request.preferred_time %}
+                        <div class="d-flex gap-1 mt-1 mb-2 flex-wrap">
+                            <span class="player-category">{{ req.player.get_skill_level_display }}</span>
+                            {% if req.desired_category %}
+                            <span class="sparring-desired-category">Партнёр: {{ req.get_desired_category_display }}</span>
+                            {% endif %}
+                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ req.city }}</span>
+                        </div>
+                        <p class="text-secondary sparring-card__desc">{{ req.description }}</p>
+                        {% if req.preferred_days or req.preferred_time %}
                         <p class="text-muted mt-2" style="font-size: var(--font-size-xs);">
-                            {% if sparring_request.preferred_days %}{{ sparring_request.preferred_days }}{% endif %}
-                            {% if sparring_request.preferred_time %} • {{ sparring_request.preferred_time }}{% endif %}
+                            {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
+                            {% if req.preferred_time %} • {{ req.preferred_time }}{% endif %}
                         </p>
                         {% endif %}
                     </div>
                 </div>
-                <div class="d-flex gap-2 mt-3">
-                    {% if sparring_request.player.telegram %}
-                    <a href="https://t.me/{{ sparring_request.player.telegram }}" class="btn btn-outline" target="_blank">Telegram</a>
-                    {% endif %}
-                    {% if sparring_request.player.whatsapp %}
-                    <a href="https://wa.me/{{ sparring_request.player.whatsapp }}" class="btn btn-outline" target="_blank">WhatsApp</a>
+                <div class="sparring-card__actions mt-3">
+                    {% if user.is_authenticated and user.player.pk == req.player_id %}
+                    <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline">Редактировать</a>
+                    <a href="{% url 'sparring_my_requests' %}" class="btn btn-ghost">Мои заявки</a>
+                    {% elif has_sparring_access %}
+                    <button type="button" class="btn btn-primary sparring-respond-btn" data-id="{{ req.pk }}"
+                            data-has-telegram="{% if req.player.telegram %}1{% else %}0{% endif %}"
+                            data-has-whatsapp="{% if req.player.whatsapp %}1{% else %}0{% endif %}">
+                        Откликнуться
+                    </button>
                     {% endif %}
                 </div>
             </div>
         </div>
         {% empty %}
-        <p class="text-secondary">Заявок на спарринг пока нет. <a href="{% url 'sparring_create' %}" class="text-primary">Создайте первую!</a></p>
+        <p class="text-secondary" style="grid-column: 1 / -1;">
+            Заявок на спарринг пока нет.
+            {% if has_sparring_access %}<a href="{% url 'sparring_create' %}" class="text-primary">Создайте первую!</a>{% else %}<a href="{% url 'pricing' %}" class="text-primary">Оформите подписку</a>, чтобы создавать заявки.{% endif %}
+        </p>
         {% endfor %}
     </div>
 </div>
+
+<div class="sparring-modal hidden" id="sparring-respond-modal" role="dialog" aria-label="Выберите способ связи">
+    <div class="sparring-modal__backdrop" id="sparring-modal-backdrop"></div>
+    <div class="sparring-modal__box">
+        <h3 class="sparring-modal__title">Связаться с автором заявки</h3>
+        <p class="text-secondary sparring-modal__sub">Выберите способ связи:</p>
+        <div class="sparring-modal__buttons">
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--tg" data-method="telegram" target="_blank" rel="noopener">Telegram</a>
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--wa" data-method="whatsapp" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--max" data-method="max">Max</a>
+        </div>
+        <button type="button" class="btn btn-ghost sparring-modal__close" id="sparring-modal-close">Закрыть</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const modal = document.getElementById('sparring-respond-modal');
+    const backdrop = document.getElementById('sparring-modal-backdrop');
+    const closeBtn = document.getElementById('sparring-modal-close');
+    const respondBtns = document.querySelectorAll('.sparring-respond-btn');
+    const baseUrl = '{% url "sparring_list" %}'.replace(/\/$/, '');
+    const prefix = baseUrl.replace(/\/sparring\/?$/, '') || '';
+    let currentId = null;
+
+    function respondUrl(id, method) {
+        return prefix + '/sparring/' + id + '/respond/?method=' + method;
+    }
+
+    function openModal(id, hasTg, hasWa) {
+        currentId = id;
+        var tg = modal.querySelector('.sparring-modal__link--tg');
+        var wa = modal.querySelector('.sparring-modal__link--wa');
+        var mx = modal.querySelector('.sparring-modal__link--max');
+        tg.href = respondUrl(id, 'telegram');
+        tg.style.display = hasTg === '1' ? '' : 'none';
+        wa.href = respondUrl(id, 'whatsapp');
+        wa.style.display = hasWa === '1' ? '' : 'none';
+        mx.href = respondUrl(id, 'max');
+        modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        currentId = null;
+    }
+
+    respondBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            openModal(this.dataset.id, this.dataset.hasTelegram || '0', this.dataset.hasWhatsapp || '0');
+        });
+    });
+
+    modal.querySelectorAll('.sparring-modal__link').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            var method = this.dataset.method;
+            if (!currentId) return;
+            var url = respondUrl(currentId, method);
+            if (method === 'max') {
+                window.location.href = url;
+            } else {
+                window.open(url, '_blank', 'noopener');
+            }
+            closeModal();
+        });
+    });
+
+    if (backdrop) backdrop.addEventListener('click', closeModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+})();
+</script>
 {% endblock %}

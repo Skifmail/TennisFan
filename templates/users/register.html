@@ -71,7 +71,10 @@
                 <h3 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Информация об игроке</h3>
 
                 <div class="form-group">
-                    <label class="form-label" for="id_skill_level">{{ player_form.skill_level.label }}</label>
+                    <label class="form-label" for="id_skill_level">
+                        {{ player_form.skill_level.label }}
+                        <a href="{% url 'ntrp_test' %}" target="_blank" style="margin-left: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-text-secondary); text-decoration: none;">(Определить свой NTRP)</a>
+                    </label>
                     {{ player_form.skill_level }}
                     {% if player_form.skill_level.errors %}
                         {% for error in player_form.skill_level.errors %}

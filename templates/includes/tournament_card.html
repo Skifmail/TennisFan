@@ -1,0 +1,70 @@
+<div class="card tournament-card" data-url="{% url 'tournament_detail' slug=tournament.slug %}" onclick="window.location.href=this.dataset.url;">
+    <div class="card-body tournament-card-body">
+        {% if tournament.image %}
+        <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img">
+        {% else %}
+        <div class="tournament-img tournament-img-placeholder"></div>
+        {% endif %}
+
+        <div class="tournament-content-wrapper">
+            <div class="tournament-info">
+                <div class="d-flex gap-1 flex-wrap">
+                    <span class="badge">{{ tournament.city }}</span>
+                    <span class="badge">{{ tournament.get_category_display }}</span>
+                    <span class="badge">{{ tournament.get_gender_display }}</span>
+                    <span class="badge">{{ tournament.get_duration_display }}</span>
+                    {% if tournament.max_participants %}
+                        {% if tournament.is_full %}
+                        <span class="badge badge-full">Мест: {{ tournament.participants.count }}/{{ tournament.max_participants }}</span>
+                        {% else %}
+                        <span class="badge badge-muted">Мест: {{ tournament.participants.count }}/{{ tournament.max_participants }}</span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+                <h3 class="card-title">{{ tournament.name }}</h3>
+                <p class="card-text text-secondary">{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}</p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <span class="player-category">{{ tournament.get_tournament_type_display }}</span>
+                </div>
+
+                {% if tournament.participants.all %}
+                <div class="tournament-participants-section">
+                    <span class="text-secondary section-label">Участники:</span>
+                    <div class="tournament-participants-grid">
+                        {% for participant in tournament.participants.all|slice:":10" %}
+                        <div class="participant-badge">
+                            {% if participant.avatar %}
+                            <img src="{{ participant.avatar.url|default:'/static/images/avatar-placeholder.png' }}" alt="" class="player-avatar">
+                            {% else %}
+                            <div class="player-avatar"></div>
+                            {% endif %}
+                            <span class="participant-name">{{ participant.user.first_name }} {{ participant.user.last_name }}</span>
+                        </div>
+                        {% endfor %}
+                        {% if tournament.participants.count > 10 %}
+                        <div class="participant-more">
+                            <span class="text-secondary">+{{ tournament.participants.count|add:"-10" }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <span class="text-secondary section-label">Пока нет участников</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tournament-action">
+            {% if user.is_authenticated %}
+                {% if tournament.is_full %}
+                <button type="button" class="btn btn-outline" disabled>Мест нет</button>
+                {% else %}
+                <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary" onclick="event.stopPropagation();">Записаться</a>
+                {% endif %}
+            {% else %}
+            <a href="{% url 'login' %}?next={% url 'tournament_list' %}" class="btn btn-outline" onclick="event.stopPropagation();">Войти</a>
+            {% endif %}
+        </div>
+    </div>
+</div>

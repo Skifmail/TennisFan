@@ -26,21 +26,21 @@
     <header class="header">
         <div class="container">
             <nav class="nav">
-                <!-- Mobile Menu Button -->
-                <button class="nav-toggle" aria-label="Меню">
+                <!-- Mobile Menu Button (visible only on mobile) -->
+                <button class="nav-toggle" aria-label="Меню" id="nav-toggle">
                     <span></span>
                     <span></span>
                     <span></span>
                 </button>
 
-                <!-- Logo -->
+                <!-- Logo (centered on mobile) -->
                 <a href="{% url 'home' %}" class="logo">
                     <span class="logo-text">Tennis<span class="logo-accent">Fan</span></span>
                     <img src="{% static 'images/logo.svg' %}" class="coin-logo" alt="TennisFan логотип">
                 </a>
 
-                <!-- Desktop Links / Mobile Dropdown -->
-                <div class="nav-menu">
+                <!-- Desktop Navigation Links -->
+                <div class="nav-menu-desktop">
                     <a href="{% url 'tournament_list' %}" class="btn btn-ghost">Турниры</a>
                     <a href="{% url 'rating' %}" class="btn btn-ghost">Рейтинг</a>
                     <a href="{% url 'champions_league' %}" class="btn btn-ghost">Лига</a>
@@ -54,19 +54,34 @@
                     <a href="{% url 'news_list' %}" class="btn btn-ghost">Новости</a>
                 </div>
                 
-                <!-- Auth Actions (Always visible) -->
+                <!-- Mobile Navigation Menu (hidden by default, shown on menu click) -->
+                <div class="nav-menu-mobile" id="nav-menu-mobile">
+                    <a href="{% url 'tournament_list' %}" class="nav-menu-link">Турниры</a>
+                    <a href="{% url 'rating' %}" class="nav-menu-link">Рейтинг</a>
+                    <a href="{% url 'champions_league' %}" class="nav-menu-link">Лига</a>
+                    <a href="{% url 'results' %}" class="nav-menu-link">Результаты</a>
+                    <a href="{% url 'sparring_list' %}" class="nav-menu-link">Спарринг</a>
+                    <a href="{% url 'training_list' %}" class="nav-menu-link">Тренировки</a>
+                    <a href="{% url 'legends' %}" class="nav-menu-link">Зал славы</a>
+                    <a href="{% url 'rules' %}" class="nav-menu-link">Правила</a>
+                    <a href="{% url 'court_list' %}" class="nav-menu-link">Корты</a>
+                    <a href="{% url 'gallery_list' %}" class="nav-menu-link">Фото</a>
+                    <a href="{% url 'news_list' %}" class="nav-menu-link">Новости</a>
+                </div>
+                
+                <!-- Auth Actions (Always visible - right side) -->
                 <div class="nav-auth">
                     {% if user.is_authenticated %}
                     <div class="nav-dropdown">
-                        <button type="button" class="nav-dropdown-toggle">
+                        <button type="button" class="nav-dropdown-toggle" id="user-menu-toggle">
                             {% if user.player %}
-                            {{ user.player }}
+                            <span class="user-name-text">{{ user.player }}</span>
                             {% else %}
-                            {{ user.email }}
+                            <span class="user-name-text">{{ user.email|truncatechars:15 }}</span>
                             {% endif %}
                             <span class="nav-dropdown-arrow">▼</span>
                         </button>
-                        <ul class="nav-dropdown-content">
+                        <ul class="nav-dropdown-content" id="user-dropdown">
                             {% if user.player %}
                             <li><a href="{% url 'profile' pk=user.player.pk %}">Профиль</a></li>
                             {% endif %}
@@ -85,7 +100,7 @@
                         </ul>
                     </div>
                     {% else %}
-                    <a href="{% url 'login' %}" class="btn btn-primary btn-pulse">Войти</a>
+                    <a href="{% url 'login' %}" class="btn btn-primary btn-pulse nav-login-btn">Войти</a>
                     {% endif %}
                 </div>
             </nav>
@@ -123,7 +138,7 @@
                     {% if not user.is_authenticated %}
                     <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2">Пройти NTRP тест</a>
                     {% endif %}
-                    <a href="{% url 'donate' %}" class="btn mt-2" style="background-color: #889b73; color: white; border: none;">ОТПРАВИТЬ ДОНАТ</a>
+                    <a href="{% url 'donate' %}" class="btn btn-donate mt-2">ОТПРАВИТЬ ДОНАТ</a>
                 </div>
 
                 <div class="footer-links">

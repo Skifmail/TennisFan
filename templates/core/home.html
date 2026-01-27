@@ -40,13 +40,13 @@
             </div>
         </div>
 
-        <form method="get" class="card" style="margin-bottom: var(--spacing-xl);">
-            <div class="card-body" style="display: grid; gap: var(--spacing-md); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
-                <div class="form-group" style="margin: 0;">
+        <form method="get" class="card mb-4">
+            <div class="card-body filter-grid">
+                <div class="form-group">
                     <label class="form-label">Город</label>
                     <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_filters.city }}">
                 </div>
-                <div class="form-group" style="margin: 0;">
+                <div class="form-group">
                     <label class="form-label">Уровень</label>
                     <select name="category" class="form-control">
                         <option value="">Все</option>
@@ -55,7 +55,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="form-group" style="margin: 0;">
+                <div class="form-group">
                     <label class="form-label">Пол</label>
                     <select name="gender" class="form-control">
                         <option value="">Все</option>
@@ -64,7 +64,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="form-group" style="margin: 0;">
+                <div class="form-group">
                     <label class="form-label">Продолжительность</label>
                     <select name="duration" class="form-control">
                         <option value="">Все</option>
@@ -73,89 +73,16 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="form-group" style="margin: 0; display: flex; flex-direction: column; align-items: stretch;">
-                    <label class="form-label" style="visibility: hidden;">Применить</label>
-                    <button type="submit" class="btn btn-primary" style="width: 100%; height: 100%;">Применить</button>
+                <div class="form-group form-group-submit">
+                    <label class="form-label">Применить</label>
+                    <button type="submit" class="btn btn-primary">Применить</button>
                 </div>
             </div>
         </form>
 
-        <div style="display: flex; flex-direction: column; gap: var(--spacing-md);">
+        <div class="d-flex flex-col gap-2">
             {% for tournament in filtered_tournaments %}
-            <div class="card" style="position: relative; cursor: pointer;" data-url="{% url 'tournament_detail' slug=tournament.slug %}" onclick="window.location.href=this.dataset.url;">
-                <div class="card-body" style="display: flex; gap: var(--spacing-lg); align-items: center;">
-                    {% if tournament.image %}
-                    <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" style="width: 160px; height: 160px; object-fit: cover; border-radius: var(--radius-md); flex-shrink: 0;">
-                    {% else %}
-                    <div style="width: 160px; height: 160px; background: var(--color-bg-elevated); border-radius: var(--radius-md); flex-shrink: 0;"></div>
-                    {% endif %}
-                    
-                    <div style="flex: 1; display: flex; flex-direction: column; gap: var(--spacing-sm);">
-                        <div class="d-flex gap-1" style="flex-wrap: wrap;">
-                            <span class="badge">{{ tournament.city }}</span>
-                            <span class="badge">{{ tournament.get_category_display }}</span>
-                            <span class="badge">{{ tournament.get_gender_display }}</span>
-                            <span class="badge">{{ tournament.get_duration_display }}</span>
-                            {% if tournament.max_participants %}
-                                {% if tournament.is_full %}
-                                <span class="badge" style="background: rgba(255, 0, 0, 0.2); color: #ff6b6b;">Мест: {{ tournament.participants.count }}/{{ tournament.max_participants }}</span>
-                                {% else %}
-                                <span class="badge" style="background: var(--color-bg-elevated);">Мест: {{ tournament.participants.count }}/{{ tournament.max_participants }}</span>
-                                {% endif %}
-                            {% endif %}
-                        </div>
-                        
-                        <h3 class="card-title" style="margin: 0; color: var(--color-text);">
-                            {{ tournament.name }}
-                        </h3>
-                        
-                        <p class="card-text text-secondary" style="margin: 0;">
-                            {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
-                        </p>
-                        
-                        <div style="display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap;">
-                            <span class="player-category">{{ tournament.get_tournament_type_display }}</span>
-                        </div>
-                        
-                        {% if tournament.participants.all %}
-                        <div style="display: flex; flex-direction: column; gap: var(--spacing-xs);">
-                            <span class="text-secondary" style="font-size: var(--font-size-sm);">Участники:</span>
-                            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--spacing-xs);">
-                                {% for participant in tournament.participants.all|slice:":10" %}
-                                <div style="display: flex; align-items: center; gap: var(--spacing-xs); background: var(--color-bg-elevated); padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--radius-md); min-width: 0;">
-                                    {% if participant.avatar %}
-                                    <img src="{{ participant.avatar.url|default:'/static/images/avatar-placeholder.png' }}" alt="" class="player-avatar" style="width: 24px; height: 24px; flex-shrink: 0;">
-                                    {% else %}
-                                    <div class="player-avatar" style="width: 24px; height: 24px; flex-shrink: 0;"></div>
-                                    {% endif %}
-                                    <span style="font-size: var(--font-size-sm); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ participant.user.first_name }} {{ participant.user.last_name }}</span>
-                                </div>
-                                {% endfor %}
-                                {% if tournament.participants.count > 10 %}
-                                <div style="display: flex; align-items: center; gap: var(--spacing-xs); background: var(--color-bg-elevated); padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--radius-md);">
-                                    <span class="text-secondary" style="font-size: var(--font-size-sm); font-weight: 500;">+{{ tournament.participants.count|add:"-10" }}</span>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% else %}
-                        <span class="text-secondary" style="font-size: var(--font-size-sm);">Пока нет участников</span>
-                        {% endif %}
-                    </div>
-                    
-                    <div style="flex-shrink: 0; position: relative; z-index: 10;">
-                        {% if user.is_authenticated %}
-                            {% if tournament.is_full %}
-                            <button class="btn btn-outline" disabled style="cursor: not-allowed; opacity: 0.5;">Мест нет</button>
-                            {% else %}
-                            <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary" onclick="event.stopPropagation();">Записаться</a>
-                            {% endif %}
-                        {% else %}
-                        <a href="{% url 'login' %}?next={% url 'home' %}" class="btn btn-outline" onclick="event.stopPropagation();">Войти</a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+                {% include 'includes/tournament_card.html' with tournament=tournament %}
             {% empty %}
             <p class="text-secondary">Подходящих турниров не найдено.</p>
             {% endfor %}

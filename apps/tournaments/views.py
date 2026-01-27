@@ -134,15 +134,23 @@ def _apply_proposal(proposal: MatchResultProposal):
         match.points_player2 = win_delta
     match.save()
 
-    # Update stats and points
-    winner.matches_played += 1
-    loser.matches_played += 1
-    winner.matches_won += 1
-    winner.total_points += win_delta
-    loser.total_points += lose_delta
-
-    winner.save()
-    loser.save()
+    # Update player statistics
+    from apps.users.models import Player
+    
+    # Update winner stats
+    winner_player = Player.objects.filter(user=winner.user).first()
+    if winner_player:
+        winner_player.total_points = winner_player.total_points + win_delta
+        winner_player.matches_played = winner_player.matches_played + 1
+        winner_player.matches_won = winner_player.matches_won + 1
+        winner_player.save(update_fields=['total_points', 'matches_played', 'matches_won'])
+    
+    # Update loser stats
+    loser_player = Player.objects.filter(user=loser.user).first()
+    if loser_player:
+        loser_player.total_points = max(0, loser_player.total_points + lose_delta)  # Don't go below 0
+        loser_player.matches_played = loser_player.matches_played + 1
+        loser_player.save(update_fields=['total_points', 'matches_played'])
 
     # Close other pending proposals for this match
     match.result_proposals.exclude(pk=proposal.pk).update(status=Match.ProposalStatus.REJECTED)

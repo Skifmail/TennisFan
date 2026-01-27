@@ -129,38 +129,46 @@ class PlayerProfileForm(forms.ModelForm):
     class Meta:
         model = Player
         fields = (
-            'avatar',
-            'skill_level',
-            'birth_date',
-            'gender',
-            'forehand',
-            'city',
-            'bio',
-            'telegram',
-            'whatsapp',
+            "avatar",
+            "skill_level",
+            "birth_date",
+            "gender",
+            "forehand",
+            "city",
+            "bio",
+            "telegram",
+            "whatsapp",
+            "max_contact",
         )
         widgets = {
-            'skill_level': forms.Select(attrs={'class': 'form-control'}),
-            'birth_date': forms.DateInput(
-                attrs={'class': 'form-control', 'type': 'date'},
-                format='%Y-%m-%d',
+            "skill_level": forms.Select(attrs={"class": "form-control"}),
+            "birth_date": forms.DateInput(
+                attrs={"class": "form-control", "type": "date"},
+                format="%Y-%m-%d",
             ),
-            'gender': forms.Select(attrs={'class': 'form-control'}),
-            'forehand': forms.Select(attrs={'class': 'form-control'}),
-            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Город'}),
-            'bio': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
-            'telegram': forms.TextInput(attrs={'class': 'form-control'}),
-            'whatsapp': forms.TextInput(attrs={'class': 'form-control'}),
+            "gender": forms.Select(attrs={"class": "form-control"}),
+            "forehand": forms.Select(attrs={"class": "form-control"}),
+            "city": forms.TextInput(attrs={"class": "form-control", "placeholder": "Город"}),
+            "bio": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+            "telegram": forms.TextInput(attrs={"class": "form-control"}),
+            "whatsapp": forms.TextInput(attrs={"class": "form-control"}),
+            "max_contact": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Ссылка на профиль MAX из «Поделиться»",
+                }
+            ),
         }
         labels = {
-            'skill_level': 'Уровень мастерства',
-            'birth_date': 'Дата рождения',
-            'gender': 'Пол',
-            'forehand': 'Ведущая рука',
-            'city': 'Город',
-            'bio': 'О себе',
-            'telegram': 'Telegram',
-            'whatsapp': 'WhatsApp',
+            "skill_level": "Уровень мастерства",
+            "birth_date": "Дата рождения",
+            "gender": "Пол",
+            "forehand": "Ведущая рука",
+            "city": "Город",
+            "bio": "О себе",
+            "telegram": "Telegram",
+            "whatsapp": "WhatsApp",
+            "max_contact": "MAX",
         }
 
     def __init__(self, *args, user=None, **kwargs):

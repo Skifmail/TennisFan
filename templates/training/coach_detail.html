@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ coach.name }}{% endblock %}
 
@@ -22,17 +23,12 @@
                 <p class="text-secondary">{{ coach.specialization }}</p>
                 <p class="text-muted mt-2">Опыт: {{ coach.experience_years }} лет</p>
 
-                {% if coach.telegram or coach.whatsapp or coach.phone %}
-                <div class="d-flex gap-2 mt-3" style="justify-content: center; flex-wrap: wrap;">
+                {% if coach.phone or coach.telegram_url or coach.whatsapp_url or coach.max_url %}
+                <div class="d-flex gap-2 mt-3 flex-wrap" style="justify-content: center;">
                     {% if coach.phone %}
                     <a href="tel:{{ coach.phone }}" class="btn btn-outline">Позвонить</a>
                     {% endif %}
-                    {% if coach.telegram %}
-                    <a href="https://t.me/{{ coach.telegram }}" class="btn btn-outline" target="_blank">Telegram</a>
-                    {% endif %}
-                    {% if coach.whatsapp %}
-                    <a href="https://wa.me/{{ coach.whatsapp }}" class="btn btn-outline" target="_blank">WhatsApp</a>
-                    {% endif %}
+                    {% include 'includes/messenger_links.html' with obj=coach %}
                 </div>
                 {% endif %}
             </div>

@@ -127,6 +127,12 @@ class Player(models.Model):
     bio = models.TextField("О себе", blank=True)
     telegram = models.CharField("Telegram", max_length=100, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
+    max_contact = models.CharField(
+        "MAX",
+        max_length=500,
+        blank=True,
+        help_text="Ссылка на профиль в мессенджере MAX (из раздела «Поделиться»)",
+    )
 
     # Statistics (computed fields)
     total_points = models.IntegerField("Очки", default=0)
@@ -164,6 +170,40 @@ class Player(models.Model):
         if tier is None or tier.name == "free":
             return None
         return tier
+
+    @property
+    def telegram_url(self) -> str | None:
+        """Link to Telegram profile."""
+        if not self.telegram:
+            return None
+        u = self.telegram.strip().lstrip("@")
+        return f"https://t.me/{u}" if u else None
+
+    @property
+    def whatsapp_url(self) -> str | None:
+        """Link to WhatsApp chat."""
+        if not self.whatsapp:
+            return None
+        phone = "".join(c for c in self.whatsapp if c.isdigit())
+        if phone.startswith("8") and len(phone) == 11:
+            phone = "7" + phone[1:]
+        elif phone.startswith("7") and len(phone) == 11:
+            pass
+        elif len(phone) == 10:
+            phone = "7" + phone
+        else:
+            return None
+        return f"https://wa.me/{phone}"
+
+    @property
+    def max_url(self) -> str | None:
+        """Link to MAX profile (stored URL)."""
+        if not self.max_contact:
+            return None
+        s = self.max_contact.strip()
+        if s.startswith(("http://", "https://")):
+            return s
+        return None
 
     @staticmethod
     def _calculate_age(birth_date):

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Редактирование профиля{% endblock %}
 
@@ -68,14 +69,24 @@
                     {{ form.bio }}
                 </div>
 
-                <div class="d-flex gap-2">
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label">{{ form.telegram.label }} (username)</label>
+                <div class="d-flex gap-2 flex-wrap">
+                    <div class="form-group form-group-messenger">
+                        <label class="form-label form-label-with-logo">
+                            <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="form-label__icon" width="18" height="18"> {{ form.telegram.label }} (username)
+                        </label>
                         {{ form.telegram }}
                     </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label">{{ form.whatsapp.label }} (номер)</label>
+                    <div class="form-group form-group-messenger">
+                        <label class="form-label form-label-with-logo">
+                            <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="form-label__icon" width="18" height="18"> {{ form.whatsapp.label }} (номер)
+                        </label>
                         {{ form.whatsapp }}
+                    </div>
+                    <div class="form-group form-group-messenger">
+                        <label class="form-label form-label-with-logo">
+                            <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="form-label__icon" width="18" height="18"> {{ form.max_contact.label }} (ссылка)
+                        </label>
+                        {{ form.max_contact }}
                     </div>
                 </div>
 

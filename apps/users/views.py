@@ -54,7 +54,12 @@ def register(request):
 
 def profile(request, pk):
     """User profile view."""
-    player = get_object_or_404(Player.objects.select_related('user'), pk=pk)
+    player = get_object_or_404(
+        Player.objects.select_related(
+            'user', 'user__subscription', 'user__subscription__tier'
+        ),
+        pk=pk,
+    )
 
     # Get player's recent matches
     from django.db.models import Q

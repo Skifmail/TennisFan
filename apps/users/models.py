@@ -153,9 +153,17 @@ class Player(models.Model):
             sub = self.user.subscription
             if sub.is_valid():
                 return sub.tier
-        except:
+        except Exception:
             pass
         return None
+
+    @property
+    def paid_subscription_tier(self):
+        """Return subscription tier if player has an active paid subscription (Silver/Gold/Diamond), else None."""
+        tier = self.active_subscription_tier
+        if tier is None or tier.name == "free":
+            return None
+        return tier
 
     @staticmethod
     def _calculate_age(birth_date):

@@ -1,19 +1,17 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ player }} - Профиль{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top: var(--spacing-2xl);">
     <!-- Profile Card -->
-    <div class="card" style="max-width: 500px; margin: 0 auto var(--spacing-xl); position: relative;">
-            {% with tier=player.active_subscription_tier %}
-                {% if tier and tier.has_badge %}
-                <div class="subscription-badge" title="Подписка {{ tier.get_name_display }}" style="position: absolute; top: var(--spacing-sm); right: var(--spacing-sm); display: flex; align-items: center; gap: var(--spacing-xs); background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 12px;">
-                    <span style="font-size: 0.7rem; font-weight: bold; color: var(--color-primary);">{{ tier.name|upper }}</span>
-                    <img src="/static/images/{{ tier.name }}.png" alt="{{ tier.name }}" style="width: 20px; height: 20px;">
-                </div>
-                {% endif %}
-            {% endwith %}
+    <div class="card profile-card">
+            {% if player.paid_subscription_tier %}
+            <div class="subscription-badge-wrap subscription-badge-wrap--card">
+                {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
+            </div>
+            {% endif %}
             <div class="card-body text-center">
                 {% if player.avatar %}
                 <img src="{{ player.avatar.url }}" alt="" class="player-avatar"

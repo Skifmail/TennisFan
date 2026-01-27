@@ -906,6 +906,12 @@ button {
     border-color: transparent;
 }
 
+.badge.badge-unverified {
+    background: rgba(255, 210, 77, 0.25);
+    color: #1a1a1a;
+    border-color: rgba(255, 210, 77, 0.5);
+}
+
 .my-matches-grid {
     gap: var(--spacing-xl);
 }
@@ -971,7 +977,72 @@ button {
 
 .player-info .player-name {
     font-size: var(--font-size-lg);
+}
+
+.player-name-block {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.2rem;
     margin-bottom: var(--spacing-xs);
+}
+
+.player-name-block .player-name {
+    flex: none;
+    margin-bottom: 0;
+}
+
+.subscription-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 2px var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.subscription-badge__icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.subscription-badge__label {
+    line-height: 1;
+}
+
+.subscription-badge--silver {
+    background: rgba(192, 192, 192, 0.2);
+    color: #c0c0c0;
+    border: 1px solid rgba(192, 192, 192, 0.4);
+}
+
+.subscription-badge--gold {
+    background: rgba(218, 165, 32, 0.2);
+    color: #daa520;
+    border: 1px solid rgba(218, 165, 32, 0.5);
+}
+
+.subscription-badge--diamond {
+    background: rgba(185, 242, 255, 0.15);
+    color: #b9f2ff;
+    border: 1px solid rgba(185, 242, 255, 0.4);
+}
+
+.subscription-badge-wrap--card {
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+}
+
+.profile-card {
+    max-width: 500px;
+    margin: 0 auto var(--spacing-xl);
+    position: relative;
 }
 
 .player-category {

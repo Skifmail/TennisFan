@@ -40,7 +40,9 @@ def home(request):
     context = {
         'filtered_tournaments': tournaments,
         'upcoming_tournaments': upcoming_tournaments,
-        'top_players': Player.objects.filter(is_verified=True).order_by('-total_points')[:10],
+        'top_players': Player.objects.filter(is_verified=True)
+        .select_related('user', 'user__subscription', 'user__subscription__tier')
+        .order_by('-total_points')[:10],
         'latest_news': News.objects.filter(is_published=True)[:4],
         'current_filters': {
             'city': city,
@@ -61,7 +63,9 @@ def rating(request):
     skill_level = request.GET.get('skill_level', '') or request.GET.get('category', '')
     search = request.GET.get('q', '')
 
-    players = Player.objects.select_related('user')
+    players = Player.objects.select_related(
+        'user', 'user__subscription', 'user__subscription__tier'
+    )
 
     if city:
         players = players.filter(city__icontains=city)

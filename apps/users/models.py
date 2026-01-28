@@ -103,24 +103,23 @@ class Player(models.Model):
         blank=True,
         storage=None,  # Use default storage from settings
     )
-    city = models.CharField("Город", max_length=100)
-    category = models.CharField(
-        "Категория", max_length=20, choices=SkillLevel.choices, default=SkillLevel.AMATEUR
-    )
+    city = models.CharField("Город", max_length=100, blank=True, default="")
     ntrp_level = models.DecimalField(
         "NTRP уровень", max_digits=3, decimal_places=2, default=3.0
     )
-    
-    # Обязательные поля при регистрации
     skill_level = models.CharField(
-        "Уровень мастерства", max_length=20, choices=SkillLevel.choices
+        "Уровень мастерства (NTRP)",
+        max_length=20,
+        choices=SkillLevel.choices,
+        default=SkillLevel.NOVICE,
+        help_text="Только из NTRP-теста или админка. Пользователь не редактирует вручную.",
     )
-    birth_date = models.DateField("Дата рождения")
+    birth_date = models.DateField("Дата рождения", null=True, blank=True)
     gender = models.CharField(
-        "Пол", max_length=10, choices=Gender.choices
+        "Пол", max_length=10, choices=Gender.choices, blank=True, default=""
     )
     forehand = models.CharField(
-        "Forehand", max_length=10, choices=Forehand.choices
+        "Ведущая рука", max_length=10, choices=Forehand.choices, blank=True, default=""
     )
     
     age = models.PositiveIntegerField("Возраст", null=True, blank=True)

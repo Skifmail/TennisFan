@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Мои тренировки{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Мои тренировки</h1>
+    <p class="page-subtitle">Управление тренировками и заявками</p>
+</div>
+
+<div class="container">
+
+    {% if coach %}
+    <section class="mb-5">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+            <h2 class="section-title mb-0">Как тренер</h2>
+            <a href="{% url 'training_add' %}" class="btn btn-primary btn--filter-size">Добавить тренировку</a>
+        </div>
+
+        {% for t in coach_trainings %}
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <h3 class="mb-0" style="font-size: var(--font-size-xl);">{{ t.title }}</h3>
+                    <a href="{% url 'training_edit' pk=t.pk %}" class="btn btn-ghost btn--filter-size">Изменить</a>
+                    <a href="{% url 'training_detail' slug=t.slug %}" class="btn btn-outline btn--filter-size">На сайт</a>
+                </div>
+                <p class="text-secondary mb-0">{{ t.get_training_type_display }}, {{ t.city }}{% if t.price %} · {{ t.price }} ₽{% endif %}</p>
+
+                <h4 class="mt-4 mb-2" style="font-size: var(--font-size-base);">Заявки ({{ t.enrollments.count }})</h4>
+                {% for e in t.enrollments.all %}
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2 p-3" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                    <div style="flex: 1; min-width: 180px;">
+                        <strong>{{ e.full_name|default:e.player.user.get_full_name|default:e.player.user.email }}</strong>
+                        <span class="text-secondary" style="font-size: var(--font-size-sm); margin-left: var(--spacing-sm);">{{ e.get_status_display }}</span>
+                    </div>
+                    <div class="d-flex gap-1 flex-wrap">
+                        {% if e.telegram_url %}
+                        <a href="{% url 'enrollment_contact' pk=e.pk method='telegram' %}" class="btn btn-outline btn--filter-size" target="_blank" rel="noopener">
+                            <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="18" height="18"> Telegram
+                        </a>
+                        {% endif %}
+                        {% if e.whatsapp_url %}
+                        <a href="{% url 'enrollment_contact' pk=e.pk method='whatsapp' %}" class="btn btn-outline btn--filter-size" target="_blank" rel="noopener">
+                            <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="18" height="18"> WhatsApp
+                        </a>
+                        {% endif %}
+                        {% if e.email %}
+                        <a href="{% url 'enrollment_contact' pk=e.pk method='email' %}" class="btn btn-outline btn--filter-size">
+                            Email
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-secondary mb-0">Заявок пока нет.</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-secondary">У вас пока нет тренировок. <a href="{% url 'training_add' %}">Добавить</a>.</p>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    <section>
+        <h2 class="section-title mb-4">Мои заявки на тренировки</h2>
+        {% if my_enrollments %}
+        <div class="grid grid-3">
+            {% for e in my_enrollments %}
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">{{ e.training.title }}</h3>
+                    <p class="text-secondary mb-2" style="font-size: var(--font-size-sm);">{{ e.training.get_training_type_display }}, {{ e.training.city }}</p>
+                    <p class="mb-3"><span class="player-category">{{ e.get_status_display }}</span></p>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'training_detail' slug=e.training.slug %}" class="btn btn-outline btn--filter-size">Подробнее</a>
+                        <form action="{% url 'enrollment_delete' pk=e.pk %}" method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-ghost btn--filter-size" onclick="return confirm('Удалить заявку?');">Удалить</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-secondary">У вас нет заявок на тренировки. <a href="{% url 'training_list' %}">Выбрать тренировку</a>.</p>
+        {% endif %}
+    </section>
+
+</div>
+{% endblock %}

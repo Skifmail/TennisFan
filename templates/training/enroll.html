@@ -8,19 +8,62 @@
     <p class="page-subtitle">{{ training.title }}</p>
 </div>
 
-<div class="container" style="max-width: 500px;">
+<div class="container" style="max-width: 520px;">
     <div class="card">
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <form method="post">
                 {% csrf_token %}
+                {% if form.non_field_errors %}
+                <div class="alert alert-error" style="margin-bottom: var(--spacing-lg);">
+                    {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+                </div>
+                {% endif %}
 
                 <div class="form-group">
-                    <label class="form-label">Сообщение (необязательно)</label>
-                    <textarea name="message" class="form-control" rows="4"
-                        placeholder="Расскажите о своём опыте, задайте вопросы..."></textarea>
+                    <label class="form-label" for="id_full_name">ФИО *</label>
+                    {{ form.full_name }}
+                    {% for err in form.full_name.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_telegram">Telegram *</label>
+                    {{ form.telegram }}
+                    {% for err in form.telegram.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_whatsapp">WhatsApp</label>
+                    {{ form.whatsapp }}
+                    {% for err in form.whatsapp.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_email">Email *</label>
+                    {{ form.email }}
+                    {% for err in form.email.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_preferred_datetime">Желаемое время</label>
+                    {{ form.preferred_datetime }}
+                    {% for err in form.preferred_datetime.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_desired_court">Желаемый корт</label>
+                    {{ form.desired_court }}
+                    {% for err in form.desired_court.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_message">Сообщение</label>
+                    {{ form.message }}
+                    {% for err in form.message.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
 
-                <div class="d-flex gap-2">
+                <div class="form-group form-group-consent">
+                    <label class="consent-label">
+                        {{ form.agree_legal }}
+                        <span class="consent-text">Я согласен на <a href="{% url 'legal_personal_data' %}" target="_blank" rel="noopener">обработку персональных данных</a> и <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политику конфиденциальности</a></span>
+                    </label>
+                    {% for err in form.agree_legal.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+
+                <div class="d-flex gap-2" style="flex-wrap: wrap;">
                     <button type="submit" class="btn btn-primary btn-lg" style="flex: 1;">Отправить заявку</button>
                     <a href="{% url 'training_detail' slug=training.slug %}" class="btn btn-ghost btn-lg">Отмена</a>
                 </div>

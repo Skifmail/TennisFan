@@ -5,7 +5,7 @@
             Оценочный тест для самопроверки. Результат не заменяет официальный рейтинг.
         </p>
 
-        <div id="ntrp-quiz" class="ntrp-quiz" data-can-save="{{ can_save|yesno:'true,false' }}">
+        <div id="ntrp-quiz" class="ntrp-quiz" data-can-save="{{ can_save|yesno:'true,false' }}" data-form-target="{{ form_target|default:'' }}">
             <div class="ntrp-progress">
                 <span id="ntrp-step">Вопрос 1 из 11</span>
                 <span id="ntrp-score" class="text-secondary">Баллы: 0</span>
@@ -25,7 +25,8 @@
             <div class="ntrp-level">Ваш уровень: <span id="ntrp-level-value"></span></div>
             <p id="ntrp-description" class="text-secondary"></p>
             <p id="ntrp-score-total" class="text-secondary"></p>
-            <a href="{% url 'tournament_list' %}" class="btn btn-primary">Записаться в турнир</a>
+            <a id="ntrp-result-link" href="{% url 'tournament_list' %}" class="btn btn-primary">Записаться в турнир</a>
+            <p id="ntrp-result-form-msg" class="hidden text-primary" style="font-weight: 600;">Результат подставлен в форму. Заполните данные выше и нажмите «Зарегистрироваться».</p>
         </div>
     </div>
 </div>
@@ -272,6 +273,10 @@
         }
     });
 
+    const formTarget = quizEl.dataset.formTarget || '';
+    const resultLink = document.getElementById('ntrp-result-link');
+    const resultFormMsg = document.getElementById('ntrp-result-form-msg');
+
     calcBtn.addEventListener('click', () => {
         const totalScore = answers.reduce((sum, value) => sum + (value || 0), 0);
         const result = getNtrpResult(totalScore);
@@ -283,7 +288,17 @@
         scoreTotalEl.textContent = `Ваш результат: ${totalScore} баллов теста`;
         quizEl.classList.add('hidden');
         resultEl.classList.remove('hidden');
-        saveNtrpIfAllowed(result.level);
+        if (formTarget) {
+            const input = document.getElementById(formTarget);
+            if (input) {
+                input.value = result.level;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (resultLink) resultLink.classList.add('hidden');
+            if (resultFormMsg) resultFormMsg.classList.remove('hidden');
+        } else {
+            saveNtrpIfAllowed(result.level);
+        }
     });
 
     renderQuestion();

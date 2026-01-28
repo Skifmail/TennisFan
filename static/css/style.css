@@ -12,6 +12,7 @@
     --color-bg-elevated: #16302B;
 
     --color-primary: #A6824A;
+    --color-accent: #83530cd3; /* заголовки, «теннису», Fan в логотипе */
     --color-primary-gradient: linear-gradient(90deg, #A6824A 0%, #390517 100%);
     --color-primary-dark: #03110D;
     --color-primary-transparent: rgba(166, 130, 74, 0.15);
@@ -25,7 +26,7 @@
 
     --color-success: #A6824A;
     --color-warning: #16302B;
-    --color-error: #FF4D4D;
+    --color-error: #a00000;
     --color-info: #A6824A;
 
     /* Typography */
@@ -272,7 +273,7 @@ button {
 }
 
 .logo-accent {
-    color: var(--color-primary);
+    color: var(--color-accent);
 }
 
 /* Desktop Navigation Menu */
@@ -536,6 +537,14 @@ button {
     animation: pulse 2s infinite;
 }
 
+/** Кнопка по высоте как поля фильтра (form-control). */
+.btn--filter-size {
+    height: 59px;
+    line-height: 16px;
+    padding: 0 var(--spacing-md); /* горизонтальные отступы */
+    margin-top: 24px;
+}
+
 .btn-donate {
     background: #889b73;
     color: white;
@@ -659,12 +668,13 @@ button {
 
 .ntrp-actions {
     display: flex;
+    align-items: center;
     gap: var(--spacing-sm);
-    flex-wrap: wrap;
 }
 
 .ntrp-actions .btn {
-    min-width: 140px;
+    flex: 1;
+    min-width: 0;
 }
 
 @media (max-width: 480px) {
@@ -673,6 +683,7 @@ button {
     }
     
     .ntrp-actions .btn {
+        flex: none;
         min-width: 100%;
         width: 100%;
     }
@@ -896,8 +907,8 @@ button {
 
 .badge.badge-full {
     background: rgba(255, 77, 77, 0.15);
-    color: #ff6b6b;
-    border-color: rgba(255, 77, 77, 0.35);
+    color: #8b0000;
+    border-color: rgb(59, 0, 0);
 }
 
 .badge.badge-muted {
@@ -1259,6 +1270,13 @@ select.form-control {
     margin-bottom: 0;
 }
 
+.filter-grid .form-control {
+    height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.25;
+}
+
 .filter-grid .form-group-submit {
     display: flex;
     flex-direction: column;
@@ -1271,7 +1289,14 @@ select.form-control {
 
 .filter-grid .form-group-submit .btn {
     width: 100%;
+    height: 44px;
     min-height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.25;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 @media (max-width: 600px) {
@@ -1372,7 +1397,7 @@ select.form-control {
     font-size: var(--font-size-4xl);
     font-weight: 800;
     margin-bottom: var(--spacing-md);
-    color: var(--color-primary);
+    color: var(--color-accent);
 }
 
 .page-subtitle {
@@ -1415,6 +1440,7 @@ select.form-control {
 .section-title {
     font-size: var(--font-size-2xl);
     font-weight: 700;
+    color: var(--color-accent);
 }
 
 @media (max-width: 768px) {
@@ -1488,7 +1514,7 @@ select.form-control {
 }
 
 .hero-title span {
-    color: var(--color-primary);
+    color: var(--color-accent);
 }
 
 .hero-text {
@@ -1691,13 +1717,7 @@ select.form-control {
         gap: var(--spacing-sm);
     }
     
-    /* Player cards */
-    .player-card {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--spacing-md);
-    }
-    
+    /* Player cards: column layout for match views etc. */
     .player-info {
         width: 100%;
     }
@@ -1713,6 +1733,118 @@ select.form-control {
     }
 }
 
+/* Player cards: узкие горизонтальные полоски на главной и в рейтинге */
+@media (max-width: 768px) {
+    .grid .player-card,
+    .rating-list .grid .player-card {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        padding: var(--spacing-sm) var(--spacing-md);
+        gap: var(--spacing-sm);
+    }
+
+    .grid .player-card .player-rank,
+    .rating-list .grid .player-card .player-rank {
+        font-size: var(--font-size-sm);
+        font-weight: 700;
+        min-width: 20px;
+    }
+
+    .grid .player-card .player-avatar,
+    .rating-list .grid .player-card .player-avatar {
+        width: 40px;
+        height: 40px;
+        flex-shrink: 0;
+    }
+
+    .grid .player-card .player-info,
+    .rating-list .grid .player-card .player-info {
+        flex: 1;
+        min-width: 0;
+        width: auto;
+    }
+
+    .grid .player-card .player-info .player-name,
+    .rating-list .grid .player-card .player-info .player-name {
+        font-size: var(--font-size-base);
+    }
+
+    .grid .player-card .player-name-block,
+    .rating-list .grid .player-card .player-name-block {
+        margin-bottom: 0;
+        gap: 0.2rem;
+        flex-wrap: wrap;
+    }
+
+    .grid .player-card .player-category,
+    .rating-list .grid .player-card .player-category {
+        font-size: var(--font-size-xs);
+        display: block;
+        margin-top: 1px;
+    }
+
+    .grid .player-card .player-stats,
+    .rating-list .grid .player-card .player-stats {
+        width: auto;
+        flex: 0 0 auto;
+        margin-top: 0;
+        padding-top: 0;
+        border-top: none;
+        gap: var(--spacing-xs);
+        flex-wrap: nowrap;
+    }
+
+    .grid .player-card .stat-value,
+    .rating-list .grid .player-card .stat-value {
+        font-size: var(--font-size-sm);
+    }
+
+    .grid .player-card .stat-label,
+    .rating-list .grid .player-card .stat-label {
+        font-size: 0.6rem;
+    }
+
+    .grid .player-card .player-points,
+    .rating-list .grid .player-card .player-points {
+        font-size: var(--font-size-base);
+        font-weight: 700;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: row;
+        align-items: baseline;
+        gap: 0.2rem;
+    }
+
+    .grid .player-card .player-points br,
+    .rating-list .grid .player-card .player-points br {
+        display: none;
+    }
+
+    .grid .player-card .player-points .text-muted,
+    .rating-list .grid .player-card .player-points .text-muted {
+        font-size: 0.55rem;
+        font-weight: 500;
+    }
+
+    .grid:has(.player-card),
+    .rating-list .grid {
+        gap: var(--spacing-sm);
+    }
+
+    .grid .player-card .subscription-badge,
+    .rating-list .grid .player-card .subscription-badge {
+        font-size: 0.6rem;
+        padding: 1px var(--spacing-xs);
+    }
+
+    .grid .player-card .subscription-badge__icon,
+    .rating-list .grid .player-card .subscription-badge__icon {
+        width: 12px;
+        height: 12px;
+    }
+}
+
 @media (max-width: 480px) {
     .container {
         padding: 0 var(--spacing-sm);
@@ -1720,6 +1852,50 @@ select.form-control {
 
     .footer-grid {
         grid-template-columns: 1fr;
+    }
+
+    /* Ещё компактнее полоски игроков */
+    .grid .player-card,
+    .rating-list .grid .player-card {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        gap: var(--spacing-xs);
+    }
+
+    .grid .player-card .player-rank,
+    .rating-list .grid .player-card .player-rank {
+        min-width: 18px;
+        font-size: var(--font-size-xs);
+    }
+
+    .grid .player-card .player-avatar,
+    .rating-list .grid .player-card .player-avatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .grid .player-card .player-info .player-name,
+    .rating-list .grid .player-card .player-info .player-name {
+        font-size: var(--font-size-sm);
+    }
+
+    .grid .player-card .stat-value,
+    .rating-list .grid .player-card .stat-value {
+        font-size: var(--font-size-xs);
+    }
+
+    .grid .player-card .stat-label,
+    .rating-list .grid .player-card .stat-label {
+        font-size: 0.55rem;
+    }
+
+    .grid .player-card .player-points,
+    .rating-list .grid .player-card .player-points {
+        font-size: var(--font-size-sm);
+    }
+
+    .grid:has(.player-card),
+    .rating-list .grid {
+        gap: var(--spacing-xs);
     }
 
     .hero-buttons {

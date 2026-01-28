@@ -2,12 +2,17 @@
 Core views - main pages.
 """
 
+import markdown
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from apps.content.models import News, Page
 from apps.tournaments.models import Match, Tournament, TournamentDuration, TournamentGender, TournamentStatus
 from apps.users.models import Player, SkillLevel
+
+from .forms import FeedbackForm
 
 
 def home(request):
@@ -106,14 +111,40 @@ def legends(request):
 
 
 def rules(request):
-    """Rules page."""
+    """Rules page. Если есть Page(slug='rules'), контент рендерится как Markdown."""
     try:
         page = Page.objects.get(slug='rules')
+        content_html = markdown.markdown(page.content or "", extensions=["extra"])
     except Page.DoesNotExist:
         page = None
-    return render(request, 'core/rules.html', {'page': page})
+        content_html = None
+    return render(
+        request,
+        "core/rules.html",
+        {"page": page, "content_html": content_html},
+    )
 
 
 def tournament_regulations(request):
     """Tournament regulations page."""
-    return render(request, 'core/tournament_regulations.html')
+    return render(request, "core/tournament_regulations.html")
+
+
+@login_required
+def feedback(request):
+    """Обратная связь. Только для залогиненных. Отправляет данные в Telegram админу."""
+    if request.method == "POST":
+        form = FeedbackForm(request.POST)
+        if form.is_valid():
+            from apps.core.telegram_notify import notify_feedback
+
+            notify_feedback(
+                request.user,
+                subject=form.cleaned_data.get("subject") or "",
+                message=form.cleaned_data["message"],
+            )
+            messages.success(request, "Сообщение отправлено. Мы ответим вам на email.")
+            return redirect("feedback")
+    else:
+        form = FeedbackForm()
+    return render(request, "core/feedback.html", {"form": form})

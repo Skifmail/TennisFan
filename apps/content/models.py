@@ -98,11 +98,14 @@ class Photo(models.Model):
 
 
 class Page(models.Model):
-    """Static page model (rules, about, etc.)."""
+    """Static page model (rules, about, etc.). Content supports Markdown."""
 
     title = models.CharField("Заголовок", max_length=200)
     slug = models.SlugField("URL", unique=True)
-    content = models.TextField("Содержание")
+    content = models.TextField(
+        "Содержание",
+        help_text="Поддерживается Markdown (заголовки, списки, ссылки, жирный и т.п.).",
+    )
 
     is_published = models.BooleanField("Опубликовано", default=True)
     show_in_footer = models.BooleanField("Показывать в футере", default=False)

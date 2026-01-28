@@ -35,8 +35,12 @@ def buy_subscription(request, tier_id):
     sub.start_date = timezone.now()
     sub.end_date = sub.start_date  # Will be updated by save() logic
     sub.is_active = True
-    sub.tournaments_registered_count = 0 # Reset count on new subscription? usually yes.
-    sub.save() # save() calculates end_date month ahead
-    
+    sub.tournaments_registered_count = 0  # Reset count on new subscription
+    sub.save()
+
+    from apps.core.telegram_notify import notify_subscription_purchase
+
+    notify_subscription_purchase(request.user, tier)
+
     messages.success(request, f'Вы успешно подписались на тариф {tier.get_name_display()}!')
     return redirect('profile', pk=request.user.player.pk)

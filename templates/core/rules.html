@@ -12,7 +12,9 @@
     <div class="card">
         <div class="card-body" style="max-width: 800px; margin: 0 auto; padding: var(--spacing-2xl);">
             {% if page %}
-            {{ page.content|safe }}
+            <div class="legal-doc__body" style="padding: 0 !important; max-width: none;">
+                {{ content_html|safe }}
+            </div>
             {% else %}
             <p class="mb-4"><strong>TennisFan позволяет сражаться в турнирах без привязки к месту, дате и даже если у вас мало свободного времени.</strong> Сейчас в рейтинге любительских турниров серии TennisFan зарегистрировано более 1000 человек. Турниры доступны по всей России.</p>
 

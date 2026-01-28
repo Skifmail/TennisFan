@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Заявка отправлена{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Заявка отправлена</h1>
+    <p class="page-subtitle">Мы рассмотрим её и свяжемся с вами. После одобрения вы появитесь в разделе «Наши тренеры».</p>
+</div>
+
+<div class="container" style="max-width: 480px; text-align: center;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <p class="mb-4">Спасибо за интерес! Обычно проверка занимает до нескольких рабочих дней.</p>
+            <a href="{% url 'training_list' %}" class="btn btn-primary">Вернуться к тренировкам</a>
+            <a href="{% url 'coach_list' %}" class="btn btn-ghost mt-2">Наши тренеры</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

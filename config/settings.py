@@ -5,6 +5,10 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Загружаем переменные из .env в корне проекта (рядом с manage.py)
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / ".env")
+
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-tennison-dev-key-change-in-production')
 
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
@@ -45,6 +49,7 @@ INSTALLED_APPS = [
     'apps.subscriptions',
     'apps.payments',
     'apps.legal',
+    'apps.navigation',
 ]
 
 # Cloudinary configuration - MUST be set BEFORE any Django initialization
@@ -104,7 +109,9 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'apps.users.context_processors.unread_notifications',
+                "apps.users.context_processors.unread_notifications",
+                "apps.users.context_processors.user_is_coach",
+                "apps.navigation.context_processors.nav_menu_items",
             ],
         },
     },
@@ -187,3 +194,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
+
+# Telegram bot for admin notifications (заявки, регистрации, обратная связь)
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_ADMIN_CHAT_ID = os.environ.get('TELEGRAM_ADMIN_CHAT_ID', '')

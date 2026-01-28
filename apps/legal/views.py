@@ -11,22 +11,22 @@ from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(settings.BASE_DIR)
+DOCS_ROOT = Path(settings.BASE_DIR) / "static" / "documents"
 DOCS = {
     "personal-data": {
-        "file": BASE_DIR / "personal_data.txt",
+        "file": DOCS_ROOT / "personal_data.txt",
         "title": "Согласие на обработку персональных данных",
     },
     "privacy": {
-        "file": BASE_DIR / "privacy.txt",
+        "file": DOCS_ROOT / "privacy.txt",
         "title": "Политика конфиденциальности",
     },
     "offer": {
-        "file": BASE_DIR / "public_offer.txt",
+        "file": DOCS_ROOT / "public_offer.txt",
         "title": "Публичная оферта",
     },
     "terms": {
-        "file": BASE_DIR / "user_agreement.txt",
+        "file": DOCS_ROOT / "user_agreement.txt",
         "title": "Пользовательское соглашение",
     },
 }

@@ -70,7 +70,6 @@ class Command(BaseCommand):
             player, _ = Player.objects.get_or_create(
                 user=user,
                 defaults={
-                    "category": skill,
                     "ntrp_level": ntrp_level,
                     "skill_level": skill,
                     "total_points": points,
@@ -222,7 +221,7 @@ class Command(BaseCommand):
                 player=player,
                 defaults={
                     "city": "moscow",
-                    "description": f"Ищу партнёра для регулярных игр. Уровень {player.get_category_display()}.",
+                    "description": f"Ищу партнёра для регулярных игр. Уровень {player.get_skill_level_display()}.",
                     "preferred_days": "Выходные",
                     "preferred_time": "10:00-14:00",
                 },

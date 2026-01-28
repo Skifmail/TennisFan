@@ -3,7 +3,7 @@ Courts models.
 """
 
 from django.db import models
-
+from django.utils.text import slugify
 
 
 class CourtSurface(models.TextChoices):
@@ -67,3 +67,111 @@ class Court(models.Model):
         else:
             return None
         return f"https://wa.me/{phone}"
+
+
+class CourtApplicationStatus(models.TextChoices):
+    """Статус заявки на добавление корта."""
+
+    PENDING = "pending", "На рассмотрении"
+    APPROVED = "approved", "Одобрена"
+    REJECTED = "rejected", "Отклонена"
+
+
+class CourtApplication(models.Model):
+    """Заявка владельца корта на добавление площадки на сайт. После одобрения создаётся Court."""
+
+    class Meta:
+        verbose_name = "Заявка на добавление корта"
+        verbose_name_plural = "Заявки"
+        ordering = ["-created_at"]
+
+    status = models.CharField(
+        "Статус",
+        max_length=20,
+        choices=CourtApplicationStatus.choices,
+        default=CourtApplicationStatus.PENDING,
+    )
+    court = models.OneToOneField(
+        Court,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="application",
+        verbose_name="Созданный корт",
+    )
+
+    applicant_name = models.CharField("Контактное лицо", max_length=200)
+    applicant_email = models.EmailField("Email заявителя")
+    applicant_phone = models.CharField("Телефон заявителя", max_length=20, blank=True)
+
+    name = models.CharField("Название", max_length=200)
+    city = models.CharField("Город", max_length=100)
+    address = models.CharField("Адрес", max_length=255)
+    description = models.TextField("Описание", blank=True)
+
+    surface = models.CharField(
+        "Покрытие",
+        max_length=20,
+        choices=CourtSurface.choices,
+        default=CourtSurface.HARD,
+    )
+    courts_count = models.PositiveSmallIntegerField("Количество кортов", default=1)
+    has_lighting = models.BooleanField("Освещение", default=True)
+    is_indoor = models.BooleanField("Крытый", default=False)
+
+    phone = models.CharField("Телефон", max_length=20, blank=True)
+    whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
+    website = models.URLField("Сайт", blank=True)
+
+    image = models.ImageField("Фото", upload_to="courts/applications/", blank=True)
+    latitude = models.DecimalField(
+        "Широта", max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    longitude = models.DecimalField(
+        "Долгота", max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    price_per_hour = models.DecimalField(
+        "Цена/час", max_digits=8, decimal_places=2, null=True, blank=True
+    )
+
+    created_at = models.DateTimeField("Создана", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлена", auto_now=True)
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.city}) — {self.get_status_display()}"
+
+    def approve_and_create_court(self) -> Court:
+        """Создать Court из заявки, привязать к заявке, пометить одобренной."""
+        if self.status != CourtApplicationStatus.PENDING:
+            raise ValueError("Можно одобрять только заявки со статусом «На рассмотрении».")
+        base_slug = slugify(self.name, allow_unicode=True) or "court"
+        slug = base_slug
+        n = 0
+        while Court.objects.filter(slug=slug).exists():
+            n += 1
+            slug = f"{base_slug}-{n}"
+        court = Court.objects.create(
+            name=self.name,
+            slug=slug,
+            city=self.city,
+            address=self.address,
+            description=self.description,
+            surface=self.surface,
+            courts_count=self.courts_count,
+            has_lighting=self.has_lighting,
+            is_indoor=self.is_indoor,
+            phone=self.phone,
+            whatsapp=self.whatsapp,
+            website=self.website or "",
+            latitude=self.latitude,
+            longitude=self.longitude,
+            price_per_hour=self.price_per_hour,
+            is_active=True,
+        )
+        if self.image:
+            court.image = self.image
+            court.save(update_fields=["image"])
+        self.court = court
+        self.status = CourtApplicationStatus.APPROVED
+        self.save(update_fields=["court", "status", "updated_at"])
+        return court

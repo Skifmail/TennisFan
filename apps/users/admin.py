@@ -46,7 +46,6 @@ class PlayerAdmin(admin.ModelAdmin):
         "city",
         "skill_level",
         "gender",
-        "category",
         "ntrp_level",
         "total_points",
         "matches_played",
@@ -54,9 +53,9 @@ class PlayerAdmin(admin.ModelAdmin):
         "is_verified",
         "is_legend",
     )
-    list_filter = ("city", "skill_level", "gender", "forehand", "category", "is_verified", "is_legend")
+    list_filter = ("city", "skill_level", "gender", "forehand", "is_verified", "is_legend")
     search_fields = ("user__email", "user__first_name", "user__last_name")
-    list_editable = ("category", "is_verified", "is_legend")
+    list_editable = ("is_verified", "is_legend")
     raw_id_fields = ("user",)
     readonly_fields = ("created_at", "updated_at")
 
@@ -76,7 +75,7 @@ class PlayerAdmin(admin.ModelAdmin):
             },
         ),
         ("О себе", {"fields": ("bio",)}),
-        ("Теннис", {"fields": ("category", "ntrp_level")}),
+        ("Теннис", {"fields": ("ntrp_level",)}),
         ("Контакты", {"fields": ("telegram", "whatsapp", "max_contact")}),
         ("Статистика", {"fields": ("total_points", "matches_played", "matches_won")}),
         ("Статус", {"fields": ("is_verified", "is_legend")}),

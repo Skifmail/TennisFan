@@ -2,6 +2,7 @@
 Content views - News, Gallery, Pages.
 """
 
+import markdown
 from django.shortcuts import get_object_or_404, render
 
 from .models import Gallery, News, Page
@@ -39,6 +40,11 @@ def gallery_detail(request, slug):
 
 
 def page_detail(request, slug):
-    """Static page detail."""
+    """Static page detail. Содержимое (Page.content) поддерживает Markdown."""
     page = get_object_or_404(Page, slug=slug, is_published=True)
-    return render(request, 'content/page_detail.html', {'page': page})
+    content_html = markdown.markdown(page.content or "", extensions=["extra"])
+    return render(
+        request,
+        "content/page_detail.html",
+        {"page": page, "content_html": content_html},
+    )

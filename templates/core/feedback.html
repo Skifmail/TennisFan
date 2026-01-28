@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Обратная связь{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Обратная связь</h1>
+    <p class="page-subtitle">Напишите нам — мы ответим на ваш email</p>
+</div>
+
+<div class="container" style="max-width: 520px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <form method="post">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                <div class="alert alert-error" style="margin-bottom: var(--spacing-lg);">
+                    {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label class="form-label" for="id_subject">{{ form.subject.label }}</label>
+                    {{ form.subject }}
+                    {% for err in form.subject.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_message">{{ form.message.label }}</label>
+                    {{ form.message }}
+                    {% for err in form.message.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+
+                <div class="d-flex gap-2" style="flex-wrap: wrap;">
+                    <button type="submit" class="btn btn-primary btn-lg">Отправить</button>
+                    <a href="{% url 'home' %}" class="btn btn-ghost btn-lg">Отмена</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -9,16 +9,19 @@
 </div>
 
 <div class="container">
-    <form method="get" class="filter-bar">
-        <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
-        <select name="surface" class="form-control" onchange="this.form.submit()">
-            <option value="">Все покрытия</option>
-            <option value="hard" {% if current_surface == 'hard' %}selected{% endif %}>Хард</option>
-            <option value="clay" {% if current_surface == 'clay' %}selected{% endif %}>Грунт</option>
-            <option value="grass" {% if current_surface == 'grass' %}selected{% endif %}>Трава</option>
-            <option value="indoor" {% if current_surface == 'indoor' %}selected{% endif %}>Закрытый хард</option>
-        </select>
-    </form>
+    <div class="d-flex flex-wrap align-items-center gap-2" style="margin-bottom: var(--spacing-xl);">
+        <form method="get" class="filter-bar" style="flex: 1; min-width: 200px;">
+            <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
+            <select name="surface" class="form-control" onchange="this.form.submit()">
+                <option value="">Все покрытия</option>
+                <option value="hard" {% if current_surface == 'hard' %}selected{% endif %}>Хард</option>
+                <option value="clay" {% if current_surface == 'clay' %}selected{% endif %}>Грунт</option>
+                <option value="grass" {% if current_surface == 'grass' %}selected{% endif %}>Трава</option>
+                <option value="indoor" {% if current_surface == 'indoor' %}selected{% endif %}>Закрытый хард</option>
+            </select>
+        </form>
+        <a href="{% url 'court_application_create' %}" class="btn btn-primary btn--filter-size">Подать заявку на добавление корта</a>
+    </div>
 
     <div class="grid grid-3">
         {% for court in courts %}

@@ -5,6 +5,7 @@ Users views.
 import json
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
+
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -12,7 +13,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .forms import PlayerProfileForm, PlayerRegistrationForm, UserRegistrationForm
+from .forms import PlayerProfileForm, UserRegistrationForm
 from .models import Notification, Player, SkillLevel, User
 
 
@@ -30,26 +31,30 @@ def _map_ntrp_to_skill_level(level: Decimal) -> str:
 
 
 def register(request):
-    """User registration view."""
-    if request.method == 'POST':
-        user_form = UserRegistrationForm(request.POST)
-        player_form = PlayerRegistrationForm(request.POST)
-        if user_form.is_valid() and player_form.is_valid():
-            user = user_form.save()
-            # Create player profile with required fields
-            player = player_form.save(commit=False)
-            player.user = user
-            player.save()
+    """Упрощённая регистрация: имя, фамилия, телефон, email, дата рождения, обязательный NTRP-тест."""
+    if request.method == "POST":
+        form = UserRegistrationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            ntrp = form.cleaned_data["ntrp_level"]
+            level_decimal = Decimal(ntrp)
+            skill = _map_ntrp_to_skill_level(level_decimal)
+            player = Player.objects.create(
+                user=user,
+                birth_date=form.cleaned_data["birth_date"],
+                city=form.cleaned_data["city"].strip(),
+                ntrp_level=level_decimal,
+                skill_level=skill,
+            )
+            from apps.core.telegram_notify import notify_new_registration
+
+            notify_new_registration(user, player)
             login(request, user)
-            messages.success(request, 'Регистрация успешна! Добро пожаловать.')
-            return redirect('home')
+            messages.success(request, "Регистрация успешна! Добро пожаловать.")
+            return redirect("home")
     else:
-        user_form = UserRegistrationForm()
-        player_form = PlayerRegistrationForm()
-    return render(request, 'users/register.html', {
-        'user_form': user_form,
-        'player_form': player_form,
-    })
+        form = UserRegistrationForm()
+    return render(request, "users/register.html", {"form": form})
 
 
 def profile(request, pk):

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{% if training %}Редактировать тренировку{% else %}Добавить тренировку{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{% if training %}Редактировать тренировку{% else %}Добавить тренировку{% endif %}</h1>
+</div>
+
+<div class="container" style="max-width: 640px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                <div class="alert alert-error" style="margin-bottom: var(--spacing-lg);">{% for err in form.non_field_errors %}{{ err }}{% endfor %}</div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label class="form-label" for="id_title">{{ form.title.label }} *</label>
+                    {{ form.title }}
+                    {% for err in form.title.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_short_description">{{ form.short_description.label }}</label>
+                    {{ form.short_description }}
+                    {% for err in form.short_description.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_description">{{ form.description.label }} *</label>
+                    {{ form.description }}
+                    {% for err in form.description.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+
+                <div class="d-flex gap-2" style="flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 140px;">
+                        <label class="form-label" for="id_training_type">{{ form.training_type.label }} *</label>
+                        {{ form.training_type }}
+                        {% for err in form.training_type.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 140px;">
+                        <label class="form-label" for="id_skill_level">{{ form.skill_level.label }} *</label>
+                        {{ form.skill_level }}
+                        {% for err in form.skill_level.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 140px;">
+                        <label class="form-label" for="id_target_category">{{ form.target_category.label }}</label>
+                        {{ form.target_category }}
+                        {% for err in form.target_category.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2" style="flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 180px;">
+                        <label class="form-label" for="id_city">{{ form.city.label }} *</label>
+                        {{ form.city }}
+                        {% for err in form.city.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 180px;">
+                        <label class="form-label" for="id_court">{{ form.court.label }}</label>
+                        {{ form.court }}
+                        {% for err in form.court.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2" style="flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 120px;">
+                        <label class="form-label" for="id_duration_minutes">{{ form.duration_minutes.label }} *</label>
+                        {{ form.duration_minutes }}
+                        {% for err in form.duration_minutes.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 120px;">
+                        <label class="form-label" for="id_max_participants">{{ form.max_participants.label }} *</label>
+                        {{ form.max_participants }}
+                        {% for err in form.max_participants.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 120px;">
+                        <label class="form-label" for="id_price">{{ form.price.label }}</label>
+                        {{ form.price }}
+                        {% for err in form.price.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="id_schedule">{{ form.schedule.label }}</label>
+                    {{ form.schedule }}
+                    {% for err in form.schedule.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_image">{{ form.image.label }}</label>
+                    {{ form.image }}
+                    {% for err in form.image.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="consent-label" style="align-items: center;">
+                        {{ form.is_active }}
+                        <span class="consent-text">{{ form.is_active.label }}</span>
+                    </label>
+                    {% for err in form.is_active.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+
+                <div class="d-flex gap-2" style="flex-wrap: wrap;">
+                    <button type="submit" class="btn btn-primary btn-lg">{% if training %}Сохранить{% else %}Создать{% endif %}</button>
+                    <a href="{% url 'my_trainings' %}" class="btn btn-ghost btn-lg">Отмена</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -9,135 +9,77 @@
 </div>
 
 <div class="container" style="max-width: 600px;">
-    <div class="card">
+    <div class="card mb-4">
         <div class="card-body" style="padding: var(--spacing-2xl);">
-            <form method="post">
+            <form method="post" id="register-form">
                 {% csrf_token %}
 
-                <h3 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Учётные данные</h3>
-
                 <div class="form-group">
-                    <label class="form-label" for="id_email">{{ user_form.email.label }}</label>
-                    {{ user_form.email }}
-                    <div class="field-error" id="email-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
-                    {% if user_form.email.errors %}
-                        {% for error in user_form.email.errors %}
-                        <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
-                        {% endfor %}
-                    {% endif %}
+                    <label class="form-label" for="id_last_name">{{ form.last_name.label }}</label>
+                    {{ form.last_name }}
+                    {% for error in form.last_name.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>{% endfor %}
                 </div>
-
                 <div class="form-group">
-                    <label class="form-label" for="id_phone">{{ user_form.phone.label }}</label>
-                    {{ user_form.phone }}
+                    <label class="form-label" for="id_first_name">{{ form.first_name.label }}</label>
+                    {{ form.first_name }}
+                    {% for error in form.first_name.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_phone">{{ form.phone.label }}</label>
+                    {{ form.phone }}
                     <div class="field-error" id="phone-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
-                    {% if user_form.phone.errors %}
-                        {% for error in user_form.phone.errors %}
-                        <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
-                        {% endfor %}
-                    {% endif %}
+                    {% for error in form.phone.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>{% endfor %}
                 </div>
-
-                <div class="d-flex gap-2">
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label" for="id_first_name">{{ user_form.first_name.label }}</label>
-                        {{ user_form.first_name }}
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label" for="id_last_name">{{ user_form.last_name.label }}</label>
-                        {{ user_form.last_name }}
-                    </div>
-                </div>
-
                 <div class="form-group">
-                    <label class="form-label" for="id_password">{{ user_form.password.label }}</label>
-                    {{ user_form.password }}
+                    <label class="form-label" for="id_email">{{ form.email.label }}</label>
+                    {{ form.email }}
+                    <div class="field-error" id="email-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
+                    {% for error in form.email.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_birth_date">{{ form.birth_date.label }}</label>
+                    {{ form.birth_date }}
+                    <div class="field-error" id="birth_date-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
+                    {% for error in form.birth_date.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_city">{{ form.city.label }}</label>
+                    {{ form.city }}
+                    <div class="field-error" id="city-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
+                    {% for error in form.city.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="id_password">{{ form.password.label }}</label>
+                    {{ form.password }}
                     <div class="field-error" id="password-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
                 </div>
-
                 <div class="form-group">
-                    <label class="form-label" for="id_password_confirm">{{ user_form.password_confirm.label }}</label>
-                    {{ user_form.password_confirm }}
+                    <label class="form-label" for="id_password_confirm">{{ form.password_confirm.label }}</label>
+                    {{ form.password_confirm }}
                     <div class="field-error" id="password_confirm-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
-                    {% if user_form.password_confirm.errors %}
-                        {% for error in user_form.password_confirm.errors %}
-                        <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
-                        {% endfor %}
-                    {% endif %}
+                    {% for error in form.password_confirm.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>{% endfor %}
                 </div>
 
                 <hr style="margin: var(--spacing-xl) 0; border: none; border-top: 1px solid var(--color-border);">
 
-                <h3 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Информация об игроке</h3>
+                <h3 style="margin-bottom: var(--spacing-md); font-size: var(--font-size-lg);">NTRP-тест</h3>
+                <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-lg);">Пройдите тест и нажмите «Рассчитать» перед регистрацией.</p>
+                {{ form.ntrp_level }}
 
-                <div class="form-group">
-                    <label class="form-label" for="id_skill_level">
-                        {{ player_form.skill_level.label }}
-                        <a href="{% url 'ntrp_test' %}" target="_blank" style="margin-left: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-text-secondary); text-decoration: none;">(Определить свой NTRP)</a>
-                    </label>
-                    {{ player_form.skill_level }}
-                    {% if player_form.skill_level.errors %}
-                        {% for error in player_form.skill_level.errors %}
-                        <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
-                        {% endfor %}
-                    {% endif %}
-                </div>
+                {% include 'users/_ntrp_quiz.html' with can_save=False form_target='id_ntrp_level' %}
 
-                <div class="form-group">
-                    <label class="form-label" for="id_birth_date">{{ player_form.birth_date.label }}</label>
-                    {{ player_form.birth_date }}
-                    <div class="field-error" id="birth_date-error" style="display: none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-error);"></div>
-                    {% if player_form.birth_date.errors %}
-                        {% for error in player_form.birth_date.errors %}
-                        <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-
-                <div class="d-flex gap-2">
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label" for="id_gender">{{ player_form.gender.label }}</label>
-                        {{ player_form.gender }}
-                        {% if player_form.gender.errors %}
-                            {% for error in player_form.gender.errors %}
-                            <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
-                            {% endfor %}
-                        {% endif %}
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label" for="id_forehand">{{ player_form.forehand.label }}</label>
-                        {{ player_form.forehand }}
-                        {% if player_form.forehand.errors %}
-                            {% for error in player_form.forehand.errors %}
-                            <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
-                            {% endfor %}
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="id_city">{{ player_form.city.label }}</label>
-                    {{ player_form.city }}
-                    {% if player_form.city.errors %}
-                        {% for error in player_form.city.errors %}
-                        <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
-                        {% endfor %}
-                    {% endif %}
-                </div>
+                <hr style="margin: var(--spacing-xl) 0; border: none; border-top: 1px solid var(--color-border);">
 
                 <div class="form-group form-group-consent">
                     <label class="consent-label">
-                        {{ user_form.agree_legal }}
+                        {{ form.agree_legal }}
                         <span class="consent-text">Я согласен на <a href="{% url 'legal_personal_data' %}" target="_blank" rel="noopener">обработку персональных данных</a> и <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политику конфиденциальности</a></span>
                     </label>
-                    {% if user_form.agree_legal.errors %}
-                        {% for error in user_form.agree_legal.errors %}
-                        <p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>
-                        {% endfor %}
-                    {% endif %}
+                    {% for error in form.agree_legal.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ error }}</p>{% endfor %}
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: var(--spacing-md);">Зарегистрироваться</button>
+                <div class="field-error" id="ntrp-error" style="display: none; margin-bottom: var(--spacing-md); font-size: var(--font-size-sm); color: var(--color-error);"></div>
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Зарегистрироваться</button>
 
                 <p class="text-center mt-3 text-secondary">
                     Уже есть аккаунт? <a href="{% url 'login' %}" class="text-primary">Войти</a>
@@ -149,264 +91,101 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Получаем элементы формы
+    const form = document.getElementById('register-form');
     const emailField = document.getElementById('id_email');
     const phoneField = document.getElementById('id_phone');
     const passwordField = document.getElementById('id_password');
     const passwordConfirmField = document.getElementById('id_password_confirm');
     const birthDateField = document.getElementById('id_birth_date');
-    
-    // Получаем элементы для отображения ошибок
+    const cityField = document.getElementById('id_city');
+    const ntrpField = document.getElementById('id_ntrp_level');
     const emailError = document.getElementById('email-error');
     const phoneError = document.getElementById('phone-error');
     const passwordError = document.getElementById('password-error');
     const passwordConfirmError = document.getElementById('password_confirm-error');
     const birthDateError = document.getElementById('birth_date-error');
-    
-    // Скрытие серверных ошибок при вводе
-    document.querySelectorAll('.form-control').forEach(input => {
-        input.addEventListener('input', function() {
-            const group = this.closest('.form-group');
-            if (group) {
-                const serverErrors = group.querySelectorAll('.text-error');
-                serverErrors.forEach(err => err.remove());
-            }
+    const cityError = document.getElementById('city-error');
+    const ntrpError = document.getElementById('ntrp-error');
+
+    function validateEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '');
+    }
+    function validatePhone(phone) {
+        const s = (phone || '').trim();
+        return s !== '' && s !== '+7' && /^\+7\d{10}$/.test(s);
+    }
+    function validateBirthDate(date) {
+        if (!date) return false;
+        const d = new Date(date);
+        const today = new Date();
+        const min = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
+        const max = new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
+        return d >= min && d <= max;
+    }
+
+    function showError(el, msg) {
+        if (!el) return;
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+    function hideError(el) {
+        if (!el) return;
+        el.style.display = 'none';
+    }
+
+    [emailField, phoneField, passwordField, passwordConfirmField, birthDateField, cityField].forEach(function(f) {
+        if (!f) return;
+        f.addEventListener('input', function() {
+            var g = this.closest('.form-group');
+            if (g) g.querySelectorAll('.text-error').forEach(function(e) { e.remove(); });
+            hideError(document.getElementById(this.id.replace('id_', '') + '-error'));
         });
     });
-    
-    // Функция для валидации email
-    function validateEmail(email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-    }
-    
-    // Функция для валидации телефона
-    function validatePhone(phone) {
-        if (!phone || phone.trim() === '' || phone.trim() === '+7') {
-            return true; // Телефон необязательный
-        }
-        const phoneRegex = /^\+7\d{10}$/;
-        return phoneRegex.test(phone.trim());
-    }
-    
-    // Функция для валидации даты рождения
-    function validateBirthDate(date) {
-        if (!date) {
-            return false;
-        }
-        const selectedDate = new Date(date);
-        const today = new Date();
-        const minDate = new Date();
-        minDate.setFullYear(today.getFullYear() - 100); // Максимальный возраст 100 лет
-        const maxDate = new Date();
-        maxDate.setFullYear(today.getFullYear() - 5); // Минимальный возраст 5 лет
-        
-        return selectedDate >= minDate && selectedDate <= maxDate;
-    }
-    
-    // Функция для отображения ошибки
-    function showError(errorElement, message) {
-        errorElement.textContent = message;
-        errorElement.style.display = 'block';
-        errorElement.previousElementSibling.style.borderColor = 'var(--color-error)';
-    }
-    
-    // Функция для скрытия ошибки
-    function hideError(errorElement, field) {
-        errorElement.style.display = 'none';
-        if (field) {
-            field.style.borderColor = '';
-        }
-    }
-    
-    // Валидация email
-    if (emailField) {
-        emailField.addEventListener('blur', function() {
-            const email = this.value.trim();
-            if (email === '') {
-                showError(emailError, 'Email обязателен для заполнения.');
-            } else if (!validateEmail(email)) {
-                showError(emailError, 'Введите корректный email адрес.');
-            } else {
-                hideError(emailError, this);
-            }
-        });
-        
-        emailField.addEventListener('input', function() {
-            const email = this.value.trim();
-            if (email && !validateEmail(email)) {
-                showError(emailError, 'Введите корректный email адрес.');
-            } else if (email && validateEmail(email)) {
-                hideError(emailError, this);
-            }
-        });
-    }
-    
-    // Валидация телефона
+
     if (phoneField) {
         phoneField.addEventListener('blur', function() {
-            const phone = this.value.trim();
-            if (phone && phone !== '+7' && !validatePhone(phone)) {
-                showError(phoneError, 'Введите телефон в формате +7XXXXXXXXXX (10 цифр после +7)');
-            } else {
-                hideError(phoneError, this);
-            }
-        });
-        
-        phoneField.addEventListener('input', function() {
-            const phone = this.value.trim();
-            if (phone && phone !== '+7' && !validatePhone(phone)) {
-                showError(phoneError, 'Введите телефон в формате +7XXXXXXXXXX (10 цифр после +7)');
-            } else {
-                hideError(phoneError, this);
-            }
+            if (!validatePhone(this.value)) showError(phoneError, 'Укажите телефон +7XXXXXXXXXX.');
+            else hideError(phoneError);
         });
     }
-    
-    // Валидация пароля
-    if (passwordField) {
-        passwordField.addEventListener('blur', function() {
-            const password = this.value;
-            if (password === '') {
-                showError(passwordError, 'Пароль обязателен для заполнения.');
-            } else if (password.length < 8) {
-                showError(passwordError, 'Пароль должен содержать минимум 8 символов.');
-            } else {
-                hideError(passwordError, this);
-            }
-        });
-        
-        passwordField.addEventListener('input', function() {
-            const password = this.value;
-            if (password && password.length < 8) {
-                showError(passwordError, 'Пароль должен содержать минимум 8 символов.');
-            } else if (password && password.length >= 8) {
-                hideError(passwordError, this);
-                // Проверяем совпадение паролей, если поле подтверждения заполнено
-                if (passwordConfirmField && passwordConfirmField.value) {
-                    passwordConfirmField.dispatchEvent(new Event('input'));
-                }
-            }
+    if (emailField) {
+        emailField.addEventListener('blur', function() {
+            var v = this.value.trim();
+            if (!v) showError(emailError, 'Email обязателен.');
+            else if (!validateEmail(v)) showError(emailError, 'Введите корректный email.');
+            else hideError(emailError);
         });
     }
-    
-    // Валидация подтверждения пароля
-    if (passwordConfirmField && passwordField) {
-        passwordConfirmField.addEventListener('blur', function() {
-            const password = passwordField.value;
-            const passwordConfirm = this.value;
-            if (passwordConfirm === '') {
-                showError(passwordConfirmError, 'Подтверждение пароля обязательно для заполнения.');
-            } else if (password !== passwordConfirm) {
-                showError(passwordConfirmError, 'Пароли не совпадают.');
-            } else {
-                hideError(passwordConfirmError, this);
-            }
-        });
-        
-        passwordConfirmField.addEventListener('input', function() {
-            const password = passwordField.value;
-            const passwordConfirm = this.value;
-            if (passwordConfirm && password !== passwordConfirm) {
-                showError(passwordConfirmError, 'Пароли не совпадают.');
-            } else if (passwordConfirm && password === passwordConfirm) {
-                hideError(passwordConfirmError, this);
-            }
-        });
-    }
-    
-    // Валидация даты рождения
     if (birthDateField) {
         birthDateField.addEventListener('change', function() {
-            const date = this.value;
-            if (!date) {
-                showError(birthDateError, 'Дата рождения обязательна для заполнения.');
-            } else if (!validateBirthDate(date)) {
-                const today = new Date();
-                const maxDate = new Date();
-                maxDate.setFullYear(today.getFullYear() - 5);
-                showError(birthDateError, 'Дата рождения должна быть не позднее ' + maxDate.toLocaleDateString('ru-RU') + ' и не ранее 100 лет назад.');
-            } else {
-                hideError(birthDateError, this);
-            }
-        });
-        
-        birthDateField.addEventListener('blur', function() {
-            const date = this.value;
-            if (!date) {
-                showError(birthDateError, 'Дата рождения обязательна для заполнения.');
-            } else if (!validateBirthDate(date)) {
-                const today = new Date();
-                const maxDate = new Date();
-                maxDate.setFullYear(today.getFullYear() - 5);
-                showError(birthDateError, 'Дата рождения должна быть не позднее ' + maxDate.toLocaleDateString('ru-RU') + ' и не ранее 100 лет назад.');
-            } else {
-                hideError(birthDateError, this);
-            }
+            if (!this.value) showError(birthDateError, 'Укажите дату рождения.');
+            else if (!validateBirthDate(this.value)) showError(birthDateError, 'Дата: от 5 до 100 лет.');
+            else hideError(birthDateError);
         });
     }
-    
-    // Предотвращение отправки формы при наличии ошибок
-    const form = document.querySelector('form');
+    if (cityField) {
+        cityField.addEventListener('blur', function() {
+            if (!this.value.trim()) showError(cityError, 'Укажите город.');
+            else hideError(cityError);
+        });
+    }
+
     if (form) {
         form.addEventListener('submit', function(e) {
-            let hasErrors = false;
-            
-            // Проверка email
-            if (emailField && (!emailField.value.trim() || !validateEmail(emailField.value.trim()))) {
-                showError(emailError, emailField.value.trim() ? 'Введите корректный email адрес.' : 'Email обязателен для заполнения.');
-                hasErrors = true;
-            }
-            
-            // Проверка телефона
-            if (phoneField && phoneField.value.trim() && phoneField.value.trim() !== '+7' && !validatePhone(phoneField.value.trim())) {
-                showError(phoneError, 'Введите телефон в формате +7XXXXXXXXXX (10 цифр после +7)');
-                hasErrors = true;
-            }
-            
-            // Проверка пароля
-            if (passwordField && (!passwordField.value || passwordField.value.length < 8)) {
-                showError(passwordError, passwordField.value ? 'Пароль должен содержать минимум 8 символов.' : 'Пароль обязателен для заполнения.');
-                hasErrors = true;
-            }
-            
-            // Проверка подтверждения пароля
-            if (passwordConfirmField && passwordField) {
-                if (!passwordConfirmField.value) {
-                    showError(passwordConfirmError, 'Подтверждение пароля обязательно для заполнения.');
-                    hasErrors = true;
-                } else if (passwordField.value !== passwordConfirmField.value) {
-                    showError(passwordConfirmError, 'Пароли не совпадают.');
-                    hasErrors = true;
-                }
-            }
-            
-            // Проверка даты рождения
-            if (birthDateField && (!birthDateField.value || !validateBirthDate(birthDateField.value))) {
-                showError(birthDateError, birthDateField.value ? 'Дата рождения некорректна.' : 'Дата рождения обязательна для заполнения.');
-                hasErrors = true;
-            }
-            
-            if (hasErrors) {
-                e.preventDefault();
-                // Прокрутка к первой ошибке
-                const firstError = document.querySelector('.field-error[style*="display: block"]');
-                if (firstError) {
-                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            }
+            var has = false;
+            hideError(ntrpError);
+            if (!emailField || !emailField.value.trim()) { showError(emailError, 'Email обязателен.'); has = true; }
+            else if (!validateEmail(emailField.value.trim())) { showError(emailError, 'Введите корректный email.'); has = true; }
+            if (!validatePhone(phoneField ? phoneField.value : '')) { showError(phoneError, 'Укажите телефон +7XXXXXXXXXX.'); has = true; }
+            if (!passwordField || !passwordField.value || passwordField.value.length < 8) { showError(passwordError, 'Пароль не менее 8 символов.'); has = true; }
+            if (passwordConfirmField && (!passwordConfirmField.value || passwordConfirmField.value !== passwordField.value)) { showError(passwordConfirmError, 'Пароли не совпадают.'); has = true; }
+            if (!birthDateField || !birthDateField.value || !validateBirthDate(birthDateField.value)) { showError(birthDateError, 'Укажите дату рождения.'); has = true; }
+            if (!cityField || !cityField.value.trim()) { showError(cityError, 'Укажите город.'); has = true; }
+            var nv = ntrpField ? (ntrpField.value || '').trim() : '';
+            if (!nv || nv < 1 || nv > 7) { showError(ntrpError, 'Пройдите NTRP-тест и нажмите «Рассчитать».'); has = true; }
+            if (has) { e.preventDefault(); return; }
         });
     }
 });
 </script>
-
-<style>
-.form-control:invalid {
-    border-color: var(--color-error);
-}
-
-.form-control:valid {
-    border-color: var(--color-primary);
-}
-</style>
 {% endblock %}

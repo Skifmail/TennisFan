@@ -27,8 +27,9 @@
         </select>
     </form>
 
-    <div class="d-flex gap-2 mb-4">
-        <a href="{% url 'coach_list' %}" class="btn btn-outline">Наши тренеры</a>
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{% url 'coach_list' %}" class="btn btn-outline btn--filter-size">Наши тренеры</a>
+        {% if not user_is_coach %}<a href="{% url 'coach_application_create' %}" class="btn btn-primary btn--filter-size">Стать тренером</a>{% endif %}
     </div>
 
     <div class="grid grid-3">

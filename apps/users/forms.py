@@ -11,63 +11,45 @@ from .models import Forehand, Gender, Player, SkillLevel
 User = get_user_model()
 
 
-class PlayerRegistrationForm(forms.ModelForm):
-    """Player information form for registration."""
-    
-    class Meta:
-        model = Player
-        fields = ('skill_level', 'birth_date', 'gender', 'forehand', 'city')
-        widgets = {
-            'skill_level': forms.Select(attrs={'class': 'form-control'}),
-            'birth_date': forms.DateInput(
-                attrs={'class': 'form-control', 'type': 'date'},
-                format='%Y-%m-%d',
-            ),
-            'gender': forms.Select(attrs={'class': 'form-control'}),
-            'forehand': forms.Select(attrs={'class': 'form-control'}),
-            'city': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Город'}),
-        }
-        labels = {
-            'skill_level': 'Уровень мастерства *',
-            'birth_date': 'Дата рождения *',
-            'gender': 'Пол *',
-            'forehand': 'Ведущая рука *',
-            'city': 'Город',
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['birth_date'].input_formats = ['%Y-%m-%d']
-        self.fields['skill_level'].initial = SkillLevel.NOVICE
-        self.fields['gender'].initial = Gender.MALE
-        self.fields['forehand'].initial = Forehand.RIGHT
-        for field_name in ('skill_level', 'gender', 'forehand'):
-            field = self.fields[field_name]
-            field.choices = [(value, label) for value, label in field.choices if value != '']
-
-
 class UserRegistrationForm(forms.ModelForm):
-    """User registration form."""
+    """Упрощённая форма регистрации: имя, фамилия, телефон, email, дата рождения, NTRP-тест."""
 
     email = forms.EmailField(
-        label='Email *',
-        widget=forms.EmailInput(attrs={'class': 'form-control'}),
+        label="Email *",
+        widget=forms.EmailInput(attrs={"class": "form-control"}),
     )
     phone = forms.CharField(
-        label='Телефон',
-        required=False,
-        initial='+7',
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+7XXXXXXXXXX'}),
+        label="Телефон *",
+        required=True,
+        initial="+7",
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "+7XXXXXXXXXX"}),
     )
-
+    birth_date = forms.DateField(
+        label="Дата рождения *",
+        required=True,
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}, format="%Y-%m-%d"),
+    )
+    city = forms.CharField(
+        label="Город *",
+        required=True,
+        max_length=100,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Например: Москва"}),
+    )
+    ntrp_level = forms.IntegerField(
+        label="NTRP",
+        required=True,
+        min_value=1,
+        max_value=7,
+        widget=forms.HiddenInput(attrs={"id": "id_ntrp_level"}),
+    )
     password = forms.CharField(
-        label='Пароль *',
-        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+        label="Пароль *",
+        widget=forms.PasswordInput(attrs={"class": "form-control"}),
         min_length=8,
     )
     password_confirm = forms.CharField(
-        label='Подтвердите пароль *',
-        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+        label="Подтвердите пароль *",
+        widget=forms.PasswordInput(attrs={"class": "form-control"}),
     )
     agree_legal = forms.BooleanField(
         required=True,
@@ -77,27 +59,49 @@ class UserRegistrationForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ('email', 'phone', 'first_name', 'last_name')
+        fields = ("email", "phone", "first_name", "last_name")
         widgets = {
-            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            "first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control"}),
         }
         labels = {
-            'first_name': 'Имя',
-            'last_name': 'Фамилия',
+            "first_name": "Имя *",
+            "last_name": "Фамилия *",
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["birth_date"].input_formats = ["%Y-%m-%d"]
+        self.fields["first_name"].required = True
+        self.fields["last_name"].required = True
+
+    def clean_city(self):
+        city = (self.cleaned_data.get("city") or "").strip()
+        if not city:
+            raise forms.ValidationError("Укажите город.")
+        return city
+
     def clean_phone(self):
-        phone = self.cleaned_data.get('phone', '').strip()
-        # Если поле пустое или содержит только '+7', возвращаем пустую строку
-        if phone in {'', '+7'}:
-            return ''
-        # Если поле заполнено, проверяем формат
         import re
-        phone_pattern = r'^\+7\d{10}$'
-        if not re.match(phone_pattern, phone):
-            raise forms.ValidationError('Введите телефон в формате +7XXXXXXXXXX (10 цифр после +7)')
+
+        phone = self.cleaned_data.get("phone", "").strip()
+        if phone in ("", "+7"):
+            raise forms.ValidationError("Укажите телефон в формате +7XXXXXXXXXX.")
+        if not re.match(r"^\+7\d{10}$", phone):
+            raise forms.ValidationError("Телефон: +7 и 10 цифр (например +79001234567).")
         return phone
+
+    def clean_ntrp_level(self):
+        val = self.cleaned_data.get("ntrp_level")
+        if val is None or val == "":
+            raise forms.ValidationError("Пройдите NTRP-тест и нажмите «Рассчитать» перед регистрацией.")
+        try:
+            v = int(val)
+            if v < 1 or v > 7:
+                raise forms.ValidationError("Некорректный результат NTRP. Пройдите тест заново.")
+            return v
+        except (TypeError, ValueError):
+            raise forms.ValidationError("Пройдите NTRP-тест и нажмите «Рассчитать» перед регистрацией.")
 
     def clean_password_confirm(self):
         password = self.cleaned_data.get('password')
@@ -130,7 +134,6 @@ class PlayerProfileForm(forms.ModelForm):
         model = Player
         fields = (
             "avatar",
-            "skill_level",
             "birth_date",
             "gender",
             "forehand",
@@ -141,7 +144,6 @@ class PlayerProfileForm(forms.ModelForm):
             "max_contact",
         )
         widgets = {
-            "skill_level": forms.Select(attrs={"class": "form-control"}),
             "birth_date": forms.DateInput(
                 attrs={"class": "form-control", "type": "date"},
                 format="%Y-%m-%d",
@@ -160,7 +162,6 @@ class PlayerProfileForm(forms.ModelForm):
             ),
         }
         labels = {
-            "skill_level": "Уровень мастерства",
             "birth_date": "Дата рождения",
             "gender": "Пол",
             "forehand": "Ведущая рука",
@@ -175,9 +176,15 @@ class PlayerProfileForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.user = user
         if user:
-            self.fields['first_name'].initial = user.first_name
-            self.fields['last_name'].initial = user.last_name
-        self.fields['birth_date'].input_formats = ['%Y-%m-%d']
+            self.fields["first_name"].initial = user.first_name
+            self.fields["last_name"].initial = user.last_name
+        self.fields["birth_date"].input_formats = ["%Y-%m-%d"]
+        for fn in ("gender", "forehand"):
+            f = self.fields.get(fn)
+            if f and hasattr(f, "choices") and f.choices:
+                choices = list(f.choices)
+                if choices and choices[0][0] != "":
+                    f.choices = [("", "———")] + choices
 
     def save(self, commit=True):
         player = super().save(commit=False)

@@ -9,6 +9,11 @@
 </div>
 
 <div class="container">
+    {% if not user_is_coach %}
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a href="{% url 'coach_application_create' %}" class="btn btn-primary btn--filter-size">Стать тренером</a>
+    </div>
+    {% endif %}
     <div class="grid grid-3">
         {% for coach in coaches %}
         <a href="{% url 'coach_detail' slug=coach.slug %}" class="card" style="text-align: center;">

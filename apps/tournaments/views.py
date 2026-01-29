@@ -2,6 +2,10 @@
 Tournaments views.
 """
 
+import json
+from collections import defaultdict
+from itertools import groupby
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import models
@@ -81,6 +85,151 @@ def tournament_detail(request, slug):
         "participants": participants_qs,
     }
     return render(request, "tournaments/detail.html", context)
+
+
+def tournament_tables_list(request):
+    """Страница «Турнирные таблицы» — список турниров с краткой статистикой."""
+    tournaments = (
+        Tournament.objects.all()
+        .prefetch_related("participants__user", "matches", "fan_results")
+        .order_by("-start_date")
+    )
+    # Добавляем статистику для каждого турнира
+    for t in tournaments:
+        main_matches = t.matches.filter(is_consolation=False)
+        matches_total = main_matches.count()
+        matches_completed = main_matches.filter(
+            status__in=["completed", "walkover"]
+        ).count()
+        t.participants_count = t.participants.count()
+        t.matches_total = matches_total
+        t.matches_completed = matches_completed
+        t.matches_pending = matches_total - matches_completed
+        t.progress_pct = (
+            int(100 * matches_completed / matches_total)
+            if matches_total > 0
+            else 0
+        )
+    context = {"tournaments": tournaments}
+    return render(request, "tournaments/tables_list.html", context)
+
+
+def tournament_tables_detail(request, slug):
+    """Детальная страница турнирной таблицы: графики, диаграммы, полная статистика."""
+    tournament = get_object_or_404(
+        Tournament.objects.prefetch_related(
+            "matches__player1__user",
+            "matches__player2__user",
+            "matches__winner__user",
+            "participants__user",
+            "fan_results__player__user",
+        ),
+        slug=slug,
+    )
+    is_fan = _is_fan(tournament)
+    participants = list(
+        tournament.participants.select_related("user").order_by("-total_points")
+    )
+
+    # FAN: итоговая таблица участников (место, очки, раунд вылета)
+    fan_results = {}
+    if is_fan:
+        for r in tournament.fan_results.select_related("player__user"):
+            fan_results[r.player_id] = r
+    # Сортируем по очкам FAN (победитель первый), затем по рейтингу
+    participants_sorted = sorted(
+        participants,
+        key=lambda p: (
+            -(fan_results.get(p.id).fan_points if fan_results.get(p.id) else 0),
+            -p.total_points,
+        ),
+    )
+    standings = []
+    for i, p in enumerate(participants_sorted, 1):
+        fr = fan_results.get(p.id)
+        standings.append(
+            {
+                "place": i,
+                "player": p,
+                "fan_result": fr,
+                "fan_points": fr.fan_points if fr else 0,
+                "round_eliminated": fr.get_round_eliminated_display() if fr else "—",
+            }
+        )
+
+    # Матчи по раундам
+    matches = tournament.matches.order_by("is_consolation", "round_index", "round_order")
+    matches_by_round = []
+    for k, group in groupby(matches, key=lambda m: (m.round_name, m.is_consolation)):
+        matches_by_round.append((k[0], k[1], list(group)))
+
+    # Статистика для графиков
+    main_matches = tournament.matches.filter(is_consolation=False)
+    status_counts = defaultdict(int)
+    for m in main_matches:
+        status_counts[m.status or "scheduled"] += 1
+    chart_status_labels = []
+    chart_status_data = []
+    status_display = {
+        "completed": "Завершён",
+        "walkover": "Без игры",
+        "scheduled": "Запланирован",
+        "in_progress": "В процессе",
+        "cancelled": "Отменён",
+    }
+    for status in ["completed", "walkover", "scheduled", "in_progress", "cancelled"]:
+        if status_counts[status] > 0:
+            chart_status_labels.append(status_display.get(status, status))
+            chart_status_data.append(status_counts[status])
+
+    # Распределение очков FAN по раундам (для FAN)
+    round_points = defaultdict(int)
+    if is_fan:
+        for r in tournament.fan_results.all():
+            round_points[r.round_eliminated] += 1
+    chart_round_labels = []
+    chart_round_data = []
+    round_display = {
+        "winner": "Победитель",
+        "final": "Финалист",
+        "sf": "Полуфинал",
+        "r2": "2 круг",
+        "r1": "1 круг",
+    }
+    for rk in ["winner", "final", "sf", "r2", "r1"]:
+        if round_points[rk] > 0:
+            chart_round_labels.append(round_display.get(rk, rk))
+            chart_round_data.append(round_points[rk])
+
+    # Рейтинг участников (для гистограммы)
+    ratings = [p.total_points for p in participants if p.total_points]
+    ratings_sorted = sorted(ratings, reverse=True)[:20]  # топ-20
+    ratings_labels = [f"Место {i}" for i in range(1, len(ratings_sorted) + 1)]
+
+    context = {
+        "tournament": tournament,
+        "is_fan": is_fan,
+        "participants": participants,
+        "standings": standings,
+        "matches_by_round": matches_by_round,
+        "chart_status_labels": json.dumps(chart_status_labels),
+        "chart_status_data": json.dumps(chart_status_data),
+        "chart_round_labels": json.dumps(chart_round_labels),
+        "chart_round_data": json.dumps(chart_round_data),
+        "ratings_sorted": json.dumps(ratings_sorted),
+        "ratings_labels": json.dumps(ratings_labels),
+        "participants_count": len(participants),
+        "matches_total": main_matches.count(),
+        "matches_completed": main_matches.filter(
+            status__in=["completed", "walkover"]
+        ).count(),
+        "progress_pct": (
+            int(100 * main_matches.filter(status__in=["completed", "walkover"]).count() / main_matches.count())
+            if main_matches.count() > 0
+            else 0
+        ),
+    }
+    return render(request, "tournaments/tables_detail.html", context)
 
 
 def champions_league(request):

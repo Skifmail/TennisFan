@@ -140,6 +140,11 @@ class Player(models.Model):
 
     is_verified = models.BooleanField("Подтверждён", default=False)
     is_legend = models.BooleanField("Легенда", default=False)
+    is_bye = models.BooleanField(
+        "Свободный круг (bye)",
+        default=False,
+        help_text="Служебный игрок для матчей «игрок — свободный круг» при нечётном числе участников.",
+    )
 
     created_at = models.DateTimeField("Дата регистрации", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
@@ -150,6 +155,8 @@ class Player(models.Model):
         ordering = ["-total_points"]
 
     def __str__(self) -> str:
+        if self.is_bye:
+            return "Свободный круг"
         return f"{self.user.first_name} {self.user.last_name}".strip() or self.user.email
 
     @property

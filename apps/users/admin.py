@@ -43,6 +43,7 @@ class PlayerAdmin(admin.ModelAdmin):
 
     list_display = (
         "user",
+        "is_bye",
         "city",
         "skill_level",
         "gender",
@@ -53,7 +54,7 @@ class PlayerAdmin(admin.ModelAdmin):
         "is_verified",
         "is_legend",
     )
-    list_filter = ("city", "skill_level", "gender", "forehand", "is_verified", "is_legend")
+    list_filter = ("city", "skill_level", "gender", "forehand", "is_verified", "is_legend", "is_bye")
     search_fields = ("user__email", "user__first_name", "user__last_name")
     list_editable = ("is_verified", "is_legend")
     raw_id_fields = ("user",)

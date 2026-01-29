@@ -9,6 +9,7 @@ from django.db.models import Q
 from django.shortcuts import redirect, render
 
 from apps.content.models import News, Page
+from apps.tournaments.fan import check_and_generate_past_deadline_brackets
 from apps.tournaments.models import Match, Tournament, TournamentDuration, TournamentGender, TournamentStatus
 from apps.users.models import Player, SkillLevel
 
@@ -17,6 +18,7 @@ from .forms import FeedbackForm
 
 def home(request):
     """Home page view."""
+    check_and_generate_past_deadline_brackets()
     tournaments = Tournament.objects.filter(
         status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE]
     ).prefetch_related('participants__user')

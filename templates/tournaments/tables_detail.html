@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Турнирная таблица: {{ tournament.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.tables-detail .tables-hero-image img { max-width: 100%; height: auto; border-radius: var(--radius-md); }
+.tables-detail .tables-description { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.tables-fan-points { padding: var(--spacing-md); background: var(--color-bg-elevated); border-radius: var(--radius-md); }
+.tables-fan-points h4 { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.fan-points-grid { display: flex; flex-wrap: wrap; gap: var(--spacing-md); font-size: var(--font-size-sm); }
+.stats-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--spacing-md); }
+.stat-card .card-body { text-align: center; padding: var(--spacing-lg); }
+.stat-card-value { display: block; font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-primary); }
+.stat-card-label { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.standings-table { width: 100%; border-collapse: collapse; min-width: 400px; }
+.standings-table th, .standings-table td { padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); }
+.standings-table th { font-weight: 600; color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.standings-table tr.top-place { background: rgba(166, 130, 74, 0.08); }
+.place-cell { font-weight: 600; width: 50px; }
+.player-link { display: flex; align-items: center; gap: var(--spacing-sm); text-decoration: none; color: inherit; }
+.player-link:hover { color: var(--color-primary); }
+.player-avatar-sm { width: 32px; height: 32px; border-radius: var(--radius-full); object-fit: cover; background: var(--color-bg-elevated); }
+.fan-points { font-weight: 600; color: var(--color-primary); }
+.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--spacing-lg); }
+.chart-card .chart-title { font-size: var(--font-size-lg); margin-bottom: var(--spacing-md); }
+.chart-container { position: relative; height: 250px; }
+.matches-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--spacing-md); }
+.match-card-mini { display: block; padding: var(--spacing-md); background: var(--color-bg-elevated); border-radius: var(--radius-md); text-decoration: none; color: inherit; transition: background var(--transition-fast); }
+.match-card-mini:hover { background: rgba(166, 130, 74, 0.15); }
+.match-mini-players { display: flex; flex-direction: column; gap: var(--spacing-xs); }
+.match-mini-player { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-sm); }
+.match-mini-player.winner { font-weight: 600; color: var(--color-primary); }
+.player-avatar-xs { width: 24px; height: 24px; border-radius: var(--radius-full); object-fit: cover; background: var(--color-bg); flex-shrink: 0; }
+.match-mini-vs { font-size: var(--font-size-xs); color: var(--color-text-secondary); padding-left: 32px; }
+.set-score { margin-left: auto; font-weight: 500; }
+.match-mini-status { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--spacing-xs); }
+.round-title { font-size: var(--font-size-lg); margin-bottom: var(--spacing-md); color: var(--color-text-secondary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container tables-detail" style="padding-top: var(--spacing-2xl);">
+    <div class="mb-4">
+        <a href="{% url 'tournament_tables_list' %}" class="text-secondary">&larr; Все турнирные таблицы</a>
+    </div>
+
+    <!-- Hero: основная информация о турнире -->
+    <section class="tables-hero card mb-4">
+        <div class="card-body">
+            {% if tournament.image %}
+            <div class="tables-hero-image mb-3">
+                <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}">
+            </div>
+            {% endif %}
+            <div class="d-flex gap-2 mb-2 flex-wrap">
+                {% if tournament.format == 'single_elimination' %}
+                <span class="player-category" style="background: rgba(150, 98, 31, 0.2); color: var(--color-accent);">FAN</span>
+                {% endif %}
+                <span class="player-category">{{ tournament.get_category_display }}</span>
+                <span class="player-category">{{ tournament.get_gender_display }}</span>
+                <span class="player-category">{{ tournament.get_duration_display }}</span>
+                <span class="player-category">{{ tournament.get_status_display }}</span>
+                {% if tournament.entry_fee > 0 %}
+                <span class="player-category" style="background: var(--color-bg-elevated);">Взнос: {{ tournament.entry_fee|intcomma|cut:".00" }} ₽</span>
+                {% else %}
+                <span class="player-category" style="background: var(--color-bg-elevated);">Бесплатно</span>
+                {% endif %}
+            </div>
+            <h1 class="page-title" style="text-align: left;">{{ tournament.name }}</h1>
+            <p class="text-secondary mb-0">
+                {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
+                {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
+            </p>
+            {% if tournament.description %}
+            <div class="tables-description mt-3">
+                {{ tournament.description }}
+            </div>
+            {% endif %}
+            {% if is_fan %}
+            <div class="tables-fan-points mt-3">
+                <h4 class="mb-2">Очки FAN по раундам</h4>
+                <div class="fan-points-grid">
+                    <span>1 круг: {{ tournament.fan_points_r1 }} очков</span>
+                    <span>2 круг: {{ tournament.fan_points_r2 }} очков</span>
+                    <span>Полуфинал: {{ tournament.fan_points_sf }} очков</span>
+                    <span>Финалист: {{ tournament.fan_points_final }} очков</span>
+                    <span>Победитель: {{ tournament.fan_points_winner }} очков</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Карточки статистики -->
+    <section class="tables-stats-cards mb-4">
+        <div class="stats-cards-grid">
+            <div class="stat-card card">
+                <div class="card-body">
+                    <span class="stat-card-value">{{ participants_count }}</span>
+                    <span class="stat-card-label">Участников</span>
+                </div>
+            </div>
+            <div class="stat-card card">
+                <div class="card-body">
+                    <span class="stat-card-value">{{ matches_total }}</span>
+                    <span class="stat-card-label">Матчей всего</span>
+                </div>
+            </div>
+            <div class="stat-card card">
+                <div class="card-body">
+                    <span class="stat-card-value">{{ matches_completed }}</span>
+                    <span class="stat-card-label">Матчей сыграно</span>
+                </div>
+            </div>
+            <div class="stat-card card">
+                <div class="card-body">
+                    <span class="stat-card-value">{{ progress_pct }}%</span>
+                    <span class="stat-card-label">Прогресс</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {% if participants_count > 0 %}
+    <!-- Турнирная таблица участников -->
+    <section class="tables-section card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">Турнирная таблица</h2>
+            <div class="table-responsive">
+                <table class="standings-table">
+                    <thead>
+                        <tr>
+                            <th>Место</th>
+                            <th>Участник</th>
+                            <th>Рейтинг</th>
+                            {% if is_fan %}
+                            <th>Раунд вылета</th>
+                            <th>Очки FAN</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in standings %}
+                        <tr class="{% if s.place <= 3 %}top-place{% endif %}">
+                            <td class="place-cell">
+                                {% if s.place == 1 %}🥇{% elif s.place == 2 %}🥈{% elif s.place == 3 %}🥉{% else %}{{ s.place }}{% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'profile' pk=s.player.pk %}" class="player-link">
+                                    {% if s.player.avatar %}
+                                    <img src="{{ s.player.avatar.url }}" alt="" class="player-avatar-sm">
+                                    {% else %}
+                                    <div class="player-avatar-sm"></div>
+                                    {% endif %}
+                                    {{ s.player.user.first_name }} {{ s.player.user.last_name }}
+                                </a>
+                            </td>
+                            <td>{{ s.player.total_points }}</td>
+                            {% if is_fan %}
+                            <td>{{ s.round_eliminated }}</td>
+                            <td class="fan-points">{{ s.fan_points }}</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Графики -->
+    <section class="tables-charts mb-4">
+        <div class="charts-grid">
+            {% if chart_status_labels %}
+            <div class="chart-card card">
+                <div class="card-body">
+                    <h3 class="chart-title">Статус матчей</h3>
+                    <div class="chart-container">
+                        <canvas id="chartStatus"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if is_fan and chart_round_labels %}
+            <div class="chart-card card">
+                <div class="card-body">
+                    <h3 class="chart-title">Распределение по раундам вылета</h3>
+                    <div class="chart-container">
+                        <canvas id="chartRounds"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if ratings_sorted %}
+            <div class="chart-card card">
+                <div class="card-body">
+                    <h3 class="chart-title">Рейтинг участников (топ-20)</h3>
+                    <div class="chart-container">
+                        <canvas id="chartRatings"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Матчи по раундам -->
+    <section class="tables-matches card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">Матчи по раундам</h2>
+            {% for round_name, is_consolation, round_matches in matches_by_round %}
+            <div class="matches-round mb-4">
+                <h3 class="round-title">{{ round_name }}{% if is_consolation %} <span class="text-muted">(подвал)</span>{% endif %}</h3>
+                <div class="matches-grid">
+                    {% for match in round_matches %}
+                    <a href="{% url 'match_detail' pk=match.pk %}" class="match-card-mini">
+                        <div class="match-mini-players">
+                            <div class="match-mini-player {% if match.winner == match.player1 %}winner{% endif %}">
+                                {% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar-xs">{% else %}<div class="player-avatar-xs"></div>{% endif %}
+                                <span>{% if match.player1.is_bye %}Свободный круг{% else %}{{ match.player1 }}{% endif %}</span>
+                                {% if match.player1_set1 is not None %}<span class="set-score">{{ match.player1_set1 }}{% if match.player1_set2 is not None %}:{{ match.player1_set2 }}{% if match.player1_set3 is not None %}:{{ match.player1_set3 }}{% endif %}{% endif %}</span>{% endif %}
+                            </div>
+                            <div class="match-mini-vs">vs</div>
+                            <div class="match-mini-player {% if match.winner == match.player2 %}winner{% endif %}">
+                                {% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar-xs">{% else %}<div class="player-avatar-xs"></div>{% endif %}
+                                <span>{% if match.player2.is_bye %}Свободный круг{% else %}{{ match.player2 }}{% endif %}</span>
+                                {% if match.player2_set1 is not None %}<span class="set-score">{{ match.player2_set1 }}{% if match.player2_set2 is not None %}:{{ match.player2_set2 }}{% if match.player2_set3 is not None %}:{{ match.player2_set3 }}{% endif %}{% endif %}</span>{% endif %}
+                            </div>
+                        </div>
+                        <div class="match-mini-status">{{ match.get_status_display }}</div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-secondary">Матчи ещё не запланированы.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Ссылка на полную страницу турнира -->
+    <div class="text-center mb-4">
+        <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="btn btn-primary">Открыть турнир (сетка, регистрация)</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chartColors = {
+        primary: '#A6824A',
+        accent: '#83530cd3',
+        palette: ['#A6824A', '#83530c', '#2d5a27', '#6b7280', '#9ca3af']
+    };
+
+    {% if chart_status_labels %}
+    new Chart(document.getElementById('chartStatus'), {
+        type: 'doughnut',
+        data: {
+            labels: {{ chart_status_labels|safe }},
+            datasets: [{
+                data: {{ chart_status_data|safe }},
+                backgroundColor: chartColors.palette,
+                borderColor: '#16302B',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+    {% endif %}
+
+    {% if is_fan and chart_round_labels %}
+    new Chart(document.getElementById('chartRounds'), {
+        type: 'bar',
+        data: {
+            labels: {{ chart_round_labels|safe }},
+            datasets: [{
+                label: 'Участников',
+                data: {{ chart_round_data|safe }},
+                backgroundColor: chartColors.primary,
+                borderColor: chartColors.accent,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+    {% endif %}
+
+    {% if ratings_sorted %}
+    new Chart(document.getElementById('chartRatings'), {
+        type: 'bar',
+        data: {
+            labels: {{ ratings_labels|safe }},
+            datasets: [{
+                label: 'Рейтинг',
+                data: {{ ratings_sorted|safe }},
+                backgroundColor: 'rgba(166, 130, 74, 0.6)',
+                borderColor: chartColors.primary,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true } }
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}

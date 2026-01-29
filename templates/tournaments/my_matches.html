@@ -11,9 +11,11 @@
         <div class="card match-card-item">
             <div class="card-body" style="display: flex; flex-direction: column; gap: var(--spacing-md);">
                 <div class="match-meta">
-                    <div class="text-secondary" style="font-size: var(--font-size-sm);">{{ match.tournament.name }}</div>
+                    <div class="text-secondary" style="font-size: var(--font-size-sm);">{{ match.tournament.name }}{% if match.round_name %} · {{ match.round_name }}{% endif %}</div>
                     <div style="font-size: var(--font-size-sm);">
-                        {% if match.scheduled_datetime %}
+                        {% if match.deadline %}
+                            Дедлайн: {{ match.deadline|date:"d.m.Y" }}
+                        {% elif match.scheduled_datetime %}
                             {{ match.scheduled_datetime|date:"d.m.Y H:i" }}
                         {% else %}
                             Дата не установлена

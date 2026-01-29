@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'apps.payments',
     'apps.legal',
     'apps.navigation',
+    'django_crontab',
 ]
 
 # Cloudinary configuration - MUST be set BEFORE any Django initialization
@@ -198,3 +199,9 @@ LOGOUT_REDIRECT_URL = 'home'
 # Telegram bot for admin notifications (заявки, регистрации, обратная связь)
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get('TELEGRAM_ADMIN_CHAT_ID', '')
+
+# Cron: FAN-турниры — формирование сетки по дедлайну, обработка просроченных матчей
+CRONJOBS = [
+    ('*/10 * * * *', 'django.core.management.call_command', ['fan_generate_past_deadlines']),
+    ('0 */6 * * *', 'django.core.management.call_command', ['fan_process_overdue_matches']),
+]

@@ -11,8 +11,15 @@
     <div class="card" style="max-width: 700px; margin: 0 auto;">
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <div class="text-center mb-4">
-                <span class="player-category">{{ match.tournament.get_category_display }}</span>
-                <p class="text-muted mt-2">{{ match.scheduled_datetime|date:"d.m.Y H:i" }}</p>
+                <span class="player-category">{{ match.tournament.get_category_display }}{% if match.round_name %} · {{ match.round_name }}{% endif %}</span>
+                <p class="text-muted mt-2">
+                    {% if match.deadline %}Дедлайн: {{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}
+                </p>
+                {% if is_fan and match.deadline and match.status != 'completed' and match.status != 'walkover' %}
+                <p class="text-muted mt-1" style="font-size: var(--font-size-sm);">
+                    Если матч не сыгран до дедлайна, тех. победа присуждается игроку с более высоким рейтингом.
+                </p>
+                {% endif %}
                 {% if match.court %}
                 <p class="text-secondary">{{ match.court.name }}</p>
                 {% endif %}
@@ -74,10 +81,12 @@
             {% if match.winner %}
             <div class="text-center">
                 <p class="text-primary" style="font-weight: 600;">Победитель: {{ match.winner }}</p>
+                {% if not is_fan %}
                 {% if match.winner == match.player1 %}
                 <p class="text-muted" style="font-size: var(--font-size-sm);">+{{ match.points_player1 }} очков</p>
                 {% else %}
                 <p class="text-muted" style="font-size: var(--font-size-sm);">+{{ match.points_player2 }} очков</p>
+                {% endif %}
                 {% endif %}
             </div>
             {% endif %}

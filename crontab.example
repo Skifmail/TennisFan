@@ -1,0 +1,14 @@
+# FAN-турниры: cron-задачи (django-crontab)
+#
+# Установить в системный crontab:
+#   python manage.py crontab add
+#
+# Удалить:
+#   python manage.py crontab remove
+#
+# Просмотр текущих задач:
+#   python manage.py crontab show
+#
+# Задачи:
+#   */10 * * * *  — каждые 10 мин: формирование сетки по дедлайну регистрации
+#   0 */6 * * *   — каждые 6 часов: обработка просроченных матчей (тех. победа)

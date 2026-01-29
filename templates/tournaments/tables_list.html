@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Турнирные таблицы{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="page-header mb-4">
+        <h1 class="page-title">Турнирные таблицы</h1>
+        <p class="page-subtitle">Подробная статистика по каждому турниру: участники, матчи, результаты, графики</p>
+    </div>
+
+    <div class="tournament-tables-grid">
+        {% for t in tournaments %}
+        <a href="{% url 'tournament_tables_detail' slug=t.slug %}" class="tournament-table-card card">
+            <div class="card-body">
+                <div class="d-flex gap-2 mb-2 flex-wrap">
+                    {% if t.format == 'single_elimination' %}
+                    <span class="player-category" style="background: rgba(150, 98, 31, 0.2); color: var(--color-accent);">FAN</span>
+                    {% endif %}
+                    <span class="player-category">{{ t.get_category_display }}</span>
+                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ t.get_status_display }}</span>
+                </div>
+                <h2 class="tournament-table-title">{{ t.name }}</h2>
+                <p class="text-secondary mb-3">{{ t.city }} • {{ t.start_date|date:"d.m.Y" }}{% if t.end_date %} — {{ t.end_date|date:"d.m.Y" }}{% endif %}</p>
+
+                <div class="tournament-table-stats">
+                    <div class="stat-item">
+                        <span class="stat-value">{{ t.participants_count }}</span>
+                        <span class="stat-label">участников</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">{{ t.matches_total }}</span>
+                        <span class="stat-label">матчей</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">{{ t.matches_completed }}/{{ t.matches_total }}</span>
+                        <span class="stat-label">сыграно</span>
+                    </div>
+                </div>
+
+                <div class="tournament-table-progress">
+                    <div class="progress-bar" role="progressbar" style="width: {{ t.progress_pct }}%;" aria-valuenow="{{ t.matches_completed }}" aria-valuemin="0" aria-valuemax="{{ t.matches_total }}"></div>
+                </div>
+
+                <span class="tournament-table-link">Подробнее →</span>
+            </div>
+        </a>
+        {% empty %}
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <p class="text-secondary">Турниры пока не добавлены.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+.tournament-tables-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--spacing-lg);
+}
+.tournament-table-card {
+    display: block;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    text-decoration: none;
+    color: inherit;
+}
+.tournament-table-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+.tournament-table-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+}
+.tournament-table-stats {
+    display: flex;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+.stat-item {
+    display: flex;
+    flex-direction: column;
+}
+.stat-value {
+    font-weight: 600;
+    color: var(--color-primary);
+}
+.stat-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+.tournament-table-progress {
+    height: 6px;
+    background: var(--color-bg-elevated);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin-bottom: var(--spacing-md);
+}
+.tournament-table-progress .progress-bar {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: var(--radius-full);
+    transition: width var(--transition-base);
+}
+.tournament-table-link {
+    font-size: var(--font-size-sm);
+    color: var(--color-primary);
+}
+</style>
+{% endblock %}

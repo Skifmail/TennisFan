@@ -8,6 +8,8 @@ from . import views
 
 urlpatterns = [
     path('', views.tournament_list, name='tournament_list'),
+    path('tables/', views.tournament_tables_list, name='tournament_tables_list'),
+    path('tables/<slug:slug>/', views.tournament_tables_detail, name='tournament_tables_detail'),
     path('champions-league/', views.champions_league, name='champions_league'),
     path('my/', views.my_matches, name='my_matches'),
     path('match/<int:pk>/propose/', views.propose_result, name='propose_result'),

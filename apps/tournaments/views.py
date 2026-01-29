@@ -8,12 +8,15 @@ from django.db import models
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from .fan import _is_fan, check_and_generate_past_deadline_brackets
 from .models import Match, MatchResultProposal, Tournament, TournamentType
+from .proposal_service import apply_proposal
 from apps.users.models import Notification, Player, SkillLevel
 
 
 def tournament_list(request):
     """List of tournaments."""
+    check_and_generate_past_deadline_brackets()
     city = request.GET.get('city', '')
     category = request.GET.get('category', '')
     status = request.GET.get('status', '')
@@ -43,18 +46,41 @@ def tournament_detail(request, slug):
     """Tournament detail page."""
     tournament = get_object_or_404(
         Tournament.objects.prefetch_related(
-            'matches__player1__user', 
-            'matches__player2__user',
-            'participants__user'
+            "matches__player1__user",
+            "matches__player2__user",
+            "matches__winner__user",
+            "participants__user",
         ),
-        slug=slug
+        slug=slug,
     )
+    is_fan = _is_fan(tournament)
+    if is_fan:
+        matches = tournament.matches.order_by("is_consolation", "round_index", "round_order")
+        from itertools import groupby
+
+        def round_key(m):
+            return (m.round_name, m.is_consolation)
+
+        matches_by_round = []
+        for k, group in groupby(matches, key=round_key):
+            matches_by_round.append((k[0], k[1], list(group)))
+    else:
+        matches_by_round = None
+        matches = tournament.matches.all().order_by("-scheduled_datetime")
+
+    participants_qs = tournament.participants.all()
+    if is_fan:
+        participants_qs = participants_qs.order_by("-total_points")
+    else:
+        participants_qs = participants_qs.order_by("user__last_name", "user__first_name")
     context = {
-        'tournament': tournament,
-        'matches': tournament.matches.all().order_by('-scheduled_datetime'),
-        'participants': tournament.participants.all().order_by('user__last_name', 'user__first_name'),
+        "tournament": tournament,
+        "matches": matches,
+        "matches_by_round": matches_by_round,
+        "is_fan": is_fan,
+        "participants": participants_qs,
     }
-    return render(request, 'tournaments/detail.html', context)
+    return render(request, "tournaments/detail.html", context)
 
 
 def champions_league(request):
@@ -69,105 +95,14 @@ def match_detail(request, pk):
     """Match detail page."""
     match = get_object_or_404(
         Match.objects.select_related(
-            'player1__user', 'player2__user', 'winner__user', 'tournament', 'court'
+            "player1__user", "player2__user", "winner__user", "tournament", "court"
         ),
-        pk=pk
+        pk=pk,
     )
-    return render(request, 'tournaments/match_detail.html', {'match': match})
-
-
-def _compute_result(proposal: MatchResultProposal):
-    """Determine winner/loser and walkover based on proposal."""
-
-    match = proposal.match
-    proposer = proposal.proposer
-    opponent = match.player2 if proposer == match.player1 else match.player1
-
-    result = proposal.result
-    if proposer == match.player1:
-        winner = match.player1 if result in (
-            Match.ResultChoice.WIN,
-            Match.ResultChoice.WALKOVER_WIN,
-        ) else match.player2
-    else:
-        winner = match.player2 if result in (
-            Match.ResultChoice.WIN,
-            Match.ResultChoice.WALKOVER_WIN,
-        ) else match.player1
-
-    loser = opponent if winner == proposer else proposer
-    walkover = result in (
-        Match.ResultChoice.WALKOVER_WIN,
-        Match.ResultChoice.WALKOVER_LOSS,
-    )
-    return winner, loser, walkover
-
-
-def _apply_proposal(proposal: MatchResultProposal):
-    """Apply accepted proposal to match and update stats."""
-
-    match = proposal.match
-    winner, loser, walkover = _compute_result(proposal)
-
-    # Update score
-    for field in [
-        "player1_set1",
-        "player2_set1",
-        "player1_set2",
-        "player2_set2",
-        "player1_set3",
-        "player2_set3",
-    ]:
-        setattr(match, field, getattr(proposal, field))
-
-    match.winner = winner
-    match.status = Match.MatchStatus.WALKOVER if walkover else Match.MatchStatus.COMPLETED
-    match.completed_datetime = match.completed_datetime or match.scheduled_datetime
-    # Set per-match points for display
-    win_delta = getattr(match.tournament, "points_winner", 100)
-    lose_delta = getattr(match.tournament, "points_loser", -50)
-    if winner == match.player1:
-        match.points_player1 = win_delta
-        match.points_player2 = lose_delta
-    else:
-        match.points_player1 = lose_delta
-        match.points_player2 = win_delta
-    match.save()
-
-    # Update player statistics
-    from apps.users.models import Player
-    
-    # Update winner stats
-    winner_player = Player.objects.filter(user=winner.user).first()
-    if winner_player:
-        winner_player.total_points = winner_player.total_points + win_delta
-        winner_player.matches_played = winner_player.matches_played + 1
-        winner_player.matches_won = winner_player.matches_won + 1
-        winner_player.save(update_fields=['total_points', 'matches_played', 'matches_won'])
-    
-    # Update loser stats
-    loser_player = Player.objects.filter(user=loser.user).first()
-    if loser_player:
-        loser_player.total_points = max(0, loser_player.total_points + lose_delta)  # Don't go below 0
-        loser_player.matches_played = loser_player.matches_played + 1
-        loser_player.save(update_fields=['total_points', 'matches_played'])
-
-    # Close other pending proposals for this match
-    match.result_proposals.exclude(pk=proposal.pk).update(status=Match.ProposalStatus.REJECTED)
-
-    proposal.status = Match.ProposalStatus.ACCEPTED
-    proposal.save(update_fields=["status"])
-
-    # Notifications
-    Notification.objects.create(
-        user=winner.user,
-        message="Результат матча подтвержден: вы выиграли.",
-        url=reverse('match_detail', args=[match.pk]),
-    )
-    Notification.objects.create(
-        user=loser.user,
-        message="Результат матча подтвержден: поражение.",
-        url=reverse('match_detail', args=[match.pk]),
+    return render(
+        request,
+        "tournaments/match_detail.html",
+        {"match": match, "is_fan": _is_fan(match.tournament)},
     )
 
 
@@ -295,8 +230,9 @@ def confirm_proposal(request, pk):
 
     action = request.POST.get('action')
     if action == 'accept':
-        _apply_proposal(proposal)
-        messages.success(request, 'Результат подтверждён.')
+        apply_proposal(proposal)
+        # FAN-логика (advance, consolation, finalize) вызывается из post_save сигнала Match
+        messages.success(request, "Результат подтверждён.")
     else:
         opponent = match.player2 if player == match.player1 else match.player1
         proposal.delete()
@@ -319,11 +255,13 @@ def tournament_register(request, slug):
     if player is None:
         player = Player.objects.create(user=request.user)
 
-    # Check if tournament is full
+    if getattr(tournament, "bracket_generated", False):
+        messages.error(request, "Регистрация закрыта: сетка турнира уже сформирована.")
+        return redirect("tournament_detail", slug=tournament.slug)
+
     if tournament.is_full():
-        messages.error(request, 'Регистрация закрыта: все места заняты.')
-        next_url = request.GET.get('next') or request.META.get('HTTP_REFERER')
-        return redirect(next_url or reverse('tournament_detail', args=[tournament.slug]))
+        messages.error(request, "Регистрация закрыта: все места заняты.")
+        return redirect("tournament_detail", slug=tournament.slug)
 
     # Check gender compatibility
     if tournament.gender != 'mixed':

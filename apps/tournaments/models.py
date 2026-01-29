@@ -34,11 +34,18 @@ class TournamentGender(models.TextChoices):
 
 
 class TournamentDuration(models.TextChoices):
-    """Tournament duration type."""
+    """Tournament duration type (категория турнира)."""
 
     SINGLE_DAY = "single", "Однодневный"
     WEEKEND = "weekend", "Выходного дня"
     MULTI_DAY = "multi", "Многодневный"
+
+
+class TournamentFormat(models.TextChoices):
+    """Формат проведения: FAN = single elimination с посевом по рейтингу."""
+
+    SINGLE_ELIMINATION = "single_elimination", "FAN (одноэтапная сетка)"
+    OTHER = "other", "Другой"
 
 
 class Tournament(models.Model):
@@ -65,21 +72,45 @@ class Tournament(models.Model):
     tournament_type = models.CharField(
         "Тип турнира", max_length=20, choices=TournamentType.choices, default=TournamentType.REGULAR
     )
+    format = models.CharField(
+        "Формат",
+        max_length=20,
+        choices=TournamentFormat.choices,
+        default=TournamentFormat.OTHER,
+        help_text="FAN: одноэтапная сетка, посев по рейтингу, очки при вылете.",
+    )
     status = models.CharField(
         "Статус", max_length=20, choices=TournamentStatus.choices, default=TournamentStatus.UPCOMING
     )
     points_winner = models.IntegerField("Очки за победу", default=100)
     points_loser = models.IntegerField("Очки за проигрыш", default=-50)
     max_participants = models.PositiveIntegerField(
-        "Максимальное количество участников", 
-        null=True, 
+        "Максимальное количество участников",
+        null=True,
         blank=True,
-        help_text="Оставьте пустым для неограниченного количества участников"
+        help_text="Обязательно для FAN. Оставьте пустым для неограниченного количества.",
+    )
+    bracket_generated = models.BooleanField(
+        "Сетка сформирована",
+        default=False,
+        help_text="FAN: сетка создана по рейтингу, регистрация закрыта.",
+    )
+    match_days_per_round = models.PositiveSmallIntegerField(
+        "Дней на раунд (дедлайн матча)",
+        default=7,
+        help_text="FAN: сколько дней у игроков на проведение матча раунда.",
     )
 
     start_date = models.DateField("Дата начала")
     end_date = models.DateField("Дата окончания", null=True, blank=True)
     registration_deadline = models.DateTimeField("Дедлайн регистрации", null=True, blank=True)
+
+    # FAN: очки за раунд (начисляются при вылете / в конце турнира)
+    fan_points_r1 = models.PositiveSmallIntegerField("FAN: очки за 1 круг", default=10)
+    fan_points_r2 = models.PositiveSmallIntegerField("FAN: очки за 2 круг", default=25)
+    fan_points_sf = models.PositiveSmallIntegerField("FAN: очки за полуфинал", default=45)
+    fan_points_final = models.PositiveSmallIntegerField("FAN: очки финалисту", default=70)
+    fan_points_winner = models.PositiveSmallIntegerField("FAN: очки победителю", default=100)
 
     image = models.ImageField("Изображение", upload_to="tournaments/", blank=True)
     participants = models.ManyToManyField(
@@ -143,12 +174,46 @@ class Match(models.Model):
         verbose_name="Корт",
     )
     round_name = models.CharField("Раунд", max_length=50, blank=True)
+    round_index = models.PositiveSmallIntegerField(
+        "Индекс раунда (1=1 круг, 2=2 круг, …)",
+        default=1,
+        help_text="Для сортировки и FAN-очков.",
+    )
+    round_order = models.PositiveSmallIntegerField(
+        "Порядок матча в раунде",
+        default=1,
+        help_text="Номер пары в раунде (1–8 для 16 участников в R1).",
+    )
+    is_consolation = models.BooleanField(
+        "Подвал (матч вылетевших)",
+        default=False,
+    )
+    deadline = models.DateTimeField(
+        "Дедлайн матча",
+        null=True,
+        blank=True,
+        help_text="До этой даты матч должен быть сыгран (FAN).",
+    )
+    next_match = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prev_matches",
+        verbose_name="Следующий матч (победитель)",
+    )
 
     player1 = models.ForeignKey(
-        Player, on_delete=models.CASCADE, related_name="matches_as_player1", verbose_name="Игрок 1"
+        Player,
+        on_delete=models.CASCADE,
+        related_name="matches_as_player1",
+        verbose_name="Игрок 1",
     )
     player2 = models.ForeignKey(
-        Player, on_delete=models.CASCADE, related_name="matches_as_player2", verbose_name="Игрок 2"
+        Player,
+        on_delete=models.CASCADE,
+        related_name="matches_as_player2",
+        verbose_name="Игрок 2",
     )
     winner = models.ForeignKey(
         Player,
@@ -281,3 +346,37 @@ class SeasonRating(models.Model):
 
     def __str__(self) -> str:
         return f"{self.player} - {self.season} ({self.points} очков)"
+
+
+class TournamentPlayerResult(models.Model):
+    """FAN: результат игрока в турнире — раунд вылета и начисленные очки."""
+
+    class RoundEliminated(models.TextChoices):
+        R1 = "r1", "1 круг"
+        R2 = "r2", "2 круг"
+        SF = "sf", "Полуфинал"
+        FINAL = "final", "Финал"
+        WINNER = "winner", "Победитель"
+
+    tournament = models.ForeignKey(
+        Tournament, on_delete=models.CASCADE, related_name="fan_results"
+    )
+    player = models.ForeignKey(
+        Player, on_delete=models.CASCADE, related_name="tournament_fan_results"
+    )
+    round_eliminated = models.CharField(
+        "Раунд вылета",
+        max_length=10,
+        choices=RoundEliminated.choices,
+    )
+    fan_points = models.PositiveIntegerField("Начислено очков FAN", default=0)
+    is_consolation = models.BooleanField("Вылет в подвале", default=False)
+
+    class Meta:
+        verbose_name = "Результат в турнире (FAN)"
+        verbose_name_plural = "Результаты в турнирах (FAN)"
+        unique_together = ("tournament", "player")
+        ordering = ["-fan_points"]
+
+    def __str__(self) -> str:
+        return f"{self.player} — {self.get_round_eliminated_display()} ({self.fan_points} очков)"

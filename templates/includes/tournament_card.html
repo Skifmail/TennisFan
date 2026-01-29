@@ -57,7 +57,9 @@
 
         <div class="tournament-action">
             {% if user.is_authenticated %}
-                {% if tournament.is_full %}
+                {% if tournament.bracket_generated %}
+                <button type="button" class="btn btn-outline" disabled>Регистрация закрыта</button>
+                {% elif tournament.is_full %}
                 <button type="button" class="btn btn-outline" disabled>Мест нет</button>
                 {% else %}
                 <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary" onclick="event.stopPropagation();">Записаться</a>

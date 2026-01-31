@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}О нас{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl); max-width: 800px;">
+    <h1 class="page-title" style="text-align: center; text-transform: uppercase; letter-spacing: 0.05em;">О НАС</h1>
+
+    {% if about.subtitle %}
+    <p class="text-muted text-center mb-4" style="font-size: var(--font-size-lg);">{{ about.subtitle }}</p>
+    {% endif %}
+
+    {% if about.image %}
+    <div class="mb-4" style="text-align: center;">
+        <img src="{{ about.image.url }}" alt="О нас" class="about-image"
+            style="max-width: 100%; border-radius: var(--radius-lg); box-shadow: var(--shadow-md);">
+    </div>
+    {% endif %}
+
+    {% if about.body %}
+    <div class="card mb-4">
+        <div class="card-body legal-doc__body">
+            {{ body_html|safe }}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="text-center mb-5">
+        <a href="{% url 'donate' %}" class="btn btn-donate">ОТПРАВИТЬ ДОНАТ</a>
+    </div>
+
+    <hr class="my-5" style="border-color: var(--color-border);">
+
+    <section class="comments-section">
+        <h2 class="mb-4" style="font-size: var(--font-size-2xl);">Комментарии</h2>
+
+        {% if user.is_authenticated %}
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="post" action="{% url 'about_us' %}">
+                    {% csrf_token %}
+                    {{ comment_form.text }}
+                    {% if comment_form.text.errors %}
+                    <p class="text-error mt-1">{{ comment_form.text.errors.0 }}</p>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary mt-3">Отправить комментарий</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted mb-4">
+            <a href="{% url 'login' %}">Войдите</a>, чтобы оставить комментарий.
+        </p>
+        {% endif %}
+
+        {% if comments %}
+        <div class="comments-list">
+            {% for comment in comments %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="mb-2" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <strong>{{ comment.author }}</strong>
+                        <span class="text-muted" style="font-size: var(--font-size-sm);">{{ comment.created_at|date:"d.m.Y H:i" }}</span>
+                    </div>
+                    <p class="mb-0" style="white-space: pre-wrap;">{{ comment.text }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">Пока нет комментариев. Будьте первым!</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

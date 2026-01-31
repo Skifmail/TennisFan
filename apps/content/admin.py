@@ -3,8 +3,25 @@ Content admin configuration.
 """
 
 from django.contrib import admin
+from django.contrib.contenttypes.admin import GenericTabularInline
+from django.shortcuts import redirect
+from django.urls import reverse
 
-from .models import Gallery, News, Page, Photo
+from apps.comments.models import Comment
+
+from .models import AboutUs, ContactItem, ContactPage, Gallery, News, Page, Photo
+
+
+class CommentInline(GenericTabularInline):
+    """Inline для комментариев на странице «О нас»."""
+
+    model = Comment
+    ct_field = "content_type"
+    ct_fk_field = "object_id"
+    extra = 0
+    fields = ("author", "text", "is_approved", "created_at")
+    readonly_fields = ("created_at",)
+    raw_id_fields = ("author",)
 
 
 class PhotoInline(admin.TabularInline):
@@ -54,6 +71,78 @@ class PhotoAdmin(admin.ModelAdmin):
     list_filter = ("gallery",)
     list_editable = ("order",)
     raw_id_fields = ("gallery",)
+
+
+@admin.register(AboutUs)
+class AboutUsAdmin(admin.ModelAdmin):
+    """Admin for AboutUs singleton. Заголовок «О НАС» фиксирован на странице."""
+
+    list_display = ("__str__", "subtitle", "updated_at")
+    fieldsets = (
+        (
+            "Контент",
+            {
+                "fields": ("subtitle", "image", "body"),
+                "description": "Заголовок «О НАС» отображается на странице автоматически.",
+            },
+        ),
+    )
+    inlines = [CommentInline]
+
+    def has_add_permission(self, request) -> bool:
+        """Only one AboutUs instance allowed."""
+        return not AboutUs.objects.exists()
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        """Prevent deletion of singleton."""
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        """Redirect to change view for singleton."""
+        obj = AboutUs.objects.first()
+        if obj and not request.path.endswith("/change/"):
+            return redirect(
+                reverse("admin:content_aboutus_change", args=[obj.pk])
+            )
+        return super().changelist_view(request, extra_context)
+
+
+class ContactItemInline(admin.TabularInline):
+    """Inline для контактов — редактируются вместе со страницей."""
+
+    model = ContactItem
+    extra = 1
+    fields = ("item_type", "label", "value", "url", "order")
+    ordering = ("order", "id")
+
+
+@admin.register(ContactPage)
+class ContactPageAdmin(admin.ModelAdmin):
+    """Объединённый админ «Контакты» — текст и список контактов в одном месте."""
+
+    list_display = ("__str__", "updated_at")
+    fieldsets = (
+        (
+            "Текст перед контактами",
+            {
+                "fields": ("intro_text",),
+                "description": "Произвольный текст (приветствие, описание). Поддерживается Markdown.",
+            },
+        ),
+    )
+    inlines = [ContactItemInline]
+
+    def has_add_permission(self, request) -> bool:
+        return not ContactPage.objects.exists()
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        obj = ContactPage.objects.first()
+        if obj and not request.path.endswith("/change/"):
+            return redirect(reverse("admin:content_contactpage_change", args=[obj.pk]))
+        return super().changelist_view(request, extra_context)
 
 
 @admin.register(Page)

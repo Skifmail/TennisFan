@@ -97,6 +97,162 @@ class Photo(models.Model):
         return f"Фото {self.id} в {self.gallery}"
 
 
+class AboutUs(models.Model):
+    """
+    Singleton model for "О нас" page.
+    Заголовок "О НАС" фиксирован в шаблоне.
+    """
+
+    subtitle = models.CharField("Подзаголовок", max_length=300, blank=True)
+    image = models.ImageField("Фото", upload_to="about/", blank=True)
+    body = models.TextField(
+        "Статья",
+        blank=True,
+        help_text="Поддерживается Markdown (заголовки, списки, ссылки, жирный и т.п.).",
+    )
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "О нас"
+        verbose_name_plural = "О нас"
+
+    def __str__(self) -> str:
+        return "О нас"
+
+    @classmethod
+    def get_singleton(cls) -> "AboutUs":
+        """Return the single AboutUs instance, creating if needed."""
+        obj = cls.objects.first()
+        if obj is None:
+            obj = cls.objects.create(subtitle="", body="")
+        return obj
+
+
+class ContactPage(models.Model):
+    """
+    Singleton для страницы «Контакты».
+    Текстовое поле перед списком контактов — редактируется в админке.
+    """
+
+    intro_text = models.TextField(
+        "Текст перед контактами",
+        blank=True,
+        help_text="Произвольный текст (приветствие, описание и т.д.). Поддерживается Markdown.",
+    )
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Контакты"
+        verbose_name_plural = "Контакты"
+
+    def __str__(self) -> str:
+        return "Контакты"
+
+    @classmethod
+    def get_singleton(cls) -> "ContactPage":
+        """Return the single ContactPage instance, creating if needed."""
+        obj = cls.objects.first()
+        if obj is None:
+            obj = cls.objects.create(intro_text="")
+        return obj
+
+
+class ContactItem(models.Model):
+    """
+    Элемент контакта на странице «Контакты».
+    Админ добавляет способы связи: адрес, телефон, мессенджеры и т.д.
+    """
+
+    contact_page = models.ForeignKey(
+        ContactPage,
+        on_delete=models.CASCADE,
+        related_name="contact_items",
+        verbose_name="Страница контактов",
+        null=True,
+        blank=True,
+    )
+    class ItemType(models.TextChoices):
+        ADDRESS = "address", "Адрес"
+        PHONE = "phone", "Телефон"
+        EMAIL = "email", "Email"
+        TELEGRAM = "telegram", "Telegram"
+        WHATSAPP = "whatsapp", "WhatsApp"
+        MAX = "max", "MAX"
+        VK = "vk", "VK"
+        WEBSITE = "website", "Сайт"
+        WORK_HOURS = "work_hours", "Режим работы"
+        OTHER = "other", "Другое"
+
+    item_type = models.CharField(
+        "Тип",
+        max_length=20,
+        choices=ItemType.choices,
+        default=ItemType.OTHER,
+    )
+    label = models.CharField(
+        "Подпись (опционально)",
+        max_length=100,
+        blank=True,
+        help_text="Например: «Поддержка», «Офис». Если пусто — используется тип.",
+    )
+    value = models.CharField(
+        "Значение",
+        max_length=500,
+        help_text="Телефон, адрес, @username, email и т.д.",
+    )
+    url = models.URLField(
+        "Ссылка (опционально)",
+        blank=True,
+        help_text="Для мессенджеров: t.me/xxx, wa.me/xxx. Для email: mailto:...",
+    )
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+
+    class Meta:
+        verbose_name = "Контакт"
+        verbose_name_plural = "Контакты"
+        ordering = ["order", "id"]
+
+    def __str__(self) -> str:
+        label = self.label or self.get_item_type_display()
+        return f"{label}: {self.value[:50]}{'…' if len(self.value) > 50 else ''}"
+
+    @property
+    def display_label(self) -> str:
+        """Подпись для отображения."""
+        return self.label or self.get_item_type_display()
+
+    @property
+    def clickable_url(self) -> str | None:
+        """URL для перехода или None."""
+        if self.url:
+            return self.url
+        if self.item_type == self.ItemType.EMAIL and self.value:
+            return f"mailto:{self.value.strip()}"
+        if self.item_type == self.ItemType.PHONE and self.value:
+            tel = "".join(c for c in self.value if c.isdigit() or c in "+")
+            return f"tel:{tel}" if tel else None
+        if self.item_type == self.ItemType.TELEGRAM and self.value:
+            uname = self.value.strip().lstrip("@")
+            return f"https://t.me/{uname}" if uname else None
+        if self.item_type == self.ItemType.WHATSAPP and self.value:
+            tel = "".join(c for c in self.value if c.isdigit())
+            return f"https://wa.me/{tel}" if tel else None
+        if self.item_type == self.ItemType.MAX and self.value:
+            v = self.value.strip()
+            if v.startswith("http"):
+                return v
+            return None  # Для MAX укажите ссылку в поле «Ссылка» или полный URL в значении
+        if self.item_type == self.ItemType.VK and self.value:
+            v = self.value.strip()
+            if v.startswith("http"):
+                return v
+            return f"https://vk.com/{v.lstrip('/')}" if v else None
+        if self.item_type == self.ItemType.WEBSITE and self.value:
+            v = self.value.strip()
+            return v if v.startswith("http") else f"https://{v}"
+        return None
+
+
 class Page(models.Model):
     """Static page model (rules, about, etc.). Content supports Markdown."""
 

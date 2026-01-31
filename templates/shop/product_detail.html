@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ product.name }}{% endblock %}
+
+{% block content %}
+<div id="shop-data" data-show-modal="{% if show_modal %}true{% else %}false{% endif %}" aria-hidden="true" style="display:none"></div>
+<div class="shop-detail">
+    <div class="container">
+        <a href="{% url 'shop_list' %}" class="text-secondary mb-4 d-inline-block">&larr; Назад в магазин</a>
+    </div>
+
+    <div class="shop-detail__card">
+        <div class="container">
+            <div class="shop-detail__main">
+                <div class="shop-detail__gallery">
+                    {% if product.photos.exists %}
+                    <div class="shop-detail__main-photo">
+                        <img src="{{ product.photos.first.image.url }}" alt="{{ product.name }}" id="shop-main-photo" class="shop-detail__main-img">
+                    </div>
+                    {% if product.photos.count > 1 %}
+                    <div class="shop-detail__thumbs">
+                        {% for photo in product.photos.all %}
+                        <button type="button" class="shop-detail__thumb{% if forloop.first %} shop-detail__thumb--active{% endif %}" data-src="{{ photo.image.url }}" aria-label="Фото {{ forloop.counter }}">
+                            <img src="{{ photo.image.url }}" alt="">
+                        </button>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="shop-detail__main-photo shop-detail__placeholder">
+                        <span>Нет фото</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="shop-detail__info">
+                    <h1 class="shop-detail__title">{{ product.name }}</h1>
+                    <p class="shop-detail__price">{{ product.price|floatformat:0 }} ₽</p>
+                    {% if product.is_available %}
+                    <p class="shop-detail__stock"><span class="player-category shop-product-card__badge--available">В наличии: {{ product.quantity }} шт.</span></p>
+                    {% else %}
+                    <p class="shop-detail__stock"><span class="player-category shop-product-card__badge--unavailable">Нет в наличии</span></p>
+                    {% endif %}
+                    {% if product.size %}<p class="shop-detail__char"><strong>Размер:</strong> {{ product.size }}</p>{% endif %}
+                    {% if product.is_available %}
+                    <button type="button" class="btn btn-primary shop-detail__buy" id="shop-buy-btn">Купить</button>
+                    {% endif %}
+                </div>
+            </div>
+            {% if product.description %}
+            <div class="shop-detail__description">
+                <h2 class="shop-detail__desc-title">Описание</h2>
+                <div class="legal-doc__body shop-detail__desc-body">{{ product.description|linebreaks }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<div class="sparring-modal shop-purchase-modal hidden" id="shop-purchase-modal" role="dialog" aria-label="Заявка на покупку">
+    <div class="sparring-modal__backdrop" id="shop-modal-backdrop"></div>
+    <div class="sparring-modal__box" style="max-width: 420px;">
+        <h3 class="sparring-modal__title">Заявка на покупку</h3>
+        <p class="text-secondary sparring-modal__sub">{{ product.name }}</p>
+        <form method="post" action="{% url 'shop_purchase_request' product_id=product.pk %}" id="shop-purchase-form">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="id_last_name" class="form-label">{{ form.last_name.label }}</label>
+                {{ form.last_name }}
+                {% if form.last_name.errors %}<p class="text-error mt-1">{{ form.last_name.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="mb-3">
+                <label for="id_first_name" class="form-label">{{ form.first_name.label }}</label>
+                {{ form.first_name }}
+                {% if form.first_name.errors %}<p class="text-error mt-1">{{ form.first_name.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="mb-3">
+                <label for="id_contact_phone" class="form-label">{{ form.contact_phone.label }}</label>
+                {{ form.contact_phone }}
+                {% if form.contact_phone.errors %}<p class="text-error mt-1">{{ form.contact_phone.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="mb-3">
+                <label for="id_comment" class="form-label">{{ form.comment.label }}</label>
+                {{ form.comment }}
+                {% if form.comment.errors %}<p class="text-error mt-1">{{ form.comment.errors.0 }}</p>{% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Отправить заявку</button>
+        </form>
+        <button type="button" class="btn btn-ghost sparring-modal__close mt-3 w-100" id="shop-modal-close">Закрыть</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const modal = document.getElementById('shop-purchase-modal');
+    const buyBtn = document.getElementById('shop-buy-btn');
+    const backdrop = document.getElementById('shop-modal-backdrop');
+    const closeBtn = document.getElementById('shop-modal-close');
+    const thumbs = document.querySelectorAll('.shop-detail__thumb');
+    const mainPhoto = document.getElementById('shop-main-photo');
+
+    if (buyBtn && modal) {
+        buyBtn.addEventListener('click', function() {
+            modal.classList.remove('hidden');
+        });
+    }
+
+    if (thumbs.length && mainPhoto) {
+        thumbs.forEach(function(thumb) {
+            thumb.addEventListener('click', function() {
+                mainPhoto.src = this.dataset.src;
+                thumbs.forEach(function(t) { t.classList.remove('shop-detail__thumb--active'); });
+                this.classList.add('shop-detail__thumb--active');
+            });
+        });
+    }
+
+    const showModal = document.getElementById('shop-data')?.getAttribute('data-show-modal') === 'true';
+    if (showModal && modal) modal.classList.remove('hidden');
+
+    function closeModal() {
+        modal.classList.add('hidden');
+    }
+
+    if (backdrop) backdrop.addEventListener('click', closeModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+})();
+</script>
+{% endblock %}

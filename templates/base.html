@@ -141,6 +141,8 @@
                 <div class="footer-links">
                     <h4>Информация</h4>
                     <ul>
+                        <li><a href="{% url 'about_us' %}">О нас</a></li>
+                        <li><a href="{% url 'contacts' %}">Контакты</a></li>
                         <li><a href="{% url 'rules' %}">Правила</a></li>
                         <li><a href="{% url 'news_list' %}">Новости</a></li>
                         <li><a href="{% url 'gallery_list' %}">Фото</a></li>
@@ -174,6 +176,7 @@
         </div>
     </footer>
 
+    {% block modals %}{% endblock %}
     <script src="{% static 'js/main.js' %}"></script>
     {% block extra_js %}{% endblock %}
 </body>

@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Магазин{% endblock %}
+
+{% block content %}
+<div class="page-header shop-page-header">
+    <h1 class="page-title">Магазин</h1>
+    {% if shop_page.intro_text %}
+    <div class="shop-intro legal-doc__body">
+        {{ intro_html|safe }}
+    </div>
+    {% endif %}
+</div>
+
+<div class="container">
+    {% if products %}
+    <div class="grid grid-3 shop-product-grid">
+        {% for product in products %}
+        <div class="card shop-product-card">
+            <a href="{% url 'shop_product_detail' pk=product.pk %}" class="shop-product-card__link" style="text-decoration: none; color: inherit;">
+                {% if product.main_image %}
+                <img src="{{ product.main_image.image.url }}" alt="{{ product.name }}" class="card-image shop-product-card__image">
+                {% else %}
+                <div class="card-image shop-product-card__placeholder">Нет фото</div>
+                {% endif %}
+                <div class="card-body shop-product-card__body">
+                    <h3 class="card-title">{{ product.name }}</h3>
+                    {% if product.size %}<p class="text-muted shop-product-card__size">Размер: {{ product.size }}</p>{% endif %}
+                    <p class="text-primary shop-product-card__price">{{ product.price|floatformat:0 }} ₽</p>
+                    {% if product.is_available %}
+                    <span class="player-category shop-product-card__badge shop-product-card__badge--available">В наличии</span>
+                    {% else %}
+                    <span class="player-category shop-product-card__badge shop-product-card__badge--unavailable">Нет в наличии</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% if product.is_available %}
+            <div class="shop-product-card__actions">
+                <a href="{% url 'shop_product_detail' pk=product.pk %}?buy=1" class="btn btn-primary shop-product-card__buy">Купить</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-secondary text-center">Товары пока не добавлены.</p>
+    {% endif %}
+</div>
+{% endblock %}

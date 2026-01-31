@@ -1,11 +1,21 @@
 """
-Content views - News, Gallery, Pages.
+Content views - News, Gallery, Pages, About Us.
 """
 
-import markdown
-from django.shortcuts import get_object_or_404, render
+import logging
 
-from .models import Gallery, News, Page
+import markdown
+from django.contrib import messages
+from django.contrib.contenttypes.models import ContentType
+from django.shortcuts import get_object_or_404, redirect, render
+
+from apps.comments.models import Comment
+from apps.users.models import Player
+
+from .forms import AboutUsCommentForm
+from .models import AboutUs, ContactItem, ContactPage, Gallery, News, Page
+
+logger = logging.getLogger(__name__)
 
 
 def news_list(request):
@@ -48,3 +58,78 @@ def page_detail(request, slug):
         "content/page_detail.html",
         {"page": page, "content_html": content_html},
     )
+
+
+def about_us(request):
+    """
+    "О нас" page with editable content and comments.
+    Заголовок "О НАС" фиксирован в шаблоне.
+    """
+    about = AboutUs.get_singleton()
+    body_html = markdown.markdown(about.body or "", extensions=["extra"])
+
+    # Comments: only approved
+    ct = ContentType.objects.get_for_model(AboutUs)
+    comments = (
+        Comment.objects.filter(
+            content_type=ct,
+            object_id=about.pk,
+            is_approved=True,
+        )
+        .select_related("author__user")
+        .order_by("-created_at")
+    )
+
+    # Comment form
+    form = AboutUsCommentForm()
+    if request.method == "POST":
+        form = AboutUsCommentForm(request.POST)
+        if form.is_valid():
+            if not request.user.is_authenticated:
+                messages.error(request, "Войдите, чтобы оставить комментарий.")
+                return redirect("login")
+            player = Player.objects.filter(user=request.user).first()
+            if player is None:
+                messages.error(
+                    request,
+                    "Создайте профиль игрока, чтобы оставлять комментарии.",
+                )
+                return redirect("profile_edit")
+            comment = Comment.objects.create(
+                content_type=ct,
+                object_id=about.pk,
+                author=player,
+                text=form.cleaned_data["text"].strip(),
+                is_approved=False,  # Модерация в админке
+            )
+            try:
+                from apps.core.telegram_notify import notify_about_us_comment
+                notify_about_us_comment(comment)
+            except Exception as e:
+                logger.warning("Telegram notify for About Us comment failed: %s", e)
+            messages.success(
+                request,
+                "Комментарий отправлен на модерацию. Он появится после одобрения.",
+            )
+            return redirect("about_us")
+
+    context = {
+        "about": about,
+        "body_html": body_html,
+        "comments": comments,
+        "comment_form": form,
+    }
+    return render(request, "content/about_us.html", context)
+
+
+def contacts(request):
+    """Страница «Контакты» с редактируемыми способами связи."""
+    contact_page = ContactPage.get_singleton()
+    intro_html = markdown.markdown(contact_page.intro_text or "", extensions=["extra"])
+    items = contact_page.contact_items.order_by("order", "id")
+    context = {
+        "contact_page": contact_page,
+        "intro_html": intro_html,
+        "contact_items": items,
+    }
+    return render(request, "content/contacts.html", context)

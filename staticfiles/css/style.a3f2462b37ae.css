@@ -1550,20 +1550,9 @@ select.form-control {
 
 .hero-text {
     font-size: var(--font-size-lg);
-    color: #ffffff;
+    color: var(--color-text-secondary);
     margin-bottom: var(--spacing-xl);
     max-width: 600px;
-}
-
-/* Ensure outline button in hero is white to be readable on hero image */
-.hero .btn-outline {
-    border-color: #ffffff;
-    color: #ffffff;
-}
-
-.hero .btn-outline:hover {
-    background: rgba(255,255,255,0.08);
-    color: #ffffff;
 }
 
 .hero-buttons {
@@ -2131,7 +2120,6 @@ select.form-control {
     display: flex;
     align-items: center;
     min-height: 600px;
-    overflow: hidden;
 }
 
 .hero-content {
@@ -2143,16 +2131,13 @@ select.form-control {
 .hero-image-wrapper {
     position: absolute;
     top: 0;
+    right: 0;
     bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100vw;
-    max-width: 100vw;
+    width: 60%;
     z-index: 0;
     display: flex;
     justify-content: center;
     align-items: center;
-    overflow: hidden;
 }
 
 .hero-image {
@@ -3084,16 +3069,11 @@ select.form-control {
     justify-content: center;
     padding: var(--spacing-md);
 }
-/* Модалка покупки — вверху страницы */
-.sparring-modal.shop-purchase-modal {
+.shop-purchase-modal {
     align-items: flex-start !important;
-    padding-top: var(--spacing-lg) !important;
+    padding-top: var(--spacing-lg);
     padding-bottom: var(--spacing-md);
     overflow-y: auto;
-}
-.sparring-modal.shop-purchase-modal .sparring-modal__box {
-    align-self: flex-start;
-    margin-top: 0;
 }
 
 .sparring-modal.hidden {

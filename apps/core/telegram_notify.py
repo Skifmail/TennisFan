@@ -145,6 +145,53 @@ def notify_feedback(user, subject: str, message: str) -> bool:
     return send_admin_message(text)
 
 
+def notify_about_us_comment(comment) -> bool:
+    """Уведомление админу о новом комментарии на странице «О нас»."""
+    author = getattr(comment, "author", None)
+    author_name = _escape(str(author) if author else "—")
+    author_email = "—"
+    if author:
+        try:
+            author_email = _escape(getattr(author.user, "email", None) or "—")
+        except Exception:
+            pass
+    text_preview = _escape((comment.text or "")[:300])
+    if (comment.text or "") and len(comment.text or "") > 300:
+        text_preview += "…"
+
+    msg = (
+        "💬 <b>Новый комментарий на странице «О нас»</b>\n\n"
+        f"Автор: {author_name}\n"
+        f"Email: {author_email}\n\n"
+        f"Текст:\n{text_preview}"
+    )
+    return send_admin_message(msg)
+
+
+def notify_purchase_request(pr) -> bool:
+    """Уведомление админу о заявке на покупку товара."""
+    product_name = _escape(pr.product.name if pr.product else "—")
+    first_name = _escape(pr.first_name or "—")
+    last_name = _escape(pr.last_name or "—")
+    phone = _escape(pr.contact_phone or "—")
+    comment = _escape((pr.comment or "")[:200])
+    if (pr.comment or "") and len(pr.comment or "") > 200:
+        comment += "…"
+    email = "—"
+    if pr.user:
+        email = _escape(pr.user.email or "—")
+
+    msg = (
+        "🛒 <b>Заявка на покупку</b>\n\n"
+        f"Товар: {product_name}\n"
+        f"Имя: {first_name} {last_name}\n"
+        f"Телефон: {phone}\n"
+        f"Email: {email}\n\n"
+        f"Комментарий: {comment}"
+    )
+    return send_admin_message(msg)
+
+
 def notify_subscription_purchase(user, tier) -> bool:
     """Уведомление о покупке подписки."""
     name = _escape(user.get_full_name() or user.email or "—")

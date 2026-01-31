@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'apps.payments',
     'apps.legal',
     'apps.navigation',
+    'apps.shop',
     'django_crontab',
 ]
 

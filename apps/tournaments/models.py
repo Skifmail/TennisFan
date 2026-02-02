@@ -42,10 +42,26 @@ class TournamentDuration(models.TextChoices):
 
 
 class TournamentFormat(models.TextChoices):
-    """Формат проведения: FAN = single elimination с посевом по рейтингу."""
+    """Формат проведения турнира."""
 
     SINGLE_ELIMINATION = "single_elimination", "FAN (одноэтапная сетка)"
-    OTHER = "other", "Другой"
+    ROUND_ROBIN = "round_robin", "Круговой"
+
+
+class MatchFormat(models.TextChoices):
+    """Формат матча для круговых турниров."""
+
+    SET_6 = "1_set_6", "1 сет до 6 геймов"
+    SET_TIEBREAK = "1_set_tiebreak", "1 сет с тай-брейком"
+    BEST_OF_2 = "2_sets", "2 сета до победы"
+    FAST4 = "fast4", "2 коротких сета + супертай-брейк"
+
+
+class TournamentVariant(models.TextChoices):
+    """Вариант турнира: одиночный или парный."""
+
+    SINGLES = "singles", "Одиночный"
+    DOUBLES = "doubles", "Парный"
 
 
 class Tournament(models.Model):
@@ -76,8 +92,15 @@ class Tournament(models.Model):
         "Формат",
         max_length=20,
         choices=TournamentFormat.choices,
-        default=TournamentFormat.OTHER,
+        default=TournamentFormat.SINGLE_ELIMINATION,
         help_text="FAN: одноэтапная сетка, посев по рейтингу, очки при вылете.",
+    )
+    variant = models.CharField(
+        "Вариант",
+        max_length=20,
+        choices=TournamentVariant.choices,
+        default=TournamentVariant.SINGLES,
+        help_text="Одиночный: 1 на 1. Парный: команды по 2 человека.",
     )
     status = models.CharField(
         "Статус", max_length=20, choices=TournamentStatus.choices, default=TournamentStatus.UPCOMING
@@ -88,17 +111,23 @@ class Tournament(models.Model):
         "Максимальное количество участников",
         null=True,
         blank=True,
-        help_text="Обязательно для FAN. Оставьте пустым для неограниченного количества.",
+        help_text="Для одиночных: обязателен для FAN и круговых. Оставьте пустым для неограниченного.",
+    )
+    max_teams = models.PositiveIntegerField(
+        "Максимальное количество команд",
+        null=True,
+        blank=True,
+        help_text="Для парных: обязателен. Количество команд (пар) для регистрации.",
     )
     bracket_generated = models.BooleanField(
         "Сетка сформирована",
         default=False,
-        help_text="FAN: сетка создана по рейтингу, регистрация закрыта.",
+        help_text="Сетка создана, участники зафиксированы, регистрация закрыта.",
     )
     match_days_per_round = models.PositiveSmallIntegerField(
         "Дней на раунд (дедлайн матча)",
         default=7,
-        help_text="FAN: сколько дней у игроков на проведение матча раунда.",
+        help_text="Сколько дней у игроков на проведение матча раунда/тура.",
     )
 
     start_date = models.DateField("Дата начала")
@@ -111,6 +140,15 @@ class Tournament(models.Model):
     fan_points_sf = models.PositiveSmallIntegerField("FAN: очки за полуфинал", default=45)
     fan_points_final = models.PositiveSmallIntegerField("FAN: очки финалисту", default=70)
     fan_points_winner = models.PositiveSmallIntegerField("FAN: очки победителю", default=100)
+
+    # Круговой: формат матча
+    match_format = models.CharField(
+        "Формат матча",
+        max_length=20,
+        choices=MatchFormat.choices,
+        blank=True,
+        help_text="Для круговых турниров: 1 сет до 6, с тай-брейком, 2 сета или Fast4.",
+    )
 
     image = models.ImageField("Изображение", upload_to="tournaments/", blank=True)
     participants = models.ManyToManyField(
@@ -128,17 +166,87 @@ class Tournament(models.Model):
     def __str__(self) -> str:
         return f"{self.name} ({self.city})"
 
+    def is_singles(self) -> bool:
+        """Check if tournament is singles (1v1)."""
+        return getattr(self, "variant", "singles") == TournamentVariant.SINGLES
+
+    def is_doubles(self) -> bool:
+        """Check if tournament is doubles (2v2)."""
+        return getattr(self, "variant", "singles") == TournamentVariant.DOUBLES
+
     def is_full(self) -> bool:
-        """Check if tournament has reached max participants."""
+        """Check if tournament has reached max participants/teams."""
+        if self.is_doubles():
+            if self.max_teams is None:
+                return False
+            return self.teams.filter(player2__isnull=False).count() >= self.max_teams
         if self.max_participants is None:
             return False
         return self.participants.count() >= self.max_participants
 
+    def full_teams_count(self) -> int:
+        """Количество полных команд (с партнёром) в парном турнире."""
+        if not self.is_doubles():
+            return 0
+        return self.teams.filter(player2__isnull=False).count()
+
     def available_slots(self) -> int:
-        """Get number of available slots."""
+        """Get number of available slots (participants or teams)."""
+        if self.is_doubles():
+            if self.max_teams is None:
+                return None
+            full_teams = self.teams.filter(player2__isnull=False).count()
+            return max(0, self.max_teams - full_teams)
         if self.max_participants is None:
             return None
         return max(0, self.max_participants - self.participants.count())
+
+
+class TournamentTeam(models.Model):
+    """Команда (пара) в парном турнире. player2=null — ожидает партнёра."""
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="teams",
+        verbose_name="Турнир",
+    )
+    player1 = models.ForeignKey(
+        Player,
+        on_delete=models.CASCADE,
+        related_name="doubles_teams_as_player1",
+        verbose_name="Игрок 1",
+    )
+    player2 = models.ForeignKey(
+        Player,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="doubles_teams_as_player2",
+        verbose_name="Игрок 2 (партнёр)",
+    )
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Команда турнира"
+        verbose_name_plural = "Команды турниров"
+        unique_together = (("tournament", "player1"),)
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        if self.player2:
+            return f"{self.player1} / {self.player2}"
+        return f"{self.player1} (ожидает партнёра)"
+
+    def get_display_name(self) -> str:
+        """Возвращает отображаемое имя команды."""
+        if self.player2:
+            return f"{self.player1.user.last_name} {self.player1.user.first_name} / {self.player2.user.last_name} {self.player2.user.first_name}"
+        return f"{self.player1.user.last_name} {self.player1.user.first_name} (ожидает партнёра)"
+
+    def is_complete(self) -> bool:
+        """Команда полная (оба игрока указаны)."""
+        return self.player2_id is not None
 
 
 class Match(models.Model):
@@ -208,12 +316,34 @@ class Match(models.Model):
         on_delete=models.CASCADE,
         related_name="matches_as_player1",
         verbose_name="Игрок 1",
+        null=True,
+        blank=True,
+        help_text="Для одиночных: игрок 1. Для парных: первый игрок команды 1 (player1 из team1).",
     )
     player2 = models.ForeignKey(
         Player,
         on_delete=models.CASCADE,
         related_name="matches_as_player2",
         verbose_name="Игрок 2",
+        null=True,
+        blank=True,
+        help_text="Для одиночных: игрок 2. Для парных: первый игрок команды 2 (player1 из team2).",
+    )
+    team1 = models.ForeignKey(
+        TournamentTeam,
+        on_delete=models.CASCADE,
+        related_name="matches_as_team1",
+        verbose_name="Команда 1",
+        null=True,
+        blank=True,
+    )
+    team2 = models.ForeignKey(
+        TournamentTeam,
+        on_delete=models.CASCADE,
+        related_name="matches_as_team2",
+        verbose_name="Команда 2",
+        null=True,
+        blank=True,
     )
     winner = models.ForeignKey(
         Player,
@@ -222,6 +352,15 @@ class Match(models.Model):
         blank=True,
         related_name="matches_won_rel",
         verbose_name="Победитель",
+        help_text="Для парных: один из игроков победившей команды.",
+    )
+    winner_team = models.ForeignKey(
+        TournamentTeam,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="matches_won",
+        verbose_name="Победившая команда",
     )
 
     # Score as sets
@@ -249,7 +388,31 @@ class Match(models.Model):
         ordering = ["-scheduled_datetime"]
 
     def __str__(self) -> str:
-        return f"{self.player1} vs {self.player2}"
+        if self.team1 and self.team2:
+            return f"{self.team1} vs {self.team2}"
+        if self.player1 and self.player2:
+            return f"{self.player1} vs {self.player2}"
+        return "Матч"
+
+    def get_player1_display(self) -> str:
+        """Отображаемое имя стороны 1 (игрок или команда)."""
+        if self.team1:
+            return str(self.team1)
+        return str(self.player1) if self.player1 else "—"
+
+    def get_player2_display(self) -> str:
+        """Отображаемое имя стороны 2 (игрок или команда)."""
+        if self.team2:
+            return str(self.team2)
+        return str(self.player2) if self.player2 else "—"
+
+    def get_side1_player(self):
+        """Игрок стороны 1 для ссылки на профиль (player1 команды или player1)."""
+        return self.team1.player1 if self.team1 else self.player1
+
+    def get_side2_player(self):
+        """Игрок стороны 2 для ссылки на профиль."""
+        return self.team2.player1 if self.team2 else self.player2
 
     @property
     def score_display(self) -> str:

@@ -1,43 +1,55 @@
 /**
- * Auto-calculate points_loser based on points_winner
+ * Admin tournament: динамическое отображение полей в зависимости от формата.
+ *
+ * При выборе формата FAN — поля FAN. При выборе Круговой — поля кругового.
  */
 
-(function() {
-    'use strict';
+(function () {
+    "use strict";
 
-    // Wait for DOM to be ready
-    document.addEventListener('DOMContentLoaded', function() {
-        const winnerInput = document.getElementById('id_points_winner');
-        const loserInput = document.getElementById('id_points_loser');
+    const FAN_FORMAT = "single_elimination";
+    const ROUND_ROBIN_FORMAT = "round_robin";
 
-        if (winnerInput && loserInput) {
-            // Function to calculate loser points
-            function calculateLoserPoints() {
-                const winnerPoints = parseInt(winnerInput.value) || 0;
-                const calculatedLoserPoints = -Math.floor(winnerPoints / 2);
-                
-                // Only update if loser field is empty or has the default calculation
-                // This allows manual override
-                if (loserInput.value === '' || 
-                    loserInput.dataset.autoCalculated === 'true') {
-                    loserInput.value = calculatedLoserPoints;
-                    loserInput.dataset.autoCalculated = 'true';
-                }
+    function getFormatSelect() {
+        return document.querySelector("#id_format, select[name='format']");
+    }
+
+    function getFormatValue() {
+        const select = getFormatSelect();
+        return select ? select.value : "";
+    }
+
+    function toggleSections(selector, show) {
+        const sections = document.querySelectorAll(selector);
+        sections.forEach(function (section) {
+            const module = section.closest(".module");
+            if (module) {
+                module.style.display = show ? "" : "none";
+            } else {
+                section.style.display = show ? "" : "none";
             }
+        });
+    }
 
-            // Track manual changes
-            loserInput.addEventListener('input', function() {
-                loserInput.dataset.autoCalculated = 'false';
-            });
+    function updateVisibility() {
+        const format = getFormatValue();
+        toggleSections(".format-fan-section", format === FAN_FORMAT);
+        toggleSections(".format-round-robin-section", format === ROUND_ROBIN_FORMAT);
+    }
 
-            // Calculate on winner input change
-            winnerInput.addEventListener('input', calculateLoserPoints);
-
-            // Initial calculation
-            if (loserInput.value === '' || loserInput.value === '-50') {
-                loserInput.dataset.autoCalculated = 'true';
-                calculateLoserPoints();
-            }
+    function init() {
+        const formatSelect = getFormatSelect();
+        if (!formatSelect) {
+            return;
         }
-    });
+
+        formatSelect.addEventListener("change", updateVisibility);
+        updateVisibility();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+    } else {
+        init();
+    }
 })();

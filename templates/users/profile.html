@@ -24,6 +24,9 @@
                 <span class="player-category">{{ player.get_skill_level_display }}</span>
 
                 <div class="mt-3 text-secondary" style="font-size: var(--font-size-sm);">
+                    {% if request.user == player.user %}
+                    <p><strong>Ваш ID в системе:</strong> <code>{{ player.id }}</code></p>
+                    {% endif %}
                     <p><strong>Город:</strong> {{ player.city }}</p>
                     <p><strong>Уровень:</strong> {{ player.get_skill_level_display }}</p>
                     <p><strong>Дата рождения:</strong> {{ player.birth_date|date:"d.m.Y" }}</p>

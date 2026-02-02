@@ -9,12 +9,18 @@
         <a href="{% url 'tournament_list' %}" class="text-secondary">&larr; Все турниры</a>
     </div>
     
-    <div class="d-flex gap-2 mb-2 flex-wrap">
+        <div class="d-flex gap-2 mb-2 flex-wrap">
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_variant_display }}</span>
         {% if tournament.format == 'single_elimination' %}
         <span class="player-category" style="background: rgba(150, 98, 31, 0.2); color: var(--color-accent);">FAN</span>
+        {% elif tournament.format == 'round_robin' %}
+        <span class="player-category" style="background: rgba(100, 149, 237, 0.2); color: #6495ed;">Круговой</span>
+        {% if tournament.match_format %}
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_match_format_display }}</span>
+        {% endif %}
         {% endif %}
         <span class="player-category">{{ tournament.get_category_display }}</span>
-        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{% if tournament.format == 'single_elimination' %}{{ tournament.get_duration_display }}{% else %}{{ tournament.points_winner }} очков{% endif %}</span>
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{% if tournament.format == 'single_elimination' %}{{ tournament.get_duration_display }}{% elif tournament.format == 'round_robin' %}1 очко за победу{% else %}{{ tournament.points_winner }} очков{% endif %}</span>
         {% if tournament.is_one_day %}
             {% if tournament.entry_fee > 0 %}
                 <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-success);">Взнос: {{ tournament.entry_fee|intcomma|cut:".00" }} ₽</span>
@@ -24,10 +30,18 @@
         {% else %}
             <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-info);">Многодневный</span>
         {% endif %}
-        {% if tournament.max_participants %}
-        <span class="player-category" style="background: {% if tournament.is_full %}rgba(255, 0, 0, 0.2){% else %}var(--color-bg-elevated){% endif %}; color: {% if tournament.is_full %}var(--color-error){% else %}var(--color-text-secondary){% endif %};">
-            Мест: {{ tournament.participants.count }} из {{ tournament.max_participants }}
-        </span>
+        {% if tournament.variant == 'doubles' and tournament.max_teams %}
+        {% if tournament.is_full %}
+        <span class="player-category" style="background: rgba(255, 0, 0, 0.2); color: var(--color-error);">Команд: {{ tournament.full_teams_count }} из {{ tournament.max_teams }}</span>
+        {% else %}
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">Команд: {{ tournament.full_teams_count }} из {{ tournament.max_teams }}</span>
+        {% endif %}
+        {% elif tournament.max_participants %}
+        {% if tournament.is_full %}
+        <span class="player-category" style="background: rgba(255, 0, 0, 0.2); color: var(--color-error);">Мест: {{ tournament.participants.count }} из {{ tournament.max_participants }}</span>
+        {% else %}
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">Мест: {{ tournament.participants.count }} из {{ tournament.max_participants }}</span>
+        {% endif %}
         {% endif %}
         {% if tournament.status == 'active' %}
         <span class="player-category" style="background: rgba(212, 255, 0, 0.2); color: var(--color-primary);">{{ tournament.get_status_display }}</span>
@@ -49,13 +63,54 @@
         </div>
     </div>
     {% endif %}
+
+    {% if is_round_robin and match_format_description %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h3 class="section-title mb-2">Формат матча</h3>
+            <p class="text-secondary mb-0">{{ match_format_description }}</p>
+        </div>
+    </div>
+    {% endif %}
     
     {% if participants %}
-    <h2 class="section-title mb-3">Участники ({{ participants.count }})</h2>
+    <h2 class="section-title mb-3">{% if tournament.variant == 'doubles' %}Команды{% else %}Участники{% endif %} ({{ participants|length }})</h2>
+    {% if can_join_team and solo_teams %}
+    <div class="card mb-3">
+        <div class="card-body">
+            <p class="text-secondary mb-2">Есть игроки без пары. Присоединитесь к одному из них:</p>
+            <div class="d-flex flex-wrap gap-2">
+                {% for team in solo_teams %}
+                <form method="post" action="{% url 'tournament_join_team' slug=tournament.slug team_id=team.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline btn-sm">
+                        {{ team.player1.user.last_name }} {{ team.player1.user.first_name }} — присоединиться
+                    </button>
+                </form>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
     <div class="card mb-4">
         <div class="card-body">
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--spacing-md);">
                 {% for participant in participants %}
+                {% if tournament.variant == 'doubles' %}
+                <div style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                    <div class="player-avatar" style="width: 48px; height: 48px;"></div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px;">
+                            <a href="{% url 'profile' pk=participant.player1.pk %}">{{ participant.player1.user.last_name }} {{ participant.player1.user.first_name }}</a>
+                            {% if participant.player2 %}
+                            / <a href="{% url 'profile' pk=participant.player2.pk %}">{{ participant.player2.user.last_name }} {{ participant.player2.user.first_name }}</a>
+                            {% else %}
+                            <span class="text-muted">(ожидает партнёра)</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% else %}
                 <a href="{% url 'profile' pk=participant.pk %}" style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md); transition: all var(--transition-fast); text-decoration: none;">
                     {% if participant.avatar %}
                     <img src="{{ participant.avatar.url|default:'/static/images/avatar-placeholder.png' }}" alt="" class="player-avatar" style="width: 48px; height: 48px;">
@@ -71,13 +126,105 @@
                         </div>
                     </div>
                 </a>
+                {% endif %}
                 {% endfor %}
             </div>
         </div>
     </div>
     {% endif %}
     
-    <h2 class="section-title mb-3">{% if is_fan %}Сетка FAN{% else %}Матчи турнира{% endif %}</h2>
+    {% if is_round_robin and matrix_rows and rr_standings %}
+    <h2 class="section-title mb-3">Матрица результатов</h2>
+    <div class="card mb-4 round-robin-table-wrapper">
+        <div class="card-body p-0">
+            <table class="round-robin-matrix">
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>{% if tournament.variant == 'doubles' %}Команда{% else %}Игрок{% endif %}</th>
+                        {% for p in matrix_participants %}
+                        <th class="matrix-col">{{ forloop.counter }}</th>
+                        {% endfor %}
+                        <th>Очки</th>
+                        <th>Место</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in matrix_rows %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td class="matrix-player-cell">
+                            {% if tournament.variant == 'doubles' %}
+                            <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                            {% else %}
+                            <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                            {% endif %}
+                        </td>
+                        {% for cell in row.cells %}
+                        {% if forloop.counter0 == forloop.parentloop.counter0 %}
+                        <td class="matrix-cell matrix-cell--diagonal">—</td>
+                        {% else %}
+                        <td class="matrix-cell">
+                            {% if cell.win is not None %}
+                            <div class="matrix-cell-win">{{ cell.win }}</div>
+                            <div class="matrix-cell-games">{{ cell.games|default:"—" }}</div>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                        {% endfor %}
+                        <td class="matrix-points">{{ row.points|default:"—" }}</td>
+                        <td class="matrix-place">{{ row.place|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h2 class="section-title mb-3">Таблица результатов</h2>
+    <div class="card mb-4 round-robin-table-wrapper">
+        <div class="card-body p-0">
+            <table class="round-robin-standings">
+                <thead>
+                    <tr>
+                        <th>Место</th>
+                        <th>{% if tournament.variant == 'doubles' %}Команда{% else %}Игрок{% endif %}</th>
+                        <th>Игр</th>
+                        <th>В</th>
+                        <th>П</th>
+                        <th>Сеты</th>
+                        <th>Геймы</th>
+                        <th>Очки</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rr_standings %}
+                    <tr>
+                        <td>{{ row.place|default:"—" }}</td>
+                        <td>
+                            {% if row.team %}
+                            <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                            {% else %}
+                            <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                            {% endif %}
+                        </td>
+                        <td>{{ row.matches }}</td>
+                        <td>{{ row.wins }}</td>
+                        <td>{{ row.losses }}</td>
+                        <td>{{ row.sets }}</td>
+                        <td>{{ row.games }}</td>
+                        <td>{{ row.points }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <h2 class="section-title mb-3">{% if is_fan %}Сетка FAN{% elif is_round_robin %}Матчи по турам{% else %}Матчи турнира{% endif %}</h2>
     {% if is_fan and matches_by_round %}
     <div class="bracket-grid">
         {% for round_name, is_consolation, round_matches in matches_by_round %}
@@ -96,20 +243,69 @@
                         {% endif %}
                     {% endif %}
                     <div class="match-players">
-                        <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
-                            {% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
-                            <span class="player-name">{{ match.player1 }}</span>
-                            {% if match.winner == match.player1 and match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}
+                        <div class="match-player {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}winner{% endif %}">
+                            {% if match.team1 %}{% if match.team1.player1.avatar %}<img src="{{ match.team1.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
+                            {% else %}{% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                            <span class="player-name">{{ match.get_player1_display }}</span>
+                            {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% endif %}
                             <div class="match-score">
                                 {% if match.player1_set1 is not None %}<span class="set-score">{{ match.player1_set1 }}</span>{% endif %}
                                 {% if match.player1_set2 is not None %}<span class="set-score">{{ match.player1_set2 }}</span>{% endif %}
                                 {% if match.player1_set3 is not None %}<span class="set-score">{{ match.player1_set3 }}</span>{% endif %}
                             </div>
                         </div>
-                        <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
-                            {% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
-                            <span class="player-name">{{ match.player2 }}</span>
-                            {% if match.winner == match.player2 and match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}
+                        <div class="match-player {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}winner{% endif %}">
+                            {% if match.team2 %}{% if match.team2.player1.avatar %}<img src="{{ match.team2.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
+                            {% else %}{% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                            <span class="player-name">{{ match.get_player2_display }}</span>
+                            {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% endif %}
+                            <div class="match-score">
+                                {% if match.player2_set1 is not None %}<span class="set-score">{{ match.player2_set1 }}</span>{% endif %}
+                                {% if match.player2_set2 is not None %}<span class="set-score">{{ match.player2_set2 }}</span>{% endif %}
+                                {% if match.player2_set3 is not None %}<span class="set-score">{{ match.player2_set3 }}</span>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+        {% endfor %}
+    </div>
+    {% elif is_round_robin and matches_by_round %}
+    <div class="bracket-grid">
+        {% for round_name, is_consolation, round_matches in matches_by_round %}
+        <section class="bracket-round">
+            <h3 class="bracket-round-title">{{ round_name }}</h3>
+            <div class="bracket-round-matches grid grid-2">
+                {% for match in round_matches %}
+                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
+                    <div class="match-header">
+                        <span class="match-tournament">{{ match.round_name|default:"Матч" }}</span>
+                        <span class="match-date">{% if match.deadline %}До {{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}</span>
+                    </div>
+                    {% if match.winner is None and match.status != 'completed' and match.status != 'walkover' %}
+                        {% if match.player1_set1 or match.player1_set2 or match.player1_set3 or match.player2_set1 or match.player2_set2 or match.player2_set3 %}
+                        <div class="text-secondary" style="font-size: var(--font-size-xs);">Результат не подтверждён</div>
+                        {% endif %}
+                    {% endif %}
+                    <div class="match-players">
+                        <div class="match-player {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}winner{% endif %}">
+                            {% if match.team1 %}{% if match.team1.player1.avatar %}<img src="{{ match.team1.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
+                            {% else %}{% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                            <span class="player-name">{{ match.get_player1_display }}</span>
+                            {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% endif %}
+                            <div class="match-score">
+                                {% if match.player1_set1 is not None %}<span class="set-score">{{ match.player1_set1 }}</span>{% endif %}
+                                {% if match.player1_set2 is not None %}<span class="set-score">{{ match.player1_set2 }}</span>{% endif %}
+                                {% if match.player1_set3 is not None %}<span class="set-score">{{ match.player1_set3 }}</span>{% endif %}
+                            </div>
+                        </div>
+                        <div class="match-player {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}winner{% endif %}">
+                            {% if match.team2 %}{% if match.team2.player1.avatar %}<img src="{{ match.team2.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
+                            {% else %}{% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                            <span class="player-name">{{ match.get_player2_display }}</span>
+                            {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% endif %}
                             <div class="match-score">
                                 {% if match.player2_set1 is not None %}<span class="set-score">{{ match.player2_set1 }}</span>{% endif %}
                                 {% if match.player2_set2 is not None %}<span class="set-score">{{ match.player2_set2 }}</span>{% endif %}
@@ -137,20 +333,22 @@
                 {% endif %}
             {% endif %}
             <div class="match-players">
-                <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
-                    {% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
-                    <span class="player-name">{{ match.player1 }}</span>
-                    {% if match.winner == match.player1 and match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}
+                <div class="match-player {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}winner{% endif %}">
+                    {% if match.team1 %}{% if match.team1.player1.avatar %}<img src="{{ match.team1.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
+                    {% else %}{% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                    <span class="player-name">{{ match.get_player1_display }}</span>
+                    {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% endif %}
                     <div class="match-score">
                         {% if match.player1_set1 is not None %}<span class="set-score">{{ match.player1_set1 }}</span>{% endif %}
                         {% if match.player1_set2 is not None %}<span class="set-score">{{ match.player1_set2 }}</span>{% endif %}
                         {% if match.player1_set3 is not None %}<span class="set-score">{{ match.player1_set3 }}</span>{% endif %}
                     </div>
                 </div>
-                <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
-                    {% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
-                    <span class="player-name">{{ match.player2 }}</span>
-                    {% if match.winner == match.player2 and match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}
+                <div class="match-player {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}winner{% endif %}">
+                    {% if match.team2 %}{% if match.team2.player1.avatar %}<img src="{{ match.team2.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
+                    {% else %}{% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                    <span class="player-name">{{ match.get_player2_display }}</span>
+                    {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% endif %}
                     <div class="match-score">
                         {% if match.player2_set1 is not None %}<span class="set-score">{{ match.player2_set1 }}</span>{% endif %}
                         {% if match.player2_set2 is not None %}<span class="set-score">{{ match.player2_set2 }}</span>{% endif %}

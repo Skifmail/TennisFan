@@ -12,6 +12,5 @@ urlpatterns = [
     path("results/", views.results, name="results"),
     path("legends/", views.legends, name="legends"),
     path("rules/", views.rules, name="rules"),
-    path("tournament-regulations/", views.tournament_regulations, name="tournament_regulations"),
     path("feedback/", views.feedback, name="feedback"),
 ]

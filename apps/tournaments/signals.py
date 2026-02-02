@@ -7,6 +7,7 @@ from .fan import (
     ensure_consolation_created,
     finalize_tournament,
 )
+from .round_robin import _is_round_robin, check_and_finalize_if_complete
 from .models import Match, MatchResultProposal
 from .proposal_service import apply_proposal
 
@@ -34,12 +35,18 @@ def prepare_match_completion(sender, instance, **kwargs):
     t = getattr(instance, "tournament", None)
     if t and _is_fan(t):
         return
-    win_points = getattr(t, "points_winner", 100)
-    lose_points = getattr(t, "points_loser", -50)
-    if instance.winner == instance.player1:
+    if t and _is_round_robin(t):
+        win_points, lose_points = 1, 0
+    else:
+        win_points = getattr(t, "points_winner", 100)
+        lose_points = getattr(t, "points_loser", -50)
+    if instance.winner_team_id:
+        instance.points_player1 = win_points if instance.winner_team_id == instance.team1_id else lose_points
+        instance.points_player2 = lose_points if instance.winner_team_id == instance.team1_id else win_points
+    elif instance.winner_id == instance.player1_id:
         instance.points_player1 = win_points
         instance.points_player2 = lose_points
-    elif instance.winner == instance.player2:
+    elif instance.winner_id == instance.player2_id:
         instance.points_player1 = lose_points
         instance.points_player2 = win_points
 
@@ -57,22 +64,67 @@ def update_player_stats(sender, instance, created, **kwargs):
         return
 
     winner = instance.winner
-    if not winner:
-        return
+    winner_team = getattr(instance, "winner_team", None)
     t = getattr(instance, "tournament", None)
+    is_doubles = t and t.is_doubles() and instance.team1_id and instance.team2_id
+
+    if not winner and not winner_team:
+        return
+
     if t and _is_fan(t):
-        winner.matches_played += 1
-        winner.matches_won += 1
-        winner.save(update_fields=["matches_played", "matches_won"])
-        loser = instance.player2 if winner == instance.player1 else instance.player1
-        if not getattr(loser, "is_bye", False):
-            loser.matches_played += 1
-            loser.save(update_fields=["matches_played"])
-        # FAN: продвижение победителя, подвал, финализация (работает и при редактировании в админке)
+        if is_doubles:
+            for p in (instance.team1.player1, instance.team1.player2) if winner_team == instance.team1 else (instance.team2.player1, instance.team2.player2):
+                if p and not getattr(p, "is_bye", False):
+                    p.matches_played += 1
+                    p.matches_won += 1
+                    p.save(update_fields=["matches_played", "matches_won"])
+            loser_team = instance.team2 if winner_team == instance.team1 else instance.team1
+            for p in (loser_team.player1, loser_team.player2):
+                if p and not getattr(p, "is_bye", False):
+                    p.matches_played += 1
+                    p.save(update_fields=["matches_played"])
+        else:
+            winner.matches_played += 1
+            winner.matches_won += 1
+            winner.save(update_fields=["matches_played", "matches_won"])
+            loser = instance.player2 if winner == instance.player1 else instance.player1
+            if not getattr(loser, "is_bye", False):
+                loser.matches_played += 1
+                loser.save(update_fields=["matches_played"])
         advance_winner_and_award_loser(instance)
         if instance.round_index == 1 and not instance.is_consolation:
             ensure_consolation_created(t)
         finalize_tournament(t)
+        return
+
+    if t and _is_round_robin(t):
+        side1_won = winner_team == instance.team1 if winner_team else winner == instance.player1
+        win_pts = instance.points_player1 if side1_won else instance.points_player2
+        lose_pts = instance.points_player2 if side1_won else instance.points_player1
+        if is_doubles:
+            for p in (instance.team1.player1, instance.team1.player2) if winner_team == instance.team1 else (instance.team2.player1, instance.team2.player2):
+                if p and not getattr(p, "is_bye", False):
+                    p.matches_played += 1
+                    p.matches_won += 1
+                    p.total_points += win_pts
+                    p.save(update_fields=["matches_played", "matches_won", "total_points"])
+            loser_team = instance.team2 if winner_team == instance.team1 else instance.team1
+            for p in (loser_team.player1, loser_team.player2):
+                if p and not getattr(p, "is_bye", False):
+                    p.matches_played += 1
+                    p.total_points += lose_pts
+                    p.save(update_fields=["matches_played", "total_points"])
+        else:
+            winner.matches_played += 1
+            winner.matches_won += 1
+            winner.save(update_fields=["matches_played", "matches_won"])
+            loser = instance.player2 if winner == instance.player1 else instance.player1
+            if not getattr(loser, "is_bye", False):
+                loser.matches_played += 1
+                loser.save(update_fields=["matches_played"])
+            winner.total_points += win_pts
+            winner.save(update_fields=["total_points"])
+        check_and_finalize_if_complete(t)
         return
 
     player1 = instance.player1

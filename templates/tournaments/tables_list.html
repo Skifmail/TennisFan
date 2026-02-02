@@ -13,13 +13,15 @@
     <div class="tournament-tables-grid">
         {% for t in tournaments %}
         <a href="{% url 'tournament_tables_detail' slug=t.slug %}" class="tournament-table-card card">
+            <span class="tournament-status-badge tournament-status-badge--{{ t.status }}">{{ t.get_status_display }}</span>
             <div class="card-body">
                 <div class="d-flex gap-2 mb-2 flex-wrap">
                     {% if t.format == 'single_elimination' %}
                     <span class="player-category" style="background: rgba(150, 98, 31, 0.2); color: var(--color-accent);">FAN</span>
+                    {% elif t.format == 'round_robin' %}
+                    <span class="player-category" style="background: rgba(100, 149, 237, 0.2); color: #6495ed;">Круговой</span>
                     {% endif %}
                     <span class="player-category">{{ t.get_category_display }}</span>
-                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ t.get_status_display }}</span>
                 </div>
                 <h2 class="tournament-table-title">{{ t.name }}</h2>
                 <p class="text-secondary mb-3">{{ t.city }} • {{ t.start_date|date:"d.m.Y" }}{% if t.end_date %} — {{ t.end_date|date:"d.m.Y" }}{% endif %}</p>

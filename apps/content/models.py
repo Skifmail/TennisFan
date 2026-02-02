@@ -254,7 +254,7 @@ class ContactItem(models.Model):
 
 
 class Page(models.Model):
-    """Static page model (rules, about, etc.). Content supports Markdown."""
+    """Static page model (about, etc.). Content supports Markdown."""
 
     title = models.CharField("Заголовок", max_length=200)
     slug = models.SlugField("URL", unique=True)

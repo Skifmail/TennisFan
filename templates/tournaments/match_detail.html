@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Матч: {{ match.player1 }} vs {{ match.player2 }}{% endblock %}
+{% block title %}Матч: {{ match.get_player1_display }} vs {{ match.get_player2_display }}{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top: var(--spacing-2xl);">
@@ -26,15 +26,12 @@
             </div>
 
             <div class="d-flex" style="align-items: center; justify-content: center; gap: var(--spacing-2xl); margin-bottom: var(--spacing-xl);">
-                <!-- Player 1 -->
-                <a href="{% url 'profile' pk=match.player1.pk %}" class="text-center" style="flex: 1;">
-                    {% if match.player1.avatar %}
-                    <img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);">
-                    {% else %}
-                    <div class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);"></div>
-                    {% endif %}
-                    <div class="{% if match.winner == match.player1 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.player1 }}</div>
-                    <div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.player1.get_skill_level_display }}</div>
+                <!-- Player/Team 1 -->
+                <a href="{% url 'profile' pk=match.get_side1_player.pk %}" class="text-center" style="flex: 1; text-decoration: none; color: inherit;">
+                    {% if match.team1 %}{% if match.team1.player1.avatar %}<img src="{{ match.team1.player1.avatar.url }}" alt="" class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);">{% else %}<div class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);"></div>{% endif %}
+                    {% else %}{% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);">{% else %}<div class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);"></div>{% endif %}{% endif %}
+                    <div class="{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player1_display }}</div>
+                    {% if match.team1 %}<div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.team1.player1.get_skill_level_display }}</div>{% else %}<div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.player1.get_skill_level_display }}</div>{% endif %}
                 </a>
 
                 <!-- Score -->
@@ -66,26 +63,23 @@
                     <div class="mt-2 text-secondary" style="font-size: var(--font-size-sm);">{{ match.get_status_display }}</div>
                 </div>
 
-                <!-- Player 2 -->
-                <a href="{% url 'profile' pk=match.player2.pk %}" class="text-center" style="flex: 1;">
-                    {% if match.player2.avatar %}
-                    <img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);">
-                    {% else %}
-                    <div class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);"></div>
-                    {% endif %}
-                    <div class="{% if match.winner == match.player2 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.player2 }}</div>
-                    <div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.player2.get_skill_level_display }}</div>
+                <!-- Player/Team 2 -->
+                <a href="{% url 'profile' pk=match.get_side2_player.pk %}" class="text-center" style="flex: 1; text-decoration: none; color: inherit;">
+                    {% if match.team2 %}{% if match.team2.player1.avatar %}<img src="{{ match.team2.player1.avatar.url }}" alt="" class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);">{% else %}<div class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);"></div>{% endif %}
+                    {% else %}{% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);">{% else %}<div class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);"></div>{% endif %}{% endif %}
+                    <div class="{% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player2_display }}</div>
+                    {% if match.team2 %}<div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.team2.player1.get_skill_level_display }}</div>{% else %}<div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.player2.get_skill_level_display }}</div>{% endif %}
                 </a>
             </div>
 
-            {% if match.winner %}
+            {% if match.winner or match.winner_team %}
             <div class="text-center">
-                <p class="text-primary" style="font-weight: 600;">Победитель: {{ match.winner }}</p>
+                <p class="text-primary" style="font-weight: 600;">Победитель: {% if match.winner_team %}{{ match.winner_team }}{% else %}{{ match.winner }}{% endif %}</p>
                 {% if not is_fan %}
-                {% if match.winner == match.player1 %}
-                <p class="text-muted" style="font-size: var(--font-size-sm);">+{{ match.points_player1 }} очков</p>
+                {% if match.winner_team == match.team1 or match.winner == match.player1 %}
+                <p class="text-muted" style="font-size: var(--font-size-sm);">+{{ match.points_player1 }} очков (каждому)</p>
                 {% else %}
-                <p class="text-muted" style="font-size: var(--font-size-sm);">+{{ match.points_player2 }} очков</p>
+                <p class="text-muted" style="font-size: var(--font-size-sm);">+{{ match.points_player2 }} очков (каждому)</p>
                 {% endif %}
                 {% endif %}
             </div>

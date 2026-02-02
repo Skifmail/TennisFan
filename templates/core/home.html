@@ -143,7 +143,8 @@
 
         <div class="grid grid-3">
             {% for tournament in upcoming_tournaments %}
-            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card">
+            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card tournament-preview-card">
+                <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}">{{ tournament.get_status_display }}</span>
                 {% if tournament.image %}
                 <img src="{{ tournament.image.url }}" alt="" class="card-image">
                 {% endif %}

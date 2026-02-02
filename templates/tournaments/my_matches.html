@@ -23,17 +23,17 @@
                     </div>
                 </div>
                 <div class="match-players">
-                    <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
-                        <span class="player-name">{{ match.player1 }}</span>
-                        {% if match.winner == match.player1 %}
+                    <div class="match-player {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}winner{% endif %}">
+                        <span class="player-name">{{ match.get_player1_display }}</span>
+                        {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}
                             {% if match.status == 'completed' or match.status == 'walkover' %}
                             <span class="win-badge">WIN</span>
                             {% endif %}
                         {% endif %}
                     </div>
-                    <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
-                        <span class="player-name">{{ match.player2 }}</span>
-                        {% if match.winner == match.player2 %}
+                    <div class="match-player {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}winner{% endif %}">
+                        <span class="player-name">{{ match.get_player2_display }}</span>
+                        {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}
                             {% if match.status == 'completed' or match.status == 'walkover' %}
                             <span class="win-badge">WIN</span>
                             {% endif %}

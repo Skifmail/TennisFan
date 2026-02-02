@@ -2,13 +2,12 @@
 Core views - main pages.
 """
 
-import markdown
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import redirect, render
 
-from apps.content.models import News, Page
+from apps.content.models import News
 from apps.tournaments.fan import check_and_generate_past_deadline_brackets
 from apps.tournaments.models import Match, Tournament, TournamentDuration, TournamentGender, TournamentStatus
 from apps.users.models import Player, SkillLevel
@@ -113,23 +112,8 @@ def legends(request):
 
 
 def rules(request):
-    """Rules page. Если есть Page(slug='rules'), контент рендерится как Markdown."""
-    try:
-        page = Page.objects.get(slug='rules')
-        content_html = markdown.markdown(page.content or "", extensions=["extra"])
-    except Page.DoesNotExist:
-        page = None
-        content_html = None
-    return render(
-        request,
-        "core/rules.html",
-        {"page": page, "content_html": content_html},
-    )
-
-
-def tournament_regulations(request):
-    """Tournament regulations page."""
-    return render(request, "core/tournament_regulations.html")
+    """Rules page: tournament formats (FAN, etc.) with detailed descriptions."""
+    return render(request, 'core/rules.html')
 
 
 @login_required

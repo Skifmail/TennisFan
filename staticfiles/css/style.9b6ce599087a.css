@@ -372,7 +372,7 @@ button {
         flex-shrink: 0; /* Prevent shrinking */
     }
 
-    .nav .logo {
+    .logo {
         position: absolute;
         left: 50%;
         transform: translateX(-50%);
@@ -381,7 +381,7 @@ button {
     }
 
     /* Adjust Logo Size for Mobile */
-    .nav .coin-logo {
+    .coin-logo {
         width: 36px;
         height: 36px;
     }
@@ -1590,7 +1590,6 @@ select.form-control {
 }
 
 .footer-brand .logo {
-    display: inline-block;
     margin-bottom: var(--spacing-md);
 }
 
@@ -1756,22 +1755,6 @@ select.form-control {
         gap: var(--spacing-xs);
     }
     
-    .footer-brand {
-        display: flex;
-        flex-direction: column;
-        gap: var(--spacing-sm);
-    }
-
-    .footer-brand .logo {
-        display: inline-block;
-        margin-bottom: 0;
-    }
-
-    .footer-desc {
-        margin-top: 0;
-        margin-bottom: var(--spacing-md);
-    }
-
     .match-players {
         gap: var(--spacing-sm);
     }
@@ -2426,46 +2409,6 @@ select.form-control {
 }
 
 /* Tournament Card Styles */
-.tournament-card,
-.tournament-preview-card,
-.tournament-table-card {
-    position: relative;
-}
-
-.tournament-status-badge {
-    position: absolute;
-    top: var(--spacing-sm);
-    right: var(--spacing-sm);
-    z-index: 1;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-radius: var(--radius-md);
-    white-space: nowrap;
-}
-
-.tournament-status-badge--upcoming {
-    background: var(--color-bg-elevated);
-    color: var(--color-text-secondary);
-}
-
-.tournament-status-badge--active {
-    background: rgba(212, 255, 0, 0.25);
-    color: var(--color-primary);
-}
-
-.tournament-status-badge--completed {
-    background: rgba(128, 128, 128, 0.25);
-    color: var(--color-text-secondary);
-}
-
-.tournament-status-badge--cancelled {
-    background: rgba(255, 0, 0, 0.15);
-    color: var(--color-error);
-}
-
 .tournament-card {
     cursor: pointer;
     transition: all var(--transition-base);
@@ -3020,11 +2963,11 @@ select.form-control {
 }
 
 .rules-subtabs__btn {
-    padding: var(--spacing-sm) var(--spacing-lg);
+    padding: var(--spacing-xs) var(--spacing-md);
     font-size: var(--font-size-sm);
     font-weight: 500;
     color: var(--color-text-secondary);
-    background: var(--color-bg-elevated);
+    background: var(--color-primary-transparent);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -3032,16 +2975,14 @@ select.form-control {
 }
 
 .rules-subtabs__btn:hover {
-    background: rgba(166, 130, 74, 0.15);
+    background: rgba(166, 130, 74, 0.25);
     color: var(--color-primary);
 }
 
 .rules-subtabs__btn--active {
-    background: var(--color-primary);
-    color: var(--color-bg);
+    background: var(--color-primary-transparent);
+    color: var(--color-primary);
     border-color: var(--color-primary);
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(166, 130, 74, 0.35);
 }
 
 .rules-doc__body {
@@ -3103,121 +3044,6 @@ select.form-control {
 
 .rules-doc__body strong {
     color: var(--color-text);
-}
-
-/* Round-robin matrix and standings */
-.round-robin-matrix,
-.round-robin-standings {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--font-size-sm);
-}
-
-.round-robin-matrix th,
-.round-robin-matrix td,
-.round-robin-standings th,
-.round-robin-standings td {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--color-border);
-    text-align: center;
-}
-
-.round-robin-matrix th,
-.round-robin-standings th {
-    background: var(--color-primary-transparent);
-    color: var(--color-primary);
-    font-weight: 600;
-}
-
-.round-robin-matrix .matrix-player-cell,
-.round-robin-standings td:first-child + td {
-    text-align: left;
-    white-space: nowrap;
-}
-
-.round-robin-matrix .matrix-cell--diagonal {
-    background: rgba(128, 128, 128, 0.2);
-    color: var(--color-text-secondary);
-}
-
-.round-robin-matrix .matrix-cell-win {
-    font-weight: 600;
-}
-
-.round-robin-matrix .matrix-cell-games {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
-}
-
-.round-robin-matrix .matrix-col {
-    min-width: 50px;
-}
-
-.round-robin-table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Round-robin tables: mobile responsive */
-@media (max-width: 768px) {
-    .round-robin-matrix,
-    .round-robin-standings {
-        font-size: var(--font-size-xs);
-    }
-
-    .round-robin-matrix th,
-    .round-robin-matrix td,
-    .round-robin-standings th,
-    .round-robin-standings td {
-        padding: var(--spacing-xs) var(--spacing-sm);
-    }
-
-    .round-robin-matrix .matrix-player-cell,
-    .round-robin-standings td:first-child + td {
-        max-width: 100px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .round-robin-matrix .matrix-col {
-        min-width: 36px;
-    }
-
-    .round-robin-matrix .matrix-cell-games {
-        font-size: 0.65rem;
-    }
-
-    .round-robin-matrix {
-        min-width: 320px;
-    }
-
-    .round-robin-standings {
-        min-width: 280px;
-    }
-}
-
-@media (max-width: 480px) {
-    .round-robin-matrix,
-    .round-robin-standings {
-        font-size: 0.7rem;
-    }
-
-    .round-robin-matrix th,
-    .round-robin-matrix td,
-    .round-robin-standings th,
-    .round-robin-standings td {
-        padding: var(--spacing-xs) 6px;
-    }
-
-    .round-robin-matrix .matrix-player-cell,
-    .round-robin-standings td:first-child + td {
-        max-width: 80px;
-    }
-
-    .round-robin-matrix .matrix-col {
-        min-width: 32px;
-    }
 }
 
 /* ==========================================================================

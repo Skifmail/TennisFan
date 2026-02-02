@@ -108,6 +108,12 @@ class UserSubscription(models.Model):
         self.tournaments_registered_count += 1
         self.save(update_fields=['tournaments_registered_count'])
 
+    def decrement_usage(self):
+        """Восстановить одну регистрацию (например, при удалении из турнира)."""
+        if self.tournaments_registered_count > 0:
+            self.tournaments_registered_count -= 1
+            self.save(update_fields=['tournaments_registered_count'])
+
     def get_remaining_slots(self):
         if self.tier.is_unlimited:
             return 999

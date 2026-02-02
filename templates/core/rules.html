@@ -3,75 +3,80 @@
 {% block title %}Правила{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">Правила</h1>
-    <p class="page-subtitle">Как устроены турниры и рейтинг TennisFan</p>
-</div>
+<div class="rules-page">
+    <div class="container container--rules">
+        <header class="rules-header">
+            <h1 class="page-title page-title--rules">Правила</h1>
+            <p class="page-subtitle">Официальные правила TennisFan</p>
+        </header>
 
-<div class="container">
-    <div class="card">
-        <div class="card-body" style="max-width: 800px; margin: 0 auto; padding: var(--spacing-2xl);">
-            {% if page %}
-            <div class="legal-doc__body" style="padding: 0 !important; max-width: none;">
-                {{ content_html|safe }}
-            </div>
-            {% else %}
-            <p class="mb-4"><strong>TennisFan позволяет сражаться в турнирах без привязки к месту, дате и даже если у вас мало свободного времени.</strong> Сейчас в рейтинге любительских турниров серии TennisFan зарегистрировано более 1000 человек. Турниры доступны по всей России.</p>
-
-            <p class="mb-4" style="background: var(--color-primary); color: white; padding: var(--spacing-lg); border-radius: var(--radius-md);"><strong>Для новых игроков участие в турнире "TennisFan" бесплатно!</strong></p>
-
-            <h2 class="mt-5 mb-4">Как это работает:</h2>
-
-            <div style="margin-bottom: var(--spacing-2xl);">
-                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">1. Регистрация</h3>
-                <p style="margin-bottom: var(--spacing-sm);">Зарегистрируйтесь на сайте tennison.ru, укажите ваш примерный уровень игры и игровой опыт.</p>
-                <p>А также время, когда вам было бы удобно принять участие в турнире.</p>
+        <!-- Вкладки первого уровня -->
+        <div class="rules-tabs">
+            <div class="rules-tabs__nav" role="tablist">
+                <button class="rules-tabs__btn rules-tabs__btn--active" data-tab="tournament-rules" role="tab" aria-selected="true">
+                    Правила турниров
+                </button>
             </div>
 
-            <div style="margin-bottom: var(--spacing-2xl);">
-                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">2. Выбор турнира</h3>
-                <p style="margin-bottom: var(--spacing-md);">После регистрации, зайдите в раздел "турниры", выберите ваш город и категорию турнира, которая соответствует вашему уровню:</p>
-                <ul style="list-style: disc; padding-left: var(--spacing-xl); margin-bottom: var(--spacing-sm);">
-                    <li><strong>«Профессионал»</strong> — NTRP 7</li>
-                    <li><strong>«Продвинутый»</strong> — NTRP 6</li>
-                    <li><strong>«Опытный»</strong> — NTRP 5</li>
-                    <li><strong>«Любитель»</strong> — NTRP 3–4</li>
-                    <li><strong>«Новичок»</strong> — NTRP 1–2</li>
-                </ul>
-                <p style="margin-top: var(--spacing-md);">После этого игроку нужно подождать заполнения сетки турнира.</p>
-            </div>
+            <div class="rules-tabs__content" id="tournament-rules" role="tabpanel">
+                <!-- Вкладки второго уровня: форматы турниров -->
+                <div class="rules-subtabs">
+                    <div class="rules-subtabs__nav" role="tablist">
+                        <button class="rules-subtabs__btn rules-subtabs__btn--active" data-subtab="fan" role="tab" aria-selected="true">
+                            FAN (одноэтапная сетка)
+                        </button>
+                        <button class="rules-subtabs__btn" data-subtab="round-robin" role="tab" aria-selected="false">
+                            Круговой
+                        </button>
+                        <button class="rules-subtabs__btn" data-subtab="doubles" role="tab" aria-selected="false">
+                            Парные турниры
+                        </button>
+                    </div>
 
-            <div style="margin-bottom: var(--spacing-2xl);">
-                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">3. Уведомление о старте</h3>
-                <p style="margin-bottom: var(--spacing-sm);">Как только сетка турнира заполнилась, вам на электронную почту придет уведомление о том, что турнир стартовал, а также контакты соперника, с которым необходимо провести первый матч.</p>
-                <p>На каждую встречу с соперником отведен срок в одну неделю, и вы сами решаете, где и когда будет проведена игра.</p>
+                    <div class="rules-subtabs__content" id="fan" role="tabpanel">
+                        <article class="rules-doc card">
+                            <div class="card-body rules-doc__body">
+                                {% include 'core/rules_fan.html' %}
+                            </div>
+                        </article>
+                    </div>
+                    <div class="rules-subtabs__content" id="round-robin" role="tabpanel" style="display: none;">
+                        <article class="rules-doc card">
+                            <div class="card-body rules-doc__body">
+                                {% include 'core/rules_round_robin.html' %}
+                            </div>
+                        </article>
+                    </div>
+                    <div class="rules-subtabs__content" id="doubles" role="tabpanel" style="display: none;">
+                        <article class="rules-doc card">
+                            <div class="card-body rules-doc__body">
+                                {% include 'core/rules_doubles.html' %}
+                            </div>
+                        </article>
+                    </div>
+                </div>
             </div>
-
-            <div style="margin-bottom: var(--spacing-2xl);">
-                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">4. Проведение матча</h3>
-                <p>Встречаетесь с соперником и проводите матч.</p>
-            </div>
-
-            <div style="margin-bottom: var(--spacing-2xl);">
-                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">5. Внесение результатов</h3>
-                <p>Вносите результаты матчей в личном кабинете на сайте tennison.ru, либо отправляйте администратору Tennison.</p>
-            </div>
-
-            <div style="margin-bottom: var(--spacing-2xl);">
-                <h3 style="color: var(--color-primary); font-size: 1.3em; margin-bottom: var(--spacing-md);">6. Рейтинг и развитие</h3>
-                <p style="margin-bottom: var(--spacing-sm);">Очень важно, что у теннисистов есть возможность следить за своей позицией в рейтинге в режиме реального времени, изучать статистику своих игр, пробовать свои силы в турнирах разного уровня. За каждое место игрок получает очки.</p>
-                <p>Игроки могут участвовать в неограниченном количестве турниров, тем самым зарабатывая больше очков, улучшая свои навыки и знакомясь с большим количеством интересных людей.</p>
-            </div>
-
-            <div style="background: var(--color-bg-elevated); padding: var(--spacing-lg); border-radius: var(--radius-md); border-left: 4px solid var(--color-primary); margin-bottom: var(--spacing-2xl);">
-                <p style="margin-bottom: var(--spacing-sm);"><strong>В течение всего турнира в режиме 24/7 игроков сопровождает администратор,</strong> который при необходимости помогает договориться с соперником и решить спорные вопросы.</p>
-                <p style="margin-bottom: 0;"><strong>Ну и, конечно же, победителей ждут призы от партнеров турниров TennisFan.</strong></p>
-            </div>
-
-            <p class="mt-5" style="font-size: 1.1em; text-align: center;">Приглашаем всех любителей тенниса попробовать свои силы в новом формате турниров!</p>
-            <p style="text-align: center; color: var(--color-text-secondary);">Подробнее о правилах Tennison в <a href="#" style="color: var(--color-primary);">регламенте турнира</a></p>
-            {% endif %}
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const subtabBtns = document.querySelectorAll('.rules-subtabs__btn');
+    const subtabPanels = document.querySelectorAll('.rules-subtabs__content');
+    subtabBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const targetId = this.dataset.subtab;
+            subtabBtns.forEach(function(b) {
+                b.classList.toggle('rules-subtabs__btn--active', b.dataset.subtab === targetId);
+            });
+            subtabPanels.forEach(function(panel) {
+                panel.style.display = panel.id === targetId ? '' : 'none';
+            });
+        });
+    });
+})();
+</script>
 {% endblock %}

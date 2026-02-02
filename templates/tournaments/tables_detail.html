@@ -149,6 +149,16 @@
                                 {% if s.place == 1 %}🥇{% elif s.place == 2 %}🥈{% elif s.place == 3 %}🥉{% else %}{{ s.place }}{% endif %}
                             </td>
                             <td>
+                                {% if s.team %}
+                                <a href="{% url 'profile' pk=s.team.player1.pk %}" class="player-link">
+                                    {% if s.team.player1.avatar %}
+                                    <img src="{{ s.team.player1.avatar.url }}" alt="" class="player-avatar-sm">
+                                    {% else %}
+                                    <div class="player-avatar-sm"></div>
+                                    {% endif %}
+                                    {{ s.team }}
+                                </a>
+                                {% else %}
                                 <a href="{% url 'profile' pk=s.player.pk %}" class="player-link">
                                     {% if s.player.avatar %}
                                     <img src="{{ s.player.avatar.url }}" alt="" class="player-avatar-sm">
@@ -157,8 +167,9 @@
                                     {% endif %}
                                     {{ s.player.user.first_name }} {{ s.player.user.last_name }}
                                 </a>
+                                {% endif %}
                             </td>
-                            <td>{{ s.player.total_points }}</td>
+                            <td>{% if s.team %}{{ s.team.player1.total_points }}{% else %}{{ s.player.total_points }}{% endif %}</td>
                             {% if is_fan %}
                             <td>{{ s.round_eliminated }}</td>
                             <td class="fan-points">{{ s.fan_points }}</td>
@@ -219,15 +230,17 @@
                     {% for match in round_matches %}
                     <a href="{% url 'match_detail' pk=match.pk %}" class="match-card-mini">
                         <div class="match-mini-players">
-                            <div class="match-mini-player {% if match.winner == match.player1 %}winner{% endif %}">
-                                {% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar-xs">{% else %}<div class="player-avatar-xs"></div>{% endif %}
-                                <span>{% if match.player1.is_bye %}Свободный круг{% else %}{{ match.player1 }}{% endif %}</span>
+                            <div class="match-mini-player {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}winner{% endif %}">
+                                {% if match.team1 %}{% if match.team1.player1.avatar %}<img src="{{ match.team1.player1.avatar.url }}" alt="" class="player-avatar-xs">{% else %}<div class="player-avatar-xs"></div>{% endif %}
+                                {% else %}{% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar-xs">{% else %}<div class="player-avatar-xs"></div>{% endif %}{% endif %}
+                                <span>{% if match.team1 %}{{ match.team1 }}{% elif match.player1.is_bye %}Свободный круг{% else %}{{ match.player1 }}{% endif %}</span>
                                 {% if match.player1_set1 is not None %}<span class="set-score">{{ match.player1_set1 }}{% if match.player1_set2 is not None %}:{{ match.player1_set2 }}{% if match.player1_set3 is not None %}:{{ match.player1_set3 }}{% endif %}{% endif %}</span>{% endif %}
                             </div>
                             <div class="match-mini-vs">vs</div>
-                            <div class="match-mini-player {% if match.winner == match.player2 %}winner{% endif %}">
-                                {% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar-xs">{% else %}<div class="player-avatar-xs"></div>{% endif %}
-                                <span>{% if match.player2.is_bye %}Свободный круг{% else %}{{ match.player2 }}{% endif %}</span>
+                            <div class="match-mini-player {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}winner{% endif %}">
+                                {% if match.team2 %}{% if match.team2.player1.avatar %}<img src="{{ match.team2.player1.avatar.url }}" alt="" class="player-avatar-xs">{% else %}<div class="player-avatar-xs"></div>{% endif %}
+                                {% else %}{% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar-xs">{% else %}<div class="player-avatar-xs"></div>{% endif %}{% endif %}
+                                <span>{% if match.team2 %}{{ match.team2 }}{% elif match.player2.is_bye %}Свободный круг{% else %}{{ match.player2 }}{% endif %}</span>
                                 {% if match.player2_set1 is not None %}<span class="set-score">{{ match.player2_set1 }}{% if match.player2_set2 is not None %}:{{ match.player2_set2 }}{% if match.player2_set3 is not None %}:{{ match.player2_set3 }}{% endif %}{% endif %}</span>{% endif %}
                             </div>
                         </div>

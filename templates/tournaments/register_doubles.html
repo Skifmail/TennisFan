@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Регистрация на парный турнир — {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="mb-4">
+        <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="text-secondary">&larr; Назад к турниру</a>
+    </div>
+
+    <h1 class="page-title mb-2">Регистрация на парный турнир</h1>
+    <p class="text-secondary mb-4">{{ tournament.name }}</p>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">Выберите способ регистрации</h2>
+
+            {% if solo_teams %}
+            <p class="text-secondary mb-3">На турнире есть игроки без пары. Вы можете присоединиться к одному из них или зарегистрироваться самостоятельно.</p>
+
+            <div class="mb-4">
+                <h3 class="h5 mb-2">Присоединиться к игроку без пары</h3>
+                <div class="d-flex flex-column gap-2">
+                    {% for team in solo_teams %}
+                    <form method="post" class="d-flex align-items-center gap-2 p-3" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="join">
+                        <input type="hidden" name="team_id" value="{{ team.id }}">
+                        <span class="flex-grow-1">{{ team.player1.user.last_name }} {{ team.player1.user.first_name }}</span>
+                        <button type="submit" class="btn btn-primary">Присоединиться</button>
+                    </form>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <hr class="my-4">
+            {% endif %}
+
+            <div class="mb-4">
+                <h3 class="h5 mb-2">Зарегистрироваться самостоятельно</h3>
+                <p class="text-secondary mb-2">Партнёр сможет присоединиться к вам позже со страницы турнира.</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="solo">
+                    <button type="submit" class="btn btn-outline">Зарегистрироваться без партнёра</button>
+                </form>
+            </div>
+
+            <hr class="my-4">
+
+            <div>
+                <h3 class="h5 mb-2">Указать партнёра сейчас</h3>
+                <p class="text-secondary mb-2">Найдите партнёра по ID, имени, телефону или email.</p>
+                <form method="get" action="{% url 'tournament_register_doubles' slug=tournament.slug %}" class="mb-3" id="partner-search-form">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <input type="text" name="q" class="form-control" placeholder="ID, имя, телефон или email" style="max-width: 300px;" value="{{ request.GET.q }}">
+                        <button type="submit" class="btn btn-outline">Найти</button>
+                    </div>
+                </form>
+                {% if request.GET.q %}
+                <div id="partner-results">
+                    {% if partner_search_results %}
+                    <div class="d-flex flex-column gap-2">
+                        {% for p in partner_search_results %}
+                        <form method="post" class="d-flex align-items-center gap-2 p-3" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="add_partner">
+                            <input type="hidden" name="partner_id" value="{{ p.id }}">
+                            <span class="flex-grow-1">{{ p.user.last_name }} {{ p.user.first_name }} (ID: {{ p.id }})</span>
+                            <button type="submit" class="btn btn-primary">Добавить в пару</button>
+                        </form>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-secondary">Игроки не найдены.</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,4 +1,5 @@
 <div class="card tournament-card" data-url="{% url 'tournament_detail' slug=tournament.slug %}" onclick="window.location.href=this.dataset.url;">
+    <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}">{{ tournament.get_status_display }}</span>
     <div class="card-body tournament-card-body">
         {% if tournament.image %}
         <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img">
@@ -9,11 +10,26 @@
         <div class="tournament-content-wrapper">
             <div class="tournament-info">
                 <div class="d-flex gap-1 flex-wrap">
+                    <span class="badge" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_variant_display }}</span>
+                    {% if tournament.format == 'single_elimination' %}
+                    <span class="badge" style="background: rgba(150, 98, 31, 0.2); color: var(--color-accent);">FAN</span>
+                    {% elif tournament.format == 'round_robin' %}
+                    <span class="badge" style="background: rgba(100, 149, 237, 0.2); color: #6495ed;">Круговой</span>
+                    {% if tournament.match_format %}
+                    <span class="badge badge-muted">{{ tournament.get_match_format_display }}</span>
+                    {% endif %}
+                    {% endif %}
                     <span class="badge">{{ tournament.city }}</span>
                     <span class="badge">{{ tournament.get_category_display }}</span>
                     <span class="badge">{{ tournament.get_gender_display }}</span>
                     <span class="badge">{{ tournament.get_duration_display }}</span>
-                    {% if tournament.max_participants %}
+                    {% if tournament.variant == 'doubles' and tournament.max_teams %}
+                        {% if tournament.is_full %}
+                        <span class="badge badge-full">Команд: {{ tournament.full_teams_count }}/{{ tournament.max_teams }}</span>
+                        {% else %}
+                        <span class="badge badge-muted">Команд: {{ tournament.full_teams_count }}/{{ tournament.max_teams }}</span>
+                        {% endif %}
+                    {% elif tournament.max_participants %}
                         {% if tournament.is_full %}
                         <span class="badge badge-full">Мест: {{ tournament.participants.count }}/{{ tournament.max_participants }}</span>
                         {% else %}
@@ -28,7 +44,28 @@
                     <span class="player-category">{{ tournament.get_tournament_type_display }}</span>
                 </div>
 
-                {% if tournament.participants.all %}
+                {% if tournament.variant == 'doubles' %}
+                <div class="tournament-participants-section">
+                    <span class="text-secondary section-label">Команды: {{ tournament.full_teams_count }}{% if tournament.max_teams %}/{{ tournament.max_teams }}{% endif %}</span>
+                    {% if tournament.teams.all %}
+                    <div class="tournament-participants-grid">
+                        {% for team in tournament.teams.all|slice:":5" %}
+                        <div class="participant-badge">
+                            <div class="player-avatar"></div>
+                            <span class="participant-name">{% if team.player2 %}{{ team.player1.user.last_name|slice:":1" }}./{{ team.player2.user.last_name|slice:":1" }}.{% else %}{{ team.player1.user.last_name }} (ищет пару){% endif %}</span>
+                        </div>
+                        {% endfor %}
+                        {% if tournament.teams.count > 5 %}
+                        <div class="participant-more">
+                            <span class="text-secondary">+{{ tournament.teams.count|add:"-5" }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <span class="text-secondary">Пока нет команд</span>
+                    {% endif %}
+                </div>
+                {% elif tournament.participants.all %}
                 <div class="tournament-participants-section">
                     <span class="text-secondary section-label">Участники:</span>
                     <div class="tournament-participants-grid">

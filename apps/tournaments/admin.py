@@ -5,6 +5,7 @@ Tournaments admin configuration.
 from django.contrib import admin, messages
 
 from .fan import generate_bracket
+from .round_robin import generate_bracket as generate_round_robin_bracket
 from .proposal_service import apply_proposal
 from .models import (
     HeadToHead,
@@ -13,6 +14,7 @@ from .models import (
     SeasonRating,
     Tournament,
     TournamentPlayerResult,
+    TournamentTeam,
 )
 
 
@@ -42,20 +44,46 @@ def generate_fan_bracket_action(modeladmin, request, queryset):
             messages.warning(request, f"{t.name}: {msg}")
 
 
+@admin.action(description="Сформировать сетку (круговой)")
+def generate_round_robin_bracket_action(modeladmin, request, queryset):
+    for t in queryset:
+        ok, msg = generate_round_robin_bracket(t)
+        if ok:
+            messages.success(request, f"{t.name}: {msg}")
+        else:
+            messages.warning(request, f"{t.name}: {msg}")
+
+
+class TournamentTeamInline(admin.TabularInline):
+    model = TournamentTeam
+    extra = 0
+    raw_id_fields = ("player1", "player2")
+    verbose_name = "Команда"
+    verbose_name_plural = "Команды"
+
+
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
-    """Admin for Tournament model."""
+    inlines = [TournamentTeamInline]
+
+    """Admin for Tournament model.
+
+    Страница добавления турнира: базовая информация + выбор формата.
+    Поля формата появляются динамически при выборе (FAN и др.).
+    """
 
     list_display = (
         "name",
         "city",
         "format",
+        "variant",
         "duration",
         "tournament_type",
         "status",
         "bracket_generated",
         "start_date",
         "max_participants",
+        "max_teams",
     )
     list_filter = (
         "city",
@@ -64,6 +92,7 @@ class TournamentAdmin(admin.ModelAdmin):
         "duration",
         "tournament_type",
         "format",
+        "variant",
         "status",
         "bracket_generated",
     )
@@ -72,40 +101,33 @@ class TournamentAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     filter_horizontal = ("participants",)
     date_hierarchy = "start_date"
-    actions = [generate_fan_bracket_action]
+    actions = [generate_fan_bracket_action, generate_round_robin_bracket_action]
 
     fieldsets = (
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
+        ("Формат турнира", {"fields": ("format", "variant")}),
         (
-            "Стоимость и Тип",
-            {"fields": ("entry_fee", "is_one_day")},
-        ),
-        (
-            "Категории",
+            "Общие поля (FAN и Круговой)",
             {
                 "fields": (
+                    "entry_fee",
+                    "is_one_day",
                     "city",
                     "category",
                     "gender",
                     "duration",
                     "tournament_type",
-                    "format",
                     "status",
-                )
-            },
-        ),
-        ("Даты", {"fields": ("start_date", "end_date", "registration_deadline")}),
-        (
-            "Очки и ограничения",
-            {
-                "fields": (
-                    "points_winner",
-                    "points_loser",
+                    "start_date",
+                    "end_date",
+                    "registration_deadline",
                     "max_participants",
+                    "max_teams",
                     "bracket_generated",
                     "match_days_per_round",
+                    "participants",
                 ),
-                "description": "points_winner/points_loser — только для не-FAN турниров. Для FAN используются очки за раунд ниже.",
+                "classes": ("format-fan-section", "format-round-robin-section"),
             },
         ),
         (
@@ -118,12 +140,31 @@ class TournamentAdmin(admin.ModelAdmin):
                     "fan_points_final",
                     "fan_points_winner",
                 ),
-                "description": "Для FAN: очки начисляются при вылете или в конце турнира. points_winner/loser не используются.",
-                "classes": ("collapse",),
+                "description": "Очки начисляются при вылете или в конце турнира.",
+                "classes": ("format-fan-section",),
             },
         ),
-        ("Участники", {"fields": ("participants",)}),
+        (
+            "Круговой: формат матча",
+            {
+                "fields": ("match_format",),
+                "classes": ("format-round-robin-section",),
+                "description": "Формат матча влияет на тай-брейки и подсчёт очков в таблице.",
+            },
+        ),
     )
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        """Добавить пустой выбор для формата на странице добавления."""
+        if db_field.name == "format":
+            resolver_match = getattr(request, "resolver_match", None)
+            is_add_page = "/add/" in (request.path or "") or (
+                resolver_match and "add" in (getattr(resolver_match, "url_name", "") or "")
+            )
+            if is_add_page:
+                kwargs["choices"] = [("", "---------")] + list(db_field.choices)
+                kwargs["initial"] = ""
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
 
     class Media:
         js = ("js/admin_tournament.js",)
@@ -141,6 +182,8 @@ class MatchAdmin(admin.ModelAdmin):
         "is_consolation",
         "player1",
         "player2",
+        "team1",
+        "team2",
         "score_display",
         "winner",
         "status",
@@ -153,7 +196,7 @@ class MatchAdmin(admin.ModelAdmin):
         "player2__user__first_name",
         "player2__user__last_name",
     )
-    raw_id_fields = ("player1", "player2", "winner", "court", "next_match")
+    raw_id_fields = ("player1", "player2", "team1", "team2", "winner", "winner_team", "court", "next_match")
     date_hierarchy = "scheduled_datetime"
 
     fieldsets = (
@@ -161,7 +204,7 @@ class MatchAdmin(admin.ModelAdmin):
             "Турнир",
             {"fields": ("tournament", "court", "round_name", "round_index", "round_order", "is_consolation", "next_match")},
         ),
-        ("Игроки", {"fields": ("player1", "player2", "winner")}),
+        ("Игроки / Команды", {"fields": ("player1", "player2", "team1", "team2", "winner", "winner_team")}),
         (
             "Счёт",
             {

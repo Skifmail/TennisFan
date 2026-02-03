@@ -2,6 +2,7 @@
 Courts models.
 """
 
+from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 
@@ -22,6 +23,7 @@ class Court(models.Model):
     slug = models.SlugField("URL", unique=True)
     city = models.CharField("Город", max_length=100)
     address = models.CharField("Адрес", max_length=255)
+    district = models.CharField("Район города", max_length=100, blank=True)
     description = models.TextField("Описание", blank=True)
 
     surface = models.CharField(
@@ -31,9 +33,14 @@ class Court(models.Model):
     has_lighting = models.BooleanField("Освещение", default=True)
     is_indoor = models.BooleanField("Крытый", default=False)
 
-    phone = models.CharField("Телефон", max_length=20, blank=True)
+    phone = models.CharField("Телефон", max_length=50, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
     website = models.URLField("Сайт", blank=True)
+    sells_balls = models.BooleanField("Теннисные мячи в продаже", default=False)
+    sells_water = models.BooleanField("Вода в продаже", default=False)
+    multiple_payment_methods = models.BooleanField(
+        "Возможность оплаты разными способами", default=False
+    )
 
     image = models.ImageField("Фото", upload_to="courts/", blank=True)
     latitude = models.DecimalField("Широта", max_digits=9, decimal_places=6, null=True, blank=True)
@@ -175,3 +182,35 @@ class CourtApplication(models.Model):
         self.status = CourtApplicationStatus.APPROVED
         self.save(update_fields=["court", "status", "updated_at"])
         return court
+
+
+class CourtRating(models.Model):
+    """Оценка корта от зарегистрированного пользователя (1–5 звёзд). Один пользователь — одна оценка на корт."""
+
+    court = models.ForeignKey(
+        Court,
+        on_delete=models.CASCADE,
+        related_name="ratings",
+        verbose_name="Корт",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="court_ratings",
+        verbose_name="Пользователь",
+    )
+    score = models.PositiveSmallIntegerField(
+        "Оценка",
+        choices=[(i, str(i)) for i in range(1, 6)],
+    )
+    created_at = models.DateTimeField("Создана", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлена", auto_now=True)
+
+    class Meta:
+        verbose_name = "Оценка корта"
+        verbose_name_plural = "Оценки кортов"
+        unique_together = (("court", "user"),)
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        return f"{self.court.name}: {self.score} от {self.user}"

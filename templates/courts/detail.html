@@ -4,98 +4,203 @@
 {% block title %}{{ court.name }}{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top: var(--spacing-2xl);">
+<div class="container court-detail" style="padding-top: var(--spacing-2xl);">
     <div class="mb-4">
         <a href="{% url 'court_list' %}" class="text-secondary">&larr; Все корты</a>
     </div>
 
-    <div class="grid" style="grid-template-columns: 1fr 350px; gap: var(--spacing-xl);">
-        <div>
-            {% if court.image %}
-            <img src="{{ court.image.url }}" alt=""
-                style="width: 100%; border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl);">
-            {% endif %}
+    {% if court.image %}
+    <img src="{{ court.image.url }}" alt="{{ court.name }}"
+         class="court-detail__image">
+    {% endif %}
 
-            <h1 style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-md);">{{ court.name }}</h1>
-            <p class="text-secondary mb-4">{{ court.address }}</p>
+    <div class="court-detail__info card">
+        <div class="card-body court-detail__info-body">
+            <h1 class="court-detail__title">{{ court.name }}</h1>
 
-            {% if court.description %}
-            <div class="card mb-4">
-                <div class="card-body">{{ court.description }}</div>
-            </div>
-            {% endif %}
+            <dl class="court-detail__dl court-detail__dl--striped">
+                <dt>Город</dt>
+                <dd>{{ court.city }}</dd>
 
-            <h2 class="section-title mb-3">Последние матчи на этом корте</h2>
-            <div class="grid">
-                {% for match in recent_matches %}
-                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
-                    <div class="match-header">
-                        <span class="match-tournament">{{ match.tournament.name }}</span>
-                        <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y" }}</span>
-                    </div>
-                    <div class="match-players">
-                        <div class="match-player">
-                            <span class="player-name">{{ match.player1 }}</span>
-                            <span>{{ match.score_display }}</span>
-                        </div>
-                        <div class="match-player">
-                            <span class="player-name">{{ match.player2 }}</span>
-                        </div>
-                    </div>
-                </a>
-                {% empty %}
-                <p class="text-secondary">Матчи на этом корте пока не проводились.</p>
-                {% endfor %}
-            </div>
-        </div>
+                <dt>Адрес</dt>
+                <dd>
+                    <a href="https://yandex.ru/maps/?text={{ court.address|urlencode }}+{{ court.city|urlencode }}" target="_blank" rel="noopener">{{ court.city }}, {{ court.address }}</a>
+                </dd>
 
-        <div class="card" style="height: fit-content;">
-            <div class="card-body">
-                <h3 class="mb-3">Информация</h3>
-
-                <div class="mb-3">
-                    <div class="text-muted" style="font-size: var(--font-size-xs);">Город</div>
-                    <div>{{ court.city }}</div>
-                </div>
-
-                <div class="mb-3">
-                    <div class="text-muted" style="font-size: var(--font-size-xs);">Покрытие</div>
-                    <div>{{ court.get_surface_display }}</div>
-                </div>
-
-                <div class="mb-3">
-                    <div class="text-muted" style="font-size: var(--font-size-xs);">Кортов</div>
-                    <div>{{ court.courts_count }}</div>
-                </div>
-
-                {% if court.price_per_hour %}
-                <div class="mb-3">
-                    <div class="text-muted" style="font-size: var(--font-size-xs);">Цена</div>
-                    <div class="text-primary" style="font-weight: 600;">{{ court.price_per_hour }} ₽/час</div>
-                </div>
+                {% if court.district %}
+                <dt>Район города</dt>
+                <dd>{{ court.district }}</dd>
                 {% endif %}
-
-                {% if court.phone or court.whatsapp or court.website %}
-                <hr style="border-color: var(--color-border); margin: var(--spacing-lg) 0;">
-                <h4 class="mb-2">Контакты</h4>
 
                 {% if court.phone %}
-                <p><a href="tel:{{ court.phone }}">{{ court.phone }}</a></p>
+                <dt>Телефон</dt>
+                <dd><a href="tel:{{ court.phone }}">{{ court.phone }}</a></dd>
                 {% endif %}
+            </dl>
 
-                <div class="d-flex gap-2 mt-3 flex-wrap">
-                    {% if court.whatsapp_url %}
-                    <a href="{{ court.whatsapp_url }}" class="btn btn-outline messenger-btn" target="_blank" rel="noopener">
-                        <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> WhatsApp
-                    </a>
-                    {% endif %}
-                    {% if court.website %}
-                    <a href="{{ court.website }}" class="btn btn-outline" target="_blank" rel="noopener">Сайт</a>
-                    {% endif %}
-                </div>
+            {% if court.sells_balls or court.sells_water or court.multiple_payment_methods %}
+            <h3 class="court-detail__section-title">Особенности</h3>
+            <ul class="court-detail__features">
+                {% if court.sells_balls %}<li><span class="court-detail__check">✓</span> Теннисные мячи в продаже</li>{% endif %}
+                {% if court.sells_water %}<li><span class="court-detail__check">✓</span> Вода в продаже</li>{% endif %}
+                {% if court.multiple_payment_methods %}<li><span class="court-detail__check">✓</span> Возможность оплаты корта разными способами</li>{% endif %}
+            </ul>
+            {% endif %}
+
+            <dl class="court-detail__dl">
+                <dt>Количество кортов</dt>
+                <dd>{{ court.courts_count }}</dd>
+
+                <dt>Типы кортов</dt>
+                <dd>{% if court.is_indoor %}Закрытые{% else %}Открытые{% endif %}</dd>
+
+                <dt>Тип покрытия</dt>
+                <dd>{{ court.get_surface_display }}</dd>
+
+                {% if court.price_per_hour %}
+                <dt>Цена</dt>
+                <dd class="text-primary" style="font-weight: 600;">{{ court.price_per_hour }} ₽/час</dd>
                 {% endif %}
+            </dl>
+
+            {% if court.website or court.whatsapp_url %}
+            <div class="court-detail__contacts">
+                {% if court.website %}
+                <a href="{{ court.website }}" class="btn btn-outline" target="_blank" rel="noopener">Открыть сайт</a>
+                {% endif %}
+                {% if court.whatsapp_url %}
+                <a href="{{ court.whatsapp_url }}" class="btn btn-outline messenger-btn" target="_blank" rel="noopener">
+                    <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> Связаться по WhatsApp
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="court-detail__rating-section">
+                <h3 class="court-detail__section-title">Оценка</h3>
+                <div class="court-detail__rating-row">
+                    {% include "courts/_star_rating.html" with rating_percent=court.rating_percent rating_count=court.rating_count average_rating=court.average_rating size="md" show_count=True %}
+                </div>
+                <a href="#court-comment-form" class="btn btn-ghost btn-sm">Подробная оценка</a>
             </div>
         </div>
     </div>
+
+    {% if court.description %}
+    <div class="card mt-4">
+        <div class="card-body">{{ court.description }}</div>
+    </div>
+    {% endif %}
+
+    <section class="court-detail__comments mt-4" id="court-comment-form">
+        <h2 class="section-title mb-3">Комментарии</h2>
+        {% if can_comment %}
+        <form method="post" action="{% url 'court_detail' slug=court.slug %}" class="card mb-4">
+            <div class="card-body">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="comment">
+                <label class="form-label">Оценка (обязательно)</label>
+                <div class="court-rate-stars mb-3">
+                    {% for score in "12345" %}
+                    <label class="court-rate-stars__label">
+                        <input type="radio" name="score" value="{{ score }}" {% if court.user_rating %}{% if court.user_rating|stringformat:"d" == score %}checked{% endif %}{% endif %} class="court-rate-stars__input" required>
+                        <span class="court-rate-stars__star">★</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <label for="court-comment-text" class="form-label">Текст комментария (обязательно)</label>
+                <textarea name="text" id="court-comment-text" class="form-control mb-2" rows="3" maxlength="2000" placeholder="Напишите ваш отзыв о корте..." required></textarea>
+                <button type="submit" class="btn btn-primary">Отправить</button>
+            </div>
+        </form>
+        {% else %}
+        <p class="text-muted"><a href="{% url 'login' %}?next={{ request.path }}">Войдите</a>, чтобы оставить комментарий и оценку.</p>
+        {% endif %}
+
+        <div class="court-comments-list">
+            {% for comment in comments %}
+            <div class="card mb-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-1">
+                        <strong>{{ comment.author }}</strong>
+                        <span class="text-muted" style="font-size: var(--font-size-sm);">{{ comment.created_at|date:"d.m.Y H:i" }}</span>
+                    </div>
+                    {% if comment.author_score %}
+                    <p class="court-comment__rating mb-1">
+                        <span class="star-rating star-rating--sm">
+                            <span class="star-rating__empty" aria-hidden="true">☆☆☆☆☆</span>
+                            <span class="star-rating__fill-clip court-comment-fill" data-width-pct="{{ comment.author_rating_percent }}" aria-hidden="true"><span class="star-rating__fill">★★★★★</span></span>
+                        </span>
+                        <span class="star-rating__count">{{ comment.author_score }}/5</span>
+                    </p>
+                    {% endif %}
+                    <p class="mb-0 mt-1">{{ comment.text }}</p>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-secondary">Пока нет комментариев.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="mt-4">
+        <h2 class="section-title mb-3">Последние матчи на этом корте</h2>
+        <div class="grid">
+            {% for match in recent_matches %}
+            <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
+                <div class="match-header">
+                    <span class="match-tournament">{{ match.tournament.name }}</span>
+                    <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y" }}</span>
+                </div>
+                <div class="match-players">
+                    <div class="match-player">
+                        <span class="player-name">{{ match.player1 }}</span>
+                        <span>{{ match.score_display }}</span>
+                    </div>
+                    <div class="match-player">
+                        <span class="player-name">{{ match.player2 }}</span>
+                    </div>
+                </div>
+            </a>
+            {% empty %}
+            <p class="text-secondary">Матчи на этом корте пока не проводились.</p>
+            {% endfor %}
+        </div>
+    </section>
 </div>
+
+<style>
+.court-detail__image {
+    width: 100%;
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-xl);
+    max-height: 400px;
+    object-fit: cover;
+}
+.court-detail__title { font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg); }
+.court-detail__dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem var(--spacing-lg); margin: 0; }
+.court-detail__dl dt { color: var(--color-text-muted); font-weight: normal; }
+.court-detail__dl dd { margin: 0; }
+.court-detail__dl dd a { color: var(--color-primary); }
+.court-detail__dl--striped { background: var(--color-bg-secondary); padding: var(--spacing-md); border-radius: var(--radius-md); margin-bottom: var(--spacing-lg); }
+.court-detail__section-title { font-size: var(--font-size-lg); margin: var(--spacing-lg) 0 var(--spacing-sm) 0; }
+.court-detail__features { list-style: none; padding: 0; margin: 0 0 var(--spacing-lg) 0; }
+.court-detail__features li { margin-bottom: 0.25rem; }
+.court-detail__check { color: var(--color-success); margin-right: 0.25rem; }
+.court-detail__contacts { display: flex; flex-wrap: wrap; gap: var(--spacing-sm); margin-bottom: var(--spacing-lg); }
+.court-detail__rating-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); }
+.court-rate-stars { display: flex; gap: 0.25rem; align-items: center; }
+.court-rate-stars__input { position: absolute; opacity: 0; }
+.court-rate-stars__label { cursor: pointer; }
+.court-rate-stars__star { font-size: 1.5rem; color: var(--color-text-muted); }
+.court-rate-stars__label:hover .court-rate-stars__star,
+.court-rate-stars__input:checked ~ .court-rate-stars__star { color: var(--color-primary); }
+.court-rate-stars__label:has(.court-rate-stars__input:checked) .court-rate-stars__star { color: var(--color-primary); }
+</style>
+<script>
+document.querySelectorAll('.court-comment-fill').forEach(function(el) {
+    var p = el.getAttribute('data-width-pct');
+    if (p !== null && p !== '') el.style.width = p + '%';
+});
+</script>
 {% endblock %}

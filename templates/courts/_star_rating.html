@@ -1,0 +1,13 @@
+{% comment %}
+  Параметры: rating_percent (0–100), rating_count (число оценок), average_rating, size (sm для карточки), show_count.
+  Звёзды полые, заполняются по рейтингу.
+{% endcomment %}
+<div class="star-rating star-rating--{{ size|default:'md' }}" aria-label="Рейтинг{% if rating_count %}: {{ rating_count }} оценок{% endif %}">
+    <span class="star-rating__empty" aria-hidden="true">☆☆☆☆☆</span>
+    <span class="star-rating__fill-clip" style="width: {{ rating_percent|default:0 }}%;" aria-hidden="true">
+        <span class="star-rating__fill">★★★★★</span>
+    </span>
+</div>
+{% if show_count and rating_count is not None %}
+    <span class="star-rating__count">{{ average_rating|floatformat:1 }} ({{ rating_count }})</span>
+{% endif %}

@@ -13,12 +13,26 @@
         <!-- Вкладки первого уровня -->
         <div class="rules-tabs">
             <div class="rules-tabs__nav" role="tablist">
-                <button class="rules-tabs__btn rules-tabs__btn--active" data-tab="tournament-rules" role="tab" aria-selected="true">
+                <button class="rules-tabs__btn rules-tabs__btn--active" data-tab="tennis-rules" role="tab" aria-selected="true">
+                    Правила тенниса
+                </button>
+                <button class="rules-tabs__btn" data-tab="tournament-rules" role="tab" aria-selected="false">
                     Правила турниров
+                </button>
+                <button class="rules-tabs__btn" data-tab="site-usage-rules" role="tab" aria-selected="false">
+                    Правила пользования сайтом
                 </button>
             </div>
 
-            <div class="rules-tabs__content" id="tournament-rules" role="tabpanel">
+            <div class="rules-tabs__content" id="tennis-rules" role="tabpanel">
+                <article class="rules-doc card">
+                    <div class="card-body rules-doc__body">
+                        {% include 'core/rules_tennis.html' %}
+                    </div>
+                </article>
+            </div>
+
+            <div class="rules-tabs__content" id="tournament-rules" role="tabpanel" style="display: none;">
                 <!-- Вкладки второго уровня: форматы турниров -->
                 <div class="rules-subtabs">
                     <div class="rules-subtabs__nav" role="tablist">
@@ -56,6 +70,14 @@
                     </div>
                 </div>
             </div>
+
+            <div class="rules-tabs__content" id="site-usage-rules" role="tabpanel" style="display: none;">
+                <article class="rules-doc card">
+                    <div class="card-body rules-doc__body">
+                        {% include 'core/rules_site_usage.html' %}
+                    </div>
+                </article>
+            </div>
         </div>
     </div>
 </div>
@@ -64,6 +86,23 @@
 {% block extra_js %}
 <script>
 (function() {
+    // Вкладки первого уровня: Правила тенниса / Правила турниров
+    const tabBtns = document.querySelectorAll('.rules-tabs__btn');
+    const tabPanels = document.querySelectorAll('.rules-tabs__content');
+    tabBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const targetId = this.dataset.tab;
+            tabBtns.forEach(function(b) {
+                b.classList.toggle('rules-tabs__btn--active', b.dataset.tab === targetId);
+                b.setAttribute('aria-selected', b.dataset.tab === targetId);
+            });
+            tabPanels.forEach(function(panel) {
+                panel.style.display = panel.id === targetId ? '' : 'none';
+            });
+        });
+    });
+
+    // Вкладки второго уровня: FAN / Круговой / Парные
     const subtabBtns = document.querySelectorAll('.rules-subtabs__btn');
     const subtabPanels = document.querySelectorAll('.rules-subtabs__content');
     subtabBtns.forEach(function(btn) {

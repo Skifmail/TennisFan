@@ -145,6 +145,33 @@ def notify_feedback(user, subject: str, message: str) -> bool:
     return send_admin_message(text)
 
 
+def notify_court_comment(comment, court, score: int | None = None) -> bool:
+    """Уведомление админу о новом комментарии и оценке к корту."""
+    author = getattr(comment, "author", None)
+    author_name = _escape(str(author) if author else "—")
+    author_email = "—"
+    if author:
+        try:
+            author_email = _escape(getattr(author.user, "email", None) or "—")
+        except Exception:
+            pass
+    text_preview = _escape((comment.text or "")[:300])
+    if (comment.text or "") and len(comment.text or "") > 300:
+        text_preview += "…"
+    court_name = _escape(getattr(court, "name", "") or "—")
+    rating_line = f"\nОценка: {score}/5 ★" if score is not None else ""
+
+    msg = (
+        "🏟 <b>Комментарий к корту</b>\n\n"
+        f"Корт: {court_name}\n"
+        f"Автор: {author_name}\n"
+        f"Email: {author_email}\n"
+        f"{rating_line}\n\n"
+        f"Текст:\n{text_preview}"
+    )
+    return send_admin_message(msg)
+
+
 def notify_about_us_comment(comment) -> bool:
     """Уведомление админу о новом комментарии на странице «О нас»."""
     author = getattr(comment, "author", None)

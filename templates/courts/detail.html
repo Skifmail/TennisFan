@@ -83,6 +83,13 @@
                 </div>
                 <a href="#court-comment-form" class="btn btn-ghost btn-sm">Подробная оценка</a>
             </div>
+
+            {% if court_has_coords and yandex_maps_api_key %}
+            <div class="court-detail__map-section">
+                <h3 class="court-detail__section-title">На карте</h3>
+                <div id="court-yandex-map" class="court-detail__map" data-lat="{{ court.latitude }}" data-lon="{{ court.longitude }}" data-name="{{ court.name }}"></div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -170,6 +177,16 @@
 </div>
 
 <style>
+.court-detail__map-section {
+    margin-top: var(--spacing-xl);
+}
+.court-detail__map {
+    width: 100%;
+    height: 360px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-bg-secondary);
+}
 .court-detail__image {
     width: 100%;
     border-radius: var(--radius-lg);
@@ -203,4 +220,32 @@ document.querySelectorAll('.court-comment-fill').forEach(function(el) {
     if (p !== null && p !== '') el.style.width = p + '%';
 });
 </script>
+{% if court_has_coords and yandex_maps_api_key %}
+<script src="https://api-maps.yandex.ru/2.1/?apikey={{ yandex_maps_api_key }}&lang=ru_RU" type="text/javascript"></script>
+<script>
+(function() {
+    var el = document.getElementById('court-yandex-map');
+    if (!el) return;
+    var lat = parseFloat(el.getAttribute('data-lat'), 10);
+    var lon = parseFloat(el.getAttribute('data-lon'), 10);
+    var name = el.getAttribute('data-name') || '';
+    if (isNaN(lat) || isNaN(lon)) return;
+    ymaps.ready(function() {
+        var map = new ymaps.Map('court-yandex-map', {
+            center: [lat, lon],
+            zoom: 16,
+            controls: ['zoomControl']
+        });
+        var safeName = document.createElement('div');
+        safeName.textContent = name;
+        var placemark = new ymaps.Placemark([lat, lon], {
+            balloonContent: safeName.innerHTML
+        }, {
+            preset: 'islands#sportIcon'
+        });
+        map.geoObjects.add(placemark);
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}

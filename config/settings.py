@@ -160,9 +160,9 @@ WHITENOISE_USE_FINDERS = True
 
 # Configure Cloudinary and Media files
 if CLOUDINARY_URL:
-    # Configure Cloudinary explicitly
+    # Configure Cloudinary explicitly (optional; django-cloudinary-storage can use CLOUDINARY_URL alone)
     try:
-        import cloudinary
+        import cloudinary  # type: ignore[import-untyped]
         # Parse CLOUDINARY_URL: cloudinary://api_key:api_secret@cloud_name
         url_parts = CLOUDINARY_URL.replace('cloudinary://', '').split('@')
         if len(url_parts) == 2:
@@ -174,10 +174,9 @@ if CLOUDINARY_URL:
                     cloud_name=cloud_name,
                     api_key=api_key,
                     api_secret=api_secret,
-                    secure=True
+                    secure=True,
                 )
-    except Exception:
-        # If cloudinary import fails, django-cloudinary-storage will use CLOUDINARY_URL
+    except ImportError:
         pass
     
     # Cloudinary returns absolute URLs

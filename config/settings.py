@@ -201,6 +201,14 @@ LOGOUT_REDIRECT_URL = 'home'
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get('TELEGRAM_ADMIN_CHAT_ID', '')
 
+# Yandex Maps JS API — для карты на странице корта (ключ в .env: YANDEX_MAPS_API_KEY)
+YANDEX_MAPS_API_KEY = os.environ.get('YANDEX_MAPS_API_KEY', '')
+
+# Yandex Geocoder API — получение координат по адресу при сохранении корта в админке.
+# Можно использовать тот же ключ, что и для карт, или отдельный (в .env: YANDEX_GEOCODER_API_KEY).
+# В кабинете разработчика нужно подключить «Геокодер» к ключу.
+YANDEX_GEOCODER_API_KEY = os.environ.get('YANDEX_GEOCODER_API_KEY', '')
+
 # Cron: FAN-турниры — формирование сетки по дедлайну, обработка просроченных матчей
 CRONJOBS = [
     ('*/10 * * * *', 'django.core.management.call_command', ['fan_generate_past_deadlines']),

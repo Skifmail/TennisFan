@@ -2,6 +2,7 @@
 Courts views.
 """
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Avg, Count
@@ -125,6 +126,8 @@ def court_detail(request, slug):
         "recent_matches": recent_matches,
         "comments": comments,
         "can_comment": request.user.is_authenticated,
+        "yandex_maps_api_key": getattr(settings, "YANDEX_MAPS_API_KEY", "") or "",
+        "court_has_coords": court.latitude is not None and court.longitude is not None,
     }
     return render(request, "courts/detail.html", context)
 

@@ -4,12 +4,37 @@ Courts admin configuration.
 
 import logging
 
+from django.conf import settings
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
+from .geocoder import geocode_address
 from .models import Court, CourtApplication, CourtApplicationStatus, CourtRating
 
 logger = logging.getLogger(__name__)
+
+
+def _get_geocoder_api_key() -> str:
+    """API-ключ для Geocoder: отдельный или общий с картами."""
+    return getattr(settings, "YANDEX_GEOCODER_API_KEY", None) or getattr(
+        settings, "YANDEX_MAPS_API_KEY", ""
+    )
+
+
+def _geocode_court(court: Court) -> bool:
+    """Получить координаты корта по адресу. Возвращает True, если координаты установлены."""
+    api_key = _get_geocoder_api_key()
+    if not api_key:
+        return False
+    full_address = f"{court.city}, {court.address}".strip(", ")
+    if not full_address.replace(",", "").strip():
+        return False
+    lat, lon = geocode_address(full_address, api_key=api_key)
+    if lat is None or lon is None:
+        return False
+    court.latitude = lat
+    court.longitude = lon
+    return True
 
 
 @admin.register(Court)
@@ -29,16 +54,58 @@ class CourtAdmin(admin.ModelAdmin):
     search_fields = ("name", "address")
     list_editable = ("is_active",)
     prepopulated_fields = {"slug": ("name",)}
+    actions = ["geocode_selected_courts"]
 
     fieldsets = (
         (None, {"fields": ("name", "slug", "city", "address", "district", "description")}),
         ("Характеристики", {"fields": ("surface", "courts_count", "has_lighting", "is_indoor")}),
         ("Особенности", {"fields": ("sells_balls", "sells_water", "multiple_payment_methods")}),
         ("Контакты", {"fields": ("phone", "whatsapp", "website")}),
-        ("Карта", {"fields": ("latitude", "longitude")}),
+        ("Карта", {
+            "fields": ("latitude", "longitude"),
+            "description": "Координаты подставляются автоматически по адресу при сохранении (если задан YANDEX_GEOCODER_API_KEY или YANDEX_MAPS_API_KEY). Либо укажите вручную или используйте действие «Получить координаты по адресу» в списке кортов.",
+        }),
         ("Цена и фото", {"fields": ("price_per_hour", "image")}),
         ("Статус", {"fields": ("is_active",)}),
     )
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # Автогеокодирование: если адрес есть, а координат нет — запросить по API
+        if obj.address and (obj.latitude is None or obj.longitude is None):
+            if _geocode_court(obj):
+                obj.save(update_fields=["latitude", "longitude"])
+                self.message_user(
+                    request,
+                    "Координаты получены по адресу и сохранены.",
+                    messages.SUCCESS,
+                )
+            elif _get_geocoder_api_key():
+                self.message_user(
+                    request,
+                    "Не удалось получить координаты по адресу. Проверьте адрес или укажите координаты вручную.",
+                    messages.WARNING,
+                )
+
+    @admin.action(description="Получить координаты по адресу")
+    def geocode_selected_courts(self, request, queryset):
+        api_key = _get_geocoder_api_key()
+        if not api_key:
+            self.message_user(
+                request,
+                "Укажите YANDEX_GEOCODER_API_KEY или YANDEX_MAPS_API_KEY в настройках.",
+                messages.ERROR,
+            )
+            return
+        ok = 0
+        for court in queryset:
+            if court.address and _geocode_court(court):
+                court.save(update_fields=["latitude", "longitude"])
+                ok += 1
+        if ok:
+            messages.success(request, f"Координаты получены для {ok} кортов.")
+        else:
+            messages.warning(request, "Не удалось получить координаты (проверьте адреса или ключ API).")
 
 
 @admin.action(description="Одобрить и добавить корт на сайт")

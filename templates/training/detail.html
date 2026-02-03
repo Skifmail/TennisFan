@@ -18,8 +18,7 @@
             <div class="d-flex gap-1 mb-2">
                 <span class="player-category">{{ training.get_training_type_display }}</span>
                 <span class="player-category"
-                    style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{
-                    training.get_skill_level_display }}</span>
+                    style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ training.get_skill_level_display }}</span>
             </div>
 
             <h1 style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);">{{ training.title }}</h1>
@@ -44,8 +43,7 @@
             <div class="card" style="position: sticky; top: 100px;">
                 <div class="card-body">
                     {% if training.price %}
-                    <div class="text-primary mb-3" style="font-size: var(--font-size-2xl); font-weight: 800;">{{
-                        training.price }} ₽</div>
+                    <div class="text-primary mb-3" style="font-size: var(--font-size-2xl); font-weight: 800;">{{ training.price }} ₽</div>
                     {% endif %}
 
                     <div class="mb-3">

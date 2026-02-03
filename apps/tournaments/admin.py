@@ -60,6 +60,7 @@ class TournamentTeamInline(admin.TabularInline):
     raw_id_fields = ("player1", "player2")
     verbose_name = "Команда"
     verbose_name_plural = "Команды"
+    classes = ("variant-doubles-only",)  # для JS: скрывать при варианте «Одиночный»
 
 
 @admin.register(Tournament)
@@ -127,7 +128,8 @@ class TournamentAdmin(admin.ModelAdmin):
                     "match_days_per_round",
                     "participants",
                 ),
-                "classes": ("format-fan-section", "format-round-robin-section"),
+                # Общие поля показываются при FAN и при Круговом (в JS — .format-common-section).
+                "classes": ("format-common-section",),
             },
         ),
         (
@@ -167,6 +169,7 @@ class TournamentAdmin(admin.ModelAdmin):
         return super().formfield_for_choice_field(db_field, request, **kwargs)
 
     class Media:
+        css = {"all": ("css/admin_tournament.css",)}
         js = ("js/admin_tournament.js",)
 
 

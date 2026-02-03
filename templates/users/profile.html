@@ -4,26 +4,32 @@
 {% block title %}{{ player }} - Профиль{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top: var(--spacing-2xl);">
-    <!-- Profile Card -->
-    <div class="card profile-card">
-            {% if player.paid_subscription_tier %}
-            <div class="subscription-badge-wrap subscription-badge-wrap--card">
-                {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
-            </div>
-            {% endif %}
-            <div class="card-body text-center">
-                {% if player.avatar %}
-                <img src="{{ player.avatar.url }}" alt="" class="player-avatar"
-                    style="width: 120px; height: 120px; margin: 0 auto var(--spacing-lg);">
-                {% else %}
-                <div class="player-avatar" style="width: 120px; height: 120px; margin: 0 auto var(--spacing-lg);"></div>
-                {% endif %}
+<div class="container container--profile" style="padding-top: var(--spacing-2xl);">
+    <!-- Profile Card: full width, left info + right charts -->
+    <div class="card profile-card profile-card--wide">
+        {% if player.paid_subscription_tier %}
+        <div class="subscription-badge-wrap subscription-badge-wrap--card">
+            {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
+        </div>
+        {% endif %}
 
-                <h1 style="font-size: var(--font-size-xl); margin-bottom: var(--spacing-sm);">{{ player }}</h1>
-                <span class="player-category">{{ player.get_skill_level_display }}</span>
+        <div class="card-body">
+        <div class="profile-card__inner">
+            <!-- Left: player info -->
+            <div class="profile-info">
+                <div class="profile-info__header">
+                    {% if player.avatar %}
+                    <img src="{{ player.avatar.url }}" alt="" class="player-avatar profile-info__avatar">
+                    {% else %}
+                    <div class="player-avatar profile-info__avatar"></div>
+                    {% endif %}
+                    <div class="profile-info__title">
+                        <h1 class="profile-info__name">{{ player }}</h1>
+                        <span class="player-category">{{ player.get_skill_level_display }}</span>
+                    </div>
+                </div>
 
-                <div class="mt-3 text-secondary" style="font-size: var(--font-size-sm);">
+                <div class="profile-info__details text-secondary">
                     {% if request.user == player.user %}
                     <p><strong>Ваш ID в системе:</strong> <code>{{ player.id }}</code></p>
                     {% endif %}
@@ -35,7 +41,7 @@
                     <p><strong>Forehand:</strong> {{ player.get_forehand_display }}</p>
                 </div>
 
-                <div class="player-stats mt-3" style="justify-content: center;">
+                <div class="player-stats profile-info__stats">
                     <div>
                         <div class="stat-value">{{ player.total_points }}</div>
                         <div class="stat-label">Очков</div>
@@ -51,117 +57,141 @@
                 </div>
 
                 {% if player.bio %}
-                <p class="mt-3 text-secondary" style="font-size: var(--font-size-sm);">{{ player.bio }}</p>
+                <p class="profile-info__bio text-secondary">{{ player.bio }}</p>
                 {% endif %}
 
                 {% if player.telegram_url or player.whatsapp_url or player.max_url %}
-                <div class="mt-3">
+                <div class="profile-info__messengers">
                     {% include 'includes/messenger_links.html' with obj=player %}
                 </div>
                 {% endif %}
 
                 {% if request.user == player.user %}
-                    {% if player.user.subscription %}
-                    <div class="subscription-info mt-3" style="text-align: left; background: var(--color-bg-secondary); padding: var(--spacing-sm); border-radius: var(--border-radius-md); font-size: 0.9em; border: 1px solid var(--color-border);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                            <span style="color: var(--color-text-muted);">Тариф:</span>
-                            <strong style="color: var(--color-primary);">{{ player.user.subscription.tier.get_name_display }}</strong>
-                        </div>
-                        
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                            <span style="color: var(--color-text-muted);">Статус:</span>
-                            {% if player.user.subscription.is_valid %}
-                                <span class="badge badge-success" style="background-color: var(--color-success); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">Активна</span>
-                            {% else %}
-                                <span class="badge badge-danger" style="background-color: var(--color-error); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">Истекла</span>
-                            {% endif %}
-                        </div>
-
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                            <span style="color: var(--color-text-muted);">Истекает:</span>
-                            <span>{{ player.user.subscription.end_date|date:"d.m.Y" }}</span>
-                        </div>
-
-                        {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.is_valid %}
-                        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-border-light);">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                                <span style="color: var(--color-text-muted);">Лимит:</span>
-                                <span>{{ player.user.subscription.tournaments_registered_count }} / {{ player.user.subscription.tier.max_tournaments }}</span>
-                            </div>
-                            <div style="background: var(--color-border-light); height: 4px; border-radius: 2px; overflow: hidden;">
-                                <div style="background: var(--color-primary); height: 100%; width: {% widthratio player.user.subscription.tournaments_registered_count player.user.subscription.tier.max_tournaments 100 %}%;"></div>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        {% if not player.user.subscription.is_valid %}
-                            <a href="{% url 'pricing' %}" class="btn btn-sm btn-outline mt-2" style="width: 100%;">Продлить</a>
+                {% if player.user.subscription %}
+                <div class="subscription-info profile-info__subscription">
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Тариф:</span>
+                        <strong class="subscription-info__value">{{ player.user.subscription.tier.get_name_display }}</strong>
+                    </div>
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Статус:</span>
+                        {% if player.user.subscription.is_valid %}
+                        <span class="badge badge-success">Активна</span>
+                        {% else %}
+                        <span class="badge badge-danger">Истекла</span>
                         {% endif %}
                     </div>
-                    {% else %}
-                     <div class="alert alert-warning mt-3" style="font-size: var(--font-size-sm); text-align: left;">
-                        У вас нет активной платной подписки. <a href="{% url 'pricing' %}">Купить</a>
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Истекает:</span>
+                        <span>{{ player.user.subscription.end_date|date:"d.m.Y" }}</span>
+                    </div>
+                    {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.is_valid %}
+                    <div class="subscription-info__limit">
+                        <div class="subscription-info__row">
+                            <span class="subscription-info__label">Лимит:</span>
+                            <span>{{ player.user.subscription.tournaments_registered_count }} / {{ player.user.subscription.tier.max_tournaments }}</span>
+                        </div>
+                        <div class="subscription-info__bar">
+                            <div class="subscription-info__bar-fill" data-width-pct="{{ subscription_usage_percent }}"></div>
+                        </div>
                     </div>
                     {% endif %}
-                <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3" style="width: 100%;">Редактировать</a>
+                    {% if not player.user.subscription.is_valid %}
+                    <a href="{% url 'pricing' %}" class="btn btn-sm btn-outline mt-2" style="width: 100%;">Продлить</a>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning profile-info__subscription-alert">
+                    У вас нет активной платной подписки. <a href="{% url 'pricing' %}">Купить</a>
+                </div>
                 {% endif %}
-                {% if request.user == player.user %}
-                <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2" style="width: 100%;">Пройти NTRP тест</a>
+                <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3 profile-info__btn-edit">Редактировать</a>
+                <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2 profile-info__btn-ntrp">Пройти NTRP тест</a>
                 {% endif %}
             </div>
+
+            <!-- Right: progress charts -->
+            <div class="profile-charts">
+                <div class="profile-charts__header">
+                    <h3 class="profile-charts__title">Прогресс</h3>
+                    <select id="profileProgressYear" class="profile-charts__year-select" aria-label="Год">
+                        <option value="">Все годы</option>
+                    </select>
+                </div>
+                <div class="profile-chart profile-chart--points">
+                    <div class="profile-chart__label">Очки</div>
+                    <div class="profile-chart__canvas-wrap">
+                        <canvas id="chartProfilePoints" aria-label="График очков"></canvas>
+                    </div>
+                </div>
+                <div class="profile-chart profile-chart--matches">
+                    <div class="profile-chart__label">Матчей</div>
+                    <div class="profile-chart__canvas-wrap">
+                        <canvas id="chartProfileMatches" aria-label="График матчей"></canvas>
+                    </div>
+                </div>
+                <div class="profile-chart profile-chart--winrate">
+                    <div class="profile-chart__label">% побед</div>
+                    <div class="profile-chart__canvas-wrap">
+                        <canvas id="chartProfileWinRate" aria-label="График процента побед"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
     </div>
 
     <!-- Recent Matches -->
-    <div>
+    <div class="profile-section">
         <h2 class="section-title mb-3">Последние матчи</h2>
         <div class="grid grid-2">
-                {% for match in recent_matches %}
-                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
-                    <div class="match-header">
-                        <span class="match-tournament">{{ match.tournament.name }}</span>
-                        <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y" }}</span>
-                    </div>
-                    <div class="match-score-table-wrap">
-                        <table class="match-score-table">
-                            <thead>
-                                <tr>
-                                    <th>Игрок</th>
-                                    <th>Сет 1</th>
-                                    <th>Сет 2</th>
-                                    <th>Сет 3</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr class="{% if match.winner == match.player1 %}winner-row{% endif %}">
-                                    <td class="player-cell">
-                                        <span class="player-name">{{ match.player1 }}</span>
-                                        {% if match.winner == match.player1 %}
-                                            {% if match.status == 'completed' or match.status == 'walkover' %}
-                                            <span class="win-badge">WIN</span>
-                                            {% endif %}
+            {% for match in recent_matches %}
+            <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
+                <div class="match-header">
+                    <span class="match-tournament">{{ match.tournament.name }}</span>
+                    <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y" }}</span>
+                </div>
+                <div class="match-score-table-wrap">
+                    <table class="match-score-table">
+                        <thead>
+                            <tr>
+                                <th>Игрок</th>
+                                <th>Сет 1</th>
+                                <th>Сет 2</th>
+                                <th>Сет 3</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="{% if match.winner == match.player1 %}winner-row{% endif %}">
+                                <td class="player-cell">
+                                    <span class="player-name">{{ match.get_player1_display }}</span>
+                                    {% if match.winner == match.player1 or match.winner_team == match.team1 %}
+                                        {% if match.status == 'completed' or match.status == 'walkover' %}
+                                        <span class="win-badge">WIN</span>
                                         {% endif %}
-                                    </td>
-                                    <td>{{ match.player1_set1|default:"—" }}</td>
-                                    <td>{{ match.player1_set2|default:"—" }}</td>
-                                    <td>{{ match.player1_set3|default:"—" }}</td>
-                                </tr>
-                                <tr class="{% if match.winner == match.player2 %}winner-row{% endif %}">
-                                    <td class="player-cell">
-                                        <span class="player-name">{{ match.player2 }}</span>
-                                        {% if match.winner == match.player2 %}
-                                            {% if match.status == 'completed' or match.status == 'walkover' %}
-                                            <span class="win-badge">WIN</span>
-                                            {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ match.player1_set1|default:"—" }}</td>
+                                <td>{{ match.player1_set2|default:"—" }}</td>
+                                <td>{{ match.player1_set3|default:"—" }}</td>
+                            </tr>
+                            <tr class="{% if match.winner == match.player2 %}winner-row{% endif %}">
+                                <td class="player-cell">
+                                    <span class="player-name">{{ match.get_player2_display }}</span>
+                                    {% if match.winner == match.player2 or match.winner_team == match.team2 %}
+                                        {% if match.status == 'completed' or match.status == 'walkover' %}
+                                        <span class="win-badge">WIN</span>
                                         {% endif %}
-                                    </td>
-                                    <td>{{ match.player2_set1|default:"—" }}</td>
-                                    <td>{{ match.player2_set2|default:"—" }}</td>
-                                    <td>{{ match.player2_set3|default:"—" }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </a>
+                                    {% endif %}
+                                </td>
+                                <td>{{ match.player2_set1|default:"—" }}</td>
+                                <td>{{ match.player2_set2|default:"—" }}</td>
+                                <td>{{ match.player2_set3|default:"—" }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </a>
             {% empty %}
             <p class="text-secondary">Нет матчей.</p>
             {% endfor %}
@@ -169,12 +199,145 @@
     </div>
 </div>
 
-<style>
-@media (max-width: 768px) {
-    .container > .card {
-        max-width: 100%;
-    }
-}
-</style>
+<script>
+document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
+    var p = el.getAttribute('data-width-pct');
+    if (p !== null && p !== '') el.style.width = p + '%';
+});
+</script>
+{{ profile_progress_data|json_script:"profile-progress-data" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    var el = document.getElementById('profile-progress-data');
+    if (!el || !el.textContent) return;
+    var progressData = JSON.parse(el.textContent);
+    if (!progressData.length) return;
 
+    function formatDateLabel(iso) {
+        var parts = iso.split('-');
+        if (parts.length === 3) return parts[2] + '.' + parts[1] + '.' + parts[0];
+        return iso;
+    }
+
+    var years = [];
+    progressData.forEach(function(d) {
+        var y = d.date && d.date.substring(0, 4);
+        if (y && years.indexOf(y) === -1) years.push(y);
+    });
+    years.sort();
+    var yearSelect = document.getElementById('profileProgressYear');
+    if (yearSelect) {
+        years.forEach(function(y) { yearSelect.appendChild(new Option(y, y)); });
+    }
+
+    function filterByYear(data, year) {
+        if (!year) return data;
+        return data.filter(function(d) { return d.date && d.date.substring(0, 4) === year; });
+    }
+
+    function buildChartOptions(valueLabel, valueSuffix) {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: function(items) {
+                            if (items.length && items[0].label) return formatDateLabel(items[0].label);
+                            return '';
+                        },
+                        label: function(context) {
+                            var v = context.parsed.y;
+                            return valueLabel + ': ' + v + (valueSuffix || '');
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { display: true, ticks: { maxTicksLimit: 8, maxRotation: 45 } },
+                y: { display: true, beginAtZero: true }
+            }
+        };
+    }
+
+    var lineDataset = {
+        borderColor: 'var(--color-primary, #2563eb)',
+        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointHoverRadius: 6
+    };
+
+    var charts = { points: null, matches: null, winrate: null };
+
+    function updateCharts(selectedYear) {
+        var data = filterByYear(progressData, selectedYear);
+        if (!data.length) data = progressData;
+        var labels = data.map(function(d) { return d.date; });
+        var pointsData = data.map(function(d) { return d.points; });
+        var matchesData = data.map(function(d) { return d.matches; });
+        var winRateData = data.map(function(d) { return d.win_rate; });
+
+        var chartOpts = buildChartOptions('Очков', '');
+        var winRateOpts = buildChartOptions('% побед', '%');
+        winRateOpts.scales = { x: chartOpts.scales.x, y: { display: true, beginAtZero: true, max: 100 } };
+
+        if (charts.points && document.getElementById('chartProfilePoints')) {
+            charts.points.data.labels = labels;
+            charts.points.data.datasets[0].data = pointsData;
+            charts.points.update('none');
+        }
+        if (charts.matches && document.getElementById('chartProfileMatches')) {
+            charts.matches.data.labels = labels;
+            charts.matches.data.datasets[0].data = matchesData;
+            charts.matches.update('none');
+        }
+        if (charts.winrate && document.getElementById('chartProfileWinRate')) {
+            charts.winrate.data.labels = labels;
+            charts.winrate.data.datasets[0].data = winRateData;
+            charts.winrate.update('none');
+        }
+    }
+
+    if (document.getElementById('chartProfilePoints')) {
+        var labels0 = progressData.map(function(d) { return d.date; });
+        var pts0 = progressData.map(function(d) { return d.points; });
+        charts.points = new Chart(document.getElementById('chartProfilePoints'), {
+            type: 'line',
+            options: buildChartOptions('Очков', ''),
+            data: { labels: labels0, datasets: [{ ...lineDataset, data: pts0 }] }
+        });
+    }
+    if (document.getElementById('chartProfileMatches')) {
+        var labels0 = progressData.map(function(d) { return d.date; });
+        var m0 = progressData.map(function(d) { return d.matches; });
+        charts.matches = new Chart(document.getElementById('chartProfileMatches'), {
+            type: 'line',
+            options: buildChartOptions('Матчей', ''),
+            data: { labels: labels0, datasets: [{ ...lineDataset, data: m0 }] }
+        });
+    }
+    if (document.getElementById('chartProfileWinRate')) {
+        var labels0 = progressData.map(function(d) { return d.date; });
+        var wr0 = progressData.map(function(d) { return d.win_rate; });
+        var winRateOpts = buildChartOptions('% побед', '%');
+        winRateOpts.scales = { x: winRateOpts.scales.x, y: { display: true, beginAtZero: true, max: 100 } };
+        charts.winrate = new Chart(document.getElementById('chartProfileWinRate'), {
+            type: 'line',
+            options: winRateOpts,
+            data: {
+                labels: labels0,
+                datasets: [{ ...lineDataset, borderColor: 'var(--color-success, #16a34a)', backgroundColor: 'rgba(22, 163, 74, 0.1)', data: wr0 }]
+            }
+        });
+    }
+
+    if (yearSelect) {
+        yearSelect.addEventListener('change', function() { updateCharts(this.value || null); });
+    }
+})();
+</script>
 {% endblock %}

@@ -93,7 +93,7 @@ class Tournament(models.Model):
         max_length=20,
         choices=TournamentFormat.choices,
         default=TournamentFormat.SINGLE_ELIMINATION,
-        help_text="FAN: одноэтапная сетка, посев по рейтингу, очки при вылете.",
+        help_text="FAN: одноэтапная сетка, посев по рейтингу, очки при вылете. \nКруговой: все играют со всеми, итоговая таблица по очкам.",
     )
     variant = models.CharField(
         "Вариант",

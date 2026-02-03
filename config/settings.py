@@ -205,8 +205,11 @@ YANDEX_MAPS_API_KEY = os.environ.get('YANDEX_MAPS_API_KEY', '')
 
 # Yandex Geocoder API — получение координат по адресу при сохранении корта в админке.
 # Можно использовать тот же ключ, что и для карт, или отдельный (в .env: YANDEX_GEOCODER_API_KEY).
-# В кабинете разработчика нужно подключить «Геокодер» к ключу.
+# В кабинете разработчика: подключить к ключу API «Геокодер».
+# Если у ключа включено «Ограничение по HTTP Referer», укажите тот же домен в YANDEX_GEOCODER_REFERER
+# (например https://tennisfan.ru или http://localhost:8000 для локальной разработки).
 YANDEX_GEOCODER_API_KEY = os.environ.get('YANDEX_GEOCODER_API_KEY', '')
+YANDEX_GEOCODER_REFERER = os.environ.get('YANDEX_GEOCODER_REFERER', '')
 
 # Cron: FAN-турниры — формирование сетки по дедлайну, обработка просроченных матчей
 CRONJOBS = [

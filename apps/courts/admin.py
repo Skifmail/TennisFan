@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .geocoder import geocode_address
+from .geocoder import geocode_address, _normalize_address_for_geocode
 from .models import Court, CourtApplication, CourtApplicationStatus, CourtRating
 
 logger = logging.getLogger(__name__)
@@ -21,15 +21,24 @@ def _get_geocoder_api_key() -> str:
     )
 
 
+def _get_geocoder_referer() -> str:
+    """Referer для запросов к Yandex Geocoder (если у ключа ограничение по Referer)."""
+    return getattr(settings, "YANDEX_GEOCODER_REFERER", "") or ""
+
+
 def _geocode_court(court: Court) -> bool:
-    """Получить координаты корта по адресу. Возвращает True, если координаты установлены."""
-    api_key = _get_geocoder_api_key()
-    if not api_key:
-        return False
-    full_address = f"{court.city}, {court.address}".strip(", ")
+    """Получить координаты корта по адресу через Yandex Geocoder. Возвращает True, если координаты установлены."""
+    full_address = _normalize_address_for_geocode(court.city or "", court.address or "")
     if not full_address.replace(",", "").strip():
         return False
-    lat, lon = geocode_address(full_address, api_key=api_key)
+    api_key = _get_geocoder_api_key()
+    referer = _get_geocoder_referer()
+    lat, lon = geocode_address(
+        full_address,
+        api_key=api_key or "",
+        referer=referer or None,
+        hint_city=(court.city or "").strip() or None,
+    )
     if lat is None or lon is None:
         return False
     court.latitude = lat
@@ -57,13 +66,19 @@ class CourtAdmin(admin.ModelAdmin):
     actions = ["geocode_selected_courts"]
 
     fieldsets = (
-        (None, {"fields": ("name", "slug", "city", "address", "district", "description")}),
+        (
+            None,
+            {
+                "fields": ("name", "slug", "city", "address", "district", "description"),
+                "description": "Для точной метки на карте: в «Город» — только название города (например: Сочи). В «Адрес» — улица и номер дома (например: Курортный проспект, 45). Не дублируйте город в поле «Адрес».",
+            },
+        ),
         ("Характеристики", {"fields": ("surface", "courts_count", "has_lighting", "is_indoor")}),
         ("Особенности", {"fields": ("sells_balls", "sells_water", "multiple_payment_methods")}),
         ("Контакты", {"fields": ("phone", "whatsapp", "website")}),
         ("Карта", {
             "fields": ("latitude", "longitude"),
-            "description": "Координаты подставляются автоматически по адресу при сохранении (если задан YANDEX_GEOCODER_API_KEY или YANDEX_MAPS_API_KEY). Либо укажите вручную или используйте действие «Получить координаты по адресу» в списке кортов.",
+            "description": "Координаты подставляются по адресу при сохранении (Yandex Geocoder). Либо укажите вручную или действие «Получить координаты по адресу» в списке кортов.",
         }),
         ("Цена и фото", {"fields": ("price_per_hour", "image")}),
         ("Статус", {"fields": ("is_active",)}),
@@ -80,7 +95,7 @@ class CourtAdmin(admin.ModelAdmin):
                     "Координаты получены по адресу и сохранены.",
                     messages.SUCCESS,
                 )
-            elif _get_geocoder_api_key():
+            else:
                 self.message_user(
                     request,
                     "Не удалось получить координаты по адресу. Проверьте адрес или укажите координаты вручную.",
@@ -89,14 +104,6 @@ class CourtAdmin(admin.ModelAdmin):
 
     @admin.action(description="Получить координаты по адресу")
     def geocode_selected_courts(self, request, queryset):
-        api_key = _get_geocoder_api_key()
-        if not api_key:
-            self.message_user(
-                request,
-                "Укажите YANDEX_GEOCODER_API_KEY или YANDEX_MAPS_API_KEY в настройках.",
-                messages.ERROR,
-            )
-            return
         ok = 0
         for court in queryset:
             if court.address and _geocode_court(court):

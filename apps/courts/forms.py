@@ -4,7 +4,18 @@ Courts forms.
 
 from django import forms
 
-from .models import CourtApplication
+from .models import CourtApplication, CourtRating
+
+
+class CourtRatingForm(forms.ModelForm):
+    """Форма оценки корта (1–5 звёзд). Только для авторизованных пользователей."""
+
+    class Meta:
+        model = CourtRating
+        fields = ("score",)
+        widgets = {
+            "score": forms.RadioSelect(choices=[(i, str(i)) for i in range(1, 6)]),
+        }
 
 
 class CourtApplicationForm(forms.ModelForm):

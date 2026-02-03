@@ -7,7 +7,7 @@ import logging
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .models import Court, CourtApplication, CourtApplicationStatus
+from .models import Court, CourtApplication, CourtApplicationStatus, CourtRating
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +31,9 @@ class CourtAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
 
     fieldsets = (
-        (None, {"fields": ("name", "slug", "city", "address", "description")}),
+        (None, {"fields": ("name", "slug", "city", "address", "district", "description")}),
         ("Характеристики", {"fields": ("surface", "courts_count", "has_lighting", "is_indoor")}),
+        ("Особенности", {"fields": ("sells_balls", "sells_water", "multiple_payment_methods")}),
         ("Контакты", {"fields": ("phone", "whatsapp", "website")}),
         ("Карта", {"fields": ("latitude", "longitude")}),
         ("Цена и фото", {"fields": ("price_per_hour", "image")}),
@@ -124,3 +125,11 @@ class CourtApplicationAdmin(admin.ModelAdmin):
         )
 
     court_link.short_description = "Корт на сайте"
+
+
+@admin.register(CourtRating)
+class CourtRatingAdmin(admin.ModelAdmin):
+    list_display = ("court", "user", "score", "updated_at")
+    list_filter = ("score",)
+    search_fields = ("court__name", "user__email")
+    raw_id_fields = ("court", "user")

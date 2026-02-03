@@ -40,9 +40,16 @@
                     <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">Крытый</span>
                     {% endif %}
                 </div>
-                {% if court.price_per_hour %}
-                <p class="text-primary mt-2" style="font-weight: 600;">{{ court.price_per_hour }} ₽/час</p>
-                {% endif %}
+                <div class="court-card__footer mt-2 d-flex justify-content-between align-items-center flex-wrap gap-1">
+                    {% if court.price_per_hour %}
+                    <span class="text-primary" style="font-weight: 600;">{{ court.price_per_hour }} ₽/час</span>
+                    {% else %}
+                    <span></span>
+                    {% endif %}
+                    <span class="court-card__stars">
+                        {% include "courts/_star_rating.html" with rating_percent=court.rating_percent rating_count=court.rating_count average_rating=court.average_rating size="sm" show_count=False %}
+                    </span>
+                </div>
             </div>
         </a>
         {% empty %}

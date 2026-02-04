@@ -5,15 +5,19 @@ Content models: News, Gallery, Pages.
 from django.db import models
 from django.utils.text import slugify
 
+from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
-class News(models.Model):
+
+class News(CompressImageFieldsMixin, models.Model):
     """News article model."""
 
     title = models.CharField("Заголовок", max_length=200)
     slug = models.SlugField("URL", unique=True, blank=True)
     excerpt = models.CharField("Краткое описание", max_length=300, blank=True)
     content = models.TextField("Содержание")
-    image = models.ImageField("Изображение", upload_to="news/", blank=True)
+    image = models.ImageField(
+        "Изображение", upload_to="news/", blank=True, validators=[validate_image_max_2mb]
+    )
 
     is_published = models.BooleanField("Опубликовано", default=True)
     is_featured = models.BooleanField("На главной", default=False)
@@ -38,13 +42,42 @@ class News(models.Model):
         super().save(*args, **kwargs)
 
 
-class Gallery(models.Model):
+class NewsPhoto(CompressImageFieldsMixin, models.Model):
+    """Фото в галерее новости (дополнительные изображения к статье)."""
+
+    news = models.ForeignKey(
+        News,
+        on_delete=models.CASCADE,
+        related_name="photos",
+        verbose_name="Новость",
+    )
+    image = models.ImageField(
+        "Фото", upload_to="news/gallery/", validators=[validate_image_max_2mb]
+    )
+    caption = models.CharField("Подпись", max_length=200, blank=True)
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+
+    class Meta:
+        verbose_name = "Фото новости"
+        verbose_name_plural = "Фото новостей"
+        ordering = ["order", "id"]
+
+    def __str__(self) -> str:
+        return f"Фото {self.id} к новости «{self.news.title}»"
+
+
+class Gallery(CompressImageFieldsMixin, models.Model):
     """Photo gallery model."""
 
     title = models.CharField("Название", max_length=200)
     slug = models.SlugField("URL", unique=True, blank=True)
     description = models.TextField("Описание", blank=True)
-    cover_image = models.ImageField("Обложка", upload_to="galleries/covers/", blank=True)
+    cover_image = models.ImageField(
+        "Обложка",
+        upload_to="galleries/covers/",
+        blank=True,
+        validators=[validate_image_max_2mb],
+    )
 
     tournament = models.ForeignKey(
         "tournaments.Tournament",
@@ -76,13 +109,15 @@ class Gallery(models.Model):
         return self.photos.count()
 
 
-class Photo(models.Model):
+class Photo(CompressImageFieldsMixin, models.Model):
     """Photo in a gallery."""
 
     gallery = models.ForeignKey(
         Gallery, on_delete=models.CASCADE, related_name="photos", verbose_name="Галерея"
     )
-    image = models.ImageField("Фото", upload_to="galleries/photos/")
+    image = models.ImageField(
+        "Фото", upload_to="galleries/photos/", validators=[validate_image_max_2mb]
+    )
     caption = models.CharField("Подпись", max_length=200, blank=True)
     order = models.PositiveSmallIntegerField("Порядок", default=0)
 
@@ -97,14 +132,16 @@ class Photo(models.Model):
         return f"Фото {self.id} в {self.gallery}"
 
 
-class AboutUs(models.Model):
+class AboutUs(CompressImageFieldsMixin, models.Model):
     """
     Singleton model for "О нас" page.
     Заголовок "О НАС" фиксирован в шаблоне.
     """
 
     subtitle = models.CharField("Подзаголовок", max_length=300, blank=True)
-    image = models.ImageField("Фото", upload_to="about/", blank=True)
+    image = models.ImageField(
+        "Фото", upload_to="about/", blank=True, validators=[validate_image_max_2mb]
+    )
     body = models.TextField(
         "Статья",
         blank=True,
@@ -251,6 +288,32 @@ class ContactItem(models.Model):
             v = self.value.strip()
             return v if v.startswith("http") else f"https://{v}"
         return None
+
+
+class RulesSection(models.Model):
+    """
+    Редактируемый блок правил на странице «Правила».
+    slug однозначно определяет раздел (tennis_rules, rules_fan, rules_round_robin,
+    rules_doubles, site_usage_rules). body — HTML-контент для вставки в шаблон.
+    Ссылки на PDF в разделе «Правила тенниса» остаются в шаблоне и не редактируются.
+    """
+
+    slug = models.SlugField("Код раздела", max_length=50, unique=True)
+    title = models.CharField("Название (для админки)", max_length=200)
+    body = models.TextField(
+        "Содержание (HTML)",
+        blank=True,
+        help_text="HTML-разметка. Для раздела «Правила тенниса» здесь только текст без заголовка и ссылок на PDF.",
+    )
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Раздел правил"
+        verbose_name_plural = "Разделы правил"
+        ordering = ["slug"]
+
+    def __str__(self) -> str:
+        return self.title
 
 
 class Page(models.Model):

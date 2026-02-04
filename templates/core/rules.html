@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Правила{% endblock %}
 
@@ -27,7 +28,16 @@
             <div class="rules-tabs__content" id="tennis-rules" role="tabpanel">
                 <article class="rules-doc card">
                     <div class="card-body rules-doc__body">
-                        {% include 'core/rules_tennis.html' %}
+                        <h2 class="rules-doc__title">Правила тенниса</h2>
+                        <p class="rules-doc__meta rules-doc__meta--links">
+                            <a class="rules-doc__doc-link" href="{% static 'documents/2020-rules-of-tennis-english.pdf' %}" target="_blank" rel="noopener">ITF Rules of Tennis 2020 (ENG).</a>
+                            <a class="rules-doc__doc-link" href="{% static 'documents/Правила_тенниса_РФ.pdf' %}" target="_blank" rel="noopener">Правила вида спорта "Теннис". Мин.спорта РФ от «28» января 2026 г.</a>
+                        </p>
+                        {% if rules_content.tennis_rules %}
+                            {{ rules_content.tennis_rules|safe }}
+                        {% else %}
+                            {% include 'core/rules_tennis_editable.html' %}
+                        {% endif %}
                     </div>
                 </article>
             </div>
@@ -42,29 +52,49 @@
                         <button class="rules-subtabs__btn" data-subtab="round-robin" role="tab" aria-selected="false">
                             Круговой
                         </button>
+                        <button class="rules-subtabs__btn" data-subtab="olympic" role="tab" aria-selected="false">
+                            Олимпийская система
+                        </button>
                         <button class="rules-subtabs__btn" data-subtab="doubles" role="tab" aria-selected="false">
                             Парные турниры
+                        </button>
+                        <button class="rules-subtabs__btn" data-subtab="seeding" role="tab" aria-selected="false">
+                            Правила посева
                         </button>
                     </div>
 
                     <div class="rules-subtabs__content" id="fan" role="tabpanel">
                         <article class="rules-doc card">
                             <div class="card-body rules-doc__body">
-                                {% include 'core/rules_fan.html' %}
+                                {% if rules_content.rules_fan %}{{ rules_content.rules_fan|safe }}{% else %}{% include 'core/rules_fan.html' %}{% endif %}
                             </div>
                         </article>
                     </div>
                     <div class="rules-subtabs__content" id="round-robin" role="tabpanel" style="display: none;">
                         <article class="rules-doc card">
                             <div class="card-body rules-doc__body">
-                                {% include 'core/rules_round_robin.html' %}
+                                {% if rules_content.rules_round_robin %}{{ rules_content.rules_round_robin|safe }}{% else %}{% include 'core/rules_round_robin.html' %}{% endif %}
+                            </div>
+                        </article>
+                    </div>
+                    <div class="rules-subtabs__content" id="olympic" role="tabpanel" style="display: none;">
+                        <article class="rules-doc card">
+                            <div class="card-body rules-doc__body">
+                                {% if rules_content.rules_olympic %}{{ rules_content.rules_olympic|safe }}{% else %}{% include 'core/rules_olympic.html' %}{% endif %}
                             </div>
                         </article>
                     </div>
                     <div class="rules-subtabs__content" id="doubles" role="tabpanel" style="display: none;">
                         <article class="rules-doc card">
                             <div class="card-body rules-doc__body">
-                                {% include 'core/rules_doubles.html' %}
+                                {% if rules_content.rules_doubles %}{{ rules_content.rules_doubles|safe }}{% else %}{% include 'core/rules_doubles.html' %}{% endif %}
+                            </div>
+                        </article>
+                    </div>
+                    <div class="rules-subtabs__content" id="seeding" role="tabpanel" style="display: none;">
+                        <article class="rules-doc card">
+                            <div class="card-body rules-doc__body">
+                                {% if rules_content.rules_seeding %}{{ rules_content.rules_seeding|safe }}{% else %}{% include 'core/rules_seeding.html' %}{% endif %}
                             </div>
                         </article>
                     </div>
@@ -74,7 +104,7 @@
             <div class="rules-tabs__content" id="site-usage-rules" role="tabpanel" style="display: none;">
                 <article class="rules-doc card">
                     <div class="card-body rules-doc__body">
-                        {% include 'core/rules_site_usage.html' %}
+                        {% if rules_content.site_usage_rules %}{{ rules_content.site_usage_rules|safe }}{% else %}{% include 'core/rules_site_usage.html' %}{% endif %}
                     </div>
                 </article>
             </div>

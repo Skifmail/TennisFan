@@ -21,7 +21,9 @@
             </div>
             {% endif %}
             <div class="card-body">
-                <span class="player-category mb-2">{{ tournament.get_category_display }}</span>
+                {% for ac in tournament.allowed_categories.all %}
+                <span class="player-category mb-2">{{ ac.get_category_display }}</span>
+                {% endfor %}
                 <h3 class="card-title">{{ tournament.name }}</h3>
                 <p class="card-text">
                     {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}

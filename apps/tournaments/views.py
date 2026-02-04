@@ -13,7 +13,8 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .fan import _is_fan, check_and_generate_past_deadline_brackets
+from .fan import _is_fan
+from .olympic_consolation import _is_olympic
 from .round_robin import _is_round_robin, compute_standings, get_match_matrix
 from .models import Match, MatchResultProposal, Tournament, TournamentTeam, TournamentType
 
@@ -27,19 +28,112 @@ from .proposal_service import apply_proposal
 from apps.users.models import Notification, Player, SkillLevel
 
 
+def _build_bracket_standings(tournament, is_fan, is_olympic):
+    """
+    Построить турнирную таблицу для страницы турнира (FAN или Олимпийская система).
+    Возвращает список словарей с ключами place, player, team, fan_points, round_eliminated или None.
+    """
+    if not (is_fan or is_olympic):
+        return None
+    if is_olympic:
+        results_by_place = list(
+            tournament.fan_results.filter(place__isnull=False)
+            .select_related("player__user")
+            .order_by("place")
+        )
+        if not results_by_place:
+            return None
+        if tournament.is_doubles():
+            seen_places = set()
+            standings = []
+            for r in results_by_place:
+                if r.place in seen_places:
+                    continue
+                seen_places.add(r.place)
+                team = tournament.teams.filter(
+                    Q(player1=r.player) | Q(player2=r.player), player2__isnull=False
+                ).select_related("player1__user", "player2__user").first()
+                standings.append({
+                    "place": r.place,
+                    "player": team.player1 if team else r.player,
+                    "team": team,
+                    "fan_points": r.fan_points,
+                    "round_eliminated": f"Место {r.place}",
+                })
+        else:
+            standings = [
+                {
+                    "place": r.place,
+                    "player": r.player,
+                    "team": None,
+                    "fan_points": r.fan_points,
+                    "round_eliminated": f"Место {r.place}",
+                }
+                for r in results_by_place
+            ]
+        return standings
+    # FAN
+    fan_results = {}
+    for r in tournament.fan_results.select_related("player__user"):
+        fan_results[r.player_id] = r
+    if tournament.is_doubles():
+        teams = list(
+            tournament.teams.filter(player2__isnull=False)
+            .select_related("player1__user", "player2__user")
+        )
+        teams_sorted = sorted(
+            teams,
+            key=lambda t: (
+                -(fan_results.get(t.player1_id).fan_points if fan_results.get(t.player1_id) else 0),
+                -t.player1.total_points,
+            ),
+        )
+        standings = []
+        for i, team in enumerate(teams_sorted, 1):
+            fr = fan_results.get(team.player1_id)
+            standings.append({
+                "place": i,
+                "player": team.player1,
+                "team": team,
+                "fan_points": fr.fan_points if fr else 0,
+                "round_eliminated": fr.get_round_eliminated_display() if fr else "—",
+            })
+    else:
+        participants = list(tournament.participants.select_related("user").order_by("-total_points"))
+        participants_sorted = sorted(
+            participants,
+            key=lambda p: (
+                -(fan_results.get(p.id).fan_points if fan_results.get(p.id) else 0),
+                -p.total_points,
+            ),
+        )
+        standings = []
+        for i, p in enumerate(participants_sorted, 1):
+            fr = fan_results.get(p.id)
+            standings.append({
+                "place": i,
+                "player": p,
+                "team": None,
+                "fan_points": fr.fan_points if fr else 0,
+                "round_eliminated": fr.get_round_eliminated_display() if fr else "—",
+            })
+    return standings
+
+
 def tournament_list(request):
-    """List of tournaments."""
-    check_and_generate_past_deadline_brackets()
+    """List of tournaments. Формирование сеток по дедлайну выполняется по cron (generate_brackets_past_deadlines)."""
     city = request.GET.get('city', '')
     category = request.GET.get('category', '')
     status = request.GET.get('status', '')
 
-    tournaments = Tournament.objects.all().prefetch_related('participants__user')
+    tournaments = Tournament.objects.all().prefetch_related(
+        "participants__user", "allowed_categories"
+    )
 
     if city:
         tournaments = tournaments.filter(city__icontains=city)
     if category:
-        tournaments = tournaments.filter(category=category)
+        tournaments = tournaments.filter(allowed_categories__category=category).distinct()
     if status:
         tournaments = tournaments.filter(status=status)
 
@@ -67,13 +161,18 @@ def tournament_detail(request, slug):
             "matches__team2__player1__user",
             "matches__team2__player2__user",
             "participants__user",
+            "fan_results__player__user",
+            "teams__player1__user",
+            "teams__player2__user",
+            "allowed_categories",
         ),
         slug=slug,
     )
     is_fan = _is_fan(tournament)
+    is_olympic = _is_olympic(tournament)
     is_round_robin = _is_round_robin(tournament)
 
-    if is_fan:
+    if is_fan or is_olympic:
         matches = tournament.matches.order_by("is_consolation", "round_index", "round_order")
         def round_key(m):
             return (m.round_name, m.is_consolation)
@@ -84,6 +183,8 @@ def tournament_detail(request, slug):
         matrix_data = None
         matrix_rows = None
         rr_standings = None
+        # Турнирная таблица для FAN и Олимпийской системы (на странице турнира)
+        standings = _build_bracket_standings(tournament, is_fan, is_olympic)
     elif is_round_robin:
         matches = tournament.matches.filter(is_consolation=False).order_by("round_index", "round_order")
         matches_by_round = []
@@ -100,6 +201,7 @@ def tournament_detail(request, slug):
             row_cells = matrix_data[i] if i < len(matrix_data) else []
             st = standings_by_entity.get(p.id, {})
             matrix_rows.append({"participant": p, "cells": row_cells, "place": st.get("place"), "points": st.get("points")})
+        standings = None
     else:
         matches_by_round = None
         matches = tournament.matches.all().order_by("-scheduled_datetime")
@@ -107,6 +209,7 @@ def tournament_detail(request, slug):
         matrix_data = None
         matrix_rows = None
         rr_standings = None
+        standings = None
 
     if tournament.is_doubles():
         participants_qs = []
@@ -123,7 +226,7 @@ def tournament_detail(request, slug):
         participants_qs = tournament.participants.all()
         solo_teams = []
         can_join_team = False
-        if is_fan:
+        if is_fan or is_olympic:
             participants_qs = participants_qs.order_by("-total_points")
         else:
             participants_qs = participants_qs.order_by("user__last_name", "user__first_name")
@@ -142,7 +245,9 @@ def tournament_detail(request, slug):
         "matrix_data": matrix_data,
         "matrix_rows": matrix_rows,
         "rr_standings": rr_standings,
+        "standings": standings,
         "is_fan": is_fan,
+        "is_olympic": is_olympic,
         "is_round_robin": is_round_robin,
         "match_format_description": match_format_description,
         "participants": participants_qs,
@@ -156,7 +261,7 @@ def tournament_tables_list(request):
     """Страница «Турнирные таблицы» — список турниров с краткой статистикой."""
     tournaments = (
         Tournament.objects.all()
-        .prefetch_related("participants__user", "matches", "fan_results")
+        .prefetch_related("participants__user", "matches", "fan_results", "allowed_categories")
         .order_by("-start_date")
     )
     # Добавляем статистику для каждого турнира
@@ -192,10 +297,12 @@ def tournament_tables_detail(request, slug):
             "matches__team2__player2__user",
             "participants__user",
             "fan_results__player__user",
+            "allowed_categories",
         ),
         slug=slug,
     )
     is_fan = _is_fan(tournament)
+    is_olympic = _is_olympic(tournament)
     is_round_robin = _is_round_robin(tournament)
     if tournament.is_doubles():
         participants = []
@@ -221,6 +328,44 @@ def tournament_tables_detail(request, slug):
             }
             for row in standings
         ]
+    elif is_olympic:
+        # Олимпийская система: таблица по итоговому месту (place из TournamentPlayerResult)
+        results_by_place = list(
+            tournament.fan_results.filter(place__isnull=False)
+            .select_related("player__user")
+            .order_by("place")
+        )
+        if tournament.is_doubles():
+            # Парные: по одному ряду на команду (у обоих игроков одинаковые place и fan_points)
+            seen_places = set()
+            standings = []
+            for r in results_by_place:
+                if r.place in seen_places:
+                    continue
+                seen_places.add(r.place)
+                team = tournament.teams.filter(
+                    Q(player1=r.player) | Q(player2=r.player), player2__isnull=False
+                ).select_related("player1__user", "player2__user").first()
+                standings.append({
+                    "place": r.place,
+                    "player": team.player1 if team else r.player,
+                    "team": team,
+                    "fan_result": r,
+                    "fan_points": r.fan_points,
+                    "round_eliminated": f"Место {r.place}",
+                })
+        else:
+            standings = [
+                {
+                    "place": r.place,
+                    "player": r.player,
+                    "team": None,
+                    "fan_result": r,
+                    "fan_points": r.fan_points,
+                    "round_eliminated": f"Место {r.place}",
+                }
+                for r in results_by_place
+            ]
     else:
         fan_results = {}
         if is_fan:
@@ -298,6 +443,7 @@ def tournament_tables_detail(request, slug):
     context = {
         "tournament": tournament,
         "is_fan": is_fan,
+        "is_olympic": is_olympic,
         "is_round_robin": is_round_robin,
         "participants": participants,
         "standings": standings,
@@ -324,10 +470,12 @@ def tournament_tables_detail(request, slug):
 
 def champions_league(request):
     """Champions League page."""
-    tournaments = Tournament.objects.filter(
-        tournament_type=TournamentType.CHAMPIONS_LEAGUE
-    ).order_by('-start_date')
-    return render(request, 'tournaments/champions_league.html', {'tournaments': tournaments})
+    tournaments = (
+        Tournament.objects.filter(tournament_type=TournamentType.CHAMPIONS_LEAGUE)
+        .prefetch_related("allowed_categories")
+        .order_by("-start_date")
+    )
+    return render(request, "tournaments/champions_league.html", {"tournaments": tournaments})
 
 
 def match_detail(request, pk):
@@ -337,13 +485,17 @@ def match_detail(request, pk):
             "player1__user", "player2__user", "winner__user", "tournament", "court",
             "team1__player1__user", "team1__player2__user",
             "team2__player1__user", "team2__player2__user",
-        ),
+        ).prefetch_related("tournament__allowed_categories"),
         pk=pk,
     )
     return render(
         request,
         "tournaments/match_detail.html",
-        {"match": match, "is_fan": _is_fan(match.tournament)},
+        {
+            "match": match,
+            "is_fan": _is_fan(match.tournament),
+            "is_olympic": _is_olympic(match.tournament),
+        },
     )
 
 
@@ -494,7 +646,7 @@ def confirm_proposal(request, pk):
 
 
 def _check_tournament_registration_eligibility(request, tournament, player):
-    """Проверка подписки и лимитов для регистрации. Возвращает (ok, error_message)."""
+    """Проверка подписки, категории и лимитов для регистрации. Возвращает (ok, error_message)."""
     user = getattr(request, "user", None)
     if user is None:
         return False, "Требуется авторизация."
@@ -508,6 +660,22 @@ def _check_tournament_registration_eligibility(request, tournament, player):
 
     if user.is_superuser or user.is_staff:
         return True, None
+
+    allowed_categories = list(
+        tournament.allowed_categories.values_list("category", flat=True)
+    )
+    if not allowed_categories:
+        return False, "В турнире не указаны допустимые категории участников. Обратитесь к организатору."
+    if player.skill_level not in allowed_categories:
+        from apps.users.models import SkillLevel
+        allowed_labels = [SkillLevel(c).label for c in allowed_categories]
+        player_label = SkillLevel(player.skill_level).label
+        return (
+            False,
+            f"Регистрация на этот турнир разрешена только для категорий: {', '.join(allowed_labels)}. "
+            f"Ваша категория «{player_label}» не входит в список. "
+            "Если ваш уровень изменился, пройдите NTRP-тест или обратитесь в поддержку.",
+        )
 
     if tournament.is_one_day:
         return True, None  # Payment flow handles it

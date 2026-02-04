@@ -6,6 +6,8 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
 
+from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
+
 
 class UserManager(BaseUserManager):
     """Custom manager for User model."""
@@ -91,7 +93,7 @@ class SkillLevel(models.TextChoices):
     PROFESSIONAL = "professional", "Профессионал"
 
 
-class Player(models.Model):
+class Player(CompressImageFieldsMixin, models.Model):
     """Player profile extending User."""
 
     user = models.OneToOneField(
@@ -102,6 +104,7 @@ class Player(models.Model):
         upload_to="avatars/",
         blank=True,
         storage=None,  # Use default storage from settings
+        validators=[validate_image_max_2mb],
     )
     city = models.CharField("Город", max_length=100, blank=True, default="")
     ntrp_level = models.DecimalField(

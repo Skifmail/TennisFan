@@ -18,12 +18,14 @@
     <div class="grid grid-3 shop-product-grid">
         {% for product in products %}
         <div class="card shop-product-card">
-            <a href="{% url 'shop_product_detail' pk=product.pk %}" class="shop-product-card__link" style="text-decoration: none; color: inherit;">
-                {% if product.main_image %}
+            {% if product.main_image %}
+            <a href="{{ product.main_image.image.url }}" class="js-lightbox shop-product-card__image-link" data-lightbox-src="{{ product.main_image.image.url }}" data-lightbox-caption="{{ product.name }}" data-lightbox-group="shop-list" style="display: block; text-decoration: none; color: inherit;">
                 <img src="{{ product.main_image.image.url }}" alt="{{ product.name }}" class="card-image shop-product-card__image">
-                {% else %}
-                <div class="card-image shop-product-card__placeholder">Нет фото</div>
-                {% endif %}
+            </a>
+            {% else %}
+            <div class="card-image shop-product-card__placeholder">Нет фото</div>
+            {% endif %}
+            <a href="{% url 'shop_product_detail' pk=product.pk %}" class="shop-product-card__link" style="text-decoration: none; color: inherit;">
                 <div class="card-body shop-product-card__body">
                     <h3 class="card-title">{{ product.name }}</h3>
                     {% if product.size %}<p class="text-muted shop-product-card__size">Размер: {{ product.size }}</p>{% endif %}

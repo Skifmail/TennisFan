@@ -12,7 +12,9 @@
                 <div class="d-flex gap-1 flex-wrap">
                     <span class="badge" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_variant_display }}</span>
                     {% if tournament.format == 'single_elimination' %}
-                    <span class="badge" style="background: rgba(150, 98, 31, 0.2); color: var(--color-accent);">FAN</span>
+                    <span class="badge" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">FAN</span>
+                    {% elif tournament.format == 'olympic_consolation' %}
+                    <span class="badge" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">Олимпийская</span>
                     {% elif tournament.format == 'round_robin' %}
                     <span class="badge" style="background: rgba(100, 149, 237, 0.2); color: #6495ed;">Круговой</span>
                     {% if tournament.match_format %}
@@ -20,7 +22,9 @@
                     {% endif %}
                     {% endif %}
                     <span class="badge">{{ tournament.city }}</span>
-                    <span class="badge">{{ tournament.get_category_display }}</span>
+                    {% for ac in tournament.allowed_categories.all %}
+                    <span class="badge">{{ ac.get_category_display }}</span>
+                    {% endfor %}
                     <span class="badge">{{ tournament.get_gender_display }}</span>
                     <span class="badge">{{ tournament.get_duration_display }}</span>
                     {% if tournament.variant == 'doubles' and tournament.max_teams %}

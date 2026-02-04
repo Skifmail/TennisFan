@@ -186,9 +186,9 @@ def profile(request, pk):
         | Q(team1__player2=player)
         | Q(team2__player1=player)
         | Q(team2__player2=player)
-    ).select_related("tournament", "player1", "player2", "team1", "team2").order_by(
-        "-scheduled_datetime"
-    )[:10]
+    ).select_related(
+        "tournament", "player1", "player2", "winner", "team1", "team2", "winner_team"
+    ).order_by("-scheduled_datetime")[:10]
 
     progress_data = _get_profile_progress_data(player)
 

@@ -11,7 +11,7 @@
     <div class="card" style="max-width: 700px; margin: 0 auto;">
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <div class="text-center mb-4">
-                <span class="player-category">{{ match.tournament.get_category_display }}{% if match.round_name %} · {{ match.round_name }}{% endif %}</span>
+                <span class="player-category">{% for ac in match.tournament.allowed_categories.all %}{{ ac.get_category_display }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if match.round_name %} · {{ match.round_name }}{% endif %}</span>
                 <p class="text-muted mt-2">
                     {% if match.deadline %}Дедлайн: {{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}
                 </p>

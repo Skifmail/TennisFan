@@ -9,6 +9,7 @@
     "use strict";
 
     const FAN_FORMAT = "single_elimination";
+    const OLYMPIC_FORMAT = "olympic_consolation";
     const ROUND_ROBIN_FORMAT = "round_robin";
     const VARIANT_DOUBLES = "doubles";
 
@@ -33,12 +34,11 @@
     function toggleSections(selector, show) {
         const sections = document.querySelectorAll(selector);
         sections.forEach(function (section) {
-            const module = section.closest(".module");
-            if (module) {
-                module.style.display = show ? "" : "none";
-            } else {
-                section.style.display = show ? "" : "none";
-            }
+            // В Django admin fieldset имеет class "module aligned ..." или обёрнут в div.module
+            const container = section.classList.contains("module")
+                ? section
+                : section.closest(".module") || section;
+            container.style.display = show ? "" : "none";
         });
     }
 
@@ -75,10 +75,12 @@
     function updateVisibility() {
         const format = getFormatValue();
         const isFan = format === FAN_FORMAT;
+        const isOlympic = format === OLYMPIC_FORMAT;
         const isRoundRobin = format === ROUND_ROBIN_FORMAT;
-        // Общие поля — при любом выбранном формате (FAN или Круговой).
-        toggleSections(".format-common-section", isFan || isRoundRobin);
+        // Общие поля — при любом выбранном формате (FAN, Олимпийская, Круговой).
+        toggleSections(".format-common-section", isFan || isOlympic || isRoundRobin);
         toggleSections(".format-fan-section", isFan);
+        toggleSections(".format-olympic-section", isOlympic);
         toggleSections(".format-round-robin-section", isRoundRobin);
         updateVariantVisibility();
     }
@@ -90,9 +92,11 @@
         }
 
         formatSelect.addEventListener("change", updateVisibility);
+        formatSelect.addEventListener("input", updateVisibility);
         const variantSelect = getVariantSelect();
         if (variantSelect) {
             variantSelect.addEventListener("change", updateVariantVisibility);
+            variantSelect.addEventListener("input", updateVariantVisibility);
         }
         updateVisibility();
     }

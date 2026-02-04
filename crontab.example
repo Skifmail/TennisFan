@@ -1,14 +1,33 @@
-# FAN-турниры: cron-задачи (django-crontab)
+# Турниры: cron-задачи (django-crontab)
 #
-# Установить в системный crontab:
+# Установить в системный crontab (на VPS — вручную или при деплое):
 #   python manage.py crontab add
 #
-# Удалить:
+# В Procfile в release уже добавлено: crontab add (сработает на своём сервере при деплое).
+# На Railway/Heroku crontab не сохраняется — добавьте задачи в планировщик платформы (см. docs/CRON_DEPLOY.md).
+#
+# Удалить задачи:
 #   python manage.py crontab remove
 #
 # Просмотр текущих задач:
 #   python manage.py crontab show
 #
-# Задачи:
+# Задачи (настраиваются в config/settings.py, CRONJOBS):
+#
 #   */10 * * * *  — каждые 10 мин: формирование сетки по дедлайну регистрации
+#                   для всех форматов (FAN, Олимпийская система, Круговой).
+#                   Команда: generate_brackets_past_deadlines
+#
 #   0 */6 * * *   — каждые 6 часов: обработка просроченных матчей (тех. победа)
+#                   FAN: fan_process_overdue_matches
+#                   Олимпийская система: olympic_process_overdue_matches
+#
+#   */15 * * * *  — каждые 15 мин: авто-подтверждение заявок на результат матча:
+#                   если соперник не подтвердил/не отклонил в течение 6 ч — результат принимается.
+#                   Команда: auto_accept_stale_proposals
+#
+# Ручной запуск:
+#   python manage.py generate_brackets_past_deadlines
+#   python manage.py fan_process_overdue_matches
+#   python manage.py olympic_process_overdue_matches
+#   python manage.py auto_accept_stale_proposals

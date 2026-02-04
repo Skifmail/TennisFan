@@ -165,9 +165,9 @@
                             <tr class="{% if match.winner == match.player1 %}winner-row{% endif %}">
                                 <td class="player-cell">
                                     <span class="player-name">{{ match.get_player1_display }}</span>
-                                    {% if match.winner == match.player1 or match.winner_team == match.team1 %}
-                                        {% if match.status == 'completed' or match.status == 'walkover' %}
-                                        <span class="win-badge">WIN</span>
+                                    {% if match.status == 'completed' or match.status == 'walkover' %}
+                                        {% if match.team1 %}{% if match.winner_team == match.team1 %}<span class="win-badge">WIN</span>{% endif %}
+                                        {% else %}{% if match.winner == match.player1 %}<span class="win-badge">WIN</span>{% endif %}
                                         {% endif %}
                                     {% endif %}
                                 </td>
@@ -178,9 +178,9 @@
                             <tr class="{% if match.winner == match.player2 %}winner-row{% endif %}">
                                 <td class="player-cell">
                                     <span class="player-name">{{ match.get_player2_display }}</span>
-                                    {% if match.winner == match.player2 or match.winner_team == match.team2 %}
-                                        {% if match.status == 'completed' or match.status == 'walkover' %}
-                                        <span class="win-badge">WIN</span>
+                                    {% if match.status == 'completed' or match.status == 'walkover' %}
+                                        {% if match.team2 %}{% if match.winner_team == match.team2 %}<span class="win-badge">WIN</span>{% endif %}
+                                        {% else %}{% if match.winner == match.player2 %}<span class="win-badge">WIN</span>{% endif %}
                                         {% endif %}
                                     {% endif %}
                                 </td>

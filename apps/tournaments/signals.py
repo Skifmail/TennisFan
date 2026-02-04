@@ -7,6 +7,7 @@ from .fan import (
     ensure_consolation_created,
     finalize_tournament,
 )
+from .olympic_consolation import _is_olympic, advance_winner_olympic, ensure_consolation_created_for_round
 from .round_robin import _is_round_robin, check_and_finalize_if_complete
 from .models import Match, MatchResultProposal
 from .proposal_service import apply_proposal
@@ -69,6 +70,31 @@ def update_player_stats(sender, instance, created, **kwargs):
     is_doubles = t and t.is_doubles() and instance.team1_id and instance.team2_id
 
     if not winner and not winner_team:
+        return
+
+    if t and _is_olympic(t):
+        if is_doubles:
+            for p in (instance.team1.player1, instance.team1.player2) if winner_team == instance.team1 else (instance.team2.player1, instance.team2.player2):
+                if p and not getattr(p, "is_bye", False):
+                    p.matches_played += 1
+                    p.matches_won += 1
+                    p.save(update_fields=["matches_played", "matches_won"])
+            loser_team = instance.team2 if winner_team == instance.team1 else instance.team1
+            for p in (loser_team.player1, loser_team.player2):
+                if p and not getattr(p, "is_bye", False):
+                    p.matches_played += 1
+                    p.save(update_fields=["matches_played"])
+        else:
+            winner.matches_played += 1
+            winner.matches_won += 1
+            winner.save(update_fields=["matches_played", "matches_won"])
+            loser = instance.player2 if winner == instance.player1 else instance.player1
+            if not getattr(loser, "is_bye", False):
+                loser.matches_played += 1
+                loser.save(update_fields=["matches_played"])
+        advance_winner_olympic(instance)
+        if instance.round_index >= 1 and not instance.is_consolation:
+            ensure_consolation_created_for_round(t, instance.round_index)
         return
 
     if t and _is_fan(t):

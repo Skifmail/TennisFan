@@ -211,8 +211,11 @@ YANDEX_MAPS_API_KEY = os.environ.get('YANDEX_MAPS_API_KEY', '')
 YANDEX_GEOCODER_API_KEY = os.environ.get('YANDEX_GEOCODER_API_KEY', '')
 YANDEX_GEOCODER_REFERER = os.environ.get('YANDEX_GEOCODER_REFERER', '')
 
-# Cron: FAN-турниры — формирование сетки по дедлайну, обработка просроченных матчей
+# Cron: формирование сеток по дедлайну (FAN, Олимпийская, Круговой), обработка просроченных матчей,
+# авто-подтверждение заявок на результат матча (6 ч без ответа = подтверждено)
 CRONJOBS = [
-    ('*/10 * * * *', 'django.core.management.call_command', ['fan_generate_past_deadlines']),
+    ('*/10 * * * *', 'django.core.management.call_command', ['generate_brackets_past_deadlines']),
     ('0 */6 * * *', 'django.core.management.call_command', ['fan_process_overdue_matches']),
+    ('0 */6 * * *', 'django.core.management.call_command', ['olympic_process_overdue_matches']),
+    ('*/15 * * * *', 'django.core.management.call_command', ['auto_accept_stale_proposals']),
 ]

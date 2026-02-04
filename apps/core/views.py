@@ -2,13 +2,15 @@
 Core views - main pages.
 """
 
+import re
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import redirect, render
+from django.utils.html import linebreaks
 
-from apps.content.models import News
-from apps.tournaments.fan import check_and_generate_past_deadline_brackets
+from apps.content.models import News, RulesSection
 from apps.tournaments.models import Match, Tournament, TournamentDuration, TournamentGender, TournamentStatus
 from apps.users.models import Player, SkillLevel
 
@@ -16,15 +18,15 @@ from .forms import FeedbackForm
 
 
 def home(request):
-    """Home page view."""
-    check_and_generate_past_deadline_brackets()
+    """Home page view. Формирование сеток по дедлайну выполняется по cron (generate_brackets_past_deadlines)."""
     tournaments = Tournament.objects.filter(
         status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE]
-    ).prefetch_related('participants__user')
+    ).prefetch_related("participants__user", "allowed_categories")
 
     upcoming_tournaments = (
         Tournament.objects.filter(status=TournamentStatus.UPCOMING)
-        .order_by('start_date')[:6]
+        .prefetch_related("allowed_categories")
+        .order_by("start_date")[:6]
     )
 
     city = request.GET.get('city', '')
@@ -35,7 +37,7 @@ def home(request):
     if city:
         tournaments = tournaments.filter(city__icontains=city)
     if category:
-        tournaments = tournaments.filter(category=category)
+        tournaments = tournaments.filter(allowed_categories__category=category).distinct()
     if gender:
         tournaments = tournaments.filter(gender=gender)
     if duration:
@@ -111,9 +113,22 @@ def legends(request):
     return render(request, 'core/legends.html', {'legends': legends})
 
 
+def _is_html_content(text: str) -> bool:
+    """Проверяет, похож ли текст на HTML (есть теги), чтобы не применять linebreaks."""
+    if not text or "<" not in text:
+        return False
+    return bool(re.search(r"<\s*[a-zA-Z]", text))
+
+
 def rules(request):
-    """Rules page: tournament formats (FAN, etc.) with detailed descriptions."""
-    return render(request, 'core/rules.html')
+    """Rules page: tournament formats (FAN, etc.) with detailed descriptions. Content is editable via admin (RulesSection)."""
+    rules_content = {}
+    for s in RulesSection.objects.all():
+        body = s.body or ""
+        if body and not _is_html_content(body):
+            body = linebreaks(body)
+        rules_content[s.slug] = body
+    return render(request, "core/rules.html", {"rules_content": rules_content})
 
 
 @login_required

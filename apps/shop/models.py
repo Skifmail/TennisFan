@@ -4,6 +4,8 @@ Shop models: ShopPage, Product, ProductPhoto, PurchaseRequest.
 
 from django.db import models
 
+from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
+
 
 class ShopPage(models.Model):
     """
@@ -69,7 +71,7 @@ class Product(models.Model):
         return self.quantity > 0
 
 
-class ProductPhoto(models.Model):
+class ProductPhoto(CompressImageFieldsMixin, models.Model):
     """Фото товара (до 10 на товар)."""
 
     product = models.ForeignKey(
@@ -78,7 +80,9 @@ class ProductPhoto(models.Model):
         related_name="photos",
         verbose_name="Товар",
     )
-    image = models.ImageField("Фото", upload_to="shop/products/")
+    image = models.ImageField(
+        "Фото", upload_to="shop/products/", validators=[validate_image_max_2mb]
+    )
     order = models.PositiveSmallIntegerField("Порядок", default=0)
 
     class Meta:

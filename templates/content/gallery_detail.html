@@ -16,8 +16,9 @@
 
     <div class="grid grid-4">
         {% for photo in gallery.photos.all %}
-        <a href="{{ photo.image.url }}" target="_blank" class="card" style="overflow: hidden;">
-            <img src="{{ photo.image.url }}" alt="{{ photo.caption }}"
+        <a href="{{ photo.image.url }}" class="js-lightbox card" style="overflow: hidden; text-decoration: none; color: inherit;"
+            data-lightbox-src="{{ photo.image.url }}" data-lightbox-caption="{{ photo.caption|default:'' }}" data-lightbox-group="gallery-{{ gallery.slug }}">
+            <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'' }}"
                 style="width: 100%; aspect-ratio: 1; object-fit: cover;">
             {% if photo.caption %}
             <div class="card-body" style="padding: var(--spacing-sm);">

@@ -9,17 +9,84 @@
     </div>
 
     {% if news.image %}
-    <img src="{{ news.image.url }}" alt=""
-        style="width: 100%; border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl);">
+    <a href="{{ news.image.url }}" class="js-lightbox" data-lightbox-src="{{ news.image.url }}" data-lightbox-caption="{{ news.title }}" data-lightbox-group="news-{{ news.slug }}"
+        style="display: block; margin-bottom: var(--spacing-xl);">
+        <img src="{{ news.image.url }}" alt=""
+            style="width: 100%; border-radius: var(--radius-lg);">
+    </a>
     {% endif %}
 
     <h1 style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-md);">{{ news.title }}</h1>
     <p class="text-muted mb-4">{{ news.created_at|date:"d.m.Y H:i" }} • {{ news.views_count }} просмотров</p>
 
-    <div class="card">
-        <div class="card-body" style="padding: var(--spacing-2xl);">
-            {{ news.content|safe|linebreaks }}
+    <div class="card mb-4">
+        <div class="card-body news-content" style="padding: var(--spacing-2xl);">
+            {{ news.content|linebreaks|safe }}
         </div>
     </div>
+
+    {% if news.photos.all %}
+    <section class="news-gallery mb-4">
+        <h2 class="section-title mb-3">Фото</h2>
+        <div class="news-gallery__grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--spacing-md);">
+            {% for photo in news.photos.all %}
+            <a href="{{ photo.image.url }}" class="js-lightbox news-gallery__item card" style="overflow: hidden; text-decoration: none; color: inherit;"
+                data-lightbox-src="{{ photo.image.url }}" data-lightbox-caption="{{ photo.caption|default:'' }}" data-lightbox-group="news-{{ news.slug }}">
+                <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'' }}"
+                    style="width: 100%; aspect-ratio: 1; object-fit: cover;">
+                {% if photo.caption %}
+                <div class="card-body" style="padding: var(--spacing-sm);">
+                    <p class="text-secondary mb-0" style="font-size: var(--font-size-sm);">{{ photo.caption }}</p>
+                </div>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <hr class="my-5" style="border-color: var(--color-border);">
+
+    <section class="comments-section" id="comments">
+        <h2 class="mb-4" style="font-size: var(--font-size-2xl);">Комментарии</h2>
+
+        {% if user.is_authenticated %}
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="post" action="{% url 'news_detail' slug=news.slug %}#comments">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="comment">
+                    {{ comment_form.text }}
+                    {% if comment_form.text.errors %}
+                    <p class="text-error mt-1">{{ comment_form.text.errors.0 }}</p>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary mt-3">Отправить комментарий</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted mb-4">
+            <a href="{% url 'login' %}">Войдите</a>, чтобы оставить комментарий.
+        </p>
+        {% endif %}
+
+        {% if comments %}
+        <div class="comments-list">
+            {% for comment in comments %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="mb-2" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: var(--spacing-xs);">
+                        <strong>{{ comment.author }}</strong>
+                        <span class="text-muted" style="font-size: var(--font-size-sm);">{{ comment.created_at|date:"d.m.Y H:i" }}</span>
+                    </div>
+                    <p class="mb-0" style="white-space: pre-wrap;">{{ comment.text }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">Пока нет комментариев. Будьте первым!</p>
+        {% endif %}
+    </section>
 </div>
 {% endblock %}

@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from apps.users.models import Notification, Player
 
-from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam
+from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam, TournamentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -88,19 +88,47 @@ def check_and_generate_past_deadline_brackets() -> int:
         return 0
     cache.set(cache_key, True, 60)  # не чаще раза в минуту
 
+    from .olympic_consolation import _is_olympic, generate_bracket as generate_olympic_bracket
+
     now = timezone.now()
     qs = list(
         Tournament.objects.filter(
-            format__in=["single_elimination", "round_robin"],
+            format__in=["single_elimination", "olympic_consolation", "round_robin"],
             bracket_generated=False,
             registration_deadline__lte=now,
             registration_deadline__isnull=False,
-        )
+        ).exclude(status=TournamentStatus.CANCELLED)
     )
     total = 0
     for t in qs:
+        # Проверка минимального количества участников/команд
+        min_required = t.min_teams if t.is_doubles() else t.min_participants
+        if min_required is not None:
+            count = t.full_teams_count() if t.is_doubles() else t.participants.count()
+            if count < min_required:
+                notified_at = t.insufficient_participants_notified_at
+                if notified_at is None:
+                    from apps.core.telegram_notify import notify_tournament_insufficient_participants
+                    notify_tournament_insufficient_participants(t)
+                    t.insufficient_participants_notified_at = now
+                    t.save(update_fields=["insufficient_participants_notified_at"])
+                    logger.info(
+                        "Insufficient participants for %s: %s/%s, notified admin",
+                        t.slug, count, min_required,
+                    )
+                elif (notified_at + timedelta(hours=3)) <= now:
+                    from .cancel import cancel_tournament
+                    cancel_tournament(t)
+                    logger.info(
+                        "Cancelled tournament %s: still insufficient after 3h (%s/%s)",
+                        t.slug, count, min_required,
+                    )
+                continue
+
         if t.format == "single_elimination":
             ok, msg = generate_bracket(t)
+        elif _is_olympic(t):
+            ok, msg = generate_olympic_bracket(t)
         else:
             ok, msg = generate_round_robin_bracket(t)
         if ok:

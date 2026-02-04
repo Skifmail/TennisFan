@@ -6,6 +6,7 @@ from django.db import models
 from django.utils.text import slugify
 
 from apps.users.models import SkillLevel
+from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
 
 class TrainingType(models.TextChoices):
@@ -29,7 +30,9 @@ class Coach(models.Model):
     )
     name = models.CharField("Имя", max_length=100)
     slug = models.SlugField("URL", unique=True)
-    photo = models.ImageField("Фото", upload_to="coaches/", blank=True)
+    photo = models.ImageField(
+        "Фото", upload_to="coaches/", blank=True, validators=[validate_image_max_2mb]
+    )
     bio = models.TextField("Биография", blank=True)
     experience_years = models.PositiveSmallIntegerField("Опыт (лет)", default=0)
     specialization = models.CharField("Специализация", max_length=200, blank=True)
@@ -95,7 +98,7 @@ class CoachApplicationStatus(models.TextChoices):
     REJECTED = "rejected", "Отклонена"
 
 
-class CoachApplication(models.Model):
+class CoachApplication(CompressImageFieldsMixin, models.Model):
     """Заявка «Стать тренером». После одобрения создаётся Coach."""
 
     class Meta:
@@ -131,7 +134,12 @@ class CoachApplication(models.Model):
     applicant_phone = models.CharField("Телефон заявителя", max_length=20, blank=True)
 
     name = models.CharField("Имя", max_length=100)
-    photo = models.ImageField("Фото", upload_to="coaches/applications/", blank=True)
+    photo = models.ImageField(
+        "Фото",
+        upload_to="coaches/applications/",
+        blank=True,
+        validators=[validate_image_max_2mb],
+    )
     bio = models.TextField("Биография", blank=True)
     experience_years = models.PositiveSmallIntegerField("Опыт (лет)", default=0)
     specialization = models.CharField("Специализация", max_length=200, blank=True)
@@ -181,7 +189,7 @@ class CoachApplication(models.Model):
         return coach
 
 
-class Training(models.Model):
+class Training(CompressImageFieldsMixin, models.Model):
     """Adult training program model."""
 
     title = models.CharField("Название", max_length=200)
@@ -212,7 +220,12 @@ class Training(models.Model):
     price = models.DecimalField("Цена", max_digits=10, decimal_places=2, null=True, blank=True)
 
     schedule = models.TextField("Расписание", blank=True, help_text="Дни и время проведения")
-    image = models.ImageField("Изображение", upload_to="trainings/", blank=True)
+    image = models.ImageField(
+        "Изображение",
+        upload_to="trainings/",
+        blank=True,
+        validators=[validate_image_max_2mb],
+    )
 
     is_active = models.BooleanField("Активно", default=True)
     is_featured = models.BooleanField("На главной", default=False)

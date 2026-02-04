@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from apps.comments.models import Comment
 from apps.users.models import Player
 
-from .forms import AboutUsCommentForm
+from .forms import AboutUsCommentForm, NewsCommentForm
 from .models import AboutUs, ContactItem, ContactPage, Gallery, News, Page
 
 logger = logging.getLogger(__name__)
@@ -25,12 +25,63 @@ def news_list(request):
 
 
 def news_detail(request, slug):
-    """News detail page."""
-    news = get_object_or_404(News, slug=slug, is_published=True)
-    # Increment views
-    news.views_count += 1
-    news.save(update_fields=['views_count'])
-    return render(request, 'content/news_detail.html', {'news': news})
+    """News detail page with gallery and comments."""
+    news = get_object_or_404(
+        News.objects.prefetch_related("photos"),
+        slug=slug,
+        is_published=True,
+    )
+    # Increment views (only for GET)
+    if request.method == "GET":
+        news.views_count += 1
+        news.save(update_fields=["views_count"])
+
+    # Comments (only approved)
+    ct = ContentType.objects.get_for_model(News)
+    comments = (
+        Comment.objects.filter(
+            content_type=ct,
+            object_id=news.pk,
+            is_approved=True,
+        )
+        .select_related("author__user")
+        .order_by("-created_at")
+    )
+
+    form = NewsCommentForm()
+    if request.method == "POST" and request.POST.get("action") == "comment":
+        form = NewsCommentForm(request.POST)
+        if form.is_valid():
+            if not request.user.is_authenticated:
+                messages.error(request, "Войдите, чтобы оставить комментарий.")
+                return redirect("login")
+            player = Player.objects.filter(user=request.user).first()
+            if player is None:
+                messages.error(
+                    request,
+                    "Создайте профиль игрока, чтобы оставлять комментарии.",
+                )
+                return redirect("profile_edit")
+            comment = Comment.objects.create(
+                content_type=ct,
+                object_id=news.pk,
+                author=player,
+                text=form.cleaned_data["text"].strip(),
+                is_approved=True,
+            )
+            try:
+                from apps.core.telegram_notify import notify_news_comment
+                notify_news_comment(comment, news)
+            except Exception as e:
+                logger.warning("Telegram notify for news comment failed: %s", e)
+            messages.success(request, "Комментарий добавлен.")
+            return redirect("news_detail", slug=news.slug)
+
+    return render(
+        request,
+        "content/news_detail.html",
+        {"news": news, "comments": comments, "comment_form": form},
+    )
 
 
 def gallery_list(request):

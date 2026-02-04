@@ -9,7 +9,7 @@ from django.urls import reverse
 
 from apps.comments.models import Comment
 
-from .models import AboutUs, ContactItem, ContactPage, Gallery, News, Page, Photo
+from .models import AboutUs, ContactItem, ContactPage, Gallery, News, NewsPhoto, Page, Photo, RulesSection
 
 
 class CommentInline(GenericTabularInline):
@@ -22,6 +22,14 @@ class CommentInline(GenericTabularInline):
     fields = ("author", "text", "is_approved", "created_at")
     readonly_fields = ("created_at",)
     raw_id_fields = ("author",)
+
+
+class NewsPhotoInline(admin.TabularInline):
+    """Inline для галереи фото к новости."""
+
+    model = NewsPhoto
+    extra = 2
+    fields = ("image", "caption", "order")
 
 
 class PhotoInline(admin.TabularInline):
@@ -42,10 +50,11 @@ class NewsAdmin(admin.ModelAdmin):
     list_editable = ("is_published", "is_featured")
     prepopulated_fields = {"slug": ("title",)}
     date_hierarchy = "created_at"
+    inlines = [NewsPhotoInline]
 
     fieldsets = (
         (None, {"fields": ("title", "slug", "excerpt", "content")}),
-        ("Медиа", {"fields": ("image",)}),
+        ("Медиа", {"fields": ("image",), "description": "Главное изображение. Дополнительные фото — в блоке «Фото новостей» ниже."}),
         ("Публикация", {"fields": ("is_published", "is_featured", "published_at")}),
     )
 
@@ -143,6 +152,26 @@ class ContactPageAdmin(admin.ModelAdmin):
         if obj and not request.path.endswith("/change/"):
             return redirect(reverse("admin:content_contactpage_change", args=[obj.pk]))
         return super().changelist_view(request, extra_context)
+
+
+@admin.register(RulesSection)
+class RulesSectionAdmin(admin.ModelAdmin):
+    """Редактирование разделов правил (теннис, турниры, пользование сайтом)."""
+
+    list_display = ("title", "slug", "updated_at")
+    list_display_links = ("title", "slug")
+    search_fields = ("title", "body")
+    readonly_fields = ("slug", "updated_at")
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ("slug", "title", "body"),
+                "description": "Содержимое отображается на странице «Правила». Для раздела «Правила тенниса» ссылки на PDF не редактируются — они закреплены на странице.",
+            },
+        ),
+        ("Служебное", {"fields": ("updated_at",)}),
+    )
 
 
 @admin.register(Page)

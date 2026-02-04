@@ -149,7 +149,9 @@
                 <img src="{{ tournament.image.url }}" alt="" class="card-image">
                 {% endif %}
                 <div class="card-body">
-                    <span class="player-category mb-1">{{ tournament.get_category_display }}</span>
+                    {% for ac in tournament.allowed_categories.all %}
+                    <span class="player-category mb-1">{{ ac.get_category_display }}</span>
+                    {% endfor %}
                     <h3 class="card-title">{{ tournament.name }}</h3>
                     <p class="card-text">
                         {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}

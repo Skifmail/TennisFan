@@ -16,8 +16,15 @@
                 <div class="shop-detail__gallery">
                     {% if product.photos.exists %}
                     <div class="shop-detail__main-photo">
-                        <img src="{{ product.photos.first.image.url }}" alt="{{ product.name }}" id="shop-main-photo" class="shop-detail__main-img">
+                        <a href="{{ product.photos.first.image.url }}" class="js-lightbox shop-detail__main-photo-link" data-lightbox-src="{{ product.photos.first.image.url }}" data-lightbox-caption="{{ product.name }}" data-lightbox-group="product-{{ product.pk }}" style="display: block; width: 100%; height: 100%;">
+                            <img src="{{ product.photos.first.image.url }}" alt="{{ product.name }}" id="shop-main-photo" class="shop-detail__main-img">
+                        </a>
                     </div>
+                    {% for photo in product.photos.all %}
+                    {% if not forloop.first %}
+                    <a href="{{ photo.image.url }}" class="js-lightbox" data-lightbox-src="{{ photo.image.url }}" data-lightbox-caption="{{ product.name }}" data-lightbox-group="product-{{ product.pk }}" style="display: none;" aria-hidden="true"></a>
+                    {% endif %}
+                    {% endfor %}
                     {% if product.photos.count > 1 %}
                     <div class="shop-detail__thumbs">
                         {% for photo in product.photos.all %}

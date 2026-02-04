@@ -6,6 +6,8 @@ from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 
+from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
+
 
 class CourtSurface(models.TextChoices):
     """Court surface types."""
@@ -16,7 +18,7 @@ class CourtSurface(models.TextChoices):
     INDOOR = "indoor", "Закрытый хард"
 
 
-class Court(models.Model):
+class Court(CompressImageFieldsMixin, models.Model):
     """Tennis court / club model."""
 
     name = models.CharField("Название", max_length=200)
@@ -42,7 +44,9 @@ class Court(models.Model):
         "Возможность оплаты разными способами", default=False
     )
 
-    image = models.ImageField("Фото", upload_to="courts/", blank=True)
+    image = models.ImageField(
+        "Фото", upload_to="courts/", blank=True, validators=[validate_image_max_2mb]
+    )
     latitude = models.DecimalField("Широта", max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField("Долгота", max_digits=9, decimal_places=6, null=True, blank=True)
 
@@ -84,7 +88,7 @@ class CourtApplicationStatus(models.TextChoices):
     REJECTED = "rejected", "Отклонена"
 
 
-class CourtApplication(models.Model):
+class CourtApplication(CompressImageFieldsMixin, models.Model):
     """Заявка владельца корта на добавление площадки на сайт. После одобрения создаётся Court."""
 
     class Meta:
@@ -130,7 +134,12 @@ class CourtApplication(models.Model):
     whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
     website = models.URLField("Сайт", blank=True)
 
-    image = models.ImageField("Фото", upload_to="courts/applications/", blank=True)
+    image = models.ImageField(
+        "Фото",
+        upload_to="courts/applications/",
+        blank=True,
+        validators=[validate_image_max_2mb],
+    )
     latitude = models.DecimalField(
         "Широта", max_digits=9, decimal_places=6, null=True, blank=True
     )

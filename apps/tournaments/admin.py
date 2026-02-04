@@ -2,9 +2,14 @@
 Tournaments admin configuration.
 """
 
+from django import forms
 from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
+
+from apps.users.models import SkillLevel
 
 from .fan import generate_bracket
+from .olympic_consolation import generate_bracket as generate_olympic_bracket
 from .round_robin import generate_bracket as generate_round_robin_bracket
 from .proposal_service import apply_proposal
 from .models import (
@@ -13,6 +18,7 @@ from .models import (
     MatchResultProposal,
     SeasonRating,
     Tournament,
+    TournamentAllowedCategory,
     TournamentPlayerResult,
     TournamentTeam,
 )
@@ -44,6 +50,16 @@ def generate_fan_bracket_action(modeladmin, request, queryset):
             messages.warning(request, f"{t.name}: {msg}")
 
 
+@admin.action(description="Сформировать сетку (олимпийская)")
+def generate_olympic_bracket_action(modeladmin, request, queryset):
+    for t in queryset:
+        ok, msg = generate_olympic_bracket(t)
+        if ok:
+            messages.success(request, f"{t.name}: {msg}")
+        else:
+            messages.warning(request, f"{t.name}: {msg}")
+
+
 @admin.action(description="Сформировать сетку (круговой)")
 def generate_round_robin_bracket_action(modeladmin, request, queryset):
     for t in queryset:
@@ -63,8 +79,40 @@ class TournamentTeamInline(admin.TabularInline):
     classes = ("variant-doubles-only",)  # для JS: скрывать при варианте «Одиночный»
 
 
+class TournamentAdminForm(forms.ModelForm):
+    """Форма турнира с полем «Допустимые категории» в виде чекбоксов (1–5)."""
+
+    allowed_categories = forms.MultipleChoiceField(
+        choices=SkillLevel.choices,
+        widget=forms.CheckboxSelectMultiple,
+        required=True,
+        label="Допустимые категории участников",
+        help_text="Отметьте от 1 до 5 категорий. Регистрироваться смогут только игроки с выбранными уровнями.",
+    )
+
+    class Meta:
+        model = Tournament
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["allowed_categories"].initial = list(
+                self.instance.allowed_categories.values_list("category", flat=True)
+            )
+
+    def clean_allowed_categories(self):
+        value = self.cleaned_data.get("allowed_categories") or []
+        if len(value) == 0:
+            raise ValidationError("Выберите хотя бы одну категорию участников.")
+        if len(value) > 5:
+            raise ValidationError("Можно выбрать не более 5 категорий.")
+        return value
+
+
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
+    form = TournamentAdminForm
     inlines = [TournamentTeamInline]
 
     """Admin for Tournament model.
@@ -83,12 +131,13 @@ class TournamentAdmin(admin.ModelAdmin):
         "status",
         "bracket_generated",
         "start_date",
+        "min_participants",
         "max_participants",
+        "min_teams",
         "max_teams",
     )
     list_filter = (
         "city",
-        "category",
         "gender",
         "duration",
         "tournament_type",
@@ -102,38 +151,42 @@ class TournamentAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     filter_horizontal = ("participants",)
     date_hierarchy = "start_date"
-    actions = [generate_fan_bracket_action, generate_round_robin_bracket_action]
+    readonly_fields = ("insufficient_participants_notified_at",)
+    actions = [generate_fan_bracket_action, generate_olympic_bracket_action, generate_round_robin_bracket_action]
 
     fieldsets = (
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
         ("Формат турнира", {"fields": ("format", "variant")}),
         (
-            "Общие поля (FAN и Круговой)",
+            "Общие поля (FAN, Олимпийская, Круговой)",
             {
                 "fields": (
                     "entry_fee",
                     "is_one_day",
                     "city",
-                    "category",
                     "gender",
+                    "allowed_categories",
                     "duration",
                     "tournament_type",
                     "status",
                     "start_date",
                     "end_date",
                     "registration_deadline",
+                    "min_participants",
                     "max_participants",
+                    "min_teams",
                     "max_teams",
+                    "insufficient_participants_notified_at",
                     "bracket_generated",
                     "match_days_per_round",
                     "participants",
                 ),
-                # Общие поля показываются при FAN и при Круговом (в JS — .format-common-section).
+                "description": "Блок отображается после выбора формата турнира (FAN, Олимпийская система или Круговой).",
                 "classes": ("format-common-section",),
             },
         ),
         (
-            "FAN: очки за раунд",
+            "FAN / Олимпийская: очки за раунд и места",
             {
                 "fields": (
                     "fan_points_r1",
@@ -142,8 +195,8 @@ class TournamentAdmin(admin.ModelAdmin):
                     "fan_points_final",
                     "fan_points_winner",
                 ),
-                "description": "Очки начисляются при вылете или в конце турнира.",
-                "classes": ("format-fan-section",),
+                "description": "FAN: очки при вылете. Олимпийская система: очки по итоговому месту (1–2–3–4–5–8–9+).",
+                "classes": ("format-fan-section", "format-olympic-section"),
             },
         ),
         (
@@ -155,6 +208,13 @@ class TournamentAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        selected = form.cleaned_data.get("allowed_categories") or []
+        obj.allowed_categories.all().delete()
+        for category in selected:
+            TournamentAllowedCategory.objects.create(tournament=obj, category=category)
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
         """Добавить пустой выбор для формата на странице добавления."""
@@ -199,13 +259,21 @@ class MatchAdmin(admin.ModelAdmin):
         "player2__user__first_name",
         "player2__user__last_name",
     )
-    raw_id_fields = ("player1", "player2", "team1", "team2", "winner", "winner_team", "court", "next_match")
+    raw_id_fields = (
+        "player1", "player2", "team1", "team2", "winner", "winner_team",
+        "court", "next_match", "loser_next_match",
+    )
     date_hierarchy = "scheduled_datetime"
 
     fieldsets = (
         (
             "Турнир",
-            {"fields": ("tournament", "court", "round_name", "round_index", "round_order", "is_consolation", "next_match")},
+            {
+                "fields": (
+                    "tournament", "court", "round_name", "round_index", "round_order",
+                    "is_consolation", "next_match", "loser_next_match", "placement_min", "placement_max",
+                )
+            },
         ),
         ("Игроки / Команды", {"fields": ("player1", "player2", "team1", "team2", "winner", "winner_team")}),
         (
@@ -254,9 +322,9 @@ class MatchResultProposalAdmin(admin.ModelAdmin):
 
 @admin.register(TournamentPlayerResult)
 class TournamentPlayerResultAdmin(admin.ModelAdmin):
-    """FAN: результаты игроков в турнире."""
+    """FAN / Олимпийская: результаты игроков в турнире (раунд вылета или итоговое место)."""
 
-    list_display = ("tournament", "player", "round_eliminated", "fan_points", "is_consolation")
+    list_display = ("tournament", "player", "place", "round_eliminated", "fan_points", "is_consolation")
     list_filter = ("tournament", "round_eliminated", "is_consolation")
     search_fields = (
         "player__user__first_name",

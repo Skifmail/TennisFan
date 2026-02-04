@@ -57,9 +57,15 @@
             {% endif %}
             <div class="d-flex gap-2 mb-2 flex-wrap">
                 {% if tournament.format == 'single_elimination' %}
-                <span class="player-category" style="background: rgba(150, 98, 31, 0.2); color: var(--color-accent);">FAN</span>
+                <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">FAN</span>
+                {% elif tournament.format == 'olympic_consolation' %}
+                <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">Олимпийская система</span>
+                {% elif tournament.format == 'round_robin' %}
+                <span class="player-category" style="background: rgba(100, 149, 237, 0.2); color: #6495ed;">Круговой</span>
                 {% endif %}
-                <span class="player-category">{{ tournament.get_category_display }}</span>
+                {% for ac in tournament.allowed_categories.all %}
+                <span class="player-category">{{ ac.get_category_display }}</span>
+                {% endfor %}
                 <span class="player-category">{{ tournament.get_gender_display }}</span>
                 <span class="player-category">{{ tournament.get_duration_display }}</span>
                 <span class="player-category">{{ tournament.get_status_display }}</span>
@@ -139,6 +145,8 @@
                             {% if is_fan %}
                             <th>Раунд вылета</th>
                             <th>Очки FAN</th>
+                            {% elif is_olympic %}
+                            <th>Очки за место</th>
                             {% endif %}
                         </tr>
                     </thead>
@@ -172,6 +180,8 @@
                             <td>{% if s.team %}{{ s.team.player1.total_points }}{% else %}{{ s.player.total_points }}{% endif %}</td>
                             {% if is_fan %}
                             <td>{{ s.round_eliminated }}</td>
+                            <td class="fan-points">{{ s.fan_points }}</td>
+                            {% elif is_olympic %}
                             <td class="fan-points">{{ s.fan_points }}</td>
                             {% endif %}
                         </tr>

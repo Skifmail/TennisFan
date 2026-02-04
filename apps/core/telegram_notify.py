@@ -195,6 +195,31 @@ def notify_about_us_comment(comment) -> bool:
     return send_admin_message(msg)
 
 
+def notify_news_comment(comment, news) -> bool:
+    """Уведомление админу о новом комментарии к новости."""
+    author = getattr(comment, "author", None)
+    author_name = _escape(str(author) if author else "—")
+    author_email = "—"
+    if author:
+        try:
+            author_email = _escape(getattr(author.user, "email", None) or "—")
+        except Exception:
+            pass
+    text_preview = _escape((comment.text or "")[:300])
+    if (comment.text or "") and len(comment.text or "") > 300:
+        text_preview += "…"
+    news_title = _escape(getattr(news, "title", "") or "—")
+
+    msg = (
+        "📰 <b>Новый комментарий к новости</b>\n\n"
+        f"Новость: {news_title}\n"
+        f"Автор: {author_name}\n"
+        f"Email: {author_email}\n\n"
+        f"Текст:\n{text_preview}"
+    )
+    return send_admin_message(msg)
+
+
 def notify_purchase_request(pr) -> bool:
     """Уведомление админу о заявке на покупку товара."""
     product_name = _escape(pr.product.name if pr.product else "—")
@@ -215,6 +240,41 @@ def notify_purchase_request(pr) -> bool:
         f"Телефон: {phone}\n"
         f"Email: {email}\n\n"
         f"Комментарий: {comment}"
+    )
+    return send_admin_message(msg)
+
+
+def notify_tournament_insufficient_participants(tournament) -> bool:
+    """Уведомление админу: недостаточно участников/команд к дедлайну, турнир отменят через 3 ч без продления."""
+    from django.utils import timezone
+    from django.conf import settings
+
+    name = _escape(getattr(tournament, "name", "") or "—")
+    slug = _escape(getattr(tournament, "slug", "") or "—")
+    if getattr(tournament, "is_doubles", lambda: False)():
+        current = getattr(tournament, "full_teams_count", lambda: 0)()
+        if callable(current):
+            current = current()
+        min_required = getattr(tournament, "min_teams", None) or 0
+        label = "команд"
+    else:
+        current = getattr(tournament, "participants", None)
+        current = current.count() if current is not None else 0
+        min_required = getattr(tournament, "min_participants", None) or 0
+        label = "участников"
+    deadline = getattr(tournament, "registration_deadline", None)
+    deadline_str = deadline.strftime("%d.%m.%Y %H:%M") if deadline else "—"
+    admin_url = ""
+    if hasattr(settings, "ADMIN_URL") and settings.ADMIN_URL:
+        admin_url = f"\nПродлить дедлайн: {settings.ADMIN_URL}/tournaments/tournament/{getattr(tournament, 'pk', '')}/change/"
+    msg = (
+        "⚠️ <b>Турнир: недостаточно участников</b>\n\n"
+        f"Турнир: {name}\n"
+        f"Slug: {slug}\n"
+        f"Зарегистрировано: {current} {label} (минимум: {min_required})\n"
+        f"Дедлайн регистрации: {deadline_str}\n\n"
+        "Если в течение <b>3 часов</b> не продлить дедлайн регистрации, турнир будет автоматически отменён, участникам вернутся лимиты регистраций."
+        f"{admin_url}"
     )
     return send_admin_message(msg)
 

@@ -5,6 +5,7 @@ Tournament models: Tournaments, Matches, Ratings.
 from django.db import models
 
 from apps.users.models import Player, SkillLevel
+from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
 
 class TournamentType(models.TextChoices):
@@ -45,6 +46,7 @@ class TournamentFormat(models.TextChoices):
     """Формат проведения турнира."""
 
     SINGLE_ELIMINATION = "single_elimination", "FAN (одноэтапная сетка)"
+    OLYMPIC_CONSOLATION = "olympic_consolation", "Олимпийская система (утешительная сетка)"
     ROUND_ROBIN = "round_robin", "Круговой"
 
 
@@ -64,7 +66,35 @@ class TournamentVariant(models.TextChoices):
     DOUBLES = "doubles", "Парный"
 
 
-class Tournament(models.Model):
+class TournamentAllowedCategory(models.Model):
+    """
+    Допустимые категории участников турнира (Новичок, Любитель и т.д.).
+    У турнира может быть от 1 до 5 категорий; регистрироваться могут только игроки с одной из них.
+    """
+
+    tournament = models.ForeignKey(
+        "Tournament",
+        on_delete=models.CASCADE,
+        related_name="allowed_categories",
+        verbose_name="Турнир",
+    )
+    category = models.CharField(
+        "Категория",
+        max_length=20,
+        choices=SkillLevel.choices,
+    )
+
+    class Meta:
+        verbose_name = "Допустимая категория турнира"
+        verbose_name_plural = "Допустимые категории турнира"
+        unique_together = [("tournament", "category")]
+        ordering = ["tournament", "category"]
+
+    def __str__(self) -> str:
+        return f"{self.tournament.name}: {self.get_category_display()}"
+
+
+class Tournament(CompressImageFieldsMixin, models.Model):
     """Tournament model."""
 
     name = models.CharField("Название", max_length=200)
@@ -76,9 +106,6 @@ class Tournament(models.Model):
     entry_fee = models.DecimalField("Вступительный взнос (руб)", max_digits=10, decimal_places=2, default=0)
     is_one_day = models.BooleanField("Однодневный турнир", default=False, help_text="Если отмечено, взнос платный для всех (с учетом скидок)")
 
-    category = models.CharField(
-        "Категория", max_length=20, choices=SkillLevel.choices, default=SkillLevel.AMATEUR
-    )
     gender = models.CharField(
         "Категория по полу", max_length=10, choices=TournamentGender.choices, default=TournamentGender.MALE
     )
@@ -107,17 +134,35 @@ class Tournament(models.Model):
     )
     points_winner = models.IntegerField("Очки за победу", default=100)
     points_loser = models.IntegerField("Очки за проигрыш", default=-50)
+    min_participants = models.PositiveIntegerField(
+        "Минимальное количество участников",
+        null=True,
+        blank=True,
+        help_text="Если к дедлайну регистрации меньше — админу уйдёт уведомление в Telegram; через 3 часа без продления турнир отменяется, лимиты регистраций возвращаются.",
+    )
     max_participants = models.PositiveIntegerField(
         "Максимальное количество участников",
         null=True,
         blank=True,
         help_text="Для одиночных: обязателен для FAN и круговых. Оставьте пустым для неограниченного.",
     )
+    min_teams = models.PositiveIntegerField(
+        "Минимальное количество команд",
+        null=True,
+        blank=True,
+        help_text="Для парных: если к дедлайну меньше — уведомление админу, через 3 ч без продления — отмена турнира.",
+    )
     max_teams = models.PositiveIntegerField(
         "Максимальное количество команд",
         null=True,
         blank=True,
         help_text="Для парных: обязателен. Количество команд (пар) для регистрации.",
+    )
+    insufficient_participants_notified_at = models.DateTimeField(
+        "Когда отправлено уведомление о недостатке участников",
+        null=True,
+        blank=True,
+        help_text="Заполняется автоматически при первом срабатывании; сбрасывается при продлении дедлайна.",
     )
     bracket_generated = models.BooleanField(
         "Сетка сформирована",
@@ -150,7 +195,12 @@ class Tournament(models.Model):
         help_text="Для круговых турниров: 1 сет до 6, с тай-брейком, 2 сета или Fast4.",
     )
 
-    image = models.ImageField("Изображение", upload_to="tournaments/", blank=True)
+    image = models.ImageField(
+        "Изображение",
+        upload_to="tournaments/",
+        blank=True,
+        validators=[validate_image_max_2mb],
+    )
     participants = models.ManyToManyField(
         Player, related_name="tournaments", blank=True, verbose_name="Участники"
     )
@@ -200,6 +250,13 @@ class Tournament(models.Model):
         if self.max_participants is None:
             return None
         return max(0, self.max_participants - self.participants.count())
+
+    def save(self, *args, **kwargs):
+        from django.utils import timezone
+        if self.registration_deadline and self.insufficient_participants_notified_at:
+            if self.registration_deadline > timezone.now():
+                self.insufficient_participants_notified_at = None
+        super().save(*args, **kwargs)
 
 
 class TournamentTeam(models.Model):
@@ -309,6 +366,27 @@ class Match(models.Model):
         blank=True,
         related_name="prev_matches",
         verbose_name="Следующий матч (победитель)",
+    )
+    loser_next_match = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prev_matches_loser",
+        verbose_name="Следующий матч (проигравший)",
+        help_text="Для олимпийской системы: матч за следующее место (утешительная сетка).",
+    )
+    placement_min = models.PositiveSmallIntegerField(
+        "Минимальное место (диапазон)",
+        null=True,
+        blank=True,
+        help_text="Олимпийская система: за какое место идёт борьба (напр. 5 для сетки 5–8).",
+    )
+    placement_max = models.PositiveSmallIntegerField(
+        "Максимальное место (диапазон)",
+        null=True,
+        blank=True,
+        help_text="Олимпийская система: верхняя граница места (напр. 8).",
     )
 
     player1 = models.ForeignKey(
@@ -531,6 +609,13 @@ class TournamentPlayerResult(models.Model):
         "Раунд вылета",
         max_length=10,
         choices=RoundEliminated.choices,
+        blank=True,
+    )
+    place = models.PositiveSmallIntegerField(
+        "Итоговое место",
+        null=True,
+        blank=True,
+        help_text="Олимпийская система: занятое место (1, 2, 3, …).",
     )
     fan_points = models.PositiveIntegerField("Начислено очков FAN", default=0)
     is_consolation = models.BooleanField("Вылет в подвале", default=False)

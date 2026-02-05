@@ -28,6 +28,33 @@ from .proposal_service import apply_proposal
 from apps.users.models import Notification, Player, SkillLevel
 
 
+def _match_participants(match):
+    """
+    Возвращает множество игроков — участников матча.
+    Для одиночных: player1, player2. Для парных: все четверо из team1 и team2.
+    """
+    participants = set()
+    if match.team1 and match.team2:
+        for team in (match.team1, match.team2):
+            if team.player1_id:
+                participants.add(team.player1)
+            if team.player2_id:
+                participants.add(team.player2)
+    else:
+        if match.player1_id:
+            participants.add(match.player1)
+        if match.player2_id:
+            participants.add(match.player2)
+    return participants
+
+
+def _match_opponent_users(match, exclude_player):
+    """Пользователи противоположной стороны (для уведомлений). exclude_player — кто отправил предложение."""
+    participants = _match_participants(match)
+    participants.discard(exclude_player)
+    return [p.user for p in participants if getattr(p, "user", None)]
+
+
 def _build_bracket_standings(tournament, is_fan, is_olympic):
     """
     Построить турнирную таблицу для страницы турнира (FAN или Олимпийская система).
@@ -544,7 +571,14 @@ def my_matches(request):
 def propose_result(request, pk):
     """Propose result for a match by participant."""
 
-    match = get_object_or_404(Match, pk=pk)
+    match = get_object_or_404(
+        Match.objects.select_related(
+            "team1__player1__user", "team1__player2__user",
+            "team2__player1__user", "team2__player2__user",
+            "player1", "player2",
+        ),
+        pk=pk,
+    )
     if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
         messages.info(request, 'Матч уже завершён.')
         return redirect('my_matches')
@@ -556,7 +590,7 @@ def propose_result(request, pk):
         messages.error(request, 'Создайте профиль игрока, чтобы предложить результат.')
         return redirect('profile_edit')
 
-    if player not in (match.player1, match.player2):
+    if player not in _match_participants(match):
         messages.error(request, 'Вы не участвуете в этом матче.')
         return redirect('my_matches')
 
@@ -586,12 +620,18 @@ def propose_result(request, pk):
         player2_set3=_to_int(request.POST.get('p2s3')),
     )
 
-    opponent = match.player2 if player == match.player1 else match.player1
-    Notification.objects.create(
-        user=opponent.user,
-        message=f"{player} предложил результат матча в турнире {match.tournament.name}",
-        url=reverse('my_matches'),
-    )
+    for opponent_user in _match_opponent_users(match, player):
+        Notification.objects.create(
+            user=opponent_user,
+            message=f"{player} предложил результат матча в турнире {match.tournament.name}",
+            url=reverse('my_matches'),
+        )
+
+    try:
+        from apps.telegram_bot import notifications as tg
+        tg.notify_result_proposal(proposal)
+    except Exception:
+        pass
 
     messages.success(request, 'Результат отправлен на подтверждение сопернику.')
     return redirect('my_matches')
@@ -602,7 +642,11 @@ def confirm_proposal(request, pk):
     """Opponent confirms or rejects proposal."""
 
     proposal = get_object_or_404(
-        MatchResultProposal.objects.select_related('match__player1', 'match__player2', 'proposer'),
+        MatchResultProposal.objects.select_related(
+            'match__player1', 'match__player2', 'proposer',
+            'match__team1__player1', 'match__team1__player2',
+            'match__team2__player1', 'match__team2__player2',
+        ),
         pk=pk,
     )
 
@@ -611,7 +655,7 @@ def confirm_proposal(request, pk):
 
     match = proposal.match
     player = getattr(request.user, 'player', None)
-    if player is None or player not in (match.player1, match.player2):
+    if player is None or player not in _match_participants(match):
         messages.error(request, 'Вы не участвуете в этом матче.')
         return redirect('my_matches')
 
@@ -633,10 +677,9 @@ def confirm_proposal(request, pk):
         # FAN-логика (advance, consolation, finalize) вызывается из post_save сигнала Match
         messages.success(request, "Результат подтверждён.")
     else:
-        opponent = match.player2 if player == match.player1 else match.player1
         proposal.delete()
         Notification.objects.create(
-            user=opponent.user,
+            user=proposal.proposer.user,
             message=f'{player} отклонил результат матча. Введите свой результат.',
             url=reverse('my_matches'),
         )
@@ -764,9 +807,14 @@ def tournament_register(request, slug):
         return redirect('tournament_detail', slug=tournament.slug)
 
     if is_admin:
-         messages.success(request, 'Регистрация администратора (бесплатно/безлимитно).')
-         tournament.participants.add(player)
-         return redirect('tournament_detail', slug=tournament.slug)
+        messages.success(request, 'Регистрация администратора (бесплатно/безлимитно).')
+        tournament.participants.add(player)
+        try:
+            from apps.telegram_bot import notifications as tg
+            tg.notify_tournament_registered(request.user, tournament)
+        except Exception:
+            pass
+        return redirect('tournament_detail', slug=tournament.slug)
 
     elif tournament.is_one_day:
         # One-day tournament: Redirect to payment preview
@@ -790,8 +838,12 @@ def tournament_register(request, slug):
         except Exception:
             messages.success(request, 'Вы зарегистрированы!')
         tournament.participants.add(player)
+        try:
+            from apps.telegram_bot import notifications as tg
+            tg.notify_tournament_registered(request.user, tournament)
+        except Exception:
+            pass
 
-    
     return redirect('tournament_detail', slug=tournament.slug)
 
 
@@ -865,6 +917,11 @@ def tournament_register_doubles(request, slug):
                     sub.increment_usage()
             except Exception:
                 pass
+            try:
+                from apps.telegram_bot import notifications as tg
+                tg.notify_tournament_registered(request.user, tournament)
+            except Exception:
+                pass
             messages.success(request, "Вы зарегистрированы. Партнёр может присоединиться к вам со своей страницы турнира.")
             return redirect("tournament_detail", slug=slug)
 
@@ -907,6 +964,11 @@ def _do_join_team(request, tournament, player, team):
         message=f"{player} присоединился к вашей команде в турнире {tournament.name}.",
         url=reverse("tournament_detail", args=[tournament.slug]),
     )
+    try:
+        from apps.telegram_bot import notifications as tg
+        tg.notify_tournament_registered(request.user, tournament)
+    except Exception:
+        pass
     messages.success(request, f"Вы присоединились к команде с {team.player1}. Регистрация завершена.")
     return redirect("tournament_detail", slug=tournament.slug)
 
@@ -955,6 +1017,12 @@ def _do_add_partner(request, tournament, player, partner_id):
         message=f"{player} добавил вас в команду на турнир {tournament.name}.",
         url=reverse("tournament_detail", args=[tournament.slug]),
     )
+    try:
+        from apps.telegram_bot import notifications as tg
+        tg.notify_tournament_registered(request.user, tournament)
+        tg.notify_tournament_registered(partner.user, tournament)
+    except Exception:
+        pass
     messages.success(request, f"Команда зарегистрирована: вы и {partner}.")
     return redirect("tournament_detail", slug=tournament.slug)
 

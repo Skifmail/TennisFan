@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Сообщение отправлено{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Сообщение принято</h1>
+    <p class="page-subtitle">Ответ придёт в Telegram</p>
+</div>
+
+<div class="container" style="max-width: 520px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <p class="alert alert-success" style="margin-bottom: var(--spacing-lg);">
+                Ваше сообщение принято. Мы ответим вам в Telegram.
+            </p>
+
+            {% if telegram_binding_url %}
+            <p style="margin-bottom: var(--spacing-sm);">Чтобы получать ответы в Telegram, привяжите аккаунт:</p>
+            <p>
+                <a href="{{ telegram_binding_url }}" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+                    Открыть бота в Telegram и привязать аккаунт
+                </a>
+            </p>
+            <p class="text-muted" style="font-size: var(--font-size-sm);">
+                Ссылка действует 24 часа. Если не успеете — отправьте форму обратной связи ещё раз и перейдите по новой ссылке.
+            </p>
+            {% else %}
+            <p class="text-muted">Ответ придёт в привязанный Telegram-аккаунт.</p>
+            {% endif %}
+
+            <p style="margin-top: var(--spacing-xl);">
+                <a href="{% url 'home' %}" class="btn btn-ghost">На главную</a>
+                <a href="{% url 'support_feedback' %}" class="btn btn-outline">Написать ещё</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -72,7 +72,6 @@
                             <li><a href="{% url 'pricing' %}">Купить подписку</a></li>
                             <li><a href="{% url 'my_matches' %}">Мои матчи</a></li>
                             <li><a href="{% url 'my_trainings' %}">Мои тренировки</a></li>
-                            <li><a href="{% url 'feedback' %}">Обратная связь</a></li>
                             <li><a href="{% url 'notifications' %}" class="nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a></li>
                             {% if user.is_staff or user.is_superuser %}
                             <li><a href="{% url 'admin:index' %}">Админ панель</a></li>
@@ -147,7 +146,6 @@
                         <li><a href="{% url 'news_list' %}">Новости</a></li>
                         <li><a href="{% url 'gallery_list' %}">Фото</a></li>
                         <li><a href="{% url 'legal_index' %}">Правовые документы</a></li>
-                        {% if user.is_authenticated %}<li><a href="{% url 'feedback' %}">Обратная связь</a></li>{% endif %}
                     </ul>
                 </div>
 
@@ -176,9 +174,59 @@
         </div>
     </footer>
 
+    <!-- Плавающая кнопка «Написать нам» -->
+    <div id="feedback-widget" class="feedback-widget" data-submit-url="{% url 'feedback_submit' %}" data-threads-url="{% url 'feedback_threads' %}" data-csrf="{{ csrf_token }}" data-is-authenticated="{% if user.is_authenticated %}1{% else %}0{% endif %}">
+        <button type="button" class="feedback-widget__btn" id="feedback-widget-btn" aria-label="Написать нам">
+            <span class="feedback-widget__icon" aria-hidden="true">
+                <img src="{% static 'images/chat_icon.png' %}" alt="" class="feedback-widget__icon-img" width="24" height="24">
+            </span>
+            <span class="feedback-widget__label">НАПИСАТЬ НАМ</span>
+        </button>
+    </div>
+
+    <div id="feedback-modal" class="feedback-modal" aria-hidden="true">
+        <div class="feedback-modal__backdrop" id="feedback-modal-backdrop"></div>
+        <div class="feedback-modal__box">
+            <div class="feedback-modal__header">
+                <h2 class="feedback-modal__title">Обратная связь</h2>
+                <button type="button" class="feedback-modal__close" id="feedback-modal-close" aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="feedback-modal__body">
+                {% if user.is_authenticated %}
+                <div id="feedback-form-wrap">
+                    <form id="feedback-form" class="feedback-form">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label class="form-label" for="feedback-subject">Тема (необязательно)</label>
+                            <input type="text" id="feedback-subject" name="subject" class="form-control" maxlength="200" placeholder="Кратко о чём">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="feedback-message">Сообщение *</label>
+                            <textarea id="feedback-message" name="message" class="form-control" rows="4" required placeholder="Ваше сообщение"></textarea>
+                            <p id="feedback-form-error" class="text-error" style="display:none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm);"></p>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Отправить</button>
+                    </form>
+                </div>
+                <div id="feedback-success" class="feedback-success" style="display:none;">
+                    <p>Сообщение отправлено. Ответ администратора появится здесь после ответа в Telegram.</p>
+                </div>
+                <div class="feedback-modal__threads" id="feedback-threads-wrap">
+                    <h3 class="feedback-modal__threads-title">Ваши обращения</h3>
+                    <div id="feedback-threads-list"></div>
+                </div>
+                {% else %}
+                <p>Войдите в аккаунт, чтобы написать нам.</p>
+                <a href="{% url 'login' %}?next={{ request.path }}" class="btn btn-primary">Войти</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
     {% block modals %}{% endblock %}
     <script src="{% static 'js/main.js' %}"></script>
     <script src="{% static 'js/lightbox.js' %}"></script>
+    <script src="{% static 'js/feedback_widget.js' %}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 

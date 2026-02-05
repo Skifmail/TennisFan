@@ -7,6 +7,7 @@ import threading
 from datetime import timedelta
 
 from django.contrib import admin, messages
+from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -91,11 +92,15 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
             {
                 "fields": ("text", "image"),
                 "description": "Текст поддерживает HTML: <b>, <i>, <a href=\"...\">. "
-                "Если указано фото — отправляется пост с подписью.",
+                "Если указано фото — отправляется пост с подписью. "
+                "Отправка только по кнопке «Сохранить» — случайное нажатие Enter не отправит форму.",
             },
         ),
         ("Служебные", {"fields": ("sent_at", "created_at", "created_by"), "classes": ("collapse",)}),
     )
+
+    class Media:
+        js = ("js/admin_broadcast.js",)
 
     def text_short(self, obj):
         return ((obj.text or "")[:60] + "…") if (obj.text and len(obj.text) > 60) else (obj.text or "—")
@@ -136,19 +141,31 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
                 "Рассылка создана. Отправка выполняется в фоне; обновите страницу через несколько секунд.",
             )
 
-    def response_add(self, request, obj, post_url_continue=None):
+    def response_post_save_add(self, request, obj):
         """
-        Редирект после добавления — всегда на change по pk.
-        Стандартный редирект Django использует get_full_path().replace('/add/', ...),
-        при пути без слэша (например /add) подстановка не срабатывает и редирект ведёт на .../add/,
-        что воспринимается как object_id='add' и даёт «объект не существует».
+        Редирект сразу после создания — на страницу просмотра рассылки по pk.
+        Иначе Django подставляет get_full_path().replace("/add/", "/<pk>/"); если в пути
+        нет слэша после add (например .../add), подстановка не срабатывает и редирект
+        ведёт на .../add/, что обрабатывается как object_id="add" → «объект не существует».
         """
-        if obj is not None and getattr(obj, "pk", None) is not None:
-            change_url = reverse(
+        pk = getattr(obj, "pk", None)
+        if pk is not None and isinstance(pk, int):
+            path = reverse(
                 "admin:telegram_bot_telegrambroadcast_change",
-                args=[obj.pk],
+                args=[pk],
             )
-            return redirect(request.build_absolute_uri(change_url))
+            return HttpResponseRedirect(path)
+        return super().response_post_save_add(request, obj)
+
+    def response_add(self, request, obj, post_url_continue=None):
+        """Дублируем явный редирект по pk на случай другого пути вызова."""
+        pk = getattr(obj, "pk", None)
+        if pk is not None and isinstance(pk, int):
+            path = reverse(
+                "admin:telegram_bot_telegrambroadcast_change",
+                args=[pk],
+            )
+            return HttpResponseRedirect(path)
         return super().response_add(request, obj, post_url_continue)
 
 

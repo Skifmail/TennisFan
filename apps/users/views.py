@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from apps.core.models import UserTelegramLink
 from .forms import PlayerProfileForm, UserRegistrationForm
 from .models import Notification, Player, SkillLevel, User
 
@@ -203,11 +204,28 @@ def profile(request, pk):
                 int(100 * sub.tournaments_registered_count / max_t),
             )
 
+    telegram_user_bot_connected = False
+    telegram_bot_username = ""
+    if request.user.is_authenticated and request.user == player.user:
+        try:
+            link = request.user.telegram_link
+            telegram_user_bot_connected = link.user_bot_chat_id is not None
+        except UserTelegramLink.DoesNotExist:
+            pass
+        if telegram_user_bot_connected:
+            try:
+                from apps.telegram_bot import services as bot_services
+                telegram_bot_username = bot_services.get_bot_username() or ""
+            except Exception:
+                pass
+
     context = {
         "player": player,
         "recent_matches": recent_matches,
         "profile_progress_data": progress_data,
         "subscription_usage_percent": subscription_usage_percent,
+        "telegram_user_bot_connected": telegram_user_bot_connected,
+        "telegram_bot_username": telegram_bot_username,
     }
     return render(request, "users/profile.html", context)
 
@@ -229,7 +247,11 @@ def profile_edit(request):
     else:
         form = PlayerProfileForm(instance=player, user=request.user)
 
-    return render(request, 'users/profile_edit.html', {'form': form})
+    return render(
+        request,
+        "users/profile_edit.html",
+        {"form": form},
+    )
 
 
 @login_required

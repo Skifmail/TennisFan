@@ -26,8 +26,12 @@
 #                   если соперник не подтвердил/не отклонил в течение 6 ч — результат принимается.
 #                   Команда: auto_accept_stale_proposals
 #
+#   0 9 * * *     — раз в день в 09:00: напоминания о дедлайне матча за 2 и 1 день в Telegram.
+#                   Команда: send_deadline_reminders
+#
 # Ручной запуск:
 #   python manage.py generate_brackets_past_deadlines
 #   python manage.py fan_process_overdue_matches
 #   python manage.py olympic_process_overdue_matches
 #   python manage.py auto_accept_stale_proposals
+#   python manage.py send_deadline_reminders

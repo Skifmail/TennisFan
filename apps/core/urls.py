@@ -13,4 +13,8 @@ urlpatterns = [
     path("legends/", views.legends, name="legends"),
     path("rules/", views.rules, name="rules"),
     path("feedback/", views.feedback, name="feedback"),
+    path("support/", views.support_feedback, name="support_feedback"),
+    path("api/feedback/submit/", views.feedback_submit, name="feedback_submit"),
+    path("api/feedback/threads/", views.feedback_threads, name="feedback_threads"),
+    path("telegram/support-webhook/", views.telegram_support_webhook, name="telegram_support_webhook"),
 ]

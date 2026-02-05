@@ -105,6 +105,28 @@
                     У вас нет активной платной подписки. <a href="{% url 'pricing' %}">Купить</a>
                 </div>
                 {% endif %}
+                <div class="profile-info__telegram">
+                    <h4 class="profile-info__telegram-title">Telegram-бот</h4>
+                    <p class="text-secondary profile-info__telegram-text">
+                        Уведомления о регистрациях на турниры, матчах и дедлайнах, напоминания за 2 и 1 день,
+                        запросы на подтверждение результата. В боте: «Мои матчи», «Мой профиль», «Моя подписка».
+                    </p>
+                    <p class="text-secondary profile-info__telegram-text">
+                        <strong>Важно:</strong> нажмите кнопку ниже, откройте чат с ботом и нажмите <strong>«Запустить»</strong> (или отправьте /start). Без этого бот не сможет присылать вам сообщения.
+                    </p>
+                    {% if telegram_user_bot_connected %}
+                    <p class="text-success profile-info__telegram-status">✓ Бот подключён — уведомления будут приходить в Telegram</p>
+                    {% if telegram_bot_username %}
+                    <a href="https://t.me/{{ telegram_bot_username }}" target="_blank" rel="noopener" class="btn btn-telegram btn-telegram--outline">
+                        <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="btn-telegram__icon" width="20" height="20"> Открыть бота
+                    </a>
+                    {% endif %}
+                    {% else %}
+                    <a href="{% url 'telegram_connect' %}" class="btn btn-telegram">
+                        <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="btn-telegram__icon" width="20" height="20"> Подключить Telegram-бот
+                    </a>
+                    {% endif %}
+                </div>
                 <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3 profile-info__btn-edit">Редактировать</a>
                 <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2 profile-info__btn-ntrp">Пройти NTRP тест</a>
                 {% endif %}

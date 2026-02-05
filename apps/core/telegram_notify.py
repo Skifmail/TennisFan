@@ -16,11 +16,20 @@ def send_admin_message(text: str, parse_mode: str = "HTML") -> bool:
     Отправить сообщение в Telegram админу.
     Возвращает True при успехе, False при отключённом боте или ошибке.
     """
+    _, ok = _send_admin_message_raw(text, parse_mode)
+    return ok
+
+
+def _send_admin_message_raw(text: str, parse_mode: str = "HTML"):
+    """
+    Отправить сообщение в Telegram админу.
+    Возвращает (message_id или None, success: bool).
+    """
     token = getattr(settings, "TELEGRAM_BOT_TOKEN", None) or ""
     chat_id = getattr(settings, "TELEGRAM_ADMIN_CHAT_ID", None) or ""
     if not token.strip() or not chat_id.strip():
         logger.debug("Telegram notify skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID not set")
-        return False
+        return None, False
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
@@ -32,10 +41,13 @@ def send_admin_message(text: str, parse_mode: str = "HTML") -> bool:
     try:
         r = requests.post(url, json=payload, timeout=10)
         r.raise_for_status()
-        return True
+        data = r.json()
+        result = data.get("result", {})
+        msg_id = result.get("message_id")
+        return msg_id, True
     except Exception as e:
         logger.warning("Telegram notify failed: %s", e)
-        return False
+        return None, False
 
 
 def _escape(s: str) -> str:
@@ -128,21 +140,48 @@ def notify_court_application(app) -> bool:
     return send_admin_message("\n".join(lines))
 
 
-def notify_feedback(user, subject: str, message: str) -> bool:
+def notify_feedback(user, subject: str, message: str, feedback_id: int | None = None) -> bool:
     """Уведомление об обратной связи от пользователя."""
     name = _escape(user.get_full_name() or "—")
     email = _escape(user.email or "—")
     subj = _escape(subject or "—")
     msg = _escape(message or "")
 
+    header = "📩 <b>Обратная связь</b>"
+    if feedback_id is not None:
+        header += f" #{feedback_id}"
+    header += "\n\n"
     text = (
-        "📩 <b>Обратная связь</b>\n\n"
+        header
+        + f"От: {name}\n"
+        f"Email: {email}\n"
+        f"Тема: {subj}\n\n"
+        f"Сообщение:\n{msg}\n\n"
+        "<i>Ответьте на это сообщение в Telegram — ответ придёт пользователю на сайт.</i>"
+    )
+    return send_admin_message(text)
+
+
+def send_feedback_to_telegram(user, feedback_id: int, subject: str, message: str) -> int | None:
+    """
+    Отправить обратную связь в Telegram админу с номером #feedback_id.
+    Возвращает message_id из Telegram для сохранения в Feedback.telegram_message_id.
+    """
+    name = _escape(user.get_full_name() or "—")
+    email = _escape(user.email or "—")
+    subj = _escape(subject or "—")
+    msg = _escape(message or "")
+
+    text = (
+        f"📩 <b>Обратная связь #{feedback_id}</b>\n\n"
         f"От: {name}\n"
         f"Email: {email}\n"
         f"Тема: {subj}\n\n"
-        f"Сообщение:\n{msg}"
+        f"Сообщение:\n{msg}\n\n"
+        "<i>Ответьте на это сообщение — ответ придёт пользователю на сайт.</i>"
     )
-    return send_admin_message(text)
+    message_id, _ = _send_admin_message_raw(text)
+    return message_id
 
 
 def notify_court_comment(comment, court, score: int | None = None) -> bool:

@@ -2,9 +2,12 @@
 Tournaments admin configuration.
 """
 
+from datetime import timedelta
+
 from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from apps.users.models import SkillLevel
 
@@ -13,6 +16,7 @@ from .olympic_consolation import generate_bracket as generate_olympic_bracket
 from .round_robin import generate_bracket as generate_round_robin_bracket
 from .proposal_service import apply_proposal
 from .models import (
+    DeadlineExtensionRequest,
     HeadToHead,
     Match,
     MatchResultProposal,
@@ -233,10 +237,30 @@ class TournamentAdmin(admin.ModelAdmin):
         js = ("js/admin_tournament.js",)
 
 
+class MatchAdminForm(forms.ModelForm):
+    """Форма матча с понятными подписями для счёта по сетам."""
+
+    class Meta:
+        model = Match
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["player1_set1"].label = "Игрок 1 — 1‑й сет (геймы)"
+        self.fields["player2_set1"].label = "Игрок 2 — 1‑й сет (геймы)"
+        self.fields["player1_set2"].label = "Игрок 1 — 2‑й сет (геймы)"
+        self.fields["player2_set2"].label = "Игрок 2 — 2‑й сет (геймы)"
+        self.fields["player1_set3"].label = "Игрок 1 — 3‑й сет (геймы)"
+        self.fields["player2_set3"].label = "Игрок 2 — 3‑й сет (геймы)"
+        for i, name in enumerate(["player1_set1", "player2_set1", "player1_set2", "player2_set2", "player1_set3", "player2_set3"], 1):
+            self.fields[name].help_text = "Количество выигранных геймов в сете. Игрок 1 и 2 — первая и вторая сторона в матче (см. выше)."
+
+
 @admin.register(Match)
 class MatchAdmin(admin.ModelAdmin):
     """Admin for Match model."""
 
+    form = MatchAdminForm
     list_display = (
         "tournament",
         "round_name",
@@ -277,16 +301,17 @@ class MatchAdmin(admin.ModelAdmin):
         ),
         ("Игроки / Команды", {"fields": ("player1", "player2", "team1", "team2", "winner", "winner_team")}),
         (
-            "Счёт",
+            "Счёт по сетам",
             {
                 "fields": (
                     ("player1_set1", "player2_set1"),
                     ("player1_set2", "player2_set2"),
                     ("player1_set3", "player2_set3"),
-                )
+                ),
+                "description": "Игрок 1 и Игрок 2 — первая и вторая сторона в матче (см. блок выше). Укажите геймы в каждом сете (например 6 и 4 для счёта 6:4). Третий сет — только если играли тай-брейк или полный третий сет.",
             },
         ),
-        ("Очки", {"fields": ("points_player1", "points_player2")}),
+        ("Очки рейтинга", {"fields": ("points_player1", "points_player2")}),
         ("Время", {"fields": ("scheduled_datetime", "deadline", "completed_datetime", "status")}),
     )
 
@@ -310,14 +335,89 @@ class SeasonRatingAdmin(admin.ModelAdmin):
     list_editable = ("points", "rank")
 
 
+class MatchResultProposalAdminForm(forms.ModelForm):
+    """Форма предложения результата с понятными подписями для счёта."""
+
+    class Meta:
+        model = MatchResultProposal
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["player1_set1"].label = "Игрок 1 — 1‑й сет (геймы)"
+        self.fields["player2_set1"].label = "Игрок 2 — 1‑й сет (геймы)"
+        self.fields["player1_set2"].label = "Игрок 1 — 2‑й сет (геймы)"
+        self.fields["player2_set2"].label = "Игрок 2 — 2‑й сет (геймы)"
+        self.fields["player1_set3"].label = "Игрок 1 — 3‑й сет (геймы)"
+        self.fields["player2_set3"].label = "Игрок 2 — 3‑й сет (геймы)"
+
+
 @admin.register(MatchResultProposal)
 class MatchResultProposalAdmin(admin.ModelAdmin):
     """Admin for match proposals. При смене статуса на «Подтверждено» результат автоматически применяется к матчу."""
 
+    form = MatchResultProposalAdminForm
     list_display = ("match", "proposer", "result", "status", "created_at")
     list_filter = ("status", "result")
     search_fields = ("match__tournament__name", "proposer__user__email")
     actions = [accept_proposal_action]
+    raw_id_fields = ("match", "proposer")
+
+    fieldsets = (
+        (None, {"fields": ("match", "proposer", "result", "status")}),
+        (
+            "Предложенный счёт по сетам",
+            {
+                "fields": (
+                    ("player1_set1", "player2_set1"),
+                    ("player1_set2", "player2_set2"),
+                    ("player1_set3", "player2_set3"),
+                ),
+                "description": "Игрок 1 и Игрок 2 — первая и вторая сторона в матче. Геймы в 1‑м, 2‑м и 3‑м сете.",
+            },
+        ),
+    )
+
+
+@admin.action(description="Одобрить (+24 ч)")
+def approve_extension_action(modeladmin, request, queryset):
+    """Продлить дедлайн матча на 24 часа и отметить запрос как одобренный."""
+    now = timezone.now()
+    count = 0
+    for ext in queryset.filter(status=DeadlineExtensionRequest.Status.PENDING):
+        match = ext.match
+        if match.status not in (Match.MatchStatus.SCHEDULED,):
+            continue
+        if match.deadline:
+            match.deadline = match.deadline + timedelta(hours=24)
+        else:
+            match.deadline = now + timedelta(hours=24)
+        match.save(update_fields=["deadline"])
+        ext.status = DeadlineExtensionRequest.Status.APPROVED
+        ext.processed_at = now
+        ext.save(update_fields=["status", "processed_at"])
+        try:
+            from apps.telegram_bot import notifications as tg
+            tg.notify_extension_approved(ext)
+        except Exception:
+            pass
+        count += 1
+    if count:
+        messages.success(request, f"Одобрено запросов: {count}. Дедлайн продлён на 24 ч.")
+    else:
+        messages.warning(request, "Нет запросов для одобрения (или матчи уже завершены).")
+
+
+@admin.register(DeadlineExtensionRequest)
+class DeadlineExtensionRequestAdmin(admin.ModelAdmin):
+    """Запросы на продление дедлайна матча (из кнопки в Telegram-боте)."""
+
+    list_display = ("match", "requested_by", "status", "created_at", "processed_at")
+    list_filter = ("status",)
+    search_fields = ("match__tournament__name", "requested_by__user__email")
+    actions = [approve_extension_action]
+    raw_id_fields = ("match", "requested_by")
+    readonly_fields = ("created_at",)
 
 
 @admin.register(TournamentPlayerResult)

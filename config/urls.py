@@ -7,7 +7,10 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+from apps.telegram_bot.views import admin_broadcast
+
 urlpatterns = [
+    path("admin/telegram-broadcast/", admin_broadcast, name="admin_telegram_broadcast"),
     path('admin/', admin.site.urls),
     path('', include('apps.core.urls')),
     path('users/', include('apps.users.urls')),
@@ -24,6 +27,7 @@ urlpatterns = [
     path('about/', include('apps.content.urls_about')),
     path('contacts/', include('apps.content.urls_contacts')),
     path('shop/', include('apps.shop.urls')),
+    path('telegram/', include('apps.telegram_bot.urls')),
 ]
 
 # Serve media files (only if using local filesystem storage, not Cloudinary)

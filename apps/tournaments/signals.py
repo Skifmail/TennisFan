@@ -1,3 +1,4 @@
+import logging
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
@@ -11,6 +12,22 @@ from .olympic_consolation import _is_olympic, advance_winner_olympic, ensure_con
 from .round_robin import _is_round_robin, check_and_finalize_if_complete
 from .models import Match, MatchResultProposal
 from .proposal_service import apply_proposal
+
+logger = logging.getLogger(__name__)
+
+
+@receiver(post_save, sender=Match)
+def notify_telegram_match_created(sender, instance, created, **kwargs):
+    """После создания матча с участниками — уведомление в Telegram."""
+    if not created:
+        return
+    if not instance.player1_id and not instance.team1_id:
+        return
+    try:
+        from apps.telegram_bot.notifications import notify_match_created
+        notify_match_created(instance)
+    except Exception as e:
+        logger.exception("Telegram notify_match_created failed: %s", e)
 
 
 @receiver(pre_save, sender=Match)

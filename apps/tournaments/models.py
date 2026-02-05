@@ -545,6 +545,45 @@ class MatchResultProposal(models.Model):
         return f"{self.match} — {self.get_result_display()} ({self.get_status_display()})"
 
 
+class DeadlineExtensionRequest(models.Model):
+    """Запрос участника матча на продление дедлайна (кнопка в Telegram-боте)."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "На рассмотрении"
+        APPROVED = "approved", "Одобрено"
+        REJECTED = "rejected", "Отклонено"
+
+    match = models.ForeignKey(
+        Match,
+        on_delete=models.CASCADE,
+        related_name="deadline_extension_requests",
+        verbose_name="Матч",
+    )
+    requested_by = models.ForeignKey(
+        Player,
+        on_delete=models.CASCADE,
+        related_name="deadline_extension_requests",
+        verbose_name="Кто запросил",
+    )
+    status = models.CharField(
+        "Статус",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    processed_at = models.DateTimeField("Обработано", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Запрос продления дедлайна"
+        verbose_name_plural = "Запросы продления дедлайна"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.match} — {self.requested_by} ({self.get_status_display()})"
+
+
 class HeadToHead(models.Model):
     """Head-to-head statistics between two players."""
 

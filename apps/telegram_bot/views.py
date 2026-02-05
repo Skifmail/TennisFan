@@ -520,6 +520,9 @@ def user_bot_webhook(request):
     # Callback от inline-кнопок: подтверждение/отклонение результата или просто снять «часики»
     callback_query = data.get("callback_query") or {}
     if callback_query:
+        # Telegram API присылает данные кнопки в поле "data", а не "callback_data"
+        if "data" in callback_query:
+            callback_query.setdefault("callback_data", callback_query["data"])
         callback_data = (callback_query.get("callback_data") or "")[:50]
         logger.info("user_bot callback_query: chat_id=%s data=%s", callback_query.get("message", {}).get("chat", {}).get("id"), callback_data)
         handled = _handle_proposal_callback(callback_query, base_url)

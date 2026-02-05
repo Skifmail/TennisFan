@@ -15,7 +15,7 @@ class TelegramBroadcast(CompressImageFieldsMixin, models.Model):
     """
     Рассылка в пользовательский Telegram-бот: текст и опционально фото.
     При сохранении (создании) отправляется всем пользователям с привязанным ботом.
-    Фото валидируется и сжимается до 2 МБ (как в остальных разделах сайта).
+    Фото валидируется и сжимается до 500 КБ (как в остальных разделах сайта).
     """
 
     text = models.TextField("Текст сообщения", help_text="Поддерживается HTML: <b>, <i>, <a href=\"...\">")
@@ -25,7 +25,7 @@ class TelegramBroadcast(CompressImageFieldsMixin, models.Model):
         blank=True,
         null=True,
         validators=[validate_image_max_2mb],
-        help_text="Необязательно. Если указано — отправляется как пост с подписью. До 2 МБ, при загрузке сжимается.",
+        help_text="Необязательно. Если указано — отправляется как пост с подписью. До 500 КБ, при загрузке сжимается.",
     )
     sent_at = models.DateTimeField("Отправлено", null=True, blank=True, editable=False)
     created_at = models.DateTimeField("Создано", auto_now_add=True)

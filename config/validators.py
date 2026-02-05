@@ -11,16 +11,16 @@ from django.db import models
 
 logger = logging.getLogger(__name__)
 
-# Лимит размера файла в байтах (2 МБ). Изображения больше лимита сжимаются при сохранении.
-MAX_IMAGE_SIZE_MB = 2
-MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024
+# Лимит размера файла: 500 КБ. Все загружаемые фото сжимаются до этого размера при сохранении.
+MAX_IMAGE_SIZE_KB = 500
+MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_KB * 1024
 
 
 def validate_image_max_2mb(value):
     """
-    Проверка размера файла. Файлы больше 2 МБ не отклоняются — они будут сжаты при сохранении
-    (если модель использует CompressImageFieldsMixin). Валидатор можно оставить для явной проверки
-    или убрать — сжатие выполняется в save().
+    Валидатор размера изображения (имя сохранено для совместимости).
+    Файлы больше лимита не отклоняются — сжимаются при сохранении через CompressImageFieldsMixin.
+    Лимит задаётся в MAX_IMAGE_SIZE_BYTES (500 КБ).
     """
     if not value:
         return
@@ -31,8 +31,9 @@ def validate_image_max_2mb(value):
 
 def compress_image_to_max_bytes(file_like, max_bytes=MAX_IMAGE_SIZE_BYTES):
     """
-    Сжимает изображение до размера не более max_bytes.
-    Сначала уменьшает качество JPEG/PNG, при необходимости уменьшает размер по ширине/высоте.
+    Сжимает изображение до размера не более max_bytes с минимальной потерей качества.
+    Сначала плавно снижает качество JPEG (начиная с 92), при необходимости уменьшает разрешение
+    (LANCZOS). Исходники меньше лимита не пережимаются.
 
     :param file_like: файл или bytes
     :param max_bytes: максимальный размер в байтах
@@ -51,7 +52,6 @@ def compress_image_to_max_bytes(file_like, max_bytes=MAX_IMAGE_SIZE_BYTES):
         data = file_like
 
     img = Image.open(io.BytesIO(data)).copy()
-    # EXIF orientation
     try:
         from PIL import ImageOps
         img = ImageOps.exif_transpose(img)
@@ -71,7 +71,7 @@ def compress_image_to_max_bytes(file_like, max_bytes=MAX_IMAGE_SIZE_BYTES):
         out_format = "JPEG"
 
     buf = io.BytesIO()
-    quality = 88
+    quality = 92
     scale = 1.0
 
     while True:
@@ -88,28 +88,27 @@ def compress_image_to_max_bytes(file_like, max_bytes=MAX_IMAGE_SIZE_BYTES):
 
         if buf.tell() <= max_bytes:
             return buf.getvalue(), out_ext
-        if quality > 30:
-            quality -= 12
+        if quality > 45:
+            quality -= 8
             continue
-        if scale > 0.4:
-            scale *= 0.85
+        if scale > 0.35:
+            scale *= 0.88
             quality = 88
             continue
-        # Последняя попытка — сильное уменьшение
         buf.seek(0)
         buf.truncate(0)
         w, h = img.size
         new_w = max(1, int(w * 0.5))
         new_h = max(1, int(h * 0.5))
         img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-        img.save(buf, format=out_format, quality=60, optimize=True)
+        img.save(buf, format=out_format, quality=70, optimize=True)
         return buf.getvalue(), out_ext
 
 
 class CompressImageFieldsMixin:
     """
-    Миксин для моделей с ImageField. При сохранении экземпляра все загруженные
-    изображения размером больше MAX_IMAGE_SIZE_BYTES автоматически сжимаются до 2 МБ.
+    Миксин для моделей с ImageField. При сохранении все загруженные изображения
+    размером больше MAX_IMAGE_SIZE_BYTES (500 КБ) автоматически сжимаются до этого лимита.
     """
 
     def save(self, *args, **kwargs):

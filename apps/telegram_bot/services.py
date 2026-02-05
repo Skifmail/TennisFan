@@ -98,3 +98,59 @@ def send_to_user(chat_id: int, text: str, reply_markup: dict | None = None) -> b
     """Отправить сообщение пользователю по chat_id."""
     _, ok = send_message(chat_id, text, reply_markup=reply_markup)
     return ok
+
+
+def send_photo(
+    chat_id: int | str,
+    photo: str | bytes,
+    caption: str | None = None,
+    parse_mode: str = "HTML",
+) -> Tuple[int | None, bool]:
+    """
+    Отправить фото пользователю от имени пользовательского бота.
+    photo: путь к файлу (str), HTTP(S) URL (str) или bytes.
+    Возвращает (message_id, success).
+    """
+    token = _get_bot_token()
+    if not token:
+        logger.debug("TELEGRAM_USER_BOT_TOKEN not set")
+        return None, False
+    api_url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    payload: dict = {"chat_id": chat_id}
+    if caption:
+        payload["caption"] = caption
+        payload["parse_mode"] = parse_mode
+    files = None
+    if isinstance(photo, str) and (photo.startswith("http://") or photo.startswith("https://")):
+        payload["photo"] = photo
+    elif isinstance(photo, str):
+        try:
+            files = {"photo": open(photo, "rb")}
+        except OSError as e:
+            logger.warning("Telegram send_photo open file failed: %s", e)
+            return None, False
+    else:
+        files = {"photo": ("photo.jpg", photo)}
+    try:
+        r = requests.post(api_url, data=payload, files=files, timeout=15)
+        if isinstance(photo, str) and not (photo.startswith("http://") or photo.startswith("https://")) and files:
+            files["photo"].close()
+        if not r.ok:
+            err_body = r.text
+            try:
+                err_data = r.json()
+                err_desc = err_data.get("description", err_body)
+            except Exception:
+                err_desc = err_body
+            logger.warning(
+                "Telegram user bot send_photo failed: %s %s",
+                r.status_code,
+                err_desc,
+            )
+            return None, False
+        data = r.json()
+        result = data.get("result", {})
+        return result.get("message_id"), True
+    except Exception as e:
+        logger.warning("Telegram user bot send_photo failed: %s", e)
+        return None, False

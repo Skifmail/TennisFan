@@ -6,6 +6,8 @@ import logging
 from datetime import timedelta
 
 from django.contrib import admin, messages
+from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.models import UserTelegramLink
@@ -112,6 +114,15 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
                 f"Рассылка отправлена: {sent} из {total} пользователей с привязанным Telegram.",
             )
         super().save_model(request, obj, form, change)
+
+    def response_add(self, request, obj, post_url_continue=None):
+        """Редирект на страницу просмотра созданной рассылки (избегаем ID "add" в URL)."""
+        return redirect(
+            reverse(
+                "admin:telegram_bot_telegrambroadcast_change",
+                args=[obj.pk],
+            )
+        )
 
 
 # ---------------------------------------------------------------------------

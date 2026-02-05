@@ -300,14 +300,22 @@ def notify_new_tournament(tournament) -> None:
     if not tournament or pk is None:
         logger.debug("notify_new_tournament: no tournament or no pk, skip")
         return
+    notify_new_tournament_by_pk(pk)
+
+
+def notify_new_tournament_by_pk(tournament_pk: int) -> None:
+    """
+    Запуск рассылки о новом турнире по pk. Вызывать после transaction.on_commit(),
+    чтобы турнир был уже закоммичен и виден в фоновом потоке.
+    """
     if not bot.is_configured():
-        logger.warning("notify_new_tournament: bot not configured, tournament pk=%s", pk)
+        logger.warning("notify_new_tournament_by_pk: bot not configured, pk=%s", tournament_pk)
         return
-    logger.info("New tournament created pk=%s, starting background notify", pk)
+    logger.info("New tournament pk=%s, starting background notify", tournament_pk)
     thread = threading.Thread(
         target=_send_new_tournament_to_all,
-        args=(tournament.pk,),
+        args=(tournament_pk,),
         daemon=True,
-        name=f"notify_tournament_{tournament.pk}",
+        name=f"notify_tournament_{tournament_pk}",
     )
     thread.start()

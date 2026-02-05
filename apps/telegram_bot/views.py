@@ -401,20 +401,30 @@ def _handle_menu_callback(callback_query: dict) -> bool:
     if not chat_id:
         return False
 
-    link = _get_link_by_chat_id(chat_id)
-    if not link:
-        _answer_callback(cq_id, "Сначала подключите бота с сайта (профиль → Telegram).", show_alert=True)
-        return True
-
-    user = link.user
-    player = getattr(user, "player", None)
-    if not player:
-        try:
-            player = Player.objects.create(user=user)
-        except Exception:
-            _answer_callback(cq_id, "Ошибка профиля игрока.", show_alert=True)
+    try:
+        link = _get_link_by_chat_id(chat_id)
+        if not link:
+            _answer_callback(cq_id, "Сначала подключите бота с сайта (профиль → Telegram).", show_alert=True)
             return True
 
+        user = link.user
+        player = getattr(user, "player", None)
+        if not player:
+            try:
+                player = Player.objects.create(user=user)
+            except Exception:
+                _answer_callback(cq_id, "Ошибка профиля игрока.", show_alert=True)
+                return True
+
+        _handle_menu_callback_action(chat_id, cq_id, callback_data, user, player)
+    except Exception as e:
+        logger.exception("_handle_menu_callback failed: %s", e)
+        _answer_callback(cq_id, "Ошибка. Попробуйте ещё раз.", show_alert=True)
+    return True
+
+
+def _handle_menu_callback_action(chat_id, cq_id: str, callback_data: str, user, player) -> None:
+    """Отправка контента по выбранному пункту меню (вынесено для удобства обработки ошибок)."""
     if callback_data == "menu_my_matches":
         matches = (
             Match.objects.filter(
@@ -429,10 +439,12 @@ def _handle_menu_callback(callback_query: dict) -> bool:
         scheduled = [m for m in matches if m.status == Match.MatchStatus.SCHEDULED]
         reply_markup = None
         if scheduled:
-            keyboard = [
-                [{"text": f"📝 Внести результат — {m.tournament.name}, {m.round_name or 'раунд'}", "callback_data": f"result_enter_{m.pk}"}]
-                for m in scheduled[:8]
-            ]
+            keyboard = []
+            for m in scheduled[:8]:
+                btn_text = f"📝 Внести результат — {m.tournament.name}, {m.round_name or 'раунд'}"
+                if len(btn_text) > 64:
+                    btn_text = btn_text[:61] + "..."
+                keyboard.append([{"text": btn_text, "callback_data": f"result_enter_{m.pk}"}])
             reply_markup = {"inline_keyboard": keyboard}
         for m in matches:
             status_emoji = "✅" if m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER) else "⏳"
@@ -441,8 +453,10 @@ def _handle_menu_callback(callback_query: dict) -> bool:
         if len(lines) == 1:
             lines.append("Нет матчей.")
         text = "\n".join(lines)
-        bot.send_message(chat_id, text, reply_markup=reply_markup)
-        _answer_callback(cq_id, "Список матчей")
+        ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer_callback(cq_id, "Список матчей" if ok else "Сообщение не отправлено")
+        if not ok:
+            logger.warning("menu_my_matches: send_message failed for chat_id=%s", chat_id)
 
     elif callback_data == "menu_my_profile":
         text = (
@@ -454,11 +468,16 @@ def _handle_menu_callback(callback_query: dict) -> bool:
             f"Матчей: {player.matches_played}\n"
             f"Побед: {player.win_rate}%"
         )
-        bot.send_message(chat_id, text)
-        _answer_callback(cq_id, "Профиль")
+        ok = bot.send_to_user(chat_id, text)
+        _answer_callback(cq_id, "Профиль" if ok else "Ошибка отправки")
+        if not ok:
+            logger.warning("menu_my_profile: send_message failed for chat_id=%s", chat_id)
 
     elif callback_data == "menu_my_subscription":
-        sub = getattr(user, "subscription", None)
+        try:
+            sub = getattr(user, "subscription", None)
+        except Exception:
+            sub = None
         if not sub:
             text = "📋 <b>Моя подписка</b>\n\nНет активной подписки.\nОформить на сайте в разделе «Тарифы»."
         else:
@@ -473,10 +492,10 @@ def _handle_menu_callback(callback_query: dict) -> bool:
                 f"До: {end_str}\n"
                 f"Регистраций в месяц: {slots}"
             )
-        bot.send_message(chat_id, text)
-        _answer_callback(cq_id, "Подписка")
-
-    return True
+        ok = bot.send_to_user(chat_id, text)
+        _answer_callback(cq_id, "Подписка" if ok else "Ошибка отправки")
+        if not ok:
+            logger.warning("menu_my_subscription: send_message failed for chat_id=%s", chat_id)
 
 
 @csrf_exempt
@@ -501,6 +520,8 @@ def user_bot_webhook(request):
     # Callback от inline-кнопок: подтверждение/отклонение результата или просто снять «часики»
     callback_query = data.get("callback_query") or {}
     if callback_query:
+        callback_data = (callback_query.get("callback_data") or "")[:50]
+        logger.info("user_bot callback_query: chat_id=%s data=%s", callback_query.get("message", {}).get("chat", {}).get("id"), callback_data)
         handled = _handle_proposal_callback(callback_query, base_url)
         if not handled:
             handled = _handle_extension_request_callback(callback_query, base_url)
@@ -695,45 +716,3 @@ def connect_redirect(request):
             return redirect("profile_edit")
     url = f"https://t.me/{username}?start={token}"
     return redirect(url)
-
-
-@staff_member_required
-@require_http_methods(["GET", "POST"])
-def admin_broadcast(request):
-    """
-    Форма «Отправить сообщение всем в Telegram» — рассылка по списку привязанных пользователей.
-    Доступно только сотрудникам (staff).
-    """
-    from apps.core.models import UserTelegramLink
-
-    if not bot.is_configured():
-        messages.error(request, "Пользовательский бот не настроен (TELEGRAM_USER_BOT_TOKEN).")
-        return redirect("admin:index")
-
-    if request.method == "POST":
-        text = (request.POST.get("message") or "").strip()
-        if not text:
-            messages.error(request, "Введите текст сообщения.")
-        else:
-            links = UserTelegramLink.objects.filter(user_bot_chat_id__isnull=False).exclude(
-                user_bot_chat_id=0
-            )
-            total = links.count()
-            sent = 0
-            for link in links:
-                try:
-                    if bot.send_to_user(link.user_bot_chat_id, text):
-                        sent += 1
-                except Exception as e:
-                    logger.warning("Broadcast to %s failed: %s", link.user_bot_chat_id, e)
-            messages.success(
-                request,
-                f"Отправлено {sent} из {total} пользователей с привязанным Telegram.",
-            )
-            return redirect("admin:index")
-
-    return render(
-        request,
-        "telegram_bot/admin_broadcast.html",
-        {"title": "Рассылка в Telegram"},
-    )

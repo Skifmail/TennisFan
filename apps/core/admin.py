@@ -4,7 +4,7 @@ Core admin.
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Feedback, FeedbackReply, SupportMessage, UserTelegramLink
+from .models import Feedback, FeedbackReply, SupportMessage
 
 
 class FeedbackReplyInline(admin.TabularInline):
@@ -41,18 +41,6 @@ class FeedbackReplyAdmin(admin.ModelAdmin):
 
     def text_short(self, obj):
         return (obj.text or "")[:60] + ("…" if len(obj.text or "") > 60 else "")
-
-
-@admin.register(UserTelegramLink)
-class UserTelegramLinkAdmin(admin.ModelAdmin):
-    list_display = ("user", "telegram_chat_id", "user_bot_chat_id", "has_binding_token", "created_at")
-    search_fields = ("user__email",)
-    readonly_fields = ("created_at", "updated_at", "token_created_at")
-
-    def has_binding_token(self, obj):
-        return bool(obj.binding_token)
-    has_binding_token.boolean = True
-    has_binding_token.short_description = "Токен привязки"
 
 
 @admin.register(SupportMessage)

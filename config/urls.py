@@ -7,10 +7,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
-from apps.telegram_bot.views import admin_broadcast
-
 urlpatterns = [
-    path("admin/telegram-broadcast/", admin_broadcast, name="admin_telegram_broadcast"),
     path('admin/', admin.site.urls),
     path('', include('apps.core.urls')),
     path('users/', include('apps.users.urls')),

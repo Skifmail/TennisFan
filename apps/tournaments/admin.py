@@ -16,7 +16,6 @@ from .olympic_consolation import generate_bracket as generate_olympic_bracket
 from .round_robin import generate_bracket as generate_round_robin_bracket
 from .proposal_service import apply_proposal
 from .models import (
-    DeadlineExtensionRequest,
     HeadToHead,
     Match,
     MatchResultProposal,
@@ -377,47 +376,6 @@ class MatchResultProposalAdmin(admin.ModelAdmin):
             },
         ),
     )
-
-
-@admin.action(description="Одобрить (+24 ч)")
-def approve_extension_action(modeladmin, request, queryset):
-    """Продлить дедлайн матча на 24 часа и отметить запрос как одобренный."""
-    now = timezone.now()
-    count = 0
-    for ext in queryset.filter(status=DeadlineExtensionRequest.Status.PENDING):
-        match = ext.match
-        if match.status not in (Match.MatchStatus.SCHEDULED,):
-            continue
-        if match.deadline:
-            match.deadline = match.deadline + timedelta(hours=24)
-        else:
-            match.deadline = now + timedelta(hours=24)
-        match.save(update_fields=["deadline"])
-        ext.status = DeadlineExtensionRequest.Status.APPROVED
-        ext.processed_at = now
-        ext.save(update_fields=["status", "processed_at"])
-        try:
-            from apps.telegram_bot import notifications as tg
-            tg.notify_extension_approved(ext)
-        except Exception:
-            pass
-        count += 1
-    if count:
-        messages.success(request, f"Одобрено запросов: {count}. Дедлайн продлён на 24 ч.")
-    else:
-        messages.warning(request, "Нет запросов для одобрения (или матчи уже завершены).")
-
-
-@admin.register(DeadlineExtensionRequest)
-class DeadlineExtensionRequestAdmin(admin.ModelAdmin):
-    """Запросы на продление дедлайна матча (из кнопки в Telegram-боте)."""
-
-    list_display = ("match", "requested_by", "status", "created_at", "processed_at")
-    list_filter = ("status",)
-    search_fields = ("match__tournament__name", "requested_by__user__email")
-    actions = [approve_extension_action]
-    raw_id_fields = ("match", "requested_by")
-    readonly_fields = ("created_at",)
 
 
 @admin.register(TournamentPlayerResult)

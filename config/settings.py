@@ -13,8 +13,11 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-tennison-dev-key-chan
 
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-# ALLOWED_HOSTS — localhost for dev; .up.railway.app matches *.up.railway.app
-_allowed = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.up.railway.app')
+# ALLOWED_HOSTS — localhost for dev; .up.railway.app для Railway; .ngrok-free.dev/.ngrok.io для туннеля
+_allowed = os.environ.get(
+    'ALLOWED_HOSTS',
+    'localhost,127.0.0.1,.up.railway.app,.ngrok-free.dev,.ngrok.io'
+)
 ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()]
 
 # CSRF: origins must match exactly or use leading-dot subdomain (e.g. https://.up.railway.app).
@@ -51,6 +54,7 @@ INSTALLED_APPS = [
     'apps.legal',
     'apps.navigation',
     'apps.shop',
+    'apps.telegram_bot',
     'django_crontab',
 ]
 
@@ -196,9 +200,23 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
 
-# Telegram bot for admin notifications (заявки, регистрации, обратная связь)
+# Telegram: основной бот (уведомления админу — заявки, регистрации и т.д.)
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get('TELEGRAM_ADMIN_CHAT_ID', '')
+
+# Telegram: бот только для обратной связи / поддержки (отдельный бот)
+TELEGRAM_SUPPORT_BOT_TOKEN = os.environ.get('TELEGRAM_SUPPORT_BOT_TOKEN', '')
+# Опционально: не задавайте — ссылка привязки строится через getMe
+TELEGRAM_SUPPORT_BOT_USERNAME = os.environ.get('TELEGRAM_SUPPORT_BOT_USERNAME', '')
+# Опционально: не задавайте — webhook работает без проверки секрета
+TELEGRAM_SUPPORT_WEBHOOK_SECRET = os.environ.get('TELEGRAM_SUPPORT_WEBHOOK_SECRET', '')
+
+# Telegram: бот для пользователей (уведомления о турнирах, матчах, подписка)
+TELEGRAM_USER_BOT_TOKEN = os.environ.get('TELEGRAM_USER_BOT_TOKEN', '')
+TELEGRAM_USER_BOT_USERNAME = os.environ.get('TELEGRAM_USER_BOT_USERNAME', '')
+TELEGRAM_USER_BOT_WEBHOOK_SECRET = os.environ.get('TELEGRAM_USER_BOT_WEBHOOK_SECRET', '')
+# Базовый URL сайта для ссылок в боте (например https://tennisfan.ru)
+TELEGRAM_BOT_SITE_BASE_URL = os.environ.get('TELEGRAM_BOT_SITE_BASE_URL', '')
 
 # Yandex Maps JS API — для карты на странице корта (ключ в .env: YANDEX_MAPS_API_KEY)
 YANDEX_MAPS_API_KEY = os.environ.get('YANDEX_MAPS_API_KEY', '')
@@ -211,6 +229,14 @@ YANDEX_MAPS_API_KEY = os.environ.get('YANDEX_MAPS_API_KEY', '')
 YANDEX_GEOCODER_API_KEY = os.environ.get('YANDEX_GEOCODER_API_KEY', '')
 YANDEX_GEOCODER_REFERER = os.environ.get('YANDEX_GEOCODER_REFERER', '')
 
+# Кэш для состояния диалога в Telegram-боте (ввод результата матча)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "OPTIONS": {"MAX_ENTRIES": 1000},
+    }
+}
+
 # Cron: формирование сеток по дедлайну (FAN, Олимпийская, Круговой), обработка просроченных матчей,
 # авто-подтверждение заявок на результат матча (6 ч без ответа = подтверждено)
 CRONJOBS = [
@@ -218,4 +244,5 @@ CRONJOBS = [
     ('0 */6 * * *', 'django.core.management.call_command', ['fan_process_overdue_matches']),
     ('0 */6 * * *', 'django.core.management.call_command', ['olympic_process_overdue_matches']),
     ('*/15 * * * *', 'django.core.management.call_command', ['auto_accept_stale_proposals']),
+    ('0 9 * * *', 'django.core.management.call_command', ['send_deadline_reminders']),
 ]

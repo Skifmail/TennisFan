@@ -6,14 +6,16 @@
 from django.conf import settings
 from django.db import models
 
+from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 from apps.core.models import UserTelegramLink as CoreUserTelegramLink
 from apps.tournaments.models import DeadlineExtensionRequest as CoreDeadlineExtensionRequest
 
 
-class TelegramBroadcast(models.Model):
+class TelegramBroadcast(CompressImageFieldsMixin, models.Model):
     """
     Рассылка в пользовательский Telegram-бот: текст и опционально фото.
     При сохранении (создании) отправляется всем пользователям с привязанным ботом.
+    Фото валидируется и сжимается до 2 МБ (как в остальных разделах сайта).
     """
 
     text = models.TextField("Текст сообщения", help_text="Поддерживается HTML: <b>, <i>, <a href=\"...\">")
@@ -22,7 +24,8 @@ class TelegramBroadcast(models.Model):
         upload_to="telegram_broadcasts/%Y/%m/",
         blank=True,
         null=True,
-        help_text="Необязательно. Если указано — отправляется как пост с подписью.",
+        validators=[validate_image_max_2mb],
+        help_text="Необязательно. Если указано — отправляется как пост с подписью. До 2 МБ, при загрузке сжимается.",
     )
     sent_at = models.DateTimeField("Отправлено", null=True, blank=True, editable=False)
     created_at = models.DateTimeField("Создано", auto_now_add=True)

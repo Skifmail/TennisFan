@@ -3,6 +3,7 @@
 """
 
 import logging
+import threading
 from datetime import timedelta
 
 from django.contrib import admin, messages
@@ -21,6 +22,53 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _send_broadcast_in_background(broadcast_pk: int) -> None:
+    """
+    В фоновом потоке: отправить рассылку всем подписчикам и проставить sent_at.
+    Вызывается после сохранения рассылки в БД (объект уже с изображением в storage).
+    """
+    from django.db import connection
+
+    connection.close()  # поток использует свою копию соединения
+    try:
+        broadcast = TelegramBroadcast.objects.get(pk=broadcast_pk)
+        if broadcast.sent_at:
+            return
+        text = (broadcast.text or "").strip()
+        if not text:
+            return
+        links = UserTelegramLink.objects.filter(
+            user_bot_chat_id__isnull=False
+        ).exclude(user_bot_chat_id=0)
+        total = links.count()
+        sent = 0
+        for link in links:
+            try:
+                if broadcast.image:
+                    photo_arg = getattr(broadcast.image, "url", None) or getattr(
+                        broadcast.image, "path", None
+                    )
+                    if photo_arg:
+                        _, ok = bot.send_photo(
+                            link.user_bot_chat_id,
+                            photo_arg,
+                            caption=text or None,
+                        )
+                    else:
+                        ok = False
+                else:
+                    ok = bot.send_to_user(link.user_bot_chat_id, text)
+                if ok:
+                    sent += 1
+            except Exception as e:
+                logger.warning("Broadcast to %s failed: %s", link.user_bot_chat_id, e)
+        broadcast.sent_at = timezone.now()
+        broadcast.save(update_fields=["sent_at"])
+        logger.info("Broadcast pk=%s sent: %s/%s", broadcast_pk, sent, total)
+    except Exception as e:
+        logger.exception("Background broadcast pk=%s failed: %s", broadcast_pk, e)
 
 
 # ---------------------------------------------------------------------------
@@ -68,52 +116,25 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if not change:
             obj.created_by = request.user
-        if not obj.sent_at and (obj.text or "").strip():
-            if not bot.is_configured():
-                messages.error(
-                    request,
-                    "Пользовательский бот не настроен (TELEGRAM_USER_BOT_TOKEN). Рассылка не отправлена.",
-                )
-                super().save_model(request, obj, form, change)
-                return
-            links = UserTelegramLink.objects.filter(
-                user_bot_chat_id__isnull=False
-            ).exclude(user_bot_chat_id=0)
-            total = links.count()
-            sent = 0
-            for link in links:
-                try:
-                    if obj.image:
-                        photo_arg = None
-                        if hasattr(obj.image, "read"):
-                            raw = obj.image.read()
-                            photo_arg = raw
-                            if hasattr(obj.image, "seek"):
-                                obj.image.seek(0)
-                        else:
-                            photo_arg = getattr(obj.image, "url", None) or getattr(
-                                obj.image, "path", None
-                            )
-                        if photo_arg is not None:
-                            _, ok = bot.send_photo(
-                                link.user_bot_chat_id,
-                                photo_arg,
-                                caption=(obj.text or "").strip() or None,
-                            )
-                        else:
-                            ok = False
-                    else:
-                        ok = bot.send_to_user(link.user_bot_chat_id, (obj.text or "").strip())
-                    if ok:
-                        sent += 1
-                except Exception as e:
-                    logger.warning("Broadcast to %s failed: %s", link.user_bot_chat_id, e)
-            obj.sent_at = timezone.now()
-            messages.success(
+        need_send = not obj.sent_at and bool((obj.text or "").strip())
+        if need_send and not bot.is_configured():
+            messages.error(
                 request,
-                f"Рассылка отправлена: {sent} из {total} пользователей с привязанным Telegram.",
+                "Пользовательский бот не настроен (TELEGRAM_USER_BOT_TOKEN). Рассылка не отправлена.",
             )
         super().save_model(request, obj, form, change)
+        if need_send and bot.is_configured():
+            thread = threading.Thread(
+                target=_send_broadcast_in_background,
+                args=(obj.pk,),
+                daemon=True,
+                name=f"broadcast-{obj.pk}",
+            )
+            thread.start()
+            messages.success(
+                request,
+                "Рассылка создана. Отправка выполняется в фоне; обновите страницу через несколько секунд.",
+            )
 
     def response_add(self, request, obj, post_url_continue=None):
         """Редирект на страницу просмотра созданной рассылки (избегаем ID "add" в URL)."""

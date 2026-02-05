@@ -15,18 +15,23 @@ logger = logging.getLogger(__name__)
 MAX_IMAGE_SIZE_KB = 500
 MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_KB * 1024
 
+# Макс. размер загружаемого файла (отклоняем с понятной ошибкой, иначе платформа обрывает запрос).
+MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 МБ
+
 
 def validate_image_max_2mb(value):
     """
     Валидатор размера изображения (имя сохранено для совместимости).
-    Файлы больше лимита не отклоняются — сжимаются при сохранении через CompressImageFieldsMixin.
-    Лимит задаётся в MAX_IMAGE_SIZE_BYTES (500 КБ).
+    Файлы > 10 МБ отклоняются (платформа может обрывать большие загрузки через 5–10 с).
+    Файлы до 10 МБ принимаются и при сохранении сжимаются до 500 КБ (CompressImageFieldsMixin).
     """
     if not value:
         return
-    if value.size > MAX_IMAGE_SIZE_BYTES:
-        # Не отклоняем: сжатие выполнится в mixin при сохранении
-        pass
+    if value.size > MAX_IMAGE_UPLOAD_BYTES:
+        raise ValidationError(
+            f"Изображение не должно превышать 10 МБ (сейчас {value.size // (1024 * 1024)} МБ). "
+            "Сожмите фото на устройстве или загрузите файл меньшего размера."
+        )
 
 
 def compress_image_to_max_bytes(file_like, max_bytes=MAX_IMAGE_SIZE_BYTES):

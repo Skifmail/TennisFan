@@ -192,9 +192,7 @@ else:
     MEDIA_URL = '/media/'
     MEDIA_ROOT = BASE_DIR / 'media'
     MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
-
-# Лимиты загрузки: платформа (Railway и др.) может обрывать запрос через 5–10 с при большом теле.
-# Рекомендуем загружать фото до 2–3 МБ (на сервере они сжимаются до 500 КБ).
+    
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 МБ — до этого размера файл в памяти
 DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024   # 12 МБ — макс. размер тела запроса (форма + файл)
 

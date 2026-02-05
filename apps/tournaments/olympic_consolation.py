@@ -320,7 +320,8 @@ def advance_winner_olympic(match: Match) -> Optional[Match]:
         _try_finalize_olympic(t)
         return None
 
-    # Основная сетка: продвижение победителя — временно считаем турнир FAN и вызываем fan-логику
+    # Основная сетка: продвижение победителя — делегируем в fan (включая логику
+    # заглушек bye: игрок с bye не должен получать bye в следующем раунде).
     t.format = "single_elimination"
     try:
         from .fan import advance_winner_and_award_loser

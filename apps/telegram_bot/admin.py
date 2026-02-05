@@ -137,13 +137,19 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
             )
 
     def response_add(self, request, obj, post_url_continue=None):
-        """Редирект на страницу просмотра созданной рассылки (избегаем ID "add" в URL)."""
-        return redirect(
-            reverse(
+        """
+        Редирект после добавления — всегда на change по pk.
+        Стандартный редирект Django использует get_full_path().replace('/add/', ...),
+        при пути без слэша (например /add) подстановка не срабатывает и редирект ведёт на .../add/,
+        что воспринимается как object_id='add' и даёт «объект не существует».
+        """
+        if obj is not None and getattr(obj, "pk", None) is not None:
+            change_url = reverse(
                 "admin:telegram_bot_telegrambroadcast_change",
                 args=[obj.pk],
             )
-        )
+            return redirect(request.build_absolute_uri(change_url))
+        return super().response_add(request, obj, post_url_continue)
 
 
 # ---------------------------------------------------------------------------

@@ -265,12 +265,20 @@ def _send_new_tournament_to_all(tournament_pk: int) -> None:
             .prefetch_related("allowed_categories")
             .first()
         )
-        if not tournament or not bot.is_configured():
+        if not tournament:
+            logger.warning("New tournament notify: tournament pk=%s not found", tournament_pk)
             return
-        text = _format_new_tournament_message(tournament)
+        if not bot.is_configured():
+            logger.warning("New tournament notify: bot not configured (TELEGRAM_USER_BOT_TOKEN), pk=%s", tournament_pk)
+            return
         links = UserTelegramLink.objects.filter(
             user_bot_chat_id__isnull=False
         ).exclude(user_bot_chat_id=0)
+        total = links.count()
+        if total == 0:
+            logger.info("New tournament pk=%s: no users with bot linked, skip send", tournament_pk)
+            return
+        text = _format_new_tournament_message(tournament)
         sent = 0
         for link in links:
             try:
@@ -278,7 +286,7 @@ def _send_new_tournament_to_all(tournament_pk: int) -> None:
                     sent += 1
             except Exception as e:
                 logger.warning("New tournament notify to %s failed: %s", link.user_bot_chat_id, e)
-        logger.info("New tournament pk=%s notified to %s users", tournament_pk, sent)
+        logger.info("New tournament pk=%s notified to %s/%s users", tournament_pk, sent, total)
     except Exception as e:
         logger.exception("_send_new_tournament_to_all pk=%s failed: %s", tournament_pk, e)
 
@@ -288,10 +296,14 @@ def notify_new_tournament(tournament) -> None:
     Уведомление всем пользователям с привязанным ботом о новом турнире.
     Вызывается при создании турнира (post_save, created=True). Отправка в фоне.
     """
+    pk = getattr(tournament, "pk", None)
+    if not tournament or pk is None:
+        logger.debug("notify_new_tournament: no tournament or no pk, skip")
+        return
     if not bot.is_configured():
+        logger.warning("notify_new_tournament: bot not configured, tournament pk=%s", pk)
         return
-    if not tournament or not getattr(tournament, "pk", None):
-        return
+    logger.info("New tournament created pk=%s, starting background notify", pk)
     thread = threading.Thread(
         target=_send_new_tournament_to_all,
         args=(tournament.pk,),

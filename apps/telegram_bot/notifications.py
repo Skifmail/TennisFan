@@ -3,10 +3,13 @@
 Отправка по User или chat_id; тексты для регистрации, матча, предложения результата.
 """
 
+import html
 import logging
+import threading
 
 from apps.core.models import UserTelegramLink
 from apps.tournaments.utils import get_match_opponent_users, get_match_participant_users
+from apps.users.models import SkillLevel
 
 from . import services as bot
 
@@ -194,3 +197,105 @@ def notify_extension_approved(extension_request) -> None:
         f"Матч «{match.tournament.name}». Новый дедлайн: {new_deadline}"
     )
     send_to_user_by_user(user, text)
+
+
+def _format_new_tournament_message(tournament) -> str:
+    """Формирует подробный текст уведомления о новом турнире (HTML для Telegram)."""
+    parts = [
+        "🆕 <b>Новый турнир</b>",
+        "",
+        f"<b>{html.escape(tournament.name)}</b>",
+        f"📍 {html.escape(tournament.city)}",
+        "",
+        f"Формат: {tournament.get_format_display()}",
+        f"Вариант: {tournament.get_variant_display()}",
+        f"Категория: {tournament.get_gender_display()}",
+        f"Продолжительность: {tournament.get_duration_display()}",
+        f"Тип: {tournament.get_tournament_type_display()}",
+        f"Статус: {tournament.get_status_display()}",
+        "",
+        f"📅 Начало: {tournament.start_date.strftime('%d.%m.%Y')}",
+    ]
+    if tournament.end_date:
+        parts.append(f"📅 Окончание: {tournament.end_date.strftime('%d.%m.%Y')}")
+    if tournament.registration_deadline:
+        parts.append(
+            f"⏰ Дедлайн регистрации: {tournament.registration_deadline.strftime('%d.%m.%Y %H:%M')}"
+        )
+    parts.append("")
+    if tournament.entry_fee and tournament.entry_fee > 0:
+        parts.append(f"💰 Взнос: {tournament.entry_fee} ₽")
+    if tournament.is_singles():
+        if tournament.min_participants is not None or tournament.max_participants is not None:
+            min_m = tournament.min_participants or "—"
+            max_m = tournament.max_participants or "—"
+            parts.append(f"Участники: от {min_m} до {max_m}")
+    else:
+        if tournament.min_teams is not None or tournament.max_teams is not None:
+            min_t = tournament.min_teams or "—"
+            max_t = tournament.max_teams or "—"
+            parts.append(f"Команд: от {min_t} до {max_t}")
+    try:
+        categories = list(
+            tournament.allowed_categories.values_list("category", flat=True)
+        )
+        if categories:
+            labels = [SkillLevel(c).label for c in categories]
+            parts.append(f"Категории участников: {', '.join(labels)}")
+    except Exception:
+        pass
+    if tournament.description:
+        desc = html.escape(tournament.description.strip())
+        if len(desc) > 400:
+            desc = desc[:397] + "..."
+        parts.extend(["", desc])
+    return "\n".join(parts)
+
+
+def _send_new_tournament_to_all(tournament_pk: int) -> None:
+    """В фоне отправить уведомление о новом турнире всем пользователям с привязанным ботом."""
+    from django.db import connection
+
+    connection.close()
+    try:
+        from apps.tournaments.models import Tournament
+
+        tournament = (
+            Tournament.objects.filter(pk=tournament_pk)
+            .prefetch_related("allowed_categories")
+            .first()
+        )
+        if not tournament or not bot.is_configured():
+            return
+        text = _format_new_tournament_message(tournament)
+        links = UserTelegramLink.objects.filter(
+            user_bot_chat_id__isnull=False
+        ).exclude(user_bot_chat_id=0)
+        sent = 0
+        for link in links:
+            try:
+                if bot.send_to_user(link.user_bot_chat_id, text):
+                    sent += 1
+            except Exception as e:
+                logger.warning("New tournament notify to %s failed: %s", link.user_bot_chat_id, e)
+        logger.info("New tournament pk=%s notified to %s users", tournament_pk, sent)
+    except Exception as e:
+        logger.exception("_send_new_tournament_to_all pk=%s failed: %s", tournament_pk, e)
+
+
+def notify_new_tournament(tournament) -> None:
+    """
+    Уведомление всем пользователям с привязанным ботом о новом турнире.
+    Вызывается при создании турнира (post_save, created=True). Отправка в фоне.
+    """
+    if not bot.is_configured():
+        return
+    if not tournament or not getattr(tournament, "pk", None):
+        return
+    thread = threading.Thread(
+        target=_send_new_tournament_to_all,
+        args=(tournament.pk,),
+        daemon=True,
+        name=f"notify_tournament_{tournament.pk}",
+    )
+    thread.start()

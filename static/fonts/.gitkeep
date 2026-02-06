@@ -1,0 +1,5 @@
+# Шрифты: Roboto (заголовки), Open Sans (основной текст).
+# Нужны файлы .ttf или .woff2 — формат .ttx в браузере не работает.
+# Имена, которые ожидает style.css: Roboto-Regular.ttf, Roboto-Bold.ttf,
+# OpenSans-Regular.ttf, OpenSans-SemiBold.ttf, OpenSans-Bold.ttf.
+# Конвертация .ttx → .ttf: pip install fonttools, затем ttx -f имя.ttx

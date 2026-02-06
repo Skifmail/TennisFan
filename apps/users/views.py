@@ -8,11 +8,13 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import AuthenticationForm
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -142,31 +144,70 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
     return result
 
 
-def register(request):
-    """Упрощённая регистрация: имя, фамилия, телефон, email, дата рождения, обязательный NTRP-тест."""
+def auth(request):
+    """Объединённая страница регистрации и входа с анимацией переключения."""
+    # Определяем активный режим из GET параметра или по умолчанию register
+    active_mode = request.GET.get('mode', 'register')
+    if active_mode not in ('register', 'login'):
+        active_mode = 'register'
+    
+    register_form = None
+    login_form = None
+    
     if request.method == "POST":
-        form = UserRegistrationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            ntrp = form.cleaned_data["ntrp_level"]
-            level_decimal = Decimal(ntrp)
-            skill = _map_ntrp_to_skill_level(level_decimal)
-            player = Player.objects.create(
-                user=user,
-                birth_date=form.cleaned_data["birth_date"],
-                city=form.cleaned_data["city"].strip(),
-                ntrp_level=level_decimal,
-                skill_level=skill,
-            )
-            from apps.core.telegram_notify import notify_new_registration
+        # Проверяем какая форма была отправлена по наличию полей
+        if 'email' in request.POST and 'first_name' in request.POST:
+            # Форма регистрации
+            active_mode = 'register'
+            register_form = UserRegistrationForm(request.POST)
+            if register_form.is_valid():
+                user = register_form.save()
+                ntrp = register_form.cleaned_data["ntrp_level"]
+                level_decimal = Decimal(ntrp)
+                skill = _map_ntrp_to_skill_level(level_decimal)
+                player = Player.objects.create(
+                    user=user,
+                    birth_date=register_form.cleaned_data["birth_date"],
+                    city=register_form.cleaned_data["city"].strip(),
+                    ntrp_level=level_decimal,
+                    skill_level=skill,
+                )
+                from apps.core.telegram_notify import notify_new_registration
+                notify_new_registration(user, player)
+                login(request, user)
+                messages.success(request, "Регистрация успешна! Добро пожаловать.")
+                return redirect("home")
+        elif 'username' in request.POST and 'password' in request.POST:
+            # Форма входа
+            active_mode = 'login'
+            login_form = AuthenticationForm(request, data=request.POST)
+            if login_form.is_valid():
+                user = login_form.get_user()
+                login(request, user)
+                messages.success(request, f"Добро пожаловать, {user.get_full_name() or user.email}!")
+                return redirect("home")
+    
+    # Инициализируем формы если они не были созданы выше
+    if register_form is None:
+        register_form = UserRegistrationForm()
+    if login_form is None:
+        login_form = AuthenticationForm(request)
+    
+    return render(request, "users/auth.html", {
+        "register_form": register_form,
+        "login_form": login_form,
+        "active_mode": active_mode,
+    })
 
-            notify_new_registration(user, player)
-            login(request, user)
-            messages.success(request, "Регистрация успешна! Добро пожаловать.")
-            return redirect("home")
-    else:
-        form = UserRegistrationForm()
-    return render(request, "users/register.html", {"form": form})
+
+def register(request):
+    """Редирект на объединённую страницу авторизации."""
+    return redirect(reverse("auth") + "?mode=register")
+
+
+def login_view(request):
+    """Редирект на объединённую страницу авторизации."""
+    return redirect(reverse("auth") + "?mode=login")
 
 
 def profile(request, pk):

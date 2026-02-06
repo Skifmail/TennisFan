@@ -230,6 +230,14 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
     if proposal.proposer_id == player.pk:
         _answer_callback(cq_id, "Вы не можете подтверждать свой запрос.", show_alert=True)
         return True
+    opponent_users = get_match_opponent_users(proposal.match, proposal.proposer)
+    if user not in opponent_users:
+        _answer_callback(
+            cq_id,
+            "Подтвердить результат может только соперник (ваш сокомандник вносил результат).",
+            show_alert=True,
+        )
+        return True
 
     if callback_data.startswith("proposal_confirm_"):
         try:
@@ -385,6 +393,14 @@ def _handle_result_enter_callback(callback_query: dict) -> bool:
         _answer_callback(cq_id, "Матч не найден.", show_alert=True)
         return True
 
+    if match.result_proposals.filter(status=Match.ProposalStatus.PENDING).exists():
+        _answer_callback(
+            cq_id,
+            "По этому матчу уже отправлен результат и он ожидает подтверждения.",
+            show_alert=True,
+        )
+        return True
+
     participants = get_match_participants(match)
     if player not in participants:
         _answer_callback(cq_id, "Вы не участвуете в этом матче.", show_alert=True)
@@ -470,6 +486,10 @@ def _handle_menu_callback_action(
                 | Q(team2__player1=player) | Q(team2__player2=player),
                 status=Match.MatchStatus.SCHEDULED,
             )
+            # Если по матчу уже отправлен результат и он ждёт подтверждения — не показываем
+            # его в списке «куда можно внести результат».
+            .exclude(result_proposals__status=Match.ProposalStatus.PENDING)
+            .distinct()
             .select_related("tournament", "player1", "player2", "team1", "team2")
             .order_by("deadline", "scheduled_datetime")[:20]
         )
@@ -697,6 +717,14 @@ def user_bot_webhook(request):
                     cache.delete(cache_key)
                     bot.send_message(chat_id, "Вы не участвуете в этом матче.")
                     return JsonResponse({"ok": True})
+                if match.result_proposals.filter(status=Match.ProposalStatus.PENDING).exists():
+                    cache.delete(cache_key)
+                    bot.send_message(
+                        chat_id,
+                        "⏳ По этому матчу уже отправлен результат и он ожидает подтверждения соперником. "
+                        "Если соперник отклонит результат и не отправит свой — вы сможете отправить результат снова.",
+                    )
+                    return JsonResponse({"ok": True})
                 is_p1 = _proposer_is_side1(match, player)
                 p1_s1 = p1_s2 = p1_s3 = p2_s1 = p2_s2 = p2_s3 = None
                 for i, (a, b) in enumerate(sets_list):
@@ -712,7 +740,6 @@ def user_bot_webhook(request):
                     sets_won_p1 = sum(1 for (a, b) in sets_list if b > a)
                 sets_won_p2 = len(sets_list) - sets_won_p1
                 result = Match.ResultChoice.WIN if (is_p1 and sets_won_p1 > sets_won_p2) or (not is_p1 and sets_won_p2 > sets_won_p1) else Match.ResultChoice.LOSS
-                MatchResultProposal.objects.filter(match=match, proposer=player, status=Match.ProposalStatus.PENDING).delete()
                 proposal = MatchResultProposal.objects.create(
                     match=match,
                     proposer=player,

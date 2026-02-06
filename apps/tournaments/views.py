@@ -25,6 +25,7 @@ MATCH_FORMAT_DESCRIPTIONS = {
     "fast4": "2 коротких сета + супертай-брейк. Сеты до 4 геймов, при 1:1 — супертай-брейк до 10 очков.",
 }
 from .proposal_service import apply_proposal
+from .utils import get_match_opponent_users
 from apps.users.models import Notification, Player, SkillLevel
 
 
@@ -48,11 +49,6 @@ def _match_participants(match):
     return participants
 
 
-def _match_opponent_users(match, exclude_player):
-    """Пользователи противоположной стороны (для уведомлений). exclude_player — кто отправил предложение."""
-    participants = _match_participants(match)
-    participants.discard(exclude_player)
-    return [p.user for p in participants if getattr(p, "user", None)]
 
 
 def _build_bracket_standings(tournament, is_fan, is_olympic):
@@ -594,13 +590,15 @@ def propose_result(request, pk):
         messages.error(request, 'Вы не участвуете в этом матче.')
         return redirect('my_matches')
 
-    result = request.POST.get('result') or Match.ResultChoice.WIN
+    if match.result_proposals.filter(status=Match.ProposalStatus.PENDING).exists():
+        messages.info(
+            request,
+            "По этому матчу уже отправлен результат и он ожидает подтверждения соперником. "
+            "Если соперник отклонит результат и не отправит свой — вы сможете отправить результат снова.",
+        )
+        return redirect('my_matches')
 
-    MatchResultProposal.objects.filter(
-        match=match,
-        proposer=player,
-        status=Match.ProposalStatus.PENDING,
-    ).delete()
+    result = request.POST.get('result') or Match.ResultChoice.WIN
 
     def _to_int(value):
         try:
@@ -620,7 +618,7 @@ def propose_result(request, pk):
         player2_set3=_to_int(request.POST.get('p2s3')),
     )
 
-    for opponent_user in _match_opponent_users(match, player):
+    for opponent_user in get_match_opponent_users(match, player):
         Notification.objects.create(
             user=opponent_user,
             message=f"{player} предложил результат матча в турнире {match.tournament.name}",
@@ -669,6 +667,11 @@ def confirm_proposal(request, pk):
 
     if proposal.proposer == player:
         messages.error(request, 'Вы не можете подтверждать свой же запрос.')
+        return redirect('my_matches')
+
+    opponent_users = get_match_opponent_users(match, proposal.proposer)
+    if request.user not in opponent_users:
+        messages.error(request, 'Подтвердить результат может только соперник (в парной игре — игрок противоположной команды).')
         return redirect('my_matches')
 
     action = request.POST.get('action')

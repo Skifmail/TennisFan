@@ -37,10 +37,35 @@ def get_match_participant_users(match: Match) -> list:
 
 
 def get_match_opponent_users(match: Match, exclude_player) -> list:
-    """Пользователи противоположной стороны (без exclude_player). Без bye-игроков."""
-    participants = get_match_participants(match)
-    participants.discard(exclude_player)
-    return [
-        p.user for p in participants
-        if getattr(p, "user", None) and not getattr(p, "is_bye", False)
-    ]
+    """
+    Пользователи только противоположной стороны (соперники).
+    В парном матче возвращаются только игроки другой команды; сокомандник не входит.
+    Без bye-игроков.
+    """
+    if match.team1_id and match.team2_id:
+        if not match.team1 or not match.team2:
+            return []
+        in_team1 = exclude_player in (match.team1.player1, match.team1.player2)
+        in_team2 = exclude_player in (match.team2.player1, match.team2.player2)
+        if in_team1:
+            opponent_team = match.team2
+        elif in_team2:
+            opponent_team = match.team1
+        else:
+            return []
+        return [
+            p.user
+            for p in (opponent_team.player1, opponent_team.player2)
+            if p and getattr(p, "user_id", None) and not getattr(p, "is_bye", False)
+        ]
+    # Одиночный матч
+    other = None
+    if match.player1_id and exclude_player != match.player1:
+        other = match.player1
+    elif match.player2_id and exclude_player != match.player2:
+        other = match.player2
+    if not other or getattr(other, "is_bye", False):
+        return []
+    if getattr(other, "user_id", None):
+        return [other.user]
+    return []

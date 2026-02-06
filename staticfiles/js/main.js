@@ -80,4 +80,50 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Карточки: появление снизу вверх по очереди слева направо
+    var cards = document.querySelectorAll('.main .card');
+    var winH = window.innerHeight;
+    var staggerMs = 120;
+    function inViewport(el) {
+        var r = el.getBoundingClientRect();
+        return r.top < winH + 60;
+    }
+    function sortByPosition(nodes) {
+        return Array.prototype.slice.call(nodes).sort(function(a, b) {
+            var ra = a.getBoundingClientRect();
+            var rb = b.getBoundingClientRect();
+            var rowA = Math.round(ra.top / 30);
+            var rowB = Math.round(rb.top / 30);
+            if (rowA !== rowB) return rowA - rowB;
+            return ra.left - rb.left;
+        });
+    }
+    function revealBatch() {
+        var toReveal = [];
+        cards.forEach(function(card) {
+            if (card.classList.contains('card-in-view')) return;
+            if (inViewport(card)) toReveal.push(card);
+        });
+        if (toReveal.length === 0) return;
+        toReveal = sortByPosition(toReveal);
+        toReveal.forEach(function(card, i) {
+            card.style.transitionDelay = (i * staggerMs) / 1000 + 's';
+            card.classList.add('card-in-view');
+        });
+    }
+    if (cards.length && 'IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function(entries) {
+            var hasNew = entries.some(function(e) { return e.isIntersecting; });
+            if (hasNew) requestAnimationFrame(revealBatch);
+        }, { rootMargin: '0px 0px -60px 0px', threshold: 0.01 });
+        cards.forEach(function(card) {
+            observer.observe(card);
+        });
+        requestAnimationFrame(revealBatch);
+    } else {
+        cards.forEach(function(card) {
+            card.classList.add('card-in-view');
+        });
+    }
 });

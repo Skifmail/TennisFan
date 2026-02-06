@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if active_mode == 'login' %}Вход{% else %}Регистрация{% endif %}{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-page">
+        <div class="auth-card">
+            <div class="auth-card-bg {% if active_mode == 'login' %}login{% endif %}"></div>
+
+            <!-- Hero блок для регистрации (слева) -->
+            <div class="auth-hero register {% if active_mode == 'register' %}active{% endif %}">
+                <h2>Добро пожаловать!</h2>
+                <p>Присоединяйтесь к теннисному сообществу. Регистрируйтесь и участвуйте в турнирах.</p>
+                <button type="button" class="btn btn-outline auth-toggle-btn" onclick="toggleView()">ВОЙТИ</button>
+            </div>
+
+            <!-- Hero блок для входа (справа) -->
+            <div class="auth-hero login {% if active_mode == 'login' %}active{% endif %}">
+                <h2>С возвращением!</h2>
+                <p>Войдите в свой аккаунт, чтобы продолжить участие в турнирах и отслеживать свой прогресс.</p>
+                <button type="button" class="btn btn-outline auth-toggle-btn"
+                    onclick="toggleView()">РЕГИСТРАЦИЯ</button>
+            </div>
+
+            <!-- Форма регистрации (справа), два этапа -->
+            <div class="auth-form register {% if active_mode == 'register' %}active{% endif %}">
+                <form method="post" id="register-form" class="register-form-layout register-form-steps">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="register">
+
+                    <!-- Этап 1: персональные данные -->
+                    <div class="register-step register-step-1" id="register-step-1">
+                        <h3 class="register-step-title">Шаг 1. Персональные данные</h3>
+                        <div class="register-step-fields">
+                            <div class="form-group">
+                                <label class="form-label" for="id_last_name">{{ register_form.last_name.label }}</label>
+                                {{ register_form.last_name }}
+                                {% for error in register_form.last_name.errors %}<p class="text-error form-error">{{
+                                    error }}</p>{% endfor %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_first_name">{{ register_form.first_name.label
+                                    }}</label>
+                                {{ register_form.first_name }}
+                                {% for error in register_form.first_name.errors %}<p class="text-error form-error">{{
+                                    error }}</p>{% endfor %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_phone">{{ register_form.phone.label }}</label>
+                                {{ register_form.phone }}
+                                <div class="field-error" id="phone-error"></div>
+                                {% for error in register_form.phone.errors %}<p class="text-error form-error">{{ error
+                                    }}</p>{% endfor %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_email">{{ register_form.email.label }}</label>
+                                {{ register_form.email }}
+                                <div class="field-error" id="email-error"></div>
+                                {% for error in register_form.email.errors %}<p class="text-error form-error">{{ error
+                                    }}</p>{% endfor %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_birth_date">{{ register_form.birth_date.label
+                                    }}</label>
+                                {{ register_form.birth_date }}
+                                <div class="field-error" id="birth_date-error"></div>
+                                {% for error in register_form.birth_date.errors %}<p class="text-error form-error">{{
+                                    error }}</p>{% endfor %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_city">{{ register_form.city.label }}</label>
+                                {{ register_form.city }}
+                                <div class="field-error" id="city-error"></div>
+                                {% for error in register_form.city.errors %}<p class="text-error form-error">{{ error }}
+                                </p>{% endfor %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_password">{{ register_form.password.label }}</label>
+                                {{ register_form.password }}
+                                <div class="field-error" id="password-error"></div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_password_confirm">{{
+                                    register_form.password_confirm.label }}</label>
+                                {{ register_form.password_confirm }}
+                                <div class="field-error" id="password_confirm-error"></div>
+                                {% for error in register_form.password_confirm.errors %}<p
+                                    class="text-error form-error">{{ error }}</p>{% endfor %}
+                            </div>
+                            <div class="form-group form-group-consent">
+                                <label class="consent-label">
+                                    {{ register_form.agree_legal }}
+                                    <span class="consent-text">Я согласен на <a href="{% url 'legal_personal_data' %}"
+                                            target="_blank" rel="noopener">обработку персональных данных</a> и <a
+                                            href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политику
+                                            конфиденциальности</a></span>
+                                </label>
+                                <div class="field-error" id="consent-error"></div>
+                                {% for error in register_form.agree_legal.errors %}<p class="text-error form-error">{{
+                                    error }}</p>{% endfor %}
+                            </div>
+                        </div>
+                        <div class="register-step-actions">
+                            <button type="button" class="btn btn-primary btn-lg" id="register-btn-next">Далее →
+                                NTRP-тест</button>
+                        </div>
+                    </div>
+
+                    <!-- Этап 2: NTRP-калькулятор -->
+                    <div class="register-step register-step-2 hidden" id="register-step-2">
+                        <h3 class="register-step-title">Шаг 2. NTRP-тест</h3>
+                        <p class="text-secondary register-form-ntrp-note">Пройдите тест и нажмите «Рассчитать», затем
+                            нажмите «Зарегистрироваться».</p>
+                        {{ register_form.ntrp_level }}
+                        <div class="register-step-ntrp">
+                            {% include 'users/_ntrp_quiz.html' with can_save=False form_target='id_ntrp_level' %}
+                        </div>
+                        <div class="field-error" id="ntrp-error"></div>
+                        <div class="register-step-actions register-step-actions-two">
+                            <button type="button" class="btn btn-outline" id="register-btn-back">← Назад</button>
+                            <button type="submit"
+                                class="btn btn-primary btn-lg register-form-submit">Зарегистрироваться</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Форма входа (слева) -->
+            <div class="auth-form login {% if active_mode == 'login' %}active{% endif %}">
+                <form method="post" class="auth-login-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="login">
+
+                    <h2 class="auth-login-title">Вход</h2>
+
+                    {% if login_form.errors %}
+                    <div class="alert alert-error mb-3">
+                        Неверный email или пароль
+                    </div>
+                    {% endif %}
+
+                    <div class="form-group">
+                        <label class="form-label" for="id_username">Email</label>
+                        <input type="email" name="username" id="id_username" class="form-control" required autofocus>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="id_password">Пароль</label>
+                        <input type="password" name="password" id="id_password" class="form-control" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Войти</button>
+                    <div class="auth-register-link">
+                        <p class="text-secondary" style="margin: 0 0 var(--spacing-sm);">Нет аккаунта?</p>
+                        <button type="button" class="btn btn-outline" style="width: 100%;"
+                            onclick="toggleView()">Зарегистрироваться</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleView() {
+        const loginHero = document.querySelector('.auth-hero.login');
+        const loginForm = document.querySelector('.auth-form.login');
+        const registerHero = document.querySelector('.auth-hero.register');
+        const registerForm = document.querySelector('.auth-form.register');
+        const cardBg = document.querySelector('.auth-card-bg');
+
+        if (!loginHero || !loginForm || !registerHero || !registerForm || !cardBg) return;
+
+        const loginActive = loginHero.classList.contains('active');
+
+        // Переключаем классы для анимации
+        cardBg.classList.toggle('login', !loginActive);
+        [loginHero, loginForm].forEach(el => el.classList.toggle('active'));
+        [registerHero, registerForm].forEach(el => el.classList.toggle('active'));
+
+        // Обновляем URL без перезагрузки страницы
+        const newMode = loginActive ? 'register' : 'login';
+        const url = new URL(window.location);
+        url.searchParams.set('mode', newMode);
+        window.history.pushState({}, '', url);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('register-form');
+        if (!form) return;
+
+        const emailField = document.getElementById('id_email');
+        const phoneField = document.getElementById('id_phone');
+        const passwordField = document.getElementById('id_password');
+        const passwordConfirmField = document.getElementById('id_password_confirm');
+        const birthDateField = document.getElementById('id_birth_date');
+        const cityField = document.getElementById('id_city');
+        const ntrpField = document.getElementById('id_ntrp_level');
+        const emailError = document.getElementById('email-error');
+        const phoneError = document.getElementById('phone-error');
+        const passwordError = document.getElementById('password-error');
+        const passwordConfirmError = document.getElementById('password_confirm-error');
+        const birthDateError = document.getElementById('birth_date-error');
+        const cityError = document.getElementById('city-error');
+        const ntrpError = document.getElementById('ntrp-error');
+        const consentError = document.getElementById('consent-error');
+
+        function validateEmail(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '');
+        }
+        function validatePhone(phone) {
+            const s = (phone || '').trim();
+            return s !== '' && s !== '+7' && /^\+7\d{10}$/.test(s);
+        }
+        function validateBirthDate(date) {
+            if (!date) return false;
+            const d = new Date(date);
+            const today = new Date();
+            const min = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
+            const max = new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
+            return d >= min && d <= max;
+        }
+
+        function showError(el, msg) {
+            if (!el) return;
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+        function hideError(el) {
+            if (!el) return;
+            el.style.display = 'none';
+        }
+
+        [emailField, phoneField, passwordField, passwordConfirmField, birthDateField, cityField].forEach(function (f) {
+            if (!f) return;
+            f.addEventListener('input', function () {
+                var g = this.closest('.form-group');
+                if (g) g.querySelectorAll('.text-error').forEach(function (e) { e.remove(); });
+                hideError(document.getElementById(this.id.replace('id_', '') + '-error'));
+            });
+        });
+
+        if (phoneField) {
+            phoneField.addEventListener('blur', function () {
+                if (!validatePhone(this.value)) showError(phoneError, 'Укажите телефон +7XXXXXXXXXX.');
+                else hideError(phoneError);
+            });
+        }
+        if (emailField) {
+            emailField.addEventListener('blur', function () {
+                var v = this.value.trim();
+                if (!v) showError(emailError, 'Email обязателен.');
+                else if (!validateEmail(v)) showError(emailError, 'Введите корректный email.');
+                else hideError(emailError);
+            });
+        }
+        if (birthDateField) {
+            birthDateField.addEventListener('change', function () {
+                if (!this.value) showError(birthDateError, 'Укажите дату рождения.');
+                else if (!validateBirthDate(this.value)) showError(birthDateError, 'Дата: от 5 до 100 лет.');
+                else hideError(birthDateError);
+            });
+        }
+        if (cityField) {
+            cityField.addEventListener('blur', function () {
+                if (!this.value.trim()) showError(cityError, 'Укажите город.');
+                else hideError(cityError);
+            });
+        }
+
+        function validateStep1() {
+            var has = false;
+            if (!emailField || !emailField.value.trim()) { showError(emailError, 'Email обязателен.'); has = true; }
+            else if (!validateEmail(emailField.value.trim())) { showError(emailError, 'Введите корректный email.'); has = true; }
+            else hideError(emailError);
+            if (!validatePhone(phoneField ? phoneField.value : '')) { showError(phoneError, 'Укажите телефон +7XXXXXXXXXX.'); has = true; }
+            else hideError(phoneError);
+            if (!passwordField || !passwordField.value || passwordField.value.length < 8) { showError(passwordError, 'Пароль не менее 8 символов.'); has = true; }
+            else hideError(passwordError);
+            if (passwordConfirmField && (!passwordConfirmField.value || passwordConfirmField.value !== passwordField.value)) { showError(passwordConfirmError, 'Пароли не совпадают.'); has = true; }
+            else hideError(passwordConfirmError);
+            if (!birthDateField || !birthDateField.value || !validateBirthDate(birthDateField.value)) { showError(birthDateError, 'Укажите дату рождения.'); has = true; }
+            else hideError(birthDateError);
+            if (!cityField || !cityField.value.trim()) { showError(cityError, 'Укажите город.'); has = true; }
+            else hideError(cityError);
+            var consent = form.querySelector('input[name="agree_legal"]');
+            if (consent && !consent.checked) {
+                showError(consentError, 'Необходимо дать согласие на обработку персональных данных.');
+                has = true;
+            } else {
+                hideError(consentError);
+            }
+            return !has;
+        }
+
+        var step1 = document.getElementById('register-step-1');
+        var step2 = document.getElementById('register-step-2');
+        var btnNext = document.getElementById('register-btn-next');
+        var btnBack = document.getElementById('register-btn-back');
+
+        if (btnNext && step1 && step2) {
+            btnNext.addEventListener('click', function () {
+                if (!validateStep1()) return;
+                step1.classList.add('hidden');
+                step2.classList.remove('hidden');
+            });
+        }
+        if (btnBack && step1 && step2) {
+            btnBack.addEventListener('click', function () {
+                step2.classList.add('hidden');
+                step1.classList.remove('hidden');
+            });
+        }
+
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                if (!step2 || !step2.classList.contains('hidden')) {
+                    hideError(ntrpError);
+                    var nv = ntrpField ? (ntrpField.value || '').trim() : '';
+                    if (!nv || nv < 1 || nv > 7) { showError(ntrpError, 'Пройдите NTRP-тест и нажмите «Рассчитать».'); e.preventDefault(); }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

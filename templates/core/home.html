@@ -11,14 +11,15 @@
     </div>
     <div class="container">
         <div class="hero-content">
-            <h1 class="hero-title">
-                Любительские турниры<br>
-                по <span>теннису</span>
-            </h1>
-            <p class="hero-text">
-                Аналог ATP Tour для любителей. Равные соперники, честная игра,
-                сообщество игроков по всей России.
-            </p>
+            <div class="hero-text-reveal">
+                <h1 class="hero-title reveal">
+                    <span style="--d: 0s">Любительские турниры</span>
+                    <span style="--d: 0.15s">по <span>теннису</span></span>
+                </h1>
+                <p class="hero-text reveal">
+                    <span style="--d: 0.3s">Аналог ATP Tour для любителей. Равные соперники, честная игра, сообщество игроков по всей России.</span>
+                </p>
+            </div>
             <div class="hero-buttons">
                 {% if not user.is_authenticated %}
                 <a href="{% url 'register' %}" class="btn btn-primary btn-lg">Регистрация</a>

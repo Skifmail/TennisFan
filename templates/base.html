@@ -82,7 +82,9 @@
                         </ul>
                     </div>
                     {% else %}
+                    {% if request.resolver_match.url_name != 'auth' and request.resolver_match.url_name != 'login' and request.resolver_match.url_name != 'register' %}
                     <a href="{% url 'login' %}" class="btn btn-primary btn-pulse nav-login-btn">Войти</a>
+                    {% endif %}
                     {% endif %}
                 </div>
             </nav>
@@ -221,7 +223,24 @@
     </div>
 
     {% block modals %}{% endblock %}
+
+    <!-- Cookie consent banner (показывается, пока нет сохранённого выбора) -->
+    <div id="cookie-consent-banner" class="cookie-banner" role="dialog" aria-label="Уведомление об использовании cookie" aria-live="polite" hidden>
+        <div class="cookie-banner__inner">
+            <p class="cookie-banner__text">
+                Мы используем файлы cookie для корректной работы сайта, персонализации контента и анализа трафика.
+                Подробности — в нашей <a href="{% url 'legal_privacy' %}" class="cookie-banner__link">политике обработки данных</a>.
+                Вы можете дать согласие на сбор cookie или отказаться.
+            </p>
+            <div class="cookie-banner__actions">
+                <button type="button" class="cookie-banner__btn cookie-banner__btn--accept" id="cookie-consent-accept" aria-label="Принять cookie">Принять</button>
+                <button type="button" class="cookie-banner__btn cookie-banner__btn--refuse" id="cookie-consent-refuse" aria-label="Отказаться от cookie">Отказаться</button>
+            </div>
+        </div>
+    </div>
+
     <script src="{% static 'js/main.js' %}"></script>
+    <script src="{% static 'js/cookie_consent.js' %}"></script>
     <script src="{% static 'js/lightbox.js' %}"></script>
     <script src="{% static 'js/feedback_widget.js' %}"></script>
     {% block extra_js %}{% endblock %}

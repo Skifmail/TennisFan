@@ -31,6 +31,8 @@
 
     /* Typography */
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* Заголовки и навигация: Strogo (добавьте @font-face при наличии файлов) или Staatliches */
+    --font-heading: 'Strogo', 'Staatliches', sans-serif;
     --font-size-xs: 0.75rem;
     --font-size-sm: 0.875rem;
     --font-size-base: 1rem;
@@ -67,6 +69,27 @@
     --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.5);
     --shadow-glow: 0 0 20px rgba(163, 133, 96, 0.3);
+}
+
+/* Заголовки и навигация: шрифт Strogo (или Staatliches),*/
+.main h1,
+.main h2,
+.main h3,
+.profile-info__name,
+.court-detail__title,
+.court-detail__section-title,
+.shop-detail__title,
+.shop-detail__desc-title,
+.feedback-modal__title,
+.rules-doc__title,
+.rules-doc__body h2,
+.tournament-table-title,
+.page-title--legal,
+.legal-doc__body h1,
+.legal-doc__body h2 {
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
 
 /* Reset */
@@ -290,6 +313,9 @@ button {
     padding: 0.35rem 0.6rem;
     font-size: 1rem;
     white-space: nowrap;
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
 
 /* Mobile Navigation Menu (hidden by default) */
@@ -328,6 +354,9 @@ button {
     border-radius: var(--radius-md);
     transition: all var(--transition-fast);
     font-size: var(--font-size-sm);
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
 
 .nav-menu-link:hover {
@@ -676,6 +705,9 @@ button {
     font-size: var(--font-size-lg);
     font-weight: 600;
     margin-bottom: var(--spacing-sm);
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
 
 .card-text {
@@ -1879,6 +1911,9 @@ select.form-control {
     font-weight: 800;
     margin-bottom: var(--spacing-md);
     color: var(--color-accent);
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .page-subtitle {
@@ -1922,6 +1957,9 @@ select.form-control {
     font-size: var(--font-size-2xl);
     font-weight: 700;
     color: var(--color-accent);
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 @media (max-width: 768px) {
@@ -1992,6 +2030,9 @@ select.form-control {
     font-weight: 800;
     line-height: 1.1;
     margin-bottom: var(--spacing-lg);
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .hero-title span {
@@ -2748,6 +2789,9 @@ select.form-control {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
     gap: var(--spacing-xs);
     padding: 0.4rem 0.8rem;
     font-size: 0.85rem;

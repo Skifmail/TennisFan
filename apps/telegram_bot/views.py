@@ -78,15 +78,39 @@ def _webhook_secret_ok(request) -> bool:
     return request.headers.get("X-Telegram-Bot-Api-Secret-Token") == secret
 
 
+# Тексты кнопок реплай-меню (должны совпадать при обработке сообщения)
+REPLY_BTN_MY_PROFILE = "👤 Мой профиль"
+REPLY_BTN_MY_MATCHES = "🎾 Мои матчи"
+REPLY_BTN_MY_SUBSCRIPTIONS = "📋 Мои подписки"
+REPLY_BTN_GO_TO_SITE = "🌐 Перейти на сайт"
+
+REPLY_MENU_BUTTONS = (REPLY_BTN_MY_PROFILE, REPLY_BTN_MY_MATCHES, REPLY_BTN_MY_SUBSCRIPTIONS, REPLY_BTN_GO_TO_SITE)
+
+
+def _reply_menu_keyboard():
+    """Реплай-клавиатура под полем ввода: Мой профиль, Мои матчи, Мои подписки, Перейти на сайт."""
+    return {
+        "keyboard": [
+            [{"text": REPLY_BTN_MY_PROFILE}, {"text": REPLY_BTN_MY_MATCHES}],
+            [{"text": REPLY_BTN_MY_SUBSCRIPTIONS}, {"text": REPLY_BTN_GO_TO_SITE}],
+        ],
+        "resize_keyboard": True,
+        "one_time_keyboard": False,
+    }
+
+
 def _main_menu_keyboard(site_base_url: str):
-    """Inline-клавиатура: Мои матчи, Мой профиль, Моя подписка (контент в боте)."""
+    """Inline-клавиатура (дублирует меню для старых клиентов): Мои матчи, Мой профиль, Подписка."""
     return {
         "inline_keyboard": [
             [
                 {"text": "🎾 Мои матчи", "callback_data": "menu_my_matches"},
                 {"text": "👤 Мой профиль", "callback_data": "menu_my_profile"},
             ],
-            [{"text": "📋 Моя подписка", "callback_data": "menu_my_subscription"}],
+            [
+                {"text": "📋 Моя подписка", "callback_data": "menu_my_subscription"},
+                {"text": "🌐 На сайт", "url": site_base_url.rstrip("/")},
+            ],
         ]
     }
 
@@ -386,13 +410,13 @@ def _handle_result_enter_callback(callback_query: dict) -> bool:
     return True
 
 
-def _handle_menu_callback(callback_query: dict) -> bool:
+def _handle_menu_callback(callback_query: dict, base_url: str = "") -> bool:
     """
-    Обработка кнопок меню: menu_my_matches, menu_my_profile, menu_my_subscription.
-    Отправляет контент прямо в чат бота (матчи, профиль, подписка).
+    Обработка кнопок меню: menu_my_matches, menu_my_profile, menu_my_subscription, menu_go_to_site.
+    Отправляет контент прямо в чат бота (матчи, профиль, подписка, ссылка на сайт).
     """
     callback_data = (callback_query.get("callback_data") or "").strip()
-    if callback_data not in ("menu_my_matches", "menu_my_profile", "menu_my_subscription"):
+    if callback_data not in ("menu_my_matches", "menu_my_profile", "menu_my_subscription", "menu_go_to_site"):
         return False
 
     cq_id = callback_query.get("id")
@@ -408,53 +432,86 @@ def _handle_menu_callback(callback_query: dict) -> bool:
             return True
 
         user = link.user
-        player = getattr(user, "player", None)
-        if not player:
-            try:
-                player = Player.objects.create(user=user)
-            except Exception:
-                _answer_callback(cq_id, "Ошибка профиля игрока.", show_alert=True)
-                return True
-
-        _handle_menu_callback_action(chat_id, cq_id, callback_data, user, player)
+        if callback_data == "menu_go_to_site":
+            _handle_menu_callback_action(chat_id, cq_id, callback_data, user, None, base_url=base_url)
+        else:
+            player = getattr(user, "player", None)
+            if not player:
+                try:
+                    player = Player.objects.create(user=user)
+                except Exception:
+                    _answer_callback(cq_id, "Ошибка профиля игрока.", show_alert=True)
+                    return True
+            _handle_menu_callback_action(chat_id, cq_id, callback_data, user, player, base_url=base_url)
     except Exception as e:
         logger.exception("_handle_menu_callback failed: %s", e)
         _answer_callback(cq_id, "Ошибка. Попробуйте ещё раз.", show_alert=True)
     return True
 
 
-def _handle_menu_callback_action(chat_id, cq_id: str, callback_data: str, user, player) -> None:
-    """Отправка контента по выбранному пункту меню (вынесено для удобства обработки ошибок)."""
+def _handle_menu_callback_action(
+    chat_id,
+    cq_id: str | None,
+    callback_data: str,
+    user,
+    player,
+    base_url: str = "",
+) -> None:
+    """Отправка контента по выбранному пункту меню. cq_id=None при нажатии реплай-кнопки."""
+    def _answer(caption: str) -> None:
+        if cq_id:
+            _answer_callback(cq_id, caption)
+
     if callback_data == "menu_my_matches":
-        matches = (
+        scheduled = (
             Match.objects.filter(
                 Q(player1=player) | Q(player2=player)
                 | Q(team1__player1=player) | Q(team1__player2=player)
-                | Q(team2__player1=player) | Q(team2__player2=player)
+                | Q(team2__player1=player) | Q(team2__player2=player),
+                status=Match.MatchStatus.SCHEDULED,
             )
             .select_related("tournament", "player1", "player2", "team1", "team2")
-            .order_by("-scheduled_datetime")[:15]
+            .order_by("deadline", "scheduled_datetime")[:20]
         )
-        lines = ["🎾 <b>Мои матчи</b>\n"]
-        scheduled = [m for m in matches if m.status == Match.MatchStatus.SCHEDULED]
+        scheduled_list = list(scheduled)
+
+        lines = [
+            "🎾 <b>Мои матчи</b>",
+            "<i>Только предстоящие. По сыгранным — смотрите на сайте.</i>",
+            "",
+        ]
+        if not scheduled_list:
+            lines.append("Нет предстоящих матчей.")
+        else:
+            for i, m in enumerate(scheduled_list, 1):
+                deadline_str = m.deadline.strftime("%d.%m.%Y %H:%M") if m.deadline else "—"
+                round_name = m.round_name or "—"
+                p1 = m.get_player1_display()
+                p2 = m.get_player2_display()
+                lines.append("─────────────────")
+                lines.append(f"<b>{i}. {m.tournament.name}</b> · {round_name}")
+                lines.append(f"   {p1}\n   vs\n   {p2}")
+                lines.append(f"   📅 Дедлайн: {deadline_str}")
+                lines.append("")
+            lines.append("─────────────────")
+            lines.append("")
+            lines.append("<b>Внести результат</b> — выберите матч кнопкой ниже:")
+
+        text = "\n".join(lines)
+
         reply_markup = None
-        if scheduled:
+        if scheduled_list:
             keyboard = []
-            for m in scheduled[:8]:
-                btn_text = f"📝 Внести результат — {m.tournament.name}, {m.round_name or 'раунд'}"
+            for i, m in enumerate(scheduled_list[:10], 1):
+                label = f"{m.tournament.name}, {m.round_name or 'раунд'}"
+                btn_text = f"📝 Матч {i}: {label}"
                 if len(btn_text) > 64:
-                    btn_text = btn_text[:61] + "..."
+                    btn_text = (f"📝 Матч {i}: {label}"[:61]).rstrip() + "…"
                 keyboard.append([{"text": btn_text, "callback_data": f"result_enter_{m.pk}"}])
             reply_markup = {"inline_keyboard": keyboard}
-        for m in matches:
-            status_emoji = "✅" if m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER) else "⏳"
-            deadline_str = m.deadline.strftime("%d.%m") if m.deadline else "—"
-            lines.append(f"{status_emoji} {m.tournament.name} · {m.round_name or '—'}\n   {m.get_player1_display()} — {m.get_player2_display()}\n   Дедлайн: {deadline_str} · {m.get_status_display()}")
-        if len(lines) == 1:
-            lines.append("Нет матчей.")
-        text = "\n".join(lines)
+
         ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
-        _answer_callback(cq_id, "Список матчей" if ok else "Сообщение не отправлено")
+        _answer("Список матчей" if ok else "Сообщение не отправлено")
         if not ok:
             logger.warning("menu_my_matches: send_message failed for chat_id=%s", chat_id)
 
@@ -469,7 +526,7 @@ def _handle_menu_callback_action(chat_id, cq_id: str, callback_data: str, user, 
             f"Побед: {player.win_rate}%"
         )
         ok = bot.send_to_user(chat_id, text)
-        _answer_callback(cq_id, "Профиль" if ok else "Ошибка отправки")
+        _answer("Профиль" if ok else "Ошибка отправки")
         if not ok:
             logger.warning("menu_my_profile: send_message failed for chat_id=%s", chat_id)
 
@@ -493,9 +550,18 @@ def _handle_menu_callback_action(chat_id, cq_id: str, callback_data: str, user, 
                 f"Регистраций в месяц: {slots}"
             )
         ok = bot.send_to_user(chat_id, text)
-        _answer_callback(cq_id, "Подписка" if ok else "Ошибка отправки")
+        _answer("Подписка" if ok else "Ошибка отправки")
         if not ok:
             logger.warning("menu_my_subscription: send_message failed for chat_id=%s", chat_id)
+
+    elif callback_data == "menu_go_to_site" and base_url:
+        site_url = base_url.rstrip("/")
+        bot.send_to_user(
+            chat_id,
+            f"🌐 <b>Перейти на сайт</b>\n\n<a href=\"{site_url}\">{site_url}</a>",
+            reply_markup=_reply_menu_keyboard(),
+        )
+        _answer("Ссылка отправлена")
 
 
 @csrf_exempt
@@ -531,7 +597,7 @@ def user_bot_webhook(request):
         if not handled:
             handled = _handle_result_enter_callback(callback_query)
         if not handled:
-            handled = _handle_menu_callback(callback_query)
+            handled = _handle_menu_callback(callback_query, base_url)
         cq_id = callback_query.get("id")
         if cq_id and not handled:
             token = bot._get_bot_token()
@@ -574,10 +640,9 @@ def user_bot_webhook(request):
                 welcome = (
                     "✅ <b>Бот подключён</b>\n\n"
                     "Теперь вы будете получать уведомления о регистрациях на турниры, "
-                    "о матчах и дедлайнах. Здесь же можно перейти в «Мои матчи», профиль и подписку.\n\n"
-                    "Выберите действие:"
+                    "о матчах и дедлайнах. Выберите действие кнопками ниже:"
                 )
-                bot.send_message(chat_id, welcome, reply_markup=_main_menu_keyboard(base_url))
+                bot.send_message(chat_id, welcome, reply_markup=_reply_menu_keyboard())
             else:
                 bot.send_message(
                     chat_id,
@@ -592,7 +657,7 @@ def user_bot_webhook(request):
                 bot.send_message(
                     chat_id,
                     "Снова привет! Выберите действие:",
-                    reply_markup=_main_menu_keyboard(base_url),
+                    reply_markup=_reply_menu_keyboard(),
                 )
             else:
                 bot.send_message(
@@ -674,13 +739,46 @@ def user_bot_webhook(request):
                 return JsonResponse({"ok": True})
         cache.delete(cache_key)
 
+    # Нажатие реплай-кнопок меню
+    if text in REPLY_MENU_BUTTONS:
+        if text == REPLY_BTN_GO_TO_SITE:
+            site_url = base_url.rstrip("/")
+            bot.send_message(
+                chat_id,
+                f"🌐 <b>Перейти на сайт</b>\n\n<a href=\"{site_url}\">{site_url}</a>",
+                reply_markup=_reply_menu_keyboard(),
+            )
+            return JsonResponse({"ok": True})
+        else:
+            link = _get_link_by_chat_id(chat_id)
+            if not link:
+                bot.send_message(chat_id, "Сначала подключите бота с сайта (профиль → Telegram).")
+            else:
+                user = link.user
+                player = getattr(user, "player", None)
+                if not player:
+                    try:
+                        player = Player.objects.create(user=user)
+                    except Exception:
+                        bot.send_message(chat_id, "Ошибка профиля игрока.")
+                        return JsonResponse({"ok": True})
+                reply_to_callback = {
+                    REPLY_BTN_MY_PROFILE: "menu_my_profile",
+                    REPLY_BTN_MY_MATCHES: "menu_my_matches",
+                    REPLY_BTN_MY_SUBSCRIPTIONS: "menu_my_subscription",
+                }[text]
+                _handle_menu_callback_action(
+                    chat_id, None, reply_to_callback, user, player, base_url=base_url
+                )
+        return JsonResponse({"ok": True})
+
     # Любое другое сообщение — показываем меню
     link = _get_link_by_chat_id(chat_id)
     if link:
         bot.send_message(
             chat_id,
             "Выберите действие:",
-            reply_markup=_main_menu_keyboard(base_url),
+            reply_markup=_reply_menu_keyboard(),
         )
     else:
         bot.send_message(

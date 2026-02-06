@@ -65,8 +65,18 @@
 <style>
 .tournament-tables-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-lg);
+}
+@media (max-width: 992px) {
+    .tournament-tables-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 768px) {
+    .tournament-tables-grid {
+        grid-template-columns: 1fr;
+    }
 }
 .tournament-table-card {
     display: block;

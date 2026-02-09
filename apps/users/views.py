@@ -18,6 +18,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from apps.core.decorators import login_required_with_message
+
 from apps.core.models import UserTelegramLink
 from .forms import PlayerProfileForm, UserRegistrationForm
 from .models import Notification, Player, SkillLevel, User
@@ -210,6 +212,7 @@ def login_view(request):
     return redirect(reverse("auth") + "?mode=login")
 
 
+@login_required_with_message("Профиль игрока доступен только для зарегистрированных пользователей.")
 def profile(request, pk):
     """User profile view."""
     player = get_object_or_404(

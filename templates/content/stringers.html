@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Стрингеры{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{{ stringer_page.title }}</h1>
+</div>
+
+<div class="container" style="max-width: 1200px;">
+    {% if stringer_page.description %}
+    <div class="card" style="margin-bottom: var(--spacing-xl);">
+        <div class="card-body">
+            <p class="text-secondary">{{ stringer_page.description|linebreaks }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if companies %}
+    <div class="stringers-grid">
+        {% for company in companies %}
+        <div class="card stringer-card">
+            <div class="card-body">
+                <div class="stringer-header">
+                    <h2 class="stringer-name">{{ company.name }}</h2>
+                    {% if company.avg_rating %}
+                    <div class="stringer-rating">
+                        <span class="rating-stars">
+                            {% with rating_int=company.avg_rating|floatformat:0 %}
+                            {% for i in "12345"|make_list %}
+                                {% if forloop.counter <= rating_int|add:0 %}
+                                    <span class="star star-filled">⭐</span>
+                                {% else %}
+                                    <span class="star star-empty">☆</span>
+                                {% endif %}
+                            {% endfor %}
+                            {% endwith %}
+                        </span>
+                        <span class="rating-value">{{ company.avg_rating }}</span>
+                        <span class="rating-count">({{ company.rating_count }})</span>
+                    </div>
+                    {% else %}
+                    <div class="stringer-rating">
+                        <span class="text-muted">Нет оценок</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if company.photos.all %}
+                <div class="stringer-photos" style="margin-bottom: var(--spacing-md);">
+                    <div class="photo-gallery">
+                        {% for photo in company.photos.all|slice:":3" %}
+                        <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:company.name }}" class="stringer-photo">
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="stringer-info">
+                    <div class="info-item">
+                        <strong>📍 Адрес:</strong>
+                        <span>{{ company.address }}</span>
+                    </div>
+
+                    {% if company.contact_items.all %}
+                    <div class="info-item">
+                        <strong>📞 Контакты:</strong>
+                        <div class="d-flex gap-1 flex-wrap" style="margin-top: 2px;">
+                            {% for contact in company.contact_items.all %}
+                                {% with link_url=contact.get_link_url %}
+                                {% if link_url %}
+                                <a href="{{ link_url }}" class="stringer-contact-chip" {% if contact.contact_type != 'phone' %}target="_blank" rel="noopener"{% endif %} title="{{ contact.get_contact_type_display }}: {{ contact.value }}">
+                                    <img src="{% static contact.get_icon_path %}" alt="" width="16" height="16" style="vertical-align: middle;">
+                                </a>
+                                {% endif %}
+                                {% endwith %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if company.price %}
+                    <div class="info-item">
+                        <strong>💰 Стоимость:</strong>
+                        <span>{{ company.price }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if company.description %}
+                    <div class="info-item">
+                        <strong>📝 Описание:</strong>
+                        <div class="description-text">{{ company.description|linebreaks }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="stringer-actions" style="margin-top: var(--spacing-md); padding-top: var(--spacing-md); border-top: 1px solid var(--color-border);">
+                    <a href="{% url 'stringer_detail' pk=company.id %}" class="btn btn-outline btn-sm w-100">
+                        Подробнее
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body" style="text-align: center; padding: var(--spacing-3xl);">
+            <p class="text-secondary">Компании стрингеров пока нет. Добавьте их через админ-панель.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.stringers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: var(--spacing-xl);
+}
+
+@media (max-width: 768px) {
+    .stringers-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-lg);
+    }
+}
+
+.stringer-card {
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.stringer-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(166, 130, 74, 0.2);
+}
+
+.stringer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--spacing-md);
+    gap: var(--spacing-md);
+}
+
+.stringer-name {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    margin: 0;
+    color: var(--color-text);
+    font-family: var(--font-heading);
+    flex: 1;
+}
+
+.stringer-rating {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+.rating-stars {
+    display: flex;
+    gap: 2px;
+}
+
+.star {
+    font-size: 1.2em;
+}
+
+.star-empty {
+    opacity: 0.3;
+}
+
+.rating-value {
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.rating-count {
+    color: var(--color-text-muted);
+    font-size: 0.9em;
+}
+
+.stringer-photos {
+    margin-bottom: var(--spacing-md);
+}
+
+.photo-gallery {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.stringer-photo {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+}
+
+.stringer-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.info-item strong {
+    color: var(--color-text-secondary);
+    font-size: 0.9em;
+    margin-bottom: 2px;
+}
+
+.contacts-text, .description-text {
+    color: var(--color-text);
+    line-height: 1.6;
+}
+
+.stringer-contact-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.stringer-contact-chip:hover {
+    border-color: var(--color-primary);
+    background: rgba(166, 130, 74, 0.08);
+}
+</style>
+{% endblock %}

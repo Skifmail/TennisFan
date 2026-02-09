@@ -17,12 +17,21 @@
                 <button class="rules-tabs__btn rules-tabs__btn--active" data-tab="tennis-rules" role="tab" aria-selected="true">
                     Правила тенниса
                 </button>
+                {% if user.is_authenticated %}
                 <button class="rules-tabs__btn" data-tab="tournament-rules" role="tab" aria-selected="false">
                     Правила турниров
                 </button>
                 <button class="rules-tabs__btn" data-tab="site-usage-rules" role="tab" aria-selected="false">
                     Правила пользования сайтом
                 </button>
+                {% else %}
+                <button class="rules-tabs__btn rules-tabs__btn--disabled" data-tab="auth-required" role="tab" aria-selected="false" title="Доступно после регистрации">
+                    Правила турниров 🔒
+                </button>
+                <button class="rules-tabs__btn rules-tabs__btn--disabled" data-tab="auth-required" role="tab" aria-selected="false" title="Доступно после регистрации">
+                    Правила пользования сайтом 🔒
+                </button>
+                {% endif %}
             </div>
 
             <div class="rules-tabs__content" id="tennis-rules" role="tabpanel">
@@ -42,6 +51,7 @@
                 </article>
             </div>
 
+            {% if user.is_authenticated %}
             <div class="rules-tabs__content" id="tournament-rules" role="tabpanel" style="display: none;">
                 <!-- Вкладки второго уровня: форматы турниров -->
                 <div class="rules-subtabs">
@@ -108,6 +118,22 @@
                     </div>
                 </article>
             </div>
+            {% else %}
+            <!-- Сообщение для неавторизованных пользователей -->
+            <div class="rules-tabs__content" id="auth-required" role="tabpanel" style="display: none;">
+                <article class="rules-doc card">
+                    <div class="card-body rules-doc__body" style="text-align: center; padding: var(--spacing-3xl);">
+                        <h2 class="rules-doc__title">Доступ ограничен</h2>
+                        <p style="margin-bottom: var(--spacing-lg); color: var(--color-text-secondary);">
+                            Данный раздел доступен только для зарегистрированных пользователей.
+                        </p>
+                        <a href="{% url 'auth' %}?mode=register" class="btn btn-primary">Зарегистрироваться</a>
+                        <span style="margin: 0 var(--spacing-sm); color: var(--color-text-muted);">или</span>
+                        <a href="{% url 'auth' %}?mode=login" class="btn btn-outline">Войти</a>
+                    </div>
+                </article>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

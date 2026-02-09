@@ -1892,6 +1892,70 @@ button {
     color: var(--color-text-muted);
 }
 
+/* Обертка для поля пароля с иконкой глаза */
+.password-field-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-field-wrapper .form-control {
+    padding-right: 45px; /* Место для иконки */
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary);
+    transition: color var(--transition-fast);
+    z-index: 1;
+}
+
+.password-toggle-btn:hover {
+    color: var(--color-primary);
+}
+
+.password-toggle-btn:focus {
+    outline: none;
+    color: var(--color-primary);
+}
+
+.password-toggle-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 480px) {
+    .password-field-wrapper .form-control {
+        padding-right: 40px;
+    }
+    
+    .password-toggle-btn {
+        right: 8px;
+        padding: 6px;
+    }
+    
+    .password-toggle-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
 select.form-control {
     cursor: pointer;
 }
@@ -2177,6 +2241,62 @@ select.form-control {
     text-align: center;
 }
 
+/* Вращающийся логотип на форме входа (только десктоп) */
+.auth-login-logo {
+    display: block;
+    text-align: center;
+    margin-bottom: var(--spacing-md);
+    margin-top: calc(-6 * var(--spacing-lg));
+    width: 100%;
+    perspective: 1000px;
+    perspective-origin: center center;
+}
+
+/* Объемная монета с логотипом */
+.auth-login-logo .coin {
+    position: relative;
+    width: 250px;
+    height: 250px;
+    margin: 0 auto;
+    transform-style: preserve-3d;
+    transform-origin: 50% 50% 0;
+    animation: coin-rotate 6s linear infinite;
+}
+
+/* Лицевая и обратная стороны монеты */
+.auth-login-logo .coin__face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    border-radius: 50%;
+    backface-visibility: hidden;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform-origin: center center;
+}
+
+.auth-login-logo .coin__face img {
+    width: 75%;
+    height: 75%;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 8px rgba(166, 130, 74, 0.5));
+}
+
+/* Задняя сторона монеты */
+.auth-login-logo .coin__back {
+    transform: rotateY(180deg) translateZ(-4px);
+}
+
+/* Передняя сторона монеты */
+.auth-login-logo .coin__front {
+    transform: translateZ(4px);
+}
+
+
 .auth-login-title {
     display: none;
     margin: 0 0 var(--spacing-lg);
@@ -2409,6 +2529,11 @@ select.form-control {
 
     .auth-login-title {
         display: block;
+    }
+
+    /* Скрываем вращающийся логотип на мобильных */
+    .auth-login-logo {
+        display: none !important;
     }
 
     .auth-card-bg {
@@ -4672,6 +4797,16 @@ select.form-control {
 .rules-tabs__btn--active {
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
+}
+
+.rules-tabs__btn--disabled {
+    color: var(--color-text-muted);
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.rules-tabs__btn--disabled:hover {
+    color: var(--color-text-secondary);
 }
 
 .rules-subtabs__nav {

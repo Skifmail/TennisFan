@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
+from apps.core.decorators import login_required_with_message
 from .forms import CoachApplicationForm, TrainingEnrollmentForm, TrainingForm
 from .models import (
     Coach,
@@ -21,8 +22,9 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
+@login_required_with_message("Раздел тренировок доступен только для зарегистрированных пользователей.")
 def training_list(request):
-    """List of trainings."""
+    """List of trainings. Только для авторизованных пользователей."""
     skill_level = request.GET.get('level', '')
     training_type = request.GET.get('type', '')
     city = request.GET.get('city', '')
@@ -45,8 +47,9 @@ def training_list(request):
     return render(request, 'training/list.html', context)
 
 
+@login_required_with_message("Детали тренировки доступны только для зарегистрированных пользователей.")
 def training_detail(request, slug):
-    """Training detail page."""
+    """Training detail page. Только для авторизованных пользователей."""
     training = get_object_or_404(
         Training.objects.select_related('coach', 'court'),
         slug=slug,
@@ -91,8 +94,9 @@ def training_enroll(request, slug):
     return render(request, "training/enroll.html", {"training": training, "form": form})
 
 
+@login_required_with_message("Список тренеров доступен только для зарегистрированных пользователей.")
 def coach_list(request):
-    """List of coaches."""
+    """List of coaches. Только для авторизованных пользователей."""
     city = request.GET.get('city', '')
 
     coaches = Coach.objects.filter(is_active=True)
@@ -146,8 +150,9 @@ def coach_application_success(request):
     return render(request, "training/coach_application_success.html")
 
 
+@login_required_with_message("Информация о тренере доступна только для зарегистрированных пользователей.")
 def coach_detail(request, slug):
-    """Coach detail page."""
+    """Coach detail page. Только для авторизованных пользователей."""
     coach = get_object_or_404(Coach, slug=slug, is_active=True)
     trainings = coach.trainings.filter(is_active=True)
     return render(request, "training/coach_detail.html", {"coach": coach, "trainings": trainings})

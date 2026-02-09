@@ -15,11 +15,14 @@ import logging
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.telegram_bot import notifications as tg
 from apps.telegram_bot import services as bot_services
 from apps.tournaments.models import Match
+from apps.tournaments.utils import get_match_participant_users
+from apps.users.models import Notification
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +85,17 @@ class Command(BaseCommand):
                 try:
                     tg.notify_match_deadline_reminder(match, days_left=2)
                     sent_2 += 1
+                    # Уведомление в ЛК (личный кабинет), сообщение до 255 символов
+                    deadline_str = match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else ""
+                    msg = f"До дедлайна матча «{match.tournament.name}» 2 дня ({deadline_str}). Внесите результат: Мои матчи."
+                    if len(msg) > 255:
+                        msg = msg[:252] + "..."
+                    url = reverse("my_matches")
+                    for user in get_match_participant_users(match):
+                        try:
+                            Notification.objects.create(user=user, message=msg, url=url)
+                        except Exception as e:
+                            logger.warning("Notification deadline 2d user %s: %s", user.pk, e)
                 except Exception as e:
                     logger.exception("send_deadline_reminder 2d match %s: %s", match.pk, e)
 
@@ -92,6 +106,17 @@ class Command(BaseCommand):
                 try:
                     tg.notify_match_deadline_reminder(match, days_left=1)
                     sent_1 += 1
+                    # Уведомление в ЛК (личный кабинет), сообщение до 255 символов
+                    deadline_str = match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else ""
+                    msg = f"До дедлайна матча «{match.tournament.name}» 1 день ({deadline_str}). Внесите результат: Мои матчи."
+                    if len(msg) > 255:
+                        msg = msg[:252] + "..."
+                    url = reverse("my_matches")
+                    for user in get_match_participant_users(match):
+                        try:
+                            Notification.objects.create(user=user, message=msg, url=url)
+                        except Exception as e:
+                            logger.warning("Notification deadline 1d user %s: %s", user.pk, e)
                 except Exception as e:
                     logger.exception("send_deadline_reminder 1d match %s: %s", match.pk, e)
 

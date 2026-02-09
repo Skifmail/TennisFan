@@ -5,29 +5,53 @@ from django.http import Http404
 from django.urls import reverse
 from urllib.parse import urlencode
 
+from apps.core.decorators import login_required_with_message
 from apps.subscriptions.models import SubscriptionTier
 from apps.tournaments.models import Tournament
 from .forms import DonateForm
 
+
 def donate_view(request):
+    """Страница доната — доступна всем пользователям."""
     if request.method == 'POST':
-        form = DonateForm(request.POST)
+        form = DonateForm(request.POST, user=request.user)
         if form.is_valid():
             params = {
                 'type': 'donation',
                 'amount': form.cleaned_data['amount'],
-                'comment': form.cleaned_data['comment']
+                'comment': form.cleaned_data.get('comment', ''),
             }
+            # Добавляем имя/email если указано
+            name_or_email = form.cleaned_data.get('name_or_email', '').strip()
+            if name_or_email:
+                params['name_or_email'] = name_or_email
             base_url = reverse('payment_preview')
             query_string = urlencode(params)
             return redirect(f'{base_url}?{query_string}')
     else:
-        form = DonateForm()
+        form = DonateForm(user=request.user)
+        # Если пользователь авторизован, предзаполняем имя/email
+        if request.user.is_authenticated:
+            if request.user.get_full_name():
+                form.fields['name_or_email'].initial = request.user.get_full_name()
+            elif request.user.email:
+                form.fields['name_or_email'].initial = request.user.email
     
     return render(request, 'payments/donate.html', {'form': form})
 
+
 def payment_preview(request):
+    """Предпросмотр платежа. Для доната доступно всем, для остальных типов требуется авторизация."""
     payment_type = request.GET.get('type')
+    
+    # Для подписок и турниров требуется авторизация
+    if payment_type in ('subscription', 'tournament') and not request.user.is_authenticated:
+        from django.conf import settings
+        messages.info(request, "Для оплаты необходимо зарегистрироваться.")
+        login_url = getattr(settings, 'LOGIN_URL', 'login')
+        next_url = request.get_full_path()
+        return redirect(f"{reverse(login_url)}?next={next_url}")
+    
     context = {}
     
     if payment_type == 'subscription':
@@ -72,15 +96,23 @@ def payment_preview(request):
     elif payment_type == 'donation':
         amount = request.GET.get('amount')
         comment = request.GET.get('comment', '')
+        name_or_email = request.GET.get('name_or_email', '')
+        
+        details = [('Тип', 'Донат')]
+        if name_or_email:
+            details.append(('Имя/Email', name_or_email))
+        if comment:
+            details.append(('Комментарий', comment))
+        else:
+            details.append(('Комментарий', 'Нет комментария'))
+        
         context = {
             'title': "Поддержка проекта (Донат)",
             'description': "Добровольный взнос на развитие проекта",
             'amount': amount,
             'comment': comment,
-            'details': [
-                ('Тип', 'Донат'),
-                ('Комментарий', comment if comment else 'Нет комментария')
-            ]
+            'name_or_email': name_or_email,
+            'details': details
         }
     
     else:
@@ -92,4 +124,16 @@ def payment_preview(request):
     return render(request, 'payments/preview.html', context)
 
 def payment_process(request):
+    """Обработка платежа. Для доната доступно всем, для остальных типов требуется авторизация."""
+    payment_type = request.POST.get('type') or request.GET.get('type')
+    
+    # Для подписок и турниров требуется авторизация
+    if payment_type in ('subscription', 'tournament') and not request.user.is_authenticated:
+        from django.conf import settings
+        messages.info(request, "Для оплаты необходимо зарегистрироваться.")
+        login_url = getattr(settings, 'LOGIN_URL', 'login')
+        next_url = request.get_full_path()
+        return redirect(f"{reverse(login_url)}?next={next_url}")
+    
+    # Пока платежный шлюз не подключен
     raise Http404("Payment gateway not connected")

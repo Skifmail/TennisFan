@@ -9,7 +9,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 from dotenv import load_dotenv
 load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-tennison-dev-key-change-in-production')
+# SECRET_KEY обязателен для безопасности
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    # В development режиме можно использовать временный ключ, но лучше задать в .env
+    if os.environ.get('DEBUG', 'False') == 'True':
+        import warnings
+        warnings.warn(
+            "SECRET_KEY not set in environment. Using a temporary key for development only. "
+            "Set SECRET_KEY in .env file for production!",
+            UserWarning
+        )
+        SECRET_KEY = 'django-insecure-dev-key-change-in-production-set-in-env'
+    else:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(
+            "SECRET_KEY environment variable must be set. "
+            "Set it in your .env file or environment variables."
+        )
 
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
@@ -31,6 +48,11 @@ CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+
+# Настройки безопасности сессий
+SESSION_COOKIE_AGE = 1209600  # 2 недели
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_SAVE_EVERY_REQUEST = True  # Обновлять таймаут при активности пользователя
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -199,7 +221,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024   # 12 МБ — макс. раз�
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Login/Logout URLs
-LOGIN_URL = 'login'
+LOGIN_URL = 'login'  # Редирект на auth с mode=login
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
 
@@ -240,6 +262,23 @@ CACHES = {
     }
 }
 
+# Email configuration
+# Для development: используйте консольный backend (письма выводятся в консоль)
+# Для production: настройте SMTP через переменные окружения
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+)
+
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@tennisfan.ru')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
 # Cron: формирование сеток по дедлайну (FAN, Олимпийская, Круговой), обработка просроченных матчей,
 # авто-подтверждение заявок на результат матча (6 ч без ответа = подтверждено)
 CRONJOBS = [
@@ -248,4 +287,5 @@ CRONJOBS = [
     ('0 */6 * * *', 'django.core.management.call_command', ['olympic_process_overdue_matches']),
     ('*/15 * * * *', 'django.core.management.call_command', ['auto_accept_stale_proposals']),
     ('0 9 * * *', 'django.core.management.call_command', ['send_deadline_reminders']),
+    ('0 8 * * *', 'django.core.management.call_command', ['send_tournament_start_reminders']),
 ]

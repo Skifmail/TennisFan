@@ -2,19 +2,23 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
+
+from apps.core.decorators import login_required_with_message
 from .models import SubscriptionTier, UserSubscription
 
+
+@login_required_with_message("Информация о тарифах доступна только для зарегистрированных пользователей.")
 def pricing_page(request):
+    """Страница тарифов — только для авторизованных пользователей."""
     tiers = SubscriptionTier.objects.exclude(name=SubscriptionTier.Level.FREE).order_by('price')
     
     current_tier_id = None
-    if request.user.is_authenticated:
-        try:
-            # Check if user has an active subscription
-            if hasattr(request.user, 'subscription') and request.user.subscription.is_valid():
-                current_tier_id = request.user.subscription.tier.id
-        except UserSubscription.DoesNotExist:
-            pass
+    try:
+        # Check if user has an active subscription
+        if hasattr(request.user, 'subscription') and request.user.subscription.is_valid():
+            current_tier_id = request.user.subscription.tier.id
+    except UserSubscription.DoesNotExist:
+        pass
             
     return render(request, 'subscriptions/pricing.html', {
         'tiers': tiers,

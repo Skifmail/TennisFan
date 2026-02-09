@@ -3,7 +3,26 @@
 Используются в views и в telegram_bot без циклических импортов.
 """
 
-from .models import Match
+from .models import Match, Tournament
+
+
+def get_tournament_participant_users(tournament: Tournament) -> list:
+    """
+    Список пользователей (User) — всех участников турнира (для рассылки уведомлений).
+    Одиночный: participants. Парный: игроки из всех команд (player1, player2).
+    """
+    users = set()
+    if tournament.is_doubles():
+        for team in tournament.teams.select_related("player1__user", "player2__user"):
+            if team.player1_id and getattr(team.player1, "user_id", None) and not getattr(team.player1, "is_bye", False):
+                users.add(team.player1.user)
+            if team.player2_id and getattr(team.player2, "user_id", None) and not getattr(team.player2, "is_bye", False):
+                users.add(team.player2.user)
+    else:
+        for player in tournament.participants.select_related("user"):
+            if getattr(player, "user_id", None) and not getattr(player, "is_bye", False):
+                users.add(player.user)
+    return list(users)
 
 
 def get_match_participants(match: Match) -> set:

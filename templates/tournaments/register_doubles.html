@@ -51,6 +51,11 @@
             <div>
                 <h3 class="h5 mb-2">Указать партнёра сейчас</h3>
                 <p class="text-secondary mb-2">Найдите партнёра по ID, имени, телефону или email.</p>
+                {% if tournament.is_mixed_doubles %}
+                <div class="alert alert-info mb-3" style="padding: var(--spacing-md); background: rgba(166, 130, 74, 0.1); border-left: 3px solid var(--color-primary); border-radius: var(--radius-sm);">
+                    <strong>Микст-турнир:</strong> В команде должны быть мужчина и женщина. Система покажет только игроков противоположного пола.
+                </div>
+                {% endif %}
                 <form method="get" action="{% url 'tournament_register_doubles' slug=tournament.slug %}" class="mb-3" id="partner-search-form">
                     <div class="d-flex gap-2 flex-wrap">
                         <input type="text" name="q" class="form-control" placeholder="ID, имя, телефон или email" style="max-width: 300px;" value="{{ request.GET.q }}">
@@ -66,7 +71,12 @@
                             {% csrf_token %}
                             <input type="hidden" name="action" value="add_partner">
                             <input type="hidden" name="partner_id" value="{{ p.id }}">
-                            <span class="flex-grow-1">{{ p.user.last_name }} {{ p.user.first_name }} (ID: {{ p.id }})</span>
+                            <div class="flex-grow-1">
+                                <div>{{ p.user.last_name }} {{ p.user.first_name }} (ID: {{ p.id }})</div>
+                                {% if tournament.is_mixed_doubles and p.gender %}
+                                <small class="text-muted">{{ p.get_gender_display }}</small>
+                                {% endif %}
+                            </div>
                             <button type="submit" class="btn btn-primary">Добавить в пару</button>
                         </form>
                         {% endfor %}

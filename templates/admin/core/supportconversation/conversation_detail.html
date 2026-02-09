@@ -1,0 +1,63 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+<p style="margin-bottom: 20px;">
+    <a href="{% url 'admin:core_supportconversation_changelist' %}">&larr; Назад к списку диалогов</a>
+</p>
+
+<div style="margin-bottom: 10px; padding: 10px; background: #f8f8f8; border-radius: 4px;">
+    <strong>Пользователь:</strong> {{ conversation_user.get_full_name|default:"—" }}<br>
+    <strong>Email:</strong> {{ conversation_user.email }}<br>
+    {% if conversation_user.telegram_link and conversation_user.telegram_link.telegram_chat_id %}
+    <strong>Telegram:</strong> Привязан ✓
+    {% else %}
+    <strong>Telegram:</strong> Не привязан
+    {% endif %}
+</div>
+
+{% if support_messages %}
+<div class="conversation-messages" style="max-width: 800px;">
+    {% for msg in support_messages %}
+    <div style="
+        margin-bottom: 15px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        {% if msg.is_from_admin %}
+        background: #e3f2fd;
+        margin-left: 50px;
+        border-left: 4px solid #2196f3;
+        {% else %}
+        background: #f5f5f5;
+        margin-right: 50px;
+        border-left: 4px solid #9e9e9e;
+        {% endif %}
+    ">
+        <div style="font-size: 11px; color: #666; margin-bottom: 6px;">
+            {% if msg.is_from_admin %}
+            <strong style="color: #2196f3;">Администратор</strong>
+            {% else %}
+            <strong>{{ conversation_user.get_full_name|default:conversation_user.email }}</strong>
+            {% endif %}
+            &nbsp;&middot;&nbsp;
+            {{ msg.created_at|date:"d.m.Y H:i" }}
+        </div>
+        {% if msg.subject %}
+        <div style="font-weight: 600; margin-bottom: 4px;">{{ msg.subject }}</div>
+        {% endif %}
+        <div style="white-space: pre-wrap;">{{ msg.text }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p>Сообщений нет.</p>
+{% endif %}
+
+<p style="margin-top: 30px; padding: 15px; background: #fff3e0; border-radius: 4px; border-left: 4px solid #ff9800;">
+    <strong>Как ответить:</strong> Ответы отправляются через Telegram-бота поддержки. 
+    Найдите сообщение пользователя в Telegram и ответьте на него (Reply).
+</p>
+
+{% endblock %}

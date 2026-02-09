@@ -9,7 +9,24 @@ from django.urls import reverse
 
 from apps.comments.models import Comment
 
-from .models import AboutUs, ContactItem, ContactPage, Gallery, News, NewsPhoto, Page, Photo, RulesSection
+from .models import (
+    AboutUs,
+    ContactItem,
+    ContactPage,
+    Gallery,
+    LiveStream,
+    News,
+    NewsPhoto,
+    Photo,
+    RulesSection,
+    StringerCompany,
+    StringerCompanyContact,
+    StringerCompanyPhoto,
+    StringerCompanyRating,
+    StringerPage,
+    Video,
+    VideoPage,
+)
 
 
 class CommentInline(GenericTabularInline):
@@ -70,16 +87,6 @@ class GalleryAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("title",)}
     raw_id_fields = ("tournament",)
     inlines = [PhotoInline]
-
-
-@admin.register(Photo)
-class PhotoAdmin(admin.ModelAdmin):
-    """Admin for Photo model."""
-
-    list_display = ("id", "gallery", "caption", "order", "created_at")
-    list_filter = ("gallery",)
-    list_editable = ("order",)
-    raw_id_fields = ("gallery",)
 
 
 @admin.register(AboutUs)
@@ -174,12 +181,210 @@ class RulesSectionAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(Page)
-class PageAdmin(admin.ModelAdmin):
-    """Admin for Page model."""
+class LiveStreamInline(admin.TabularInline):
+    """Inline для прямых трансляций."""
 
-    list_display = ("title", "slug", "is_published", "show_in_footer", "order")
-    list_filter = ("is_published", "show_in_footer")
-    search_fields = ("title", "content")
-    list_editable = ("is_published", "show_in_footer", "order")
-    prepopulated_fields = {"slug": ("title",)}
+    model = LiveStream
+    extra = 1
+    fields = ("title", "url", "platform", "is_active", "order")
+    ordering = ("order", "-created_at")
+
+
+class VideoInline(admin.TabularInline):
+    """Inline для видео в плейлисте."""
+
+    model = Video
+    extra = 1
+    fields = ("title", "url", "platform", "is_published", "order")
+    ordering = ("order", "-created_at")
+
+
+@admin.register(VideoPage)
+class VideoPageAdmin(admin.ModelAdmin):
+    """Админ для страницы «Видео» — настройки и контент в одном месте."""
+
+    list_display = ("__str__", "live_streams_title", "playlist_title", "updated_at")
+    fieldsets = (
+        (
+            "Заголовки блоков",
+            {
+                "fields": ("live_streams_title", "playlist_title"),
+                "description": "Заголовки отображаются на странице «Видео».",
+            },
+        ),
+    )
+    inlines = [LiveStreamInline, VideoInline]
+
+    def has_add_permission(self, request) -> bool:
+        """Only one VideoPage instance allowed."""
+        return not VideoPage.objects.exists()
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        """Prevent deletion of singleton."""
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        """Redirect to change view for singleton."""
+        obj = VideoPage.objects.first()
+        if obj and not request.path.endswith("/change/"):
+            return redirect(reverse("admin:content_videopage_change", args=[obj.pk]))
+        return super().changelist_view(request, extra_context)
+
+
+# LiveStream и Video управляются через inline формы в VideoPageAdmin
+# Отдельные разделы убраны для упрощения интерфейса
+
+
+# ---------------------------------------------------------------------------
+# Стрингеры
+# ---------------------------------------------------------------------------
+
+
+class StringerCompanyContactInline(admin.TabularInline):
+    """Inline для контактов компании стрингеров (Телефон, Telegram, WhatsApp, MAX)."""
+
+    model = StringerCompanyContact
+    extra = 1
+    fields = ("contact_type", "value", "order")
+    verbose_name = "Контакт"
+    verbose_name_plural = "Контакты"
+
+
+class StringerCompanyPhotoInline(admin.TabularInline):
+    """Inline для фото компании стрингеров."""
+
+    model = StringerCompanyPhoto
+    extra = 1
+    fields = ("image", "caption", "order")
+    verbose_name = "Фото"
+    verbose_name_plural = "Фото компании"
+
+
+class StringerCompanyRatingInline(admin.TabularInline):
+    """Inline для оценок компании (только просмотр)."""
+
+    model = StringerCompanyRating
+    extra = 0
+    readonly_fields = ("user", "score", "comment", "created_at")
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+class StringerCompanyInline(admin.StackedInline):
+    """Inline для компаний стрингеров в StringerPageAdmin."""
+
+    model = StringerCompany
+    extra = 0
+    fieldsets = (
+        (
+            "Основная информация",
+            {
+                "fields": ("name", "address", "price", "description"),
+            },
+        ),
+        (
+            "Настройки",
+            {
+                "fields": ("is_active", "order"),
+            },
+        ),
+    )
+    # Контакты и фото — через редактирование конкретной компании
+    # или использовать кастомный шаблон для вложенных inlines
+
+
+@admin.register(StringerPage)
+class StringerPageAdmin(admin.ModelAdmin):
+    """Админ для страницы «Стрингеры» — настройки и компании в одном месте."""
+
+    list_display = ("__str__", "is_enabled", "updated_at")
+    fieldsets = (
+        (
+            "Настройки страницы",
+            {
+                "fields": ("title", "description", "is_enabled"),
+                "description": "Настройки отображаются на странице «Стрингеры».",
+            },
+        ),
+        ("Служебное", {"fields": ("updated_at",)}),
+    )
+    readonly_fields = ("updated_at",)
+    inlines = [StringerCompanyInline]
+
+    def has_add_permission(self, request) -> bool:
+        """Prevent adding new instances (singleton)."""
+        return False
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        """Prevent deletion of singleton."""
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        """Redirect to change view for singleton."""
+        obj = StringerPage.objects.first()
+        if obj and not request.path.endswith("/change/"):
+            return redirect(reverse("admin:content_stringerpage_change", args=[obj.pk]))
+        return super().changelist_view(request, extra_context)
+
+
+@admin.register(StringerCompany)
+class StringerCompanyAdmin(admin.ModelAdmin):
+    """Админ для компаний стрингеров — отдельное редактирование с фото и контактами."""
+
+    list_display = ("name", "address", "is_active", "order", "rating_display", "created_at")
+    list_filter = ("is_active", "created_at", "stringer_page")
+    search_fields = ("name", "address", "contact_items__value", "description")
+    list_editable = ("is_active", "order")
+    inlines = [StringerCompanyContactInline, StringerCompanyPhotoInline, StringerCompanyRatingInline]
+
+    fieldsets = (
+        (
+            "Основная информация",
+            {
+                "fields": ("stringer_page", "name", "address", "price", "description"),
+            },
+        ),
+        (
+            "Настройки",
+            {
+                "fields": ("is_active", "order"),
+            },
+        ),
+        (
+            "Служебное",
+            {
+                "fields": ("created_at", "updated_at"),
+            },
+        ),
+    )
+    readonly_fields = ("created_at", "updated_at")
+
+    def rating_display(self, obj):
+        """Отображение рейтинга в списке."""
+        avg = obj.get_average_rating()
+        count = obj.get_rating_count()
+        if avg is not None:
+            return f"{avg:.1f} ⭐ ({count})"
+        return "Нет оценок"
+
+    rating_display.short_description = "Рейтинг"
+
+
+@admin.register(StringerCompanyRating)
+class StringerCompanyRatingAdmin(admin.ModelAdmin):
+    """Отдельный список всех отзывов (оценок с комментариями) о компаниях стрингеров."""
+
+    list_display = ("company", "user", "score", "comment_preview", "created_at")
+    list_filter = ("score", "company", "created_at")
+    search_fields = ("comment", "user__email", "user__first_name", "user__last_name", "company__name")
+    readonly_fields = ("company", "user", "score", "comment", "created_at", "updated_at")
+    raw_id_fields = ("user",)
+
+    def comment_preview(self, obj):
+        if not obj.comment:
+            return "—"
+        return obj.comment[:80] + "…" if len(obj.comment) > 80 else obj.comment
+
+    comment_preview.short_description = "Комментарий"

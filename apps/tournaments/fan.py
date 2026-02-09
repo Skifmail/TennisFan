@@ -231,6 +231,11 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     tournament.bracket_generated = True
     tournament.save(update_fields=["bracket_generated"])
     logger.info("FAN bracket R1 created for %s: %d matches (n=%d, odd=%s)", tournament.name, created, n, odd)
+    try:
+        from apps.telegram_bot.notifications import notify_bracket_formed
+        notify_bracket_formed(tournament)
+    except Exception as e:
+        logger.exception("notify_bracket_formed for %s: %s", tournament.slug, e)
     return True, f"Сетка сформирована: {created} матчей 1-го круга, {entity_name} {n}."
 
 

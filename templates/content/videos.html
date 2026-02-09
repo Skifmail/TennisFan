@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Видео{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Видео</h1>
+</div>
+
+<div class="container" style="max-width: 1200px;">
+    <!-- Блок прямых трансляций -->
+    {% if live_streams %}
+    <section class="video-section" style="margin-bottom: var(--spacing-3xl);">
+        <h2 class="section-title" style="margin-bottom: var(--spacing-xl);">{{ video_page.live_streams_title }}</h2>
+        
+        <div class="video-grid">
+            {% for stream in live_streams %}
+            <div class="video-card">
+                <div class="video-wrapper">
+                    {% with embed_url=stream.get_embed_url %}
+                    {% if embed_url %}
+                        {% if stream.platform == 'vk' %}
+                            <iframe 
+                                src="{{ embed_url }}" 
+                                width="100%" 
+                                height="100%" 
+                                frameborder="0" 
+                                allowfullscreen
+                                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                            </iframe>
+                        {% else %}
+                            <iframe 
+                                src="{{ embed_url }}" 
+                                width="100%" 
+                                height="100%" 
+                                frameborder="0" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                referrerpolicy="strict-origin-when-cross-origin"
+                                allowfullscreen
+                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                            </iframe>
+                        {% endif %}
+                    {% else %}
+                        <div class="video-placeholder">
+                            <p>Не удалось загрузить трансляцию</p>
+                            <a href="{{ stream.url }}" target="_blank" rel="noopener" class="btn btn-primary">Открыть трансляцию</a>
+                        </div>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+                <div class="video-card-body">
+                    <h3 class="video-title">{{ stream.title }}</h3>
+                    <a href="{{ stream.url }}" target="_blank" rel="noopener" class="video-link">
+                        Открыть в {{ stream.get_platform_display }} →
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Блок плейлиста -->
+    {% if videos %}
+    <section class="video-section">
+        <h2 class="section-title" style="margin-bottom: var(--spacing-xl);">{{ video_page.playlist_title }}</h2>
+        
+        <div class="video-grid">
+            {% for video in videos %}
+            <div class="video-card">
+                <div class="video-wrapper">
+                    {% with embed_url=video.get_embed_url %}
+                    {% if embed_url %}
+                        {% if video.platform == 'vk' %}
+                            <iframe 
+                                src="{{ embed_url }}" 
+                                width="100%" 
+                                height="100%" 
+                                frameborder="0" 
+                                allowfullscreen
+                                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                            </iframe>
+                        {% else %}
+                            <iframe 
+                                src="{{ embed_url }}" 
+                                width="100%" 
+                                height="100%" 
+                                frameborder="0" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                                referrerpolicy="strict-origin-when-cross-origin"
+                                allowfullscreen
+                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                            </iframe>
+                        {% endif %}
+                    {% else %}
+                        <div class="video-placeholder">
+                            <p>Не удалось загрузить видео</p>
+                            <a href="{{ video.url }}" target="_blank" rel="noopener" class="btn btn-primary">Открыть видео</a>
+                        </div>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+                <div class="video-card-body">
+                    <h3 class="video-title">{{ video.title }}</h3>
+                    {% if video.description %}
+                    <p class="video-description">{{ video.description|truncatewords:20 }}</p>
+                    {% endif %}
+                    <div class="video-meta">
+                        <span class="video-platform">{{ video.get_platform_display }}</span>
+                        {% if video.views_count > 0 %}
+                        <span class="video-views">{{ video.views_count }} просмотров</span>
+                        {% endif %}
+                    </div>
+                    <a href="{{ video.url }}" target="_blank" rel="noopener" class="video-link">
+                        Открыть в {{ video.get_platform_display }} →
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if not live_streams and not videos %}
+    <div class="card">
+        <div class="card-body" style="text-align: center; padding: var(--spacing-3xl);">
+            <p class="text-secondary">Видео пока нет.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.video-section {
+    margin-bottom: var(--spacing-3xl);
+}
+
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: var(--spacing-xl);
+}
+
+@media (max-width: 768px) {
+    .video-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-lg);
+    }
+}
+
+.video-card {
+    background: var(--color-bg-elevated);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.video-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(166, 130, 74, 0.2);
+}
+
+.video-wrapper {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    background: #000;
+    overflow: hidden;
+}
+
+.video-wrapper iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.video-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-elevated);
+    color: var(--color-text-secondary);
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+.video-card-body {
+    padding: var(--spacing-lg);
+}
+
+.video-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text);
+    font-family: var(--font-heading);
+}
+
+.video-description {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-md);
+    line-height: 1.5;
+}
+
+.video-meta {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.video-platform {
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.video-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    color: var(--color-primary);
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    transition: color var(--transition-fast);
+}
+
+.video-link:hover {
+    color: var(--color-text-secondary);
+    text-decoration: underline;
+}
+</style>
+{% endblock %}

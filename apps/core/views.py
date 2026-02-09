@@ -117,12 +117,6 @@ def results(request):
     return render(request, 'core/results.html', {'matches': matches})
 
 
-def legends(request):
-    """Hall of fame page."""
-    legends = Player.objects.filter(is_legend=True).select_related('user')
-    return render(request, 'core/legends.html', {'legends': legends})
-
-
 def _is_html_content(text: str) -> bool:
     """Проверяет, похож ли текст на HTML (есть теги), чтобы не применять linebreaks."""
     if not text or "<" not in text:

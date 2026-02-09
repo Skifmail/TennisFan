@@ -37,57 +37,63 @@
                             <div class="form-group">
                                 <label class="form-label" for="id_last_name">{{ register_form.last_name.label }}</label>
                                 {{ register_form.last_name }}
-                                {% for error in register_form.last_name.errors %}<p class="text-error form-error">{{
-                                    error }}</p>{% endfor %}
+                                {% for error in register_form.last_name.errors %}<p class="text-error form-error">{{ error }}</p>{% endfor %}
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="id_first_name">{{ register_form.first_name.label
-                                    }}</label>
+                                <label class="form-label" for="id_first_name">{{ register_form.first_name.label }}</label>
                                 {{ register_form.first_name }}
-                                {% for error in register_form.first_name.errors %}<p class="text-error form-error">{{
-                                    error }}</p>{% endfor %}
+                                {% for error in register_form.first_name.errors %}<p class="text-error form-error">{{ error }}</p>{% endfor %}
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="id_phone">{{ register_form.phone.label }}</label>
                                 {{ register_form.phone }}
                                 <div class="field-error" id="phone-error"></div>
-                                {% for error in register_form.phone.errors %}<p class="text-error form-error">{{ error
-                                    }}</p>{% endfor %}
+                                {% for error in register_form.phone.errors %}<p class="text-error form-error">{{ error }}</p>{% endfor %}
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="id_email">{{ register_form.email.label }}</label>
                                 {{ register_form.email }}
                                 <div class="field-error" id="email-error"></div>
-                                {% for error in register_form.email.errors %}<p class="text-error form-error">{{ error
-                                    }}</p>{% endfor %}
+                                {% for error in register_form.email.errors %}<p class="text-error form-error">{{ error }}</p>{% endfor %}
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="id_birth_date">{{ register_form.birth_date.label
-                                    }}</label>
+                                <label class="form-label" for="id_birth_date">{{ register_form.birth_date.label }}</label>
                                 {{ register_form.birth_date }}
                                 <div class="field-error" id="birth_date-error"></div>
-                                {% for error in register_form.birth_date.errors %}<p class="text-error form-error">{{
-                                    error }}</p>{% endfor %}
+                                {% for error in register_form.birth_date.errors %}<p class="text-error form-error">{{ error }}</p>{% endfor %}
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="id_city">{{ register_form.city.label }}</label>
                                 {{ register_form.city }}
                                 <div class="field-error" id="city-error"></div>
-                                {% for error in register_form.city.errors %}<p class="text-error form-error">{{ error }}
-                                </p>{% endfor %}
+                                {% for error in register_form.city.errors %}<p class="text-error form-error">{{ error }}</p>{% endfor %}
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="id_password">{{ register_form.password.label }}</label>
-                                {{ register_form.password }}
+                                <div class="password-field-wrapper">
+                                    {{ register_form.password }}
+                                    <button type="button" class="password-toggle-btn" aria-label="Показать пароль" onclick="togglePasswordVisibility(this)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                    </button>
+                                </div>
                                 <div class="field-error" id="password-error"></div>
                             </div>
                             <div class="form-group">
-                                <label class="form-label" for="id_password_confirm">{{
-                                    register_form.password_confirm.label }}</label>
-                                {{ register_form.password_confirm }}
+                                <label class="form-label" for="id_password_confirm">{{ register_form.password_confirm.label }}</label>
+                                <div class="password-field-wrapper">
+                                    {{ register_form.password_confirm }}
+                                    <button type="button" class="password-toggle-btn" aria-label="Показать пароль" onclick="togglePasswordVisibility(this)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
+                                        </svg>
+                                    </button>
+                                </div>
                                 <div class="field-error" id="password_confirm-error"></div>
-                                {% for error in register_form.password_confirm.errors %}<p
-                                    class="text-error form-error">{{ error }}</p>{% endfor %}
+                                {% for error in register_form.password_confirm.errors %}<p class="text-error form-error">{{ error }}</p>{% endfor %}
                             </div>
                             <div class="form-group form-group-consent">
                                 <label class="consent-label">
@@ -98,8 +104,7 @@
                                             конфиденциальности</a></span>
                                 </label>
                                 <div class="field-error" id="consent-error"></div>
-                                {% for error in register_form.agree_legal.errors %}<p class="text-error form-error">{{
-                                    error }}</p>{% endfor %}
+                                {% for error in register_form.agree_legal.errors %}<p class="text-error form-error">{{ error }}</p>{% endfor %}
                             </div>
                         </div>
                         <div class="register-step-actions">
@@ -133,13 +138,23 @@
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="login">
 
-                    <h2 class="auth-login-title">Вход</h2>
-
                     {% if login_form.errors %}
                     <div class="alert alert-error mb-3">
                         Неверный email или пароль
                     </div>
                     {% endif %}
+
+                    <div class="auth-login-logo">
+                        <div class="coin">
+                            <div class="coin__face coin__front">
+                                <img src="{% static 'images/logo.svg' %}" alt="TennisFan">
+                            </div>
+                            <div class="coin__face coin__back">
+                                <img src="{% static 'images/logo.svg' %}" alt="TennisFan">
+                            </div>
+                            <div class="coin__edge"></div>
+                        </div>
+                    </div>
 
                     <div class="form-group">
                         <label class="form-label" for="id_username">Email</label>
@@ -148,7 +163,19 @@
 
                     <div class="form-group">
                         <label class="form-label" for="id_password">Пароль</label>
-                        <input type="password" name="password" id="id_password" class="form-control" required>
+                        <div class="password-field-wrapper">
+                            <input type="password" name="password" id="id_password" class="form-control" required>
+                            <button type="button" class="password-toggle-btn" aria-label="Показать пароль" onclick="togglePasswordVisibility(this)">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="text-align: right; margin-bottom: var(--spacing-sm);">
+                        <a href="{% url 'password_reset' %}" class="text-link" style="font-size: var(--font-size-sm);">Забыли пароль?</a>
                     </div>
 
                     <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Войти</button>
@@ -185,6 +212,24 @@
         const url = new URL(window.location);
         url.searchParams.set('mode', newMode);
         window.history.pushState({}, '', url);
+    }
+
+    // Переключение видимости пароля: ищем input в той же обёртке, что и кнопка (чтобы работало при двух формах на странице)
+    function togglePasswordVisibility(btn) {
+        var wrapper = btn && btn.closest && btn.closest('.password-field-wrapper');
+        var input = wrapper ? wrapper.querySelector('input') : null;
+        if (!input) return;
+        var isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+        var svg = btn.querySelector('svg');
+        if (svg) {
+            if (isPassword) {
+                svg.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+            } else {
+                svg.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+            }
+        }
+        btn.setAttribute('aria-label', isPassword ? 'Скрыть пароль' : 'Показать пароль');
     }
 
     document.addEventListener('DOMContentLoaded', function () {

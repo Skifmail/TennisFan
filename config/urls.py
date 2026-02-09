@@ -18,6 +18,8 @@ urlpatterns = [
     path('news/', include('apps.content.urls_news')),
     path('gallery/', include('apps.content.urls_gallery')),
     path('pages/', include('apps.content.urls_pages')),
+    path('videos/', include('apps.content.urls_videos')),
+    path('stringers/', include('apps.content.urls_stringers')),
     path('subscriptions/', include('apps.subscriptions.urls')),
     path('payments/', include('apps.payments.urls')),
     path('legal/', include('apps.legal.urls')),

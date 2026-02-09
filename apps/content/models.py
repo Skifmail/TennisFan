@@ -150,8 +150,8 @@ class AboutUs(CompressImageFieldsMixin, models.Model):
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
 
     class Meta:
-        verbose_name = "О нас"
-        verbose_name_plural = "О нас"
+        verbose_name = "Страница «О нас»"
+        verbose_name_plural = "Страница «О нас»"
 
     def __str__(self) -> str:
         return "О нас"
@@ -179,8 +179,8 @@ class ContactPage(models.Model):
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
 
     class Meta:
-        verbose_name = "Контакты"
-        verbose_name_plural = "Контакты"
+        verbose_name = "Страница «Контакты»"
+        verbose_name_plural = "Страница «Контакты»"
 
     def __str__(self) -> str:
         return "Контакты"
@@ -334,9 +334,425 @@ class Page(models.Model):
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
 
     class Meta:
-        verbose_name = "Страница"
-        verbose_name_plural = "Страницы"
+        verbose_name = "Страница (текстовая)"
+        verbose_name_plural = "Страницы (текстовые)"
         ordering = ["order"]
 
     def __str__(self) -> str:
         return self.title
+
+
+class VideoPage(models.Model):
+    """
+    Singleton модель для страницы «Видео».
+    Хранит настройки страницы: заголовки блоков.
+    """
+
+    live_streams_title = models.CharField(
+        "Заголовок блока «Прямые трансляции»",
+        max_length=200,
+        default="Прямые трансляции",
+    )
+    playlist_title = models.CharField(
+        "Заголовок блока «Плейлист»",
+        max_length=200,
+        default="Плейлист",
+    )
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Страница «Видео»"
+        verbose_name_plural = "Страница «Видео»"
+
+    def __str__(self) -> str:
+        return "Страница «Видео»"
+
+    @classmethod
+    def get_singleton(cls) -> "VideoPage":
+        """Return the single VideoPage instance, creating if needed."""
+        obj = cls.objects.first()
+        if obj is None:
+            obj = cls.objects.create(
+                live_streams_title="Прямые трансляции",
+                playlist_title="Плейлист",
+            )
+        return obj
+
+
+class VideoPlatform(models.TextChoices):
+    """Платформы для видео."""
+
+    YOUTUBE = "youtube", "YouTube"
+    VK = "vk", "VK"
+    RUTUBE = "rutube", "RuTube"
+
+
+class LiveStream(models.Model):
+    """Прямая трансляция на странице «Видео»."""
+
+    video_page = models.ForeignKey(
+        VideoPage,
+        on_delete=models.CASCADE,
+        related_name="live_streams",
+        verbose_name="Страница видео",
+        null=True,
+        blank=True,
+    )
+    title = models.CharField("Название трансляции", max_length=200)
+    url = models.URLField(
+        "Ссылка на трансляцию",
+        help_text=(
+            "YouTube: любая ссылка (youtube.com/watch?v=... или youtu.be/...). "
+            "VK: используйте формат vk.com/video-XXXXX_YYYYY. "
+            "RuTube: любая ссылка на видео."
+        ),
+    )
+    platform = models.CharField(
+        "Платформа",
+        max_length=20,
+        choices=VideoPlatform.choices,
+        default=VideoPlatform.YOUTUBE,
+    )
+    is_active = models.BooleanField("Активна (показывать)", default=True)
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Прямая трансляция"
+        verbose_name_plural = "Прямые трансляции"
+        ordering = ["order", "-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.title} ({self.get_platform_display()})"
+
+    def save(self, *args, **kwargs):
+        """Автоматически определяем платформу по URL при сохранении."""
+        if self.url:
+            self.platform = self._detect_platform(self.url)
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _detect_platform(url: str) -> str:
+        """Определяет платформу по URL."""
+        url_lower = url.lower()
+        if "youtube.com" in url_lower or "youtu.be" in url_lower:
+            return VideoPlatform.YOUTUBE
+        if "vk.com" in url_lower or "vk.ru" in url_lower:
+            return VideoPlatform.VK
+        if "rutube.ru" in url_lower:
+            return VideoPlatform.RUTUBE
+        return VideoPlatform.YOUTUBE  # По умолчанию
+
+    def get_embed_url(self) -> str | None:
+        """Возвращает URL для встраивания трансляции."""
+        from apps.content.utils import get_video_embed_url
+
+        return get_video_embed_url(self.url, self.platform)
+
+
+class Video(models.Model):
+    """Видео в плейлисте на странице «Видео»."""
+
+    video_page = models.ForeignKey(
+        VideoPage,
+        on_delete=models.CASCADE,
+        related_name="videos",
+        verbose_name="Страница видео",
+        null=True,
+        blank=True,
+    )
+    title = models.CharField("Название видео", max_length=200)
+    description = models.TextField("Описание", blank=True)
+    url = models.URLField(
+        "Ссылка на видео",
+        help_text=(
+            "YouTube: любая ссылка (youtube.com/watch?v=... или youtu.be/...). "
+            "VK: используйте формат vk.com/video-XXXXX_YYYYY. "
+            "RuTube: любая ссылка на видео."
+        ),
+    )
+    platform = models.CharField(
+        "Платформа",
+        max_length=20,
+        choices=VideoPlatform.choices,
+        default=VideoPlatform.YOUTUBE,
+    )
+    thumbnail_url = models.URLField(
+        "URL превью (опционально)",
+        blank=True,
+        help_text="Ссылка на изображение превью. Если не указано, будет использовано превью с платформы.",
+    )
+    is_published = models.BooleanField("Опубликовано", default=True)
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+    views_count = models.PositiveIntegerField("Просмотры", default=0)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Видео"
+        verbose_name_plural = "Видео"
+        ordering = ["order", "-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.title} ({self.get_platform_display()})"
+
+    def save(self, *args, **kwargs):
+        """Автоматически определяем платформу по URL при сохранении."""
+        if self.url:
+            self.platform = self._detect_platform(self.url)
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _detect_platform(url: str) -> str:
+        """Определяет платформу по URL."""
+        url_lower = url.lower()
+        if "youtube.com" in url_lower or "youtu.be" in url_lower:
+            return VideoPlatform.YOUTUBE
+        if "vk.com" in url_lower or "vk.ru" in url_lower:
+            return VideoPlatform.VK
+        if "rutube.ru" in url_lower:
+            return VideoPlatform.RUTUBE
+        return VideoPlatform.YOUTUBE  # По умолчанию
+
+    def get_embed_url(self) -> str | None:
+        """Возвращает URL для встраивания видео."""
+        from apps.content.utils import get_video_embed_url
+
+        return get_video_embed_url(self.url, self.platform)
+
+
+# ---------------------------------------------------------------------------
+# Стрингеры (компании по натяжке струн на ракетки)
+# ---------------------------------------------------------------------------
+
+
+class StringerPage(models.Model):
+    """
+    Singleton модель для страницы «Стрингеры».
+    Хранит настройки страницы: заголовок, описание.
+    """
+
+    title = models.CharField("Заголовок страницы", max_length=200, default="Стрингеры")
+    description = models.TextField(
+        "Описание страницы",
+        blank=True,
+        help_text="Текст, который отображается вверху страницы перед списком компаний.",
+    )
+    is_enabled = models.BooleanField("Включить страницу", default=True)
+
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Страница «Стрингеры»"
+        verbose_name_plural = "Страница «Стрингеры»"
+
+    def __str__(self) -> str:
+        return self.title
+
+    def save(self, *args, **kwargs):
+        """Обеспечиваем singleton: всегда только одна запись."""
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_singleton(cls):
+        """Получить или создать единственный экземпляр."""
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={"title": "Стрингеры"})
+        return obj
+
+
+class StringerCompanyContactType(models.TextChoices):
+    """Тип контакта компании стрингеров."""
+
+    PHONE = "phone", "Телефон"
+    TELEGRAM = "telegram", "Telegram"
+    WHATSAPP = "whatsapp", "WhatsApp"
+    MAX = "max", "MAX"
+
+
+class StringerCompany(CompressImageFieldsMixin, models.Model):
+    """Компания по натяжке струн на ракетки."""
+
+    stringer_page = models.ForeignKey(
+        StringerPage,
+        on_delete=models.CASCADE,
+        related_name="companies",
+        verbose_name="Страница стрингеров",
+        null=True,
+        blank=True,
+    )
+    name = models.CharField("Наименование", max_length=200)
+    address = models.CharField("Адрес", max_length=300)
+    price = models.CharField(
+        "Стоимость",
+        max_length=200,
+        blank=True,
+        help_text="Например: 'от 500 руб.', '500-1000 руб.' и т.д.",
+    )
+    description = models.TextField("Описание", blank=True)
+    is_active = models.BooleanField("Активна (показывать)", default=True)
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Компания стрингеров"
+        verbose_name_plural = "Компании стрингеров"
+        ordering = ["order", "name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def get_average_rating(self) -> float | None:
+        """Возвращает средний рейтинг компании."""
+        from django.db.models import Avg
+
+        avg = self.ratings.aggregate(Avg("score"))["score__avg"]
+        return round(avg, 1) if avg is not None else None
+
+    def get_rating_count(self) -> int:
+        """Возвращает количество оценок."""
+        return self.ratings.count()
+
+
+class StringerCompanyContact(models.Model):
+    """Контакт компании стрингеров: телефон, Telegram, WhatsApp, MAX."""
+
+    company = models.ForeignKey(
+        StringerCompany,
+        on_delete=models.CASCADE,
+        related_name="contact_items",
+        verbose_name="Компания",
+    )
+    contact_type = models.CharField(
+        "Тип контакта",
+        max_length=20,
+        choices=StringerCompanyContactType.choices,
+    )
+    value = models.CharField(
+        "Значение",
+        max_length=300,
+        help_text=(
+            "Телефон: номер (например 79991234567). "
+            "Telegram: @username или username. "
+            "WhatsApp: номер. MAX: ссылка на профиль или номер.",
+        ),
+    )
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+
+    class Meta:
+        verbose_name = "Контакт компании"
+        verbose_name_plural = "Контакты компании"
+        ordering = ["order", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.get_contact_type_display()}: {self.value}"
+
+    def get_link_url(self) -> str | None:
+        """Возвращает URL для перехода по контакту (tel:, t.me, wa.me, ссылка MAX)."""
+        if not self.value or not self.value.strip():
+            return None
+        v = self.value.strip()
+        if self.contact_type == StringerCompanyContactType.PHONE:
+            phone = "".join(c for c in v if c.isdigit())
+            if phone.startswith("8") and len(phone) == 11:
+                phone = "7" + phone[1:]
+            elif phone.startswith("7") and len(phone) == 11:
+                pass
+            elif len(phone) == 10:
+                phone = "7" + phone
+            else:
+                return None
+            return f"tel:+{phone}"
+        if self.contact_type == StringerCompanyContactType.TELEGRAM:
+            username = v.lstrip("@")
+            return f"https://t.me/{username}" if username else None
+        if self.contact_type == StringerCompanyContactType.WHATSAPP:
+            phone = "".join(c for c in v if c.isdigit())
+            if phone.startswith("8") and len(phone) == 11:
+                phone = "7" + phone[1:]
+            elif len(phone) == 10:
+                phone = "7" + phone
+            elif phone.startswith("7") and len(phone) == 11:
+                pass
+            else:
+                return None
+            return f"https://wa.me/{phone}"
+        if self.contact_type == StringerCompanyContactType.MAX:
+            if v.startswith(("http://", "https://")):
+                return v
+            return v if v else None
+        return None
+
+    def get_icon_path(self) -> str:
+        """Путь к иконке мессенджера в static (для шаблона)."""
+        icons = {
+            StringerCompanyContactType.PHONE: "images/chat_icon.png",
+            StringerCompanyContactType.TELEGRAM: "images/Telegram_logo.svg",
+            StringerCompanyContactType.WHATSAPP: "images/WhatsApp.svg",
+            StringerCompanyContactType.MAX: "images/Max_logo_2025.png",
+        }
+        return icons.get(self.contact_type, "images/chat_icon.png")
+
+
+class StringerCompanyPhoto(CompressImageFieldsMixin, models.Model):
+    """Фото компании стрингеров."""
+
+    company = models.ForeignKey(
+        StringerCompany,
+        on_delete=models.CASCADE,
+        related_name="photos",
+        verbose_name="Компания",
+    )
+    image = models.ImageField(
+        "Фото",
+        upload_to="stringers/photos/",
+        validators=[validate_image_max_2mb],
+    )
+    caption = models.CharField("Подпись", max_length=200, blank=True)
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+
+    created_at = models.DateTimeField("Загружено", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Фото компании"
+        verbose_name_plural = "Фото компаний"
+        ordering = ["order", "-created_at"]
+
+    def __str__(self) -> str:
+        return f"Фото {self.id} для {self.company.name}"
+
+
+class StringerCompanyRating(models.Model):
+    """Оценка компании стрингеров от пользователя."""
+
+    company = models.ForeignKey(
+        StringerCompany,
+        on_delete=models.CASCADE,
+        related_name="ratings",
+        verbose_name="Компания",
+    )
+    user = models.ForeignKey(
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="stringer_ratings",
+        verbose_name="Пользователь",
+    )
+    score = models.PositiveSmallIntegerField(
+        "Оценка",
+        choices=[(i, str(i)) for i in range(1, 6)],
+        help_text="Оценка от 1 до 5",
+    )
+    comment = models.TextField("Комментарий", blank=True)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Оценка компании"
+        verbose_name_plural = "Оценки компаний"
+        unique_together = [["company", "user"]]
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.user} → {self.company}: {self.score}/5"

@@ -70,6 +70,51 @@
         if (teamsEl) {
             teamsEl.style.display = variant === VARIANT_DOUBLES ? "" : "none";
         }
+        updateGenderOptions();
+    }
+
+    function updateGenderOptions() {
+        const variant = getVariantValue();
+        const genderSelect = document.querySelector("#id_gender, select[name='gender']");
+        if (!genderSelect) {
+            return;
+        }
+
+        // Сохраняем текущее значение
+        const currentValue = genderSelect.value;
+        
+        // Получаем все опции
+        const allOptions = Array.from(genderSelect.querySelectorAll("option"));
+        const mixedOption = allOptions.find(opt => opt.value === "mixed");
+        
+        if (!mixedOption) {
+            return;
+        }
+
+        const isDoubles = variant === VARIANT_DOUBLES;
+        
+        if (isDoubles) {
+            // Парный турнир - показываем "Микст"
+            mixedOption.disabled = false;
+            mixedOption.style.display = "";
+            // Убираем атрибут hidden если есть
+            if (mixedOption.hasAttribute("hidden")) {
+                mixedOption.removeAttribute("hidden");
+            }
+        } else {
+            // Одиночный турнир - скрываем "Микст"
+            mixedOption.disabled = true;
+            mixedOption.style.display = "none";
+            mixedOption.setAttribute("hidden", "hidden");
+            
+            // Если выбран "Микст", переключаем на "Мужчины"
+            if (currentValue === "mixed") {
+                genderSelect.value = "male";
+                // Триггерим событие change для обновления формы
+                const event = new Event("change", { bubbles: true });
+                genderSelect.dispatchEvent(event);
+            }
+        }
     }
 
     function updateVisibility() {
@@ -99,6 +144,7 @@
             variantSelect.addEventListener("input", updateVariantVisibility);
         }
         updateVisibility();
+        updateGenderOptions(); // Инициализация при загрузке
     }
 
     if (document.readyState === "loading") {

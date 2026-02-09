@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ company.name }} - Стрингеры{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div style="margin-bottom: var(--spacing-md);">
+        <a href="{% url 'stringers' %}" class="text-secondary">&larr; Все стрингеры</a>
+    </div>
+    <h1 class="page-title">{{ company.name }}</h1>
+</div>
+
+<div class="container" style="max-width: 1000px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <!-- Заголовок с рейтингом -->
+            <div class="stringer-detail-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--spacing-xl); gap: var(--spacing-lg); flex-wrap: wrap;">
+                <div style="flex: 1;">
+                    <h2 style="font-size: var(--font-size-2xl); margin-bottom: var(--spacing-md);">{{ company.name }}</h2>
+                    {% if company.avg_rating %}
+                    <div class="stringer-rating" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                        <span class="rating-stars" style="display: flex; gap: 2px;">
+                            {% with rating_int=company.avg_rating|floatformat:0 %}
+                            {% for i in "12345"|make_list %}
+                                {% if forloop.counter <= rating_int|add:0 %}
+                                    <span class="star star-filled" style="font-size: 1.5em;">⭐</span>
+                                {% else %}
+                                    <span class="star star-empty" style="font-size: 1.5em; opacity: 0.3;">☆</span>
+                                {% endif %}
+                            {% endfor %}
+                            {% endwith %}
+                        </span>
+                        <span class="rating-value" style="font-weight: 600; color: var(--color-primary); font-size: 1.2em;">{{ company.avg_rating }}</span>
+                        <span class="rating-count" style="color: var(--color-text-muted);">({{ company.rating_count }} оценок)</span>
+                    </div>
+                    {% else %}
+                    <div class="stringer-rating">
+                        <span class="text-muted">Нет оценок</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Галерея фото -->
+            {% if company.photos.all %}
+            <div class="stringer-photos-gallery" style="margin-bottom: var(--spacing-xl);">
+                <h3 class="section-title" style="margin-bottom: var(--spacing-md);">Фото</h3>
+                <div class="photo-gallery-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--spacing-md);">
+                    {% for photo in company.photos.all %}
+                    <div class="photo-item">
+                        <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:company.name }}" 
+                             class="stringer-photo-large" 
+                             style="width: 100%; height: 200px; object-fit: cover; border-radius: var(--radius-md); border: 1px solid var(--color-border); cursor: pointer;"
+                             onclick="openLightbox('{{ photo.image.url }}', '{{ photo.caption|default:company.name|escapejs }}')">
+                        {% if photo.caption %}
+                        <p class="photo-caption" style="margin-top: var(--spacing-xs); font-size: 0.9em; color: var(--color-text-muted); text-align: center;">{{ photo.caption }}</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Информация о компании -->
+            <div class="stringer-info-detail" style="margin-bottom: var(--spacing-xl);">
+                <h3 class="section-title" style="margin-bottom: var(--spacing-md);">Информация</h3>
+                <div class="info-grid" style="display: grid; gap: var(--spacing-md);">
+                    <div class="info-item">
+                        <strong style="color: var(--color-text-secondary);">📍 Адрес:</strong>
+                        <span>{{ company.address }}</span>
+                    </div>
+
+                    {% if company.contact_items.all %}
+                    <div class="info-item">
+                        <strong style="color: var(--color-text-secondary);">📞 Контакты:</strong>
+                        <div class="messenger-links d-flex gap-2 flex-wrap" style="margin-top: var(--spacing-xs);">
+                            {% for contact in company.contact_items.all %}
+                                {% with link_url=contact.get_link_url %}
+                                {% if link_url %}
+                                <a href="{{ link_url }}" class="btn btn-outline messenger-btn" {% if contact.contact_type != 'phone' %}target="_blank" rel="noopener"{% endif %}>
+                                    <img src="{% static contact.get_icon_path %}" alt="{{ contact.get_contact_type_display }}" class="messenger-btn__icon" width="20" height="20">
+                                    {{ contact.get_contact_type_display }}{% if contact.contact_type != 'phone' %}: {{ contact.value }}{% endif %}
+                                </a>
+                                {% else %}
+                                <span class="btn btn-outline messenger-btn" style="cursor: default;">
+                                    <img src="{% static contact.get_icon_path %}" alt="{{ contact.get_contact_type_display }}" class="messenger-btn__icon" width="20" height="20">
+                                    {{ contact.get_contact_type_display }}: {{ contact.value }}
+                                </span>
+                                {% endif %}
+                                {% endwith %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if company.price %}
+                    <div class="info-item">
+                        <strong style="color: var(--color-text-secondary);">💰 Стоимость:</strong>
+                        <span>{{ company.price }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if company.description %}
+                    <div class="info-item">
+                        <strong style="color: var(--color-text-secondary);">📝 Описание:</strong>
+                        <div class="description-text" style="white-space: pre-line;">{{ company.description }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Форма оценки -->
+            {% if user.is_authenticated %}
+            <div class="stringer-rating-form" style="margin-bottom: var(--spacing-xl); padding-top: var(--spacing-xl); border-top: 2px solid var(--color-border);">
+                <h3 class="section-title" style="margin-bottom: var(--spacing-md);">
+                    {% if user_has_rated %}
+                        Изменить оценку
+                    {% else %}
+                        Оставить оценку
+                    {% endif %}
+                </h3>
+                <form method="post" action="{% url 'stringer_rate' %}" class="card" style="padding: var(--spacing-lg);">
+                    {% csrf_token %}
+                    <input type="hidden" name="company_id" value="{{ company.id }}">
+                    
+                    <div class="form-group" style="margin-bottom: var(--spacing-lg);">
+                        <label class="form-label">Оценка (1-5):</label>
+                        <div class="rating-input" style="display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-xs);">
+                            {% for i in "12345"|make_list %}
+                            <label class="rating-label" style="cursor: pointer; display: flex; align-items: center;">
+                                <input type="radio" name="score" value="{{ forloop.counter }}" 
+                                       {% if user_rating and user_rating.score == forloop.counter %}checked{% endif %} 
+                                       required style="display: none;">
+                                <span class="star-input" style="font-size: 2em; opacity: {% if user_rating and user_rating.score >= forloop.counter %}1{% else %}0.3{% endif %}; transition: opacity var(--transition-fast);">⭐</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: var(--spacing-lg);">
+                        <label class="form-label" for="ratingComment">Комментарий (необязательно):</label>
+                        <textarea name="comment" id="ratingComment" class="form-control" rows="4" placeholder="Ваш отзыв о компании">{{ user_rating.comment|default:"" }}</textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        {% if user_has_rated %}
+                            Обновить оценку
+                        {% else %}
+                            Отправить оценку
+                        {% endif %}
+                    </button>
+                </form>
+            </div>
+            {% else %}
+            <div class="stringer-rating-form" style="margin-bottom: var(--spacing-xl); padding-top: var(--spacing-xl); border-top: 2px solid var(--color-border);">
+                <div class="card" style="padding: var(--spacing-lg); text-align: center;">
+                    <p class="text-muted">
+                        <a href="{% url 'auth' %}?mode=login">Войдите</a> или 
+                        <a href="{% url 'auth' %}?mode=register">зарегистрируйтесь</a> для оценки компании
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Список оценок -->
+            {% if ratings %}
+            <div class="stringer-ratings-list" style="padding-top: var(--spacing-xl); border-top: 2px solid var(--color-border);">
+                <h3 class="section-title" style="margin-bottom: var(--spacing-md);">Отзывы и оценки</h3>
+                <div class="ratings-list">
+                    {% for rating in ratings %}
+                    <div class="card" style="margin-bottom: var(--spacing-md);">
+                        <div class="card-body">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--spacing-sm); flex-wrap: wrap; gap: var(--spacing-xs);">
+                                <div>
+                                    <strong>{{ rating.user.get_full_name|default:rating.user.email }}</strong>
+                                    <div class="rating-stars" style="display: flex; align-items: center; gap: 2px; margin-top: 4px;">
+                                        {% for i in "12345"|make_list %}
+                                            {% if forloop.counter <= rating.score %}
+                                                <span class="star star-filled" style="font-size: 1em;">⭐</span>
+                                            {% else %}
+                                                <span class="star star-empty" style="font-size: 1em; opacity: 0.3;">☆</span>
+                                            {% endif %}
+                                        {% endfor %}
+                                        <span style="margin-left: var(--spacing-xs); font-weight: 600; color: var(--color-primary);">{{ rating.score }}/5</span>
+                                    </div>
+                                </div>
+                                <span class="text-muted" style="font-size: 0.9em;">{{ rating.created_at|date:"d.m.Y H:i" }}</span>
+                            </div>
+                            {% if rating.comment %}
+                            <div class="rating-comment" style="margin-top: var(--spacing-sm); white-space: pre-line;">{{ rating.comment }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Lightbox для фото -->
+<div id="lightbox" class="lightbox" style="display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.9); align-items: center; justify-content: center;">
+    <span class="lightbox-close" onclick="closeLightbox()" style="position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
+    <img id="lightbox-img" src="" alt="" style="max-width: 90%; max-height: 90%; object-fit: contain;">
+    <div id="lightbox-caption" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; text-align: center; padding: 10px 20px; background: rgba(0, 0, 0, 0.7); border-radius: var(--radius-md);"></div>
+</div>
+
+<style>
+.rating-label:hover .star-input {
+    opacity: 1 !important;
+}
+
+.rating-label input[type="radio"]:checked ~ .star-input,
+.rating-label input[type="radio"]:checked + .star-input {
+    opacity: 1 !important;
+}
+
+.rating-label:has(input[type="radio"]:checked) ~ .rating-label .star-input {
+    opacity: 0.3;
+}
+
+.rating-label:has(input[type="radio"]:checked) ~ .rating-label input[type="radio"]:checked ~ .star-input,
+.rating-label:has(input[type="radio"]:checked) ~ .rating-label input[type="radio"]:checked + .star-input {
+    opacity: 1;
+}
+
+.rating-label:has(input[type="radio"]:checked) ~ .rating-label input[type="radio"]:not(:checked) ~ .star-input,
+.rating-label:has(input[type="radio"]:checked) ~ .rating-label input[type="radio"]:not(:checked) + .star-input {
+    opacity: 0.3;
+}
+
+.lightbox {
+    cursor: pointer;
+}
+</style>
+
+<script>
+function openLightbox(imageUrl, caption) {
+    document.getElementById('lightbox-img').src = imageUrl;
+    document.getElementById('lightbox-caption').textContent = caption || '';
+    document.getElementById('lightbox').style.display = 'flex';
+}
+
+function closeLightbox() {
+    document.getElementById('lightbox').style.display = 'none';
+}
+
+document.getElementById('lightbox').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeLightbox();
+    }
+});
+
+// Обновление звезд при выборе оценки
+document.querySelectorAll('.rating-label input[type="radio"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+        const labels = document.querySelectorAll('.rating-label');
+        const selectedValue = parseInt(this.value);
+        labels.forEach(function(label, index) {
+            const star = label.querySelector('.star-input');
+            if (index < selectedValue) {
+                star.style.opacity = '1';
+            } else {
+                star.style.opacity = '0.3';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

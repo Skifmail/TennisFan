@@ -6,10 +6,12 @@ import logging
 
 import markdown
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from apps.core.decorators import login_required_with_message
 from apps.core.telegram_notify import notify_purchase_request
 
 from .forms import PurchaseRequestForm
@@ -31,8 +33,9 @@ def shop_list(request):
     return render(request, "shop/list.html", context)
 
 
+@login_required_with_message("Информация о товаре доступна только для зарегистрированных пользователей.")
 def product_detail(request, pk):
-    """Детальная страница товара."""
+    """Детальная страница товара. Только для авторизованных пользователей."""
     product = get_object_or_404(
         Product.objects.prefetch_related("photos"),
         pk=pk,
@@ -53,9 +56,10 @@ def product_detail(request, pk):
     return render(request, "shop/product_detail.html", context)
 
 
+@login_required
 @require_POST
 def purchase_request_create(request, product_id):
-    """Создание заявки на покупку (AJAX или обычный POST)."""
+    """Создание заявки на покупку (AJAX или обычный POST). Только для авторизованных пользователей."""
     product = get_object_or_404(Product.objects.prefetch_related("photos"), pk=product_id)
     form = PurchaseRequestForm(request.POST)
     if not form.is_valid():

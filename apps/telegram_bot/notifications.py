@@ -8,8 +8,12 @@ import logging
 import threading
 
 from apps.core.models import UserTelegramLink
-from apps.tournaments.utils import get_match_opponent_users, get_match_participant_users
-from apps.users.models import SkillLevel
+from apps.tournaments.utils import (
+    get_match_opponent_users,
+    get_match_participant_users,
+    get_tournament_participant_users,
+)
+from apps.users.models import Notification, SkillLevel
 
 from . import services as bot
 
@@ -71,6 +75,41 @@ def _match_info_text(match) -> str:
         f"Дедлайн: {deadline_str}\n\n"
         "Внести результат или посмотреть матчи — кнопки ниже."
     )
+
+
+def notify_bracket_formed(tournament) -> None:
+    """
+    Уведомление всем участникам турнира о сформированной сетке (в бот и в ЛК).
+    Вызывать после формирования сетки (bracket_generated=True), один раз на турнир.
+    """
+    users = get_tournament_participant_users(tournament)
+    from django.urls import reverse
+
+    url = reverse("tournament_detail", args=[tournament.slug])
+    message_lk = f"Сетка турнира «{tournament.name}» сформирована. Проверьте матчи в «Мои матчи»."
+    if len(message_lk) > 255:
+        message_lk = message_lk[:252] + "..."
+
+    for user in users:
+        try:
+            Notification.objects.create(user=user, message=message_lk, url=url)
+        except Exception as e:
+            logger.warning("notify_bracket_formed Notification for user %s: %s", user.pk, e)
+
+    if not bot.is_configured():
+        return
+    text = (
+        f"📋 <b>Сетка турнира сформирована</b>\n\n"
+        f"«{tournament.name}»\n\n"
+        "Ваши матчи уже в разделе «Мои матчи». Внесите результат до дедлайна."
+    )
+    reply_markup = {
+        "inline_keyboard": [
+            [{"text": "📅 Мои матчи", "callback_data": "menu_my_matches"}],
+        ],
+    }
+    for user in users:
+        send_to_user_by_user(user, text, reply_markup=reply_markup)
 
 
 def notify_match_created(match) -> None:
@@ -301,6 +340,45 @@ def notify_new_tournament(tournament) -> None:
         logger.debug("notify_new_tournament: no tournament or no pk, skip")
         return
     notify_new_tournament_by_pk(pk)
+
+
+def notify_tournament_start(tournament) -> None:
+    """
+    Уведомление участникам турнира о начале турнира (в бот и в ЛК).
+    Вызывать в день start_date турнира (например из cron утром).
+    """
+    from django.urls import reverse
+
+    users = get_tournament_participant_users(tournament)
+    url = reverse("tournament_detail", args=[tournament.slug])
+    message_lk = f"Турнир «{tournament.name}» начинается сегодня. Удачи!"
+    if len(message_lk) > 255:
+        message_lk = message_lk[:252] + "..."
+
+    for user in users:
+        try:
+            Notification.objects.create(user=user, message=message_lk, url=url)
+        except Exception as e:
+            logger.warning("notify_tournament_start Notification for user %s: %s", user.pk, e)
+
+    if not bot.is_configured():
+        return
+    start_str = tournament.start_date.strftime("%d.%m.%Y") if tournament.start_date else "сегодня"
+    text = (
+        f"🏟 <b>Турнир начинается</b>\n\n"
+        f"«{tournament.name}»\n"
+        f"📍 {tournament.city}\n"
+        f"📅 {start_str}\n\n"
+        "Проверьте свои матчи в разделе «Мои матчи» и внесите результат до дедлайна."
+    )
+    reply_markup = {
+        "inline_keyboard": [
+            [{"text": "📅 Мои матчи", "callback_data": "menu_my_matches"}],
+            [{"text": "🔗 Страница турнира", "url": _get_site_base_url().rstrip("/") + url}],
+        ],
+    }
+    for user in users:
+        send_to_user_by_user(user, text, reply_markup=reply_markup)
 
 
 def notify_new_tournament_by_pk(tournament_pk: int) -> None:

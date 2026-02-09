@@ -174,6 +174,11 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     tournament.save(update_fields=["bracket_generated"])
     total_expected = n * (n - 1) // 2
     logger.info("Round-robin bracket created for %s: %d matches (n=%d)", tournament.name, created, n)
+    try:
+        from apps.telegram_bot.notifications import notify_bracket_formed
+        notify_bracket_formed(tournament)
+    except Exception as e:
+        logger.exception("notify_bracket_formed for %s: %s", tournament.slug, e)
     return True, f"Сетка сформирована: {created} матчей (ожидалось {total_expected}), {entity_name} {n}."
 
 

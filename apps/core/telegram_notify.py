@@ -335,3 +335,37 @@ def notify_subscription_purchase(user, tier) -> bool:
         f"Сумма: {price} ₽"
     )
     return send_admin_message(text)
+
+
+def notify_stringer_rating(rating, created: bool = True) -> bool:
+    """Уведомление админу о новой или обновлённой оценке/комментарии компании стрингеров."""
+    user = getattr(rating, "user", None)
+    company = getattr(rating, "company", None)
+    if not company:
+        return False
+
+    user_name = _escape(user.get_full_name() or user.email or "—") if user else "—"
+    user_email = _escape(user.email or "—") if user else "—"
+    company_name = _escape(getattr(company, "name", "") or "—")
+    score = getattr(rating, "score", None)
+    comment_text = _escape((getattr(rating, "comment", "") or "")[:500])
+    if (getattr(rating, "comment", "") or "") and len(getattr(rating, "comment", "") or "") > 500:
+        comment_text += "…"
+
+    action = "Новая оценка" if created else "Обновлена оценка"
+    msg = (
+        "🎾 <b>Стрингеры: {}</b>\n\n"
+        "Компания: {}\n"
+        "Автор: {}\n"
+        "Email: {}\n"
+        "Оценка: {}/5 ★\n\n"
+        "Комментарий:\n{}"
+    ).format(
+        action,
+        company_name,
+        user_name,
+        user_email,
+        score or "—",
+        comment_text or "—",
+    )
+    return send_admin_message(msg)

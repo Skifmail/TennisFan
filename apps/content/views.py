@@ -6,14 +6,29 @@ import logging
 
 import markdown
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.contenttypes.models import ContentType
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.comments.models import Comment
 from apps.users.models import Player
 
 from .forms import AboutUsCommentForm, NewsCommentForm
-from .models import AboutUs, ContactItem, ContactPage, Gallery, News, Page
+from .models import (
+    AboutUs,
+    ContactItem,
+    ContactPage,
+    Gallery,
+    LiveStream,
+    News,
+    Page,
+    StringerCompany,
+    StringerCompanyRating,
+    StringerPage,
+    Video,
+    VideoPage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -184,3 +199,130 @@ def contacts(request):
         "contact_items": items,
     }
     return render(request, "content/contacts.html", context)
+
+
+def videos(request):
+    """Страница «Видео» с прямыми трансляциями и плейлистом."""
+    video_page = VideoPage.get_singleton()
+    live_streams = video_page.live_streams.filter(is_active=True).order_by("order", "-created_at")
+    videos = video_page.videos.filter(is_published=True).order_by("order", "-created_at")
+    
+    # Увеличиваем счетчик просмотров при просмотре видео (через AJAX или при клике)
+    
+    context = {
+        "video_page": video_page,
+        "live_streams": live_streams,
+        "videos": videos,
+    }
+    return render(request, "content/videos.html", context)
+
+
+def stringers(request):
+    """Страница «Стрингеры» со списком компаний по натяжке струн."""
+    stringer_page = StringerPage.get_singleton()
+    
+    # Если страница отключена, возвращаем 404
+    if not stringer_page.is_enabled:
+        from django.http import Http404
+        raise Http404("Страница отключена")
+    
+    companies = stringer_page.companies.filter(is_active=True).prefetch_related(
+        "photos", "ratings", "ratings__user"
+    ).order_by("order", "name")
+    
+    # Добавляем рейтинг и информацию о наличии оценки пользователя для каждой компании
+    user_rated_company_ids = set()
+    if request.user.is_authenticated:
+        user_rated_company_ids = set(
+            StringerCompanyRating.objects.filter(
+                user=request.user,
+                company__in=companies
+            ).values_list("company_id", flat=True)
+        )
+    
+    for company in companies:
+        company.avg_rating = company.get_average_rating()
+        company.rating_count = company.get_rating_count()
+        company.user_has_rated = company.id in user_rated_company_ids
+    
+    context = {
+        "stringer_page": stringer_page,
+        "companies": companies,
+    }
+    return render(request, "content/stringers.html", context)
+
+
+def stringer_detail(request, pk):
+    """Детальная страница компании стрингеров."""
+    company = get_object_or_404(
+        StringerCompany.objects.prefetch_related("photos", "ratings", "ratings__user"),
+        pk=pk,
+        is_active=True,
+    )
+
+    # Рейтинг компании
+    company.avg_rating = company.get_average_rating()
+    company.rating_count = company.get_rating_count()
+
+    # Проверяем, есть ли оценка от текущего пользователя
+    user_has_rated = False
+    user_rating = None
+    if request.user.is_authenticated:
+        user_rating = StringerCompanyRating.objects.filter(
+            company=company, user=request.user
+        ).first()
+        user_has_rated = user_rating is not None
+
+    # Получаем все оценки с комментариями
+    ratings = company.ratings.select_related("user").order_by("-created_at")
+
+    context = {
+        "company": company,
+        "user_has_rated": user_has_rated,
+        "user_rating": user_rating,
+        "ratings": ratings,
+    }
+    return render(request, "content/stringer_detail.html", context)
+
+
+@login_required
+@require_POST
+def stringer_rate(request):
+    """Оценка компании стрингеров."""
+    company_id = request.POST.get("company_id")
+    score = request.POST.get("score")
+    comment = request.POST.get("comment", "").strip()
+
+    if not company_id or not score:
+        messages.error(request, "Не указаны обязательные поля.")
+        return redirect("stringers")
+
+    try:
+        company = get_object_or_404(StringerCompany, pk=company_id, is_active=True)
+        score = int(score)
+        if not (1 <= score <= 5):
+            messages.error(request, "Оценка должна быть от 1 до 5.")
+            return redirect("stringer_detail", pk=company_id)
+    except (ValueError, TypeError):
+        messages.error(request, "Неверная оценка.")
+        return redirect("stringers")
+
+    # Создаем или обновляем оценку
+    rating, created = StringerCompanyRating.objects.update_or_create(
+        company=company,
+        user=request.user,
+        defaults={"score": score, "comment": comment},
+    )
+
+    try:
+        from apps.core.telegram_notify import notify_stringer_rating
+        notify_stringer_rating(rating, created=created)
+    except Exception:
+        pass
+
+    if created:
+        messages.success(request, f"Спасибо! Ваша оценка для {company.name} сохранена.")
+    else:
+        messages.success(request, f"Ваша оценка для {company.name} обновлена.")
+
+    return redirect("stringer_detail", pk=company_id)

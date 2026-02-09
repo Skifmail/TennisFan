@@ -79,10 +79,28 @@
 
             <div class="court-detail__rating-section">
                 <h3 class="court-detail__section-title">Оценка</h3>
-                <div class="court-detail__rating-row">
-                    {% include "courts/_star_rating.html" with rating_percent=court.rating_percent rating_count=court.rating_count average_rating=court.average_rating size="md" show_count=True %}
+                {% if court.average_rating %}
+                <div class="court-detail__rating-row" style="display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap;">
+                    <div class="court-rating" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                        <span class="rating-stars" style="display: flex; gap: 2px;">
+                            {% with rating_int=court.average_rating|floatformat:0 %}
+                            {% for i in "12345"|make_list %}
+                                {% if forloop.counter <= rating_int|add:0 %}
+                                    <span class="star star-filled" style="font-size: 1.5em;">⭐</span>
+                                {% else %}
+                                    <span class="star star-empty" style="font-size: 1.5em; opacity: 0.3;">☆</span>
+                                {% endif %}
+                            {% endfor %}
+                            {% endwith %}
+                        </span>
+                        <span class="rating-value" style="font-weight: 600; color: var(--color-primary); font-size: 1.2em;">{{ court.average_rating|floatformat:1 }}</span>
+                        <span class="rating-count" style="color: var(--color-text-muted);">({{ court.rating_count }} оценок)</span>
+                    </div>
                 </div>
-                <a href="#court-comment-form" class="btn btn-ghost btn-sm">Подробная оценка</a>
+                {% else %}
+                <p class="text-muted">Пока нет оценок</p>
+                {% endif %}
+                <a href="#court-comment-form" class="btn btn-ghost btn-sm" style="margin-top: var(--spacing-sm);">Оставить оценку</a>
             </div>
             </div>
 
@@ -135,13 +153,18 @@
                         <span class="text-muted" style="font-size: var(--font-size-sm);">{{ comment.created_at|date:"d.m.Y H:i" }}</span>
                     </div>
                     {% if comment.author_score %}
-                    <p class="court-comment__rating mb-1">
-                        <span class="star-rating star-rating--sm">
-                            <span class="star-rating__empty" aria-hidden="true">☆☆☆☆☆</span>
-                            <span class="star-rating__fill-clip court-comment-fill" data-width-pct="{{ comment.author_rating_percent }}" aria-hidden="true"><span class="star-rating__fill">★★★★★</span></span>
+                    <div class="court-comment__rating mb-1" style="display: flex; align-items: center; gap: var(--spacing-xs);">
+                        <span class="rating-stars" style="display: flex; gap: 2px;">
+                            {% for i in "12345"|make_list %}
+                                {% if forloop.counter <= comment.author_score %}
+                                    <span class="star star-filled" style="font-size: 1em;">⭐</span>
+                                {% else %}
+                                    <span class="star star-empty" style="font-size: 1em; opacity: 0.3;">☆</span>
+                                {% endif %}
+                            {% endfor %}
                         </span>
-                        <span class="star-rating__count">{{ comment.author_score }}/5</span>
-                    </p>
+                        <span class="rating-value" style="font-weight: 600; color: var(--color-primary); font-size: 0.9em;">{{ comment.author_score }}/5</span>
+                    </div>
                     {% endif %}
                     <p class="mb-0 mt-1">{{ comment.text }}</p>
                 </div>
@@ -257,12 +280,6 @@
 .court-rate-stars__input:checked ~ .court-rate-stars__star { color: var(--color-primary); }
 .court-rate-stars__label:has(.court-rate-stars__input:checked) .court-rate-stars__star { color: var(--color-primary); }
 </style>
-<script>
-document.querySelectorAll('.court-comment-fill').forEach(function(el) {
-    var p = el.getAttribute('data-width-pct');
-    if (p !== null && p !== '') el.style.width = p + '%';
-});
-</script>
 {% if court_has_coords and yandex_maps_api_key %}
 <script src="https://api-maps.yandex.ru/2.1?apikey={{ yandex_maps_api_key }}&lang=ru_RU" type="text/javascript"></script>
 <script>

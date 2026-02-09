@@ -4,6 +4,7 @@ Tournaments views.
 
 import json
 from collections import defaultdict
+from functools import wraps
 from itertools import groupby
 
 from django.contrib import messages
@@ -14,6 +15,25 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from .fan import _is_fan
+
+
+def login_required_with_message(message="Данная информация доступна только для зарегистрированных пользователей."):
+    """
+    Декоратор, требующий авторизации и показывающий сообщение при редиректе.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                messages.info(request, message)
+                from django.conf import settings
+                login_url = getattr(settings, 'LOGIN_URL', 'login')
+                from django.urls import reverse
+                next_url = request.get_full_path()
+                return redirect(f"{reverse(login_url)}?next={next_url}")
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
 from .olympic_consolation import _is_olympic
 from .round_robin import _is_round_robin, compute_standings, get_match_matrix
 from .models import Match, MatchResultProposal, Tournament, TournamentTeam, TournamentType
@@ -144,7 +164,11 @@ def _build_bracket_standings(tournament, is_fan, is_olympic):
 
 
 def tournament_list(request):
-    """List of tournaments. Формирование сеток по дедлайну выполняется по cron (generate_brackets_past_deadlines)."""
+    """List of tournaments. При загрузке страницы проверяется дедлайн регистрации и при необходимости формируются сетки (также по cron)."""
+    from apps.tournaments.fan import check_and_generate_past_deadline_brackets
+
+    check_and_generate_past_deadline_brackets()
+
     city = request.GET.get('city', '')
     category = request.GET.get('category', '')
     status = request.GET.get('status', '')
@@ -172,8 +196,9 @@ def tournament_list(request):
     return render(request, 'tournaments/list.html', context)
 
 
+@login_required_with_message("Детали турнира доступны только для зарегистрированных пользователей.")
 def tournament_detail(request, slug):
-    """Tournament detail page."""
+    """Tournament detail page. Только для авторизованных пользователей."""
     tournament = get_object_or_404(
         Tournament.objects.prefetch_related(
             "matches__player1__user",
@@ -239,6 +264,13 @@ def tournament_detail(request, slug):
         for team in tournament.teams.select_related("player1__user", "player2__user").order_by("created_at"):
             participants_qs.append(team)
         solo_teams = [t for t in participants_qs if not t.player2_id]
+        
+        # Для микст-турниров фильтруем команды по противоположному полу
+        if tournament.is_mixed_doubles() and request.user.is_authenticated:
+            current_player = getattr(request.user, "player", None)
+            if current_player and current_player.gender:
+                solo_teams = [t for t in solo_teams if t.player1.gender and t.player1.gender != current_player.gender]
+        
         can_join_team = (
             request.user.is_authenticated
             and getattr(request.user, "player", None)
@@ -260,6 +292,22 @@ def tournament_detail(request, slug):
             tournament.match_format, tournament.get_match_format_display()
         )
 
+    # Проверяем, может ли пользователь зарегистрироваться
+    user_is_registered = False
+    can_register = False
+    registration_closed = tournament.bracket_generated or tournament.is_full()
+    
+    if request.user.is_authenticated:
+        current_player = getattr(request.user, "player", None)
+        if current_player:
+            if tournament.is_doubles():
+                user_is_registered = _is_player_registered_in_doubles(tournament, current_player)
+            else:
+                user_is_registered = tournament.participants.filter(id=current_player.id).exists()
+            
+            # Может зарегистрироваться, если не зарегистрирован и регистрация открыта
+            can_register = not user_is_registered and not registration_closed
+
     context = {
         "tournament": tournament,
         "matches": matches,
@@ -276,6 +324,9 @@ def tournament_detail(request, slug):
         "participants": participants_qs,
         "solo_teams": solo_teams,
         "can_join_team": can_join_team,
+        "user_is_registered": user_is_registered,
+        "can_register": can_register,
+        "registration_closed": registration_closed,
     }
     return render(request, "tournaments/detail.html", context)
 
@@ -307,6 +358,7 @@ def tournament_tables_list(request):
     return render(request, "tournaments/tables_list.html", context)
 
 
+@login_required_with_message("Детали турнирной таблицы доступны только для зарегистрированных пользователей.")
 def tournament_tables_detail(request, slug):
     """Детальная страница турнирной таблицы: графики, диаграммы, полная статистика."""
     tournament = get_object_or_404(
@@ -501,8 +553,9 @@ def champions_league(request):
     return render(request, "tournaments/champions_league.html", {"tournaments": tournaments})
 
 
+@login_required_with_message("Детали матча доступны только для зарегистрированных пользователей.")
 def match_detail(request, pk):
-    """Match detail page."""
+    """Match detail page. Только для авторизованных пользователей."""
     match = get_object_or_404(
         Match.objects.select_related(
             "player1__user", "player2__user", "winner__user", "tournament", "court",
@@ -890,23 +943,59 @@ def tournament_register_doubles(request, slug):
         return redirect("tournament_detail", slug=slug)
 
     solo_teams = list(tournament.teams.filter(player2__isnull=True).select_related("player1__user"))
+    
+    # Для микст-турниров фильтруем команды по противоположному полу
+    if tournament.is_mixed_doubles() and player.gender:
+        solo_teams = [t for t in solo_teams if t.player1.gender and t.player1.gender != player.gender]
+    
     partner_search_results = []
 
     if request.method == "GET" and request.GET.get("q"):
         q = request.GET.get("q", "").strip()
         if q:
             from django.db.models import Q
+            
             filters = Q(user__first_name__icontains=q) | Q(user__last_name__icontains=q) | Q(
                 user__email__icontains=q
             ) | Q(user__phone__icontains=q)
             if str(q).isdigit():
                 filters = filters | Q(id=int(q))
-            partner_search_results = list(
+            
+            # Выполняем поиск
+            all_results = list(
                 Player.objects.filter(filters)
                 .exclude(id=player.id)
                 .select_related("user")
                 .distinct()[:10]
             )
+            
+            partner_search_results = all_results
+            
+            # Для микст-турниров фильтруем результаты поиска по противоположному полу
+            if tournament.is_mixed_doubles():
+                if not player.gender:
+                    messages.warning(request, "Для участия в микст-турнире укажите свой пол в профиле.")
+                    partner_search_results = []
+                else:
+                    # Фильтруем по противоположному полу
+                    filtered_results = []
+                    for p in all_results:
+                        if not p.gender:
+                            continue  # Пропускаем игроков без указанного пола
+                        if p.gender != player.gender:
+                            filtered_results.append(p)
+                    partner_search_results = filtered_results
+                    
+                    if not partner_search_results:
+                        if all_results:
+                            gender_text = "женщину" if player.gender == "male" else "мужчину"
+                            messages.info(request, f"Найдено игроков: {len(all_results)}, но для микст-турнира нужен партнёр противоположного пола ({gender_text}).")
+                        else:
+                            messages.info(request, f"По запросу «{q}» игроки не найдены.")
+            else:
+                # Для обычных парных турниров показываем сообщение если ничего не найдено
+                if not partner_search_results:
+                    messages.info(request, f"По запросу «{q}» игроки не найдены. Попробуйте другой поиск.")
 
     # POST: обработка выбора
     if request.method == "POST":
@@ -954,6 +1043,17 @@ def _do_join_team(request, tournament, player, team):
     if not ok and not (request.user.is_superuser or request.user.is_staff):
         messages.error(request, err)
         return redirect("tournament_detail", slug=tournament.slug)
+    
+    # Проверка пола для микст-турниров
+    if tournament.is_mixed_doubles():
+        if not player.gender or not team.player1.gender:
+            messages.error(request, "Для участия в микст-турнире необходимо указать пол в профиле.")
+            return redirect("tournament_detail", slug=tournament.slug)
+        if player.gender == team.player1.gender:
+            gender_text = "женщину" if player.gender == "male" else "мужчину"
+            messages.error(request, f"Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола ({gender_text}).")
+            return redirect("tournament_detail", slug=tournament.slug)
+    
     team.player2 = player
     team.save()
     try:
@@ -991,6 +1091,16 @@ def _do_add_partner(request, tournament, player, partner_id):
     if _is_player_registered_in_doubles(tournament, partner):
         messages.error(request, f"{partner} уже зарегистрирован в этом турнире.")
         return redirect("tournament_register_doubles", slug=tournament.slug)
+
+    # Проверка пола для микст-турниров
+    if tournament.is_mixed_doubles():
+        if not player.gender or not partner.gender:
+            messages.error(request, "Для участия в микст-турнире необходимо указать пол в профиле (у вас и у партнёра).")
+            return redirect("tournament_register_doubles", slug=tournament.slug)
+        if player.gender == partner.gender:
+            gender_text = "женщину" if player.gender == "male" else "мужчину"
+            messages.error(request, f"Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола ({gender_text}).")
+            return redirect("tournament_register_doubles", slug=tournament.slug)
 
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok and not (request.user.is_superuser or request.user.is_staff):

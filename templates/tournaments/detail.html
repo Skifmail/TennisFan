@@ -76,6 +76,73 @@
         </div>
     </div>
     {% endif %}
+
+    {# Кнопка регистрации #}
+    {% if user.is_authenticated %}
+        {% if user_is_registered %}
+        <div class="card mb-4" style="background: rgba(166, 130, 74, 0.1); border-left: 3px solid var(--color-primary);">
+            <div class="card-body">
+                <p class="mb-0" style="color: var(--color-primary); font-weight: 600;">✓ Вы зарегистрированы на этот турнир</p>
+            </div>
+        </div>
+        {% elif can_register %}
+        <div class="card mb-4">
+            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h3 class="mb-1" style="font-size: var(--font-size-lg);">Регистрация на турнир</h3>
+                    <p class="text-secondary mb-0">
+                        {% if tournament.variant == 'doubles' %}
+                        Зарегистрируйтесь на парный турнир: самостоятельно, с партнёром или присоединитесь к игроку без пары.
+                        {% else %}
+                        Зарегистрируйтесь для участия в турнире.
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    {% if tournament.variant == 'doubles' %}
+                    <a href="{% url 'tournament_register_doubles' slug=tournament.slug %}" class="btn btn-primary">
+                        Зарегистрироваться
+                    </a>
+                    {% else %}
+                    <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary">
+                        Зарегистрироваться
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% elif registration_closed %}
+        <div class="card mb-4" style="background: rgba(255, 0, 0, 0.05); border-left: 3px solid var(--color-error);">
+            <div class="card-body">
+                <p class="mb-0" style="color: var(--color-error);">
+                    {% if tournament.bracket_generated %}
+                    Регистрация закрыта: сетка турнира уже сформирована.
+                    {% elif tournament.is_full %}
+                    Регистрация закрыта: все места заняты.
+                    {% else %}
+                    Регистрация закрыта.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    {% else %}
+        {% if not registration_closed %}
+        <div class="card mb-4">
+            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h3 class="mb-1" style="font-size: var(--font-size-lg);">Регистрация на турнир</h3>
+                    <p class="text-secondary mb-0">Войдите или зарегистрируйтесь, чтобы принять участие в турнире.</p>
+                </div>
+                <div>
+                    <a href="{% url 'auth' %}?next={{ request.path }}" class="btn btn-primary">
+                        Войти / Регистрация
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
     
     {% if participants %}
     <h2 class="section-title mb-3">{% if tournament.variant == 'doubles' %}Команды{% else %}Участники{% endif %} ({{ participants|length }})</h2>

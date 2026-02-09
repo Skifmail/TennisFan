@@ -1,0 +1,43 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+{% if conversations %}
+<div id="content-main">
+    <div class="results">
+        <table id="result_list">
+            <thead>
+                <tr>
+                    <th scope="col"><div class="text">Пользователь</div></th>
+                    <th scope="col"><div class="text">Email</div></th>
+                    <th scope="col"><div class="text">Сообщений</div></th>
+                    <th scope="col"><div class="text">Последнее сообщение</div></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for conv in conversations %}
+                <tr class="{% cycle 'row1' 'row2' %}">
+                    <td>
+                        <a href="{% url 'admin:core_supportconversation_detail' conv.user %}">
+                            {{ conv.user__first_name }} {{ conv.user__last_name }}
+                            {% if not conv.user__first_name and not conv.user__last_name %}
+                                (без имени)
+                            {% endif %}
+                        </a>
+                    </td>
+                    <td>{{ conv.user__email }}</td>
+                    <td>{{ conv.message_count }}</td>
+                    <td>{{ conv.last_message_at|date:"d.m.Y H:i" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<p>Диалогов пока нет.</p>
+{% endif %}
+
+{% endblock %}

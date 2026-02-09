@@ -9,6 +9,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from apps.core.decorators import login_required_with_message
 from apps.users.models import Player
 
 from .forms import SparringRequestForm
@@ -39,8 +40,9 @@ def _get_contact_url(player: Player, method: str) -> str | None:
     return None
 
 
+@login_required_with_message("Раздел спарринга доступен только для зарегистрированных пользователей.")
 def sparring_list(request):
-    """List of active sparring requests."""
+    """List of active sparring requests. Только для авторизованных пользователей."""
     city = request.GET.get("city", "")
     category = request.GET.get("category", "")
 

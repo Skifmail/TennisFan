@@ -2,59 +2,83 @@
 Core admin.
 """
 from django.contrib import admin
+from django.db.models import Count, Max, Q
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils.html import format_html
 
-from .models import Feedback, FeedbackReply, SupportMessage
+from .models import SupportConversation, SupportMessage
 
 
-class FeedbackReplyInline(admin.TabularInline):
-    model = FeedbackReply
-    extra = 0
-    readonly_fields = ("created_at",)
+@admin.register(SupportConversation)
+class SupportConversationAdmin(admin.ModelAdmin):
+    """
+    Админка для диалогов поддержки.
+    Показывает список пользователей с количеством сообщений.
+    При клике открывается переписка с пользователем.
+    """
 
+    change_list_template = "admin/core/supportconversation/change_list.html"
 
-@admin.register(Feedback)
-class FeedbackAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "subject_short", "created_at", "has_telegram_id")
-    list_filter = ("created_at",)
-    search_fields = ("user__email", "message", "subject")
-    readonly_fields = ("created_at", "telegram_message_id")
-    inlines = [FeedbackReplyInline]
+    def has_add_permission(self, request):
+        return False
 
-    def subject_short(self, obj):
-        return (obj.subject or obj.message[:50] or "—") + ("…" if obj.subject and len(obj.subject) > 50 else "")
+    def has_delete_permission(self, request, obj=None):
+        return False
 
-    subject_short.short_description = "Тема / сообщение"
+    def has_change_permission(self, request, obj=None):
+        return False
 
-    def has_telegram_id(self, obj):
-        return bool(obj.telegram_message_id)
+    def changelist_view(self, request, extra_context=None):
+        """Показываем список пользователей с диалогами."""
+        # Группируем сообщения по пользователям
+        conversations = (
+            SupportMessage.objects.values("user", "user__email", "user__first_name", "user__last_name")
+            .annotate(
+                message_count=Count("id"),
+                last_message_at=Max("created_at"),
+                unanswered_count=Count("id", filter=Q(is_from_admin=False)),
+            )
+            .order_by("-last_message_at")
+        )
 
-    has_telegram_id.boolean = True
-    has_telegram_id.short_description = "В Telegram"
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Диалоги поддержки",
+            "conversations": conversations,
+            "opts": self.model._meta,
+        }
+        return TemplateResponse(request, self.change_list_template, context)
 
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "conversation/<int:user_id>/",
+                self.admin_site.admin_view(self.conversation_view),
+                name="core_supportconversation_detail",
+            ),
+        ]
+        return custom_urls + urls
 
-@admin.register(FeedbackReply)
-class FeedbackReplyAdmin(admin.ModelAdmin):
-    list_display = ("id", "feedback", "text_short", "created_at")
-    list_filter = ("created_at",)
-    readonly_fields = ("created_at",)
+    def conversation_view(self, request, user_id):
+        """Показываем переписку с конкретным пользователем."""
+        from apps.users.models import User
 
-    def text_short(self, obj):
-        return (obj.text or "")[:60] + ("…" if len(obj.text or "") > 60 else "")
+        user = User.objects.filter(pk=user_id).first()
+        if not user:
+            from django.http import Http404
+            raise Http404("Пользователь не найден")
 
+        support_messages = SupportMessage.objects.filter(user=user).order_by("created_at")
 
-@admin.register(SupportMessage)
-class SupportMessageAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "subject_short", "is_from_admin", "created_at", "has_admin_msg_id")
-    list_filter = ("is_from_admin", "created_at")
-    search_fields = ("user__email", "text", "subject")
-    readonly_fields = ("created_at", "admin_telegram_message_id")
-
-    def subject_short(self, obj):
-        return (obj.subject or obj.text[:50] or "—") + ("…" if (obj.text or "") and len(obj.text or "") > 50 else "")
-    subject_short.short_description = "Тема / сообщение"
-
-    def has_admin_msg_id(self, obj):
-        return bool(obj.admin_telegram_message_id)
-    has_admin_msg_id.boolean = True
-    has_admin_msg_id.short_description = "В Telegram"
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Переписка с {user.get_full_name() or user.email}",
+            "conversation_user": user,
+            "support_messages": support_messages,
+            "opts": self.model._meta,
+        }
+        return TemplateResponse(
+            request, "admin/core/supportconversation/conversation_detail.html", context
+        )

@@ -46,9 +46,27 @@
                     {% else %}
                     <span></span>
                     {% endif %}
-                    <span class="court-card__stars">
-                        {% include "courts/_star_rating.html" with rating_percent=court.rating_percent rating_count=court.rating_count average_rating=court.average_rating size="sm" show_count=False %}
-                    </span>
+                    {% if court.average_rating %}
+                    <div class="court-rating" style="display: flex; align-items: center; gap: 4px;">
+                        <span class="rating-stars" style="display: flex; gap: 2px;">
+                            {% with rating_int=court.average_rating|floatformat:0 %}
+                            {% for i in "12345"|make_list %}
+                                {% if forloop.counter <= rating_int|add:0 %}
+                                    <span class="star star-filled" style="font-size: 1em;">⭐</span>
+                                {% else %}
+                                    <span class="star star-empty" style="font-size: 1em; opacity: 0.3;">☆</span>
+                                {% endif %}
+                            {% endfor %}
+                            {% endwith %}
+                        </span>
+                        <span class="rating-value" style="font-weight: 600; color: var(--color-primary); font-size: 0.9em;">{{ court.average_rating|floatformat:1 }}</span>
+                        {% if court.rating_count > 0 %}
+                        <span class="rating-count" style="color: var(--color-text-muted); font-size: 0.85em;">({{ court.rating_count }})</span>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <span class="text-muted" style="font-size: 0.85em;">Нет оценок</span>
+                    {% endif %}
                 </div>
             </div>
         </a>

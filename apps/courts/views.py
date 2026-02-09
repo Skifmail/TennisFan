@@ -4,6 +4,7 @@ Courts views.
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404, redirect, render
@@ -35,7 +36,11 @@ def court_list(request):
 
     courts = list(courts)
     for c in courts:
-        c.rating_percent = round((float(getattr(c, "average_rating") or 0) / 5) * 100, 1)
+        avg_rating = getattr(c, "average_rating")
+        if avg_rating is not None:
+            c.average_rating = round(float(avg_rating), 1)
+        else:
+            c.average_rating = None
 
     context = {
         "courts": courts,
@@ -54,9 +59,12 @@ def court_detail(request, slug):
         average_rating=Avg("score"),
         rating_count=Count("id"),
     )
-    court.average_rating = rating_agg["average_rating"]
+    avg_rating = rating_agg["average_rating"]
+    if avg_rating is not None:
+        court.average_rating = round(float(avg_rating), 1)
+    else:
+        court.average_rating = None
     court.rating_count = rating_agg["rating_count"] or 0
-    court.rating_percent = round((float(court.average_rating or 0) / 5) * 100, 1)
     user_rating = None
     if request.user.is_authenticated:
         user_rating = CourtRating.objects.filter(court=court, user=request.user).first()

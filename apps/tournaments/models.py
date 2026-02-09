@@ -31,7 +31,7 @@ class TournamentGender(models.TextChoices):
 
     MALE = "male", "Мужчины"
     FEMALE = "female", "Женщины"
-    MIXED = "mixed", "Смешанный"
+    MIXED = "mixed", "Микст"
 
 
 class TournamentDuration(models.TextChoices):
@@ -223,6 +223,10 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     def is_doubles(self) -> bool:
         """Check if tournament is doubles (2v2)."""
         return getattr(self, "variant", "singles") == TournamentVariant.DOUBLES
+
+    def is_mixed_doubles(self) -> bool:
+        """Check if tournament is mixed doubles (парный микст: мужчина + женщина в команде)."""
+        return self.is_doubles() and self.gender == TournamentGender.MIXED
 
     def is_full(self) -> bool:
         """Check if tournament has reached max participants/teams."""

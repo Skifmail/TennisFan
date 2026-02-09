@@ -417,9 +417,10 @@ def _handle_result_enter_callback(callback_query: dict) -> bool:
         f"📝 <b>Внести результат</b>\n\n"
         f"Матч: {match.tournament.name}, {match.round_name or '—'}\n"
         f"{match.get_player1_display()} — {match.get_player2_display()}\n\n"
-        f"Введите счёт по сетам через пробел.\n"
-        f"Пример: <code>6:4 6:3</code> или <code>6:4 3:6 10:7</code> (тайбрейк).\n\n"
-        f"Вы играете за {side_text}\n"
+        f"Вы играете за {side_text}\n\n"
+        f"<b>Формат счёта:</b> в каждом сете сначала геймы <b>вашей</b> команды, затем геймы соперника.\n"
+        f"Пример: <code>6:4 6:3</code> — вы выиграли оба сета. <code>3:6 4:6</code> — вы проиграли оба (вы 3 и 4, соперник 6 и 6).\n\n"
+        f"Введите счёт через пробел по сетам, например: <code>6:4 6:3</code> или <code>6:4 3:6 10:7</code> (тайбрейк).\n\n"
         f"Отправьте счёт в чат (или /cancel чтобы отменить).",
     )
     _answer_callback(cq_id, "Введите счёт в следующем сообщении")

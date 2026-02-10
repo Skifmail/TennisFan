@@ -238,10 +238,11 @@ def profile(request, pk):
         effective_date=Coalesce("scheduled_datetime", "deadline", "completed_datetime"),
     ).order_by("-effective_date")
 
-    # ---------- Фильтрация по месяцу/году ----------
+    # ---------- Фильтрация по месяцу/году/статусу ----------
     now = timezone.now()
     filter_year = request.GET.get("year")
     filter_month = request.GET.get("month")
+    filter_status = request.GET.get("status")
 
     # Допустимые годы из реальных данных
     from django.db.models import Min, Max
@@ -260,6 +261,7 @@ def profile(request, pk):
     # Применение фильтров
     active_year: int | None = None
     active_month: int | None = None
+    active_status: str | None = None
 
     if filter_year:
         try:
@@ -275,10 +277,18 @@ def profile(request, pk):
         except (ValueError, TypeError):
             active_month = None
 
+    if filter_status:
+        # Проверяем что статус валидный
+        valid_statuses = [s[0] for s in Match.MatchStatus.choices]
+        if filter_status in valid_statuses:
+            active_status = filter_status
+
     if active_year:
         all_matches_qs = all_matches_qs.filter(effective_date__year=active_year)
     if active_month and active_year:
         all_matches_qs = all_matches_qs.filter(effective_date__month=active_month)
+    if active_status:
+        all_matches_qs = all_matches_qs.filter(status=active_status)
 
     recent_matches = all_matches_qs
 
@@ -327,6 +337,8 @@ def profile(request, pk):
         "months_ru": MONTHS_RU,
         "active_year": active_year,
         "active_month": active_month,
+        "active_status": active_status,
+        "match_statuses": Match.MatchStatus.choices,
     }
     return render(request, "users/profile.html", context)
 

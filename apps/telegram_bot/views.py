@@ -1116,12 +1116,21 @@ def user_bot_webhook(request):
 
 
 @login_required
-@require_http_methods(["GET"])
+@require_http_methods(["POST"])
 def connect_redirect(request):
     """
     Редирект на t.me/BotUsername?start=TOKEN для привязки Telegram.
     Генерирует токен, сохраняет в UserTelegramLink, перенаправляет пользователя в бота.
     """
+    consent_raw = str(request.POST.get("telegram_transfer_consent", "")).strip().lower()
+    consent_ok = consent_raw in {"1", "true", "on", "yes"}
+    if not consent_ok:
+        messages.error(
+            request,
+            "Для подключения Telegram-бота необходимо подтвердить согласие на передачу данных в Telegram.",
+        )
+        return redirect("profile", pk=request.user.player.pk)
+
     if not bot.is_configured():
         messages.error(request, "Telegram-бот временно недоступен. Проверьте TELEGRAM_USER_BOT_TOKEN в .env и перезапустите сервер.")
         try:
@@ -1143,3 +1152,25 @@ def connect_redirect(request):
             return redirect("profile_edit")
     url = f"https://t.me/{username}?start={token}"
     return redirect(url)
+
+
+@login_required
+@require_http_methods(["POST"])
+def disconnect_user_bot(request):
+    """
+    Отключить пользовательского Telegram-бота в ЛК:
+    - очищает chat_id пользовательского бота
+    - сбрасывает одноразовый токен привязки
+    """
+    link = UserTelegramLink.objects.filter(user=request.user).first()
+    if not link or not link.user_bot_chat_id:
+        messages.info(request, "Telegram-бот уже отключён.")
+        return redirect("profile", pk=request.user.player.pk)
+
+    link.user_bot_chat_id = None
+    link.binding_token = ""
+    link.token_created_at = None
+    link.save(update_fields=["user_bot_chat_id", "binding_token", "token_created_at"])
+
+    messages.success(request, "Telegram-бот отключён. Уведомления в Telegram больше не будут приходить.")
+    return redirect("profile", pk=request.user.player.pk)

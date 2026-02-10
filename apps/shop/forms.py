@@ -3,12 +3,18 @@ Shop forms.
 """
 
 from django import forms
+from django.core.exceptions import ValidationError
 
 from .models import PurchaseRequest
 
 
 class PurchaseRequestForm(forms.ModelForm):
     """Форма заявки на покупку."""
+    agree_legal = forms.BooleanField(
+        required=True,
+        label="Согласие на обработку персональных данных",
+        error_messages={"required": "Необходимо согласиться с обработкой персональных данных."},
+    )
 
     class Meta:
         model = PurchaseRequest
@@ -25,3 +31,9 @@ class PurchaseRequestForm(forms.ModelForm):
             "contact_phone": "Номер для связи",
             "comment": "Комментарий",
         }
+
+    def clean_agree_legal(self) -> bool:
+        """Проверка обязательного согласия на обработку персональных данных."""
+        if not self.cleaned_data.get("agree_legal"):
+            raise ValidationError("Необходимо согласиться с обработкой персональных данных.")
+        return True

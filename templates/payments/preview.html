@@ -31,6 +31,9 @@
             <form action="{{ process_url }}" method="post">
                 {% csrf_token %}
                 <input type="hidden" name="type" value="{{ payment_type }}">
+                {% if item_id %}
+                    <input type="hidden" name="id" value="{{ item_id }}">
+                {% endif %}
                 {% if payment_type == 'donation' %}
                     <input type="hidden" name="amount" value="{{ amount }}">
                     {% if comment %}

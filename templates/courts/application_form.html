@@ -136,6 +136,19 @@
                 </div>
 
                 <hr style="margin: var(--spacing-xl) 0; border: none; border-top: 1px solid var(--color-border);">
+                <div class="form-group form-group-consent">
+                    <label class="consent-label">
+                        {{ form.agree_legal }}
+                        <span class="consent-text">
+                            Я согласен на
+                            <a href="{% url 'legal_personal_data' %}" target="_blank" rel="noopener">обработку персональных данных</a>
+                            и
+                            <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политику конфиденциальности</a>
+                        </span>
+                    </label>
+                    {% for err in form.agree_legal.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+
                 <div class="d-flex gap-2" style="flex-wrap: wrap;">
                     <button type="submit" class="btn btn-primary btn-lg">Отправить заявку</button>
                     <a href="{% url 'court_list' %}" class="btn btn-ghost btn-lg">Отмена</a>

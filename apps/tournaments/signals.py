@@ -106,6 +106,10 @@ def update_player_stats(sender, instance, created, **kwargs):
     if not winner and not winner_team:
         return
 
+    # При тех. поражении (walkover_loss) не начислять очки за место —
+    # штраф -40 уже применён в proposal_service.py
+    _walkover_loss = instance.is_walkover_loss()
+
     if t and _is_olympic(t):
         if is_doubles:
             for p in (instance.team1.player1, instance.team1.player2) if winner_team == instance.team1 else (instance.team2.player1, instance.team2.player2):
@@ -126,7 +130,7 @@ def update_player_stats(sender, instance, created, **kwargs):
             if not getattr(loser, "is_bye", False):
                 loser.matches_played += 1
                 loser.save(update_fields=["matches_played"])
-        advance_winner_olympic(instance)
+        advance_winner_olympic(instance, skip_points=_walkover_loss)
         if instance.round_index >= 1 and not instance.is_consolation:
             ensure_consolation_created_for_round(t, instance.round_index)
         return
@@ -151,7 +155,7 @@ def update_player_stats(sender, instance, created, **kwargs):
             if not getattr(loser, "is_bye", False):
                 loser.matches_played += 1
                 loser.save(update_fields=["matches_played"])
-        advance_winner_and_award_loser(instance)
+        advance_winner_and_award_loser(instance, skip_points=_walkover_loss)
         if instance.round_index == 1 and not instance.is_consolation:
             ensure_consolation_created(t)
         finalize_tournament(t)
@@ -192,28 +196,14 @@ def update_player_stats(sender, instance, created, **kwargs):
         winner_points = instance.points_player2
         loser_points = instance.points_player1
 
-    # Проверяем, является ли это тех.поражением (WALKOVER_LOSS)
-    # Очки при тех.поражении уже обработаны в proposal_service.py при применении proposal
-    # Здесь только обновляем статистику матчей, но не добавляем очки при тех.поражении
-    is_walkover_loss = False
-    if instance.status == Match.MatchStatus.WALKOVER:
-        # Проверяем через принятые proposals
-        accepted_walkover_loss = instance.result_proposals.filter(
-            status=Match.ProposalStatus.ACCEPTED,
-            result=Match.ResultChoice.WALKOVER_LOSS
-        ).exists()
-        if accepted_walkover_loss:
-            is_walkover_loss = True
-    
     winner.matches_played += 1
     winner.matches_won += 1
-    # При тех.поражении очки уже обработаны в proposal_service.py (победитель не получает очки)
-    if not is_walkover_loss:
+    # При тех. поражении очки уже обработаны в proposal_service.py (штраф -40)
+    if not _walkover_loss:
         winner.total_points += winner_points
     winner.save()
     loser.matches_played += 1
-    # При тех.поражении очки уже обработаны в proposal_service.py (вычтено 40 очков)
-    if not is_walkover_loss:
+    if not _walkover_loss:
         loser.total_points += loser_points
     loser.save()
 

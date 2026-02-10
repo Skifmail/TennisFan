@@ -476,6 +476,30 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
     standings = compute_standings(tournament)
     is_doubles = tournament.is_doubles()
 
+    # Определяем игроков, у которых было тех. поражение (walkover_loss) в этом турнире.
+    # Они НЕ получают очки за место, т.к. уже получили штраф -40 очков.
+    walkover_loss_player_ids: set[int] = set()
+    walkover_matches = main_matches.filter(status=Match.MatchStatus.WALKOVER)
+    for wm in walkover_matches:
+        if wm.is_walkover_loss():
+            # Определяем проигравшего
+            if wm.winner_team_id:
+                loser_team = wm.team2 if wm.winner_team_id == wm.team1_id else wm.team1
+                if loser_team.player1_id:
+                    walkover_loss_player_ids.add(loser_team.player1_id)
+                if loser_team.player2_id:
+                    walkover_loss_player_ids.add(loser_team.player2_id)
+            elif wm.winner_id:
+                loser = wm.player2 if wm.winner_id == wm.player1_id else wm.player1
+                if loser:
+                    walkover_loss_player_ids.add(loser.pk)
+    if walkover_loss_player_ids:
+        logger.info(
+            "Round-robin %s: players with walkover_loss (no place-based points): %s",
+            tournament.name,
+            walkover_loss_player_ids,
+        )
+
     for row in standings:
         place = row.get("place")
         if not place:
@@ -488,24 +512,44 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
             for player in (team.player1, team.player2):
                 if not player or getattr(player, "is_bye", False):
                     continue
+                # Если игрок получил тех. поражение — очки за место не начисляем
+                skip_points = player.pk in walkover_loss_player_ids
+                award = 0 if skip_points else points
                 TournamentPlayerResult.objects.update_or_create(
                     tournament=tournament,
                     player=player,
-                    defaults={"place": place, "fan_points": points, "is_consolation": False},
+                    defaults={"place": place, "fan_points": award, "is_consolation": False},
                 )
-                player.total_points += points
-                player.save(update_fields=["total_points"])
+                if not skip_points:
+                    player.total_points += points
+                    player.save(update_fields=["total_points"])
+                else:
+                    logger.info(
+                        "Round-robin %s: skipping place-based points for %s (walkover_loss penalty already applied)",
+                        tournament.name,
+                        player,
+                    )
         elif row.get("player"):
             player = row["player"]
             if getattr(player, "is_bye", False):
                 continue
+            # Если игрок получил тех. поражение — очки за место не начисляем
+            skip_points = player.pk in walkover_loss_player_ids
+            award = 0 if skip_points else points
             TournamentPlayerResult.objects.update_or_create(
                 tournament=tournament,
                 player=player,
-                defaults={"place": place, "fan_points": points, "is_consolation": False},
+                defaults={"place": place, "fan_points": award, "is_consolation": False},
             )
-            player.total_points += points
-            player.save(update_fields=["total_points"])
+            if not skip_points:
+                player.total_points += points
+                player.save(update_fields=["total_points"])
+            else:
+                logger.info(
+                    "Round-robin %s: skipping place-based points for %s (walkover_loss penalty already applied)",
+                    tournament.name,
+                    player,
+                )
 
     tournament.status = "completed"
     tournament.save(update_fields=["status"])

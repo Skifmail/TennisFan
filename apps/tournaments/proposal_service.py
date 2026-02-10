@@ -67,10 +67,13 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     match = proposal.match
     winner, loser, walkover, winner_team, loser_team = _compute_result(proposal)
     
-    # При тех.поражении записываем счёт 6:0 6:0 в пользу победителя
-    is_walkover_loss = proposal.result == Match.ResultChoice.WALKOVER_LOSS
-    if is_walkover_loss:
-        # Определяем, кто победитель и кто проигравший для записи счёта
+    # При тех.поражении / тех.победе записываем счёт 6:0 6:0 в пользу победителя
+    is_walkover_retired = proposal.result in (
+        Match.ResultChoice.WALKOVER_LOSS,
+        Match.ResultChoice.WALKOVER_WIN,
+    )
+    if is_walkover_retired:
+        # Определяем, кто победитель для записи счёта 6:0 6:0
         if winner == match.player1 or (winner_team and winner_team == match.team1):
             match.player1_set1 = 6
             match.player2_set1 = 0
@@ -86,7 +89,7 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
             match.player1_set3 = None
             match.player2_set3 = None
     else:
-        # Для обычных матчей и тех.побед используем счёт из proposal
+        # Для обычных матчей используем счёт из proposal
         for field in [
             "player1_set1", "player2_set1", "player1_set2", "player2_set2",
             "player1_set3", "player2_set3",
@@ -101,9 +104,9 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
 
     # FAN и Олимпийская система используют только очки за раунды/места, не за отдельные матчи
     if not _is_fan(match.tournament) and not _is_olympic(match.tournament):
-        # При тех.поражении вычитаем 40 очков из рейтинга проигравшего (обрабатывается ниже в уведомлениях)
+        # При тех.поражении/тех.победе вычитаем 40 очков из рейтинга проигравшего
         # Здесь устанавливаем points для матча (для отображения)
-        if is_walkover_loss:
+        if is_walkover_retired:
             # При тех.поражении проигравший получает -40 очков
             if winner_team:
                 match.points_player1 = -40 if winner_team == match.team2 else 0
@@ -140,8 +143,8 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
 
     url = reverse("match_detail", args=[match.pk])
     
-    # При тех.поражении вычитаем 40 очков из рейтинга проигравшего
-    if is_walkover_loss:
+    # При тех.поражении/тех.победе вычитаем 40 очков из рейтинга проигравшего
+    if is_walkover_retired:
         for p in (loser_team.player1, loser_team.player2) if loser_team else [loser]:
             if p and not getattr(p, "is_bye", False):
                 p.total_points = max(0, p.total_points - 40)  # Не даём уйти в минус

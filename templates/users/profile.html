@@ -171,7 +171,7 @@
             <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
                 <div class="match-header">
                     <span class="match-tournament">{{ match.tournament.name }}</span>
-                    <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y" }}</span>
+                    <span class="match-date">{{ match.scheduled_datetime|default:match.deadline|date:"d.m.Y" }}</span>
                 </div>
                 <div class="match-score-table-wrap">
                     <table class="match-score-table">
@@ -191,6 +191,10 @@
                                         {% if match.team1 %}{% if match.winner_team == match.team1 %}<span class="win-badge">WIN</span>{% endif %}
                                         {% else %}{% if match.winner == match.player1 %}<span class="win-badge">WIN</span>{% endif %}
                                         {% endif %}
+                                        {% if match.is_walkover_loss %}
+                                            {% if match.winner != match.player1 and not match.team1 %}<span class="retired-badge">Rt.</span>{% endif %}
+                                            {% if match.team1 and match.winner_team != match.team1 %}<span class="retired-badge">Rt.</span>{% endif %}
+                                        {% endif %}
                                     {% endif %}
                                 </td>
                                 <td>{{ match.player1_set1|default:"—" }}</td>
@@ -203,6 +207,10 @@
                                     {% if match.status == 'completed' or match.status == 'walkover' %}
                                         {% if match.team2 %}{% if match.winner_team == match.team2 %}<span class="win-badge">WIN</span>{% endif %}
                                         {% else %}{% if match.winner == match.player2 %}<span class="win-badge">WIN</span>{% endif %}
+                                        {% endif %}
+                                        {% if match.is_walkover_loss %}
+                                            {% if match.winner != match.player2 and not match.team2 %}<span class="retired-badge">Rt.</span>{% endif %}
+                                            {% if match.team2 and match.winner_team != match.team2 %}<span class="retired-badge">Rt.</span>{% endif %}
                                         {% endif %}
                                     {% endif %}
                                 </td>

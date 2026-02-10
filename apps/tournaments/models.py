@@ -524,19 +524,28 @@ class Match(models.Model):
         return " ".join(sets) if sets else "—"
 
     def is_walkover_loss(self) -> bool:
-        """Проверка, является ли матч тех.поражением (Retired)."""
+        """
+        Проверка, является ли матч тех.поражением (Retired).
+        Покрывает оба случая:
+        - WALKOVER_LOSS (игрок признал, что не может играть)
+        - WALKOVER_WIN (соперник заявил, что оппонент не вышел)
+        В обоих случаях проигравший получает штраф.
+        """
         # Проверяем через принятые proposals
         if self.result_proposals.filter(
             status=Match.ProposalStatus.ACCEPTED,
-            result=Match.ResultChoice.WALKOVER_LOSS
+            result__in=[
+                Match.ResultChoice.WALKOVER_LOSS,
+                Match.ResultChoice.WALKOVER_WIN,
+            ]
         ).exists():
             return True
         # Альтернативная проверка: статус WALKOVER и счёт 6:0 6:0 или 0:6 0:6
         if self.status == Match.MatchStatus.WALKOVER:
-            if (self.player1_set1 == 6 and self.player2_set1 == 0 and 
+            if (self.player1_set1 == 6 and self.player2_set1 == 0 and
                 self.player1_set2 == 6 and self.player2_set2 == 0):
                 return True
-            if (self.player1_set1 == 0 and self.player2_set1 == 6 and 
+            if (self.player1_set1 == 0 and self.player2_set1 == 6 and
                 self.player1_set2 == 0 and self.player2_set2 == 6):
                 return True
         return False

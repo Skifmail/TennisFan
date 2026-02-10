@@ -70,6 +70,39 @@ class UserTelegramLink(models.Model):
         return self.binding_token
 
 
+class TelegramTransferConsentLog(models.Model):
+    """
+    Журнал согласий на передачу данных в Telegram.
+    Хранит юридически значимые атрибуты согласия для возможных споров/проверок.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="telegram_transfer_consents",
+    )
+    consent_version = models.CharField(
+        "Версия текста согласия",
+        max_length=32,
+        default="v1",
+        db_index=True,
+    )
+    ip_address = models.GenericIPAddressField(
+        "IP-адрес",
+        null=True,
+        blank=True,
+    )
+    user_agent = models.TextField("User-Agent", blank=True, default="")
+    consented_at = models.DateTimeField("Дата и время согласия", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-consented_at"]
+        verbose_name = "согласие на передачу данных в Telegram"
+        verbose_name_plural = "согласия на передачу данных в Telegram"
+
+    def __str__(self):
+        return f"{self.user} / {self.consent_version} / {self.consented_at:%d.%m.%Y %H:%M}"
+
+
 class SupportMessage(models.Model):
     """
     Сообщение в системе поддержки: от пользователя (с сайта или из Telegram)

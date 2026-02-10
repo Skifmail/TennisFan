@@ -35,6 +35,10 @@
 #   0 10 * * *    — раз в день в 10:00: напоминания об истечении подписки за 3 и 1 день в Telegram.
 #                   Команда: send_subscription_expiry_reminders
 #
+#   */30 * * * *  — каждые 30 мин: синхронизация доступа в приватный Telegram-чат
+#                   (удаление пользователей без активного доступа).
+#                   Команда: sync_private_chat_access
+#
 # Ручной запуск:
 #   python manage.py generate_brackets_past_deadlines
 #   python manage.py fan_process_overdue_matches
@@ -43,3 +47,4 @@
 #   python manage.py send_deadline_reminders
 #   python manage.py send_tournament_start_reminders
 #   python manage.py send_subscription_expiry_reminders
+#   python manage.py sync_private_chat_access

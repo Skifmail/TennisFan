@@ -170,22 +170,6 @@ def _edit_message_remove_reply_markup(chat_id: int, message_id: int) -> None:
         logger.debug("editMessageReplyMarkup failed: %s", e)
 
 
-def _edit_message_text(chat_id: int, message_id: int, text: str) -> None:
-    """Редактировать текст сообщения в Telegram."""
-    token = bot._get_bot_token()
-    if not token:
-        return
-    try:
-        r = requests.post(
-            f"https://api.telegram.org/bot{token}/editMessageText",
-            json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "HTML"},
-            timeout=5,
-        )
-        r.raise_for_status()
-    except Exception as e:
-        logger.debug("editMessageText failed: %s", e)
-
-
 def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
     """
     Обработка callback proposal_confirm_<pk> / proposal_reject_<pk>.
@@ -257,33 +241,21 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
 
     if callback_data.startswith("proposal_confirm_"):
         try:
-            # Сохраняем оригинальный текст сообщения для редактирования
-            original_message_text = None
-            if message_id:
-                # Получаем оригинальный текст из callback_query
-                message_text = message.get("text", "")
-                if not message_text:
-                    # Пробуем получить из другого формата сообщения
-                    message_text = message.get("caption", "")
-                if message_text:
-                    original_message_text = message_text
-            
             apply_proposal(proposal)
             tg_notify.notify_proposal_confirmed(proposal)
-            
-            # Редактируем сообщение, добавляя строку о подтверждении
-            if message_id and original_message_text:
-                updated_text = original_message_text + "\n\n✅ <b>Результат подтверждён.</b>"
-                _edit_message_text(chat_id, message_id, updated_text)
-            elif message_id:
+            # Убираем кнопки из исходного сообщения
+            if message_id:
                 _edit_message_remove_reply_markup(chat_id, message_id)
-            
-            if cq_id:
-                _answer_callback(cq_id, "✅ Результат подтверждён.")
+            # Отправляем отдельное сообщение с подтверждением в чат соперника
+            bot.send_message(
+                chat_id,
+                f"✅ <b>Результат подтверждён.</b>\n\n"
+                f"Матч «{proposal.match.tournament.name}» завершён.",
+            )
+            _answer_callback(cq_id, "✅ Результат подтверждён.")
         except Exception as e:
             logger.exception("apply_proposal in webhook: %s", e)
-            if cq_id:
-                _answer_callback(cq_id, "❌ Ошибка при подтверждении.", show_alert=True)
+            _answer_callback(cq_id, "❌ Ошибка при подтверждении.", show_alert=True)
     else:
         try:
             tg_notify.notify_proposal_rejected(proposal)
@@ -293,14 +265,19 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
                 url=reverse("my_matches"),
             )
             proposal.delete()
+            # Убираем кнопки из исходного сообщения
             if message_id:
                 _edit_message_remove_reply_markup(chat_id, message_id)
-            if cq_id:
-                _answer_callback(cq_id, "❌ Результат отклонён.")
+            # Отправляем отдельное сообщение с отклонением в чат соперника
+            bot.send_message(
+                chat_id,
+                "❌ <b>Результат отклонён.</b>\n\n"
+                "Вы отклонили предложенный счёт. Соперник уведомлён.",
+            )
+            _answer_callback(cq_id, "❌ Результат отклонён.")
         except Exception as e:
             logger.exception("proposal reject in webhook: %s", e)
-            if cq_id:
-                _answer_callback(cq_id, "❌ Ошибка при отклонении.", show_alert=True)
+            _answer_callback(cq_id, "❌ Ошибка при отклонении.", show_alert=True)
 
     return True
 

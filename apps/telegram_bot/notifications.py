@@ -134,8 +134,22 @@ def notify_result_proposal(proposal) -> None:
         return
     match = proposal.match
     proposer = proposal.proposer
-    is_walkover_loss = proposal.result == Match.ResultChoice.WALKOVER_LOSS
-    is_walkover_win = proposal.result == Match.ResultChoice.WALKOVER_WIN
+    
+    # Явная проверка значения result (может быть строка или enum)
+    proposal_result = proposal.result
+    result_str = str(proposal_result) if proposal_result else ""
+    
+    # Проверяем через строковое сравнение для надежности
+    is_walkover_loss = (
+        proposal_result == Match.ResultChoice.WALKOVER_LOSS or
+        result_str == "walkover_loss" or
+        result_str == Match.ResultChoice.WALKOVER_LOSS
+    )
+    is_walkover_win = (
+        proposal_result == Match.ResultChoice.WALKOVER_WIN or
+        result_str == "walkover_win" or
+        result_str == Match.ResultChoice.WALKOVER_WIN
+    )
     
     if is_walkover_loss:
         result_text = "Тех. поражение"

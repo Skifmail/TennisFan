@@ -32,6 +32,9 @@
 #   0 8 * * *     — раз в день в 08:00: уведомления участникам о начале турнира (start_date = сегодня).
 #                   В бот и в ЛК. Команда: send_tournament_start_reminders
 #
+#   0 10 * * *    — раз в день в 10:00: напоминания об истечении подписки за 3 и 1 день в Telegram.
+#                   Команда: send_subscription_expiry_reminders
+#
 # Ручной запуск:
 #   python manage.py generate_brackets_past_deadlines
 #   python manage.py fan_process_overdue_matches
@@ -39,3 +42,4 @@
 #   python manage.py auto_accept_stale_proposals
 #   python manage.py send_deadline_reminders
 #   python manage.py send_tournament_start_reminders
+#   python manage.py send_subscription_expiry_reminders

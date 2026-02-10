@@ -18,6 +18,7 @@ from django.views.decorators.http import require_http_methods
 from django.core.cache import cache
 from django.db.models import Q
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.core.models import UserTelegramLink
 from apps.users.models import Notification, Player
@@ -748,21 +749,124 @@ def _handle_menu_callback_action(
             sub = getattr(user, "subscription", None)
         except Exception:
             sub = None
+        
+        reply_markup = None
+        
         if not sub:
-            text = "📋 <b>Моя подписка</b>\n\nНет активной подписки.\nОформить на сайте в разделе «Тарифы»."
-        else:
-            status = "Активна" if sub.is_valid() else "Истекла"
-            end_str = sub.end_date.strftime("%d.%m.%Y") if sub.end_date else "—"
-            slots = sub.get_remaining_slots() if hasattr(sub, "get_remaining_slots") else "—"
-            tier_name = getattr(sub.tier, "get_name_display", lambda: str(sub.tier))()
             text = (
-                f"📋 <b>Моя подписка</b>\n\n"
-                f"Тариф: {tier_name}\n"
-                f"Статус: {status}\n"
-                f"До: {end_str}\n"
-                f"Регистраций в месяц: {slots}"
+                "📋 <b>Моя подписка</b>\n\n"
+                "❌ <b>Нет активной подписки</b>\n\n"
+                "Для участия в турнирах и доступа ко всем функциям платформы оформите подписку.\n\n"
+                "💡 Выберите тариф, который подходит именно вам!"
             )
-        ok = bot.send_to_user(chat_id, text)
+            if base_url:
+                pricing_url = f"{base_url.rstrip('/')}/subscriptions/pricing/"
+                reply_markup = {
+                    "inline_keyboard": [
+                        [{"text": "💳 Выбрать тариф", "url": pricing_url}],
+                    ],
+                }
+        else:
+            tier = sub.tier
+            tier_name = tier.get_name_display()
+            is_valid = sub.is_valid()
+            is_cancelled = sub.is_cancelled
+            
+            # Статус подписки
+            if is_cancelled and is_valid:
+                status_emoji = "⚠️"
+                status_text = f"Отменена (действует до {sub.end_date.strftime('%d.%m.%Y')})"
+            elif is_valid:
+                status_emoji = "✅"
+                status_text = "Активна"
+            else:
+                status_emoji = "❌"
+                status_text = "Истекла"
+            
+            # Дата окончания
+            now = timezone.now()
+            end_str = sub.end_date.strftime("%d.%m.%Y") if sub.end_date else "—"
+            days_left = None
+            if sub.end_date and is_valid:
+                delta = sub.end_date.date() - now.date()
+                days_left = delta.days
+                if days_left <= 3 and days_left >= 0:
+                    end_str = f"{end_str} (через {days_left} дн.)"
+            
+            # Регистрации на турниры
+            if tier.is_unlimited:
+                reg_text = "♾️ Безлимит"
+            elif tier.max_tournaments == 0:
+                reg_text = "🚫 Недоступно"
+            else:
+                used = sub.tournaments_registered_count
+                total = tier.max_tournaments
+                remaining = sub.get_remaining_slots()
+                reg_text = f"{used}/{total} (осталось: {remaining})"
+            
+            # Список возможностей тарифа
+            features = []
+            if tier.can_see_stats:
+                features.append("✅ Просмотр статистики и рейтингов")
+            if tier.can_read_comments:
+                features.append("✅ Чтение комментариев")
+            if tier.can_write_comments:
+                features.append("✅ Написание комментариев")
+            if tier.can_rate_opponents:
+                features.append("✅ Оценка соперников после матчей")
+            if tier.has_private_chat:
+                features.append("✅ Доступ в закрытый чат сообщества")
+            if tier.has_sparring:
+                features.append("✅ Организация спаррингов")
+            if tier.one_day_tournament_discount > 0:
+                features.append(f"✅ Скидка {tier.one_day_tournament_discount}% на однодневные турниры")
+            if tier.has_admin_support:
+                features.append("✅ Приоритетная поддержка администратора")
+            if tier.has_badge:
+                features.append("✅ Особый статус в профиле")
+            
+            features_text = "\n".join(features) if features else "• Базовые функции"
+            
+            # Формирование сообщения
+            lines = [
+                "📋 <b>Моя подписка</b>",
+                "",
+                f"💎 <b>Тариф:</b> {tier_name}",
+                f"{status_emoji} <b>Статус:</b> {status_text}",
+                f"📅 <b>Истекает:</b> {end_str}",
+                "",
+                "🎯 <b>Регистрации на турниры:</b>",
+                reg_text,
+                "",
+                "✨ <b>Ваши возможности:</b>",
+                features_text,
+            ]
+            
+            # Предупреждение если истекает скоро
+            if days_left is not None and days_left <= 3 and days_left >= 0 and not is_cancelled:
+                lines.append("")
+                if days_left == 0:
+                    lines.append("🚨 <b>Подписка истекает сегодня!</b>")
+                elif days_left == 1:
+                    lines.append("⚠️ <b>Подписка истекает завтра!</b>")
+                else:
+                    lines.append(f"⚠️ <b>Подписка истекает через {days_left} дн.</b>")
+                lines.append("Продлите сейчас, чтобы не потерять доступ!")
+            
+            text = "\n".join(lines)
+            
+            # Кнопки действий
+            if base_url:
+                pricing_url = f"{base_url.rstrip('/')}/subscriptions/pricing/"
+                keyboard = []
+                if not is_valid or (days_left is not None and days_left <= 3):
+                    keyboard.append([{"text": "💳 Продлить подписку", "url": pricing_url}])
+                if is_valid and not is_cancelled:
+                    keyboard.append([{"text": "🔄 Сменить тариф", "url": pricing_url}])
+                if keyboard:
+                    reply_markup = {"inline_keyboard": keyboard}
+        
+        ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
         _answer("Подписка" if ok else "Ошибка отправки")
         if not ok:
             logger.warning("menu_my_subscription: send_message failed for chat_id=%s", chat_id)

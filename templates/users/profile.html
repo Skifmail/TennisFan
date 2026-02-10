@@ -75,16 +75,20 @@
                     </div>
                     <div class="subscription-info__row">
                         <span class="subscription-info__label">Статус:</span>
-                        {% if player.user.subscription.is_valid %}
-                        <span class="badge badge-success">Активна</span>
+                        {% if player.user.subscription.is_cancelled and player.user.subscription.is_valid %}
+                            <span class="badge badge-warning">Отменена (до {{ player.user.subscription.end_date|date:"d.m.Y" }})</span>
+                        {% elif player.user.subscription.is_valid %}
+                            <span class="badge badge-success">Активна</span>
                         {% else %}
-                        <span class="badge badge-danger">Истекла</span>
+                            <span class="badge badge-danger">Истекла</span>
                         {% endif %}
                     </div>
+                    {% if player.user.subscription.is_valid %}
                     <div class="subscription-info__row">
-                        <span class="subscription-info__label">Истекает:</span>
+                        <span class="subscription-info__label">{% if player.user.subscription.is_cancelled %}Действует до:{% else %}Истекает:{% endif %}</span>
                         <span>{{ player.user.subscription.end_date|date:"d.m.Y" }}</span>
                     </div>
+                    {% endif %}
                     {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.is_valid %}
                     <div class="subscription-info__limit">
                         <div class="subscription-info__row">
@@ -96,10 +100,45 @@
                         </div>
                     </div>
                     {% endif %}
-                    {% if not player.user.subscription.is_valid %}
-                    <a href="{% url 'pricing' %}" class="btn btn-sm btn-outline mt-2" style="width: 100%;">Продлить</a>
-                    {% endif %}
+
+                    {# --- Кнопки управления подпиской --- #}
+                    <div class="subscription-info__actions">
+                        {% if player.user.subscription.is_valid and not player.user.subscription.is_cancelled %}
+                            <a href="{% url 'pricing' %}" class="btn btn-sm btn-outline" style="flex: 1;">Сменить тариф</a>
+                            <button type="button" class="btn btn-sm btn-ghost btn-danger-text" onclick="document.getElementById('cancel-sub-modal').style.display='flex'">Отменить подписку</button>
+                        {% elif player.user.subscription.is_cancelled and player.user.subscription.is_valid %}
+                            <a href="{% url 'pricing' %}" class="btn btn-sm btn-primary" style="width: 100%;">Возобновить подписку</a>
+                        {% else %}
+                            <a href="{% url 'pricing' %}" class="btn btn-sm btn-outline" style="width: 100%;">Продлить</a>
+                        {% endif %}
+                    </div>
                 </div>
+
+                {# --- Модальное окно подтверждения отмены --- #}
+                {% if player.user.subscription.is_valid and not player.user.subscription.is_cancelled %}
+                <div id="cancel-sub-modal" class="modal-overlay" style="display:none;">
+                    <div class="modal-dialog">
+                        <h3 class="modal-dialog__title">Отменить подписку?</h3>
+                        <p class="modal-dialog__text">
+                            Вы уверены, что хотите отменить подписку
+                            «{{ player.user.subscription.tier.get_name_display }}»?
+                        </p>
+                        <p class="modal-dialog__text text-secondary">
+                            Доступ ко всем функциям сохранится до
+                            <strong>{{ player.user.subscription.end_date|date:"d.m.Y" }}</strong>.
+                            После этой даты подписка не будет продлена.
+                        </p>
+                        <div class="modal-dialog__actions">
+                            <form method="post" action="{% url 'cancel_subscription' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">Да, отменить</button>
+                            </form>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-sub-modal').style.display='none'">Не отменять</button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 {% else %}
                 <div class="alert alert-warning profile-info__subscription-alert">
                     У вас нет активной платной подписки. <a href="{% url 'pricing' %}">Купить</a>

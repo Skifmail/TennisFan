@@ -263,10 +263,16 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
 
         # 4. Отправляем сообщение-подтверждение нажавшему (OPPONENT)
         try:
+            match = proposal.match
+            score = match.score_display() if match.winner else "—"
+            winner_name = str(match.winner) if match.winner else "—"
             bot.send_message(
                 chat_id,
                 f"✅ <b>Результат подтверждён.</b>\n\n"
-                f"Матч «{proposal.match.tournament.name}» завершён.",
+                f"Турнир: {match.tournament.name}\n"
+                f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
+                f"Счёт: {score}\n"
+                f"Победитель: {winner_name}",
             )
         except Exception as e:
             logger.exception("send confirm message to opponent failed: %s", e)
@@ -308,10 +314,13 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
 
         # 5. Отправляем сообщение-отклонение нажавшему (OPPONENT)
         try:
+            match = proposal.match
             bot.send_message(
                 chat_id,
                 "❌ <b>Результат отклонён.</b>\n\n"
-                "Вы отклонили предложенный счёт. Соперник уведомлён.",
+                f"Турнир: {match.tournament.name}\n"
+                f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n\n"
+                f"Вы отклонили предложенный счёт. {proposal.proposer} уведомлён(а).",
             )
         except Exception as e:
             logger.exception("send reject message to opponent failed: %s", e)

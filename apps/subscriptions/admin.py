@@ -28,6 +28,7 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
     autocomplete_fields = ('user',)
 
     def registrations_limit_display(self, obj):
+        """Отображение лимита регистраций."""
         if obj.tier.is_unlimited:
             return "Безлимит"
         return f"{obj.tier.max_tournaments}"

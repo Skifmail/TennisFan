@@ -10,7 +10,7 @@ from .models import SubscriptionTier, UserSubscription
 @login_required_with_message("Информация о тарифах доступна только для зарегистрированных пользователей.")
 def pricing_page(request):
     """Страница тарифов — только для авторизованных пользователей."""
-    tiers = SubscriptionTier.objects.exclude(name=SubscriptionTier.Level.FREE).order_by('price')
+    tiers = SubscriptionTier.objects.all().order_by('price')
     
     current_tier_id = None
     try:

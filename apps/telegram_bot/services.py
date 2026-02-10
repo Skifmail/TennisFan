@@ -126,31 +126,31 @@ def send_photo(
     elif isinstance(photo, str):
         try:
             files = {"photo": open(photo, "rb")}
-        except OSError as e:
-            logger.warning("Telegram send_photo open file failed: %s", e)
+        except FileNotFoundError:
+            logger.warning("send_photo: file not found %s", photo)
             return None, False
+    elif isinstance(photo, bytes):
+        from io import BytesIO
+        files = {"photo": BytesIO(photo)}
     else:
-        files = {"photo": ("photo.jpg", photo)}
+        logger.warning("send_photo: unsupported photo type %s", type(photo))
+        return None, False
     try:
-        r = requests.post(api_url, data=payload, files=files, timeout=15)
-        if isinstance(photo, str) and not (photo.startswith("http://") or photo.startswith("https://")) and files:
-            files["photo"].close()
+        if files:
+            r = requests.post(api_url, data=payload, files=files, timeout=30)
+        else:
+            r = requests.post(api_url, json=payload, timeout=10)
         if not r.ok:
-            err_body = r.text
-            try:
-                err_data = r.json()
-                err_desc = err_data.get("description", err_body)
-            except Exception:
-                err_desc = err_body
-            logger.warning(
-                "Telegram user bot send_photo failed: %s %s",
-                r.status_code,
-                err_desc,
-            )
+            logger.warning("send_photo failed: %s %s", r.status_code, r.text[:200])
             return None, False
         data = r.json()
         result = data.get("result", {})
         return result.get("message_id"), True
     except Exception as e:
-        logger.warning("Telegram user bot send_photo failed: %s", e)
+        logger.warning("send_photo exception: %s", e)
         return None, False
+    finally:
+        if files:
+            for f in files.values():
+                if hasattr(f, "close"):
+                    f.close()

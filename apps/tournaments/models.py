@@ -132,8 +132,24 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     status = models.CharField(
         "Статус", max_length=20, choices=TournamentStatus.choices, default=TournamentStatus.UPCOMING
     )
-    points_winner = models.IntegerField("Очки за победу", default=100)
-    points_loser = models.IntegerField("Очки за проигрыш", default=-50)
+    points_winner = models.IntegerField(
+        "Очки за победу",
+        default=100,
+        help_text=(
+            "Используется для круговых и других форматов (не FAN/Олимпийская). "
+            "Для кругового по умолчанию: 1 очко. Для других форматов: 100 очков."
+        ),
+    )
+    points_loser = models.IntegerField(
+        "Очки за проигрыш",
+        default=-50,
+        help_text=(
+            "Используется для круговых и других форматов (не FAN/Олимпийская). "
+            "Для кругового по умолчанию: 0 очков (можно настроить отрицательные, например -1). "
+            "Для других форматов: -50 очков (очки отнимаются). "
+            "FAN и Олимпийская система используют только положительные очки за раунды/места."
+        ),
+    )
     min_participants = models.PositiveIntegerField(
         "Минимальное количество участников",
         null=True,
@@ -506,6 +522,24 @@ class Match(models.Model):
             if s1 is not None and s2 is not None:
                 sets.append(f"{s1}:{s2}")
         return " ".join(sets) if sets else "—"
+
+    def is_walkover_loss(self) -> bool:
+        """Проверка, является ли матч тех.поражением (Retired)."""
+        # Проверяем через принятые proposals
+        if self.result_proposals.filter(
+            status=Match.ProposalStatus.ACCEPTED,
+            result=Match.ResultChoice.WALKOVER_LOSS
+        ).exists():
+            return True
+        # Альтернативная проверка: статус WALKOVER и счёт 6:0 6:0 или 0:6 0:6
+        if self.status == Match.MatchStatus.WALKOVER:
+            if (self.player1_set1 == 6 and self.player2_set1 == 0 and 
+                self.player1_set2 == 6 and self.player2_set2 == 0):
+                return True
+            if (self.player1_set1 == 0 and self.player2_set1 == 6 and 
+                self.player1_set2 == 0 and self.player2_set2 == 6):
+                return True
+        return False
 
 
 class MatchResultProposal(models.Model):

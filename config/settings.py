@@ -285,6 +285,7 @@ CRONJOBS = [
     ('*/10 * * * *', 'django.core.management.call_command', ['generate_brackets_past_deadlines']),
     ('0 */6 * * *', 'django.core.management.call_command', ['fan_process_overdue_matches']),
     ('0 */6 * * *', 'django.core.management.call_command', ['olympic_process_overdue_matches']),
+    ('0 */6 * * *', 'django.core.management.call_command', ['round_robin_process_overdue_matches']),
     ('*/15 * * * *', 'django.core.management.call_command', ['auto_accept_stale_proposals']),
     ('0 9 * * *', 'django.core.management.call_command', ['send_deadline_reminders']),
     ('0 8 * * *', 'django.core.management.call_command', ['send_tournament_start_reminders']),

@@ -1,6 +1,7 @@
 import logging
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 from .fan import (
     _is_fan,
@@ -51,13 +52,29 @@ def prepare_match_completion(sender, instance, **kwargs):
     if instance.points_player1 != 0 or instance.points_player2 != 0:
         return
     t = getattr(instance, "tournament", None)
-    if t and _is_fan(t):
+    # FAN и Олимпийская система используют только очки за раунды/места, не за отдельные матчи
+    if t and (_is_fan(t) or _is_olympic(t)):
         return
+    # Для кругового и других форматов используем настраиваемые очки из модели
+    # Но при просрочке (WALKOVER и deadline истёк) не начисляем очки
+    is_overdue = (
+        instance.status == Match.MatchStatus.WALKOVER
+        and instance.deadline
+        and instance.deadline <= timezone.now()
+    )
+    if is_overdue:
+        # При просрочке не начисляем очки - устанавливаем 0
+        instance.points_player1 = 0
+        instance.points_player2 = 0
+        return
+    
+    win_points = getattr(t, "points_winner", 100)
+    lose_points = getattr(t, "points_loser", -50)
+    # Для кругового по умолчанию: 1 очко за победу, 0 за поражение (если не задано иное)
     if t and _is_round_robin(t):
-        win_points, lose_points = 1, 0
-    else:
-        win_points = getattr(t, "points_winner", 100)
-        lose_points = getattr(t, "points_loser", -50)
+        if win_points == 100 and lose_points == -50:
+            # Используем стандартные значения для кругового, если админ не изменил
+            win_points, lose_points = 1, 0
     if instance.winner_team_id:
         instance.points_player1 = win_points if instance.winner_team_id == instance.team1_id else lose_points
         instance.points_player2 = lose_points if instance.winner_team_id == instance.team1_id else win_points
@@ -141,22 +158,18 @@ def update_player_stats(sender, instance, created, **kwargs):
         return
 
     if t and _is_round_robin(t):
-        side1_won = winner_team == instance.team1 if winner_team else winner == instance.player1
-        win_pts = instance.points_player1 if side1_won else instance.points_player2
-        lose_pts = instance.points_player2 if side1_won else instance.points_player1
+        # Круговой: очки 1/0 только для определения мест в турнире; в общий рейтинг не добавляем до завершения
         if is_doubles:
             for p in (instance.team1.player1, instance.team1.player2) if winner_team == instance.team1 else (instance.team2.player1, instance.team2.player2):
                 if p and not getattr(p, "is_bye", False):
                     p.matches_played += 1
                     p.matches_won += 1
-                    p.total_points += win_pts
-                    p.save(update_fields=["matches_played", "matches_won", "total_points"])
+                    p.save(update_fields=["matches_played", "matches_won"])
             loser_team = instance.team2 if winner_team == instance.team1 else instance.team1
             for p in (loser_team.player1, loser_team.player2):
                 if p and not getattr(p, "is_bye", False):
                     p.matches_played += 1
-                    p.total_points += lose_pts
-                    p.save(update_fields=["matches_played", "total_points"])
+                    p.save(update_fields=["matches_played"])
         else:
             winner.matches_played += 1
             winner.matches_won += 1
@@ -165,8 +178,6 @@ def update_player_stats(sender, instance, created, **kwargs):
             if not getattr(loser, "is_bye", False):
                 loser.matches_played += 1
                 loser.save(update_fields=["matches_played"])
-            winner.total_points += win_pts
-            winner.save(update_fields=["total_points"])
         check_and_finalize_if_complete(t)
         return
 
@@ -181,12 +192,29 @@ def update_player_stats(sender, instance, created, **kwargs):
         winner_points = instance.points_player2
         loser_points = instance.points_player1
 
+    # Проверяем, является ли это тех.поражением (WALKOVER_LOSS)
+    # Очки при тех.поражении уже обработаны в proposal_service.py при применении proposal
+    # Здесь только обновляем статистику матчей, но не добавляем очки при тех.поражении
+    is_walkover_loss = False
+    if instance.status == Match.MatchStatus.WALKOVER:
+        # Проверяем через принятые proposals
+        accepted_walkover_loss = instance.result_proposals.filter(
+            status=Match.ProposalStatus.ACCEPTED,
+            result=Match.ResultChoice.WALKOVER_LOSS
+        ).exists()
+        if accepted_walkover_loss:
+            is_walkover_loss = True
+    
     winner.matches_played += 1
     winner.matches_won += 1
-    winner.total_points += winner_points
+    # При тех.поражении очки уже обработаны в proposal_service.py (победитель не получает очки)
+    if not is_walkover_loss:
+        winner.total_points += winner_points
     winner.save()
     loser.matches_played += 1
-    loser.total_points += loser_points
+    # При тех.поражении очки уже обработаны в proposal_service.py (вычтено 40 очков)
+    if not is_walkover_loss:
+        loser.total_points += loser_points
     loser.save()
 
 

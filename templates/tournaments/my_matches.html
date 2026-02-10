@@ -29,6 +29,10 @@
                             {% if match.status == 'completed' or match.status == 'walkover' %}
                             <span class="win-badge">WIN</span>
                             {% endif %}
+                        {% elif match.is_walkover_loss %}
+                            {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}
+                            <span class="retired-badge">Rt.</span>
+                            {% endif %}
                         {% endif %}
                     </div>
                     <div class="match-player {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}winner{% endif %}">
@@ -36,6 +40,10 @@
                         {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}
                             {% if match.status == 'completed' or match.status == 'walkover' %}
                             <span class="win-badge">WIN</span>
+                            {% endif %}
+                        {% elif match.is_walkover_loss %}
+                            {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}
+                            <span class="retired-badge">Rt.</span>
                             {% endif %}
                         {% endif %}
                     </div>
@@ -64,6 +72,9 @@
                             </div>
                         </div>
                         {% if proposal.proposer != player %}
+                        <div class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">
+                            ⏰ У вас есть 3 часа на подтверждение. Если не ответите, результат будет подтверждён автоматически.
+                        </div>
                         <form method="post" action="{% url 'confirm_proposal' proposal.pk %}" class="match-proposal-card__form">
                             {% csrf_token %}
                             <div class="match-proposal-card__form-row">
@@ -73,7 +84,7 @@
                             </div>
                         </form>
                         {% else %}
-                        <span class="text-secondary match-proposal-card__waiting">Ожидание подтверждения</span>
+                        <span class="text-secondary match-proposal-card__waiting">Ожидание подтверждения (3 часа)</span>
                         {% endif %}
                     </div>
                 </div>

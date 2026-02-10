@@ -200,27 +200,9 @@
         // Общие поля — при любом выбранном формате (FAN, Олимпийская, Круговой).
         toggleSections(".format-common-section", isFan || isOlympic || isRoundRobin);
         // Секция очков за раунды/места: FAN, Олимпийская и Круговой (одни и те же поля)
-        // Эта секция имеет все три класса (format-fan-section, format-olympic-section, format-round-robin-section)
-        // Показываем её для любого из форматов
-        const showPointsSection = isFan || isOlympic || isRoundRobin;
-        toggleSections(".format-fan-section", showPointsSection);
-        toggleSections(".format-olympic-section", showPointsSection);
-        // Секция "Круговой: формат матча" имеет только класс format-round-robin-section (без format-fan-section и format-olympic-section)
-        // Показываем её только для кругового
-        const roundRobinMatchFormatSections = document.querySelectorAll(".format-round-robin-section");
-        roundRobinMatchFormatSections.forEach(function(section) {
-            // Проверяем, имеет ли секция также классы format-fan-section или format-olympic-section
-            // Если да - это секция очков (уже обработана выше), если нет - это секция "Формат матча"
-            const hasFanOrOlympicClass = section.classList.contains("format-fan-section") || section.classList.contains("format-olympic-section");
-            if (!hasFanOrOlympicClass) {
-                const container = section.tagName && section.tagName.toUpperCase() === "FIELDSET" 
-                    ? section 
-                    : section.closest("fieldset") || section.closest(".module") || section;
-                if (container) {
-                    container.style.display = isRoundRobin ? "" : "none";
-                }
-            }
-        });
+        toggleSections(".format-fan-section", isFan || isOlympic || isRoundRobin);
+        toggleSections(".format-olympic-section", isFan || isOlympic || isRoundRobin);
+        toggleSections(".format-round-robin-section", isRoundRobin);
         updateVariantVisibility();
         updateParticipantsVsTeamsVisibility();
     }

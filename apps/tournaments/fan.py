@@ -80,13 +80,16 @@ def check_and_generate_past_deadline_brackets() -> int:
     Возвращает количество сформированных сеток.
     """
     from django.core.cache import cache
+    from django.conf import settings
 
     from .round_robin import generate_bracket as generate_round_robin_bracket
 
     cache_key = "tournament_generate_brackets_last_run"
+    # В режиме разработки уменьшаем время кэширования для более быстрой отладки
+    cache_timeout = 10 if settings.DEBUG else 60
     if cache.get(cache_key):
         return 0
-    cache.set(cache_key, True, 60)  # не чаще раза в минуту
+    cache.set(cache_key, True, cache_timeout)  # не чаще раза в минуту (или 10 сек в DEBUG)
 
     from .olympic_consolation import _is_olympic, generate_bracket as generate_olympic_bracket
 
@@ -361,11 +364,14 @@ def _next_match_pair(next_round_index: int, next_round_order: int) -> tuple[int,
     return (p1, p2)
 
 
-def advance_winner_and_award_loser(match: Match) -> Optional[Match]:
+def advance_winner_and_award_loser(match: Match, skip_points: bool = False) -> Optional[Match]:
     """
     После подтверждения результата матча: выдать очки проигравшему,
     при необходимости создать матч следующего раунда и «перевести» победителя.
     Поддерживает одиночные и парные турниры.
+    
+    Args:
+        skip_points: Если True, не начислять очки проигравшему (для просроченных матчей).
     Возвращает созданный next_match или None.
     """
     t = match.tournament
@@ -387,23 +393,25 @@ def advance_winner_and_award_loser(match: Match) -> Optional[Match]:
     ri, ro = match.round_index, match.round_order
     is_cons = match.is_consolation
 
-    if is_cons:
-        points = t.fan_points_r1
-        round_elim = TournamentPlayerResult.RoundEliminated.R1
-    else:
-        points = _fan_points_for_round(t, ri)
-        round_elim = _round_eliminated(ri)
+    # Начисляем очки проигравшему только если не пропущено (не просроченный матч)
+    if not skip_points:
+        if is_cons:
+            points = t.fan_points_r1
+            round_elim = TournamentPlayerResult.RoundEliminated.R1
+        else:
+            points = _fan_points_for_round(t, ri)
+            round_elim = _round_eliminated(ri)
 
-    for loser in losers:
-        if not loser or getattr(loser, "is_bye", False):
-            continue
-        TournamentPlayerResult.objects.update_or_create(
-            tournament=t,
-            player=loser,
-            defaults={"round_eliminated": round_elim, "fan_points": points, "is_consolation": is_cons},
-        )
-        loser.total_points += points
-        loser.save(update_fields=["total_points"])
+        for loser in losers:
+            if not loser or getattr(loser, "is_bye", False):
+                continue
+            TournamentPlayerResult.objects.update_or_create(
+                tournament=t,
+                player=loser,
+                defaults={"round_eliminated": round_elim, "fan_points": points, "is_consolation": is_cons},
+            )
+            loser.total_points += points
+            loser.save(update_fields=["total_points"])
 
     # Подвал: один круг. Проигравшие подвала уже вылетели в R1 и имеют запись. Обновляем очки? Нет — они уже 10.
     if is_cons:
@@ -724,7 +732,8 @@ def process_overdue_match(match: Match) -> tuple[bool, str]:
     winner = _overdue_winner(match)
     apply_overdue_walkover(match, winner)
 
-    advance_winner_and_award_loser(match)
+    # При просрочке не начисляем очки проигравшему
+    advance_winner_and_award_loser(match, skip_points=True)
     if match.round_index == 1 and not match.is_consolation:
         ensure_consolation_created(match.tournament)
     finalize_tournament(match.tournament)

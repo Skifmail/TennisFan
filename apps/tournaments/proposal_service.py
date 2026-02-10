@@ -9,6 +9,7 @@ from django.utils import timezone
 from apps.users.models import Notification
 
 from .fan import _is_fan
+from .olympic_consolation import _is_olympic
 from .round_robin import _is_round_robin
 from .models import Match, MatchResultProposal
 
@@ -65,33 +66,72 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     """
     match = proposal.match
     winner, loser, walkover, winner_team, loser_team = _compute_result(proposal)
-
-    for field in [
-        "player1_set1", "player2_set1", "player1_set2", "player2_set2",
-        "player1_set3", "player2_set3",
-    ]:
-        setattr(match, field, getattr(proposal, field))
+    
+    # При тех.поражении записываем счёт 6:0 6:0 в пользу победителя
+    is_walkover_loss = proposal.result == Match.ResultChoice.WALKOVER_LOSS
+    if is_walkover_loss:
+        # Определяем, кто победитель и кто проигравший для записи счёта
+        if winner == match.player1 or (winner_team and winner_team == match.team1):
+            match.player1_set1 = 6
+            match.player2_set1 = 0
+            match.player1_set2 = 6
+            match.player2_set2 = 0
+            match.player1_set3 = None
+            match.player2_set3 = None
+        else:
+            match.player1_set1 = 0
+            match.player2_set1 = 6
+            match.player1_set2 = 0
+            match.player2_set2 = 6
+            match.player1_set3 = None
+            match.player2_set3 = None
+    else:
+        # Для обычных матчей и тех.побед используем счёт из proposal
+        for field in [
+            "player1_set1", "player2_set1", "player1_set2", "player2_set2",
+            "player1_set3", "player2_set3",
+        ]:
+            setattr(match, field, getattr(proposal, field))
+    
     match.winner = winner
     if winner_team is not None:
         match.winner_team = winner_team
     match.status = Match.MatchStatus.WALKOVER if walkover else Match.MatchStatus.COMPLETED
     match.completed_datetime = match.completed_datetime or match.scheduled_datetime or timezone.now()
 
-    if not _is_fan(match.tournament):
-        if _is_round_robin(match.tournament):
-            win_delta, lose_delta = 1, 0
+    # FAN и Олимпийская система используют только очки за раунды/места, не за отдельные матчи
+    if not _is_fan(match.tournament) and not _is_olympic(match.tournament):
+        # При тех.поражении вычитаем 40 очков из рейтинга проигравшего (обрабатывается ниже в уведомлениях)
+        # Здесь устанавливаем points для матча (для отображения)
+        if is_walkover_loss:
+            # При тех.поражении проигравший получает -40 очков
+            if winner_team:
+                match.points_player1 = -40 if winner_team == match.team2 else 0
+                match.points_player2 = -40 if winner_team == match.team1 else 0
+            elif winner == match.player1:
+                match.points_player1 = 0
+                match.points_player2 = -40
+            else:
+                match.points_player1 = -40
+                match.points_player2 = 0
         else:
+            # Для обычных матчей и тех.побед используем настраиваемые очки из модели
             win_delta = getattr(match.tournament, "points_winner", 100)
             lose_delta = getattr(match.tournament, "points_loser", -50)
-        if winner_team:
-            match.points_player1 = win_delta if winner_team == match.team1 else lose_delta
-            match.points_player2 = lose_delta if winner_team == match.team1 else win_delta
-        elif winner == match.player1:
-            match.points_player1 = win_delta
-            match.points_player2 = lose_delta
-        else:
-            match.points_player1 = lose_delta
-            match.points_player2 = win_delta
+            # Для кругового по умолчанию: 1 очко за победу, 0 за поражение (если не задано иное)
+            if _is_round_robin(match.tournament):
+                if win_delta == 100 and lose_delta == -50:
+                    # Используем стандартные значения для кругового, если админ не изменил
+                    win_delta, lose_delta = 1, 0
+            if winner_team:
+                match.points_player1 = win_delta if winner_team == match.team1 else lose_delta
+                match.points_player2 = lose_delta if winner_team == match.team1 else win_delta
+            elif winner == match.player1:
+                match.points_player1 = win_delta
+                match.points_player2 = lose_delta
+            else:
+                match.points_player1 = lose_delta
+                match.points_player2 = win_delta
     match.save()
 
     match.result_proposals.exclude(pk=proposal.pk).update(status=Match.ProposalStatus.REJECTED)
@@ -99,17 +139,37 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     proposal.save(update_fields=["status"])
 
     url = reverse("match_detail", args=[match.pk])
-    for p in (winner_team.player1, winner_team.player2) if winner_team else [winner]:
-        if p and not getattr(p, "is_bye", False):
-            Notification.objects.create(
-                user=p.user,
-                message="Результат матча подтверждён: вы выиграли.",
-                url=url,
-            )
-    for p in (loser_team.player1, loser_team.player2) if loser_team else [loser]:
-        if p and not getattr(p, "is_bye", False):
-            Notification.objects.create(
-                user=p.user,
-                message="Результат матча подтверждён: поражение.",
-                url=url,
-            )
+    
+    # При тех.поражении вычитаем 40 очков из рейтинга проигравшего
+    if is_walkover_loss:
+        for p in (loser_team.player1, loser_team.player2) if loser_team else [loser]:
+            if p and not getattr(p, "is_bye", False):
+                p.total_points = max(0, p.total_points - 40)  # Не даём уйти в минус
+                p.save(update_fields=["total_points"])
+                Notification.objects.create(
+                    user=p.user,
+                    message="Результат матча подтверждён: тех. поражение. Из вашего рейтинга вычтено 40 очков.",
+                    url=url,
+                )
+        for p in (winner_team.player1, winner_team.player2) if winner_team else [winner]:
+            if p and not getattr(p, "is_bye", False):
+                Notification.objects.create(
+                    user=p.user,
+                    message="Результат матча подтверждён: тех. победа (соперник снялся).",
+                    url=url,
+                )
+    else:
+        for p in (winner_team.player1, winner_team.player2) if winner_team else [winner]:
+            if p and not getattr(p, "is_bye", False):
+                Notification.objects.create(
+                    user=p.user,
+                    message="Результат матча подтверждён: вы выиграли.",
+                    url=url,
+                )
+        for p in (loser_team.player1, loser_team.player2) if loser_team else [loser]:
+            if p and not getattr(p, "is_bye", False):
+                Notification.objects.create(
+                    user=p.user,
+                    message="Результат матча подтверждён: поражение.",
+                    url=url,
+                )

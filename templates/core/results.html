@@ -33,6 +33,10 @@
                     </div>
                     {% if match.winner == match.player1 %}
                     <span class="win-badge">WIN</span>
+                    {% elif match.is_walkover_loss %}
+                    {% if match.winner == match.player2 %}
+                    <span class="retired-badge">Rt.</span>
+                    {% endif %}
                     {% endif %}
                     <div class="match-score">
                         {% if match.player1_set1 is not None %}
@@ -62,6 +66,10 @@
                     </div>
                     {% if match.winner == match.player2 %}
                     <span class="win-badge">WIN</span>
+                    {% elif match.is_walkover_loss %}
+                    {% if match.winner == match.player1 %}
+                    <span class="retired-badge">Rt.</span>
+                    {% endif %}
                     {% endif %}
                     <div class="match-score">
                         {% if match.player2_set1 is not None %}

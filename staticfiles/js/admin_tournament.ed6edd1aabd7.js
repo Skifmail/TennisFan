@@ -19,21 +19,7 @@
 
     function getFormatValue() {
         const select = getFormatSelect();
-        if (!select) return "";
-        const value = select.value;
-        // Если значение пустое, но есть опция по умолчанию (selected), используем её
-        if (!value && select.options.length > 0) {
-            for (let i = 0; i < select.options.length; i++) {
-                if (select.options[i].selected && select.options[i].value) {
-                    return select.options[i].value;
-                }
-            }
-            // Если ничего не выбрано, но есть первая опция, используем её (для нового турнира с дефолтом)
-            if (select.options[0].value) {
-                return select.options[0].value;
-            }
-        }
-        return value;
+        return select ? select.value : "";
     }
 
     function getVariantSelect() {
@@ -60,16 +46,7 @@
                 container = section.closest("fieldset") || section.closest(".module") || section;
             }
             if (container) {
-                // Если показываем, убираем display: none, иначе скрываем
-                if (show) {
-                    container.style.display = "";
-                    // Убираем атрибут style, если он был установлен на none
-                    if (container.style.display === "none") {
-                        container.removeAttribute("style");
-                    }
-                } else {
-                    container.style.display = "none";
-                }
+                container.style.display = show ? "" : "none";
             }
         });
     }
@@ -199,30 +176,14 @@
         const isRoundRobin = format === ROUND_ROBIN_FORMAT;
         // Общие поля — при любом выбранном формате (FAN, Олимпийская, Круговой).
         toggleSections(".format-common-section", isFan || isOlympic || isRoundRobin);
-        // Секция очков за раунды/места: FAN, Олимпийская и Круговой (одни и те же поля)
-        // Эта секция имеет все три класса (format-fan-section, format-olympic-section, format-round-robin-section)
-        // Показываем её для любого из форматов
-        const showPointsSection = isFan || isOlympic || isRoundRobin;
-        toggleSections(".format-fan-section", showPointsSection);
-        toggleSections(".format-olympic-section", showPointsSection);
-        // Секция "Круговой: формат матча" имеет только класс format-round-robin-section (без format-fan-section и format-olympic-section)
-        // Показываем её только для кругового
-        const roundRobinMatchFormatSections = document.querySelectorAll(".format-round-robin-section");
-        roundRobinMatchFormatSections.forEach(function(section) {
-            // Проверяем, имеет ли секция также классы format-fan-section или format-olympic-section
-            // Если да - это секция очков (уже обработана выше), если нет - это секция "Формат матча"
-            const hasFanOrOlympicClass = section.classList.contains("format-fan-section") || section.classList.contains("format-olympic-section");
-            if (!hasFanOrOlympicClass) {
-                const container = section.tagName && section.tagName.toUpperCase() === "FIELDSET" 
-                    ? section 
-                    : section.closest("fieldset") || section.closest(".module") || section;
-                if (container) {
-                    container.style.display = isRoundRobin ? "" : "none";
-                }
-            }
-        });
+        // Для FAN и Олимпийской системы показываем одну и ту же секцию с очками
+        // (fieldset имеет оба класса format-fan-section и format-olympic-section)
+        toggleSections(".format-fan-section", isFan || isOlympic);
+        toggleSections(".format-olympic-section", isFan || isOlympic);
+        toggleSections(".format-round-robin-section", isRoundRobin);
         updateVariantVisibility();
         updateParticipantsVsTeamsVisibility();
+        updateRoundRobinPointsDefaults();
     }
 
     function init() {
@@ -238,12 +199,10 @@
             variantSelect.addEventListener("change", updateVariantVisibility);
             variantSelect.addEventListener("input", updateVariantVisibility);
         }
-        // Вызываем updateVisibility с небольшой задержкой, чтобы убедиться, что значения по умолчанию установлены
-        setTimeout(function() {
-            updateVisibility();
-            updateGenderOptions();
-            updateParticipantsVsTeamsVisibility();
-        }, 50);
+        updateVisibility();
+        updateGenderOptions();
+        updateParticipantsVsTeamsVisibility();
+        updateRoundRobinPointsDefaults();
     }
 
     if (document.readyState === "loading") {

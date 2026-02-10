@@ -7,12 +7,6 @@
 <div class="container container--profile" style="padding-top: var(--spacing-2xl);">
     <!-- Profile Card: full width, left info + right charts -->
     <div class="card profile-card profile-card--wide">
-        {% if player.paid_subscription_tier %}
-        <div class="subscription-badge-wrap subscription-badge-wrap--card">
-            {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
-        </div>
-        {% endif %}
-
         <div class="card-body">
         <div class="profile-card__inner">
             <!-- Left: player info -->
@@ -25,7 +19,14 @@
                     {% endif %}
                     <div class="profile-info__title">
                         <h1 class="profile-info__name">{{ player }}</h1>
-                        <span class="player-category">{{ player.get_skill_level_display }}</span>
+                        <div class="profile-info__badges">
+                            {% if player.paid_subscription_tier %}
+                            <span class="profile-info__subscription-badge">
+                                {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
+                            </span>
+                            {% endif %}
+                            <span class="player-category">{{ player.get_skill_level_display }}</span>
+                        </div>
                     </div>
                 </div>
 

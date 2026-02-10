@@ -52,75 +52,108 @@ class SubscriptionTier(models.Model):
 
 class UserSubscription(models.Model):
     """User's active subscription."""
-    
+
     user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
         related_name='subscription',
-        verbose_name="Пользователь"
+        verbose_name="Пользователь",
     )
     tier = models.ForeignKey(
-        SubscriptionTier, 
-        on_delete=models.PROTECT, 
-        verbose_name="Тариф"
+        SubscriptionTier,
+        on_delete=models.PROTECT,
+        verbose_name="Тариф",
     )
     start_date = models.DateTimeField("Дата начала", default=timezone.now)
     end_date = models.DateTimeField("Дата окончания")
     is_active = models.BooleanField("Активна", default=True)
-    
+    cancelled_at = models.DateTimeField(
+        "Дата отмены",
+        null=True,
+        blank=True,
+        help_text="Если заполнено — подписка отменена, но действует до end_date.",
+    )
+
     # Registration tracking for the current period
     tournaments_registered_count = models.PositiveIntegerField(
-        "Использовано регистраций в этом месяце", 
-        default=0
+        "Использовано регистраций в этом месяце",
+        default=0,
     )
 
     class Meta:
         verbose_name = "Подписка пользователя"
         verbose_name_plural = "Подписки пользователей"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.user} - {self.tier} ({self.status_display})"
 
+    # ------------------------------------------------------------------
+    # Status helpers
+    # ------------------------------------------------------------------
+
     @property
-    def status_display(self):
-        if not self.is_active:
+    def is_cancelled(self) -> bool:
+        """Подписка была отменена пользователем."""
+        return self.cancelled_at is not None
+
+    @property
+    def status_display(self) -> str:
+        now = timezone.now()
+        if self.is_cancelled:
+            if self.end_date > now:
+                return "Отменена (действует до окончания периода)"
             return "Отменена"
-        if self.end_date < timezone.now():
+        if not self.is_active:
+            return "Неактивна"
+        if self.end_date < now:
             return "Истекла"
         return "Активна"
 
+    # ------------------------------------------------------------------
+    # Persistence
+    # ------------------------------------------------------------------
+
     def save(self, *args, **kwargs):
         if not self.end_date:
-            # Default to 1 month from start
             self.end_date = self.start_date + relativedelta(months=1)
         super().save(*args, **kwargs)
 
-    def is_valid(self):
+    # ------------------------------------------------------------------
+    # Validity & limits
+    # ------------------------------------------------------------------
+
+    def is_valid(self) -> bool:
+        """
+        Подписка считается действующей, если:
+        - is_active = True
+        - end_date ещё не наступил
+        Отменённая подписка (cancelled_at != None) продолжает действовать
+        до end_date — пользователь сохраняет доступ до конца оплаченного
+        периода.
+        """
         return self.is_active and self.end_date > timezone.now()
 
-    def can_register_for_tournament(self):
+    def can_register_for_tournament(self) -> bool:
         """Check if user has registration slots left."""
         if self.tier.is_unlimited:
             return True
-        # max_tournaments = 0 означает запрет регистраций
         if self.tier.max_tournaments == 0:
             return False
         return self.tournaments_registered_count < self.tier.max_tournaments
-    
-    def increment_usage(self):
+
+    def increment_usage(self) -> None:
         self.tournaments_registered_count += 1
         self.save(update_fields=['tournaments_registered_count'])
 
-    def decrement_usage(self):
+    def decrement_usage(self) -> None:
         """Восстановить одну регистрацию (например, при удалении из турнира)."""
         if self.tournaments_registered_count > 0:
             self.tournaments_registered_count -= 1
             self.save(update_fields=['tournaments_registered_count'])
 
-    def get_remaining_slots(self):
+    def get_remaining_slots(self) -> int:
         if self.tier.is_unlimited:
             return 999
-        # max_tournaments = 0 означает запрет регистраций
         if self.tier.max_tournaments == 0:
             return 0
         return max(0, self.tier.max_tournaments - self.tournaments_registered_count)

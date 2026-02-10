@@ -756,7 +756,19 @@ def confirm_proposal(request, pk):
         apply_proposal(proposal)
         # FAN-логика (advance, consolation, finalize) вызывается из post_save сигнала Match
         messages.success(request, "Результат подтверждён.")
+        # Telegram-уведомление инициатору
+        try:
+            from apps.telegram_bot.notifications import notify_proposal_confirmed
+            notify_proposal_confirmed(proposal)
+        except Exception:
+            pass  # Telegram-уведомление не критично
     else:
+        # Telegram-уведомление инициатору (до удаления proposal)
+        try:
+            from apps.telegram_bot.notifications import notify_proposal_rejected
+            notify_proposal_rejected(proposal)
+        except Exception:
+            pass  # Telegram-уведомление не критично
         proposal.delete()
         Notification.objects.create(
             user=proposal.proposer.user,

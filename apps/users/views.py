@@ -225,7 +225,7 @@ def profile(request, pk):
 
     from apps.tournaments.models import Match
 
-    recent_matches = Match.objects.filter(
+    all_matches_qs = Match.objects.filter(
         Q(player1=player)
         | Q(player2=player)
         | Q(team1__player1=player)
@@ -236,7 +236,57 @@ def profile(request, pk):
         "tournament", "player1", "player2", "winner", "team1", "team2", "winner_team"
     ).annotate(
         effective_date=Coalesce("scheduled_datetime", "deadline", "completed_datetime"),
-    ).order_by("-effective_date")[:10]
+    ).order_by("-effective_date")
+
+    # ---------- Фильтрация по месяцу/году ----------
+    now = timezone.now()
+    filter_year = request.GET.get("year")
+    filter_month = request.GET.get("month")
+
+    # Допустимые годы из реальных данных
+    from django.db.models import Min, Max
+
+    date_range = all_matches_qs.aggregate(
+        min_date=Min("effective_date"),
+        max_date=Max("effective_date"),
+    )
+    min_date = date_range["min_date"]
+    max_date = date_range["max_date"]
+
+    available_years: list[int] = []
+    if min_date and max_date:
+        available_years = list(range(max_date.year, min_date.year - 1, -1))
+
+    # Применение фильтров
+    active_year: int | None = None
+    active_month: int | None = None
+
+    if filter_year:
+        try:
+            active_year = int(filter_year)
+        except (ValueError, TypeError):
+            active_year = None
+
+    if filter_month:
+        try:
+            active_month = int(filter_month)
+            if not (1 <= active_month <= 12):
+                active_month = None
+        except (ValueError, TypeError):
+            active_month = None
+
+    if active_year:
+        all_matches_qs = all_matches_qs.filter(effective_date__year=active_year)
+    if active_month and active_year:
+        all_matches_qs = all_matches_qs.filter(effective_date__month=active_month)
+
+    recent_matches = all_matches_qs
+
+    MONTHS_RU = [
+        (1, "Январь"), (2, "Февраль"), (3, "Март"), (4, "Апрель"),
+        (5, "Май"), (6, "Июнь"), (7, "Июль"), (8, "Август"),
+        (9, "Сентябрь"), (10, "Октябрь"), (11, "Ноябрь"), (12, "Декабрь"),
+    ]
 
     progress_data = _get_profile_progress_data(player)
 
@@ -273,6 +323,10 @@ def profile(request, pk):
         "subscription_usage_percent": subscription_usage_percent,
         "telegram_user_bot_connected": telegram_user_bot_connected,
         "telegram_bot_username": telegram_bot_username,
+        "available_years": available_years,
+        "months_ru": MONTHS_RU,
+        "active_year": active_year,
+        "active_month": active_month,
     }
     return render(request, "users/profile.html", context)
 

@@ -163,9 +163,53 @@
         </div>
     </div>
 
-    <!-- Recent Matches -->
-    <div class="profile-section">
-        <h2 class="section-title mb-3">Последние матчи</h2>
+    <!-- Matches -->
+    <div class="profile-section" id="matches">
+        <h2 class="section-title mb-3">Матчи</h2>
+
+        <!-- Фильтры -->
+        <form method="get" action="#matches" class="matches-filter-form">
+            <div class="matches-filter-bar">
+                <div class="matches-filter-group">
+                    <label class="matches-filter-label" for="filter-year">Год</label>
+                    <select name="year" id="filter-year" class="matches-filter-select" onchange="this.form.submit()">
+                        <option value="">Все годы</option>
+                        {% for y in available_years %}
+                        <option value="{{ y }}" {% if active_year == y %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="matches-filter-group">
+                    <label class="matches-filter-label" for="filter-month">Месяц</label>
+                    <select name="month" id="filter-month" class="matches-filter-select" onchange="this.form.submit()">
+                        <option value="">Все месяцы</option>
+                        {% for m_num, m_name in months_ru %}
+                        <option value="{{ m_num }}" {% if active_month == m_num %}selected{% endif %}>{{ m_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if active_year or active_month %}
+                <a href="{% url 'profile' pk=player.pk %}#matches" class="matches-filter-reset">Сбросить</a>
+                {% endif %}
+            </div>
+        </form>
+
+        <!-- Быстрые фильтры -->
+        <div class="matches-quick-filters">
+            {% now "Y" as current_year %}
+            {% now "n" as current_month %}
+            <a href="?year={{ current_year }}&month={{ current_month }}#matches"
+               class="matches-quick-btn {% if active_year|stringformat:'d' == current_year and active_month|stringformat:'d' == current_month %}active{% endif %}">
+                Этот месяц
+            </a>
+            <a href="?year={{ current_year }}#matches"
+               class="matches-quick-btn {% if active_year|stringformat:'d' == current_year and not active_month %}active{% endif %}">
+                Этот год
+            </a>
+        </div>
+
+        <p class="matches-count text-secondary">Найдено матчей: {{ recent_matches|length }}</p>
+
         <div class="grid grid-2">
             {% for match in recent_matches %}
             <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
@@ -223,7 +267,7 @@
                 </div>
             </a>
             {% empty %}
-            <p class="text-secondary">Нет матчей.</p>
+            <p class="text-secondary">Нет матчей за выбранный период.</p>
             {% endfor %}
         </div>
     </div>

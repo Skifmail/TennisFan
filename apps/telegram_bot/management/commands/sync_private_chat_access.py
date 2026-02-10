@@ -24,6 +24,8 @@ class Command(BaseCommand):
     """
 
     help = "Синхронизировать доступ к приватному Telegram-чату по подпискам."
+    _ACTIVE_STATUSES = {"member", "administrator", "creator", "restricted"}
+    _INACTIVE_STATUSES = {"left", "kicked"}
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
@@ -61,7 +63,26 @@ class Command(BaseCommand):
             user_chat_id = int(link.user_bot_chat_id)
             status = bot_services.get_private_chat_member_status(user_chat_id)
             # Если пользователь уже не участник чата, удалять не требуется.
-            if status not in {"member", "administrator", "creator", "restricted"}:
+            if status in self._INACTIVE_STATUSES:
+                continue
+            # Неизвестный статус (None) может означать ошибку getChatMember
+            # (например, недостаточно прав бота). В этом случае всё равно
+            # пробуем удалить, чтобы не оставлять "висящий" доступ.
+            if status is None:
+                logger.warning(
+                    "sync_private_chat_access: unknown member status for user_id=%s chat_id=%s; "
+                    "attempting forced removal",
+                    link.user_id,
+                    user_chat_id,
+                )
+            elif status not in self._ACTIVE_STATUSES:
+                logger.warning(
+                    "sync_private_chat_access: unexpected member status=%s for user_id=%s chat_id=%s; "
+                    "skipping",
+                    status,
+                    link.user_id,
+                    user_chat_id,
+                )
                 continue
 
             to_remove += 1

@@ -227,7 +227,16 @@
                         {% endfor %}
                     </select>
                 </div>
-                {% if active_year or active_month %}
+                <div class="matches-filter-group">
+                    <label class="matches-filter-label" for="filter-status">Статус</label>
+                    <select name="status" id="filter-status" class="matches-filter-select" onchange="this.form.submit()">
+                        <option value="">Все статусы</option>
+                        {% for status_val, status_label in match_statuses %}
+                        <option value="{{ status_val }}" {% if active_status == status_val %}selected{% endif %}>{{ status_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if active_year or active_month or active_status %}
                 <a href="{% url 'profile' pk=player.pk %}#matches" class="matches-filter-reset">Сбросить</a>
                 {% endif %}
             </div>
@@ -254,7 +263,18 @@
             <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
                 <div class="match-header">
                     <span class="match-tournament">{{ match.tournament.name }}</span>
-                    <span class="match-date">{{ match.scheduled_datetime|default:match.deadline|date:"d.m.Y" }}</span>
+                    <div class="match-header__right">
+                        <span class="match-status-badge match-status-badge--{{ match.status }}">
+                            {% if match.status == 'scheduled' %}📅 Запланирован
+                            {% elif match.status == 'in_progress' %}⚡ В процессе
+                            {% elif match.status == 'completed' %}✅ Завершён
+                            {% elif match.status == 'cancelled' %}❌ Отменён
+                            {% elif match.status == 'walkover' %}🚫 Без игры
+                            {% else %}{{ match.get_status_display }}
+                            {% endif %}
+                        </span>
+                        <span class="match-date">{{ match.scheduled_datetime|default:match.deadline|date:"d.m.Y" }}</span>
+                    </div>
                 </div>
                 <div class="match-score-table-wrap">
                     <table class="match-score-table">

@@ -970,6 +970,7 @@ button {
     border-radius: var(--radius-lg);
     padding: var(--spacing-lg);
     transition: all var(--transition-base);
+    position: relative;
 }
 
 .match-card:hover {
@@ -980,15 +981,64 @@ button {
 .match-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: var(--spacing-md);
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
+    gap: var(--spacing-sm);
+}
+
+.match-header__right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
 }
 
 .match-tournament {
     color: var(--color-primary);
     font-weight: 500;
+}
+
+.match-status-badge {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.match-status-badge--scheduled {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.match-status-badge--in_progress {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.match-status-badge--completed {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.match-status-badge--cancelled {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.match-status-badge--walkover {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+    border: 1px solid rgba(107, 114, 128, 0.3);
 }
 
 /* FAN bracket */
@@ -3449,6 +3499,16 @@ select.form-control {
         flex-direction: column;
         align-items: flex-start;
         gap: var(--spacing-xs);
+    }
+
+    .match-header__right {
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    .match-status-badge {
+        font-size: 0.7rem;
+        padding: 2px var(--spacing-xs);
     }
 
     .footer-brand {

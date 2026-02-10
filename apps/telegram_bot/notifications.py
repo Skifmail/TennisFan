@@ -196,6 +196,55 @@ def notify_result_proposal(proposal) -> None:
         send_to_user_by_user(user, text, reply_markup=reply_markup)
 
 
+def _proposal_score_text(proposal) -> str:
+    """Формирует строку счёта из proposal."""
+    sets = []
+    for i in (1, 2, 3):
+        s1 = getattr(proposal, f"player1_set{i}", None)
+        s2 = getattr(proposal, f"player2_set{i}", None)
+        if s1 is not None and s2 is not None:
+            sets.append(f"{s1}:{s2}")
+    return " / ".join(sets) if sets else "—"
+
+
+def _proposal_opponent_name(proposal) -> str:
+    """Имя соперника (того, кто подтверждает/отклоняет)."""
+    match = proposal.match
+    proposer = proposal.proposer
+    is_doubles = match.team1_id and match.team2_id
+    if is_doubles:
+        proposer_team = (
+            match.team1
+            if proposer in (match.team1.player1, match.team1.player2)
+            else match.team2
+        )
+        opponent_team = match.team2 if proposer_team == match.team1 else match.team1
+        names = []
+        for p in (opponent_team.player1, opponent_team.player2):
+            if p and not getattr(p, "is_bye", False):
+                names.append(str(p))
+        return " / ".join(names) if names else "Соперник"
+    opponent = match.player2 if proposer == match.player1 else match.player1
+    return str(opponent) if opponent else "Соперник"
+
+
+def _proposal_result_text(proposal) -> str:
+    """Текстовое описание результата из proposal."""
+    result_val = str(proposal.result) if proposal.result else ""
+    if result_val == "walkover_loss":
+        return "Тех. поражение"
+    if result_val == "walkover_win":
+        return "Тех. победа"
+    if result_val == "win":
+        return "Победа"
+    if result_val == "loss":
+        return "Поражение"
+    try:
+        return proposal.get_result_display()
+    except Exception:
+        return result_val or "—"
+
+
 def notify_proposal_confirmed(proposal) -> None:
     """Уведомление инициатору о подтверждении результата."""
     if not bot.is_configured():
@@ -206,9 +255,19 @@ def notify_proposal_confirmed(proposal) -> None:
         logger.warning("notify_proposal_confirmed: proposer has no user")
         return
     match = proposal.match
+    opponent = _proposal_opponent_name(proposal)
+    result = _proposal_result_text(proposal)
+    score = match.score_display() if match.winner else _proposal_score_text(proposal)
+    winner_name = str(match.winner) if match.winner else "—"
+
     text = (
         "✅ <b>Результат подтверждён</b>\n\n"
-        f"Матч «{match.tournament.name}» завершён. Счёт учтён."
+        f"Турнир: {match.tournament.name}\n"
+        f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
+        f"Результат: {result}\n"
+        f"Счёт: {score}\n"
+        f"Победитель: {winner_name}\n\n"
+        f"<b>{opponent}</b> подтвердил(а) результат."
     )
     ok = send_to_user_by_user(proposer_user, text)
     logger.info(
@@ -227,9 +286,18 @@ def notify_proposal_rejected(proposal) -> None:
         logger.warning("notify_proposal_rejected: proposer has no user")
         return
     match = proposal.match
+    opponent = _proposal_opponent_name(proposal)
+    result = _proposal_result_text(proposal)
+    score = _proposal_score_text(proposal)
+
     text = (
         "❌ <b>Результат отклонён</b>\n\n"
-        f"Соперник отклонил предложенный счёт. Введите результат заново (Мои матчи → Внести результат)."
+        f"Турнир: {match.tournament.name}\n"
+        f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
+        f"Ваш результат: {result}\n"
+        f"Счёт: {score}\n\n"
+        f"<b>{opponent}</b> отклонил(а) предложенный счёт.\n"
+        "Введите результат заново (Мои матчи → Внести результат)."
     )
     ok = send_to_user_by_user(proposer_user, text)
     logger.info(

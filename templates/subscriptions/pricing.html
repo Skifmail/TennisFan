@@ -6,90 +6,156 @@
 
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">Выбор подписки</h1>
-    <p class="page-subtitle">Получите максимум возможностей от TennisFan</p>
+    <h1 class="page-title">Тарифы и подписка</h1>
+    <p class="page-subtitle">Выберите подходящий тариф и получите максимум возможностей от TennisFan</p>
 </div>
 
 <div class="container">
+    <div class="pricing-intro">
+        <p class="pricing-intro__text">
+            Подписка даёт доступ к регистрации на турниры, закрытому чату, спаррингам и другим возможностям платформы.
+            Выберите тариф, который подходит именно вам.
+        </p>
+    </div>
+
     <div class="pricing-grid">
-        
-        <!-- FREE TIER (Static) -->
-        <div class="pricing-card pricing-card-free">
-            <h3 style="color: var(--color-text); margin-bottom: var(--spacing-sm);">Free</h3>
-            <div class="price" style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg);">
-                0 ₽ <span style="font-size: var(--font-size-base); color: var(--color-text-muted); font-weight: 400;">/ месяц</span>
-            </div>
-            
-            <ul class="features-list" style="list-style: none; padding: 0; margin-bottom: var(--spacing-xl);">
-                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
-                    <i class="fas fa-trophy" style="color: var(--color-primary);"></i>
-                     Регистрации на турниры: <span style="font-weight: bold; color: var(--color-text);">0</span>
-                </li>
-                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
-                    <i class="fas fa-check" style="color: var(--color-success);"></i> Просмотр статистики и рейтингов
-                </li>
-                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
-                    <i class="fas fa-check" style="color: var(--color-success);"></i> Чтение комментариев
-                </li>
-                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm); opacity: 0.5;">
-                    <i class="fas fa-times" style="color: var(--color-error);"></i> Закрытый чат и спарринги
-                </li>
-            </ul>
-
-            {% if not user.is_authenticated or not current_tier_id %}
-                <button disabled class="btn btn-outline" style="width: 100%; opacity: 0.7;">Текущий план</button>
-            {% else %}
-                <button disabled class="btn btn-outline" style="width: 100%; opacity: 0.5;">Бесплатный тариф</button>
-            {% endif %}
-        </div>
-
         {% for tier in tiers %}
-        <div class="pricing-card {% if tier.name == 'diamond' %}diamond{% endif %}">
-            <h3 style="color: var(--color-text); margin-bottom: var(--spacing-sm);">{{ tier.get_name_display }}</h3>
-            <div class="price" style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-text-secondary); margin-bottom: var(--spacing-lg);">
-                {{ tier.price|intcomma|cut:".00" }} ₽ <span style="font-size: var(--font-size-base); color: var(--color-text-muted); font-weight: 400;">/ месяц</span>
+        <div class="pricing-card {% if tier.name == 'free' %}pricing-card-free{% endif %} {% if tier.name == 'diamond' %}pricing-card-diamond{% endif %} {% if current_tier_id == tier.id %}pricing-card-current{% endif %}">
+            {% if tier.name == 'diamond' %}
+            <div class="pricing-card__badge">Популярный</div>
+            {% endif %}
+            
+            <h3 class="pricing-card__title">{{ tier.get_name_display }}</h3>
+            
+            <div class="pricing-card__price">
+                {% if tier.price == 0 %}
+                    <span class="price-amount">Бесплатно</span>
+                {% else %}
+                    <span class="price-amount">{{ tier.price|intcomma|cut:".00" }} ₽</span>
+                    <span class="price-period">/ месяц</span>
+                {% endif %}
             </div>
             
-            <ul class="features-list" style="list-style: none; padding: 0; margin-bottom: var(--spacing-xl);">
-                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
-                    <i class="fas fa-trophy" style="color: var(--color-primary);"></i>
-                    {% if tier.is_unlimited %}
-                        Регистрации на турниры: <span style="font-weight: bold; color: var(--color-text); font-size: 1.25em;">∞</span>
-                    {% else %}
-                        Регистрации на турниры: <span style="font-weight: bold; color: var(--color-text);">{{ tier.max_tournaments }}</span>
-                    {% endif %}
-                </li>
-                {% if tier.one_day_tournament_discount > 0 %}
-                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
-                    <i class="fas fa-percent" style="color: var(--color-primary);"></i>
-                    Скидка {{ tier.one_day_tournament_discount }}% на однодневные турниры
-                </li>
-                {% endif %}
-                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
-                    <i class="fas fa-comments" style="color: var(--color-success);"></i> Доступ в закрытый чат
-                </li>
-                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
-                    <i class="fas fa-handshake" style="color: var(--color-success);"></i> Доступ к спаррингам
-                </li>
-                <li style="margin-bottom: var(--spacing-md); display: flex; align-items: center; gap: var(--spacing-sm);">
-                    <i class="fas fa-star" style="color: var(--color-success);"></i> Оценка соперников и комментирование
-                </li>
-                {% if tier.has_badge %}
-                <li class="pricing-feature pricing-feature-badge">
-                    <i class="fas fa-certificate" style="color: var(--color-success);"></i>
-                    <span>Особый статус в профиле:</span>
-                    {% include 'includes/subscription_badge.html' with tier=tier %}
-                </li>
-                {% endif %}
-            </ul>
+            <div class="pricing-card__features">
+                <div class="pricing-feature">
+                    <i class="fas fa-trophy pricing-feature__icon"></i>
+                    <div class="pricing-feature__content">
+                        <strong>Регистрации на турниры:</strong>
+                        {% if tier.is_unlimited %}
+                            <span class="pricing-feature__value">Безлимит</span>
+                        {% elif tier.max_tournaments == 0 %}
+                            <span class="pricing-feature__value">Недоступно</span>
+                        {% else %}
+                            <span class="pricing-feature__value">{{ tier.max_tournaments }} в месяц</span>
+                        {% endif %}
+                    </div>
+                </div>
 
-            {% if current_tier_id == tier.id %}
-                <button disabled class="btn btn-outline" style="width: 100%; opacity: 0.7;">Текущий план</button>
-            {% else %}
-                <a href="{% url 'payment_preview' %}?type=subscription&id={{ tier.id }}" class="btn {% if tier.name == 'diamond' %}btn-primary{% else %}btn-outline{% endif %}" style="width: 100%;">Купить подписку</a>
-            {% endif %}
+                {% if tier.one_day_tournament_discount > 0 %}
+                <div class="pricing-feature">
+                    <i class="fas fa-percent pricing-feature__icon"></i>
+                    <div class="pricing-feature__content">
+                        <strong>Скидка на однодневные турниры:</strong>
+                        <span class="pricing-feature__value">{{ tier.one_day_tournament_discount }}%</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="pricing-feature">
+                    <i class="fas {% if tier.can_see_stats %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.can_see_stats %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <div class="pricing-feature__content">
+                        Просмотр статистики и рейтингов
+                    </div>
+                </div>
+
+                <div class="pricing-feature">
+                    <i class="fas {% if tier.can_read_comments %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.can_read_comments %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <div class="pricing-feature__content">
+                        Чтение комментариев
+                    </div>
+                </div>
+
+                <div class="pricing-feature">
+                    <i class="fas {% if tier.can_write_comments %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.can_write_comments %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <div class="pricing-feature__content">
+                        Написание комментариев
+                    </div>
+                </div>
+
+                <div class="pricing-feature">
+                    <i class="fas {% if tier.can_rate_opponents %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.can_rate_opponents %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <div class="pricing-feature__content">
+                        Оценка соперников после матчей
+                    </div>
+                </div>
+
+                <div class="pricing-feature">
+                    <i class="fas {% if tier.has_private_chat %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.has_private_chat %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <div class="pricing-feature__content">
+                        Доступ в закрытый чат сообщества
+                    </div>
+                </div>
+
+                <div class="pricing-feature">
+                    <i class="fas {% if tier.has_sparring %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.has_sparring %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <div class="pricing-feature__content">
+                        Доступ к организации спаррингов
+                    </div>
+                </div>
+
+                <div class="pricing-feature">
+                    <i class="fas {% if tier.has_admin_support %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.has_admin_support %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <div class="pricing-feature__content">
+                        Приоритетная поддержка администратора
+                    </div>
+                </div>
+
+                {% if tier.has_badge %}
+                <div class="pricing-feature pricing-feature--highlight">
+                    <i class="fas fa-certificate pricing-feature__icon pricing-feature__icon--success"></i>
+                    <div class="pricing-feature__content">
+                        <strong>Особый статус в профиле:</strong>
+                        {% include 'includes/subscription_badge.html' with tier=tier %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="pricing-card__action">
+                {% if current_tier_id == tier.id %}
+                    <button disabled class="btn btn-outline pricing-card__btn">Текущий план</button>
+                {% elif tier.price == 0 %}
+                    <button disabled class="btn btn-outline pricing-card__btn">Бесплатный тариф</button>
+                {% else %}
+                    <a href="{% url 'payment_preview' %}?type=subscription&id={{ tier.id }}" class="btn {% if tier.name == 'diamond' %}btn-primary{% else %}btn-outline{% endif %} pricing-card__btn">Купить подписку</a>
+                {% endif %}
+            </div>
         </div>
         {% endfor %}
+    </div>
+
+    <div class="pricing-faq">
+        <h2 class="pricing-faq__title">Часто задаваемые вопросы</h2>
+        <div class="pricing-faq__list">
+            <div class="pricing-faq__item">
+                <h3 class="pricing-faq__question">Как работает подписка?</h3>
+                <p class="pricing-faq__answer">
+                    Подписка действует в течение месяца с момента покупки. После окончания срока действия подписка автоматически продлевается, если у вас есть активная оплата.
+                </p>
+            </div>
+            <div class="pricing-faq__item">
+                <h3 class="pricing-faq__question">Можно ли отменить подписку?</h3>
+                <p class="pricing-faq__answer">
+                    Да, вы можете отменить подписку в любой момент в настройках профиля. Доступ к функциям сохранится до конца оплаченного периода.
+                </p>
+            </div>
+            <div class="pricing-faq__item">
+                <h3 class="pricing-faq__question">Что происходит с регистрациями при смене тарифа?</h3>
+                <p class="pricing-faq__answer">
+                    При переходе на более высокий тариф лимит регистраций увеличивается. При переходе на более низкий тариф текущие регистрации сохраняются, но новые будут ограничены новым лимитом.
+                </p>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

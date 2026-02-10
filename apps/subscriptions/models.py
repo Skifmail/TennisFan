@@ -19,7 +19,7 @@ class SubscriptionTier(models.Model):
     # Registration limits
     max_tournaments = models.PositiveIntegerField(
         "Максимум турниров в месяц", 
-        help_text="0 = без ограничений, или конкретное число",
+        help_text="Количество турниров, на которые можно зарегистрироваться в месяц. 0 = регистрации запрещены.",
         default=0
     )
     is_unlimited = models.BooleanField("Неограниченные регистрации", default=False)
@@ -102,6 +102,9 @@ class UserSubscription(models.Model):
         """Check if user has registration slots left."""
         if self.tier.is_unlimited:
             return True
+        # max_tournaments = 0 означает запрет регистраций
+        if self.tier.max_tournaments == 0:
+            return False
         return self.tournaments_registered_count < self.tier.max_tournaments
     
     def increment_usage(self):
@@ -117,4 +120,7 @@ class UserSubscription(models.Model):
     def get_remaining_slots(self):
         if self.tier.is_unlimited:
             return 999
+        # max_tournaments = 0 означает запрет регистраций
+        if self.tier.max_tournaments == 0:
+            return 0
         return max(0, self.tier.max_tournaments - self.tournaments_registered_count)

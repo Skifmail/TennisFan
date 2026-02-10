@@ -199,31 +199,43 @@ def notify_result_proposal(proposal) -> None:
 def notify_proposal_confirmed(proposal) -> None:
     """Уведомление инициатору о подтверждении результата."""
     if not bot.is_configured():
+        logger.warning("notify_proposal_confirmed: bot not configured")
         return
     proposer_user = getattr(proposal.proposer, "user", None)
     if not proposer_user:
+        logger.warning("notify_proposal_confirmed: proposer has no user")
         return
     match = proposal.match
     text = (
         "✅ <b>Результат подтверждён</b>\n\n"
         f"Матч «{match.tournament.name}» завершён. Счёт учтён."
     )
-    send_to_user_by_user(proposer_user, text)
+    ok = send_to_user_by_user(proposer_user, text)
+    logger.info(
+        "notify_proposal_confirmed: proposer=%s, user=%s, sent=%s",
+        proposal.proposer, proposer_user, ok,
+    )
 
 
 def notify_proposal_rejected(proposal) -> None:
     """Уведомление инициатору об отклонении результата."""
     if not bot.is_configured():
+        logger.warning("notify_proposal_rejected: bot not configured")
         return
     proposer_user = getattr(proposal.proposer, "user", None)
     if not proposer_user:
+        logger.warning("notify_proposal_rejected: proposer has no user")
         return
     match = proposal.match
     text = (
         "❌ <b>Результат отклонён</b>\n\n"
         f"Соперник отклонил предложенный счёт. Введите результат заново (Мои матчи → Внести результат)."
     )
-    send_to_user_by_user(proposer_user, text)
+    ok = send_to_user_by_user(proposer_user, text)
+    logger.info(
+        "notify_proposal_rejected: proposer=%s, user=%s, sent=%s",
+        proposal.proposer, proposer_user, ok,
+    )
 
 
 def notify_match_deadline_reminder(match, days_left: int) -> None:

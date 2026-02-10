@@ -240,44 +240,84 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
         return True
 
     if callback_data.startswith("proposal_confirm_"):
+        # 1. Применяем результат матча
+        apply_ok = False
         try:
             apply_proposal(proposal)
+            apply_ok = True
+        except Exception as e:
+            logger.exception("apply_proposal in webhook: %s", e)
+
+        # 2. Уведомляем инициатора (PROPOSER) в Telegram — независимо от п.1
+        try:
             tg_notify.notify_proposal_confirmed(proposal)
-            # Убираем кнопки из исходного сообщения
+        except Exception as e:
+            logger.exception("notify_proposal_confirmed failed: %s", e)
+
+        # 3. Убираем кнопки из исходного сообщения
+        try:
             if message_id:
                 _edit_message_remove_reply_markup(chat_id, message_id)
-            # Отправляем отдельное сообщение с подтверждением в чат соперника
+        except Exception as e:
+            logger.exception("edit_message_remove_reply_markup failed: %s", e)
+
+        # 4. Отправляем сообщение-подтверждение нажавшему (OPPONENT)
+        try:
             bot.send_message(
                 chat_id,
                 f"✅ <b>Результат подтверждён.</b>\n\n"
                 f"Матч «{proposal.match.tournament.name}» завершён.",
             )
-            _answer_callback(cq_id, "✅ Результат подтверждён.")
         except Exception as e:
-            logger.exception("apply_proposal in webhook: %s", e)
-            _answer_callback(cq_id, "❌ Ошибка при подтверждении.", show_alert=True)
+            logger.exception("send confirm message to opponent failed: %s", e)
+
+        # 5. Callback-ответ (всплывающий тост)
+        if apply_ok:
+            _answer_callback(cq_id, "✅ Результат подтверждён.")
+        else:
+            _answer_callback(cq_id, "⚠️ Результат обработан с ошибкой. Проверьте матч.", show_alert=True)
     else:
+        # 1. Уведомляем инициатора (PROPOSER) в Telegram
         try:
             tg_notify.notify_proposal_rejected(proposal)
+        except Exception as e:
+            logger.exception("notify_proposal_rejected failed: %s", e)
+
+        # 2. Создаём уведомление на сайте для инициатора
+        try:
             Notification.objects.create(
                 user=proposal.proposer.user,
                 message=f"{player} отклонил результат матча. Введите свой результат.",
                 url=reverse("my_matches"),
             )
+        except Exception as e:
+            logger.exception("create rejection notification failed: %s", e)
+
+        # 3. Удаляем proposal
+        try:
             proposal.delete()
-            # Убираем кнопки из исходного сообщения
+        except Exception as e:
+            logger.exception("proposal.delete failed: %s", e)
+
+        # 4. Убираем кнопки из исходного сообщения
+        try:
             if message_id:
                 _edit_message_remove_reply_markup(chat_id, message_id)
-            # Отправляем отдельное сообщение с отклонением в чат соперника
+        except Exception as e:
+            logger.exception("edit_message_remove_reply_markup failed: %s", e)
+
+        # 5. Отправляем сообщение-отклонение нажавшему (OPPONENT)
+        try:
             bot.send_message(
                 chat_id,
                 "❌ <b>Результат отклонён.</b>\n\n"
                 "Вы отклонили предложенный счёт. Соперник уведомлён.",
             )
-            _answer_callback(cq_id, "❌ Результат отклонён.")
         except Exception as e:
-            logger.exception("proposal reject in webhook: %s", e)
-            _answer_callback(cq_id, "❌ Ошибка при отклонении.", show_alert=True)
+            logger.exception("send reject message to opponent failed: %s", e)
+
+        # 6. Callback-ответ (всплывающий тост)
+        _answer_callback(cq_id, "❌ Результат отклонён.")
 
     return True
 

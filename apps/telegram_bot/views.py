@@ -245,10 +245,12 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
             tg_notify.notify_proposal_confirmed(proposal)
             if message_id:
                 _edit_message_remove_reply_markup(chat_id, message_id)
-            _answer_callback(cq_id, "Результат подтверждён.")
+            if cq_id:
+                _answer_callback(cq_id, "✅ Результат подтверждён.")
         except Exception as e:
             logger.exception("apply_proposal in webhook: %s", e)
-            _answer_callback(cq_id, "Ошибка при подтверждении.", show_alert=True)
+            if cq_id:
+                _answer_callback(cq_id, "❌ Ошибка при подтверждении.", show_alert=True)
     else:
         try:
             tg_notify.notify_proposal_rejected(proposal)
@@ -260,10 +262,12 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
             proposal.delete()
             if message_id:
                 _edit_message_remove_reply_markup(chat_id, message_id)
-            _answer_callback(cq_id, "Результат отклонён.")
+            if cq_id:
+                _answer_callback(cq_id, "❌ Результат отклонён.")
         except Exception as e:
             logger.exception("proposal reject in webhook: %s", e)
-            _answer_callback(cq_id, "Ошибка при отклонении.", show_alert=True)
+            if cq_id:
+                _answer_callback(cq_id, "❌ Ошибка при отклонении.", show_alert=True)
 
     return True
 

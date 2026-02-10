@@ -135,15 +135,22 @@ def notify_result_proposal(proposal) -> None:
     match = proposal.match
     proposer = proposal.proposer
     is_walkover_loss = proposal.result == Match.ResultChoice.WALKOVER_LOSS
+    is_walkover_win = proposal.result == Match.ResultChoice.WALKOVER_WIN
     
     if is_walkover_loss:
+        result_text = "Тех. поражение"
         score = "6:0 6:0 (тех. поражение)"
         warning_text = (
             f"\n\n⚠️ <b>Внимание!</b> При подтверждении тех. поражения:\n"
             f"• Из вашего рейтинга будет вычтено <b>40 очков</b>\n"
             f"• Счёт будет записан как <b>6:0 6:0</b> в пользу соперника"
         )
+    elif is_walkover_win:
+        result_text = "Тех. победа"
+        score = "—"
+        warning_text = ""
     else:
+        result_text = proposal.get_result_display()
         score = proposal.match.score_display
         try:
             score = " / ".join(
@@ -158,7 +165,7 @@ def notify_result_proposal(proposal) -> None:
     text = (
         f"📩 <b>{proposer} предложил результат матча</b>\n\n"
         f"Турнир: {match.tournament.name}\n"
-        f"Результат: {proposal.get_result_display()}\n"
+        f"Результат: {result_text}\n"
         f"Счёт: {score}{warning_text}\n\n"
         f"⏰ У вас есть <b>3 часа</b> на подтверждение или отклонение.\n"
         f"Если не ответите в течение 3 часов, результат будет подтверждён автоматически.\n\n"

@@ -37,88 +37,102 @@
             </div>
             
             <div class="pricing-card__features">
+                {# --- Регистрации на турниры --- #}
                 <div class="pricing-feature">
-                    <i class="fas fa-trophy pricing-feature__icon"></i>
+                    <i class="fas {% if tier.is_unlimited or tier.max_tournaments > 0 %}fa-check pricing-feature__icon--success{% else %}fa-times pricing-feature__icon--disabled{% endif %} pricing-feature__icon"></i>
                     <div class="pricing-feature__content">
                         <strong>Регистрации на турниры:</strong>
                         {% if tier.is_unlimited %}
                             <span class="pricing-feature__value">Безлимит</span>
                         {% elif tier.max_tournaments == 0 %}
-                            <span class="pricing-feature__value">Недоступно</span>
+                            <span class="pricing-feature__value pricing-feature__value--disabled">Недоступно</span>
                         {% else %}
                             <span class="pricing-feature__value">{{ tier.max_tournaments }} в месяц</span>
                         {% endif %}
                     </div>
                 </div>
 
-                {% if tier.one_day_tournament_discount > 0 %}
+                {# --- Скидка на однодневные турниры --- #}
                 <div class="pricing-feature">
-                    <i class="fas fa-percent pricing-feature__icon"></i>
+                    <i class="fas {% if tier.one_day_tournament_discount > 0 %}fa-check pricing-feature__icon--success{% else %}fa-times pricing-feature__icon--disabled{% endif %} pricing-feature__icon"></i>
                     <div class="pricing-feature__content">
                         <strong>Скидка на однодневные турниры:</strong>
-                        <span class="pricing-feature__value">{{ tier.one_day_tournament_discount }}%</span>
+                        {% if tier.one_day_tournament_discount > 0 %}
+                            <span class="pricing-feature__value">{{ tier.one_day_tournament_discount }}%</span>
+                        {% else %}
+                            <span class="pricing-feature__value pricing-feature__value--disabled">Нет</span>
+                        {% endif %}
                     </div>
                 </div>
-                {% endif %}
 
+                {# --- Статистика --- #}
                 <div class="pricing-feature">
-                    <i class="fas {% if tier.can_see_stats %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.can_see_stats %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <i class="fas {% if tier.can_see_stats %}fa-check pricing-feature__icon--success{% else %}fa-times pricing-feature__icon--disabled{% endif %} pricing-feature__icon"></i>
                     <div class="pricing-feature__content">
                         Просмотр статистики и рейтингов
                     </div>
                 </div>
 
+                {# --- Чтение комментариев --- #}
                 <div class="pricing-feature">
-                    <i class="fas {% if tier.can_read_comments %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.can_read_comments %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <i class="fas {% if tier.can_read_comments %}fa-check pricing-feature__icon--success{% else %}fa-times pricing-feature__icon--disabled{% endif %} pricing-feature__icon"></i>
                     <div class="pricing-feature__content">
                         Чтение комментариев
                     </div>
                 </div>
 
+                {# --- Написание комментариев --- #}
                 <div class="pricing-feature">
-                    <i class="fas {% if tier.can_write_comments %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.can_write_comments %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <i class="fas {% if tier.can_write_comments %}fa-check pricing-feature__icon--success{% else %}fa-times pricing-feature__icon--disabled{% endif %} pricing-feature__icon"></i>
                     <div class="pricing-feature__content">
                         Написание комментариев
                     </div>
                 </div>
 
+                {# --- Оценка соперников --- #}
                 <div class="pricing-feature">
-                    <i class="fas {% if tier.can_rate_opponents %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.can_rate_opponents %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <i class="fas {% if tier.can_rate_opponents %}fa-check pricing-feature__icon--success{% else %}fa-times pricing-feature__icon--disabled{% endif %} pricing-feature__icon"></i>
                     <div class="pricing-feature__content">
                         Оценка соперников после матчей
                     </div>
                 </div>
 
+                {# --- Закрытый чат --- #}
                 <div class="pricing-feature">
-                    <i class="fas {% if tier.has_private_chat %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.has_private_chat %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <i class="fas {% if tier.has_private_chat %}fa-check pricing-feature__icon--success{% else %}fa-times pricing-feature__icon--disabled{% endif %} pricing-feature__icon"></i>
                     <div class="pricing-feature__content">
                         Доступ в закрытый чат сообщества
                     </div>
                 </div>
 
+                {# --- Спарринги --- #}
                 <div class="pricing-feature">
-                    <i class="fas {% if tier.has_sparring %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.has_sparring %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <i class="fas {% if tier.has_sparring %}fa-check pricing-feature__icon--success{% else %}fa-times pricing-feature__icon--disabled{% endif %} pricing-feature__icon"></i>
                     <div class="pricing-feature__content">
                         Доступ к организации спаррингов
                     </div>
                 </div>
 
+                {# --- Поддержка администратора --- #}
                 <div class="pricing-feature">
-                    <i class="fas {% if tier.has_admin_support %}fa-check{% else %}fa-times{% endif %} pricing-feature__icon {% if tier.has_admin_support %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}"></i>
+                    <i class="fas {% if tier.has_admin_support %}fa-check pricing-feature__icon--success{% else %}fa-times pricing-feature__icon--disabled{% endif %} pricing-feature__icon"></i>
                     <div class="pricing-feature__content">
                         Приоритетная поддержка администратора
                     </div>
                 </div>
 
-                {% if tier.has_badge %}
-                <div class="pricing-feature pricing-feature--highlight">
-                    <i class="fas fa-certificate pricing-feature__icon pricing-feature__icon--success"></i>
+                {# --- Особый значок в профиле --- #}
+                <div class="pricing-feature {% if tier.has_badge %}pricing-feature--highlight{% endif %}">
+                    <i class="fas {% if tier.has_badge %}fa-check pricing-feature__icon--success{% else %}fa-times pricing-feature__icon--disabled{% endif %} pricing-feature__icon"></i>
                     <div class="pricing-feature__content">
-                        <strong>Особый статус в профиле:</strong>
-                        {% include 'includes/subscription_badge.html' with tier=tier %}
+                        {% if tier.has_badge %}
+                            <strong>Особый статус в профиле:</strong>
+                            {% include 'includes/subscription_badge.html' with tier=tier %}
+                        {% else %}
+                            Особый статус в профиле
+                        {% endif %}
                     </div>
                 </div>
-                {% endif %}
             </div>
 
             <div class="pricing-card__action">

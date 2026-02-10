@@ -131,70 +131,79 @@ def notify_match_created(match) -> None:
 def notify_result_proposal(proposal) -> None:
     """Уведомление сопернику о предложенном результате с кнопками Подтвердить/Отклонить."""
     if not bot.is_configured():
+        logger.warning("Bot not configured, skipping notify_result_proposal")
         return
-    match = proposal.match
-    proposer = proposal.proposer
-    
-    # Явная проверка значения result (может быть строка или enum)
-    proposal_result = proposal.result
-    result_str = str(proposal_result) if proposal_result else ""
-    
-    # Проверяем через строковое сравнение для надежности
-    is_walkover_loss = (
-        proposal_result == Match.ResultChoice.WALKOVER_LOSS or
-        result_str == "walkover_loss" or
-        result_str == Match.ResultChoice.WALKOVER_LOSS
-    )
-    is_walkover_win = (
-        proposal_result == Match.ResultChoice.WALKOVER_WIN or
-        result_str == "walkover_win" or
-        result_str == Match.ResultChoice.WALKOVER_WIN
-    )
-    
-    if is_walkover_loss:
-        result_text = "Тех. поражение"
-        score = "6:0 6:0 (тех. поражение)"
-        warning_text = (
-            f"\n\n⚠️ <b>Внимание!</b> При подтверждении тех. поражения:\n"
-            f"• Из вашего рейтинга будет вычтено <b>40 очков</b>\n"
-            f"• Счёт будет записан как <b>6:0 6:0</b> в пользу соперника"
+    try:
+        match = proposal.match
+        proposer = proposal.proposer
+        
+        # Явная проверка значения result (может быть строка или enum)
+        proposal_result = proposal.result
+        result_str = str(proposal_result) if proposal_result else ""
+        
+        logger.info(f"notify_result_proposal: proposal_id={proposal.pk}, result={proposal_result}, result_str={result_str}")
+        
+        # Проверяем через строковое сравнение для надежности
+        # Match.ResultChoice.WALKOVER_LOSS это "walkover_loss", Match.ResultChoice.WALKOVER_WIN это "walkover_win"
+        is_walkover_loss = (
+            proposal_result == Match.ResultChoice.WALKOVER_LOSS or
+            result_str == "walkover_loss"
         )
-    elif is_walkover_win:
-        result_text = "Тех. победа"
-        score = "—"
-        warning_text = ""
-    else:
-        result_text = proposal.get_result_display()
-        score = proposal.match.score_display
-        try:
-            score = " / ".join(
-                f"{getattr(proposal, f'player1_set{i}')}:{getattr(proposal, f'player2_set{i}')}"
-                for i in (1, 2, 3)
-                if getattr(proposal, f"player1_set{i}") is not None
-            ) or "—"
-        except Exception:
+        is_walkover_win = (
+            proposal_result == Match.ResultChoice.WALKOVER_WIN or
+            result_str == "walkover_win"
+        )
+        
+        if is_walkover_loss:
+            result_text = "Тех. поражение"
+            score = "6:0 6:0 (тех. поражение)"
+            warning_text = (
+                f"\n\n⚠️ <b>Внимание!</b> При подтверждении тех. поражения:\n"
+                f"• Из вашего рейтинга будет вычтено <b>40 очков</b>\n"
+                f"• Счёт будет записан как <b>6:0 6:0</b> в пользу соперника"
+            )
+        elif is_walkover_win:
+            result_text = "Тех. победа"
             score = "—"
-        warning_text = ""
-    
-    text = (
-        f"📩 <b>{proposer} предложил результат матча</b>\n\n"
-        f"Турнир: {match.tournament.name}\n"
-        f"Результат: {result_text}\n"
-        f"Счёт: {score}{warning_text}\n\n"
-        f"⏰ У вас есть <b>3 часа</b> на подтверждение или отклонение.\n"
-        f"Если не ответите в течение 3 часов, результат будет подтверждён автоматически.\n\n"
-        "Подтвердите или отклоните:"
-    )
-    reply_markup = {
-        "inline_keyboard": [
-            [
-                {"text": "✅ Подтвердить", "callback_data": f"proposal_confirm_{proposal.pk}"},
-                {"text": "❌ Отклонить", "callback_data": f"proposal_reject_{proposal.pk}"},
+            warning_text = ""
+        else:
+            result_text = proposal.get_result_display()
+            score = proposal.match.score_display
+            try:
+                score = " / ".join(
+                    f"{getattr(proposal, f'player1_set{i}')}:{getattr(proposal, f'player2_set{i}')}"
+                    for i in (1, 2, 3)
+                    if getattr(proposal, f"player1_set{i}") is not None
+                ) or "—"
+            except Exception:
+                score = "—"
+            warning_text = ""
+        
+        text = (
+            f"📩 <b>{proposer} предложил результат матча</b>\n\n"
+            f"Турнир: {match.tournament.name}\n"
+            f"Результат: {result_text}\n"
+            f"Счёт: {score}{warning_text}\n\n"
+            f"⏰ У вас есть <b>3 часа</b> на подтверждение или отклонение.\n"
+            f"Если не ответите в течение 3 часов, результат будет подтверждён автоматически.\n\n"
+            "Подтвердите или отклоните:"
+        )
+        reply_markup = {
+            "inline_keyboard": [
+                [
+                    {"text": "✅ Подтвердить", "callback_data": f"proposal_confirm_{proposal.pk}"},
+                    {"text": "❌ Отклонить", "callback_data": f"proposal_reject_{proposal.pk}"},
+                ],
             ],
-        ],
-    }
-    for user in get_match_opponent_users(match, proposer):
-        send_to_user_by_user(user, text, reply_markup=reply_markup)
+        }
+        opponent_users = get_match_opponent_users(match, proposer)
+        logger.info(f"notify_result_proposal: sending to {len(opponent_users)} opponent users")
+        for user in opponent_users:
+            success = send_to_user_by_user(user, text, reply_markup=reply_markup)
+            logger.info(f"notify_result_proposal: sent to user {user.id}, success={success}")
+    except Exception as e:
+        logger.exception("notify_result_proposal failed: %s", e)
+        raise
 
 
 def notify_proposal_confirmed(proposal) -> None:

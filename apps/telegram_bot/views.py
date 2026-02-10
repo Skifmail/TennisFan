@@ -577,8 +577,8 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
             )
         try:
             tg_notify.notify_result_proposal(proposal)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.exception("notify_result_proposal failed: %s", e)
         result_text = "техническую победу" if result_type == "walkover_win" else "техническое поражение"
         bot.send_message(
             chat_id,
@@ -928,8 +928,8 @@ def user_bot_webhook(request):
                     )
                 try:
                     tg_notify.notify_result_proposal(proposal)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.exception("notify_result_proposal failed: %s", e)
                 cache.delete(cache_key)
                 bot.send_message(chat_id, "✅ Результат отправлен на подтверждение сопернику. Ожидайте подтверждения в боте.")
                 return JsonResponse({"ok": True})

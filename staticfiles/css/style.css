@@ -4375,6 +4375,12 @@ select.form-control {
     color: var(--color-primary);
 }
 
+.pricing-feature__value--disabled {
+    color: var(--color-text-muted);
+    opacity: 0.6;
+    font-weight: 400;
+}
+
 .pricing-card__badge {
     position: absolute;
     top: var(--spacing-md);

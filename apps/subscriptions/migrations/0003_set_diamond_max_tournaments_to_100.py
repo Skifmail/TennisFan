@@ -3,18 +3,36 @@
 from django.db import migrations
 
 
-def set_diamond_max_tournaments_to_100(apps, schema_editor):
-    """Установить max_tournaments = 100 для DIAMOND тарифа."""
+def fix_tier_settings(apps, schema_editor):
+    """
+    Исправить настройки тарифов:
+    - FREE: is_unlimited=False, max_tournaments=0 (нет регистраций)
+    - DIAMOND: max_tournaments=100 (условный безлимит)
+    """
     SubscriptionTier = apps.get_model('subscriptions', 'SubscriptionTier')
+
+    free_tier = SubscriptionTier.objects.filter(name='free').first()
+    if free_tier:
+        free_tier.is_unlimited = False
+        free_tier.max_tournaments = 0
+        free_tier.save(update_fields=['is_unlimited', 'max_tournaments'])
+
     diamond_tier = SubscriptionTier.objects.filter(name='diamond').first()
     if diamond_tier:
         diamond_tier.max_tournaments = 100
         diamond_tier.save(update_fields=['max_tournaments'])
 
 
-def reverse_set_diamond_max_tournaments(apps, schema_editor):
-    """Обратная операция: вернуть значение по умолчанию (0)."""
+def reverse_fix_tier_settings(apps, schema_editor):
+    """Обратная операция."""
     SubscriptionTier = apps.get_model('subscriptions', 'SubscriptionTier')
+
+    free_tier = SubscriptionTier.objects.filter(name='free').first()
+    if free_tier:
+        free_tier.is_unlimited = True
+        free_tier.max_tournaments = 0
+        free_tier.save(update_fields=['is_unlimited', 'max_tournaments'])
+
     diamond_tier = SubscriptionTier.objects.filter(name='diamond').first()
     if diamond_tier:
         diamond_tier.max_tournaments = 0
@@ -29,7 +47,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(
-            set_diamond_max_tournaments_to_100,
-            reverse_set_diamond_max_tournaments,
+            fix_tier_settings,
+            reverse_fix_tier_settings,
         ),
     ]

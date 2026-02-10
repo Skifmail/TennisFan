@@ -7,7 +7,7 @@ from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
 
-from .models import SupportConversation, SupportMessage
+from .models import SupportConversation, SupportMessage, TelegramTransferConsentLog
 
 
 @admin.register(SupportConversation)
@@ -82,3 +82,22 @@ class SupportConversationAdmin(admin.ModelAdmin):
         return TemplateResponse(
             request, "admin/core/supportconversation/conversation_detail.html", context
         )
+
+
+@admin.register(TelegramTransferConsentLog)
+class TelegramTransferConsentLogAdmin(admin.ModelAdmin):
+    """Журнал согласий на передачу данных в Telegram."""
+
+    list_display = ("user", "consent_version", "ip_address", "consented_at")
+    list_filter = ("consent_version", "consented_at")
+    search_fields = ("user__email", "user__first_name", "user__last_name", "ip_address", "user_agent")
+    readonly_fields = ("user", "consent_version", "ip_address", "user_agent", "consented_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

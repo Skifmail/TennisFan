@@ -240,6 +240,9 @@ TELEGRAM_SUPPORT_WEBHOOK_SECRET = os.environ.get('TELEGRAM_SUPPORT_WEBHOOK_SECRE
 TELEGRAM_USER_BOT_TOKEN = os.environ.get('TELEGRAM_USER_BOT_TOKEN', '')
 TELEGRAM_USER_BOT_USERNAME = os.environ.get('TELEGRAM_USER_BOT_USERNAME', '')
 TELEGRAM_USER_BOT_WEBHOOK_SECRET = os.environ.get('TELEGRAM_USER_BOT_WEBHOOK_SECRET', '')
+# ID приватного чата сообщества (супергруппа), куда даём инвайт платным тарифам.
+# Пример: -1001234567890
+TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID = os.environ.get('TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID', '')
 # Базовый URL сайта для ссылок в боте (например https://tennisfan.ru)
 TELEGRAM_BOT_SITE_BASE_URL = os.environ.get('TELEGRAM_BOT_SITE_BASE_URL', '')
 
@@ -289,4 +292,5 @@ CRONJOBS = [
     ('*/15 * * * *', 'django.core.management.call_command', ['auto_accept_stale_proposals']),
     ('0 9 * * *', 'django.core.management.call_command', ['send_deadline_reminders']),
     ('0 8 * * *', 'django.core.management.call_command', ['send_tournament_start_reminders']),
+    ('*/30 * * * *', 'django.core.management.call_command', ['sync_private_chat_access']),
 ]

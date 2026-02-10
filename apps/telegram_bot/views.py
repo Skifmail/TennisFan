@@ -20,7 +20,7 @@ from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.core.models import UserTelegramLink
+from apps.core.models import TelegramTransferConsentLog, UserTelegramLink
 from apps.users.models import Notification, Player
 from apps.tournaments.models import DeadlineExtensionRequest, Match, MatchResultProposal
 from apps.tournaments.utils import get_match_opponent_users, get_match_participants
@@ -29,11 +29,13 @@ from apps.core import telegram_notify as admin_notify
 
 from . import services as bot
 from . import notifications as tg_notify
+from .private_chat import get_private_chat_access_status
 
 logger = logging.getLogger(__name__)
 
 CACHE_KEY_RESULT_ENTRY = "tg_result_entry:%s"
 CACHE_RESULT_ENTRY_TIMEOUT = 300  # 5 min
+TELEGRAM_TRANSFER_CONSENT_VERSION = "v1-2026-02-10"
 
 
 def _parse_score_input(text: str):
@@ -79,21 +81,42 @@ def _webhook_secret_ok(request) -> bool:
     return request.headers.get("X-Telegram-Bot-Api-Secret-Token") == secret
 
 
+def _get_client_ip(request) -> str | None:
+    """Определить IP клиента с учётом reverse proxy."""
+    forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
+    if forwarded:
+        # Берём первый IP в цепочке X-Forwarded-For
+        return forwarded.split(",")[0].strip()
+    real_ip = (request.META.get("HTTP_X_REAL_IP") or "").strip()
+    if real_ip:
+        return real_ip
+    remote_addr = (request.META.get("REMOTE_ADDR") or "").strip()
+    return remote_addr or None
+
+
 # Тексты кнопок реплай-меню (должны совпадать при обработке сообщения)
 REPLY_BTN_MY_PROFILE = "👤 Мой профиль"
 REPLY_BTN_MY_MATCHES = "🎾 Мои матчи"
 REPLY_BTN_MY_SUBSCRIPTIONS = "📋 Мои подписки"
+REPLY_BTN_PRIVATE_CHAT = "💬 Закрытый чат"
 REPLY_BTN_GO_TO_SITE = "🌐 Перейти на сайт"
 
-REPLY_MENU_BUTTONS = (REPLY_BTN_MY_PROFILE, REPLY_BTN_MY_MATCHES, REPLY_BTN_MY_SUBSCRIPTIONS, REPLY_BTN_GO_TO_SITE)
+REPLY_MENU_BUTTONS = (
+    REPLY_BTN_MY_PROFILE,
+    REPLY_BTN_MY_MATCHES,
+    REPLY_BTN_MY_SUBSCRIPTIONS,
+    REPLY_BTN_PRIVATE_CHAT,
+    REPLY_BTN_GO_TO_SITE,
+)
 
 
 def _reply_menu_keyboard():
-    """Реплай-клавиатура под полем ввода: Мой профиль, Мои матчи, Мои подписки, Перейти на сайт."""
+    """Реплай-клавиатура под полем ввода: профиль, матчи, подписка, чат, сайт."""
     return {
         "keyboard": [
             [{"text": REPLY_BTN_MY_PROFILE}, {"text": REPLY_BTN_MY_MATCHES}],
-            [{"text": REPLY_BTN_MY_SUBSCRIPTIONS}, {"text": REPLY_BTN_GO_TO_SITE}],
+            [{"text": REPLY_BTN_MY_SUBSCRIPTIONS}, {"text": REPLY_BTN_PRIVATE_CHAT}],
+            [{"text": REPLY_BTN_GO_TO_SITE}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
@@ -101,7 +124,7 @@ def _reply_menu_keyboard():
 
 
 def _main_menu_keyboard(site_base_url: str):
-    """Inline-клавиатура (дублирует меню для старых клиентов): Мои матчи, Мой профиль, Подписка."""
+    """Inline-клавиатура (дублирует меню для старых клиентов)."""
     return {
         "inline_keyboard": [
             [
@@ -110,6 +133,9 @@ def _main_menu_keyboard(site_base_url: str):
             ],
             [
                 {"text": "📋 Моя подписка", "callback_data": "menu_my_subscription"},
+                {"text": "💬 Закрытый чат", "callback_data": "menu_private_chat"},
+            ],
+            [
                 {"text": "🌐 На сайт", "url": site_base_url.rstrip("/")},
             ],
         ]
@@ -622,11 +648,18 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
 
 def _handle_menu_callback(callback_query: dict, base_url: str = "") -> bool:
     """
-    Обработка кнопок меню: menu_my_matches, menu_my_profile, menu_my_subscription, menu_go_to_site.
+    Обработка кнопок меню:
+    menu_my_matches, menu_my_profile, menu_my_subscription, menu_private_chat, menu_go_to_site.
     Отправляет контент прямо в чат бота (матчи, профиль, подписка, ссылка на сайт).
     """
     callback_data = (callback_query.get("callback_data") or "").strip()
-    if callback_data not in ("menu_my_matches", "menu_my_profile", "menu_my_subscription", "menu_go_to_site"):
+    if callback_data not in (
+        "menu_my_matches",
+        "menu_my_profile",
+        "menu_my_subscription",
+        "menu_private_chat",
+        "menu_go_to_site",
+    ):
         return False
 
     cq_id = callback_query.get("id")
@@ -871,6 +904,46 @@ def _handle_menu_callback_action(
         if not ok:
             logger.warning("menu_my_subscription: send_message failed for chat_id=%s", chat_id)
 
+    elif callback_data == "menu_private_chat":
+        has_access, reason = get_private_chat_access_status(user)
+        reply_markup = None
+
+        if not bot.is_private_chat_configured():
+            text = (
+                "⚙️ <b>Закрытый чат сообщества</b>\n\n"
+                "Чат пока настраивается администратором. Попробуйте немного позже."
+            )
+        elif not has_access:
+            text = (
+                "💬 <b>Закрытый чат сообщества</b>\n\n"
+                "🔒 Доступ сейчас недоступен.\n"
+                f"Причина: {reason}\n\n"
+                "Оформите/продлите подписку с доступом к сообществу, и бот сразу даст ссылку."
+            )
+            if base_url:
+                pricing_url = f"{base_url.rstrip('/')}/subscriptions/pricing/"
+                reply_markup = {"inline_keyboard": [[{"text": "💳 Выбрать тариф", "url": pricing_url}]]}
+        else:
+            invite_link = bot.create_private_chat_invite_link(expire_seconds=1800, member_limit=1)
+            if invite_link:
+                text = (
+                    "💬 <b>Закрытый чат сообщества</b>\n\n"
+                    "✅ Доступ подтверждён.\n"
+                    "Ниже ваша персональная ссылка для входа в чат.\n\n"
+                    "⚠️ Ссылка одноразовая и действует 30 минут."
+                )
+                reply_markup = {"inline_keyboard": [[{"text": "➡️ Войти в закрытый чат", "url": invite_link}]]}
+            else:
+                text = (
+                    "⚠️ <b>Не удалось создать приглашение в чат</b>\n\n"
+                    "Попробуйте ещё раз через минуту. Если ошибка повторяется, обратитесь в поддержку."
+                )
+
+        ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer("Закрытый чат" if ok else "Ошибка отправки")
+        if not ok:
+            logger.warning("menu_private_chat: send_message failed for chat_id=%s", chat_id)
+
     elif callback_data == "menu_go_to_site" and base_url:
         site_url = base_url.rstrip("/")
         bot.send_to_user(
@@ -1092,6 +1165,7 @@ def user_bot_webhook(request):
                     REPLY_BTN_MY_PROFILE: "menu_my_profile",
                     REPLY_BTN_MY_MATCHES: "menu_my_matches",
                     REPLY_BTN_MY_SUBSCRIPTIONS: "menu_my_subscription",
+                    REPLY_BTN_PRIVATE_CHAT: "menu_private_chat",
                 }[text]
                 _handle_menu_callback_action(
                     chat_id, None, reply_to_callback, user, player, base_url=base_url
@@ -1130,6 +1204,17 @@ def connect_redirect(request):
             "Для подключения Telegram-бота необходимо подтвердить согласие на передачу данных в Telegram.",
         )
         return redirect("profile", pk=request.user.player.pk)
+
+    # Фиксируем юридически значимое согласие на передачу данных в Telegram
+    try:
+        TelegramTransferConsentLog.objects.create(
+            user=request.user,
+            consent_version=TELEGRAM_TRANSFER_CONSENT_VERSION,
+            ip_address=_get_client_ip(request),
+            user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:1000],
+        )
+    except Exception as exc:
+        logger.warning("Failed to log Telegram transfer consent for user=%s: %s", request.user.pk, exc)
 
     if not bot.is_configured():
         messages.error(request, "Telegram-бот временно недоступен. Проверьте TELEGRAM_USER_BOT_TOKEN в .env и перезапустите сервер.")

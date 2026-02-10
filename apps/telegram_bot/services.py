@@ -5,7 +5,8 @@
 
 import json
 import logging
-from typing import Tuple
+import time
+from typing import Any, Tuple
 
 import requests
 
@@ -19,9 +20,114 @@ def _get_bot_token() -> str:
     return (getattr(settings, "TELEGRAM_USER_BOT_TOKEN", None) or "").strip()
 
 
+def _get_private_chat_id() -> int | None:
+    """ID закрытого сообщества Telegram (супергруппа), если настроен."""
+    raw = (getattr(settings, "TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID", None) or "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        logger.warning("Invalid TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID: %s", raw)
+        return None
+
+
 def is_configured() -> bool:
     """Проверка, что бот настроен."""
     return bool(_get_bot_token())
+
+
+def is_private_chat_configured() -> bool:
+    """Проверка, что настроен ID приватного чата сообщества."""
+    return _get_private_chat_id() is not None
+
+
+def _api_post(method: str, payload: dict[str, Any], timeout: int = 10) -> tuple[Any, bool]:
+    """Унифицированный POST в Telegram Bot API с проверкой `ok` в JSON-ответе."""
+    token = _get_bot_token()
+    if not token:
+        return None, False
+    url = f"https://api.telegram.org/bot{token}/{method}"
+    try:
+        r = requests.post(url, json=payload, timeout=timeout)
+        if not r.ok:
+            logger.warning("Telegram API %s failed: %s %s", method, r.status_code, r.text[:300])
+            return None, False
+        data = r.json()
+        if not data.get("ok", False):
+            logger.warning(
+                "Telegram API %s returned ok=false: %s",
+                method,
+                data.get("description", "unknown error"),
+            )
+            return None, False
+        return data.get("result"), True
+    except Exception as exc:
+        logger.warning("Telegram API %s exception: %s", method, exc)
+        return None, False
+
+
+def create_private_chat_invite_link(expire_seconds: int = 1800, member_limit: int = 1) -> str | None:
+    """
+    Создать одноразовую ссылку-приглашение в закрытый чат сообщества.
+    По умолчанию действует 30 минут и на 1 участника.
+    """
+    chat_id = _get_private_chat_id()
+    if chat_id is None:
+        logger.warning("create_private_chat_invite_link: private chat is not configured")
+        return None
+
+    expire_date = int(time.time()) + max(60, int(expire_seconds))
+    payload = {
+        "chat_id": chat_id,
+        "expire_date": expire_date,
+        "member_limit": max(1, int(member_limit)),
+        "creates_join_request": False,
+    }
+    result, ok = _api_post("createChatInviteLink", payload, timeout=10)
+    if not ok or not isinstance(result, dict):
+        return None
+    return result.get("invite_link")
+
+
+def get_private_chat_member_status(user_chat_id: int) -> str | None:
+    """Статус участника в закрытом чате (member/admin/left/kicked и т.д.)."""
+    chat_id = _get_private_chat_id()
+    if chat_id is None:
+        return None
+    result, ok = _api_post(
+        "getChatMember",
+        {"chat_id": chat_id, "user_id": int(user_chat_id)},
+        timeout=10,
+    )
+    if not ok or not isinstance(result, dict):
+        return None
+    return result.get("status")
+
+
+def kick_from_private_chat(user_chat_id: int) -> bool:
+    """
+    Удалить пользователя из закрытого чата.
+    Используем ban + unban, чтобы пользователь мог вернуться после продления.
+    """
+    chat_id = _get_private_chat_id()
+    if chat_id is None:
+        return False
+
+    # Сначала баним, затем сразу снимаем бан.
+    _, ban_ok = _api_post(
+        "banChatMember",
+        {"chat_id": chat_id, "user_id": int(user_chat_id), "revoke_messages": False},
+        timeout=10,
+    )
+    if not ban_ok:
+        return False
+    _, unban_ok = _api_post(
+        "unbanChatMember",
+        {"chat_id": chat_id, "user_id": int(user_chat_id), "only_if_banned": True},
+        timeout=10,
+    )
+    return unban_ok
 
 
 def get_bot_username() -> str | None:

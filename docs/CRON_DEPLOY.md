@@ -69,6 +69,8 @@ web: gunicorn config.wsgi --log-file -
 | `*/15 * * * *`  | `python manage.py auto_accept_stale_proposals`      |
 | `0 */6 * * *`   | `python manage.py fan_process_overdue_matches`      |
 | `0 */6 * * *`   | `python manage.py olympic_process_overdue_matches`  |
+| `*/30 * * * *`  | `python manage.py sync_private_chat_access`         |
+| `0 10 * * *`    | `python manage.py send_subscription_expiry_reminders` |
 
 В Railway Cron обычно указывают расписание (cron expression) и одну команду на задачу, т.е. 4 отдельные cron-задачи.
 
@@ -95,6 +97,8 @@ web: gunicorn config.wsgi --log-file -
 | `auto_accept_stale_proposals`      | каждые 15 мин | Авто-подтверждение заявок на результат (6 ч без ответа) |
 | `fan_process_overdue_matches`      | каждые 6 ч   | Тех. победа по рейтингу в FAN при просрочке матча |
 | `olympic_process_overdue_matches`  | каждые 6 ч   | То же для олимпийской системы |
+| `sync_private_chat_access`         | каждые 30 мин| Удаление из закрытого Telegram-чата без активного доступа |
+| `send_subscription_expiry_reminders` | раз в день 10:00 | Напоминания об окончании подписки за 3 и 1 день |
 
 Все команды можно запускать вручную для проверки:
 
@@ -103,4 +107,6 @@ python manage.py generate_brackets_past_deadlines
 python manage.py auto_accept_stale_proposals
 python manage.py fan_process_overdue_matches
 python manage.py olympic_process_overdue_matches
+python manage.py sync_private_chat_access
+python manage.py send_subscription_expiry_reminders
 ```

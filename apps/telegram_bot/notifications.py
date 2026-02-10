@@ -513,3 +513,77 @@ def notify_new_tournament_by_pk(tournament_pk: int) -> None:
         name=f"notify_tournament_{tournament_pk}",
     )
     thread.start()
+
+
+def notify_subscription_expiring(user, subscription, days_left: int) -> None:
+    """
+    Уведомление пользователю об истечении подписки за N дней.
+    
+    Args:
+        user: User объект
+        subscription: UserSubscription объект
+        days_left: количество дней до истечения (3 или 1)
+    """
+    if not bot.is_configured():
+        return
+    
+    tier = subscription.tier
+    tier_name = tier.get_name_display()
+    end_date_str = subscription.end_date.strftime("%d.%m.%Y")
+    
+    # Продающий текст о том, чего лишится игрок
+    features_lost = []
+    if tier.can_write_comments:
+        features_lost.append("• Комментирование матчей и турниров")
+    if tier.can_rate_opponents:
+        features_lost.append("• Оценка соперников после матчей")
+    if tier.has_private_chat:
+        features_lost.append("• Доступ в закрытый чат сообщества")
+    if tier.has_sparring:
+        features_lost.append("• Организация спаррингов")
+    if tier.max_tournaments > 0 or tier.is_unlimited:
+        if tier.is_unlimited:
+            features_lost.append("• Регистрация на турниры (безлимит)")
+        else:
+            features_lost.append(f"• Регистрация на турниры ({tier.max_tournaments} в месяц)")
+    if tier.one_day_tournament_discount > 0:
+        features_lost.append(f"• Скидка {tier.one_day_tournament_discount}% на однодневные турниры")
+    if tier.has_admin_support:
+        features_lost.append("• Приоритетная поддержка администратора")
+    if tier.has_badge:
+        features_lost.append("• Особый статус в профиле")
+    
+    features_text = "\n".join(features_lost) if features_lost else "• Все функции тарифа"
+    
+    if days_left == 3:
+        urgency_text = "⏰ <b>Ваша подписка истекает через 3 дня!</b>"
+    elif days_left == 1:
+        urgency_text = "🚨 <b>Ваша подписка истекает завтра!</b>"
+    else:
+        urgency_text = f"⏰ <b>Ваша подписка истекает через {days_left} дн.</b>"
+    
+    text = (
+        f"{urgency_text}\n\n"
+        f"Тариф: <b>{tier_name}</b>\n"
+        f"Истекает: {end_date_str}\n\n"
+        f"<b>Что вы потеряете:</b>\n"
+        f"{features_text}\n\n"
+        f"💡 <b>Продлите подписку сейчас</b> и сохраните доступ ко всем функциям!\n"
+        f"Не упустите возможность участвовать в турнирах и общаться с сообществом."
+    )
+    
+    site_base_url = _get_site_base_url()
+    pricing_url = f"{site_base_url.rstrip('/')}/subscriptions/pricing/"
+    
+    reply_markup = {
+        "inline_keyboard": [
+            [{"text": "💳 Продлить подписку", "url": pricing_url}],
+            [{"text": "📋 Моя подписка", "callback_data": "menu_my_subscription"}],
+        ],
+    }
+    
+    ok = send_to_user_by_user(user, text, reply_markup=reply_markup)
+    logger.info(
+        "notify_subscription_expiring: user=%s, tier=%s, days_left=%s, sent=%s",
+        user, tier_name, days_left, ok,
+    )

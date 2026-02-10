@@ -4350,18 +4350,27 @@ select.form-control {
 
 .pricing-feature__icon {
     flex-shrink: 0;
-    width: 20px;
-    text-align: center;
-    margin-top: 2px;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    margin-top: 1px;
 }
 
 .pricing-feature__icon--success {
-    color: var(--color-success);
+    color: #fff;
+    background: var(--color-success, #28a745);
 }
 
 .pricing-feature__icon--disabled {
-    color: var(--color-text-muted);
-    opacity: 0.5;
+    color: #fff;
+    background: var(--color-text-muted, #adb5bd);
+    opacity: 0.55;
 }
 
 .pricing-feature__content {

@@ -248,8 +248,15 @@ def _set_place(
     entity: Union[Player, TournamentTeam],
     place: int,
     is_doubles: bool = False,
+    skip_points: bool = False,
 ) -> None:
-    points = _olympic_points_for_place(tournament, place)
+    """
+    Присвоить место игроку/команде в олимпийской системе.
+    
+    Args:
+        skip_points: Если True, не начислять очки (для просроченных матчей).
+    """
+    points = _olympic_points_for_place(tournament, place) if not skip_points else 0
     if is_doubles:
         for p in (entity.player1, entity.player2):
             if p and not getattr(p, "is_bye", False):
@@ -258,6 +265,9 @@ def _set_place(
                     player=p,
                     defaults={"place": place, "fan_points": points, "is_consolation": True},
                 )
+                if not skip_points:
+                    p.total_points += points
+                    p.save(update_fields=["total_points"])
     else:
         if entity and not getattr(entity, "is_bye", False):
             TournamentPlayerResult.objects.update_or_create(
@@ -265,6 +275,9 @@ def _set_place(
                 player=entity,
                 defaults={"place": place, "fan_points": points, "is_consolation": True},
             )
+            if not skip_points:
+                entity.total_points += points
+                entity.save(update_fields=["total_points"])
 
 
 def ensure_consolation_created_for_round(tournament: Tournament, round_index: int) -> None:
@@ -279,10 +292,13 @@ def ensure_consolation_created_for_round(tournament: Tournament, round_index: in
         logger.info("Olympic consolation for round %s created: %s", round_index, msg)
 
 
-def advance_winner_olympic(match: Match) -> Optional[Match]:
+def advance_winner_olympic(match: Match, skip_points: bool = False) -> Optional[Match]:
     """
     Олимпийская система: продвижение победителя и проигравшего (в утешительную),
     присвоение мест при завершении матчей за два места.
+    
+    Args:
+        skip_points: Если True, не начислять очки (для просроченных матчей).
     """
     t = match.tournament
     if not _is_olympic(t):
@@ -308,8 +324,8 @@ def advance_winner_olympic(match: Match) -> Optional[Match]:
     if is_cons:
         # Утешительная сетка: матч за два места (place_max - place_min == 1) — присвоить оба места
         if place_min is not None and place_max is not None and place_max - place_min == 1:
-            _set_place(t, winner_entity, place_min, is_doubles=t.is_doubles())
-            _set_place(t, loser_entity, place_max, is_doubles=t.is_doubles())
+            _set_place(t, winner_entity, place_min, is_doubles=t.is_doubles(), skip_points=skip_points)
+            _set_place(t, loser_entity, place_max, is_doubles=t.is_doubles(), skip_points=skip_points)
         # Победитель идёт в next_match, проигравший — в loser_next_match (если есть)
         next_winner = match.next_match
         next_loser = match.loser_next_match
@@ -325,7 +341,7 @@ def advance_winner_olympic(match: Match) -> Optional[Match]:
     t.format = "single_elimination"
     try:
         from .fan import advance_winner_and_award_loser
-        next_m = advance_winner_and_award_loser(match)
+        next_m = advance_winner_and_award_loser(match, skip_points=skip_points)
     finally:
         t.format = OLYMPIC_FORMAT
     ensure_consolation_created_for_round(t, ri)
@@ -441,10 +457,12 @@ def process_overdue_match(match: Match) -> Tuple[bool, str]:
         if match.team1_id and match.team2_id:
             match.winner_team = winner_entity
             match.save(update_fields=["winner_team"])
-        advance_winner_olympic(match)
+        # При просрочке не начисляем очки
+        advance_winner_olympic(match, skip_points=True)
         return True, f"Матч {match.pk}: тех. победа (олимпийская система)."
     else:
         winner = _overdue_winner(match)
         apply_overdue_walkover(match, winner)
-        advance_winner_olympic(match)
+        # При просрочке не начисляем очки
+        advance_winner_olympic(match, skip_points=True)
         return True, f"Матч {match.pk}: тех. победа (олимпийская система)."

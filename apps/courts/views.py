@@ -77,7 +77,6 @@ def court_detail(request, slug):
         Comment.objects.filter(
             content_type=ct,
             object_id=court.pk,
-            is_approved=True,
         )
         .select_related("author__user")
         .order_by("-created_at")

@@ -147,6 +147,9 @@
                             <th>Очки FAN</th>
                             {% elif is_olympic %}
                             <th>Очки за место</th>
+                            {% elif is_round_robin %}
+                            <th>Очки (в турнире)</th>
+                            <th>Очки в рейтинг</th>
                             {% endif %}
                         </tr>
                     </thead>
@@ -183,6 +186,9 @@
                             <td class="fan-points">{{ s.fan_points }}</td>
                             {% elif is_olympic %}
                             <td class="fan-points">{{ s.fan_points }}</td>
+                            {% elif is_round_robin %}
+                            <td>{{ s.fan_points }}</td>
+                            <td class="fan-points">{{ s.rating_points|default:"—" }}</td>
                             {% endif %}
                         </tr>
                         {% endfor %}

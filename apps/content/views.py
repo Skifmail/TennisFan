@@ -51,13 +51,12 @@ def news_detail(request, slug):
         news.views_count += 1
         news.save(update_fields=["views_count"])
 
-    # Comments (only approved)
+    # Comments
     ct = ContentType.objects.get_for_model(News)
     comments = (
         Comment.objects.filter(
             content_type=ct,
             object_id=news.pk,
-            is_approved=True,
         )
         .select_related("author__user")
         .order_by("-created_at")
@@ -134,13 +133,12 @@ def about_us(request):
     about = AboutUs.get_singleton()
     body_html = markdown.markdown(about.body or "", extensions=["extra"])
 
-    # Comments: only approved
+    # Comments
     ct = ContentType.objects.get_for_model(AboutUs)
     comments = (
         Comment.objects.filter(
             content_type=ct,
             object_id=about.pk,
-            is_approved=True,
         )
         .select_related("author__user")
         .order_by("-created_at")
@@ -166,7 +164,7 @@ def about_us(request):
                 object_id=about.pk,
                 author=player,
                 text=form.cleaned_data["text"].strip(),
-                is_approved=False,  # Модерация в админке
+                is_approved=True,
             )
             try:
                 from apps.core.telegram_notify import notify_about_us_comment

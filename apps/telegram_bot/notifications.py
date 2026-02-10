@@ -8,6 +8,7 @@ import logging
 import threading
 
 from apps.core.models import UserTelegramLink
+from apps.tournaments.models import Match
 from apps.tournaments.utils import (
     get_match_opponent_users,
     get_match_participant_users,
@@ -133,19 +134,34 @@ def notify_result_proposal(proposal) -> None:
         return
     match = proposal.match
     proposer = proposal.proposer
-    score = proposal.match.score_display
-    try:
-        score = " / ".join(
-            f"{getattr(proposal, f'player1_set{i}')}:{getattr(proposal, f'player2_set{i}')}"
-            for i in (1, 2, 3)
-            if getattr(proposal, f"player1_set{i}") is not None
-        ) or "—"
-    except Exception:
-        score = "—"
+    is_walkover_loss = proposal.result == Match.ResultChoice.WALKOVER_LOSS
+    
+    if is_walkover_loss:
+        score = "6:0 6:0 (тех. поражение)"
+        warning_text = (
+            f"\n\n⚠️ <b>Внимание!</b> При подтверждении тех. поражения:\n"
+            f"• Из вашего рейтинга будет вычтено <b>40 очков</b>\n"
+            f"• Счёт будет записан как <b>6:0 6:0</b> в пользу соперника"
+        )
+    else:
+        score = proposal.match.score_display
+        try:
+            score = " / ".join(
+                f"{getattr(proposal, f'player1_set{i}')}:{getattr(proposal, f'player2_set{i}')}"
+                for i in (1, 2, 3)
+                if getattr(proposal, f"player1_set{i}") is not None
+            ) or "—"
+        except Exception:
+            score = "—"
+        warning_text = ""
+    
     text = (
         f"📩 <b>{proposer} предложил результат матча</b>\n\n"
         f"Турнир: {match.tournament.name}\n"
-        f"Счёт: {score}\n\n"
+        f"Результат: {proposal.get_result_display()}\n"
+        f"Счёт: {score}{warning_text}\n\n"
+        f"⏰ У вас есть <b>3 часа</b> на подтверждение или отклонение.\n"
+        f"Если не ответите в течение 3 часов, результат будет подтверждён автоматически.\n\n"
         "Подтвердите или отклоните:"
     )
     reply_markup = {

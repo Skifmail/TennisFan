@@ -10,9 +10,24 @@ from django.utils import timezone
 
 from apps.users.models import Player
 
-from .models import Match, Tournament, TournamentTeam
+from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam
+from django.urls import reverse
+from apps.users.models import Notification
 
 logger = logging.getLogger(__name__)
+
+
+def _round_robin_points_for_place(tournament: Tournament, place: int) -> int:
+    """Очки в общий рейтинг за занятое место в круговом турнире (те же поля, что FAN/Олимпийская)."""
+    if place == 1:
+        return tournament.fan_points_winner
+    if place == 2:
+        return tournament.fan_points_final
+    if 3 <= place <= 4:
+        return tournament.fan_points_sf
+    if 5 <= place <= 8:
+        return tournament.fan_points_r2
+    return tournament.fan_points_r1  # 9+
 
 ROUND_ROBIN_FORMAT = "round_robin"
 BYE_EMAIL = "bye@tennisfan.local"
@@ -437,8 +452,8 @@ def get_match_matrix(tournament: Tournament) -> tuple[list, list]:
 
 def check_and_finalize_if_complete(tournament: Tournament) -> bool:
     """
-    Если все матчи кругового турнира сыграны — установить статус «Завершён».
-    Очки (1 за победу) начисляются при завершении каждого матча (в signal).
+    Если все матчи кругового турнира сыграны — установить статус «Завершён»
+    и начислить очки в общий рейтинг по итоговым местам (1 место = fan_points_winner, 2 = fan_points_final, …).
     """
     if not _is_round_robin(tournament) or tournament.status == "completed":
         return False
@@ -449,9 +464,171 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
     completed = main_matches.filter(
         status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
     ).exclude(winner__isnull=True).count()
-    if completed >= total:
+    if completed < total:
+        return False
+
+    # Уже финализирован (очки начислены)?
+    if tournament.fan_results.filter(place__isnull=False).exists():
         tournament.status = "completed"
         tournament.save(update_fields=["status"])
-        logger.info("Round-robin tournament %s completed (all %d matches done).", tournament.name, total)
         return True
-    return False
+
+    standings = compute_standings(tournament)
+    is_doubles = tournament.is_doubles()
+
+    for row in standings:
+        place = row.get("place")
+        if not place:
+            continue
+        points = _round_robin_points_for_place(tournament, place)
+        if is_doubles and row.get("team"):
+            team = row["team"]
+            if getattr(team.player1, "is_bye", False) or getattr(team.player2, "is_bye", False):
+                continue
+            for player in (team.player1, team.player2):
+                if not player or getattr(player, "is_bye", False):
+                    continue
+                TournamentPlayerResult.objects.update_or_create(
+                    tournament=tournament,
+                    player=player,
+                    defaults={"place": place, "fan_points": points, "is_consolation": False},
+                )
+                player.total_points += points
+                player.save(update_fields=["total_points"])
+        elif row.get("player"):
+            player = row["player"]
+            if getattr(player, "is_bye", False):
+                continue
+            TournamentPlayerResult.objects.update_or_create(
+                tournament=tournament,
+                player=player,
+                defaults={"place": place, "fan_points": points, "is_consolation": False},
+            )
+            player.total_points += points
+            player.save(update_fields=["total_points"])
+
+    tournament.status = "completed"
+    tournament.save(update_fields=["status"])
+    logger.info(
+        "Round-robin tournament %s completed (all %d matches done), ratings updated by place.",
+        tournament.name,
+        total,
+    )
+    return True
+
+
+def _overdue_winner_round_robin(match: Match) -> Optional[Player]:
+    """
+    При просрочке дедлайна в круговом турнире победа присуждается игроку с более высоким рейтингом.
+    При равенстве — с меньшим id. Поддерживает одиночные и парные матчи.
+    """
+    if match.team1_id and match.team2_id:
+        # Парный матч: сравниваем сумму рейтингов команд
+        t1_pts = match.team1.player1.total_points + (match.team1.player2.total_points if match.team1.player2_id else 0)
+        t2_pts = match.team2.player1.total_points + (match.team2.player2.total_points if match.team2.player2_id else 0)
+        if t1_pts != t2_pts:
+            return match.team1.player1 if t1_pts > t2_pts else match.team2.player1
+        # При равенстве — команда с меньшим id первого игрока
+        return match.team1.player1 if match.team1.player1_id < match.team2.player1_id else match.team2.player1
+    else:
+        # Одиночный матч
+        a, b = match.player1, match.player2
+        if getattr(a, "is_bye", False):
+            return b
+        if getattr(b, "is_bye", False):
+            return a
+        if a.total_points != b.total_points:
+            return a if a.total_points > b.total_points else b
+        return a if a.pk < b.pk else b
+
+
+def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
+    """
+    Оформить тех. победу в круговом турнире (дедлайн истёк): обновить матч, отклонить заявки, уведомить игроков.
+    """
+    is_doubles = match.tournament.is_doubles() and match.team1_id and match.team2_id
+    
+    winner_team = None
+    if is_doubles:
+        winner_team = match.team1 if winner == match.team1.player1 else match.team2
+        match.winner_team = winner_team
+        match.winner = winner
+    else:
+        match.winner = winner
+    
+    match.status = Match.MatchStatus.WALKOVER
+    match.completed_datetime = timezone.now()
+    update_fields = ["winner", "status", "completed_datetime"]
+    if is_doubles:
+        update_fields.append("winner_team")
+    match.save(update_fields=update_fields)
+
+    match.result_proposals.filter(status=Match.ProposalStatus.PENDING).update(
+        status=Match.ProposalStatus.REJECTED
+    )
+    
+    url = reverse("match_detail", args=[match.pk])
+    if is_doubles:
+        # Для парных: уведомляем обоих игроков команды-победителя и обоих игроков команды-проигравшего
+        loser_team = match.team2 if winner_team == match.team1 else match.team1
+        for player in (winner_team.player1, winner_team.player2):
+            if player and not getattr(player, "is_bye", False):
+                Notification.objects.create(
+                    user=player.user,
+                    message="Дедлайн матча истёк. Вам присуждена тех. победа.",
+                    url=url
+                )
+        for player in (loser_team.player1, loser_team.player2):
+            if player and not getattr(player, "is_bye", False):
+                Notification.objects.create(
+                    user=player.user,
+                    message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
+                    url=url
+                )
+    else:
+        winner_user = winner.user
+        loser = match.player2 if winner == match.player1 else match.player1
+        loser_user = loser.user
+        
+        Notification.objects.create(
+            user=winner_user,
+            message="Дедлайн матча истёк. Вам присуждена тех. победа.",
+            url=url
+        )
+        Notification.objects.create(
+            user=loser_user,
+            message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
+            url=url
+        )
+    logger.info("Round-robin overdue walkover: match %s → winner %s", match.pk, winner)
+
+
+def process_overdue_match(match: Match) -> tuple[bool, str]:
+    """
+    Обработать просроченный матч кругового турнира: тех. победа сильнейшему по рейтингу.
+    Проверяет, завершён ли турнир после обработки матча.
+    Возвращает (успех, сообщение).
+    """
+    if not _is_round_robin(match.tournament):
+        return False, "Не круговой турнир."
+    if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
+        return False, "Матч уже завершён."
+    if not match.deadline or match.deadline > timezone.now():
+        return False, "Дедлайн не истёк."
+    
+    is_doubles = match.tournament.is_doubles() and match.team1_id and match.team2_id
+    if is_doubles:
+        if getattr(match.team1.player1, "is_bye", False) and getattr(match.team2.player1, "is_bye", False):
+            return False, "Служебный матч."
+    else:
+        if getattr(match.player1, "is_bye", False) and getattr(match.player2, "is_bye", False):
+            return False, "Служебный матч."
+
+    winner = _overdue_winner_round_robin(match)
+    apply_overdue_walkover_round_robin(match, winner)
+    
+    # Проверяем, завершён ли турнир после этого матча
+    check_and_finalize_if_complete(match.tournament)
+
+    match_display = f"{match.team1} vs {match.team2}" if is_doubles else f"{match.player1} vs {match.player2}"
+    return True, f"Матч {match.pk} ({match_display}): тех. победа {winner} (дедлайн истёк)."

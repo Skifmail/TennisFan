@@ -199,6 +199,10 @@ def tournament_list(request):
 @login_required_with_message("Детали турнира доступны только для зарегистрированных пользователей.")
 def tournament_detail(request, slug):
     """Tournament detail page. Только для авторизованных пользователей."""
+    # Проверяем и формируем сетки для турниров с истёкшим дедлайном регистрации
+    from apps.tournaments.fan import check_and_generate_past_deadline_brackets
+    check_and_generate_past_deadline_brackets()
+    
     tournament = get_object_or_404(
         Tournament.objects.prefetch_related(
             "matches__player1__user",
@@ -242,6 +246,16 @@ def tournament_detail(request, slug):
                 matches_by_round.append((round_matches[0].round_name, False, round_matches))
         matrix_participants, matrix_data = get_match_matrix(tournament)
         rr_standings = compute_standings(tournament)
+        if tournament.status == "completed":
+            fan_results_map = {
+                r.player_id: r.fan_points for r in tournament.fan_results.select_related("player")
+            }
+            for row in rr_standings:
+                pid = (row["team"].player1_id if row.get("team") else row["player"].id)
+                row["rating_points"] = fan_results_map.get(pid)
+        else:
+            for row in rr_standings:
+                row["rating_points"] = None
         entity_id = lambda r: (r["team"] or r["player"]).id
         standings_by_entity = {entity_id(row): row for row in rr_standings}
         matrix_rows = []
@@ -391,7 +405,14 @@ def tournament_tables_detail(request, slug):
         )
 
     if is_round_robin:
-        standings = compute_standings(tournament)
+        rr_standings = compute_standings(tournament)
+        if tournament.status == "completed":
+            fan_results_map = {
+                r.player_id: r.fan_points
+                for r in tournament.fan_results.select_related("player")
+            }
+        else:
+            fan_results_map = {}
         standings = [
             {
                 "place": row["place"],
@@ -400,8 +421,11 @@ def tournament_tables_detail(request, slug):
                 "fan_result": None,
                 "fan_points": row["points"],
                 "round_eliminated": "—",
+                "rating_points": fan_results_map.get(
+                    row["team"].player1_id if row.get("team") else row["player"].id
+                ),
             }
-            for row in standings
+            for row in rr_standings
         ]
     elif is_olympic:
         # Олимпийская система: таблица по итоговому месту (place из TournamentPlayerResult)
@@ -674,7 +698,7 @@ def propose_result(request, pk):
     for opponent_user in get_match_opponent_users(match, player):
         Notification.objects.create(
             user=opponent_user,
-            message=f"{player} предложил результат матча в турнире {match.tournament.name}",
+            message=f"{player} предложил результат матча в турнире {match.tournament.name}. У вас 3 часа на подтверждение.",
             url=reverse('my_matches'),
         )
 

@@ -356,7 +356,7 @@ def _handle_extension_request_callback(callback_query: dict, base_url: str) -> b
 
 def _handle_result_enter_callback(callback_query: dict) -> bool:
     """
-    Кнопка «Внести результат»: запоминаем матч в кэш, просим ввести счёт в следующем сообщении.
+    Кнопка «Внести результат»: показываем выбор типа результата (обычный матч, тех. победа, тех. поражение).
     """
     callback_data = (callback_query.get("callback_data") or "").strip()
     if not callback_data.startswith("result_enter_"):
@@ -410,20 +410,149 @@ def _handle_result_enter_callback(callback_query: dict) -> bool:
         _answer_callback(cq_id, "Матч уже завершён.", show_alert=True)
         return True
 
-    cache.set(CACHE_KEY_RESULT_ENTRY % chat_id, match_pk, CACHE_RESULT_ENTRY_TIMEOUT)
     side_text = "первую ({}).".format(match.get_player1_display()) if _proposer_is_side1(match, player) else "вторую ({}).".format(match.get_player2_display())
+    
+    # Показываем кнопки выбора типа результата
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "📝 Обычный матч (ввести счёт)", "callback_data": f"result_type_{match_pk}_normal"}
+            ],
+            [
+                {"text": "✅ Тех. победа (соперник не вышел)", "callback_data": f"result_type_{match_pk}_walkover_win"},
+                {"text": "❌ Тех. поражение (мы не вышли)", "callback_data": f"result_type_{match_pk}_walkover_loss"}
+            ],
+        ]
+    }
+    
     bot.send_message(
         chat_id,
         f"📝 <b>Внести результат</b>\n\n"
         f"Матч: {match.tournament.name}, {match.round_name or '—'}\n"
         f"{match.get_player1_display()} — {match.get_player2_display()}\n\n"
         f"Вы играете за {side_text}\n\n"
-        f"<b>Формат счёта:</b> в каждом сете сначала геймы <b>вашей</b> команды, затем геймы соперника.\n"
-        f"Пример: <code>6:4 6:3</code> — вы выиграли оба сета. <code>3:6 4:6</code> — вы проиграли оба (вы 3 и 4, соперник 6 и 6).\n\n"
-        f"Введите счёт через пробел по сетам, например: <code>6:4 6:3</code> или <code>6:4 3:6 10:7</code> (тайбрейк).\n\n"
-        f"Отправьте счёт в чат (или /cancel чтобы отменить).",
+        f"Выберите тип результата:",
+        reply_markup=keyboard,
     )
-    _answer_callback(cq_id, "Введите счёт в следующем сообщении")
+    _answer_callback(cq_id, "Выберите тип результата")
+    return True
+
+
+def _handle_result_type_callback(callback_query: dict) -> bool:
+    """
+    Обработка выбора типа результата: обычный матч (просим счёт) или тех. победа/поражение (создаём proposal сразу).
+    """
+    callback_data = (callback_query.get("callback_data") or "").strip()
+    if not callback_data.startswith("result_type_"):
+        return False
+
+    cq_id = callback_query.get("id")
+    message = callback_query.get("message") or {}
+    chat_id = message.get("chat", {}).get("id")
+    if not chat_id:
+        return False
+
+    try:
+        # Формат: result_type_<match_pk>_<type>
+        parts = callback_data.split("_")
+        if len(parts) < 4:
+            _answer_callback(cq_id, "Ошибка данных.", show_alert=True)
+            return True
+        match_pk = int(parts[2])
+        result_type = "_".join(parts[3:])  # Может быть "normal", "walkover_win", "walkover_loss"
+    except (ValueError, TypeError, IndexError):
+        _answer_callback(cq_id, "Ошибка данных.", show_alert=True)
+        return True
+
+    link = _get_link_by_chat_id(chat_id)
+    if not link:
+        _answer_callback(cq_id, "Сначала подключите бота с сайта.", show_alert=True)
+        return True
+
+    player = getattr(link.user, "player", None)
+    if not player:
+        _answer_callback(cq_id, "Нет профиля игрока.", show_alert=True)
+        return True
+
+    match = (
+        Match.objects.filter(pk=match_pk)
+        .select_related("tournament", "player1", "player2", "team1", "team2")
+        .first()
+    )
+    if not match:
+        _answer_callback(cq_id, "Матч не найден.", show_alert=True)
+        return True
+
+    if match.result_proposals.filter(status=Match.ProposalStatus.PENDING).exists():
+        _answer_callback(
+            cq_id,
+            "По этому матчу уже отправлен результат и он ожидает подтверждения.",
+            show_alert=True,
+        )
+        return True
+
+    participants = get_match_participants(match)
+    if player not in participants:
+        _answer_callback(cq_id, "Вы не участвуете в этом матче.", show_alert=True)
+        return True
+
+    if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
+        _answer_callback(cq_id, "Матч уже завершён.", show_alert=True)
+        return True
+
+    # Если выбран обычный матч - просим ввести счёт
+    if result_type == "normal":
+        cache.set(CACHE_KEY_RESULT_ENTRY % chat_id, match_pk, CACHE_RESULT_ENTRY_TIMEOUT)
+        side_text = "первую ({}).".format(match.get_player1_display()) if _proposer_is_side1(match, player) else "вторую ({}).".format(match.get_player2_display())
+        bot.send_message(
+            chat_id,
+            f"📝 <b>Внести результат</b>\n\n"
+            f"Матч: {match.tournament.name}, {match.round_name or '—'}\n"
+            f"{match.get_player1_display()} — {match.get_player2_display()}\n\n"
+            f"Вы играете за {side_text}\n\n"
+            f"<b>Формат счёта:</b> в каждом сете сначала геймы <b>вашей</b> команды, затем геймы соперника.\n"
+            f"Пример: <code>6:4 6:3</code> — вы выиграли оба сета. <code>3:6 4:6</code> — вы проиграли оба (вы 3 и 4, соперник 6 и 6).\n\n"
+            f"Введите счёт через пробел по сетам, например: <code>6:4 6:3</code> или <code>6:4 3:6 10:7</code> (тайбрейк).\n\n"
+            f"Отправьте счёт в чат (или /cancel чтобы отменить).",
+        )
+        _answer_callback(cq_id, "Введите счёт в следующем сообщении")
+        return True
+
+    # Если выбрана тех. победа или тех. поражение - создаём proposal сразу
+    if result_type in ("walkover_win", "walkover_loss"):
+        result_choice = Match.ResultChoice.WALKOVER_WIN if result_type == "walkover_win" else Match.ResultChoice.WALKOVER_LOSS
+        proposal = MatchResultProposal.objects.create(
+            match=match,
+            proposer=player,
+            result=result_choice,
+            player1_set1=None,
+            player2_set1=None,
+            player1_set2=None,
+            player2_set2=None,
+            player1_set3=None,
+            player2_set3=None,
+        )
+        for opp_user in get_match_opponent_users(match, player):
+            Notification.objects.create(
+                user=opp_user,
+                message=f"{player} предложил результат матча в турнире {match.tournament.name}. У вас 3 часа на подтверждение.",
+                url=reverse("my_matches"),
+            )
+        try:
+            tg_notify.notify_result_proposal(proposal)
+        except Exception:
+            pass
+        result_text = "техническую победу" if result_type == "walkover_win" else "техническое поражение"
+        bot.send_message(
+            chat_id,
+            f"✅ Результат отправлен на подтверждение сопернику.\n\n"
+            f"Вы указали: <b>{result_text}</b>\n"
+            f"Ожидайте подтверждения в боте.",
+        )
+        _answer_callback(cq_id, "Результат отправлен")
+        return True
+
+    _answer_callback(cq_id, "Неизвестный тип результата.", show_alert=True)
     return True
 
 
@@ -616,6 +745,8 @@ def user_bot_webhook(request):
         if not handled:
             handled = _handle_extension_request_callback(callback_query, base_url)
         if not handled:
+            handled = _handle_result_type_callback(callback_query)
+        if not handled:
             handled = _handle_result_enter_callback(callback_query)
         if not handled:
             handled = _handle_menu_callback(callback_query, base_url)
@@ -755,7 +886,7 @@ def user_bot_webhook(request):
                 for opp_user in get_match_opponent_users(match, player):
                     Notification.objects.create(
                         user=opp_user,
-                        message=f"{player} предложил результат матча в турнире {match.tournament.name}",
+                        message=f"{player} предложил результат матча в турнире {match.tournament.name}. У вас 3 часа на подтверждение.",
                         url=reverse("my_matches"),
                     )
                 try:

@@ -659,6 +659,9 @@ button {
     background: var(--color-bg-secondary, #f8fafc);
     border-radius: 8px;
     border: 1px solid var(--color-border, #e2e8f0);
+    overflow: hidden;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .profile-info__telegram-title {
@@ -688,6 +691,8 @@ button {
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
+    overflow: hidden;
+    max-width: 100%;
     background: #0088cc;
     color: #fff;
     border: none;
@@ -706,6 +711,10 @@ button {
 .btn-telegram__icon {
     flex-shrink: 0;
     display: block;
+    width: 20px;
+    height: 20px;
+    max-width: 20px;
+    max-height: 20px;
 }
 
 .btn-telegram--outline {

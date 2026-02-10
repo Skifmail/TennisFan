@@ -1697,6 +1697,18 @@ button {
     margin: 0 0 var(--spacing-xs) 0;
 }
 
+.profile-info__badges {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.profile-info__subscription-badge {
+    display: inline-flex;
+    align-items: center;
+}
+
 .profile-info__details {
     font-size: var(--font-size-sm);
 }
@@ -1845,6 +1857,11 @@ button {
     .profile-info__header {
         flex-direction: column;
         text-align: center;
+    }
+
+    .profile-info__badges {
+        justify-content: center;
+        gap: var(--spacing-xs);
     }
 
     .profile-info {

@@ -93,6 +93,18 @@
                 {{ form.comment }}
                 {% if form.comment.errors %}<p class="text-error mt-1">{{ form.comment.errors.0 }}</p>{% endif %}
             </div>
+            <div class="mb-3 form-group-consent">
+                <label class="consent-label">
+                    {{ form.agree_legal }}
+                    <span class="consent-text">
+                        Я согласен на
+                        <a href="{% url 'legal_personal_data' %}" target="_blank" rel="noopener">обработку персональных данных</a>
+                        и
+                        <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политику конфиденциальности</a>
+                    </span>
+                </label>
+                {% if form.agree_legal.errors %}<p class="text-error mt-1">{{ form.agree_legal.errors.0 }}</p>{% endif %}
+            </div>
             <button type="submit" class="btn btn-primary w-100">Отправить заявку</button>
         </form>
         <button type="button" class="btn btn-ghost sparring-modal__close mt-3 w-100" id="shop-modal-close">Закрыть</button>

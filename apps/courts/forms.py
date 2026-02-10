@@ -3,6 +3,7 @@ Courts forms.
 """
 
 from django import forms
+from django.core.exceptions import ValidationError
 
 from .models import CourtApplication, CourtRating
 
@@ -20,6 +21,11 @@ class CourtRatingForm(forms.ModelForm):
 
 class CourtApplicationForm(forms.ModelForm):
     """Форма заявки на добавление корта. Поля совпадают с админкой ручного добавления."""
+    agree_legal = forms.BooleanField(
+        required=True,
+        label="Согласие на обработку персональных данных",
+        error_messages={"required": "Необходимо согласиться с обработкой персональных данных."},
+    )
 
     class Meta:
         model = CourtApplication
@@ -116,3 +122,9 @@ class CourtApplicationForm(forms.ModelForm):
         self.fields["latitude"].required = False
         self.fields["longitude"].required = False
         self.fields["price_per_hour"].required = False
+
+    def clean_agree_legal(self) -> bool:
+        """Проверка обязательного согласия на обработку персональных данных."""
+        if not self.cleaned_data.get("agree_legal"):
+            raise ValidationError("Необходимо согласиться с обработкой персональных данных.")
+        return True

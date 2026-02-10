@@ -1,4 +1,10 @@
-<p class="offer-consent">
-    Нажимая кнопку оплаты, Вы подтверждаете, что ознакомлены, полностью согласны и принимаете условия
-    <a href="{% url 'legal_offer' %}" target="_blank" rel="noopener">«Публичной оферты»</a>.
-</p>
+<div class="offer-consent">
+    <label class="offer-consent__label">
+        <input type="checkbox" name="offer_accepted" required class="offer-consent__checkbox">
+        <span class="offer-consent__text">
+            Я ознакомлен(а), полностью согласен(на) и принимаю условия
+            <a href="{% url 'legal_offer' %}" target="_blank" rel="noopener">«Публичной оферты»</a>,
+            включая условия автоматического продления подписки и безакцептного списания денежных средств.
+        </span>
+    </label>
+</div>

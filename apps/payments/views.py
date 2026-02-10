@@ -11,6 +11,39 @@ from apps.tournaments.models import Tournament
 from .forms import DonateForm
 
 
+def _is_offer_accepted(request) -> bool:
+    """Проверяет, подтверждена ли оферта в POST-форме оплаты."""
+    raw = str(request.POST.get("offer_accepted", "")).strip().lower()
+    return raw in {"1", "true", "on", "yes"}
+
+
+def _build_preview_redirect(request, payment_type: str | None):
+    """Возвращает redirect на страницу предпросмотра с восстановлением параметров платежа."""
+    params: dict[str, str] = {}
+    if payment_type:
+        params["type"] = payment_type
+
+    # subscription / tournament
+    item_id = request.POST.get("id") or request.GET.get("id")
+    if item_id:
+        params["id"] = str(item_id)
+
+    # donation
+    amount = request.POST.get("amount")
+    if amount:
+        params["amount"] = str(amount)
+    comment = request.POST.get("comment")
+    if comment:
+        params["comment"] = str(comment)
+    name_or_email = request.POST.get("name_or_email")
+    if name_or_email:
+        params["name_or_email"] = str(name_or_email)
+
+    base_url = reverse("payment_preview")
+    query_string = urlencode(params)
+    return redirect(f"{base_url}?{query_string}" if query_string else base_url)
+
+
 def donate_view(request):
     """Страница доната — доступна всем пользователям."""
     if request.method == 'POST':
@@ -61,6 +94,7 @@ def payment_preview(request):
             'title': f"Подписка: {tier.get_name_display()}",
             'description': "Ежемесячная подписка на сервис TennisFan",
             'amount': tier.price,
+            'item_id': tier.id,
             'details': [
                 ('Тариф', tier.get_name_display()),
                 ('Срок действия', '1 месяц'),
@@ -85,6 +119,7 @@ def payment_preview(request):
             'title': f"Турнир: {tournament.name}",
             'description': f"Взнос за участие в турнире {tournament.get_city_display() if hasattr(tournament, 'get_city_display') else tournament.city}",
             'amount': entry_fee,
+            'item_id': tournament.id,
             'details': [
                 ('Турнир', tournament.name),
                 ('Дата', tournament.start_date),
@@ -134,6 +169,14 @@ def payment_process(request):
         login_url = getattr(settings, 'LOGIN_URL', 'login')
         next_url = request.get_full_path()
         return redirect(f"{reverse(login_url)}?next={next_url}")
+
+    # Server-side проверка акцепта оферты (нельзя полагаться только на required в HTML)
+    if request.method == "POST" and not _is_offer_accepted(request):
+        messages.error(
+            request,
+            "Для продолжения оплаты необходимо подтвердить согласие с условиями Публичной оферты.",
+        )
+        return _build_preview_redirect(request, payment_type)
     
     # Пока платежный шлюз не подключен
     raise Http404("Payment gateway not connected")

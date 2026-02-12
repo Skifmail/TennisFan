@@ -109,13 +109,13 @@
                         </div>
                         <div class="register-step-actions">
                             <button type="button" class="btn btn-primary btn-lg" id="register-btn-next">Далее →
-                                NTRP-тест</button>
+                                Тест уровня силы</button>
                         </div>
                     </div>
 
-                    <!-- Этап 2: NTRP-калькулятор -->
+                    <!-- Этап 2: Калькулятор уровня силы -->
                     <div class="register-step register-step-2 hidden" id="register-step-2">
-                        <h3 class="register-step-title">Шаг 2. NTRP-тест</h3>
+                        <h3 class="register-step-title">Шаг 2. Тест уровня силы</h3>
                         <p class="text-secondary register-form-ntrp-note">Пройдите тест и нажмите «Рассчитать», затем
                             нажмите «Зарегистрироваться».</p>
                         {{ register_form.ntrp_level }}
@@ -364,7 +364,7 @@
                 if (!step2 || !step2.classList.contains('hidden')) {
                     hideError(ntrpError);
                     var nv = ntrpField ? (ntrpField.value || '').trim() : '';
-                    if (!nv || nv < 1 || nv > 7) { showError(ntrpError, 'Пройдите NTRP-тест и нажмите «Рассчитать».'); e.preventDefault(); }
+                    if (!nv || nv < 1 || nv > 7) { showError(ntrpError, 'Пройдите тест уровня силы и нажмите «Рассчитать».'); e.preventDefault(); }
                 }
             });
         }

@@ -512,7 +512,6 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
             for player in (team.player1, team.player2):
                 if not player or getattr(player, "is_bye", False):
                     continue
-                # Если игрок получил тех. поражение — очки за место не начисляем
                 skip_points = player.pk in walkover_loss_player_ids
                 award = 0 if skip_points else points
                 TournamentPlayerResult.objects.update_or_create(
@@ -520,20 +519,14 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
                     player=player,
                     defaults={"place": place, "fan_points": award, "is_consolation": False},
                 )
-                if not skip_points:
-                    player.total_points += points
-                    player.save(update_fields=["total_points"])
-                else:
-                    logger.info(
-                        "Round-robin %s: skipping place-based points for %s (walkover_loss penalty already applied)",
-                        tournament.name,
-                        player,
-                    )
+                # Обновляем сезонные очки
+                if award > 0:
+                    from .fan import _update_season_points
+                    _update_season_points(player, award)
         elif row.get("player"):
             player = row["player"]
             if getattr(player, "is_bye", False):
                 continue
-            # Если игрок получил тех. поражение — очки за место не начисляем
             skip_points = player.pk in walkover_loss_player_ids
             award = 0 if skip_points else points
             TournamentPlayerResult.objects.update_or_create(
@@ -541,15 +534,10 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
                 player=player,
                 defaults={"place": place, "fan_points": award, "is_consolation": False},
             )
-            if not skip_points:
-                player.total_points += points
-                player.save(update_fields=["total_points"])
-            else:
-                logger.info(
-                    "Round-robin %s: skipping place-based points for %s (walkover_loss penalty already applied)",
-                    tournament.name,
-                    player,
-                )
+            # Обновляем сезонные очки
+            if award > 0:
+                from .fan import _update_season_points
+                _update_season_points(player, award)
 
     tournament.status = "completed"
     tournament.save(update_fields=["status"])

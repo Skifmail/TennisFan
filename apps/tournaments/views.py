@@ -793,9 +793,10 @@ def _check_tournament_registration_eligibility(request, tournament, player):
     except Exception:
         sub = None
 
-    if user.is_superuser or user.is_staff:
-        return True, None
+    is_admin = user.is_superuser or user.is_staff
 
+    # Проверка категорий применяется ко ВСЕМ, включая администраторов
+    # (чтобы не нарушать баланс турнира)
     allowed_categories = list(
         tournament.allowed_categories.values_list("category", flat=True)
     )
@@ -809,8 +810,12 @@ def _check_tournament_registration_eligibility(request, tournament, player):
             False,
             f"Регистрация на этот турнир разрешена только для категорий: {', '.join(allowed_labels)}. "
             f"Ваша категория «{player_label}» не входит в список. "
-            "Если ваш уровень изменился, пройдите NTRP-тест или обратитесь в поддержку.",
+            "Если ваш уровень изменился, пройдите тест уровня силы или обратитесь в поддержку.",
         )
+
+    # Администраторы обходят проверку подписки и лимитов
+    if is_admin:
+        return True, None
 
     if tournament.is_one_day:
         return True, None  # Payment flow handles it
@@ -888,27 +893,19 @@ def tournament_register(request, slug):
     except:
         sub = None
 
-    # Admin bypass
-    is_admin = request.user.is_superuser or request.user.is_staff
-
+    # Проверка всех условий регистрации (включая категории)
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
-    if not ok and not is_admin:
+    if not ok:
         messages.error(request, err)
         if 'подписк' in (err or ''):
             return redirect('pricing')
         return redirect('tournament_detail', slug=tournament.slug)
 
-    if is_admin:
-        messages.success(request, 'Регистрация администратора (бесплатно/безлимитно).')
-        tournament.participants.add(player)
-        try:
-            from apps.telegram_bot import notifications as tg
-            tg.notify_tournament_registered(request.user, tournament)
-        except Exception:
-            pass
-        return redirect('tournament_detail', slug=tournament.slug)
-
-    elif tournament.is_one_day:
+    # Администраторы обходят только проверку подписки (внутри функции),
+    # но проходят проверку категорий как обычные игроки
+    is_admin = request.user.is_superuser or request.user.is_staff
+    
+    if tournament.is_one_day:
         # One-day tournament: Redirect to payment preview
         from django.urls import reverse
         from urllib.parse import urlencode
@@ -917,26 +914,28 @@ def tournament_register(request, slug):
         base_url = reverse('payment_preview')
         query_string = urlencode(params)
         return redirect(f'{base_url}?{query_string}')
-        
     else:
-        # Multi-day tournament: subscription already checked above
-        try:
-            sub = request.user.subscription
-            if sub and sub.is_valid():
-                sub.increment_usage()
-                messages.success(request, f'Вы зарегистрированы! Осталось регистраций в этом месяце: {sub.get_remaining_slots()}')
-            else:
+        # Multi-day tournament: subscription already checked in eligibility function
+        if is_admin:
+            messages.success(request, 'Регистрация администратора (бесплатно/безлимитно).')
+        else:
+            try:
+                sub = request.user.subscription
+                if sub and sub.is_valid():
+                    sub.increment_usage()
+                    messages.success(request, f'Вы зарегистрированы! Осталось регистраций в этом месяце: {sub.get_remaining_slots()}')
+                else:
+                    messages.success(request, 'Вы зарегистрированы!')
+            except Exception:
                 messages.success(request, 'Вы зарегистрированы!')
-        except Exception:
-            messages.success(request, 'Вы зарегистрированы!')
+        
         tournament.participants.add(player)
         try:
             from apps.telegram_bot import notifications as tg
             tg.notify_tournament_registered(request.user, tournament)
         except Exception:
             pass
-
-    return redirect('tournament_detail', slug=tournament.slug)
+        return redirect('tournament_detail', slug=tournament.slug)
 
 
 @login_required
@@ -971,8 +970,9 @@ def tournament_register_doubles(request, slug):
         messages.info(request, "Вы уже зарегистрированы на этот турнир.")
         return redirect("tournament_detail", slug=slug)
 
+    # Проверка всех условий регистрации (включая категории)
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
-    if not ok and not (request.user.is_superuser or request.user.is_staff):
+    if not ok:
         messages.error(request, err)
         if err and "подписк" in err:
             return redirect("pricing")
@@ -1075,8 +1075,9 @@ def tournament_register_doubles(request, slug):
 
 def _do_join_team(request, tournament, player, team):
     """Присоединить игрока к существующей команде (solo)."""
+    # Проверка всех условий регистрации (включая категории)
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
-    if not ok and not (request.user.is_superuser or request.user.is_staff):
+    if not ok:
         messages.error(request, err)
         return redirect("tournament_detail", slug=tournament.slug)
     
@@ -1138,8 +1139,9 @@ def _do_add_partner(request, tournament, player, partner_id):
             messages.error(request, f"Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола ({gender_text}).")
             return redirect("tournament_register_doubles", slug=tournament.slug)
 
+    # Проверка всех условий регистрации для текущего игрока (включая категории)
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
-    if not ok and not (request.user.is_superuser or request.user.is_staff):
+    if not ok:
         messages.error(request, err)
         return redirect("tournament_detail", slug=tournament.slug)
 

@@ -478,6 +478,29 @@ class Match(models.Model):
     points_player1 = models.IntegerField("Очки П1", default=0)
     points_player2 = models.IntegerField("Очки П2", default=0)
 
+    # Elo rating tracking
+    class RatingCalcStatus(models.TextChoices):
+        NOT_APPLICABLE = "na", "Не применимо"
+        PENDING = "pending_calc", "Ожидает расчёта"
+        CALCULATED = "calculated", "Рассчитано"
+
+    rating_status = models.CharField(
+        "Статус рейтинга",
+        max_length=20,
+        choices=RatingCalcStatus.choices,
+        default=RatingCalcStatus.NOT_APPLICABLE,
+        db_index=True,
+        help_text="pending_calc — матч ждёт ежемесячного пересчёта; calculated — рейтинг обновлён.",
+    )
+    rating_delta_player1 = models.FloatField(
+        "Изменение рейтинга П1", default=0.0,
+        help_text="Дельта рейтинга для игрока 1 / команды 1 после расчёта.",
+    )
+    rating_delta_player2 = models.FloatField(
+        "Изменение рейтинга П2", default=0.0,
+        help_text="Дельта рейтинга для игрока 2 / команды 2 после расчёта.",
+    )
+
     created_at = models.DateTimeField("Создан", auto_now_add=True)
 
     class Meta:
@@ -714,3 +737,97 @@ class TournamentPlayerResult(models.Model):
 
     def __str__(self) -> str:
         return f"{self.player} — {self.get_round_eliminated_display()} ({self.fan_points} очков)"
+
+
+class SeasonPoints(models.Model):
+    """Сезонные FAN очки игрока за текущий сезон.
+    
+    Очки накапливаются в течение сезона (Зима: Октябрь-Апрель, Лето: Май-Сентябрь)
+    и сбрасываются в ноль в конце сезона с архивацией результатов.
+    """
+    
+    player = models.OneToOneField(
+        Player,
+        on_delete=models.CASCADE,
+        related_name="season_points",
+        verbose_name="Игрок",
+    )
+    current_season_points = models.PositiveIntegerField(
+        "Очки текущего сезона",
+        default=0,
+        help_text="FAN очки, накопленные в текущем сезоне. Сбрасываются в конце сезона.",
+    )
+    season_name = models.CharField(
+        "Название сезона",
+        max_length=20,
+        default="",
+        help_text="Текущий сезон: 'Зима' или 'Лето'",
+    )
+    season_year = models.IntegerField(
+        "Год сезона",
+        default=0,
+        help_text="Год текущего сезона",
+    )
+    updated_at = models.DateTimeField(
+        "Обновлено",
+        auto_now=True,
+        help_text="Время последнего обновления сезонных очков",
+    )
+
+    class Meta:
+        verbose_name = "Сезонные очки"
+        verbose_name_plural = "Сезонные очки"
+        ordering = ["-current_season_points"]
+
+    def __str__(self) -> str:
+        return f"{self.player}: {self.current_season_points} очков ({self.season_name} {self.season_year})"
+
+
+class SeasonArchive(models.Model):
+    """Архив результатов сезонов для Зала Славы.
+    
+    Сохраняет итоговые результаты игроков по завершении сезона.
+    """
+    
+    player = models.ForeignKey(
+        Player,
+        on_delete=models.CASCADE,
+        related_name="season_archives",
+        verbose_name="Игрок",
+    )
+    season_name = models.CharField(
+        "Название сезона",
+        max_length=20,
+        help_text="'Зима' или 'Лето'",
+    )
+    season_year = models.IntegerField(
+        "Год сезона",
+        help_text="Год сезона (для зимы - год начала, для лета - текущий год)",
+    )
+    final_points = models.PositiveIntegerField(
+        "Итоговые очки",
+        help_text="Количество FAN очков, накопленных за сезон",
+    )
+    final_rank = models.PositiveIntegerField(
+        "Итоговое место",
+        help_text="Место игрока в рейтинге сезона",
+        null=True,
+        blank=True,
+    )
+    archived_at = models.DateTimeField(
+        "Дата архивации",
+        auto_now_add=True,
+        help_text="Когда сезон был завершён и результаты заархивированы",
+    )
+
+    class Meta:
+        verbose_name = "Архив сезона"
+        verbose_name_plural = "Архивы сезонов"
+        unique_together = ("player", "season_name", "season_year")
+        ordering = ["-season_year", "-season_name", "-final_points"]
+        indexes = [
+            models.Index(fields=["season_name", "season_year", "-final_points"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.player}: {self.final_points} очков, место {self.final_rank or '?'} ({self.season_name} {self.season_year})"

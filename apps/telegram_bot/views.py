@@ -290,16 +290,23 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
 
         # 4. Отправляем сообщение-подтверждение нажавшему (OPPONENT)
         try:
+            from apps.telegram_bot.notifications import _get_penalty_text_for_player
+            
             match = proposal.match
             score = match.score_display() if match.winner else "—"
             winner_name = str(match.winner) if match.winner else "—"
+            
+            # Получаем текст о штрафе для подтвердившего (opponent)
+            opponent_player = player  # Тот, кто подтвердил
+            penalty_text = _get_penalty_text_for_player(match, opponent_player)
+            
             bot.send_message(
                 chat_id,
                 f"✅ <b>Результат подтверждён.</b>\n\n"
                 f"Турнир: {match.tournament.name}\n"
                 f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
                 f"Счёт: {score}\n"
-                f"Победитель: {winner_name}",
+                f"Победитель: {winner_name}{penalty_text}",
             )
         except Exception as e:
             logger.exception("send confirm message to opponent failed: %s", e)

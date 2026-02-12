@@ -14,7 +14,7 @@
         <form method="get" class="filter-bar sparring-filters">
             <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
             <select name="category" class="form-control" onchange="this.form.submit()">
-                <option value="">Все уровни (NTRP)</option>
+                <option value="">Все уровни силы</option>
                 <option value="novice" {% if current_category == 'novice' %}selected{% endif %}>Новичок</option>
                 <option value="amateur" {% if current_category == 'amateur' %}selected{% endif %}>Любитель</option>
                 <option value="experienced" {% if current_category == 'experienced' %}selected{% endif %}>Опытный</option>

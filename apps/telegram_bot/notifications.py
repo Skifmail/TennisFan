@@ -213,12 +213,16 @@ def _proposal_opponent_name(proposal) -> str:
     proposer = proposal.proposer
     is_doubles = match.team1_id and match.team2_id
     if is_doubles:
-        proposer_team = (
-            match.team1
-            if proposer in (match.team1.player1, match.team1.player2)
-            else match.team2
-        )
-        opponent_team = match.team2 if proposer_team == match.team1 else match.team1
+        if not match.team1 or not match.team2:
+            return "Соперник"
+        if proposer in (match.team1.player1, match.team1.player2):
+            proposer_team = match.team1
+            opponent_team = match.team2
+        elif proposer in (match.team2.player1, match.team2.player2):
+            proposer_team = match.team2
+            opponent_team = match.team1
+        else:
+            return "Соперник"
         names = []
         for p in (opponent_team.player1, opponent_team.player2):
             if p and not getattr(p, "is_bye", False):
@@ -245,6 +249,58 @@ def _proposal_result_text(proposal) -> str:
         return result_val or "—"
 
 
+def _get_penalty_text_for_player(match, player) -> str:
+    """
+    Получить текст о штрафе для конкретного игрока.
+    
+    Args:
+        match: Объект Match (уже должен иметь установленные winner и winner_team)
+        player: Player объект, для которого нужно определить штраф
+    
+    Returns:
+        Строка с информацией о штрафе или пустая строка, если штраф не применяется
+    """
+    if not match.is_walkover_loss():
+        return ""
+    
+    is_doubles = match.team1_id and match.team2_id
+    
+    if is_doubles:
+        # Проверяем наличие команд
+        if not match.team1 or not match.team2:
+            return ""
+        
+        # Определяем команду игрока
+        if player in (match.team1.player1, match.team1.player2):
+            player_team = match.team1
+        elif player in (match.team2.player1, match.team2.player2):
+            player_team = match.team2
+        else:
+            # Игрок не найден в командах (не должен происходить в нормальной ситуации)
+            return ""
+        
+        winner_team = match.winner_team
+        if not winner_team:
+            return ""
+        loser_team = match.team2 if winner_team == match.team1 else match.team1
+        
+        # Если команда игрока проиграла - он получил штраф
+        if player_team == loser_team:
+            return "\n\n⚠️ <b>Штраф:</b> Из вашего рейтинга силы вычтено <b>40 очков</b> за тех. поражение."
+        else:
+            return "\n\nℹ️ Из рейтинга силы соперника вычтено <b>40 очков</b> за тех. поражение."
+    else:
+        # Одиночный матч
+        if not match.winner:
+            return ""
+        if player == match.winner:
+            # Игрок выиграл - соперник получил штраф
+            return "\n\nℹ️ Из рейтинга силы соперника вычтено <b>40 очков</b> за тех. поражение."
+        else:
+            # Игрок проиграл - он получил штраф
+            return "\n\n⚠️ <b>Штраф:</b> Из вашего рейтинга силы вычтено <b>40 очков</b> за тех. поражение."
+
+
 def notify_proposal_confirmed(proposal) -> None:
     """Уведомление инициатору о подтверждении результата."""
     if not bot.is_configured():
@@ -259,6 +315,10 @@ def notify_proposal_confirmed(proposal) -> None:
     result = _proposal_result_text(proposal)
     score = match.score_display() if match.winner else _proposal_score_text(proposal)
     winner_name = str(match.winner) if match.winner else "—"
+    
+    # Получаем текст о штрафе для инициатора (proposer)
+    proposer_player = proposal.proposer
+    penalty_text = _get_penalty_text_for_player(match, proposer_player)
 
     text = (
         "✅ <b>Результат подтверждён</b>\n\n"
@@ -266,7 +326,7 @@ def notify_proposal_confirmed(proposal) -> None:
         f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
         f"Результат: {result}\n"
         f"Счёт: {score}\n"
-        f"Победитель: {winner_name}\n\n"
+        f"Победитель: {winner_name}{penalty_text}\n\n"
         f"<b>{opponent}</b> подтвердил(а) результат."
     )
     ok = send_to_user_by_user(proposer_user, text)

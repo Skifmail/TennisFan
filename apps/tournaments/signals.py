@@ -36,7 +36,7 @@ def prepare_match_completion(sender, instance, **kwargs):
     """
     Handle pre-save logic:
     1. Store old status to detect transitions.
-    2. Auto-calculate points if match is completing (только для не-FAN).
+    2. Mark completed matches as pending_calc for Elo rating.
     """
     if instance.pk:
         try:
@@ -47,50 +47,19 @@ def prepare_match_completion(sender, instance, **kwargs):
     else:
         instance._old_status = None
 
-    if instance.status not in [Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]:
-        return
-    if instance.points_player1 != 0 or instance.points_player2 != 0:
-        return
-    t = getattr(instance, "tournament", None)
-    # FAN и Олимпийская система используют только очки за раунды/места, не за отдельные матчи
-    if t and (_is_fan(t) or _is_olympic(t)):
-        return
-    # Для кругового и других форматов используем настраиваемые очки из модели
-    # Но при просрочке (WALKOVER и deadline истёк) не начисляем очки
-    is_overdue = (
-        instance.status == Match.MatchStatus.WALKOVER
-        and instance.deadline
-        and instance.deadline <= timezone.now()
-    )
-    if is_overdue:
-        # При просрочке не начисляем очки - устанавливаем 0
-        instance.points_player1 = 0
-        instance.points_player2 = 0
-        return
-    
-    win_points = getattr(t, "points_winner", 100)
-    lose_points = getattr(t, "points_loser", -50)
-    # Для кругового по умолчанию: 1 очко за победу, 0 за поражение (если не задано иное)
-    if t and _is_round_robin(t):
-        if win_points == 100 and lose_points == -50:
-            # Используем стандартные значения для кругового, если админ не изменил
-            win_points, lose_points = 1, 0
-    if instance.winner_team_id:
-        instance.points_player1 = win_points if instance.winner_team_id == instance.team1_id else lose_points
-        instance.points_player2 = lose_points if instance.winner_team_id == instance.team1_id else win_points
-    elif instance.winner_id == instance.player1_id:
-        instance.points_player1 = win_points
-        instance.points_player2 = lose_points
-    elif instance.winner_id == instance.player2_id:
-        instance.points_player1 = lose_points
-        instance.points_player2 = win_points
+    # If match is transitioning to completed, mark for Elo calculation
+    if instance.status in [Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]:
+        old_status = getattr(instance, "_old_status", None)
+        was_completed = old_status in [Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
+        if not was_completed and instance.rating_status == Match.RatingCalcStatus.NOT_APPLICABLE:
+            instance.rating_status = Match.RatingCalcStatus.PENDING
 
 
 @receiver(post_save, sender=Match)
 def update_player_stats(sender, instance, created, **kwargs):
     """
     Update matches_played / matches_won when match is completed.
-    total_points для FAN не трогаем — начисление при вылете/завершении турнира.
+    Apply shadow Elo rating calculation to hidden_rating.
     """
     old_status = getattr(instance, "_old_status", None)
     is_completed = instance.status in [Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
@@ -106,106 +75,205 @@ def update_player_stats(sender, instance, created, **kwargs):
     if not winner and not winner_team:
         return
 
-    # При тех. поражении (walkover_loss) не начислять очки за место —
-    # штраф -40 уже применён в proposal_service.py
     _walkover_loss = instance.is_walkover_loss()
 
+    # ------------------------------------------------------------------
+    # 1) Update matches_played / matches_won for all formats
+    # ------------------------------------------------------------------
+    def _update_stats_singles(match):
+        w = match.winner
+        los = match.player2 if w == match.player1 else match.player1
+        if w and not getattr(w, "is_bye", False):
+            w.matches_played += 1
+            w.matches_won += 1
+            w.save(update_fields=["matches_played", "matches_won"])
+        if los and not getattr(los, "is_bye", False):
+            los.matches_played += 1
+            los.save(update_fields=["matches_played"])
+
+    def _update_stats_doubles(match):
+        wt = match.winner_team
+        lt = match.team2 if wt == match.team1 else match.team1
+        for p in (wt.player1, wt.player2):
+            if p and not getattr(p, "is_bye", False):
+                p.matches_played += 1
+                p.matches_won += 1
+                p.save(update_fields=["matches_played", "matches_won"])
+        for p in (lt.player1, lt.player2):
+            if p and not getattr(p, "is_bye", False):
+                p.matches_played += 1
+                p.save(update_fields=["matches_played"])
+
+    if is_doubles:
+        _update_stats_doubles(instance)
+    else:
+        _update_stats_singles(instance)
+
+    # ------------------------------------------------------------------
+    # 2) Shadow Elo calculation (updates hidden_rating immediately)
+    # ------------------------------------------------------------------
+    _apply_elo_shadow(instance)
+
+    # ------------------------------------------------------------------
+    # 3) Format-specific bracket advancement (FAN / Olympic / Round Robin)
+    # ------------------------------------------------------------------
     if t and _is_olympic(t):
-        if is_doubles:
-            for p in (instance.team1.player1, instance.team1.player2) if winner_team == instance.team1 else (instance.team2.player1, instance.team2.player2):
-                if p and not getattr(p, "is_bye", False):
-                    p.matches_played += 1
-                    p.matches_won += 1
-                    p.save(update_fields=["matches_played", "matches_won"])
-            loser_team = instance.team2 if winner_team == instance.team1 else instance.team1
-            for p in (loser_team.player1, loser_team.player2):
-                if p and not getattr(p, "is_bye", False):
-                    p.matches_played += 1
-                    p.save(update_fields=["matches_played"])
-        else:
-            winner.matches_played += 1
-            winner.matches_won += 1
-            winner.save(update_fields=["matches_played", "matches_won"])
-            loser = instance.player2 if winner == instance.player1 else instance.player1
-            if not getattr(loser, "is_bye", False):
-                loser.matches_played += 1
-                loser.save(update_fields=["matches_played"])
         advance_winner_olympic(instance, skip_points=_walkover_loss)
         if instance.round_index >= 1 and not instance.is_consolation:
             ensure_consolation_created_for_round(t, instance.round_index)
-        return
-
-    if t and _is_fan(t):
-        if is_doubles:
-            for p in (instance.team1.player1, instance.team1.player2) if winner_team == instance.team1 else (instance.team2.player1, instance.team2.player2):
-                if p and not getattr(p, "is_bye", False):
-                    p.matches_played += 1
-                    p.matches_won += 1
-                    p.save(update_fields=["matches_played", "matches_won"])
-            loser_team = instance.team2 if winner_team == instance.team1 else instance.team1
-            for p in (loser_team.player1, loser_team.player2):
-                if p and not getattr(p, "is_bye", False):
-                    p.matches_played += 1
-                    p.save(update_fields=["matches_played"])
-        else:
-            winner.matches_played += 1
-            winner.matches_won += 1
-            winner.save(update_fields=["matches_played", "matches_won"])
-            loser = instance.player2 if winner == instance.player1 else instance.player1
-            if not getattr(loser, "is_bye", False):
-                loser.matches_played += 1
-                loser.save(update_fields=["matches_played"])
+    elif t and _is_fan(t):
         advance_winner_and_award_loser(instance, skip_points=_walkover_loss)
         if instance.round_index == 1 and not instance.is_consolation:
             ensure_consolation_created(t)
         finalize_tournament(t)
-        return
-
-    if t and _is_round_robin(t):
-        # Круговой: очки 1/0 только для определения мест в турнире; в общий рейтинг не добавляем до завершения
-        if is_doubles:
-            for p in (instance.team1.player1, instance.team1.player2) if winner_team == instance.team1 else (instance.team2.player1, instance.team2.player2):
-                if p and not getattr(p, "is_bye", False):
-                    p.matches_played += 1
-                    p.matches_won += 1
-                    p.save(update_fields=["matches_played", "matches_won"])
-            loser_team = instance.team2 if winner_team == instance.team1 else instance.team1
-            for p in (loser_team.player1, loser_team.player2):
-                if p and not getattr(p, "is_bye", False):
-                    p.matches_played += 1
-                    p.save(update_fields=["matches_played"])
-        else:
-            winner.matches_played += 1
-            winner.matches_won += 1
-            winner.save(update_fields=["matches_played", "matches_won"])
-            loser = instance.player2 if winner == instance.player1 else instance.player1
-            if not getattr(loser, "is_bye", False):
-                loser.matches_played += 1
-                loser.save(update_fields=["matches_played"])
+    elif t and _is_round_robin(t):
         check_and_finalize_if_complete(t)
+
+
+def _apply_elo_shadow(match: Match) -> None:
+    """Apply shadow Elo rating calculation to both players' hidden_rating.
+
+    For doubles: delta is applied to both members of each team.
+    Bye players are skipped.
+    """
+    from .rating import (
+        MatchScore,
+        PlayerRatingSnapshot,
+        calculate_new_ratings,
+    )
+
+    p1 = match.player1
+    p2 = match.player2
+    if not p1 or not p2:
+        return
+    if getattr(p1, "is_bye", False) or getattr(p2, "is_bye", False):
         return
 
-    player1 = instance.player1
-    player2 = instance.player2
-    if winner == player1:
-        loser = player2
-        winner_points = instance.points_player1
-        loser_points = instance.points_player2
-    else:
-        loser = player1
-        winner_points = instance.points_player2
-        loser_points = instance.points_player1
+    # K-factor определяется по количеству матчей ДО этого матча
+    # (matches_played уже обновлён выше, поэтому вычитаем 1)
+    matches_before_a = max(0, p1.matches_played - 1)
+    matches_before_b = max(0, p2.matches_played - 1)
 
-    winner.matches_played += 1
-    winner.matches_won += 1
-    # При тех. поражении очки уже обработаны в proposal_service.py (штраф -40)
-    if not _walkover_loss:
-        winner.total_points += winner_points
-    winner.save()
-    loser.matches_played += 1
-    if not _walkover_loss:
-        loser.total_points += loser_points
-    loser.save()
+    # Для первого матча используем total_points как начальный рейтинг,
+    # если hidden_rating не был правильно инициализирован
+    rating_a = p1.hidden_rating
+    rating_b = p2.hidden_rating
+    
+    if matches_before_a == 0:
+        # Первый матч: если hidden_rating сильно отличается от total_points,
+        # используем total_points как начальный рейтинг
+        if abs(rating_a - float(p1.total_points)) > 100:
+            rating_a = float(p1.total_points)
+            logger.warning(
+                "Player %s: hidden_rating (%.1f) не соответствует total_points (%d) для первого матча. "
+                "Используем total_points как начальный рейтинг.",
+                p1.pk, p1.hidden_rating, p1.total_points
+            )
+    
+    if matches_before_b == 0:
+        # Первый матч: если hidden_rating сильно отличается от total_points,
+        # используем total_points как начальный рейтинг
+        if abs(rating_b - float(p2.total_points)) > 100:
+            rating_b = float(p2.total_points)
+            logger.warning(
+                "Player %s: hidden_rating (%.1f) не соответствует total_points (%d) для первого матча. "
+                "Используем total_points как начальный рейтинг.",
+                p2.pk, p2.hidden_rating, p2.total_points
+            )
+
+    snap_a = PlayerRatingSnapshot(rating=rating_a, total_matches=matches_before_a)
+    snap_b = PlayerRatingSnapshot(rating=rating_b, total_matches=matches_before_b)
+
+    score_a = MatchScore(
+        set1=match.player1_set1 or 0,
+        set2=match.player1_set2 or 0,
+        set3=match.player1_set3 or 0,
+    )
+    score_b = MatchScore(
+        set1=match.player2_set1 or 0,
+        set2=match.player2_set2 or 0,
+        set3=match.player2_set3 or 0,
+    )
+
+    a_won = (
+        match.winner_team_id == match.team1_id
+        if match.team1_id and match.team2_id and match.winner_team_id
+        else match.winner_id == p1.pk
+    )
+
+    result = calculate_new_ratings(snap_a, snap_b, score_a, score_b, a_won)
+
+    is_doubles = match.team1_id and match.team2_id
+    
+    # Проверяем, является ли это техническим поражением (Retired)
+    is_walkover_loss = match.is_walkover_loss()
+    
+    # Определяем проигравшего для применения штрафа
+    if is_doubles:
+        # Для парных: определяем проигравшую команду
+        winner_team = match.winner_team
+        if winner_team:
+            loser_team = match.team2 if winner_team == match.team1 else match.team1
+        else:
+            # Если winner_team не установлен, определяем по a_won
+            loser_team = match.team2 if a_won else match.team1
+        loser = None  # Не используется для парных
+    else:
+        # Для одиночных: определяем проигравшего игрока
+        loser = p2 if a_won else p1
+        loser_team = None
+
+    # Update hidden_rating and total_points for player1 side
+    # total_points обновляется сразу после каждого матча для видимости прогресса
+    if is_doubles:
+        for p in (match.team1.player1, match.team1.player2):
+            if p and not getattr(p, "is_bye", False):
+                new_rating = result.new_rating_a
+                # Применяем штраф -40 очков для проигравшего при тех. поражении
+                if is_walkover_loss and loser_team and p in (loser_team.player1, loser_team.player2):
+                    new_rating = max(0, new_rating - 40.0)
+                    logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk)
+                p.hidden_rating = new_rating
+                p.total_points = float(new_rating)
+                p.save(update_fields=["hidden_rating", "total_points"])
+    else:
+        new_rating_a = result.new_rating_a
+        # Применяем штраф -40 очков для проигравшего при тех. поражении
+        if is_walkover_loss and loser == p1:
+            new_rating_a = max(0, new_rating_a - 40.0)
+            logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p1.pk)
+        p1.hidden_rating = new_rating_a
+        p1.total_points = float(new_rating_a)
+        p1.save(update_fields=["hidden_rating", "total_points"])
+
+    # Update hidden_rating and total_points for player2 side
+    if is_doubles:
+        for p in (match.team2.player1, match.team2.player2):
+            if p and not getattr(p, "is_bye", False):
+                new_rating = result.new_rating_b
+                # Применяем штраф -40 очков для проигравшего при тех. поражении
+                if is_walkover_loss and loser_team and p in (loser_team.player1, loser_team.player2):
+                    new_rating = max(0, new_rating - 40.0)
+                    logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk)
+                p.hidden_rating = new_rating
+                p.total_points = float(new_rating)
+                p.save(update_fields=["hidden_rating", "total_points"])
+    else:
+        new_rating_b = result.new_rating_b
+        # Применяем штраф -40 очков для проигравшего при тех. поражении
+        if is_walkover_loss and loser == p2:
+            new_rating_b = max(0, new_rating_b - 40.0)
+            logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p2.pk)
+        p2.hidden_rating = new_rating_b
+        p2.total_points = float(new_rating_b)
+        p2.save(update_fields=["hidden_rating", "total_points"])
+
+    # Store deltas and mark as calculated
+    Match.objects.filter(pk=match.pk).update(
+        rating_delta_player1=result.delta_a,
+        rating_delta_player2=result.delta_b,
+        rating_status=Match.RatingCalcStatus.CALCULATED,
+    )
 
 
 @receiver(post_save, sender=MatchResultProposal)

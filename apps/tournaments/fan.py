@@ -13,12 +13,50 @@ from django.utils import timezone
 
 from apps.users.models import Notification, Player
 
-from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam, TournamentStatus
+from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam, TournamentStatus, SeasonPoints
+from .season_utils import get_current_season, get_season_display
 
 logger = logging.getLogger(__name__)
 
 FAN_FORMAT = "single_elimination"
 BYE_EMAIL = "bye@tennisfan.local"
+
+
+def _update_season_points(player: Player, points: int) -> None:
+    """Обновить сезонные очки игрока.
+    
+    Args:
+        player: Игрок, которому начисляются очки.
+        points: Количество FAN очков для добавления.
+    """
+    if not player or getattr(player, "is_bye", False):
+        return
+    
+    if points <= 0:
+        return
+    
+    current_season = get_current_season()
+    season_points, created = SeasonPoints.objects.get_or_create(
+        player=player,
+        defaults={
+            "current_season_points": 0,
+            "season_name": current_season.name,
+            "season_year": current_season.year,
+        }
+    )
+    
+    # Если сезон изменился, сбросить очки (должно происходить через команду, но на всякий случай)
+    if season_points.season_name != current_season.name or season_points.season_year != current_season.year:
+        season_points.current_season_points = 0
+        season_points.season_name = current_season.name
+        season_points.season_year = current_season.year
+    
+    season_points.current_season_points += points
+    season_points.save(update_fields=["current_season_points", "season_name", "season_year", "updated_at"])
+    logger.debug(
+        "Season points updated: %s +%d = %d (%s)",
+        player, points, season_points.current_season_points, get_season_display(current_season)
+    )
 
 
 def _is_fan(t: Tournament) -> bool:
@@ -410,8 +448,8 @@ def advance_winner_and_award_loser(match: Match, skip_points: bool = False) -> O
                 player=loser,
                 defaults={"round_eliminated": round_elim, "fan_points": points, "is_consolation": is_cons},
             )
-            loser.total_points += points
-            loser.save(update_fields=["total_points"])
+            # Обновляем сезонные очки
+            _update_season_points(loser, points)
 
     # Подвал: один круг. Проигравшие подвала уже вылетели в R1 и имеют запись. Обновляем очки? Нет — они уже 10.
     if is_cons:
@@ -662,8 +700,8 @@ def finalize_tournament(tournament: Tournament) -> tuple[bool, str]:
             player=player,
             defaults={"round_eliminated": round_elim, "fan_points": points, "is_consolation": False},
         )
-        player.total_points += points
-        player.save(update_fields=["total_points"])
+        # Обновляем сезонные очки
+        _update_season_points(player, points)
 
     tournament.status = "completed"
     tournament.save(update_fields=["status"])

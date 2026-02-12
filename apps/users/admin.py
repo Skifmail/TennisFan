@@ -76,7 +76,7 @@ class PlayerAdmin(admin.ModelAdmin):
             },
         ),
         ("О себе", {"fields": ("bio",)}),
-        ("Теннис", {"fields": ("ntrp_level",)}),
+        ("Уровень силы", {"fields": ("ntrp_level",)}),
         ("Контакты", {"fields": ("telegram", "whatsapp", "max_contact")}),
         ("Статистика", {"fields": ("total_points", "matches_played", "matches_won")}),
         ("Статус", {"fields": ("is_verified", "is_legend")}),

@@ -21,12 +21,18 @@
                 <button class="rules-tabs__btn" data-tab="tournament-rules" role="tab" aria-selected="false">
                     Правила турниров
                 </button>
+                <button class="rules-tabs__btn" data-tab="rating-rules" role="tab" aria-selected="false">
+                    Рейтинг и очки
+                </button>
                 <button class="rules-tabs__btn" data-tab="site-usage-rules" role="tab" aria-selected="false">
                     Правила пользования сайтом
                 </button>
                 {% else %}
                 <button class="rules-tabs__btn rules-tabs__btn--disabled" data-tab="auth-required" role="tab" aria-selected="false" title="Доступно после регистрации">
                     Правила турниров 🔒
+                </button>
+                <button class="rules-tabs__btn rules-tabs__btn--disabled" data-tab="auth-required" role="tab" aria-selected="false" title="Доступно после регистрации">
+                    Рейтинг и очки 🔒
                 </button>
                 <button class="rules-tabs__btn rules-tabs__btn--disabled" data-tab="auth-required" role="tab" aria-selected="false" title="Доступно после регистрации">
                     Правила пользования сайтом 🔒
@@ -109,6 +115,14 @@
                         </article>
                     </div>
                 </div>
+            </div>
+
+            <div class="rules-tabs__content" id="rating-rules" role="tabpanel" style="display: none;">
+                <article class="rules-doc card">
+                    <div class="card-body rules-doc__body">
+                        {% if rules_content.rating_rules %}{{ rules_content.rating_rules|safe }}{% else %}{% include 'core/rules_rating.html' %}{% endif %}
+                    </div>
+                </article>
             </div>
 
             <div class="rules-tabs__content" id="site-usage-rules" role="tabpanel" style="display: none;">

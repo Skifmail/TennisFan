@@ -33,10 +33,10 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Уровень мастерства (NTRP)</label>
+                    <label class="form-label">Уровень силы</label>
                     <p class="text-secondary" style="margin-bottom: var(--spacing-sm);">
-                        {{ form.instance.get_skill_level_display }} (NTRP {{ form.instance.ntrp_level }}).
-                        Изменить можно только через <a href="{% url 'ntrp_test' %}" target="_blank" rel="noopener">NTRP-тест</a> или в админке.
+                        {{ form.instance.get_skill_level_display }} ({{ form.instance.ntrp_level }}).
+                        Изменить можно только через <a href="{% url 'ntrp_test' %}" target="_blank" rel="noopener">тест уровня силы</a> или в админке.
                     </p>
                 </div>
 

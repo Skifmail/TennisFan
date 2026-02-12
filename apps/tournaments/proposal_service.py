@@ -102,39 +102,8 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     match.status = Match.MatchStatus.WALKOVER if walkover else Match.MatchStatus.COMPLETED
     match.completed_datetime = match.completed_datetime or match.scheduled_datetime or timezone.now()
 
-    # FAN и Олимпийская система используют только очки за раунды/места, не за отдельные матчи
-    if not _is_fan(match.tournament) and not _is_olympic(match.tournament):
-        # При тех.поражении/тех.победе вычитаем 40 очков из рейтинга проигравшего
-        # Здесь устанавливаем points для матча (для отображения)
-        if is_walkover_retired:
-            # При тех.поражении проигравший получает -40 очков
-            if winner_team:
-                match.points_player1 = -40 if winner_team == match.team2 else 0
-                match.points_player2 = -40 if winner_team == match.team1 else 0
-            elif winner == match.player1:
-                match.points_player1 = 0
-                match.points_player2 = -40
-            else:
-                match.points_player1 = -40
-                match.points_player2 = 0
-        else:
-            # Для обычных матчей и тех.побед используем настраиваемые очки из модели
-            win_delta = getattr(match.tournament, "points_winner", 100)
-            lose_delta = getattr(match.tournament, "points_loser", -50)
-            # Для кругового по умолчанию: 1 очко за победу, 0 за поражение (если не задано иное)
-            if _is_round_robin(match.tournament):
-                if win_delta == 100 and lose_delta == -50:
-                    # Используем стандартные значения для кругового, если админ не изменил
-                    win_delta, lose_delta = 1, 0
-            if winner_team:
-                match.points_player1 = win_delta if winner_team == match.team1 else lose_delta
-                match.points_player2 = lose_delta if winner_team == match.team1 else win_delta
-            elif winner == match.player1:
-                match.points_player1 = win_delta
-                match.points_player2 = lose_delta
-            else:
-                match.points_player1 = lose_delta
-                match.points_player2 = win_delta
+    # Mark match for Elo rating calculation
+    match.rating_status = Match.RatingCalcStatus.PENDING
     match.save()
 
     match.result_proposals.exclude(pk=proposal.pk).update(status=Match.ProposalStatus.REJECTED)
@@ -142,16 +111,13 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     proposal.save(update_fields=["status"])
 
     url = reverse("match_detail", args=[match.pk])
-    
-    # При тех.поражении/тех.победе вычитаем 40 очков из рейтинга проигравшего
+
     if is_walkover_retired:
         for p in (loser_team.player1, loser_team.player2) if loser_team else [loser]:
             if p and not getattr(p, "is_bye", False):
-                p.total_points = max(0, p.total_points - 40)  # Не даём уйти в минус
-                p.save(update_fields=["total_points"])
                 Notification.objects.create(
                     user=p.user,
-                    message="Результат матча подтверждён: тех. поражение. Из вашего рейтинга вычтено 40 очков.",
+                    message="Результат матча подтверждён: тех. поражение.",
                     url=url,
                 )
         for p in (winner_team.player1, winner_team.player2) if winner_team else [winner]:

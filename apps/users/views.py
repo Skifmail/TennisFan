@@ -27,16 +27,9 @@ from .models import Notification, Player, SkillLevel, User
 
 
 def _map_ntrp_to_skill_level(level: Decimal) -> str:
-    normalized = int(level.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-    if normalized <= 2:
-        return SkillLevel.NOVICE
-    if normalized <= 4:
-        return SkillLevel.AMATEUR
-    if normalized == 5:
-        return SkillLevel.EXPERIENCED
-    if normalized == 6:
-        return SkillLevel.ADVANCED
-    return SkillLevel.PROFESSIONAL
+    """Map NTRP decimal level to SkillLevel category (delegates to rating_utils)."""
+    from .rating_utils import map_ntrp_to_skill_level
+    return map_ntrp_to_skill_level(level)
 
 
 def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
@@ -164,16 +157,23 @@ def auth(request):
             active_mode = 'register'
             register_form = UserRegistrationForm(request.POST)
             if register_form.is_valid():
+                from .rating_utils import get_starting_points
+
                 user = register_form.save()
-                ntrp = register_form.cleaned_data["ntrp_level"]
-                level_decimal = Decimal(ntrp)
+                level_decimal = register_form.cleaned_data["ntrp_level"]
+                if not isinstance(level_decimal, Decimal):
+                    level_decimal = Decimal(str(level_decimal))
                 skill = _map_ntrp_to_skill_level(level_decimal)
+                starting_pts = get_starting_points(level_decimal)
                 player = Player.objects.create(
                     user=user,
                     birth_date=register_form.cleaned_data["birth_date"],
                     city=register_form.cleaned_data["city"].strip(),
                     ntrp_level=level_decimal,
                     skill_level=skill,
+                    total_points=starting_pts,
+                    hidden_rating=float(starting_pts),
+                    is_verified=True,  # Новые пользователи автоматически верифицированы
                 )
                 from apps.core.telegram_notify import notify_new_registration
                 notify_new_registration(user, player)
@@ -300,6 +300,124 @@ def profile(request, pk):
 
     progress_data = _get_profile_progress_data(player)
 
+    # Собираем данные о сезонных очках по датам
+    def _get_season_points_data(player: Player) -> list[dict[str, Any]]:
+        """Собрать данные о сезонных очках по датам для графика."""
+        from apps.tournaments.models import TournamentPlayerResult
+        from apps.tournaments.season_utils import get_current_season
+        
+        current_season = get_current_season()
+        # Получаем все результаты турниров игрока за текущий сезон
+        fan_results = (
+            TournamentPlayerResult.objects.filter(
+                player=player,
+                tournament__status="completed",
+            )
+            .select_related("tournament")
+            .order_by("tournament__end_date", "tournament__start_date", "tournament__pk")
+        )
+        
+        # Фильтруем только результаты за текущий сезон
+        season_start_month = current_season.start_month
+        season_end_month = current_season.end_month
+        season_year = current_season.year
+        
+        events: list[tuple[date, int]] = []  # (date, points)
+        
+        for r in fan_results:
+            tourn_date = r.tournament.end_date or r.tournament.start_date
+            if not tourn_date:
+                continue
+            
+            # Проверяем, что турнир в текущем сезоне
+            if current_season.name == "Зима":
+                # Зима: октябрь (год начала) - апрель (год начала + 1)
+                if tourn_date.month >= 10 and tourn_date.year == season_year:
+                    events.append((tourn_date, r.fan_points))
+                elif tourn_date.month <= 4 and tourn_date.year == season_year + 1:
+                    events.append((tourn_date, r.fan_points))
+            else:  # Лето
+                # Лето: май - сентябрь (один год)
+                if tourn_date.month >= 5 and tourn_date.month <= 9 and tourn_date.year == season_year:
+                    events.append((tourn_date, r.fan_points))
+        
+        events.sort(key=lambda x: x[0])
+        
+        # Строим кумулятивный ряд
+        start_date = current_season.start_month
+        start_year = season_year if current_season.name == "Лето" or start_date == 10 else season_year + 1
+        if start_date == 10:  # Зима начинается в октябре
+            season_start = date(start_year, 10, 1)
+        else:  # Лето начинается в мае
+            season_start = date(start_year, 5, 1)
+        
+        result = [{"date": season_start.isoformat(), "season_points": 0}]
+        cum_points = 0
+        
+        for event_date, points in events:
+            cum_points += points
+            result.append({
+                "date": event_date.isoformat(),
+                "season_points": cum_points,
+            })
+        
+        # Добавляем текущую дату с актуальными очками
+        today = timezone.now().date()
+        try:
+            season_points_obj = player.season_points
+            if (season_points_obj.season_name == current_season.name and 
+                season_points_obj.season_year == current_season.year):
+                current_points = season_points_obj.current_season_points
+            else:
+                current_points = 0
+        except:
+            current_points = 0
+        
+        if not result or result[-1]["date"] != today.isoformat():
+            result.append({
+                "date": today.isoformat(),
+                "season_points": current_points,
+            })
+        else:
+            result[-1]["season_points"] = current_points
+        
+        return result
+    
+    season_points_data = _get_season_points_data(player)
+
+    # Получаем сезонные очки
+    from apps.tournaments.models import SeasonPoints, SeasonArchive
+    from apps.tournaments.season_utils import get_current_season, get_season_display
+    
+    try:
+        season_points = player.season_points
+        current_season = get_current_season()
+        # Проверяем, что сезон совпадает
+        if season_points.season_name != current_season.name or season_points.season_year != current_season.year:
+            # Создаём новую запись для нового сезона
+            season_points = SeasonPoints.objects.create(
+                player=player,
+                current_season_points=0,
+                season_name=current_season.name,
+                season_year=current_season.year,
+            )
+    except SeasonPoints.DoesNotExist:
+        current_season = get_current_season()
+        season_points = SeasonPoints.objects.create(
+            player=player,
+            current_season_points=0,
+            season_name=current_season.name,
+            season_year=current_season.year,
+        )
+    
+    current_season_display = get_season_display(current_season)
+    
+    # Получаем архивные результаты (чемпионские бейджи)
+    season_championships = SeasonArchive.objects.filter(
+        player=player,
+        final_rank=1,
+    ).order_by("-season_year", "-season_name")
+
     subscription_usage_percent = 0
     if getattr(player.user, "subscription", None):
         sub = player.user.subscription
@@ -339,6 +457,10 @@ def profile(request, pk):
         "active_month": active_month,
         "active_status": active_status,
         "match_statuses": Match.MatchStatus.choices,
+        "season_points": season_points,
+        "current_season_display": current_season_display,
+        "season_points_data": season_points_data,
+        "season_championships": season_championships,
     }
     return render(request, "users/profile.html", context)
 
@@ -378,15 +500,24 @@ def notifications(request):
 
 
 def ntrp_test(request):
-    """Public NTRP test page."""
-    can_save = request.user.is_authenticated
+    """Public NTRP test page.
+    
+    Note: Test result can only be saved during registration.
+    For registered users, the test is informational only and does not affect their rating.
+    """
+    # Test can only be saved during registration (via auth view), not after
+    can_save = False
     return render(request, 'users/ntrp_test.html', {'can_save': can_save})
 
 
 @login_required
 @require_POST
 def save_ntrp(request):
-    """Save NTRP level for the authenticated user's player profile."""
+    """Save NTRP level ONLY during registration.
+    
+    After registration, NTRP test results cannot be saved.
+    Rating is determined solely by match results.
+    """
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except json.JSONDecodeError:
@@ -409,7 +540,22 @@ def save_ntrp(request):
     except Player.DoesNotExist:
         return JsonResponse({"ok": False, "error": "player_not_found"}, status=404)
 
+    # CRITICAL: Do not allow saving test results after registration
+    # Rating is determined only by match results after initial registration
+    if player.matches_played > 0:
+        return JsonResponse({
+            "ok": False,
+            "error": "test_already_saved",
+            "message": "NTRP тест можно пройти только один раз при регистрации. Рейтинг формируется только по результатам матчей."
+        }, status=403)
+
+    from .rating_utils import get_starting_points
+
     player.ntrp_level = level
     player.skill_level = _map_ntrp_to_skill_level(level)
-    player.save(update_fields=["ntrp_level", "skill_level"])
+    starting_pts = get_starting_points(level)
+    player.total_points = starting_pts
+    player.hidden_rating = float(starting_pts)
+
+    player.save(update_fields=["ntrp_level", "skill_level", "total_points", "hidden_rating"])
     return JsonResponse({"ok": True, "ntrp_level": f"{level:.1f}"})

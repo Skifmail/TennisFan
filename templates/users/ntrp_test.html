@@ -1,17 +1,23 @@
 {% extends 'base.html' %}
 
-{% block title %}NTRP тест{% endblock %}
+{% block title %}Тест уровня силы{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">NTRP тест</h1>
+    <h1 class="page-title">Тест уровня силы</h1>
     <p class="page-subtitle">Определите свой уровень и подберите турниры по уровню игры</p>
 </div>
 
 <div class="container">
-    {% if can_save %}
+    {% if user.is_authenticated %}
+    <div class="alert alert-warning">
+        <strong>Внимание:</strong> Тест уровня силы можно пройти только один раз — при регистрации.
+        Для зарегистрированных пользователей тест носит информационный характер и не влияет на ваш рейтинг.
+        Рейтинг формируется исключительно по результатам матчей.
+    </div>
+    {% else %}
     <div class="alert alert-info">
-        Результат теста будет автоматически сохранён в вашем профиле.
+        Пройдите тест при регистрации, чтобы определить ваш начальный уровень силы и получить стартовый рейтинг.
     </div>
     {% endif %}
     {% include 'users/_ntrp_quiz.html' with can_save=can_save %}

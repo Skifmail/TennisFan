@@ -115,14 +115,14 @@ class Player(CompressImageFieldsMixin, models.Model):
     )
     city = models.CharField("Город", max_length=100, blank=True, default="")
     ntrp_level = models.DecimalField(
-        "NTRP уровень", max_digits=3, decimal_places=2, default=3.0
+        "Уровень силы (NTRP)", max_digits=3, decimal_places=1, default=1.0
     )
     skill_level = models.CharField(
-        "Уровень мастерства (NTRP)",
+        "Уровень силы",
         max_length=20,
         choices=SkillLevel.choices,
         default=SkillLevel.NOVICE,
-        help_text="Только из NTRP-теста или админка. Пользователь не редактирует вручную.",
+        help_text="Определяется тестом уровня силы или админкой. Пользователь не редактирует вручную.",
     )
     birth_date = models.DateField("Дата рождения", null=True, blank=True)
     gender = models.CharField(
@@ -143,12 +143,21 @@ class Player(CompressImageFieldsMixin, models.Model):
         help_text="Ссылка на профиль в мессенджере MAX (из раздела «Поделиться»)",
     )
 
-    # Statistics (computed fields)
-    total_points = models.IntegerField("Очки", default=0)
+    # Statistics / Rating
+    total_points = models.FloatField(
+        "Рейтинг (отображаемый)",
+        default=0.0,
+        help_text="Публичный рейтинг. Обновляется после каждого матча.",
+    )
+    hidden_rating = models.FloatField(
+        "Скрытый рейтинг",
+        default=0.0,
+        help_text="Теневой рейтинг, пересчитывается хронологически после каждого матча.",
+    )
     matches_played = models.PositiveIntegerField("Сыграно матчей", default=0)
     matches_won = models.PositiveIntegerField("Побед", default=0)
 
-    is_verified = models.BooleanField("Подтверждён", default=False)
+    is_verified = models.BooleanField("Подтверждён", default=True)
     is_legend = models.BooleanField("Легенда", default=False)
     is_bye = models.BooleanField(
         "Свободный круг (bye)",

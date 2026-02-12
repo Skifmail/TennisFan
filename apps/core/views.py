@@ -16,7 +16,7 @@ from django.views.decorators.http import require_http_methods, require_safe
 from django.utils.html import linebreaks
 
 from apps.content.models import News, RulesSection
-from apps.tournaments.models import Match, Tournament, TournamentDuration, TournamentGender, TournamentStatus
+from apps.tournaments.models import Match, Tournament, TournamentDuration, TournamentGender, TournamentStatus, SeasonArchive
 from apps.users.models import Player, SkillLevel
 
 from .forms import FeedbackForm
@@ -76,14 +76,20 @@ def home(request):
 
 
 def rating(request):
-    """Player rating page."""
+    """Player rating page - сортировка по сезонным очкам."""
+    from apps.tournaments.models import SeasonPoints
+    from apps.tournaments.season_utils import get_current_season
+    
     city = request.GET.get('city', '')
     skill_level = request.GET.get('skill_level', '') or request.GET.get('category', '')
     search = request.GET.get('q', '')
 
+    current_season = get_current_season()
+    
+    # Получаем игроков с сезонными очками
     players = Player.objects.select_related(
-        'user', 'user__subscription', 'user__subscription__tier'
-    )
+        'user', 'user__subscription', 'user__subscription__tier', 'season_points'
+    ).prefetch_related('season_points')
 
     if city:
         players = players.filter(city__icontains=city)
@@ -95,7 +101,21 @@ def rating(request):
             Q(user__last_name__icontains=search)
         )
 
-    players = players.order_by('-total_points')
+    # Сортируем по сезонным очкам текущего сезона
+    # Используем аннотацию для получения сезонных очков
+    from django.db.models import Case, When, Value, IntegerField, F
+    
+    players = players.annotate(
+        season_pts=Case(
+            When(
+                season_points__season_name=current_season.name,
+                season_points__season_year=current_season.year,
+                then=F('season_points__current_season_points')
+            ),
+            default=Value(0),
+            output_field=IntegerField()
+        )
+    ).order_by('-season_pts', '-total_points')
 
     context = {
         'players': players,
@@ -103,8 +123,62 @@ def rating(request):
         'current_skill_level': skill_level,
         'search_query': search,
         'skill_level_choices': SkillLevel.choices,
+        'current_season_display': f"{current_season.name} {current_season.year}",
     }
     return render(request, 'core/rating.html', context)
+
+
+def hall_of_fame(request):
+    """Зал Славы - архив результатов сезонов."""
+    season_filter = request.GET.get('season', '')
+    
+    # Получаем все уникальные сезоны из архива
+    seasons = SeasonArchive.objects.values('season_name', 'season_year').distinct().order_by('-season_year', '-season_name')
+    
+    # Если выбран конкретный сезон, фильтруем
+    if season_filter:
+        parts = season_filter.split('_')
+        if len(parts) == 2:
+            try:
+                season_name = "Зима" if parts[0] == "winter" else "Лето"
+                season_year = int(parts[1])
+                archives = SeasonArchive.objects.filter(
+                    season_name=season_name,
+                    season_year=season_year,
+                ).select_related('player', 'player__user').order_by('final_rank', '-final_points')
+            except (ValueError, KeyError):
+                archives = SeasonArchive.objects.none()
+        else:
+            archives = SeasonArchive.objects.none()
+    else:
+        # Показываем последний сезон по умолчанию
+        if seasons:
+            last_season = seasons[0]
+            archives = SeasonArchive.objects.filter(
+                season_name=last_season['season_name'],
+                season_year=last_season['season_year'],
+            ).select_related('player', 'player__user').order_by('final_rank', '-final_points')
+        else:
+            archives = SeasonArchive.objects.none()
+    
+    # Формируем список сезонов для выпадающего списка
+    season_list = []
+    for s in seasons:
+        season_key = f"{'winter' if s['season_name'] == 'Зима' else 'summer'}_{s['season_year']}"
+        season_display = f"{s['season_name']} {s['season_year']}"
+        season_list.append({
+            'key': season_key,
+            'display': season_display,
+            'name': s['season_name'],
+            'year': s['season_year'],
+        })
+    
+    context = {
+        'archives': archives,
+        'seasons': season_list,
+        'current_season': season_filter,
+    }
+    return render(request, 'core/hall_of_fame.html', context)
 
 
 def results(request):

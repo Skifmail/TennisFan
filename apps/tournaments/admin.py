@@ -20,6 +20,8 @@ from .models import (
     Match,
     MatchResultProposal,
     SeasonRating,
+    SeasonPoints,
+    SeasonArchive,
     Tournament,
     TournamentAllowedCategory,
     TournamentPlayerResult,
@@ -393,10 +395,26 @@ class TournamentPlayerResultAdmin(admin.ModelAdmin):
     """FAN / Олимпийская: результаты игроков в турнире (раунд вылета или итоговое место)."""
 
     list_display = ("tournament", "player", "place", "round_eliminated", "fan_points", "is_consolation")
-    list_filter = ("tournament", "round_eliminated", "is_consolation")
-    search_fields = (
-        "player__user__first_name",
-        "player__user__last_name",
-        "tournament__name",
-    )
-    raw_id_fields = ("tournament", "player")
+
+
+@admin.register(SeasonPoints)
+class SeasonPointsAdmin(admin.ModelAdmin):
+    """Админка для сезонных очков игроков."""
+
+    list_display = ("player", "current_season_points", "season_name", "season_year", "updated_at")
+    list_filter = ("season_name", "season_year")
+    search_fields = ("player__user__first_name", "player__user__last_name", "player__user__email")
+    readonly_fields = ("updated_at",)
+    ordering = ("-current_season_points", "-season_year", "-season_name")
+
+
+@admin.register(SeasonArchive)
+class SeasonArchiveAdmin(admin.ModelAdmin):
+    """Админка для архива результатов сезонов."""
+
+    list_display = ("player", "season_name", "season_year", "final_points", "final_rank", "archived_at")
+    list_filter = ("season_name", "season_year", "final_rank")
+    search_fields = ("player__user__first_name", "player__user__last_name", "player__user__email")
+    readonly_fields = ("archived_at",)
+    raw_id_fields = ("player",)
+    ordering = ("-season_year", "-season_name", "final_rank", "-final_points")

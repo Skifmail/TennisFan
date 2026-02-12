@@ -290,7 +290,10 @@ CRONJOBS = [
     ('0 */6 * * *', 'django.core.management.call_command', ['olympic_process_overdue_matches']),
     ('0 */6 * * *', 'django.core.management.call_command', ['round_robin_process_overdue_matches']),
     ('*/15 * * * *', 'django.core.management.call_command', ['auto_accept_stale_proposals']),
+    ('0 3 1 5,10 *', 'django.core.management.call_command', ['reset_season_points']),  # 1 мая и 1 октября в 03:00
     ('0 9 * * *', 'django.core.management.call_command', ['send_deadline_reminders']),
     ('0 8 * * *', 'django.core.management.call_command', ['send_tournament_start_reminders']),
     ('*/30 * * * *', 'django.core.management.call_command', ['sync_private_chat_access']),
+    # 1st of each month at 03:00 — publish hidden Elo ratings to displayed rating
+    ('0 3 1 * *', 'django.core.management.call_command', ['monthly_rating_publish']),
 ]

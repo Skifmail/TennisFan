@@ -35,36 +35,62 @@
                     <p><strong>Ваш ID в системе:</strong> <code>{{ player.id }}</code></p>
                     {% endif %}
                     <p><strong>Город:</strong> {{ player.city }}</p>
-                    <p><strong>Уровень:</strong> {{ player.get_skill_level_display }}</p>
                     <p><strong>Дата рождения:</strong> {{ player.birth_date|date:"d.m.Y" }}</p>
                     {% if player.calculated_age %}<p><strong>Возраст:</strong> {{ player.calculated_age }} лет</p>{% endif %}
                     <p><strong>Пол:</strong> {{ player.get_gender_display }}</p>
                     <p><strong>Forehand:</strong> {{ player.get_forehand_display }}</p>
                 </div>
 
-                <div class="player-stats profile-info__stats">
-                    <div>
-                        <div class="stat-value">{{ player.total_points }}</div>
-                        <div class="stat-label">Очков</div>
-                    </div>
-                    <div>
-                        <div class="stat-value">{{ player.matches_played }}</div>
-                        <div class="stat-label">Матчей</div>
-                    </div>
-                    <div>
-                        <div class="stat-value">{{ player.win_rate }}%</div>
-                        <div class="stat-label">Побед</div>
+                <!-- Статистика в виде таблицы (две строки: уровень/NTRP/Elo и очки сезона/матчей/побед) -->
+                <div class="profile-stats-table">
+                    <table class="stats-table stats-table--two-rows">
+                        <tr class="stats-table__header-row">
+                            <td>Уровень</td>
+                            <td>NTRP</td>
+                            <td>Очки (Elo)</td>
+                        </tr>
+                        <tr class="stats-table__data-row">
+                            <td><strong>{{ player.get_skill_level_display }}</strong></td>
+                            <td><strong>{{ player.ntrp_level }}</strong></td>
+                            <td><strong>{{ player.total_points|floatformat:1 }}</strong></td>
+                        </tr>
+                        <tr class="stats-table__header-row">
+                            <td>Очки сезона</td>
+                            <td>Матчей</td>
+                            <td>% побед</td>
+                        </tr>
+                        <tr class="stats-table__data-row">
+                            <td><strong>{{ season_points.current_season_points }} ({{ current_season_display }})</strong></td>
+                            <td><strong>{{ player.matches_played }}</strong></td>
+                            <td><strong>{{ player.win_rate }}%</strong></td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Бейджи чемпионов -->
+                {% if season_championships %}
+                <div class="profile-championships">
+                    <h3 class="profile-championships__title">🏆 Чемпион сезонов</h3>
+                    <div class="profile-championships__badges">
+                        {% for championship in season_championships %}
+                        <span class="championship-badge" title="{{ championship.season_name }} {{ championship.season_year }}: {{ championship.final_points }} очков">
+                            🏆 {{ championship.season_name }} {{ championship.season_year }}
+                        </span>
+                        {% endfor %}
                     </div>
                 </div>
+                {% endif %}
 
                 {% if player.bio %}
                 <p class="profile-info__bio text-secondary">{{ player.bio }}</p>
                 {% endif %}
 
-                {% if player.telegram_url or player.whatsapp_url or player.max_url %}
-                <div class="profile-info__messengers">
-                    {% include 'includes/messenger_links.html' with obj=player %}
-                </div>
+                {% if request.user != player.user %}
+                    {% if player.telegram_url or player.whatsapp_url or player.max_url %}
+                    <div class="profile-info__messengers">
+                        {% include 'includes/messenger_links.html' with obj=player %}
+                    </div>
+                    {% endif %}
                 {% endif %}
 
                 {% if request.user == player.user %}
@@ -190,8 +216,8 @@
                     </form>
                     {% endif %}
                 </div>
-                <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3 profile-info__btn-edit">Редактировать</a>
-                <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2 profile-info__btn-ntrp">Пройти NTRP тест</a>
+                <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3 profile-info__btn-edit profile-info__btn-fullwidth">Редактировать</a>
+                <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2 profile-info__btn-ntrp profile-info__btn-fullwidth" title="Тест носит информационный характер и не влияет на ваш рейтинг">Проверить уровень силы (информационно)</a>
                 {% endif %}
             </div>
 
@@ -199,14 +225,34 @@
             <div class="profile-charts">
                 <div class="profile-charts__header">
                     <h3 class="profile-charts__title">Прогресс</h3>
-                    <select id="profileProgressYear" class="profile-charts__year-select" aria-label="Год">
-                        <option value="">Все годы</option>
-                    </select>
+                    <div class="profile-charts__filters">
+                        <select id="profileProgressYear" class="profile-charts__filter-select" aria-label="Год">
+                            <option value="">Все годы</option>
+                        </select>
+                        <select id="profileProgressMonth" class="profile-charts__filter-select" aria-label="Месяц">
+                            <option value="">Все месяцы</option>
+                            <option value="1">Январь</option>
+                            <option value="2">Февраль</option>
+                            <option value="3">Март</option>
+                            <option value="4">Апрель</option>
+                            <option value="5">Май</option>
+                            <option value="6">Июнь</option>
+                            <option value="7">Июль</option>
+                            <option value="8">Август</option>
+                            <option value="9">Сентябрь</option>
+                            <option value="10">Октябрь</option>
+                            <option value="11">Ноябрь</option>
+                            <option value="12">Декабрь</option>
+                        </select>
+                        <select id="profileProgressSeason" class="profile-charts__filter-select" aria-label="Сезон">
+                            <option value="">Все сезоны</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="profile-chart profile-chart--points">
-                    <div class="profile-chart__label">Очки</div>
+                    <div class="profile-chart__label">Очки Elo</div>
                     <div class="profile-chart__canvas-wrap">
-                        <canvas id="chartProfilePoints" aria-label="График очков"></canvas>
+                        <canvas id="chartProfilePoints" aria-label="График очков Elo"></canvas>
                     </div>
                 </div>
                 <div class="profile-chart profile-chart--matches">
@@ -219,6 +265,12 @@
                     <div class="profile-chart__label">% побед</div>
                     <div class="profile-chart__canvas-wrap">
                         <canvas id="chartProfileWinRate" aria-label="График процента побед"></canvas>
+                    </div>
+                </div>
+                <div class="profile-chart profile-chart--season">
+                    <div class="profile-chart__label">Очки сезона ({{ current_season_display }})</div>
+                    <div class="profile-chart__canvas-wrap">
+                        <canvas id="chartProfileSeasonPoints" aria-label="График сезонных очков"></canvas>
                     </div>
                 </div>
             </div>
@@ -361,8 +413,46 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
     var p = el.getAttribute('data-width-pct');
     if (p !== null && p !== '') el.style.width = p + '%';
 });
+
+// Динамическое выравнивание диаграмм с таблицей статистики
+(function() {
+    var statsTable = document.querySelector('.profile-stats-table');
+    var charts = document.querySelector('.profile-charts');
+    var profileInfo = document.querySelector('.profile-info');
+    
+    if (statsTable && charts && profileInfo) {
+        function alignCharts() {
+            // Получаем позицию таблицы статистики относительно .profile-info
+            var profileInfoTop = profileInfo.getBoundingClientRect().top;
+            var statsTop = statsTable.getBoundingClientRect().top;
+            var offset = statsTop - profileInfoTop;
+            
+            // Устанавливаем отступ для диаграмм
+            if (offset > 0) {
+                charts.style.marginTop = offset + 'px';
+            } else {
+                charts.style.marginTop = '0';
+            }
+        }
+        
+        // Выравниваем при загрузке
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', alignCharts);
+        } else {
+            alignCharts();
+        }
+        
+        // Выравниваем при изменении размера окна
+        window.addEventListener('resize', alignCharts);
+        
+        // Выравниваем после небольшой задержки (на случай асинхронной загрузки контента)
+        setTimeout(alignCharts, 100);
+        setTimeout(alignCharts, 500);
+    }
+})();
 </script>
 {{ profile_progress_data|json_script:"profile-progress-data" }}
+{{ season_points_data|json_script:"season-points-data" }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 (function() {
@@ -377,6 +467,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         return iso;
     }
 
+    // Получаем список годов
     var years = [];
     progressData.forEach(function(d) {
         var y = d.date && d.date.substring(0, 4);
@@ -388,9 +479,87 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         years.forEach(function(y) { yearSelect.appendChild(new Option(y, y)); });
     }
 
+    // Получаем список сезонов из данных
+    function getSeasonFromDate(dateStr) {
+        if (!dateStr) return null;
+        var parts = dateStr.split('-');
+        if (parts.length !== 3) return null;
+        var year = parseInt(parts[0], 10);
+        var month = parseInt(parts[1], 10);
+        if (month >= 10) {
+            return { name: 'Зима', year: year, key: 'winter_' + year };
+        } else if (month <= 4) {
+            return { name: 'Зима', year: year - 1, key: 'winter_' + (year - 1) };
+        } else {
+            return { name: 'Лето', year: year, key: 'summer_' + year };
+        }
+    }
+
+    var seasonsMap = {};
+    progressData.forEach(function(d) {
+        var season = getSeasonFromDate(d.date);
+        if (season && !seasonsMap[season.key]) {
+            seasonsMap[season.key] = season;
+        }
+    });
+    
+    // Добавляем сезоны из сезонных очков
+    var seasonPointsEl = document.getElementById('season-points-data');
+    var seasonPointsData = [];
+    if (seasonPointsEl && seasonPointsEl.textContent) {
+        try {
+            seasonPointsData = JSON.parse(seasonPointsEl.textContent);
+            seasonPointsData.forEach(function(d) {
+                var season = getSeasonFromDate(d.date);
+                if (season && !seasonsMap[season.key]) {
+                    seasonsMap[season.key] = season;
+                }
+            });
+        } catch (e) {
+            console.error('Failed to parse season points data:', e);
+        }
+    }
+
+    var seasons = Object.values(seasonsMap).sort(function(a, b) {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.name === 'Зима' ? -1 : 1;
+    });
+
+    var seasonSelect = document.getElementById('profileProgressSeason');
+    if (seasonSelect) {
+        seasons.forEach(function(s) {
+            var label = s.name + ' ' + s.year;
+            seasonSelect.appendChild(new Option(label, s.key));
+        });
+    }
+
     function filterByYear(data, year) {
         if (!year) return data;
         return data.filter(function(d) { return d.date && d.date.substring(0, 4) === year; });
+    }
+
+    function filterByMonth(data, month) {
+        if (!month) return data;
+        var monthNum = parseInt(month, 10);
+        return data.filter(function(d) {
+            if (!d.date) return false;
+            var parts = d.date.split('-');
+            return parts.length === 3 && parseInt(parts[1], 10) === monthNum;
+        });
+    }
+
+    function filterBySeason(data, seasonKey) {
+        if (!seasonKey) return data;
+        var parts = seasonKey.split('_');
+        if (parts.length !== 2) return data;
+        var seasonName = parts[0] === 'winter' ? 'Зима' : 'Лето';
+        var seasonYear = parseInt(parts[1], 10);
+        
+        return data.filter(function(d) {
+            if (!d.date) return false;
+            var season = getSeasonFromDate(d.date);
+            return season && season.name === seasonName && season.year === seasonYear;
+        });
     }
 
     function buildChartOptions(valueLabel, valueSuffix) {
@@ -428,17 +597,28 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         pointHoverRadius: 6
     };
 
-    var charts = { points: null, matches: null, winrate: null };
+    var charts = { points: null, matches: null, winrate: null, season: null };
 
-    function updateCharts(selectedYear) {
-        var data = filterByYear(progressData, selectedYear);
+    function updateCharts(selectedYear, selectedMonth, selectedSeason) {
+        // Фильтруем основные данные (Elo, матчи, % побед)
+        var data = progressData;
+        if (selectedYear) {
+            data = filterByYear(data, selectedYear);
+        }
+        if (selectedMonth) {
+            data = filterByMonth(data, selectedMonth);
+        }
+        if (selectedSeason) {
+            data = filterBySeason(data, selectedSeason);
+        }
         if (!data.length) data = progressData;
+        
         var labels = data.map(function(d) { return d.date; });
         var pointsData = data.map(function(d) { return d.points; });
         var matchesData = data.map(function(d) { return d.matches; });
         var winRateData = data.map(function(d) { return d.win_rate; });
 
-        var chartOpts = buildChartOptions('Очков', '');
+        var chartOpts = buildChartOptions('Очков Elo', '');
         var winRateOpts = buildChartOptions('% побед', '%');
         winRateOpts.scales = { x: chartOpts.scales.x, y: { display: true, beginAtZero: true, max: 100 } };
 
@@ -457,6 +637,36 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
             charts.winrate.data.datasets[0].data = winRateData;
             charts.winrate.update('none');
         }
+
+        // Фильтруем сезонные очки
+        var seasonData = seasonPointsData;
+        if (selectedYear) {
+            seasonData = filterByYear(seasonData, selectedYear);
+        }
+        if (selectedMonth) {
+            seasonData = filterByMonth(seasonData, selectedMonth);
+        }
+        if (selectedSeason) {
+            seasonData = filterBySeason(seasonData, selectedSeason);
+        }
+        if (!seasonData.length && seasonPointsData.length) {
+            seasonData = seasonPointsData;
+        }
+
+        if (charts.season && document.getElementById('chartProfileSeasonPoints')) {
+            var seasonLabels = seasonData.map(function(d) { return d.date; });
+            var seasonPts = seasonData.map(function(d) { return d.season_points; });
+            charts.season.data.labels = seasonLabels;
+            charts.season.data.datasets[0].data = seasonPts;
+            charts.season.update('none');
+        }
+    }
+
+    function onFilterChange() {
+        var year = yearSelect ? yearSelect.value : '';
+        var month = document.getElementById('profileProgressMonth') ? document.getElementById('profileProgressMonth').value : '';
+        var season = seasonSelect ? seasonSelect.value : '';
+        updateCharts(year || null, month || null, season || null);
     }
 
     if (document.getElementById('chartProfilePoints')) {
@@ -464,7 +674,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         var pts0 = progressData.map(function(d) { return d.points; });
         charts.points = new Chart(document.getElementById('chartProfilePoints'), {
             type: 'line',
-            options: buildChartOptions('Очков', ''),
+            options: buildChartOptions('Очков Elo', ''),
             data: { labels: labels0, datasets: [{ ...lineDataset, data: pts0 }] }
         });
     }
@@ -492,8 +702,35 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         });
     }
 
+    // Инициализация графика сезонных очков
+    if (document.getElementById('chartProfileSeasonPoints') && seasonPointsData.length) {
+        var seasonLabels = seasonPointsData.map(function(d) { return d.date; });
+        var seasonPts = seasonPointsData.map(function(d) { return d.season_points; });
+        charts.season = new Chart(document.getElementById('chartProfileSeasonPoints'), {
+            type: 'line',
+            options: buildChartOptions('Очков сезона', ''),
+            data: {
+                labels: seasonLabels,
+                datasets: [{
+                    ...lineDataset,
+                    borderColor: 'var(--color-warning, #f59e0b)',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    data: seasonPts
+                }]
+            }
+        });
+    }
+
+    // Добавляем обработчики событий для всех фильтров
     if (yearSelect) {
-        yearSelect.addEventListener('change', function() { updateCharts(this.value || null); });
+        yearSelect.addEventListener('change', onFilterChange);
+    }
+    var monthSelect = document.getElementById('profileProgressMonth');
+    if (monthSelect) {
+        monthSelect.addEventListener('change', onFilterChange);
+    }
+    if (seasonSelect) {
+        seasonSelect.addEventListener('change', onFilterChange);
     }
 })();
 </script>

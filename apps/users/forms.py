@@ -12,7 +12,7 @@ User = get_user_model()
 
 
 class UserRegistrationForm(forms.ModelForm):
-    """Упрощённая форма регистрации: имя, фамилия, телефон, email, дата рождения, NTRP-тест."""
+    """Упрощённая форма регистрации: имя, фамилия, телефон, email, дата рождения, тест уровня силы."""
 
     email = forms.EmailField(
         label="Email *",
@@ -35,11 +35,12 @@ class UserRegistrationForm(forms.ModelForm):
         max_length=100,
         widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Например: Москва"}),
     )
-    ntrp_level = forms.IntegerField(
-        label="NTRP",
+    ntrp_level = forms.DecimalField(
+        label="Уровень силы",
         required=True,
         min_value=1,
         max_value=7,
+        decimal_places=1,
         widget=forms.HiddenInput(attrs={"id": "id_ntrp_level"}),
     )
     password = forms.CharField(
@@ -92,16 +93,18 @@ class UserRegistrationForm(forms.ModelForm):
         return phone
 
     def clean_ntrp_level(self):
+        from decimal import Decimal, InvalidOperation
+
         val = self.cleaned_data.get("ntrp_level")
         if val is None or val == "":
-            raise forms.ValidationError("Пройдите NTRP-тест и нажмите «Рассчитать» перед регистрацией.")
+            raise forms.ValidationError("Пройдите тест уровня силы и нажмите «Рассчитать» перед регистрацией.")
         try:
-            v = int(val)
-            if v < 1 or v > 7:
-                raise forms.ValidationError("Некорректный результат NTRP. Пройдите тест заново.")
+            v = Decimal(str(val))
+            if v < Decimal("1.0") or v > Decimal("7.0"):
+                raise forms.ValidationError("Некорректный результат теста. Пройдите тест заново.")
             return v
-        except (TypeError, ValueError):
-            raise forms.ValidationError("Пройдите NTRP-тест и нажмите «Рассчитать» перед регистрацией.")
+        except (TypeError, ValueError, InvalidOperation):
+            raise forms.ValidationError("Пройдите тест уровня силы и нажмите «Рассчитать» перед регистрацией.")
 
     def clean_password_confirm(self):
         password = self.cleaned_data.get('password')

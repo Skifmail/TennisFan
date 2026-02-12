@@ -39,6 +39,12 @@
 #                   (удаление пользователей без активного доступа).
 #                   Команда: sync_private_chat_access
 #
+#   0 3 1 * *     — 1-го числа каждого месяца в 03:00: публикация скрытого рейтинга (hidden_rating → total_points).
+#                   Команда: monthly_rating_publish
+#
+#   0 3 1 5,10 *  — 1 мая и 1 октября в 03:00: сброс сезонных очков и архивация результатов сезона.
+#                   Команда: reset_season_points
+#
 # Ручной запуск:
 #   python manage.py generate_brackets_past_deadlines
 #   python manage.py fan_process_overdue_matches
@@ -48,3 +54,8 @@
 #   python manage.py send_tournament_start_reminders
 #   python manage.py send_subscription_expiry_reminders
 #   python manage.py sync_private_chat_access
+#   python manage.py monthly_rating_publish
+#   python manage.py monthly_rating_publish --dry-run
+#   python manage.py reset_season_points
+#   python manage.py reset_season_points --dry-run
+#   python manage.py reset_season_points --force-season winter_2024

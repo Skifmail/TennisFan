@@ -265,9 +265,10 @@ def _set_place(
                     player=p,
                     defaults={"place": place, "fan_points": points, "is_consolation": True},
                 )
-                if not skip_points:
-                    p.total_points += points
-                    p.save(update_fields=["total_points"])
+                # Обновляем сезонные очки
+                if points > 0:
+                    from .fan import _update_season_points
+                    _update_season_points(p, points)
     else:
         if entity and not getattr(entity, "is_bye", False):
             TournamentPlayerResult.objects.update_or_create(
@@ -275,9 +276,10 @@ def _set_place(
                 player=entity,
                 defaults={"place": place, "fan_points": points, "is_consolation": True},
             )
-            if not skip_points:
-                entity.total_points += points
-                entity.save(update_fields=["total_points"])
+            # Обновляем сезонные очки
+            if points > 0:
+                from .fan import _update_season_points
+                _update_season_points(entity, points)
 
 
 def ensure_consolation_created_for_round(tournament: Tournament, round_index: int) -> None:
@@ -410,12 +412,8 @@ def finalize_olympic(tournament: Tournament) -> Tuple[bool, str]:
     if tournament.status == "completed":
         return False, "Турнир уже завершён."
 
-    for r in tournament.fan_results.select_related("player").all():
-        if getattr(r.player, "is_bye", False):
-            continue
-        if r.place is not None and r.fan_points:
-            r.player.total_points += r.fan_points
-            r.player.save(update_fields=["total_points"])
+    # FAN очки не влияют на рейтинг (total_points) - только для отображения результатов турнира
+    # Рейтинг обновляется только через Elo-алгоритм после каждого матча
 
     tournament.status = "completed"
     tournament.save(update_fields=["status"])

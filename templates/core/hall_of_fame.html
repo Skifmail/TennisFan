@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Зал Славы{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">🏆 Зал Славы</h1>
+    <p class="page-subtitle">Архив результатов завершённых сезонов</p>
+</div>
+
+<div class="container">
+    <!-- Фильтр по сезону -->
+    <form method="get" class="filter-bar" style="margin-bottom: var(--spacing-lg);">
+        <select name="season" class="form-control" onchange="this.form.submit()">
+            <option value="">Выберите сезон...</option>
+            {% for season in seasons %}
+            <option value="{{ season.key }}" {% if current_season == season.key %}selected{% endif %}>
+                {{ season.display }}
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+
+    {% if archives %}
+    <div class="hall-of-fame-list">
+        <div class="grid">
+            {% for archive in archives %}
+            <a href="{% url 'profile' pk=archive.player.pk %}" class="player-card">
+                <span class="player-rank">
+                    {% if archive.final_rank == 1 %}
+                        🥇
+                    {% elif archive.final_rank == 2 %}
+                        🥈
+                    {% elif archive.final_rank == 3 %}
+                        🥉
+                    {% else %}
+                        {{ archive.final_rank }}
+                    {% endif %}
+                </span>
+                {% if archive.player.avatar %}
+                <img src="{{ archive.player.avatar.url }}" alt="" class="player-avatar">
+                {% else %}
+                <div class="player-avatar"></div>
+                {% endif %}
+                <div class="player-info">
+                    <div class="player-name-block">
+                        <span class="player-name">{{ archive.player }}</span>
+                        {% include 'includes/subscription_badge.html' with tier=archive.player.paid_subscription_tier %}
+                    </div>
+                    <span class="player-category">{{ archive.player.get_skill_level_display }}</span>
+                </div>
+                <div class="player-stats">
+                    <div>
+                        <div class="stat-value">{{ archive.final_points }}</div>
+                        <div class="stat-label">Очков</div>
+                    </div>
+                </div>
+                <div class="player-points">
+                    <span class="text-muted" style="font-size: var(--font-size-xs);">СЕЗОН</span><br>
+                    <span class="text-primary">{{ archive.season_name }} {{ archive.season_year }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center" style="padding: var(--spacing-xl);">
+        <p class="text-secondary">Нет данных для отображения.</p>
+        {% if not seasons %}
+        <p class="text-muted">Архивы сезонов появятся после завершения первого сезона.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

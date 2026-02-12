@@ -196,10 +196,24 @@
                 <button type="button" class="feedback-modal__close" id="feedback-modal-close" aria-label="Закрыть">&times;</button>
             </div>
             <div class="feedback-modal__body">
-                {% if user.is_authenticated %}
                 <div id="feedback-form-wrap">
                     <form id="feedback-form" class="feedback-form">
                         {% csrf_token %}
+                        {% if not user.is_authenticated %}
+                        <div class="form-group">
+                            <label class="form-label" for="feedback-guest-name">Ваше имя *</label>
+                            <input type="text" id="feedback-guest-name" name="guest_name" class="form-control" maxlength="200" required placeholder="Как к вам обращаться?">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="feedback-guest-telegram">Telegram username (необязательно, но рекомендуется)</label>
+                            <input type="text" id="feedback-guest-telegram" name="guest_telegram_username" class="form-control" maxlength="100" placeholder="@username (без @)">
+                            <small class="text-muted" style="font-size: 0.85rem; display: block; margin-top: 0.25rem;">Укажите ваш Telegram username, чтобы получать ответы в Telegram. После отправки вы получите ссылку для привязки бота.</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="feedback-guest-contact">Email или телефон (необязательно)</label>
+                            <input type="text" id="feedback-guest-contact" name="guest_contact" class="form-control" maxlength="200" placeholder="Для связи с вами">
+                        </div>
+                        {% endif %}
                         <div class="form-group">
                             <label class="form-label" for="feedback-subject">Тема (необязательно)</label>
                             <input type="text" id="feedback-subject" name="subject" class="form-control" maxlength="200" placeholder="Кратко о чём">
@@ -213,15 +227,13 @@
                     </form>
                 </div>
                 <div id="feedback-success" class="feedback-success" style="display:none;">
-                    <p>Сообщение отправлено. Ответ администратора появится здесь после ответа в Telegram.</p>
+                    <p>Сообщение отправлено. {% if user.is_authenticated %}Ответ администратора появится здесь после ответа в Telegram.{% else %}Если вы указали Telegram username, перейдите по ссылке для привязки бота, чтобы получать ответы в Telegram.{% endif %}</p>
                 </div>
+                {% if user.is_authenticated %}
                 <div class="feedback-modal__threads" id="feedback-threads-wrap">
                     <h3 class="feedback-modal__threads-title">Ваши обращения</h3>
                     <div id="feedback-threads-list"></div>
                 </div>
-                {% else %}
-                <p>Войдите в аккаунт, чтобы написать нам.</p>
-                <a href="{% url 'login' %}?next={{ request.path }}" class="btn btn-primary">Войти</a>
                 {% endif %}
             </div>
         </div>

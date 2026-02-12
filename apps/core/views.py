@@ -55,12 +55,30 @@ def home(request):
 
     tournaments = tournaments.order_by('start_date')
 
+    # Получаем топ игроков по сезонным очкам
+    from apps.tournaments.models import SeasonPoints
+    from apps.tournaments.season_utils import get_current_season
+    from django.db.models import Case, When, Value, IntegerField, F
+    
+    current_season = get_current_season()
+    top_players = Player.objects.filter(is_verified=True, is_bye=False).select_related(
+        'user', 'user__subscription', 'user__subscription__tier', 'season_points'
+    ).annotate(
+        season_pts=Case(
+            When(
+                season_points__season_name=current_season.name,
+                season_points__season_year=current_season.year,
+                then=F('season_points__current_season_points')
+            ),
+            default=Value(0),
+            output_field=IntegerField()
+        )
+    ).order_by('-season_pts', '-total_points')[:10]
+
     context = {
         'filtered_tournaments': tournaments,
         'upcoming_tournaments': upcoming_tournaments,
-        'top_players': Player.objects.filter(is_verified=True)
-        .select_related('user', 'user__subscription', 'user__subscription__tier')
-        .order_by('-total_points')[:10],
+        'top_players': top_players,
         'latest_news': News.objects.filter(is_published=True)[:4],
         'current_filters': {
             'city': city,
@@ -86,8 +104,8 @@ def rating(request):
 
     current_season = get_current_season()
     
-    # Получаем игроков с сезонными очками
-    players = Player.objects.select_related(
+    # Получаем игроков с сезонными очками (исключаем служебного игрока "Свободный круг")
+    players = Player.objects.filter(is_bye=False).select_related(
         'user', 'user__subscription', 'user__subscription__tier', 'season_points'
     ).prefetch_related('season_points')
 
@@ -214,19 +232,54 @@ def rules(request):
 # ---------------------------------------------------------------------------
 
 
-def _create_support_message_and_send_to_admin(request, subject: str, message: str):
+def _create_support_message_and_send_to_admin(
+    request, subject: str, message: str, guest_name: str = None, guest_contact: str = None, guest_telegram_username: str = None
+):
     """
     Создать SupportMessage, отправить админу в Telegram, сохранить admin_telegram_message_id.
     Возвращает (support_message, telegram_binding_url или None).
+    Поддерживает как зарегистрированных пользователей, так и гостей.
     """
-    support_msg = SupportMessage.objects.create(
-        user=request.user,
-        subject=(subject or "")[:200],
-        text=message,
-        is_from_admin=False,
-    )
-    user_display = request.user.get_full_name() or request.user.email or "—"
-    user_email = request.user.email or ""
+    import secrets
+    from django.utils import timezone
+    
+    if request.user.is_authenticated:
+        support_msg = SupportMessage.objects.create(
+            user=request.user,
+            subject=(subject or "")[:200],
+            text=message,
+            is_from_admin=False,
+        )
+        user_display = request.user.get_full_name() or request.user.email or "—"
+        user_email = request.user.email or ""
+        is_guest = False
+        guest_contact_val = ""
+        guest_telegram_val = ""
+    else:
+        # Незарегистрированный пользователь (гость)
+        guest_tg_username = (guest_telegram_username or "").strip().lstrip("@")
+        binding_token = None
+        
+        # Если гость указал Telegram username, создаем токен привязки
+        if guest_tg_username and tg_support.is_telegram_configured():
+            binding_token = secrets.token_urlsafe(32)
+        
+        support_msg = SupportMessage.objects.create(
+            user=None,
+            guest_name=(guest_name or "")[:200].strip(),
+            guest_contact=(guest_contact or "")[:200].strip(),
+            guest_telegram_username=guest_tg_username,
+            guest_binding_token=binding_token or "",
+            subject=(subject or "")[:200],
+            text=message,
+            is_from_admin=False,
+        )
+        user_display = guest_name or "Гость (незарегистрированный пользователь)"
+        user_email = guest_contact or ""
+        is_guest = True
+        guest_contact_val = guest_contact or ""
+        guest_telegram_val = guest_tg_username
+    
     text_for_admin = tg_support.format_support_message_to_admin(
         support_message_id=support_msg.pk,
         user_display=user_display,
@@ -234,6 +287,9 @@ def _create_support_message_and_send_to_admin(request, subject: str, message: st
         subject=subject,
         text=message,
         source="сайт",
+        is_guest=is_guest,
+        guest_contact=guest_contact_val,
+        guest_telegram_username=guest_telegram_val,
     )
     msg_id, ok = tg_support.send_to_admin(text_for_admin)
     if ok and msg_id is not None:
@@ -242,16 +298,24 @@ def _create_support_message_and_send_to_admin(request, subject: str, message: st
         support_msg.save(update_fields=["admin_telegram_message_id", "admin_telegram_text"])
 
     binding_url = None
-    if tg_support.is_telegram_configured():
+    if request.user.is_authenticated and tg_support.is_telegram_configured():
         link, _ = UserTelegramLink.objects.get_or_create(
             user=request.user,
             defaults={"telegram_chat_id": None},
         )
-        if link.telegram_chat_id is None:
+        # Если пользователь уже привязал бота, проверяем гостевые сообщения
+        if link.telegram_chat_id:
+            link.migrate_guest_messages()
+        elif link.telegram_chat_id is None:
             token = link.get_or_create_binding_token()
             bot_username = tg_support.get_bot_username()
             if bot_username:
                 binding_url = f"https://t.me/{bot_username}?start={token}"
+    elif is_guest and support_msg.guest_binding_token and tg_support.is_telegram_configured():
+        # Для гостя создаем ссылку привязки, если указан Telegram username
+        bot_username = tg_support.get_bot_username()
+        if bot_username:
+            binding_url = f"https://t.me/{bot_username}?start={support_msg.guest_binding_token}"
 
     return support_msg, binding_url
 
@@ -282,12 +346,12 @@ def support_feedback(request):
     )
 
 
-@login_required
 @require_http_methods(["POST"])
 def support_feedback_submit(request):
     """
     API для виджета (JSON): создать SupportMessage, отправить админу.
     Возвращает success и при необходимости telegram_binding_url.
+    Поддерживает как зарегистрированных пользователей, так и гостей.
     """
     try:
         if request.content_type and "application/json" in request.content_type:
@@ -296,20 +360,36 @@ def support_feedback_submit(request):
             data = request.POST
         message = (data.get("message") or "").strip()
         subject = (data.get("subject") or "").strip()
+        guest_name = (data.get("guest_name") or "").strip()
+        guest_contact = (data.get("guest_contact") or "").strip()
+        guest_telegram_username = (data.get("guest_telegram_username") or "").strip()
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({"success": False, "error": "Неверный формат запроса"}, status=400)
 
     if not message:
         return JsonResponse({"success": False, "error": "Введите сообщение."}, status=400)
 
-    _, binding_url = _create_support_message_and_send_to_admin(request, subject, message)
+    # Для незарегистрированных пользователей имя обязательно
+    if not request.user.is_authenticated:
+        if not guest_name:
+            return JsonResponse({"success": False, "error": "Введите ваше имя."}, status=400)
+
+    _, binding_url = _create_support_message_and_send_to_admin(
+        request, subject, message, guest_name=guest_name, guest_contact=guest_contact, guest_telegram_username=guest_telegram_username
+    )
 
     payload = {"success": True}
     if binding_url:
         payload["telegram_binding_url"] = binding_url
-        payload["message"] = "Ваше сообщение принято. Ответ придёт в Telegram. Привяжите аккаунт по ссылке, чтобы получать ответы."
+        if request.user.is_authenticated:
+            payload["message"] = "Ваше сообщение принято. Ответ придёт в Telegram. Привяжите аккаунт по ссылке, чтобы получать ответы."
+        else:
+            payload["message"] = "Ваше сообщение принято. Перейдите по ссылке ниже, чтобы привязать Telegram бота и получать ответы администратора в Telegram."
     else:
-        payload["message"] = "Ваше сообщение принято. Ответ придёт в Telegram."
+        if request.user.is_authenticated:
+            payload["message"] = "Ваше сообщение принято. Ответ придёт в Telegram."
+        else:
+            payload["message"] = "Ваше сообщение принято. Администратор свяжется с вами по указанным контактам. Рекомендуем указать Telegram username при следующем обращении для быстрого ответа."
     return JsonResponse(payload)
 
 
@@ -366,17 +446,42 @@ def telegram_support_webhook(request):
             return JsonResponse({"ok": True})
 
         user = support_msg.user
-        link = getattr(user, "telegram_link", None)
-        if link and link.telegram_chat_id:
+        is_guest = user is None
+        sent_via_telegram = False
+        
+        # Если это зарегистрированный пользователь с привязанным Telegram, отправляем ответ
+        if user:
+            link = getattr(user, "telegram_link", None)
+            if link and link.telegram_chat_id:
+                safe_text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                tg_support.send_to_user(link.telegram_chat_id, f"📩 <b>Ответ поддержки:</b>\n\n{safe_text}")
+                sent_via_telegram = True
+        elif is_guest and support_msg.guest_telegram_chat_id:
+            # Если гость привязал Telegram, отправляем ответ через бот
             safe_text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            tg_support.send_to_user(link.telegram_chat_id, f"📩 <b>Ответ поддержки:</b>\n\n{safe_text}")
+            tg_support.send_to_user(support_msg.guest_telegram_chat_id, f"📩 <b>Ответ поддержки:</b>\n\n{safe_text}")
+            sent_via_telegram = True
+        
+        # Сохраняем ответ админа в БД
         SupportMessage.objects.create(
             user=user,
+            guest_name=support_msg.guest_name if is_guest else "",
+            guest_contact=support_msg.guest_contact if is_guest else "",
+            guest_telegram_username=support_msg.guest_telegram_username if is_guest else "",
+            guest_telegram_chat_id=support_msg.guest_telegram_chat_id if is_guest else None,
             text=text,
             is_from_admin=True,
         )
+        
+        # Обновляем сообщение админу с пометкой об отправке ответа
         if support_msg.admin_telegram_text and support_msg.admin_telegram_message_id:
-            new_text = support_msg.admin_telegram_text + "\n\n✅ Ответ отправлен"
+            if is_guest:
+                if sent_via_telegram:
+                    new_text = support_msg.admin_telegram_text + "\n\n✅ Ответ отправлен в Telegram"
+                else:
+                    new_text = support_msg.admin_telegram_text + "\n\n✅ Ответ сохранён. Свяжитесь с пользователем по указанным контактам (Telegram не привязан)."
+            else:
+                new_text = support_msg.admin_telegram_text + "\n\n✅ Ответ отправлен"
             tg_support.edit_message(admin_chat_id, original_message_id, new_text)
         return JsonResponse({"ok": True})
 
@@ -400,25 +505,60 @@ def telegram_support_webhook(request):
             token = (parts[1] or "").strip()
 
         if token:
+            # Сначала проверяем токен для зарегистрированных пользователей
             link = UserTelegramLink.objects.filter(binding_token=token).first()
             if link:
                 link.telegram_chat_id = chat_id_int
                 link.binding_token = ""
                 link.token_created_at = None
                 link.save(update_fields=["telegram_chat_id", "binding_token", "token_created_at"])
-                tg_support.send_message(chat_id_int, "✅ Ваш аккаунт успешно привязан.")
+                # Переносим гостевые сообщения к этому пользователю, если они есть
+                migrated_count = link.migrate_guest_messages()
+                if migrated_count > 0:
+                    tg_support.send_message(
+                        chat_id_int,
+                        f"✅ Ваш аккаунт успешно привязан.\n"
+                        f"📨 Найдено и привязано {migrated_count} обращений, отправленных до регистрации."
+                    )
+                else:
+                    tg_support.send_message(chat_id_int, "✅ Ваш аккаунт успешно привязан.")
             else:
-                tg_support.send_message(chat_id_int, "Токен не найден или устарел. Отправьте форму на сайте заново и перейдите по новой ссылке.")
+                # Проверяем токен для гостей
+                guest_msg = SupportMessage.objects.filter(guest_binding_token=token, user__isnull=True).first()
+                if guest_msg:
+                    guest_msg.guest_telegram_chat_id = chat_id_int
+                    guest_msg.guest_binding_token = ""
+                    guest_msg.save(update_fields=["guest_telegram_chat_id", "guest_binding_token"])
+                    tg_support.send_message(
+                        chat_id_int,
+                        f"✅ Ваш Telegram успешно привязан для получения ответов на обращение #{guest_msg.pk}.\n"
+                        f"Администратор сможет ответить вам здесь в Telegram."
+                    )
+                else:
+                    tg_support.send_message(chat_id_int, "Токен не найден или устарел. Отправьте форму на сайте заново и перейдите по новой ссылке.")
         else:
             # /start без токена — проверяем, привязан ли уже этот чат
             existing = UserTelegramLink.objects.filter(telegram_chat_id=chat_id_int).first()
             if existing:
                 tg_support.send_message(chat_id_int, "✅ Ваш аккаунт уже привязан.")
             else:
-                tg_support.send_message(
-                    chat_id_int,
-                    "Отправьте форму обратной связи на сайте и перейдите по ссылке из уведомления, чтобы привязать аккаунт и получать ответы здесь.",
-                )
+                # Проверяем, есть ли гостевые сообщения с таким chat_id
+                guest_messages = SupportMessage.objects.filter(
+                    user__isnull=True,
+                    guest_telegram_chat_id=chat_id_int
+                ).first()
+                if guest_messages:
+                    tg_support.send_message(
+                        chat_id_int,
+                        "Вы отправили обращение как незарегистрированный пользователь. "
+                        "Зарегистрируйтесь на сайте и привяжите аккаунт по ссылке из профиля, "
+                        "чтобы ваши обращения были привязаны к вашему аккаунту."
+                    )
+                else:
+                    tg_support.send_message(
+                        chat_id_int,
+                        "Отправьте форму обратной связи на сайте и перейдите по ссылке из уведомления, чтобы привязать аккаунт и получать ответы здесь.",
+                    )
         return JsonResponse({"ok": True})
 
     # ----- Обычное сообщение от пользователя (личный чат, уже привязан) -----
@@ -472,11 +612,11 @@ def feedback(request):
     return redirect("support_feedback")
 
 
-@login_required
 @require_http_methods(["POST"])
 def feedback_submit(request):
     """
     API виджета: использует новую систему SupportMessage и возвращает telegram_binding_url при необходимости.
+    Поддерживает как зарегистрированных пользователей, так и гостей.
     """
     return support_feedback_submit(request)
 

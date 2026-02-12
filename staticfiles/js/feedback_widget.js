@@ -122,6 +122,9 @@
             e.preventDefault();
             var messageEl = form.querySelector("[name=message]");
             var subjectEl = form.querySelector("[name=subject]");
+            var guestNameEl = form.querySelector("[name=guest_name]");
+            var guestContactEl = form.querySelector("[name=guest_contact]");
+            var guestTelegramEl = form.querySelector("[name=guest_telegram_username]");
             var message = (messageEl && messageEl.value || "").trim();
             if (!message) {
                 if (formError) {
@@ -129,6 +132,17 @@
                     formError.style.display = "block";
                 }
                 return;
+            }
+            // Для незарегистрированных пользователей проверяем имя
+            if (!isAuth && guestNameEl) {
+                var guestName = (guestNameEl.value || "").trim();
+                if (!guestName) {
+                    if (formError) {
+                        formError.textContent = "Введите ваше имя.";
+                        formError.style.display = "block";
+                    }
+                    return;
+                }
             }
             if (formError) formError.style.display = "none";
 
@@ -151,7 +165,10 @@
                         }
                         if (messageEl) messageEl.value = "";
                         if (subjectEl) subjectEl.value = "";
-                        if (threadsList && threadsUrl) loadThreads();
+                        if (guestNameEl) guestNameEl.value = "";
+                        if (guestContactEl) guestContactEl.value = "";
+                        if (guestTelegramEl) guestTelegramEl.value = "";
+                        if (threadsList && threadsUrl && isAuth) loadThreads();
                     } else {
                         if (formError) {
                             formError.textContent = data.error || "Ошибка отправки.";
@@ -171,10 +188,26 @@
                     formError.style.display = "block";
                 }
             };
-            xhr.send(JSON.stringify({
+            var payload = {
                 message: message,
                 subject: (subjectEl && subjectEl.value || "").trim()
-            }));
+            };
+            // Добавляем данные гостя, если пользователь не авторизован
+            if (!isAuth) {
+                if (guestNameEl) {
+                    payload.guest_name = (guestNameEl.value || "").trim();
+                }
+                if (guestContactEl) {
+                    payload.guest_contact = (guestContactEl.value || "").trim();
+                }
+                if (guestTelegramEl) {
+                    var tgUsername = (guestTelegramEl.value || "").trim().replace(/^@/, "");
+                    if (tgUsername) {
+                        payload.guest_telegram_username = tgUsername;
+                    }
+                }
+            }
+            xhr.send(JSON.stringify(payload));
         });
     }
 })();

@@ -124,6 +124,9 @@ def format_support_message_to_admin(
     subject: str,
     text: str,
     source: str = "сайт",
+    is_guest: bool = False,
+    guest_contact: str = "",
+    guest_telegram_username: str = "",
 ) -> str:
     """
     Форматирует текст сообщения для админа с идентификатором SupportMessage#id,
@@ -133,14 +136,31 @@ def format_support_message_to_admin(
     msg = _escape(text or "")
     user_d = _escape(user_display or "—")
     email = _escape(user_email or "—")
-    return (
-        f"📩 <b>Обратная связь #{support_message_id}</b> ({source})\n\n"
-        f"От: {user_d}\n"
-        f"Email: {email}\n"
-        f"Тема: {subj}\n\n"
-        f"Сообщение:\n{msg}\n\n"
-        "<i>Ответьте на это сообщение — ответ уйдёт пользователю в Telegram.</i>"
-    )
+    contact = _escape(guest_contact or "—")
+    
+    if is_guest:
+        tg_info = ""
+        if guest_telegram_username:
+            tg_info = f"\nTelegram: @{_escape(guest_telegram_username)}\n"
+            tg_info += "<i>Пользователь может привязать бота по ссылке из ответа на сайте. После привязки вы сможете ответить через Telegram.</i>\n"
+        return (
+            f"📩 <b>Обратная связь #{support_message_id}</b> ({source})\n\n"
+            f"⚠️ <b>Незарегистрированный пользователь</b>\n"
+            f"От: {user_d}\n"
+            f"Контакт: {contact}{tg_info}"
+            f"Тема: {subj}\n\n"
+            f"Сообщение:\n{msg}\n\n"
+            "<i>Ответьте на это сообщение — ответ будет сохранён. Если пользователь привязал бота, ответ уйдёт в Telegram, иначе свяжитесь по указанным контактам.</i>"
+        )
+    else:
+        return (
+            f"📩 <b>Обратная связь #{support_message_id}</b> ({source})\n\n"
+            f"От: {user_d}\n"
+            f"Email: {email}\n"
+            f"Тема: {subj}\n\n"
+            f"Сообщение:\n{msg}\n\n"
+            "<i>Ответьте на это сообщение — ответ уйдёт пользователю в Telegram.</i>"
+        )
 
 
 def get_bot_username() -> str | None:

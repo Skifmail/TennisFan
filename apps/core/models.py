@@ -68,6 +68,30 @@ class UserTelegramLink(models.Model):
         self.token_created_at = timezone.now()
         self.save(update_fields=["binding_token", "token_created_at"])
         return self.binding_token
+    
+    def migrate_guest_messages(self):
+        """
+        Переносит гостевые SupportMessage к этому пользователю, если они связаны с тем же chat_id.
+        Вызывается после привязки Telegram бота зарегистрированным пользователем.
+        Возвращает количество перенесенных сообщений.
+        """
+        if not self.telegram_chat_id:
+            return 0
+        
+        # Ищем гостевые сообщения с таким же chat_id
+        guest_messages = SupportMessage.objects.filter(
+            user__isnull=True,
+            guest_telegram_chat_id=self.telegram_chat_id
+        )
+        
+        # Переносим найденные сообщения к пользователю
+        updated_count = guest_messages.update(
+            user=self.user,
+            guest_telegram_chat_id=None,  # Очищаем, так как теперь это зарегистрированный пользователь
+            guest_binding_token="",  # Очищаем токен
+        )
+        
+        return updated_count
 
 
 class TelegramTransferConsentLog(models.Model):
@@ -107,11 +131,48 @@ class SupportMessage(models.Model):
     """
     Сообщение в системе поддержки: от пользователя (с сайта или из Telegram)
     или от администратора (ответ в Telegram).
+    Поддерживает как зарегистрированных пользователей, так и гостей (незарегистрированных).
     """
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="support_messages",
+        null=True,
+        blank=True,
+        help_text="Зарегистрированный пользователь (null для гостей)",
+    )
+    guest_name = models.CharField(
+        "Имя гостя",
+        max_length=200,
+        blank=True,
+        help_text="Имя незарегистрированного пользователя",
+    )
+    guest_contact = models.CharField(
+        "Контакт гостя",
+        max_length=200,
+        blank=True,
+        help_text="Email или телефон незарегистрированного пользователя",
+    )
+    guest_telegram_username = models.CharField(
+        "Telegram username гостя",
+        max_length=100,
+        blank=True,
+        help_text="Telegram username незарегистрированного пользователя (без @)",
+    )
+    guest_telegram_chat_id = models.BigIntegerField(
+        "Telegram chat_id гостя",
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Chat ID гостя в Telegram (заполняется после привязки бота)",
+    )
+    guest_binding_token = models.CharField(
+        "Токен привязки для гостя",
+        max_length=64,
+        blank=True,
+        unique=True,
+        db_index=True,
+        help_text="Токен для привязки Telegram бота гостю (t.me/bot?start=TOKEN)",
     )
     subject = models.CharField("Тема", max_length=200, blank=True)
     text = models.TextField("Текст сообщения")
@@ -134,7 +195,10 @@ class SupportMessage(models.Model):
         verbose_name_plural = "сообщения поддержки"
 
     def __str__(self):
-        return f"#{self.pk} {'(админ)' if self.is_from_admin else ''} {self.user}"
+        if self.user:
+            return f"#{self.pk} {'(админ)' if self.is_from_admin else ''} {self.user}"
+        else:
+            return f"#{self.pk} {'(админ)' if self.is_from_admin else ''} Гость: {self.guest_name or 'Без имени'}"
 
 
 class SupportConversation(SupportMessage):

@@ -2144,22 +2144,31 @@ button {
 
 .player-stats {
     display: flex;
-    gap: var(--spacing-xl);
+    gap: var(--spacing-md);
     text-align: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    min-width: 0;
+    justify-content: space-between;
+}
+
+.player-stats > div {
+    min-width: 0;
+    flex: 0 0 auto;
 }
 
 @media (max-width: 768px) {
     .player-stats {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
         gap: var(--spacing-md);
-        justify-content: space-around;
     }
 }
 
 @media (max-width: 480px) {
     .player-stats {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
         gap: var(--spacing-sm);
-        justify-content: space-between;
     }
 
     .stat-value {
@@ -3861,8 +3870,9 @@ select.form-control {
     .grid .player-card .player-category,
     .rating-list .grid .player-card .player-category {
         font-size: var(--font-size-xs);
-        display: block;
+        display: inline-block;
         margin-top: 1px;
+        width: auto;
     }
 
     .grid .player-card .player-stats,

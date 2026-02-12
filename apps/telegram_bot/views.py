@@ -770,15 +770,79 @@ def _handle_menu_callback_action(
             logger.warning("menu_my_matches: send_message failed for chat_id=%s", chat_id)
 
     elif callback_data == "menu_my_profile":
-        text = (
-            f"👤 <b>Мой профиль</b>\n\n"
-            f"<b>{player}</b>\n"
-            f"Уровень: {player.get_skill_level_display()}\n"
-            f"Город: {player.city or '—'}\n"
-            f"Очков: {player.total_points}\n"
-            f"Матчей: {player.matches_played}\n"
-            f"Побед: {player.win_rate}%"
-        )
+        # Получаем сезонные очки
+        from apps.tournaments.season_utils import get_current_season
+        from apps.tournaments.models import SeasonPoints
+        
+        current_season = get_current_season()
+        season_points = 0
+        try:
+            sp = player.season_points
+            if sp.season_name == current_season.name and sp.season_year == current_season.year:
+                season_points = sp.current_season_points
+        except (AttributeError, SeasonPoints.DoesNotExist):
+            pass
+        
+        # Получаем информацию о подписке
+        try:
+            sub = getattr(user, "subscription", None)
+            if sub:
+                tier = sub.tier
+                tier_name = tier.get_name_display()
+                is_valid = sub.is_valid()
+                if is_valid:
+                    sub_status = f"✅ {tier_name}"
+                else:
+                    sub_status = f"❌ {tier_name} (истекла)"
+            else:
+                sub_status = "❌ Нет подписки"
+        except Exception:
+            sub_status = "❌ Нет подписки"
+        
+        # Формируем красивую таблицу
+        lines = [
+            "👤 <b>МОЙ ПРОФИЛЬ</b>",
+            "",
+            f"<b>{player}</b>",
+            "",
+            "📊 <b>ОСНОВНАЯ ИНФОРМАЦИЯ</b>",
+            "━━━━━━━━━━━━━━━━━━",
+            f"📍 Город: <b>{player.city or '—'}</b>",
+            f"🎯 Уровень: <b>{player.get_skill_level_display()}</b>",
+            f"📈 NTRP: <b>{player.ntrp_level}</b>",
+        ]
+        
+        # Добавляем дополнительную информацию, если есть
+        if player.birth_date:
+            from datetime import date
+            today = date.today()
+            age = today.year - player.birth_date.year - ((today.month, today.day) < (player.birth_date.month, player.birth_date.day))
+            lines.append(f"🎂 Возраст: <b>{age} лет</b>")
+        
+        if player.gender:
+            gender_display = dict(player.Gender.choices).get(player.gender, player.gender)
+            lines.append(f"⚧️ Пол: <b>{gender_display}</b>")
+        
+        if player.forehand:
+            forehand_display = dict(player.Forehand.choices).get(player.forehand, player.forehand)
+            lines.append(f"✋ Ведущая рука: <b>{forehand_display}</b>")
+        
+        lines.extend([
+            "",
+            "🏆 <b>РЕЙТИНГ И СТАТИСТИКА</b>",
+            "━━━━━━━━━━━━━━━━━━",
+            f"💎 Очки Elo: <b>{player.total_points:.1f}</b>",
+            f"🎖️ Очки сезона: <b>{season_points}</b>",
+            f"🎾 Матчей: <b>{player.matches_played}</b>",
+            f"✅ Побед: <b>{player.matches_won}</b>",
+            f"📊 Процент побед: <b>{player.win_rate}%</b>",
+            "",
+            "💳 <b>ПОДПИСКА</b>",
+            "━━━━━━━━━━━━━━━━━━",
+            f"{sub_status}",
+        ])
+        
+        text = "\n".join(lines)
         ok = bot.send_to_user(chat_id, text)
         _answer("Профиль" if ok else "Ошибка отправки")
         if not ok:

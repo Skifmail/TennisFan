@@ -48,27 +48,35 @@
             </div>
             <div class="player-stats">
                 <div>
-                    <div class="stat-value">{{ player.matches_played }}</div>
+                    <div class="stat-label">NTRP</div>
+                    <div class="stat-value">{{ player.ntrp_level }}</div>
+                </div>
+                <div>
+                    <div class="stat-label">Очки Elo</div>
+                    <div class="stat-value">{{ player.total_points|floatformat:1 }}</div>
+                </div>
+                <div>
                     <div class="stat-label">Матчей</div>
+                    <div class="stat-value">{{ player.matches_played }}</div>
                 </div>
                 <div>
-                    <div class="stat-value">{{ player.matches_won }}</div>
                     <div class="stat-label">Побед</div>
+                    <div class="stat-value">{{ player.matches_won }}</div>
                 </div>
                 <div>
-                    <div class="stat-value">{{ player.win_rate }}%</div>
                     <div class="stat-label">% побед</div>
+                    <div class="stat-value">{{ player.win_rate }}%</div>
                 </div>
-            </div>
-            <div class="player-points">
-                <span class="text-muted" style="font-size: var(--font-size-xs);">ОЧКИ СЕЗОНА</span><br>
-                <span class="text-primary">
-                    {% if player.season_pts %}
-                        {{ player.season_pts }}
-                    {% else %}
-                        0
-                    {% endif %}
-                </span>
+                <div>
+                    <div class="stat-label">Очки сезона</div>
+                    <div class="stat-value text-primary">
+                        {% if player.season_pts %}
+                            {{ player.season_pts }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </a>
         {% empty %}

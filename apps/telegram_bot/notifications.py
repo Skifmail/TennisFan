@@ -72,10 +72,19 @@ def _match_info_text(match) -> str:
     deadline_str = (
         match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else "не указан"
     )
+
+    # Для спарринговых матчей tournament может быть None
+    if match.is_sparring():
+        tournament_info = "Спарринг (личная встреча)"
+        round_info = "—"
+    else:
+        tournament_info = match.tournament.name if match.tournament else "—"
+        round_info = match.round_name or "—"
+
     return (
         f"🎾 <b>Новый матч</b>\n\n"
-        f"Турнир: {match.tournament.name}\n"
-        f"Этап: {match.round_name or '—'}\n"
+        f"Турнир: {tournament_info}\n"
+        f"Этап: {round_info}\n"
         f"{side1} — {side2}\n"
         f"Дедлайн: {deadline_str}\n\n"
         "Внести результат или посмотреть матчи — кнопки ниже."
@@ -772,54 +781,36 @@ def notify_sparring_response(sparring_response) -> None:
 
     text = "\n".join(lines)
 
-    # Формируем inline-кнопки
-    base_url = _get_site_base_url()
-    profile_url = f"{base_url.rstrip('/')}/players/{respondent.pk}/"
-
-    keyboard = []
-
-    # Кнопка "Получить контакт"
-    contact_method = sparring_response.contact_method
-    if contact_method == "telegram" and respondent.telegram:
-        keyboard.append(
-            [
-                {
-                    "text": "📱 Получить контакт",
-                    "callback_data": f"contact_{sparring_response.pk}",
-                }
-            ]
-        )
-    elif contact_method == "whatsapp" and respondent.whatsapp:
-        keyboard.append(
-            [
-                {
-                    "text": "📱 Получить контакт",
-                    "callback_data": f"contact_{sparring_response.pk}",
-                }
-            ]
-        )
-    elif contact_method == "max" and respondent.max_contact:
-        keyboard.append(
-            [
-                {
-                    "text": "📱 Получить контакт",
-                    "callback_data": f"contact_{sparring_response.pk}",
-                }
-            ]
-        )
-
-    # Кнопка "Профиль игрока"
-    keyboard.append([{"text": "👤 Профиль игрока", "url": profile_url}])
-
-    # Кнопка "Подтвердить игру"
-    keyboard.append(
+    # Кнопки: Профиль в боте, Подтвердить, Связаться (без ссылок на сайт)
+    keyboard = [
         [
             {
-                "text": "✅ Подтвердить игру",
+                "text": "👤 Профиль игрока",
+                "callback_data": f"sparring_profile_{sparring_response.pk}",
+            }
+        ],
+        [
+            {
+                "text": "✅ Подтвердить",
                 "callback_data": f"confirm_match_{sparring_response.pk}",
             }
-        ]
+        ],
+    ]
+    contact_method = sparring_response.contact_method
+    has_contact = (
+        (contact_method == "telegram" and respondent.telegram)
+        or (contact_method == "whatsapp" and respondent.whatsapp)
+        or (contact_method == "max" and respondent.max_contact)
     )
+    if has_contact:
+        keyboard.append(
+            [
+                {
+                    "text": "💬 Связаться",
+                    "callback_data": f"contact_{sparring_response.pk}",
+                }
+            ]
+        )
 
     reply_markup = {"inline_keyboard": keyboard}
 

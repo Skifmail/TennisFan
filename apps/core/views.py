@@ -5,6 +5,7 @@ Core views - main pages.
 import json
 import logging
 import re
+import secrets
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -276,11 +277,11 @@ def _create_support_message_and_send_to_admin(
     Возвращает (support_message, telegram_binding_url или None).
     Поддерживает как зарегистрированных пользователей, так и гостей.
     """
-    import secrets
-
     if request.user.is_authenticated:
+        # Уникальный токен для каждого сообщения (поле unique=True); для привязки бота используется UserTelegramLink
         support_msg = SupportMessage.objects.create(
             user=request.user,
+            guest_binding_token=secrets.token_urlsafe(32),
             subject=(subject or "")[:200],
             text=message,
             is_from_admin=False,
@@ -336,13 +337,11 @@ def _create_support_message_and_send_to_admin(
 
     binding_url = None
     if request.user.is_authenticated and tg_support.is_telegram_configured():
-        import secrets as _secrets
-
         link, _ = UserTelegramLink.objects.get_or_create(
             user=request.user,
             defaults={
                 "telegram_chat_id": None,
-                "binding_token": _secrets.token_urlsafe(32),
+                "binding_token": secrets.token_urlsafe(32),
             },
         )
         # Если пользователь уже привязал бота, проверяем гостевые сообщения
@@ -552,9 +551,10 @@ def telegram_support_webhook(request):
             )
             sent_via_telegram = True
 
-        # Сохраняем ответ админа в БД
+        # Сохраняем ответ админа в БД (guest_binding_token уникален в модели)
         SupportMessage.objects.create(
             user=user,
+            guest_binding_token=secrets.token_urlsafe(32),
             guest_name=support_msg.guest_name if is_guest else "",
             guest_contact=support_msg.guest_contact if is_guest else "",
             guest_telegram_username=(
@@ -694,6 +694,7 @@ def telegram_support_webhook(request):
 
         support_msg = SupportMessage.objects.create(
             user=link.user,
+            guest_binding_token=secrets.token_urlsafe(32),
             text=text,
             is_from_admin=False,
         )

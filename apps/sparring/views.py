@@ -5,12 +5,26 @@ Sparring views.
 import json
 import logging
 
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.http import Http404, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_http_methods, require_POST
+from django.contrib import messages  # pyright: ignore[reportMissingImports]
+from django.contrib.auth.decorators import (
+    login_required,
+)
 
+# pyright: ignore[reportMissingImports]
+from django.http import Http404, JsonResponse  # pyright: ignore[reportMissingImports]
+from django.shortcuts import (
+    get_object_or_404,
+    redirect,
+    render,
+)
+
+# pyright: ignore[reportMissingImports]
+from django.views.decorators.http import (
+    require_http_methods,
+    require_POST,
+)
+
+# pyright: ignore[reportMissingImports]
 from apps.core.decorators import login_required_with_message, require_filled_profile
 from apps.users.models import Player
 

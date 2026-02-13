@@ -1,142 +1,125 @@
-"""Django settings for TennisFan project."""
+"""
+Django settings for TennisFan project.
+Production-ready configuration.
+"""
 
-from pathlib import Path
 import os
+from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Загружаем переменные из .env в корне проекта (рядом с manage.py)
-from dotenv import load_dotenv
 load_dotenv(BASE_DIR / ".env")
 
-# SECRET_KEY обязателен для безопасности
-SECRET_KEY = os.environ.get('SECRET_KEY')
+# ------------------------------------------------------------------------------
+# CORE
+# ------------------------------------------------------------------------------
+
+DEBUG = os.environ.get("DEBUG", "False") == "True"
+
+SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
-    # В development режиме можно использовать временный ключ, но лучше задать в .env
-    if os.environ.get('DEBUG', 'False') == 'True':
-        import warnings
-        warnings.warn(
-            "SECRET_KEY not set in environment. Using a temporary key for development only. "
-            "Set SECRET_KEY in .env file for production!",
-            UserWarning
-        )
-        SECRET_KEY = 'django-insecure-dev-key-change-in-production-set-in-env'
+    if DEBUG:
+        SECRET_KEY = "dev-secret-key-change-in-production"
     else:
-        from django.core.exceptions import ImproperlyConfigured
-        raise ImproperlyConfigured(
-            "SECRET_KEY environment variable must be set. "
-            "Set it in your .env file or environment variables."
-        )
+        raise ImproperlyConfigured("SECRET_KEY must be set in environment")
 
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+# ------------------------------------------------------------------------------
+# ALLOWED HOSTS / CSRF
+# ------------------------------------------------------------------------------
 
-# ALLOWED_HOSTS — localhost for dev; .up.railway.app для Railway; .ngrok-free.dev/.ngrok.io для туннеля
-_allowed = os.environ.get(
-    'ALLOWED_HOSTS',
-    'localhost,127.0.0.1,.up.railway.app,.ngrok-free.dev,.ngrok.io'
+_allowed = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1")
+ALLOWED_HOSTS = [h.strip() for h in _allowed.split(",") if h.strip()]
+
+_csrf = os.environ.get(
+    "CSRF_TRUSTED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"
 )
-ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()]
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf.split(",") if o.strip()]
 
-# CSRF: origins must match exactly or use leading-dot subdomain (e.g. https://.up.railway.app).
-# For custom domains set CSRF_TRUSTED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
-_csrf_origins = os.environ.get(
-    'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:8000,http://127.0.0.1:8000,https://.up.railway.app,https://.railway.app'
-)
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
+# ------------------------------------------------------------------------------
+# SECURITY
+# ------------------------------------------------------------------------------
 
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
-# Настройки безопасности сессий
-SESSION_COOKIE_AGE = 1209600  # 2 недели
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+
+SESSION_COOKIE_AGE = 1209600
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-SESSION_SAVE_EVERY_REQUEST = True  # Обновлять таймаут при активности пользователя
+SESSION_SAVE_EVERY_REQUEST = True
+
+# ------------------------------------------------------------------------------
+# APPLICATIONS
+# ------------------------------------------------------------------------------
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'django.contrib.humanize',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django.contrib.humanize",
+    "django_crontab",
     # Local apps
-    'apps.core',
-    'apps.users',
-    'apps.tournaments',
-    'apps.courts',
-    'apps.sparring',
-    'apps.training',
-    'apps.content',
-    'apps.comments',
-    'apps.subscriptions',
-    'apps.payments',
-    'apps.legal',
-    'apps.navigation',
-    'apps.shop',
-    'apps.telegram_bot',
-    'django_crontab',
+    "apps.core",
+    "apps.users",
+    "apps.tournaments",
+    "apps.courts",
+    "apps.sparring",
+    "apps.training",
+    "apps.content",
+    "apps.comments",
+    "apps.subscriptions",
+    "apps.payments",
+    "apps.legal",
+    "apps.navigation",
+    "apps.shop",
+    "apps.telegram_bot",
 ]
 
-# Cloudinary configuration - MUST be set BEFORE any Django initialization
-CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL')
-
-# Configure STORAGES FIRST - this must be done before any other imports
-if CLOUDINARY_URL:
-    # Production: Use Cloudinary for media storage
-    STORAGES = {
-        'default': {
-            'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
-        },
-    }
-else:
-    # Development: Use local filesystem storage
-    STORAGES = {
-        'default': {
-            'BACKEND': 'django.core.files.storage.FileSystemStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
-        },
-    }
-
-# Now modify INSTALLED_APPS AFTER STORAGES is configured
-if CLOUDINARY_URL:
-    # Production: Use Cloudinary for media storage
-    # NOTE: Only add 'cloudinary' app, NOT 'cloudinary_storage' 
-    # cloudinary_storage has compatibility issues with Django 4.2+ STORAGES
-    # We configure cloudinary_storage backend directly in STORAGES instead
-    INSTALLED_APPS.append('cloudinary')
+# ------------------------------------------------------------------------------
+# MIDDLEWARE
+# ------------------------------------------------------------------------------
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = "config.urls"
+WSGI_APPLICATION = "config.wsgi.application"
+
+# ------------------------------------------------------------------------------
+# TEMPLATES
+# ------------------------------------------------------------------------------
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
                 "apps.users.context_processors.unread_notifications",
                 "apps.users.context_processors.user_is_coach",
                 "apps.navigation.context_processors.nav_menu_items",
@@ -145,155 +128,187 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+# ------------------------------------------------------------------------------
+# DATABASE
+# ------------------------------------------------------------------------------
 
-# Database - SQLite
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.environ.get("USE_POSTGRES", "False") == "True":
+    required = ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"]
+    for var in required:
+        if not os.environ.get(var):
+            raise ImproperlyConfigured(f"{var} is required when USE_POSTGRES=True")
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_DB"),
+            "USER": os.environ.get("POSTGRES_USER"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
+            "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        }
     }
-}
-
-# Custom User Model
-AUTH_USER_MODEL = 'users.User'
-
-# Password validation
-AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
-]
-
-# Internationalization
-LANGUAGE_CODE = 'ru-ru'
-TIME_ZONE = 'Europe/Moscow'
-USE_I18N = True
-USE_TZ = True
-
-# Static files
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-# Note: STATICFILES_STORAGE is now configured in STORAGES dict above (Django 4.2+)
-
-# Ensure static root exists in ephemeral environments (Railway) to avoid missing-dir warnings
-STATIC_ROOT.mkdir(parents=True, exist_ok=True)
-
-# Fallback: allow WhiteNoise to use finders if collectstatic didn't run (demo safety)
-WHITENOISE_USE_FINDERS = True
-
-# Configure Cloudinary and Media files
-if CLOUDINARY_URL:
-    # Configure Cloudinary explicitly (optional; django-cloudinary-storage can use CLOUDINARY_URL alone)
-    try:
-        import cloudinary  # type: ignore[import-untyped]
-        # Parse CLOUDINARY_URL: cloudinary://api_key:api_secret@cloud_name
-        url_parts = CLOUDINARY_URL.replace('cloudinary://', '').split('@')
-        if len(url_parts) == 2:
-            credentials = url_parts[0].split(':')
-            cloud_name = url_parts[1]
-            if len(credentials) == 2:
-                api_key, api_secret = credentials
-                cloudinary.config(
-                    cloud_name=cloud_name,
-                    api_key=api_key,
-                    api_secret=api_secret,
-                    secure=True,
-                )
-    except ImportError:
-        pass
-    
-    # Cloudinary returns absolute URLs
-    MEDIA_URL = '/media/'
-    # Do NOT set MEDIA_ROOT when using Cloudinary - set to None
-    MEDIA_ROOT = None
 else:
-    # Development: Use local filesystem storage
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'media'
-    MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
-    
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 МБ — до этого размера файл в памяти
-DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024   # 12 МБ — макс. размер тела запроса (форма + файл)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": str(BASE_DIR / "db.sqlite3"),
+        }
+    }
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+AUTH_USER_MODEL = "users.User"
 
-# Login/Logout URLs
-LOGIN_URL = 'login'  # Редирект на auth с mode=login
-LOGIN_REDIRECT_URL = 'home'
-LOGOUT_REDIRECT_URL = 'home'
+# ------------------------------------------------------------------------------
+# STATIC FILES
+# ------------------------------------------------------------------------------
 
-# Telegram: основной бот (уведомления админу — заявки, регистрации и т.д.)
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
-TELEGRAM_ADMIN_CHAT_ID = os.environ.get('TELEGRAM_ADMIN_CHAT_ID', '')
+STATIC_URL = "/static/"
+STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Telegram: бот только для обратной связи / поддержки (отдельный бот)
-TELEGRAM_SUPPORT_BOT_TOKEN = os.environ.get('TELEGRAM_SUPPORT_BOT_TOKEN', '')
-# Опционально: не задавайте — ссылка привязки строится через getMe
-TELEGRAM_SUPPORT_BOT_USERNAME = os.environ.get('TELEGRAM_SUPPORT_BOT_USERNAME', '')
-# Опционально: не задавайте — webhook работает без проверки секрета
-TELEGRAM_SUPPORT_WEBHOOK_SECRET = os.environ.get('TELEGRAM_SUPPORT_WEBHOOK_SECRET', '')
-
-# Telegram: бот для пользователей (уведомления о турнирах, матчах, подписка)
-TELEGRAM_USER_BOT_TOKEN = os.environ.get('TELEGRAM_USER_BOT_TOKEN', '')
-TELEGRAM_USER_BOT_USERNAME = os.environ.get('TELEGRAM_USER_BOT_USERNAME', '')
-TELEGRAM_USER_BOT_WEBHOOK_SECRET = os.environ.get('TELEGRAM_USER_BOT_WEBHOOK_SECRET', '')
-# ID приватного чата сообщества (супергруппа), куда даём инвайт платным тарифам.
-# Пример: -1001234567890
-TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID = os.environ.get('TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID', '')
-# Базовый URL сайта для ссылок в боте (например https://tennisfan.ru)
-TELEGRAM_BOT_SITE_BASE_URL = os.environ.get('TELEGRAM_BOT_SITE_BASE_URL', '')
-
-# Yandex Maps JS API — для карты на странице корта (ключ в .env: YANDEX_MAPS_API_KEY)
-YANDEX_MAPS_API_KEY = os.environ.get('YANDEX_MAPS_API_KEY', '')
-
-# Yandex Geocoder API — получение координат по адресу при сохранении корта в админке.
-# Можно использовать тот же ключ, что и для карт, или отдельный (в .env: YANDEX_GEOCODER_API_KEY).
-# В кабинете разработчика: подключить к ключу API «Геокодер».
-# Если у ключа включено «Ограничение по HTTP Referer», укажите тот же домен в YANDEX_GEOCODER_REFERER
-# (например https://tennisfan.ru или http://localhost:8000 для локальной разработки).
-YANDEX_GEOCODER_API_KEY = os.environ.get('YANDEX_GEOCODER_API_KEY', '')
-YANDEX_GEOCODER_REFERER = os.environ.get('YANDEX_GEOCODER_REFERER', '')
-
-# Кэш для состояния диалога в Telegram-боте (ввод результата матча)
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "OPTIONS": {"MAX_ENTRIES": 1000},
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     }
 }
 
-# Email configuration
-# Для development: используйте консольный backend (письма выводятся в консоль)
-# Для production: настройте SMTP через переменные окружения
+# ------------------------------------------------------------------------------
+# MEDIA STORAGE (Spaceweb S3 или локально)
+# ------------------------------------------------------------------------------
+
+if os.environ.get("USE_S3", "False") == "True":
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    }
+
+    AWS_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY")
+    AWS_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_KEY")
+    AWS_STORAGE_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
+    AWS_S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL")
+    AWS_S3_REGION_NAME = os.environ.get("S3_REGION", "ru-1")
+
+    AWS_DEFAULT_ACL = None
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_QUERYSTRING_AUTH = False
+
+    MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+
+else:
+    STORAGES["default"] = {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    }
+
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = BASE_DIR / "media"
+    MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+# ------------------------------------------------------------------------------
+# CACHE (Redis optional)
+# ------------------------------------------------------------------------------
+
+if os.environ.get("USE_REDIS", "False") == "True":
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1"),
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+
+# ------------------------------------------------------------------------------
+# EMAIL
+# ------------------------------------------------------------------------------
+
 EMAIL_BACKEND = os.environ.get(
-    'EMAIL_BACKEND',
-    'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+    "EMAIL_BACKEND",
+    (
+        "django.core.mail.backends.console.EmailBackend"
+        if DEBUG
+        else "django.core.mail.backends.smtp.EmailBackend"
+    ),
 )
 
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
-EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@tennisfan.ru')
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False") == "True"
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru")
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
-# Cron: формирование сеток по дедлайну (FAN, Олимпийская, Круговой), обработка просроченных матчей,
-# авто-подтверждение заявок на результат матча (6 ч без ответа = подтверждено)
+# ------------------------------------------------------------------------------
+# TELEGRAM
+# ------------------------------------------------------------------------------
+
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
+TELEGRAM_SUPPORT_BOT_TOKEN = os.environ.get("TELEGRAM_SUPPORT_BOT_TOKEN", "")
+TELEGRAM_USER_BOT_TOKEN = os.environ.get("TELEGRAM_USER_BOT_TOKEN", "")
+TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID = os.environ.get(
+    "TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID", ""
+)
+TELEGRAM_BOT_SITE_BASE_URL = os.environ.get("TELEGRAM_BOT_SITE_BASE_URL", "")
+
+# ------------------------------------------------------------------------------
+# CRON
+# ------------------------------------------------------------------------------
+
 CRONJOBS = [
-    ('*/10 * * * *', 'django.core.management.call_command', ['generate_brackets_past_deadlines']),
-    ('0 */6 * * *', 'django.core.management.call_command', ['fan_process_overdue_matches']),
-    ('0 */6 * * *', 'django.core.management.call_command', ['olympic_process_overdue_matches']),
-    ('0 */6 * * *', 'django.core.management.call_command', ['round_robin_process_overdue_matches']),
-    ('*/15 * * * *', 'django.core.management.call_command', ['auto_accept_stale_proposals']),
-    ('0 3 1 5,10 *', 'django.core.management.call_command', ['reset_season_points']),  # 1 мая и 1 октября в 03:00
-    ('0 9 * * *', 'django.core.management.call_command', ['send_deadline_reminders']),
-    ('0 8 * * *', 'django.core.management.call_command', ['send_tournament_start_reminders']),
-    ('*/30 * * * *', 'django.core.management.call_command', ['sync_private_chat_access']),
-    # 1st of each month at 03:00 — publish hidden Elo ratings to displayed rating
-    ('0 3 1 * *', 'django.core.management.call_command', ['monthly_rating_publish']),
+    (
+        "*/10 * * * *",
+        "django.core.management.call_command",
+        ["generate_brackets_past_deadlines"],
+    ),
+    (
+        "0 */6 * * *",
+        "django.core.management.call_command",
+        ["fan_process_overdue_matches"],
+    ),
+    (
+        "0 */6 * * *",
+        "django.core.management.call_command",
+        ["olympic_process_overdue_matches"],
+    ),
+    (
+        "0 */6 * * *",
+        "django.core.management.call_command",
+        ["round_robin_process_overdue_matches"],
+    ),
+    (
+        "*/15 * * * *",
+        "django.core.management.call_command",
+        ["auto_accept_stale_proposals"],
+    ),
+    ("0 3 1 5,10 *", "django.core.management.call_command", ["reset_season_points"]),
+    ("0 9 * * *", "django.core.management.call_command", ["send_deadline_reminders"]),
+    (
+        "0 8 * * *",
+        "django.core.management.call_command",
+        ["send_tournament_start_reminders"],
+    ),
+    (
+        "*/30 * * * *",
+        "django.core.management.call_command",
+        ["sync_private_chat_access"],
+    ),
+    ("0 3 1 * *", "django.core.management.call_command", ["monthly_rating_publish"]),
 ]
+
+# ------------------------------------------------------------------------------
+# MISC
+# ------------------------------------------------------------------------------
+
+LANGUAGE_CODE = "ru-ru"
+TIME_ZONE = "Europe/Moscow"
+USE_I18N = True
+USE_TZ = True
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "home"
+LOGOUT_REDIRECT_URL = "home"

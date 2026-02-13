@@ -784,6 +784,14 @@ button {
     box-shadow: var(--shadow-glow);
 }
 
+.btn-sm {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    min-height: 28px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
 .btn-lg {
     padding: var(--spacing-md) var(--spacing-xl);
     font-size: var(--font-size-base);

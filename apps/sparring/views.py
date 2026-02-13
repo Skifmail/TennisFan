@@ -182,6 +182,75 @@ def sparring_my_requests(request):
     )
 
 
+@require_POST
+@login_required
+def sparring_confirm_response(request, response_id):
+    """
+    Подтвердить отклик и создать матч из спарринга.
+    POST /sparring/response/<id>/confirm/
+    """
+    if not user_has_sparring_access(request.user):
+        messages.error(request, "Нет доступа к спаррингам.")
+        return redirect("sparring_list")
+
+    try:
+        response = SparringResponse.objects.select_related(
+            "sparring_request__player", "respondent"
+        ).get(pk=response_id)
+    except SparringResponse.DoesNotExist:
+        messages.error(request, "Отклик не найден.")
+        return redirect("sparring_my_requests")
+
+    # Проверяем, что пользователь - автор заявки
+    if response.sparring_request.player.user_id != request.user.id:
+        messages.error(request, "Вы не можете подтвердить этот отклик.")
+        return redirect("sparring_my_requests")
+
+    # Проверяем, что отклик еще не принят
+    if response.status == SparringResponse.ResponseStatus.ACCEPTED:
+        messages.warning(request, "Этот отклик уже принят.")
+        return redirect("sparring_my_requests")
+
+    # Проверяем, что заявка еще активна
+    if response.sparring_request.status != SparringRequest.Status.ACTIVE:
+        messages.error(request, "Заявка уже закрыта.")
+        return redirect("sparring_my_requests")
+
+    try:
+        from apps.sparring.services import create_match_from_response
+
+        match = create_match_from_response(response)
+
+        # Обновляем статус отклика
+        response.status = SparringResponse.ResponseStatus.ACCEPTED
+        response.save(update_fields=["status"])
+
+        # Закрываем заявку
+        response.sparring_request.status = SparringRequest.Status.CLOSED
+        response.sparring_request.save(update_fields=["status"])
+
+        messages.success(
+            request,
+            f"Матч создан! Вы играете с {response.respondent}. Дедлайн: {match.deadline.strftime('%d.%m.%Y')}.",
+        )
+        logger.info(
+            "Sparring match created: %s from response %s by user %s",
+            match.pk,
+            response.pk,
+            request.user.id,
+        )
+    except ValueError as e:
+        messages.error(request, str(e))
+        logger.error("Failed to create sparring match: %s", e)
+    except Exception:
+        messages.error(request, "Ошибка при создании матча.")
+        logger.exception(
+            "Failed to create sparring match from response %s", response.pk
+        )
+
+    return redirect("sparring_my_requests")
+
+
 @require_GET
 @login_required
 @require_filled_profile

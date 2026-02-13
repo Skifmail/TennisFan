@@ -80,16 +80,25 @@
                                     </span>
                                 </div>
                                 {% if response.status == 'pending' %}
-                                <div class="d-flex gap-1">
-                                    <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-sm btn-outline">Профиль</a>
+                                <div class="d-flex gap-1 align-items-center" style="flex-wrap: wrap;">
+                                    <form action="{% url 'sparring_confirm_response' response_id=response.pk %}" method="post" class="d-inline" style="margin: 0;" onsubmit="return confirm('Подтвердить отклик и создать матч? Заявка будет закрыта.');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-primary" style="min-width: 110px; white-space: nowrap;">Подтвердить</button>
+                                    </form>
+                                    <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-sm btn-outline" style="min-width: 90px; white-space: nowrap;">Профиль</a>
                                     {% if response.respondent.telegram or response.respondent.whatsapp or response.respondent.max_url %}
-                                    <a href="#" class="btn btn-sm btn-primary contact-btn" 
+                                    <a href="#" class="btn btn-sm btn-outline contact-btn" style="min-width: 90px; white-space: nowrap;"
                                        data-telegram="{% if response.respondent.telegram %}https://t.me/{{ response.respondent.telegram|cut:'@' }}{% endif %}"
                                        data-whatsapp="{% if response.respondent.whatsapp %}{{ response.respondent.whatsapp }}{% endif %}"
                                        data-max="{% if response.respondent.max_url %}{{ response.respondent.max_url }}{% endif %}">
                                         Контакт
                                     </a>
                                     {% endif %}
+                                </div>
+                                {% elif response.status == 'accepted' %}
+                                <div class="d-flex gap-1 align-items-center">
+                                    <span class="text-success" style="font-size: var(--font-size-xs); font-weight: 600;">✓ Матч создан</span>
+                                    <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-sm btn-outline" style="min-width: 90px; white-space: nowrap;">Профиль</a>
                                 </div>
                                 {% endif %}
                             </div>

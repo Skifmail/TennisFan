@@ -14,4 +14,9 @@ urlpatterns = [
     path("<int:pk>/delete/", views.sparring_delete, name="sparring_delete"),
     path("<int:pk>/cancel/", views.sparring_cancel, name="sparring_cancel"),
     path("<int:pk>/respond/", views.sparring_respond, name="sparring_respond"),
+    path(
+        "response/<int:response_id>/confirm/",
+        views.sparring_confirm_response,
+        name="sparring_confirm_response",
+    ),
 ]

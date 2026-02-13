@@ -20,102 +20,138 @@
 
     <div class="pricing-grid">
         {% for tier in tiers %}
-        <div class="pricing-card {% if tier.name == 'free' %}pricing-card-free{% endif %} {% if tier.name == 'diamond' %}pricing-card-diamond{% endif %} {% if current_tier_id == tier.id %}pricing-card-current{% endif %}">
+        <div
+            class="pricing-card {% if tier.name == 'free' %}pricing-card-free{% endif %} {% if tier.name == 'diamond' %}pricing-card-diamond{% endif %} {% if current_tier_id == tier.id %}pricing-card-current{% endif %}">
             {% if tier.name == 'diamond' %}
             <div class="pricing-card__badge">Популярный</div>
             {% endif %}
-            
+
             <h3 class="pricing-card__title">{{ tier.get_name_display }}</h3>
-            
+
             <div class="pricing-card__price">
-                {% if tier.price == 0 %}
-                    <span class="price-amount">Бесплатно</span>
+                {% if tier.effective_price == 0 %}
+                <span class="price-amount">Бесплатно</span>
                 {% else %}
-                    <span class="price-amount">{{ tier.price|intcomma|cut:".00" }} ₽</span>
-                    <span class="price-period">/ месяц</span>
+                <span class="price-amount">{{ tier.effective_price|intcomma|cut:".00" }} ₽</span>
+                <span class="price-period">/ месяц</span>
+                {% if tier.is_regional_price %}
+                <div style="font-size: 0.8rem; color: var(--color-success); margin-top: 5px;">
+                    Ваш регион: {{ user_city|capfirst }}
+                </div>
+                {% endif %}
                 {% endif %}
             </div>
-            
+
             <div class="pricing-card__features">
                 {# --- Регистрации на турниры --- #}
                 <div class="pricing-feature">
-                    <span class="pricing-feature__icon {% if tier.is_unlimited or tier.max_tournaments > 0 %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">{% if tier.is_unlimited or tier.max_tournaments > 0 %}&#10003;{% else %}&#10007;{% endif %}</span>
+                    <span
+                        class="pricing-feature__icon {% if tier.is_unlimited or tier.max_tournaments > 0 %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.is_unlimited or tier.max_tournaments > 0 %}&#10003;{% else %}&#10007;{% endif %}
+                    </span>
                     <div class="pricing-feature__content">
                         <strong>Регистрации на турниры:</strong>
                         {% if tier.is_unlimited %}
-                            <span class="pricing-feature__value">Безлимит</span>
+                        <span class="pricing-feature__value">Безлимит</span>
                         {% elif tier.max_tournaments == 0 %}
-                            <span class="pricing-feature__value pricing-feature__value--disabled">Недоступно</span>
+                        <span class="pricing-feature__value pricing-feature__value--disabled">Недоступно</span>
                         {% else %}
-                            <span class="pricing-feature__value">{{ tier.max_tournaments }} в месяц</span>
+                        <span class="pricing-feature__value">{{ tier.max_tournaments }} в месяц</span>
                         {% endif %}
                     </div>
                 </div>
 
                 {# --- Скидка на однодневные турниры --- #}
                 <div class="pricing-feature">
-                    <span class="pricing-feature__icon {% if tier.one_day_tournament_discount > 0 %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">{% if tier.one_day_tournament_discount > 0 %}&#10003;{% else %}&#10007;{% endif %}</span>
+                    <span
+                        class="pricing-feature__icon {% if tier.one_day_tournament_discount > 0 %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.one_day_tournament_discount > 0 %}&#10003;{% else %}&#10007;{% endif %}
+                    </span>
                     <div class="pricing-feature__content">
                         <strong>Скидка на однодневные турниры:</strong>
                         {% if tier.one_day_tournament_discount > 0 %}
-                            <span class="pricing-feature__value">{{ tier.one_day_tournament_discount }}%</span>
+                        <span class="pricing-feature__value">{{ tier.one_day_tournament_discount }}%</span>
                         {% else %}
-                            <span class="pricing-feature__value pricing-feature__value--disabled">Нет</span>
+                        <span class="pricing-feature__value pricing-feature__value--disabled">Нет</span>
                         {% endif %}
                     </div>
                 </div>
 
                 {# --- Статистика --- #}
                 <div class="pricing-feature">
-                    <span class="pricing-feature__icon {% if tier.can_see_stats %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">{% if tier.can_see_stats %}&#10003;{% else %}&#10007;{% endif %}</span>
+                    <span
+                        class="pricing-feature__icon {% if tier.can_see_stats %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.can_see_stats %}&#10003;{% else %}&#10007;{% endif %}
+                    </span>
                     <div class="pricing-feature__content">Просмотр статистики и рейтингов</div>
                 </div>
 
                 {# --- Чтение комментариев --- #}
                 <div class="pricing-feature">
-                    <span class="pricing-feature__icon {% if tier.can_read_comments %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">{% if tier.can_read_comments %}&#10003;{% else %}&#10007;{% endif %}</span>
+                    <span
+                        class="pricing-feature__icon {% if tier.can_read_comments %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.can_read_comments %}&#10003;{% else %}&#10007;{% endif %}
+                    </span>
                     <div class="pricing-feature__content">Чтение комментариев</div>
                 </div>
 
                 {# --- Написание комментариев --- #}
                 <div class="pricing-feature">
-                    <span class="pricing-feature__icon {% if tier.can_write_comments %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">{% if tier.can_write_comments %}&#10003;{% else %}&#10007;{% endif %}</span>
+                    <span
+                        class="pricing-feature__icon {% if tier.can_write_comments %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.can_write_comments %}&#10003;{% else %}&#10007;{% endif %}
+                    </span>
                     <div class="pricing-feature__content">Написание комментариев</div>
                 </div>
 
                 {# --- Оценка соперников --- #}
                 <div class="pricing-feature">
-                    <span class="pricing-feature__icon {% if tier.can_rate_opponents %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">{% if tier.can_rate_opponents %}&#10003;{% else %}&#10007;{% endif %}</span>
+                    <span
+                        class="pricing-feature__icon {% if tier.can_rate_opponents %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.can_rate_opponents %}&#10003;{% else %}&#10007;{% endif %}
+                    </span>
                     <div class="pricing-feature__content">Оценка соперников после матчей</div>
                 </div>
 
                 {# --- Закрытый чат --- #}
                 <div class="pricing-feature">
-                    <span class="pricing-feature__icon {% if tier.has_private_chat %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">{% if tier.has_private_chat %}&#10003;{% else %}&#10007;{% endif %}</span>
+                    <span
+                        class="pricing-feature__icon {% if tier.has_private_chat %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.has_private_chat %}&#10003;{% else %}&#10007;{% endif %}
+                    </span>
                     <div class="pricing-feature__content">Доступ в закрытый чат сообщества</div>
                 </div>
 
                 {# --- Спарринги --- #}
                 <div class="pricing-feature">
-                    <span class="pricing-feature__icon {% if tier.has_sparring %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">{% if tier.has_sparring %}&#10003;{% else %}&#10007;{% endif %}</span>
+                    <span
+                        class="pricing-feature__icon {% if tier.has_sparring %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.has_sparring %}&#10003;{% else %}&#10007;{% endif %}
+                    </span>
                     <div class="pricing-feature__content">Доступ к организации спаррингов</div>
                 </div>
 
                 {# --- Поддержка администратора --- #}
                 <div class="pricing-feature">
-                    <span class="pricing-feature__icon {% if tier.has_admin_support %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">{% if tier.has_admin_support %}&#10003;{% else %}&#10007;{% endif %}</span>
+                    <span
+                        class="pricing-feature__icon {% if tier.has_admin_support %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.has_admin_support %}&#10003;{% else %}&#10007;{% endif %}
+                    </span>
                     <div class="pricing-feature__content">Приоритетная поддержка администратора</div>
                 </div>
 
                 {# --- Особый значок в профиле --- #}
                 <div class="pricing-feature {% if tier.has_badge %}pricing-feature--highlight{% endif %}">
-                    <span class="pricing-feature__icon {% if tier.has_badge %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">{% if tier.has_badge %}&#10003;{% else %}&#10007;{% endif %}</span>
+                    <span
+                        class="pricing-feature__icon {% if tier.has_badge %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.has_badge %}&#10003;{% else %}&#10007;{% endif %}
+                    </span>
                     <div class="pricing-feature__content">
                         {% if tier.has_badge %}
-                            <strong>Особый статус в профиле:</strong>
-                            {% include 'includes/subscription_badge.html' with tier=tier %}
+                        <strong>Особый статус в профиле:</strong>
+                        {% include 'includes/subscription_badge.html' with tier=tier %}
                         {% else %}
-                            Особый статус в профиле
+                        Особый статус в профиле
                         {% endif %}
                     </div>
                 </div>
@@ -123,11 +159,13 @@
 
             <div class="pricing-card__action">
                 {% if current_tier_id == tier.id %}
-                    <button disabled class="btn btn-outline pricing-card__btn">Текущий план</button>
+                <button disabled class="btn btn-outline pricing-card__btn">Текущий план</button>
                 {% elif tier.price == 0 %}
-                    <button disabled class="btn btn-outline pricing-card__btn">Бесплатный тариф</button>
+                <button disabled class="btn btn-outline pricing-card__btn">Бесплатный тариф</button>
                 {% else %}
-                    <a href="{% url 'payment_preview' %}?type=subscription&id={{ tier.id }}" class="btn {% if tier.name == 'diamond' %}btn-primary{% else %}btn-outline{% endif %} pricing-card__btn">Купить подписку</a>
+                <a href="{% url 'payment_preview' %}?type=subscription&id={{ tier.id }}"
+                    class="btn {% if tier.name == 'diamond' %}btn-primary{% else %}btn-outline{% endif %} pricing-card__btn">Купить
+                    подписку</a>
                 {% endif %}
             </div>
         </div>
@@ -140,19 +178,22 @@
             <div class="pricing-faq__item">
                 <h3 class="pricing-faq__question">Как работает подписка?</h3>
                 <p class="pricing-faq__answer">
-                    Подписка действует в течение месяца с момента покупки. После окончания срока действия подписка автоматически продлевается, если у вас есть активная оплата.
+                    Подписка действует в течение месяца с момента покупки. После окончания срока действия подписка
+                    автоматически продлевается, если у вас есть активная оплата.
                 </p>
             </div>
             <div class="pricing-faq__item">
                 <h3 class="pricing-faq__question">Можно ли отменить подписку?</h3>
                 <p class="pricing-faq__answer">
-                    Да, вы можете отменить подписку в любой момент в своём профиле — в блоке «Подписка» нажмите кнопку «Отменить подписку». Доступ ко всем функциям тарифа сохранится до конца оплаченного периода.
+                    Да, вы можете отменить подписку в любой момент в своём профиле — в блоке «Подписка» нажмите кнопку
+                    «Отменить подписку». Доступ ко всем функциям тарифа сохранится до конца оплаченного периода.
                 </p>
             </div>
             <div class="pricing-faq__item">
                 <h3 class="pricing-faq__question">Что происходит с регистрациями при смене тарифа?</h3>
                 <p class="pricing-faq__answer">
-                    При переходе на более высокий тариф лимит регистраций увеличивается. При переходе на более низкий тариф текущие регистрации сохраняются, но новые будут ограничены новым лимитом.
+                    При переходе на более высокий тариф лимит регистраций увеличивается. При переходе на более низкий
+                    тариф текущие регистрации сохраняются, но новые будут ограничены новым лимитом.
                 </p>
             </div>
         </div>

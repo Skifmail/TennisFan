@@ -9,46 +9,37 @@ html[data-theme="light"],
     --secondary: #417690;
     --accent: #f5dd5d;
     --primary-fg: #fff;
-
     --body-fg: #333;
     --body-bg: #fff;
     --body-quiet-color: #666;
     --body-medium-color: #444;
     --body-loud-color: #000;
-
     --header-color: #ffc;
     --header-branding-color: var(--accent);
     --header-bg: var(--secondary);
     --header-link-color: var(--primary-fg);
-
     --breadcrumbs-fg: #c4dce8;
     --breadcrumbs-link-fg: var(--body-bg);
     --breadcrumbs-bg: #264b5d;
-
     --link-fg: #417893;
     --link-hover-color: #036;
     --link-selected-fg: var(--secondary);
-
     --hairline-color: #e8e8e8;
     --border-color: #ccc;
-
     --error-fg: #ba2121;
-
     --message-debug-bg: #efefef;
-    --message-debug-icon: url(../img/icon-debug.svg);
+    --message-debug-icon: url("../img/icon-debug.svg");
     --message-info-bg: #ccefff;
-    --message-info-icon: url(../img/icon-info.svg);
+    --message-info-icon: url("../img/icon-info.svg");
     --message-success-bg: #dfd;
-    --message-success-icon: url(../img/icon-yes.svg);
+    --message-success-icon: url("../img/icon-yes.svg");
     --message-warning-bg: #ffc;
-    --message-warning-icon: url(../img/icon-alert.svg);
+    --message-warning-icon: url("../img/icon-alert.svg");
     --message-error-bg: #ffefef;
-    --message-error-icon: url(../img/icon-no.svg);
-
+    --message-error-icon: url("../img/icon-no.svg");
     --darkened-bg: #f8f8f8; /* A bit darker than --body-bg */
     --selected-bg: #e4e4e4; /* E.g. selected table cells */
     --selected-row: #ffc;
-
     --button-fg: #fff;
     --button-bg: var(--secondary);
     --button-hover-bg: #205067;
@@ -58,17 +49,15 @@ html[data-theme="light"],
     --close-button-hover-bg: #333;
     --delete-button-bg: #ba2121;
     --delete-button-hover-bg: #a41515;
-
     --object-tools-fg: var(--button-fg);
     --object-tools-bg: var(--close-button-bg);
     --object-tools-hover-bg: var(--close-button-hover-bg);
-
     --font-family-primary:
         "Segoe UI",
         system-ui,
-        Roboto,
+        roboto,
         "Helvetica Neue",
-        Arial,
+        arial,
         sans-serif,
         "Apple Color Emoji",
         "Segoe UI Emoji",
@@ -76,8 +65,8 @@ html[data-theme="light"],
         "Noto Color Emoji";
     --font-family-monospace:
         ui-monospace,
-        Menlo,
-        Monaco,
+        menlo,
+        monaco,
         "Cascadia Mono",
         "Segoe UI Mono",
         "Roboto Mono",
@@ -151,7 +140,7 @@ a.section:focus, a.section:hover {
 /* GLOBAL DEFAULTS */
 
 p, ol, ul, dl {
-    margin: .2em 0 .8em 0;
+    margin: .2em 0 .8em;
 }
 
 p {
@@ -171,7 +160,7 @@ h1 {
 
 h2 {
     font-size: 1rem;
-    margin: 1em 0 .5em 0;
+    margin: 1em 0 .5em;
 }
 
 h2.subhead {
@@ -181,21 +170,21 @@ h2.subhead {
 
 h3 {
     font-size: 0.875rem;
-    margin: .8em 0 .3em 0;
+    margin: .8em 0 .3em;
     color: var(--body-medium-color);
     font-weight: bold;
 }
 
 h4 {
     font-size: 0.75rem;
-    margin: 1em 0 .8em 0;
+    margin: 1em 0 .8em;
     padding-bottom: 3px;
     color: var(--body-medium-color);
 }
 
 h5 {
     font-size: 0.625rem;
-    margin: 1.5em 0 .5em 0;
+    margin: 1.5em 0 .5em;
     color: var(--body-quiet-color);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -246,7 +235,7 @@ blockquote {
     color: var(--body-quiet-color);
     margin-left: 2px;
     padding-left: 10px;
-    border-left: 5px solid currentColor;
+    border-left: 5px solid currentcolor;
 }
 
 code, pre {
@@ -422,7 +411,7 @@ table thead th.sorted:hover a.sortremove {
 
 table thead th.sorted .sortoptions {
     display: block;
-    padding: 9px 5px 0 5px;
+    padding: 9px 5px 0;
     float: right;
     text-align: right;
 }
@@ -441,7 +430,7 @@ table thead th.sorted .sortoptions a {
     width: 14px;
     height: 14px;
     display: inline-block;
-    background: url(../img/sorting-icons.svg) 0 0 no-repeat;
+    background: url("../img/sorting-icons.svg") 0 0 no-repeat;
     background-size: 14px auto;
 }
 
@@ -449,7 +438,7 @@ table thead th.sorted .sortoptions a.sortremove {
     background-position: 0 0;
 }
 
-table thead th.sorted .sortoptions a.sortremove:after {
+table thead th.sorted .sortoptions a.sortremove::after {
     content: '\\';
     position: absolute;
     top: -6px;
@@ -459,8 +448,8 @@ table thead th.sorted .sortoptions a.sortremove:after {
     color: var(--body-quiet-color);
 }
 
-table thead th.sorted .sortoptions a.sortremove:focus:after,
-table thead th.sorted .sortoptions a.sortremove:hover:after {
+table thead th.sorted .sortoptions a.sortremove:focus::after,
+table thead th.sorted .sortoptions a.sortremove:hover::after {
     color: var(--link-fg);
 }
 
@@ -498,6 +487,7 @@ input, textarea, select, .form-row p, form .button {
     font-weight: normal;
     font-size: 0.8125rem;
 }
+
 .form-row div.help {
     padding: 2px 3px;
 }
@@ -510,8 +500,8 @@ textarea {
 Minifiers remove the default (text) "type" attribute from "input" HTML tags.
 Add input:not([type]) to make the CSS stylesheet work the same.
 */
-input:not([type]), input[type=text], input[type=password], input[type=email],
-input[type=url], input[type=number], input[type=tel], textarea, select,
+input:not([type]), input[type="text"], input[type="password"], input[type="email"],
+input[type="url"], input[type="number"], input[type="tel"], textarea, select,
 .vTextField {
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -525,9 +515,9 @@ input[type=url], input[type=number], input[type=tel], textarea, select,
 Minifiers remove the default (text) "type" attribute from "input" HTML tags.
 Add input:not([type]) to make the CSS stylesheet work the same.
 */
-input:not([type]):focus, input[type=text]:focus, input[type=password]:focus,
-input[type=email]:focus, input[type=url]:focus, input[type=number]:focus,
-input[type=tel]:focus, textarea:focus, select:focus, .vTextField:focus {
+input:not([type]):focus, input[type="text"]:focus, input[type="password"]:focus,
+input[type="email"]:focus, input[type="url"]:focus, input[type="number"]:focus,
+input[type="tel"]:focus, textarea:focus, select:focus, .vTextField:focus {
     border-color: var(--body-quiet-color);
 }
 
@@ -543,7 +533,7 @@ select[multiple] {
 
 /* FORM BUTTONS */
 
-.button, input[type=submit], input[type=button], .submit-row input, a.button {
+.button, input[type="submit"], input[type="button"], .submit-row input, a.button {
     background: var(--button-bg);
     padding: 10px 15px;
     border: none;
@@ -557,31 +547,31 @@ a.button {
     padding: 4px 5px;
 }
 
-.button:active, input[type=submit]:active, input[type=button]:active,
-.button:focus, input[type=submit]:focus, input[type=button]:focus,
-.button:hover, input[type=submit]:hover, input[type=button]:hover {
+.button:active, input[type="submit"]:active, input[type="button"]:active,
+.button:focus, input[type="submit"]:focus, input[type="button"]:focus,
+.button:hover, input[type="submit"]:hover, input[type="button"]:hover {
     background: var(--button-hover-bg);
 }
 
-.button[disabled], input[type=submit][disabled], input[type=button][disabled] {
+.button[disabled], input[type="submit"][disabled], input[type="button"][disabled] {
     opacity: 0.4;
 }
 
-.button.default, input[type=submit].default, .submit-row input.default {
+.button.default, input[type="submit"].default, .submit-row input.default {
     border: none;
     font-weight: 400;
     background: var(--default-button-bg);
 }
 
-.button.default:active, input[type=submit].default:active,
-.button.default:focus, input[type=submit].default:focus,
-.button.default:hover, input[type=submit].default:hover {
+.button.default:active, input[type="submit"].default:active,
+.button.default:focus, input[type="submit"].default:focus,
+.button.default:hover, input[type="submit"].default:hover {
     background: var(--default-button-hover-bg);
 }
 
 .button[disabled].default,
-input[type=submit][disabled].default,
-input[type=button][disabled].default {
+input[type="submit"][disabled].default,
+input[type="button"][disabled].default {
     opacity: 0.4;
 }
 
@@ -644,7 +634,7 @@ ul.messagelist li {
     font-weight: 400;
     font-size: 0.8125rem;
     padding: 10px 10px 10px 65px;
-    margin: 0 0 10px 0;
+    margin: 0 0 10px;
     color: var(--body-fg);
     word-break: break-word;
     background-color: var(--message-info-bg);
@@ -690,7 +680,7 @@ ul.messagelist li.error {
     font-weight: 700;
     display: block;
     padding: 10px 12px;
-    margin: 0 0 10px 0;
+    margin: 0 0 10px;
     color: var(--error-fg);
     border: 1px solid var(--error-fg);
     border-radius: 4px;
@@ -774,27 +764,27 @@ div.breadcrumbs a:focus, div.breadcrumbs a:hover {
 
 .viewlink, .inlineviewlink {
     padding-left: 16px;
-    background: url(../img/icon-viewlink.svg) 0 1px no-repeat;
+    background: url("../img/icon-viewlink.svg") 0 1px no-repeat;
 }
 
 .hidelink {
     padding-left: 16px;
-    background: url(../img/icon-hidelink.svg) 0 1px no-repeat;
+    background: url("../img/icon-hidelink.svg") 0 1px no-repeat;
 }
 
 .addlink {
     padding-left: 16px;
-    background: url(../img/icon-addlink.svg) 0 1px no-repeat;
+    background: url("../img/icon-addlink.svg") 0 1px no-repeat;
 }
 
 .changelink, .inlinechangelink {
     padding-left: 16px;
-    background: url(../img/icon-changelink.svg) 0 1px no-repeat;
+    background: url("../img/icon-changelink.svg") 0 1px no-repeat;
 }
 
 .deletelink {
     padding-left: 16px;
-    background: url(../img/icon-deletelink.svg) 0 1px no-repeat;
+    background: url("../img/icon-deletelink.svg") 0 1px no-repeat;
 }
 
 a.deletelink:link, a.deletelink:visited {
@@ -802,7 +792,7 @@ a.deletelink:link, a.deletelink:visited {
 }
 
 a.deletelink:focus, a.deletelink:hover {
-    color: #993333; /* XXX Probably unused? */
+    color: #933; /* XXX Probably unused? */
     text-decoration: none;
 }
 
@@ -855,11 +845,11 @@ a.deletelink:focus, a.deletelink:hover {
 }
 
 .object-tools a.viewsitelink {
-    background-image: url(../img/tooltag-arrowright.svg);
+    background-image: url("../img/tooltag-arrowright.svg");
 }
 
 .object-tools a.addlink {
-    background-image: url(../img/tooltag-add.svg);
+    background-image: url("../img/tooltag-add.svg");
 }
 
 /* OBJECT HISTORY */
@@ -911,8 +901,8 @@ a.deletelink:focus, a.deletelink:hover {
 }
 
 .skip-to-content-link:focus {
-    left: 0px;
-    top: 0px;
+    left: 0;
+    top: 0;
 }
 
 #content {
@@ -1012,7 +1002,7 @@ a.deletelink:focus, a.deletelink:hover {
 #branding h2 {
     padding: 0 10px;
     font-size: 0.875rem;
-    margin: -8px 0 8px 0;
+    margin: -8px 0 8px;
     font-weight: normal;
     color: var(--header-color);
 }
@@ -1047,7 +1037,7 @@ a.deletelink:focus, a.deletelink:hover {
 }
 
 #user-tools a, #logout-form button {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+    border-bottom: 1px solid rgb(255 255 255 / 25%);
 }
 
 #user-tools a:focus, #user-tools a:hover,

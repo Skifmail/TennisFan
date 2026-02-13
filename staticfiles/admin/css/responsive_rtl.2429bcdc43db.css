@@ -1,6 +1,6 @@
 /* TABLETS */
 
-@media (max-width: 1024px) {
+@media (width <= 1024px) {
     [dir="rtl"] .colMS {
         margin-right: 0;
     }
@@ -47,7 +47,7 @@
 
 /* MOBILE */
 
-@media (max-width: 767px) {
+@media (width <= 767px) {
     [dir="rtl"] .aligned .related-lookup,
     [dir="rtl"] .aligned .datetimeshortcuts {
         margin-left: 0;

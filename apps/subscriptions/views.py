@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from apps.core.decorators import login_required_with_message
+from apps.core.decorators import login_required_with_message, require_filled_profile
 from .models import SubscriptionTier, UserSubscription
 
 logger = logging.getLogger(__name__)
@@ -15,22 +15,66 @@ logger = logging.getLogger(__name__)
 @login_required_with_message("Информация о тарифах доступна только для зарегистрированных пользователей.")
 def pricing_page(request):
     """Страница тарифов — только для авторизованных пользователей."""
-    tiers = SubscriptionTier.objects.all().order_by('price')
-
+    
+    # Logic to determine user city and apply regional pricing
     current_tier_id = None
-    try:
-        if hasattr(request.user, 'subscription') and request.user.subscription.is_valid():
-            current_tier_id = request.user.subscription.tier.id
-    except UserSubscription.DoesNotExist:
-        pass
+    user_city = "moscow"  # Default to Moscow logic if not authenticated or not set
+    if request.user.is_authenticated:
+        try:
+            if hasattr(request.user, 'subscription') and request.user.subscription.is_valid():
+                current_tier_id = request.user.subscription.tier.id
+        except UserSubscription.DoesNotExist:
+            pass
+
+        try:
+            player = request.user.player
+            if player.city:
+                # Normalize city check. In our system Moscow is "moscow" in City choices
+                # But let's check broadly.
+                # City choices: MOSCOW = "moscow", SPB = "spb"
+                city_val = player.city.lower().strip()
+                if city_val in ["moscow", "moskva", "москва"]:
+                    user_city = "moscow"
+                else:
+                    user_city = city_val
+        except Exception:
+            pass
+
+    # Fetch all tiers
+    tiers = list(SubscriptionTier.objects.all().order_by('price'))
+    
+    # If user is NOT from Moscow, try to find regional prices
+    # We assume 'moscow' is the default price (stored in SubscriptionTier.price)
+    # Any other city gets the regional price if available.
+    if user_city != "moscow":
+        from .models import RegionalTierPrice
+        # Fetch all regional prices
+        regional_prices = {
+            rp.tier_id: rp.price 
+            for rp in RegionalTierPrice.objects.all()
+        }
+        
+        for tier in tiers:
+            if tier.id in regional_prices:
+                tier.effective_price = regional_prices[tier.id]
+                tier.is_regional_price = True
+            else:
+                tier.effective_price = tier.price
+                tier.is_regional_price = False
+    else:
+        for tier in tiers:
+            tier.effective_price = tier.price
+            tier.is_regional_price = False
 
     return render(request, 'subscriptions/pricing.html', {
         'tiers': tiers,
         'current_tier_id': current_tier_id,
+        'user_city': user_city,
     })
 
 
 @login_required
+@require_filled_profile
 def buy_subscription(request, tier_id):
     """Покупка подписки (или мгновенная активация — пока без платёжного шлюза)."""
     tier = get_object_or_404(SubscriptionTier, pk=tier_id)

@@ -88,7 +88,7 @@ thead th.sorted .text {
 
 .change-list .filtered table {
     border-left: none;
-    border-right: 0px none;
+    border-right: 0 none;
 }
 
 #changelist-filter {
@@ -202,14 +202,14 @@ fieldset .fieldBox {
     top: 0;
     left: auto;
     right: 10px;
-    background: url(../img/calendar-icons.svg) 0 -15px no-repeat;
+    background: url("../img/calendar-icons.svg") 0 -15px no-repeat;
 }
 
 .calendarnav-next {
     top: 0;
     right: auto;
     left: 10px;
-    background: url(../img/calendar-icons.svg) 0 0 no-repeat;
+    background: url("../img/calendar-icons.svg") 0 0 no-repeat;
 }
 
 .calendar caption, .calendarbox h2 {
@@ -225,7 +225,7 @@ fieldset .fieldBox {
 }
 
 .selector-add {
-    background: url(../img/selector-icons.svg) 0 -96px no-repeat;
+    background: url("../img/selector-icons.svg") 0 -96px no-repeat;
     background-size: 24px auto;
 }
 
@@ -234,7 +234,7 @@ fieldset .fieldBox {
 }
 
 .selector-remove {
-    background: url(../img/selector-icons.svg) 0 -144px no-repeat;
+    background: url("../img/selector-icons.svg") 0 -144px no-repeat;
     background-size: 24px auto;
 }
 

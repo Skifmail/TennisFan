@@ -138,7 +138,7 @@
     margin: 0;
     vertical-align: middle;
     background: var(--body-bg);
-    box-shadow: 0 -15px 20px -10px rgba(0, 0, 0, 0.15) inset;
+    box-shadow: 0 -15px 20px -10px rgb(0 0 0 / 15%) inset;
     cursor: pointer;
     color: var(--body-fg);
 }
@@ -303,6 +303,7 @@
     #changelist tbody tr.selected {
         background-color: SelectedItem;
     }
+
     #changelist tbody tr:has(.action-select:checked) {
         background-color: SelectedItem;
     }
@@ -357,7 +358,7 @@
     border: 1px solid var(--border-color);
     border-radius: 4px;
     background: var(--body-bg);
-    box-shadow: 0 -15px 20px -10px rgba(0, 0, 0, 0.15) inset;
+    box-shadow: 0 -15px 20px -10px rgb(0 0 0 / 15%) inset;
     cursor: pointer;
     height: 1.5rem;
     line-height: 1;

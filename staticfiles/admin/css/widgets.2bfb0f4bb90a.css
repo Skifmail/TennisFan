@@ -39,6 +39,7 @@
     color: var(--header-link-color);
     cursor: pointer;
 }
+
 .selector-chosen .list-footer-display__clear {
     color: var(--breadcrumbs-fg);
 }
@@ -113,6 +114,7 @@
     margin: 0 0 10px;
     border-radius: 0 0 4px 4px;
 }
+
 .selector .selector-chosen--with-filtered select {
     margin: 0;
     border-radius: 0;
@@ -262,7 +264,7 @@
 }
 
 .stacked :enabled.selector-remove {
-    background-position: 0 0px;
+    background-position: 0 0;
     cursor: pointer;
 }
 
@@ -410,7 +412,7 @@ span.clearable-file-input label {
     color: var(--body-fg);
     border: 1px solid var(--hairline-color);
     border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 15%);
     overflow: hidden;
     position: relative;
 }
@@ -572,7 +574,7 @@ ul.timelist, .timelist li {
     background-size: contain;
     width: 1.5rem;
     height: 1.5rem;
-    border: 0px none;
+    border: 0 none;
     margin-bottom: .25rem;
 }
 

@@ -9,7 +9,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from apps.core.decorators import login_required_with_message
+from apps.core.decorators import login_required_with_message, require_filled_profile
 from apps.users.models import Player
 
 from .forms import SparringRequestForm
@@ -67,6 +67,7 @@ def sparring_list(request):
 
 
 @login_required
+@require_filled_profile
 def sparring_create(request):
     """Create sparring request. Requires has_sparring_access."""
     if not user_has_sparring_access(request.user):
@@ -169,6 +170,7 @@ def sparring_my_requests(request):
 
 @require_GET
 @login_required
+@require_filled_profile
 def sparring_respond(request, pk):
     """
     Record response and redirect to contact URL.

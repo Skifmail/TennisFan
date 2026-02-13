@@ -18,17 +18,6 @@ class UserRegistrationForm(forms.ModelForm):
         label="Email *",
         widget=forms.EmailInput(attrs={"class": "form-control"}),
     )
-    phone = forms.CharField(
-        label="Телефон *",
-        required=True,
-        initial="+7",
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "+7XXXXXXXXXX"}),
-    )
-    birth_date = forms.DateField(
-        label="Дата рождения *",
-        required=True,
-        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}, format="%Y-%m-%d"),
-    )
     city = forms.CharField(
         label="Город *",
         required=True,
@@ -60,37 +49,18 @@ class UserRegistrationForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ("email", "phone", "first_name", "last_name")
-        widgets = {
-            "first_name": forms.TextInput(attrs={"class": "form-control"}),
-            "last_name": forms.TextInput(attrs={"class": "form-control"}),
-        }
-        labels = {
-            "first_name": "Имя *",
-            "last_name": "Фамилия *",
-        }
+        fields = ("email",)
+        widgets = {}
+        labels = {}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["birth_date"].input_formats = ["%Y-%m-%d"]
-        self.fields["first_name"].required = True
-        self.fields["last_name"].required = True
 
     def clean_city(self):
         city = (self.cleaned_data.get("city") or "").strip()
         if not city:
             raise forms.ValidationError("Укажите город.")
         return city
-
-    def clean_phone(self):
-        import re
-
-        phone = self.cleaned_data.get("phone", "").strip()
-        if phone in ("", "+7"):
-            raise forms.ValidationError("Укажите телефон в формате +7XXXXXXXXXX.")
-        if not re.match(r"^\+7\d{10}$", phone):
-            raise forms.ValidationError("Телефон: +7 и 10 цифр (например +79001234567).")
-        return phone
 
     def clean_ntrp_level(self):
         from decimal import Decimal, InvalidOperation
@@ -131,6 +101,11 @@ class PlayerProfileForm(forms.ModelForm):
     last_name = forms.CharField(
         label='Фамилия',
         widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    phone = forms.CharField(
+        label='Телефон',
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+7XXXXXXXXXX'}),
     )
 
     class Meta:
@@ -181,6 +156,7 @@ class PlayerProfileForm(forms.ModelForm):
         if user:
             self.fields["first_name"].initial = user.first_name
             self.fields["last_name"].initial = user.last_name
+            self.fields["phone"].initial = user.phone
         self.fields["birth_date"].input_formats = ["%Y-%m-%d"]
         for fn in ("gender", "forehand"):
             f = self.fields.get(fn)
@@ -194,6 +170,7 @@ class PlayerProfileForm(forms.ModelForm):
         if self.user:
             self.user.first_name = self.cleaned_data['first_name']
             self.user.last_name = self.cleaned_data['last_name']
+            self.user.phone = self.cleaned_data['phone']
             if commit:
                 self.user.save()
         if commit:

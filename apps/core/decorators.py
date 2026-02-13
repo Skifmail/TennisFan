@@ -35,3 +35,40 @@ def login_required_with_message(
             return view_func(request, *args, **kwargs)
         return wrapper
     return decorator
+
+
+def require_filled_profile(view_func):
+    """
+    Декоратор, проверяющий заполненность обязательных полей профиля перед доступом к функционалу.
+    Если профиль не заполнен, перенаправляет на страницу редактирования с сообщением.
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return login_required_with_message()(view_func)(request, *args, **kwargs)
+            
+        user = request.user
+        try:
+            player = user.player
+        except Exception:
+            from apps.users.models import Player
+            player = Player.objects.create(user=user)
+            
+        required_fields = {
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'phone': user.phone,
+            'birth_date': player.birth_date,
+        }
+        
+        missing = [k for k, v in required_fields.items() if not v]
+        
+        if missing:
+            messages.warning(
+                request, 
+                "Для выполнения этого действия необходимо заполнить профиль (Имя, Фамилия, Телефон, Дата рождения)."
+            )
+            return redirect('profile_edit')
+            
+        return view_func(request, *args, **kwargs)
+    return wrapper

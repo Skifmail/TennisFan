@@ -61,12 +61,29 @@
                             <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ req.city }}</span>
                         </div>
                         <p class="text-secondary sparring-card__desc">{{ req.description }}</p>
-                        {% if req.preferred_days or req.preferred_time %}
-                        <p class="text-muted mt-2" style="font-size: var(--font-size-xs);">
-                            {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
-                            {% if req.preferred_time %} • {{ req.preferred_time }}{% endif %}
-                        </p>
-                        {% endif %}
+                        <div class="sparring-card__details mt-2" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                            {% if req.preferred_days or req.preferred_time %}
+                            <p>
+                                {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
+                                {% if req.preferred_time %} • {{ req.preferred_time }}{% endif %}
+                            </p>
+                            {% endif %}
+                            {% if req.preferred_location %}
+                            <p>📍 {{ req.preferred_location }}</p>
+                            {% endif %}
+                            {% if req.desired_partner_age_min or req.desired_partner_age_max %}
+                            <p>
+                                👤 Возраст партнёра:
+                                {% if req.desired_partner_age_min and req.desired_partner_age_max %}
+                                    {{ req.desired_partner_age_min }}-{{ req.desired_partner_age_max }} лет
+                                {% elif req.desired_partner_age_min %}
+                                    от {{ req.desired_partner_age_min }} лет
+                                {% elif req.desired_partner_age_max %}
+                                    до {{ req.desired_partner_age_max }} лет
+                                {% endif %}
+                            </p>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
                 <div class="sparring-card__actions mt-3">

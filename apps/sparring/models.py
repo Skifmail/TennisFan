@@ -74,7 +74,7 @@ class SparringRequest(models.Model):
 
     def has_responses(self) -> bool:
         """Return True if at least one user has responded to this request."""
-        return self.responses.exists()
+        return bool(self.responses.exists())
 
 
 class SparringResponse(models.Model):

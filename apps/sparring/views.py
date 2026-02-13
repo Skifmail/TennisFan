@@ -171,7 +171,7 @@ def sparring_my_requests(request):
 
     requests_qs = (
         SparringRequest.objects.filter(player=player)
-        .prefetch_related("responses")
+        .prefetch_related("responses__respondent__user")
         .order_by("-created_at")
     )
     has_access = user_has_sparring_access(request.user)

@@ -38,11 +38,63 @@
                             {{ req.city }}{% if req.desired_category %} • {{ req.get_desired_category_display }}{% endif %}
                         </p>
                         <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ req.description|truncatewords:30 }}</p>
-                        {% if req.preferred_days or req.preferred_time %}
-                        <p class="text-muted mt-2" style="font-size: var(--font-size-xs);">
-                            {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
-                            {% if req.preferred_time %} • {{ req.preferred_time }}{% endif %}
-                        </p>
+                        <div class="mt-2" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                            {% if req.preferred_days or req.preferred_time %}
+                            <p>
+                                {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
+                                {% if req.preferred_time %} • {{ req.preferred_time }}{% endif %}
+                            </p>
+                            {% endif %}
+                            {% if req.preferred_location %}
+                            <p>📍 {{ req.preferred_location }}</p>
+                            {% endif %}
+                            {% if req.desired_partner_age_min or req.desired_partner_age_max %}
+                            <p>
+                                👤 Возраст партнёра:
+                                {% if req.desired_partner_age_min and req.desired_partner_age_max %}
+                                    {{ req.desired_partner_age_min }}-{{ req.desired_partner_age_max }} лет
+                                {% elif req.desired_partner_age_min %}
+                                    от {{ req.desired_partner_age_min }} лет
+                                {% elif req.desired_partner_age_max %}
+                                    до {{ req.desired_partner_age_max }} лет
+                                {% endif %}
+                            </p>
+                            {% endif %}
+                        </div>
+                        {% if req.responses.exists %}
+                        <div class="mt-3 pt-3" style="border-top: 1px solid var(--color-border-light);">
+                            <p class="text-secondary mb-2" style="font-size: var(--font-size-sm); font-weight: 600;">Отклики ({{ req.responses.count }}):</p>
+                            {% for response in req.responses.all %}
+                            <div class="d-flex justify-content-between align-items-center mb-2" style="padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                                <div>
+                                    <a href="{% url 'profile' pk=response.respondent.pk %}" class="text-primary" style="font-weight: 600;">{{ response.respondent }}</a>
+                                    <span class="text-muted" style="font-size: var(--font-size-xs);">
+                                        • {{ response.get_contact_method_display }}
+                                        {% if response.status == 'pending' %}
+                                            <span class="badge" style="background: var(--color-warning); color: var(--color-bg);">Ожидает</span>
+                                        {% elif response.status == 'accepted' %}
+                                            <span class="badge" style="background: var(--color-success); color: var(--color-bg);">Принят</span>
+                                        {% elif response.status == 'rejected' %}
+                                            <span class="badge" style="background: var(--color-error); color: var(--color-bg);">Отклонён</span>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                {% if response.status == 'pending' %}
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-sm btn-outline">Профиль</a>
+                                    {% if response.respondent.telegram or response.respondent.whatsapp or response.respondent.max_url %}
+                                    <a href="#" class="btn btn-sm btn-primary contact-btn" 
+                                       data-telegram="{% if response.respondent.telegram %}https://t.me/{{ response.respondent.telegram|cut:'@' }}{% endif %}"
+                                       data-whatsapp="{% if response.respondent.whatsapp %}{{ response.respondent.whatsapp }}{% endif %}"
+                                       data-max="{% if response.respondent.max_url %}{{ response.respondent.max_url }}{% endif %}">
+                                        Контакт
+                                    </a>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
                         {% endif %}
                     </div>
                 </div>
@@ -66,4 +118,86 @@
         {% endfor %}
     </div>
 </div>
+
+<div class="sparring-modal hidden" id="sparring-contact-modal" role="dialog" aria-label="Выберите способ связи">
+    <div class="sparring-modal__backdrop" id="sparring-contact-backdrop"></div>
+    <div class="sparring-modal__box">
+        <h3 class="sparring-modal__title">Связаться с откликнувшимся</h3>
+        <p class="text-secondary sparring-modal__sub">Выберите способ связи:</p>
+        <div class="sparring-modal__buttons">
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--tg messenger-btn" id="contact-telegram" target="_blank" rel="noopener" style="display: none;">
+                <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> Telegram
+            </a>
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--wa messenger-btn" id="contact-whatsapp" target="_blank" rel="noopener" style="display: none;">
+                <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> WhatsApp
+            </a>
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--max messenger-btn" id="contact-max" style="display: none;">
+                <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> MAX
+            </a>
+        </div>
+        <button type="button" class="btn btn-ghost sparring-modal__close" id="sparring-contact-close">Закрыть</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const modal = document.getElementById('sparring-contact-modal');
+    const backdrop = document.getElementById('sparring-contact-backdrop');
+    const closeBtn = document.getElementById('sparring-contact-close');
+    const contactBtns = document.querySelectorAll('.contact-btn');
+    const tgLink = document.getElementById('contact-telegram');
+    const waLink = document.getElementById('contact-whatsapp');
+    const maxLink = document.getElementById('contact-max');
+
+    function openContactModal(telegram, whatsapp, max) {
+        if (telegram) {
+            tgLink.href = telegram;
+            tgLink.style.display = '';
+        } else {
+            tgLink.style.display = 'none';
+        }
+        if (whatsapp) {
+            // Форматируем WhatsApp URL
+            let phone = whatsapp.replace(/\D/g, '');
+            if (phone.startsWith('8') && phone.length === 11) {
+                phone = '7' + phone.substring(1);
+            } else if (phone.startsWith('7') && phone.length === 11) {
+                // OK
+            } else if (phone.length === 10) {
+                phone = '7' + phone;
+            }
+            waLink.href = 'https://wa.me/' + phone;
+            waLink.style.display = '';
+        } else {
+            waLink.style.display = 'none';
+        }
+        if (max) {
+            maxLink.href = max;
+            maxLink.style.display = '';
+        } else {
+            maxLink.style.display = 'none';
+        }
+        modal.classList.remove('hidden');
+    }
+
+    function closeContactModal() {
+        modal.classList.add('hidden');
+    }
+
+    contactBtns.forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const telegram = this.dataset.telegram || '';
+            const whatsapp = this.dataset.whatsapp || '';
+            const max = this.dataset.max || '';
+            openContactModal(telegram, whatsapp, max);
+        });
+    });
+
+    if (backdrop) backdrop.addEventListener('click', closeContactModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeContactModal);
+})();
+</script>
 {% endblock %}

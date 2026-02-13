@@ -4,6 +4,7 @@ Views for legal documents (privacy, offer, terms, personal data).
 
 import logging
 from pathlib import Path
+from typing import TypedDict
 
 import markdown
 from django.conf import settings
@@ -11,8 +12,14 @@ from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
 
+
+class _DocMeta(TypedDict):
+    file: Path
+    title: str
+
+
 DOCS_ROOT = Path(settings.BASE_DIR) / "static" / "documents"
-DOCS = {
+DOCS: dict[str, _DocMeta] = {
     "personal-data": {
         "file": DOCS_ROOT / "personal_data.txt",
         "title": "Согласие на обработку персональных данных",

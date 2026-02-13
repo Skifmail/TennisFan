@@ -1,11 +1,11 @@
 """
 Core admin.
 """
+
 from django.contrib import admin
 from django.db.models import Count, Max, Q
 from django.template.response import TemplateResponse
-from django.urls import path, reverse
-from django.utils.html import format_html
+from django.urls import path
 
 from .models import SupportConversation, SupportMessage, TelegramTransferConsentLog
 
@@ -33,7 +33,9 @@ class SupportConversationAdmin(admin.ModelAdmin):
         """Показываем список пользователей с диалогами."""
         # Группируем сообщения по пользователям
         conversations = (
-            SupportMessage.objects.values("user", "user__email", "user__first_name", "user__last_name")
+            SupportMessage.objects.values(
+                "user", "user__email", "user__first_name", "user__last_name"
+            )
             .annotate(
                 message_count=Count("id"),
                 last_message_at=Max("created_at"),
@@ -68,9 +70,12 @@ class SupportConversationAdmin(admin.ModelAdmin):
         user = User.objects.filter(pk=user_id).first()
         if not user:
             from django.http import Http404
+
             raise Http404("Пользователь не найден")
 
-        support_messages = SupportMessage.objects.filter(user=user).order_by("created_at")
+        support_messages = SupportMessage.objects.filter(user=user).order_by(
+            "created_at"
+        )
 
         context = {
             **self.admin_site.each_context(request),
@@ -90,8 +95,20 @@ class TelegramTransferConsentLogAdmin(admin.ModelAdmin):
 
     list_display = ("user", "consent_version", "ip_address", "consented_at")
     list_filter = ("consent_version", "consented_at")
-    search_fields = ("user__email", "user__first_name", "user__last_name", "ip_address", "user_agent")
-    readonly_fields = ("user", "consent_version", "ip_address", "user_agent", "consented_at")
+    search_fields = (
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+        "ip_address",
+        "user_agent",
+    )
+    readonly_fields = (
+        "user",
+        "consent_version",
+        "ip_address",
+        "user_agent",
+        "consented_at",
+    )
 
     def has_add_permission(self, request):
         return False

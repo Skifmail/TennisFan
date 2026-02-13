@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
-from .geocoder import geocode_address, _normalize_address_for_geocode
+from .geocoder import _normalize_address_for_geocode, geocode_address
 from .models import Court, CourtApplication, CourtApplicationStatus, CourtRating
 
 logger = logging.getLogger(__name__)
@@ -16,14 +16,16 @@ logger = logging.getLogger(__name__)
 
 def _get_geocoder_api_key() -> str:
     """API-ключ для Geocoder: отдельный или общий с картами."""
-    return getattr(settings, "YANDEX_GEOCODER_API_KEY", None) or getattr(
-        settings, "YANDEX_MAPS_API_KEY", ""
+    return (
+        getattr(settings, "YANDEX_GEOCODER_API_KEY", None)
+        or getattr(settings, "YANDEX_MAPS_API_KEY", "")
+        or ""
     )
 
 
 def _get_geocoder_referer() -> str:
     """Referer для запросов к Yandex Geocoder (если у ключа ограничение по Referer)."""
-    return getattr(settings, "YANDEX_GEOCODER_REFERER", "") or ""
+    return str(getattr(settings, "YANDEX_GEOCODER_REFERER", "") or "")
 
 
 def _geocode_court(court: Court) -> bool:
@@ -69,17 +71,33 @@ class CourtAdmin(admin.ModelAdmin):
         (
             None,
             {
-                "fields": ("name", "slug", "city", "address", "district", "description"),
+                "fields": (
+                    "name",
+                    "slug",
+                    "city",
+                    "address",
+                    "district",
+                    "description",
+                ),
                 "description": "Для точной метки на карте: в «Город» — только название города (например: Сочи). В «Адрес» — улица и номер дома (например: Курортный проспект, 45). Не дублируйте город в поле «Адрес».",
             },
         ),
-        ("Характеристики", {"fields": ("surface", "courts_count", "has_lighting", "is_indoor")}),
-        ("Особенности", {"fields": ("sells_balls", "sells_water", "multiple_payment_methods")}),
+        (
+            "Характеристики",
+            {"fields": ("surface", "courts_count", "has_lighting", "is_indoor")},
+        ),
+        (
+            "Особенности",
+            {"fields": ("sells_balls", "sells_water", "multiple_payment_methods")},
+        ),
         ("Контакты", {"fields": ("phone", "whatsapp", "website")}),
-        ("Карта", {
-            "fields": ("latitude", "longitude"),
-            "description": "Координаты подставляются по адресу при сохранении (Yandex Geocoder). Либо укажите вручную или действие «Получить координаты по адресу» в списке кортов.",
-        }),
+        (
+            "Карта",
+            {
+                "fields": ("latitude", "longitude"),
+                "description": "Координаты подставляются по адресу при сохранении (Yandex Geocoder). Либо укажите вручную или действие «Получить координаты по адресу» в списке кортов.",
+            },
+        ),
         ("Цена и фото", {"fields": ("price_per_hour", "image")}),
         ("Статус", {"fields": ("is_active",)}),
     )
@@ -112,7 +130,10 @@ class CourtAdmin(admin.ModelAdmin):
         if ok:
             messages.success(request, f"Координаты получены для {ok} кортов.")
         else:
-            messages.warning(request, "Не удалось получить координаты (проверьте адреса или ключ API).")
+            messages.warning(
+                request,
+                "Не удалось получить координаты (проверьте адреса или ключ API).",
+            )
 
 
 @admin.action(description="Одобрить и добавить корт на сайт")
@@ -167,7 +188,10 @@ class CourtApplicationAdmin(admin.ModelAdmin):
             {"fields": ("applicant_name", "applicant_email", "applicant_phone")},
         ),
         (None, {"fields": ("name", "city", "address", "description")}),
-        ("Характеристики", {"fields": ("surface", "courts_count", "has_lighting", "is_indoor")}),
+        (
+            "Характеристики",
+            {"fields": ("surface", "courts_count", "has_lighting", "is_indoor")},
+        ),
         ("Контакты корта", {"fields": ("phone", "whatsapp", "website")}),
         ("Карта", {"fields": ("latitude", "longitude")}),
         ("Цена и фото", {"fields": ("price_per_hour", "image")}),

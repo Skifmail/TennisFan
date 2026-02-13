@@ -4,7 +4,7 @@ Webhook пользовательского Telegram-бота и редирект
 
 import json
 import logging
-from typing import Any
+from typing import Any, cast
 
 import requests
 from django.conf import settings
@@ -79,8 +79,10 @@ def _parse_score_input(text: str):
 def _proposer_is_side1(match: Match, player: Player) -> bool:
     """Играет ли участник за первую сторону (player1 / team1)."""
     if match.team1_id and match.team2_id:
-        return match.team1 and player in (match.team1.player1, match.team1.player2)
-    return match.player1_id == player.pk
+        return bool(
+            match.team1 and player in (match.team1.player1, match.team1.player2)
+        )
+    return bool(match.player1_id == player.pk)
 
 
 def _webhook_secret_ok(request) -> bool:
@@ -88,7 +90,7 @@ def _webhook_secret_ok(request) -> bool:
     secret = getattr(settings, "TELEGRAM_USER_BOT_WEBHOOK_SECRET", None) or ""
     if not secret:
         return True
-    return request.headers.get("X-Telegram-Bot-Api-Secret-Token") == secret
+    return bool(request.headers.get("X-Telegram-Bot-Api-Secret-Token") == secret)
 
 
 def _get_client_ip(request) -> str | None:
@@ -110,6 +112,11 @@ REPLY_BTN_MY_MATCHES = "🎾 Мои матчи"
 REPLY_BTN_MY_SUBSCRIPTIONS = "📋 Мои подписки"
 REPLY_BTN_PRIVATE_CHAT = "💬 Закрытый чат"
 REPLY_BTN_GO_TO_SITE = "🌐 Перейти на сайт"
+REPLY_BTN_SPARRING = "🎾 Спарринг"
+REPLY_BTN_SPARRING_MY_REQUESTS = "📝 Мои заявки"
+REPLY_BTN_SPARRING_MY_RESPONSES = "🙋 Мои отклики"
+REPLY_BTN_SPARRING_RESPONSES_TO_ME = "📬 Отклики на мои заявки"
+REPLY_BTN_BACK_TO_MENU = "← В меню"
 
 REPLY_MENU_BUTTONS = (
     REPLY_BTN_MY_PROFILE,
@@ -117,16 +124,37 @@ REPLY_MENU_BUTTONS = (
     REPLY_BTN_MY_SUBSCRIPTIONS,
     REPLY_BTN_PRIVATE_CHAT,
     REPLY_BTN_GO_TO_SITE,
+    REPLY_BTN_SPARRING,
+)
+REPLY_SPARRING_BUTTONS = (
+    REPLY_BTN_SPARRING_MY_REQUESTS,
+    REPLY_BTN_SPARRING_MY_RESPONSES,
+    REPLY_BTN_SPARRING_RESPONSES_TO_ME,
+    REPLY_BTN_BACK_TO_MENU,
 )
 
 
 def _reply_menu_keyboard():
-    """Реплай-клавиатура под полем ввода: профиль, матчи, подписка, чат, сайт."""
+    """Реплай-клавиатура: профиль, матчи, подписка, чат; в последней строке Спарринг и На сайт."""
     return {
         "keyboard": [
             [{"text": REPLY_BTN_MY_PROFILE}, {"text": REPLY_BTN_MY_MATCHES}],
             [{"text": REPLY_BTN_MY_SUBSCRIPTIONS}, {"text": REPLY_BTN_PRIVATE_CHAT}],
-            [{"text": REPLY_BTN_GO_TO_SITE}],
+            [{"text": REPLY_BTN_SPARRING}, {"text": REPLY_BTN_GO_TO_SITE}],
+        ],
+        "resize_keyboard": True,
+        "one_time_keyboard": False,
+    }
+
+
+def _reply_sparring_keyboard():
+    """Реплай-клавиатура подменю спарринга."""
+    return {
+        "keyboard": [
+            [{"text": REPLY_BTN_SPARRING_MY_REQUESTS}],
+            [{"text": REPLY_BTN_SPARRING_MY_RESPONSES}],
+            [{"text": REPLY_BTN_SPARRING_RESPONSES_TO_ME}],
+            [{"text": REPLY_BTN_BACK_TO_MENU}],
         ],
         "resize_keyboard": True,
         "one_time_keyboard": False,
@@ -146,9 +174,6 @@ def _main_menu_keyboard(site_base_url: str):
                 {"text": "💬 Закрытый чат", "callback_data": "menu_private_chat"},
             ],
             [
-                {"text": "🎾 Спарринг", "callback_data": "menu_sparring"},
-            ],
-            [
                 {"text": "🌐 На сайт", "url": site_base_url.rstrip("/")},
             ],
         ]
@@ -159,9 +184,10 @@ def _get_link_by_chat_id(chat_id: int | None) -> UserTelegramLink | None:
     """Найти привязку по chat_id (бот поддержки или пользовательский бот)."""
     if chat_id is None:
         return None
-    return UserTelegramLink.objects.filter(
+    link = UserTelegramLink.objects.filter(
         Q(telegram_chat_id=chat_id) | Q(user_bot_chat_id=chat_id)
     ).first()
+    return cast("UserTelegramLink | None", link)
 
 
 def _answer_callback(
@@ -693,10 +719,11 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
             player1_set3=None,
             player2_set3=None,
         )
+        tour_name = match.tournament.name if match.tournament else "спарринг"
         for opp_user in get_match_opponent_users(match, player):
             Notification.objects.create(
                 user=opp_user,
-                message=f"{player} предложил результат матча в турнире {match.tournament.name}. У вас 3 часа на подтверждение.",
+                message=f"{player} предложил результат матча в турнире {tour_name}. У вас 3 часа на подтверждение.",
                 url=reverse("my_matches"),
             )
         try:
@@ -883,10 +910,8 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
                     ]
                 )
         text = "\n".join(lines)
-        reply_markup: dict[str, Any] | None = (
-            {"inline_keyboard": keyboard} if keyboard else None
-        )
-        bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        markup = {"inline_keyboard": keyboard} if keyboard else None
+        bot.send_to_user(chat_id, text, reply_markup=markup)
         _answer_callback(cq_id, "Мои отклики")
         return True
 
@@ -1330,8 +1355,9 @@ def _handle_menu_callback_action(
                 round_name = m.round_name or "—"
                 p1 = m.get_player1_display()
                 p2 = m.get_player2_display()
+                tour_name = m.tournament.name if m.tournament else "Спарринг"
                 lines.append("─────────────────")
-                lines.append(f"<b>{i}. {m.tournament.name}</b> · {round_name}")
+                lines.append(f"<b>{i}. {tour_name}</b> · {round_name}")
                 lines.append(f"   {p1}\n   vs\n   {p2}")
                 lines.append(f"   📅 Дедлайн: {deadline_str}")
                 lines.append("")
@@ -1345,7 +1371,8 @@ def _handle_menu_callback_action(
         if scheduled_list:
             keyboard = []
             for i, m in enumerate(scheduled_list[:10], 1):
-                label = f"{m.tournament.name}, {m.round_name or 'раунд'}"
+                tour_name = m.tournament.name if m.tournament else "Спарринг"
+                label = f"{tour_name}, {m.round_name or 'раунд'}"
                 btn_text = f"📝 Матч {i}: {label}"
                 if len(btn_text) > 64:
                     btn_text = (f"📝 Матч {i}: {label}"[:61]).rstrip() + "…"
@@ -1877,10 +1904,11 @@ def user_bot_webhook(request):
                     player1_set3=p1_s3,
                     player2_set3=p2_s3,
                 )
+                tour_name = match.tournament.name if match.tournament else "спарринг"
                 for opp_user in get_match_opponent_users(match, player):
                     Notification.objects.create(
                         user=opp_user,
-                        message=f"{player} предложил результат матча в турнире {match.tournament.name}. У вас 3 часа на подтверждение.",
+                        message=f"{player} предложил результат матча в турнире {tour_name}. У вас 3 часа на подтверждение.",
                         url=reverse("my_matches"),
                     )
                 try:
@@ -1895,7 +1923,42 @@ def user_bot_webhook(request):
                 return JsonResponse({"ok": True})
         cache.delete(cache_key)
 
-    # Нажатие реплай-кнопок меню
+    # Нажатие кнопок подменю «Спарринг»
+    if text in REPLY_SPARRING_BUTTONS:
+        if text == REPLY_BTN_BACK_TO_MENU:
+            bot.send_message(
+                chat_id, "Главное меню:", reply_markup=_reply_menu_keyboard()
+            )
+            return JsonResponse({"ok": True})
+        link = _get_link_by_chat_id(chat_id)
+        if not link:
+            bot.send_message(
+                chat_id, "Сначала подключите бота с сайта (профиль → Telegram)."
+            )
+            return JsonResponse({"ok": True})
+        user = link.user
+        player = getattr(user, "player", None)
+        if not player:
+            try:
+                player = Player.objects.create(user=user)
+            except Exception:
+                bot.send_message(chat_id, "Ошибка профиля игрока.")
+                return JsonResponse({"ok": True})
+        reply_to_sparring = {
+            REPLY_BTN_SPARRING_MY_REQUESTS: "sparring_my_requests",
+            REPLY_BTN_SPARRING_MY_RESPONSES: "sparring_my_responses",
+            REPLY_BTN_SPARRING_RESPONSES_TO_ME: "sparring_responses_to_me",
+        }.get(text)
+        if reply_to_sparring:
+            fake_callback = {
+                "id": None,
+                "callback_data": reply_to_sparring,
+                "message": {"chat": {"id": chat_id}},
+            }
+            _handle_sparring_callback(fake_callback, base_url)
+        return JsonResponse({"ok": True})
+
+    # Нажатие реплай-кнопок главного меню
     if text in REPLY_MENU_BUTTONS:
         if text == REPLY_BTN_GO_TO_SITE:
             site_url = base_url.rstrip("/")
@@ -1905,30 +1968,51 @@ def user_bot_webhook(request):
                 reply_markup=_reply_menu_keyboard(),
             )
             return JsonResponse({"ok": True})
-        else:
+        if text == REPLY_BTN_SPARRING:
             link = _get_link_by_chat_id(chat_id)
             if not link:
                 bot.send_message(
                     chat_id, "Сначала подключите бота с сайта (профиль → Telegram)."
                 )
-            else:
-                user = link.user
-                player = getattr(user, "player", None)
-                if not player:
-                    try:
-                        player = Player.objects.create(user=user)
-                    except Exception:
-                        bot.send_message(chat_id, "Ошибка профиля игрока.")
-                        return JsonResponse({"ok": True})
-                reply_to_callback = {
-                    REPLY_BTN_MY_PROFILE: "menu_my_profile",
-                    REPLY_BTN_MY_MATCHES: "menu_my_matches",
-                    REPLY_BTN_MY_SUBSCRIPTIONS: "menu_my_subscription",
-                    REPLY_BTN_PRIVATE_CHAT: "menu_private_chat",
-                }[text]
-                _handle_menu_callback_action(
-                    chat_id, None, reply_to_callback, user, player, base_url=base_url
+                return JsonResponse({"ok": True})
+            from apps.sparring.utils import user_has_sparring_access
+
+            if not user_has_sparring_access(link.user):
+                bot.send_message(
+                    chat_id,
+                    "❌ Оформите подписку для доступа к разделу спаррингов.",
+                    reply_markup=_reply_menu_keyboard(),
                 )
+                return JsonResponse({"ok": True})
+            bot.send_message(
+                chat_id,
+                "🎾 <b>Спарринг</b>\n\nВыберите раздел:",
+                reply_markup=_reply_sparring_keyboard(),
+            )
+            return JsonResponse({"ok": True})
+        link = _get_link_by_chat_id(chat_id)
+        if not link:
+            bot.send_message(
+                chat_id, "Сначала подключите бота с сайта (профиль → Telegram)."
+            )
+        else:
+            user = link.user
+            player = getattr(user, "player", None)
+            if not player:
+                try:
+                    player = Player.objects.create(user=user)
+                except Exception:
+                    bot.send_message(chat_id, "Ошибка профиля игрока.")
+                    return JsonResponse({"ok": True})
+            reply_to_callback = {
+                REPLY_BTN_MY_PROFILE: "menu_my_profile",
+                REPLY_BTN_MY_MATCHES: "menu_my_matches",
+                REPLY_BTN_MY_SUBSCRIPTIONS: "menu_my_subscription",
+                REPLY_BTN_PRIVATE_CHAT: "menu_private_chat",
+            }[text]
+            _handle_menu_callback_action(
+                chat_id, None, reply_to_callback, user, player, base_url=base_url
+            )
         return JsonResponse({"ok": True})
 
     # Любое другое сообщение — показываем меню

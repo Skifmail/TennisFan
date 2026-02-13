@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from django.db import migrations
 
-
 LEGACY_TO_NTRP = {
     "beginner": "2.0",
     "intermediate": "3.0",

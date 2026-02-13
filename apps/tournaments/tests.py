@@ -4,9 +4,12 @@
 
 from django.test import TestCase
 
-from apps.tournaments.fan import _expected_final_round, generate_bracket as fan_generate_bracket
+from apps.tournaments.fan import _expected_final_round
+from apps.tournaments.fan import generate_bracket as fan_generate_bracket
 from apps.tournaments.models import Match, Tournament
-from apps.tournaments.olympic_consolation import generate_bracket as olympic_generate_bracket
+from apps.tournaments.olympic_consolation import (
+    generate_bracket as olympic_generate_bracket,
+)
 from apps.users.models import Player, User
 
 
@@ -16,7 +19,9 @@ class FanAdvanceWinnerTestCase(TestCase):
     def setUp(self) -> None:
         """Bye-игрок создаётся миграцией 0016. Создать 10 участников."""
         self.bye_player = Player.objects.filter(is_bye=True).first()
-        self.assertIsNotNone(self.bye_player, "Bye-игрок должен существовать (миграция)")
+        self.assertIsNotNone(
+            self.bye_player, "Bye-игрок должен существовать (миграция)"
+        )
         self.players = []
         for i in range(10):
             u = User.objects.create_user(
@@ -49,9 +54,18 @@ class FanAdvanceWinnerTestCase(TestCase):
 
         # Завершить все R1
         for m in t.matches.filter(round_index=1, is_consolation=False):
-            if m.status not in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-                w = m.player1 if getattr(m.player2, "is_bye", False) else (
-                    m.player1 if m.player1.total_points >= m.player2.total_points else m.player2
+            if m.status not in (
+                Match.MatchStatus.COMPLETED,
+                Match.MatchStatus.WALKOVER,
+            ):
+                w = (
+                    m.player1
+                    if getattr(m.player2, "is_bye", False)
+                    else (
+                        m.player1
+                        if m.player1.total_points >= m.player2.total_points
+                        else m.player2
+                    )
                 )
                 m.winner = w
                 m.status = Match.MatchStatus.COMPLETED
@@ -60,9 +74,18 @@ class FanAdvanceWinnerTestCase(TestCase):
         # Завершить R2, R3
         for ri in [2, 3]:
             for m in t.matches.filter(round_index=ri, is_consolation=False):
-                if m.status not in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-                    w = m.player1 if getattr(m.player2, "is_bye", False) else (
-                        m.player1 if m.player1.total_points >= m.player2.total_points else m.player2
+                if m.status not in (
+                    Match.MatchStatus.COMPLETED,
+                    Match.MatchStatus.WALKOVER,
+                ):
+                    w = (
+                        m.player1
+                        if getattr(m.player2, "is_bye", False)
+                        else (
+                            m.player1
+                            if m.player1.total_points >= m.player2.total_points
+                            else m.player2
+                        )
                     )
                     m.winner = w
                     m.status = Match.MatchStatus.COMPLETED
@@ -120,13 +143,19 @@ class FanAdvanceWinnerTestCase(TestCase):
         self.assertTrue(ok, "Сетка должна сформироваться")
 
         # Завершаем все R1
-        for m in t.matches.filter(round_index=1, is_consolation=False).order_by("round_order"):
+        for m in t.matches.filter(round_index=1, is_consolation=False).order_by(
+            "round_order"
+        ):
             if m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
                 continue
             w = (
                 m.player1
                 if getattr(m.player2, "is_bye", False)
-                else (m.player1 if m.player1.total_points >= m.player2.total_points else m.player2)
+                else (
+                    m.player1
+                    if m.player1.total_points >= m.player2.total_points
+                    else m.player2
+                )
             )
             m.winner = w
             m.status = Match.MatchStatus.COMPLETED
@@ -134,12 +163,20 @@ class FanAdvanceWinnerTestCase(TestCase):
 
         # Завершаем первый матч R2 (тот, где уже два реальных игрока).
         # Это должно обновить заглушку второго слота R2 (победитель R1 match 3 vs Bye).
-        for m in t.matches.filter(round_index=2, is_consolation=False).order_by("round_order"):
+        for m in t.matches.filter(round_index=2, is_consolation=False).order_by(
+            "round_order"
+        ):
             if m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
                 continue
-            if getattr(m.player1, "is_bye", False) or getattr(m.player2, "is_bye", False):
+            if getattr(m.player1, "is_bye", False) or getattr(
+                m.player2, "is_bye", False
+            ):
                 continue  # заглушка — заполнится после завершения другого R2
-            w = m.player1 if m.player1.total_points >= m.player2.total_points else m.player2
+            w = (
+                m.player1
+                if m.player1.total_points >= m.player2.total_points
+                else m.player2
+            )
             m.winner = w
             m.status = Match.MatchStatus.COMPLETED
             m.save()
@@ -163,7 +200,9 @@ class OlympicAdvanceWinnerTestCase(TestCase):
 
     def setUp(self) -> None:
         self.bye_player = Player.objects.filter(is_bye=True).first()
-        self.assertIsNotNone(self.bye_player, "Bye-игрок должен существовать (миграция)")
+        self.assertIsNotNone(
+            self.bye_player, "Bye-игрок должен существовать (миграция)"
+        )
         self.players = []
         for i in range(10):
             u = User.objects.create_user(email=f"olympic{i}@test.local", password="x")
@@ -192,25 +231,39 @@ class OlympicAdvanceWinnerTestCase(TestCase):
         self.assertTrue(ok, "Основная сетка олимпийского турнира должна сформироваться")
 
         # Завершаем все R1 основной сетки
-        for m in t.matches.filter(round_index=1, is_consolation=False).order_by("round_order"):
+        for m in t.matches.filter(round_index=1, is_consolation=False).order_by(
+            "round_order"
+        ):
             if m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
                 continue
             w = (
                 m.player1
                 if getattr(m.player2, "is_bye", False)
-                else (m.player1 if m.player1.total_points >= m.player2.total_points else m.player2)
+                else (
+                    m.player1
+                    if m.player1.total_points >= m.player2.total_points
+                    else m.player2
+                )
             )
             m.winner = w
             m.status = Match.MatchStatus.COMPLETED
             m.save()
 
         # Завершаем первый матч R2 основной сетки (два реальных игрока)
-        for m in t.matches.filter(round_index=2, is_consolation=False).order_by("round_order"):
+        for m in t.matches.filter(round_index=2, is_consolation=False).order_by(
+            "round_order"
+        ):
             if m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
                 continue
-            if getattr(m.player1, "is_bye", False) or getattr(m.player2, "is_bye", False):
+            if getattr(m.player1, "is_bye", False) or getattr(
+                m.player2, "is_bye", False
+            ):
                 continue
-            w = m.player1 if m.player1.total_points >= m.player2.total_points else m.player2
+            w = (
+                m.player1
+                if m.player1.total_points >= m.player2.total_points
+                else m.player2
+            )
             m.winner = w
             m.status = Match.MatchStatus.COMPLETED
             m.save()

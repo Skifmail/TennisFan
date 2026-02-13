@@ -2,8 +2,6 @@
 Sparring app utilities.
 """
 
-from apps.subscriptions.models import SubscriptionTier
-
 
 def user_has_sparring_access(user) -> bool:
     """

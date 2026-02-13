@@ -13,11 +13,11 @@
 """
 
 import logging
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.utils import timezone
 
-from apps.tournaments.models import SeasonPoints, SeasonArchive
+from apps.tournaments.models import SeasonArchive, SeasonPoints
 from apps.tournaments.season_utils import get_current_season
 
 logger = logging.getLogger(__name__)
@@ -43,25 +43,31 @@ class Command(BaseCommand):
         force_season = options.get("force_season")
 
         if dry_run:
-            self.stdout.write(self.style.WARNING("DRY RUN MODE - изменения не будут сохранены"))
+            self.stdout.write(
+                self.style.WARNING("DRY RUN MODE - изменения не будут сохранены")
+            )
 
         # Определяем завершившийся сезон
         current_season = get_current_season()
-        
+
         if force_season:
             # Парсим принудительно указанный сезон
             parts = force_season.split("_")
             if len(parts) != 2:
-                self.stdout.write(self.style.ERROR(f"Неверный формат сезона: {force_season}. Используйте 'winter_2024' или 'summer_2025'"))
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"Неверный формат сезона: {force_season}. Используйте 'winter_2024' или 'summer_2025'"
+                    )
+                )
                 return
-            
+
             season_code, year_str = parts
             try:
                 season_year = int(year_str)
             except ValueError:
                 self.stdout.write(self.style.ERROR(f"Неверный год: {year_str}"))
                 return
-            
+
             if season_code == "winter":
                 ended_season_name = "Зима"
                 ended_season_year = season_year
@@ -69,7 +75,11 @@ class Command(BaseCommand):
                 ended_season_name = "Лето"
                 ended_season_year = season_year
             else:
-                self.stdout.write(self.style.ERROR(f"Неверный код сезона: {season_code}. Используйте 'winter' или 'summer'"))
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"Неверный код сезона: {season_code}. Используйте 'winter' или 'summer'"
+                    )
+                )
                 return
         else:
             # Автоматически определяем завершившийся сезон
@@ -84,18 +94,20 @@ class Command(BaseCommand):
                 ended_season_name = "Лето"
                 ended_season_year = current_season.year
 
-        self.stdout.write(
-            f"Архивация сезона: {ended_season_name} {ended_season_year}"
-        )
+        self.stdout.write(f"Архивация сезона: {ended_season_name} {ended_season_year}")
         self.stdout.write(
             f"Начало нового сезона: {current_season.name} {current_season.year}"
         )
 
         # Получаем все записи сезонных очков за завершившийся сезон
-        ended_season_points = SeasonPoints.objects.filter(
-            season_name=ended_season_name,
-            season_year=ended_season_year,
-        ).select_related("player").order_by("-current_season_points")
+        ended_season_points = (
+            SeasonPoints.objects.filter(
+                season_name=ended_season_name,
+                season_year=ended_season_year,
+            )
+            .select_related("player")
+            .order_by("-current_season_points")
+        )
 
         if not ended_season_points.exists():
             self.stdout.write(self.style.WARNING("Нет данных для архивации"))
@@ -110,12 +122,14 @@ class Command(BaseCommand):
             if prev_points is not None and sp.current_season_points < prev_points:
                 rank = len(players_to_archive) + 1
             prev_points = sp.current_season_points
-            
-            players_to_archive.append({
-                "player": sp.player,
-                "points": sp.current_season_points,
-                "rank": rank,
-            })
+
+            players_to_archive.append(
+                {
+                    "player": sp.player,
+                    "points": sp.current_season_points,
+                    "rank": rank,
+                }
+            )
 
         self.stdout.write(f"Найдено игроков для архивации: {len(players_to_archive)}")
 
@@ -131,7 +145,7 @@ class Command(BaseCommand):
                         defaults={
                             "final_points": data["points"],
                             "final_rank": data["rank"],
-                        }
+                        },
                     )
                     if created:
                         archived_count += 1
@@ -153,13 +167,14 @@ class Command(BaseCommand):
 
                 # Создаём записи для игроков, у которых их нет (на случай если они были созданы после начала сезона)
                 from apps.users.models import Player
+
                 all_players = Player.objects.exclude(
                     pk__in=SeasonPoints.objects.filter(
                         season_name=current_season.name,
                         season_year=current_season.year,
                     ).values_list("player_id", flat=True)
                 )
-                
+
                 new_records = []
                 for player in all_players:
                     new_records.append(
@@ -170,7 +185,7 @@ class Command(BaseCommand):
                             season_year=current_season.year,
                         )
                     )
-                
+
                 if new_records:
                     SeasonPoints.objects.bulk_create(new_records, ignore_conflicts=True)
 

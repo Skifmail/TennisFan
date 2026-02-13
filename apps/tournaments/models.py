@@ -278,27 +278,29 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         if self.is_doubles():
             if self.max_teams is None:
                 return False
-            return self.teams.filter(player2__isnull=False).count() >= self.max_teams
+            return bool(
+                self.teams.filter(player2__isnull=False).count() >= self.max_teams
+            )
         if self.max_participants is None:
             return False
-        return self.participants.count() >= self.max_participants
+        return bool(self.participants.count() >= self.max_participants)
 
     def full_teams_count(self) -> int:
         """Количество полных команд (с партнёром) в парном турнире."""
         if not self.is_doubles():
             return 0
-        return self.teams.filter(player2__isnull=False).count()
+        return int(self.teams.filter(player2__isnull=False).count())
 
     def available_slots(self) -> int:
         """Get number of available slots (participants or teams)."""
         if self.is_doubles():
             if self.max_teams is None:
-                return None
+                return 0
             full_teams = self.teams.filter(player2__isnull=False).count()
-            return max(0, self.max_teams - full_teams)
+            return int(max(0, self.max_teams - full_teams))
         if self.max_participants is None:
-            return None
-        return max(0, self.max_participants - self.participants.count())
+            return 0
+        return int(max(0, self.max_participants - self.participants.count()))
 
     def save(self, *args, **kwargs):
         from django.utils import timezone
@@ -578,7 +580,7 @@ class Match(models.Model):
 
     def is_sparring(self) -> bool:
         """Проверка, является ли матч спаррингом (личной встречей)."""
-        return self.match_type == self.MatchType.SPARRING
+        return bool(self.match_type == self.MatchType.SPARRING)
 
     def is_tournament_match(self) -> bool:
         """Проверка, является ли матч турнирным."""

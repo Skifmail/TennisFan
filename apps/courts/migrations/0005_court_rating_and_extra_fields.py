@@ -1,8 +1,8 @@
 # Generated manually for court rating and extra fields
 
+import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
@@ -16,12 +16,16 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="court",
             name="district",
-            field=models.CharField(blank=True, max_length=100, verbose_name="Район города"),
+            field=models.CharField(
+                blank=True, max_length=100, verbose_name="Район города"
+            ),
         ),
         migrations.AddField(
             model_name="court",
             name="sells_balls",
-            field=models.BooleanField(default=False, verbose_name="Теннисные мячи в продаже"),
+            field=models.BooleanField(
+                default=False, verbose_name="Теннисные мячи в продаже"
+            ),
         ),
         migrations.AddField(
             model_name="court",
@@ -31,7 +35,9 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="court",
             name="multiple_payment_methods",
-            field=models.BooleanField(default=False, verbose_name="Возможность оплаты разными способами"),
+            field=models.BooleanField(
+                default=False, verbose_name="Возможность оплаты разными способами"
+            ),
         ),
         migrations.AlterField(
             model_name="court",
@@ -41,12 +47,48 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="CourtRating",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("score", models.PositiveSmallIntegerField(choices=[(1, "1"), (2, "2"), (3, "3"), (4, "4"), (5, "5")], verbose_name="Оценка")),
-                ("created_at", models.DateTimeField(auto_now_add=True, verbose_name="Создана")),
-                ("updated_at", models.DateTimeField(auto_now=True, verbose_name="Обновлена")),
-                ("court", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="ratings", to="courts.court", verbose_name="Корт")),
-                ("user", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="court_ratings", to=settings.AUTH_USER_MODEL, verbose_name="Пользователь")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "score",
+                    models.PositiveSmallIntegerField(
+                        choices=[(1, "1"), (2, "2"), (3, "3"), (4, "4"), (5, "5")],
+                        verbose_name="Оценка",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Создана"),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Обновлена"),
+                ),
+                (
+                    "court",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="ratings",
+                        to="courts.court",
+                        verbose_name="Корт",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="court_ratings",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Пользователь",
+                    ),
+                ),
             ],
             options={
                 "verbose_name": "Оценка корта",

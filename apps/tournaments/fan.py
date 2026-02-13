@@ -5,7 +5,7 @@
 import logging
 import math
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import cast
 
 from django.urls import reverse
 from django.utils import timezone
@@ -90,12 +90,13 @@ def _is_fan(t: Tournament) -> bool:
     return getattr(t, "format", None) == FAN_FORMAT
 
 
-def _get_bye_player() -> Optional[Player]:
+def _get_bye_player() -> Player | None:
     """Служебный игрок «Свободный круг» для матчей при нечётном числе участников."""
-    return (
+    return cast(
+        Player | None,
         Player.objects.filter(user__email=BYE_EMAIL, is_bye=True)
         .select_related("user")
-        .first()
+        .first(),
     )
 
 
@@ -109,7 +110,7 @@ def _get_or_create_bye_team(
         player2=bye_player,
         defaults={},
     )
-    return team
+    return cast(TournamentTeam, team)
 
 
 def _round_name(round_index: int) -> str:
@@ -124,7 +125,7 @@ def _fan_points_for_round(t: Tournament, round_index: int) -> int:
         3: t.fan_points_sf,
         4: t.fan_points_final,
     }
-    return m.get(round_index, 0)
+    return int(m.get(round_index, 0))
 
 
 def _round_eliminated(round_index: int) -> str:
@@ -134,7 +135,8 @@ def _round_eliminated(round_index: int) -> str:
         3: TournamentPlayerResult.RoundEliminated.SF,
         4: TournamentPlayerResult.RoundEliminated.FINAL,
     }
-    return m.get(round_index, TournamentPlayerResult.RoundEliminated.R1)
+    val = m.get(round_index, TournamentPlayerResult.RoundEliminated.R1)
+    return val if isinstance(val, str) else str(val)
 
 
 def _tournament_start_dt(tournament: Tournament):
@@ -319,7 +321,7 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
         created += 1
         round_order += 1
 
-    if odd:
+    if odd and bye_player is not None:
         _create_match(
             entities[0],
             (
@@ -483,7 +485,7 @@ def _next_match_pair(next_round_index: int, next_round_order: int) -> tuple[int,
 
 def advance_winner_and_award_loser(
     match: Match, skip_points: bool = False
-) -> Optional[Match]:
+) -> Match | None:
     """
     После подтверждения результата матча: выдать очки проигравшему,
     при необходимости создать матч следующего раунда и «перевести» победителя.
@@ -516,7 +518,10 @@ def advance_winner_and_award_loser(
     if not skip_points:
         if is_cons:
             points = t.fan_points_r1
-            round_elim = TournamentPlayerResult.RoundEliminated.R1
+            re1 = TournamentPlayerResult.RoundEliminated.R1
+            round_elim: str = (
+                re1 if isinstance(re1, str) else getattr(re1, "value", str(re1))
+            )
         else:
             points = _fan_points_for_round(t, ri)
             round_elim = _round_eliminated(ri)
@@ -570,8 +575,9 @@ def advance_winner_and_award_loser(
             t1_bye = m.team1_id and getattr(m.team1.player1, "is_bye", False)
             t2_bye = m.team2_id and getattr(m.team2.player1, "is_bye", False)
             return bool(t1_bye or t2_bye)
-        return m.winner_id is None and (
-            bye_player
+        return bool(
+            m.winner_id is None
+            and bye_player
             and (m.player1_id == bye_player.pk or m.player2_id == bye_player.pk)
         )
 
@@ -587,7 +593,7 @@ def advance_winner_and_award_loser(
             ),
             None,
         )
-        if bye_prev is not None:
+        if bye_prev is not None and bye_player is not None:
             other_prev = next(m for m in prev_matches if m.pk != bye_prev.pk)
             if other_prev.winner_id or other_prev.winner_team_id:
                 if is_doubles:
@@ -607,14 +613,15 @@ def advance_winner_and_award_loser(
                     )
                 else:
                     other_winner = other_prev.winner
-                    if existing.player2_id == bye_player.pk:
-                        existing.player2 = other_winner
-                    else:
-                        existing.player1 = other_winner
-                    existing.save(update_fields=["player1", "player2"])
+                    if other_winner is not None:
+                        if existing.player2_id == bye_player.pk:
+                            existing.player2 = other_winner
+                        else:
+                            existing.player1 = other_winner
+                        existing.save(update_fields=["player1", "player2"])
                 other_prev.next_match = existing
                 other_prev.save(update_fields=["next_match"])
-                return existing
+                return cast(Match | None, existing)
 
     if existing:
         return None
@@ -658,7 +665,7 @@ def advance_winner_and_award_loser(
             )
         prev_matches[0].next_match = next_m
         prev_matches[0].save(update_fields=["next_match"])
-        return next_m
+        return cast(Match | None, next_m)
 
     if len(prev_matches) != 2:
         return None
@@ -683,14 +690,14 @@ def advance_winner_and_award_loser(
             bye_placeholder.save(update_fields=["team1", "team2", "player1", "player2"])
         else:
             other_winner = other_match.winner
-            if bye_placeholder.player2_id == bye_player.pk:
+            if bye_player is not None and bye_placeholder.player2_id == bye_player.pk:
                 bye_placeholder.player2 = other_winner
             else:
                 bye_placeholder.player1 = other_winner
             bye_placeholder.save(update_fields=["player1", "player2"])
         other_match.next_match = bye_placeholder
         other_match.save(update_fields=["next_match"])
-        return bye_placeholder
+        return cast(Match | None, bye_placeholder)
 
     both_done = all(
         m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
@@ -732,7 +739,7 @@ def advance_winner_and_award_loser(
     for pm in prev_matches:
         pm.next_match = next_m
         pm.save(update_fields=["next_match"])
-    return next_m
+    return cast(Match | None, next_m)
 
 
 def _expected_final_round(tournament: Tournament) -> int:
@@ -743,7 +750,7 @@ def _expected_final_round(tournament: Tournament) -> int:
         n = tournament.participants.count()
     if n < 2:
         return 1
-    return max(1, math.ceil(math.log2(n)))
+    return int(max(1, math.ceil(math.log2(n))))
 
 
 def finalize_tournament(tournament: Tournament) -> tuple[bool, str]:
@@ -855,19 +862,21 @@ def ensure_consolation_created(tournament: Tournament) -> None:
         logger.info("Consolation bracket created for %s", tournament.name)
 
 
-def _overdue_winner(match: Match) -> Optional[Player]:
+def _overdue_winner(match: Match) -> Player | None:
     """
     При просрочке дедлайна победа присуждается игроку с более высоким рейтингом.
     При равенстве — с меньшим id. Bye не может быть «победителем» в таком матче.
     """
     a, b = match.player1, match.player2
+    if a is None or b is None:
+        return None
     if getattr(a, "is_bye", False):
-        return b
+        return cast(Player | None, b)
     if getattr(b, "is_bye", False):
-        return a
+        return cast(Player | None, a)
     if a.total_points != b.total_points:
-        return a if a.total_points > b.total_points else b
-    return a if a.pk < b.pk else b
+        return cast(Player | None, a if a.total_points > b.total_points else b)
+    return cast(Player | None, a if a.pk < b.pk else b)
 
 
 def apply_overdue_walkover(match: Match, winner: Player) -> None:
@@ -876,6 +885,8 @@ def apply_overdue_walkover(match: Match, winner: Player) -> None:
     Не вызывает advance_winner / finalize — это делает вызывающий код.
     """
     loser = match.player2 if winner == match.player1 else match.player1
+    if loser is None:
+        return
     match.winner = winner
     match.status = Match.MatchStatus.WALKOVER
     match.completed_datetime = timezone.now()
@@ -915,6 +926,8 @@ def process_overdue_match(match: Match) -> tuple[bool, str]:
         return False, "Служебный матч."
 
     winner = _overdue_winner(match)
+    if winner is None:
+        return False, "Не удалось определить победителя."
     apply_overdue_walkover(match, winner)
 
     # При просрочке не начисляем очки проигравшему

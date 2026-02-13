@@ -2,6 +2,8 @@
 Custom User model with phone and email authentication.
 """
 
+from typing import cast
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
@@ -21,7 +23,7 @@ class UserManager(BaseUserManager):
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
-        return user
+        return cast("User", user)
 
     def create_superuser(
         self, email: str, password: str | None = None, **extra_fields
@@ -29,13 +31,13 @@ class UserManager(BaseUserManager):
         """Создание суперпользователя с проверкой обязательных флагов."""
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        
+
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True.")
         if extra_fields.get("is_superuser") is not True:
             raise ValueError("Superuser must have is_superuser=True.")
-        
-        return self.create_user(email, password, **extra_fields)
+
+        return cast("User", self.create_user(email, password, **extra_fields))
 
 
 class User(AbstractUser):
@@ -46,7 +48,7 @@ class User(AbstractUser):
     phone = models.CharField("Телефон", max_length=20, blank=True)
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = []
+    REQUIRED_FIELDS: list[str] = []
 
     objects = UserManager()
 
@@ -55,7 +57,7 @@ class User(AbstractUser):
         verbose_name_plural = "Пользователи"
 
     def __str__(self) -> str:
-        return self.email
+        return str(self.email)
 
 
 class PlayerCategory(models.TextChoices):
@@ -104,7 +106,10 @@ class Player(CompressImageFieldsMixin, models.Model):
     """Player profile extending User."""
 
     user = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name="player", verbose_name="Пользователь"
+        User,
+        on_delete=models.CASCADE,
+        related_name="player",
+        verbose_name="Пользователь",
     )
     avatar = models.ImageField(
         "Аватар",
@@ -131,7 +136,7 @@ class Player(CompressImageFieldsMixin, models.Model):
     forehand = models.CharField(
         "Ведущая рука", max_length=10, choices=Forehand.choices, blank=True, default=""
     )
-    
+
     age = models.PositiveIntegerField("Возраст", null=True, blank=True)
     bio = models.TextField("О себе", blank=True)
     telegram = models.CharField("Telegram", max_length=100, blank=True)
@@ -176,7 +181,9 @@ class Player(CompressImageFieldsMixin, models.Model):
     def __str__(self) -> str:
         if self.is_bye:
             return "Свободный круг"
-        return f"{self.user.first_name} {self.user.last_name}".strip() or self.user.email
+        return (
+            f"{self.user.first_name} {self.user.last_name}".strip() or self.user.email
+        )
 
     @property
     def active_subscription_tier(self):
@@ -227,7 +234,7 @@ class Player(CompressImageFieldsMixin, models.Model):
             return None
         s = self.max_contact.strip()
         if s.startswith(("http://", "https://")):
-            return s
+            return str(s)
         return None
 
     @staticmethod
@@ -252,13 +259,15 @@ class Player(CompressImageFieldsMixin, models.Model):
     def win_rate(self) -> float:
         if self.matches_played == 0:
             return 0.0
-        return round(self.matches_won / self.matches_played * 100, 1)
+        return float(round(self.matches_won / self.matches_played * 100, 1))
 
 
 class Notification(models.Model):
     """Simple notification for user actions."""
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="notifications"
+    )
     message = models.CharField("Сообщение", max_length=255)
     url = models.CharField("Ссылка", max_length=255, blank=True)
     is_read = models.BooleanField("Прочитано", default=False)
@@ -270,4 +279,4 @@ class Notification(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return self.message
+        return str(self.message)

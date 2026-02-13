@@ -1,7 +1,7 @@
 # Add NewsPhoto model for news gallery
 
-from django.db import migrations, models
 import django.db.models.deletion
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
@@ -14,10 +14,29 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="NewsPhoto",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("image", models.ImageField(upload_to="news/gallery/", verbose_name="Фото")),
-                ("caption", models.CharField(blank=True, max_length=200, verbose_name="Подпись")),
-                ("order", models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "image",
+                    models.ImageField(upload_to="news/gallery/", verbose_name="Фото"),
+                ),
+                (
+                    "caption",
+                    models.CharField(
+                        blank=True, max_length=200, verbose_name="Подпись"
+                    ),
+                ),
+                (
+                    "order",
+                    models.PositiveSmallIntegerField(default=0, verbose_name="Порядок"),
+                ),
                 (
                     "news",
                     models.ForeignKey(

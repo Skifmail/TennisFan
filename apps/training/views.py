@@ -11,10 +11,10 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.decorators import login_required_with_message
+
 from .forms import CoachApplicationForm, TrainingEnrollmentForm, TrainingForm
 from .models import (
     Coach,
-    CoachApplication,
     Training,
     TrainingEnrollment,
 )
@@ -22,14 +22,16 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
-@login_required_with_message("Раздел тренировок доступен только для зарегистрированных пользователей.")
+@login_required_with_message(
+    "Раздел тренировок доступен только для зарегистрированных пользователей."
+)
 def training_list(request):
     """List of trainings. Только для авторизованных пользователей."""
-    skill_level = request.GET.get('level', '')
-    training_type = request.GET.get('type', '')
-    city = request.GET.get('city', '')
+    skill_level = request.GET.get("level", "")
+    training_type = request.GET.get("type", "")
+    city = request.GET.get("city", "")
 
-    trainings = Training.objects.filter(is_active=True).select_related('coach')
+    trainings = Training.objects.filter(is_active=True).select_related("coach")
 
     if skill_level:
         trainings = trainings.filter(skill_level=skill_level)
@@ -39,23 +41,23 @@ def training_list(request):
         trainings = trainings.filter(city__icontains=city)
 
     context = {
-        'trainings': trainings,
-        'current_level': skill_level,
-        'current_type': training_type,
-        'current_city': city,
+        "trainings": trainings,
+        "current_level": skill_level,
+        "current_type": training_type,
+        "current_city": city,
     }
-    return render(request, 'training/list.html', context)
+    return render(request, "training/list.html", context)
 
 
-@login_required_with_message("Детали тренировки доступны только для зарегистрированных пользователей.")
+@login_required_with_message(
+    "Детали тренировки доступны только для зарегистрированных пользователей."
+)
 def training_detail(request, slug):
     """Training detail page. Только для авторизованных пользователей."""
     training = get_object_or_404(
-        Training.objects.select_related('coach', 'court'),
-        slug=slug,
-        is_active=True
+        Training.objects.select_related("coach", "court"), slug=slug, is_active=True
     )
-    return render(request, 'training/detail.html', {'training': training})
+    return render(request, "training/detail.html", {"training": training})
 
 
 @login_required
@@ -94,17 +96,19 @@ def training_enroll(request, slug):
     return render(request, "training/enroll.html", {"training": training, "form": form})
 
 
-@login_required_with_message("Список тренеров доступен только для зарегистрированных пользователей.")
+@login_required_with_message(
+    "Список тренеров доступен только для зарегистрированных пользователей."
+)
 def coach_list(request):
     """List of coaches. Только для авторизованных пользователей."""
-    city = request.GET.get('city', '')
+    city = request.GET.get("city", "")
 
     coaches = Coach.objects.filter(is_active=True)
     if city:
         coaches = coaches.filter(city__icontains=city)
 
-    context = {'coaches': coaches, 'current_city': city}
-    return render(request, 'training/coach_list.html', context)
+    context = {"coaches": coaches, "current_city": city}
+    return render(request, "training/coach_list.html", context)
 
 
 @login_required
@@ -150,20 +154,24 @@ def coach_application_success(request):
     return render(request, "training/coach_application_success.html")
 
 
-@login_required_with_message("Информация о тренере доступна только для зарегистрированных пользователей.")
+@login_required_with_message(
+    "Информация о тренере доступна только для зарегистрированных пользователей."
+)
 def coach_detail(request, slug):
     """Coach detail page. Только для авторизованных пользователей."""
     coach = get_object_or_404(Coach, slug=slug, is_active=True)
     trainings = coach.trainings.filter(is_active=True)
-    return render(request, "training/coach_detail.html", {"coach": coach, "trainings": trainings})
+    return render(
+        request, "training/coach_detail.html", {"coach": coach, "trainings": trainings}
+    )
 
 
 def _enrollment_contact_url(enrollment, method: str) -> str | None:
     """Return redirect URL for contacting enrollee (telegram, whatsapp, email) or None."""
     if method == "telegram" and enrollment.telegram_url:
-        return enrollment.telegram_url
+        return str(enrollment.telegram_url)
     if method == "whatsapp" and enrollment.whatsapp_url:
-        return enrollment.whatsapp_url
+        return str(enrollment.whatsapp_url)
     if method == "email" and enrollment.email:
         return f"mailto:{enrollment.email}"
     return None
@@ -232,7 +240,9 @@ def training_add(request):
     else:
         form = TrainingForm(initial={"city": coach.city} if coach.city else {})
 
-    return render(request, "training/training_form.html", {"form": form, "training": None})
+    return render(
+        request, "training/training_form.html", {"form": form, "training": None}
+    )
 
 
 @login_required
@@ -258,7 +268,9 @@ def training_edit(request, pk):
     else:
         form = TrainingForm(instance=training)
 
-    return render(request, "training/training_form.html", {"form": form, "training": training})
+    return render(
+        request, "training/training_form.html", {"form": form, "training": training}
+    )
 
 
 @login_required

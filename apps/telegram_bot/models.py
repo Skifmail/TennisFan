@@ -6,9 +6,11 @@
 from django.conf import settings
 from django.db import models
 
-from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 from apps.core.models import UserTelegramLink as CoreUserTelegramLink
-from apps.tournaments.models import DeadlineExtensionRequest as CoreDeadlineExtensionRequest
+from apps.tournaments.models import (
+    DeadlineExtensionRequest as CoreDeadlineExtensionRequest,
+)
+from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
 
 class TelegramBroadcast(CompressImageFieldsMixin, models.Model):
@@ -18,7 +20,9 @@ class TelegramBroadcast(CompressImageFieldsMixin, models.Model):
     Фото валидируется и сжимается до 500 КБ (как в остальных разделах сайта).
     """
 
-    text = models.TextField("Текст сообщения", help_text="Поддерживается HTML: <b>, <i>, <a href=\"...\">")
+    text = models.TextField(
+        "Текст сообщения", help_text='Поддерживается HTML: <b>, <i>, <a href="...">'
+    )
     image = models.ImageField(
         "Фото",
         upload_to="telegram_broadcasts/%Y/%m/",

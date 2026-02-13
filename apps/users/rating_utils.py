@@ -78,15 +78,19 @@ def map_ntrp_to_skill_level(level: Decimal) -> str:
         5.1–6.0 → Продвинутый
         6.1–7.0 → Профессионал
     """
+
+    def _choice_value(x) -> str:
+        return str(x[0]) if isinstance(x, tuple) else str(x)
+
     if level <= Decimal("2.0"):
-        return SkillLevel.NOVICE
+        return _choice_value(SkillLevel.NOVICE)
     if level <= Decimal("3.5"):
-        return SkillLevel.AMATEUR
+        return _choice_value(SkillLevel.AMATEUR)
     if level <= Decimal("5.0"):
-        return SkillLevel.EXPERIENCED
+        return _choice_value(SkillLevel.EXPERIENCED)
     if level <= Decimal("6.0"):
-        return SkillLevel.ADVANCED
-    return SkillLevel.PROFESSIONAL
+        return _choice_value(SkillLevel.ADVANCED)
+    return _choice_value(SkillLevel.PROFESSIONAL)
 
 
 def rating_to_ntrp_level(rating: int | float) -> Decimal:
@@ -106,7 +110,7 @@ def rating_to_ntrp_level(rating: int | float) -> Decimal:
     # Handle edge cases: below minimum or above maximum
     min_points = Decimal("500")
     max_points = Decimal("3500")
-    
+
     if rating_val < min_points:
         # Below minimum: extrapolate linearly from 1.0
         # Assume 0 points = NTRP 0.0, 500 points = NTRP 1.0

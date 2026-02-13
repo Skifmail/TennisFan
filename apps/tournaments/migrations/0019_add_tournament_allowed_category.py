@@ -1,7 +1,7 @@
 # Tournament allowed categories (1–5 per tournament)
 
-from django.db import migrations, models
 import django.db.models.deletion
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
@@ -14,7 +14,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="TournamentAllowedCategory",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 (
                     "category",
                     models.CharField(

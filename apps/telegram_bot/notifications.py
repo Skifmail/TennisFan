@@ -271,9 +271,9 @@ def _proposal_result_text(proposal) -> str:
     if result_val == "loss":
         return "Поражение"
     try:
-        return proposal.get_result_display()
+        return str(proposal.get_result_display())
     except Exception:
-        return result_val or "—"
+        return str(result_val or "—")
 
 
 def _get_penalty_text_for_player(match, player) -> str:

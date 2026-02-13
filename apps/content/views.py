@@ -17,16 +17,13 @@ from apps.users.models import Player
 from .forms import AboutUsCommentForm, NewsCommentForm
 from .models import (
     AboutUs,
-    ContactItem,
     ContactPage,
     Gallery,
-    LiveStream,
     News,
     Page,
     StringerCompany,
     StringerCompanyRating,
     StringerPage,
-    Video,
     VideoPage,
 )
 
@@ -35,8 +32,8 @@ logger = logging.getLogger(__name__)
 
 def news_list(request):
     """News list page."""
-    news = News.objects.filter(is_published=True).order_by('-created_at')
-    return render(request, 'content/news_list.html', {'news_list': news})
+    news = News.objects.filter(is_published=True).order_by("-created_at")
+    return render(request, "content/news_list.html", {"news_list": news})
 
 
 def news_detail(request, slug):
@@ -85,6 +82,7 @@ def news_detail(request, slug):
             )
             try:
                 from apps.core.telegram_notify import notify_news_comment
+
                 notify_news_comment(comment, news)
             except Exception as e:
                 logger.warning("Telegram notify for news comment failed: %s", e)
@@ -100,18 +98,16 @@ def news_detail(request, slug):
 
 def gallery_list(request):
     """Gallery list page."""
-    galleries = Gallery.objects.filter(is_published=True).prefetch_related('photos')
-    return render(request, 'content/gallery_list.html', {'galleries': galleries})
+    galleries = Gallery.objects.filter(is_published=True).prefetch_related("photos")
+    return render(request, "content/gallery_list.html", {"galleries": galleries})
 
 
 def gallery_detail(request, slug):
     """Gallery detail page."""
     gallery = get_object_or_404(
-        Gallery.objects.prefetch_related('photos'),
-        slug=slug,
-        is_published=True
+        Gallery.objects.prefetch_related("photos"), slug=slug, is_published=True
     )
-    return render(request, 'content/gallery_detail.html', {'gallery': gallery})
+    return render(request, "content/gallery_detail.html", {"gallery": gallery})
 
 
 def page_detail(request, slug):
@@ -168,6 +164,7 @@ def about_us(request):
             )
             try:
                 from apps.core.telegram_notify import notify_about_us_comment
+
                 notify_about_us_comment(comment)
             except Exception as e:
                 logger.warning("Telegram notify for About Us comment failed: %s", e)
@@ -202,11 +199,15 @@ def contacts(request):
 def videos(request):
     """Страница «Видео» с прямыми трансляциями и плейлистом."""
     video_page = VideoPage.get_singleton()
-    live_streams = video_page.live_streams.filter(is_active=True).order_by("order", "-created_at")
-    videos = video_page.videos.filter(is_published=True).order_by("order", "-created_at")
-    
+    live_streams = video_page.live_streams.filter(is_active=True).order_by(
+        "order", "-created_at"
+    )
+    videos = video_page.videos.filter(is_published=True).order_by(
+        "order", "-created_at"
+    )
+
     # Увеличиваем счетчик просмотров при просмотре видео (через AJAX или при клике)
-    
+
     context = {
         "video_page": video_page,
         "live_streams": live_streams,
@@ -218,31 +219,33 @@ def videos(request):
 def stringers(request):
     """Страница «Стрингеры» со списком компаний по натяжке струн."""
     stringer_page = StringerPage.get_singleton()
-    
+
     # Если страница отключена, возвращаем 404
     if not stringer_page.is_enabled:
         from django.http import Http404
+
         raise Http404("Страница отключена")
-    
-    companies = stringer_page.companies.filter(is_active=True).prefetch_related(
-        "photos", "ratings", "ratings__user"
-    ).order_by("order", "name")
-    
+
+    companies = (
+        stringer_page.companies.filter(is_active=True)
+        .prefetch_related("photos", "ratings", "ratings__user")
+        .order_by("order", "name")
+    )
+
     # Добавляем рейтинг и информацию о наличии оценки пользователя для каждой компании
     user_rated_company_ids = set()
     if request.user.is_authenticated:
         user_rated_company_ids = set(
             StringerCompanyRating.objects.filter(
-                user=request.user,
-                company__in=companies
+                user=request.user, company__in=companies
             ).values_list("company_id", flat=True)
         )
-    
+
     for company in companies:
         company.avg_rating = company.get_average_rating()
         company.rating_count = company.get_rating_count()
         company.user_has_rated = company.id in user_rated_company_ids
-    
+
     context = {
         "stringer_page": stringer_page,
         "companies": companies,
@@ -314,6 +317,7 @@ def stringer_rate(request):
 
     try:
         from apps.core.telegram_notify import notify_stringer_rating
+
         notify_stringer_rating(rating, created=created)
     except Exception:
         pass

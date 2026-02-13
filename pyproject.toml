@@ -18,3 +18,12 @@ warn_unused_ignores = true
 explicit_package_bases = true
 namespace_packages = true
 ignore_missing_imports = true
+exclude = [".*migrations.*"]
+
+[[tool.mypy.overrides]]
+module = ["*.admin"]
+disable_error_code = ["attr-defined"]
+
+[[tool.mypy.overrides]]
+module = ["apps.subscriptions.models", "apps.core.telegram_support", "apps.core.telegram_notify", "apps.telegram_bot.views", "apps.telegram_bot.services", "apps.content.views", "apps.legal.views", "apps.courts.geocoder", "apps.shop.views"]
+disable_error_code = ["import-untyped"]

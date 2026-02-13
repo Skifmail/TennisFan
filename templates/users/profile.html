@@ -141,30 +141,6 @@
                     </div>
                 </div>
 
-                {# --- Модальное окно подтверждения отмены --- #}
-                {% if player.user.subscription.is_valid and not player.user.subscription.is_cancelled %}
-                <div id="cancel-sub-modal" class="modal-overlay" style="display:none;">
-                    <div class="modal-dialog">
-                        <h3 class="modal-dialog__title">Отменить подписку?</h3>
-                        <p class="modal-dialog__text">
-                            Вы уверены, что хотите отменить подписку
-                            «{{ player.user.subscription.tier.get_name_display }}»?
-                        </p>
-                        <p class="modal-dialog__text text-secondary">
-                            Доступ ко всем функциям сохранится до
-                            <strong>{{ player.user.subscription.end_date|date:"d.m.Y" }}</strong>.
-                            После этой даты подписка не будет продлена.
-                        </p>
-                        <div class="modal-dialog__actions">
-                            <form method="post" action="{% url 'cancel_subscription' %}">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-danger">Да, отменить</button>
-                            </form>
-                            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-sub-modal').style.display='none'">Не отменять</button>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
 
                 {% else %}
                 <div class="alert alert-warning profile-info__subscription-alert">
@@ -732,6 +708,50 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
     if (seasonSelect) {
         seasonSelect.addEventListener('change', onFilterChange);
     }
+
+    // Обработка модального окна отмены подписки
+    var cancelSubModal = document.getElementById('cancel-sub-modal');
+    if (cancelSubModal) {
+        // Закрытие по клику на backdrop
+        cancelSubModal.addEventListener('click', function(e) {
+            if (e.target === cancelSubModal) {
+                cancelSubModal.style.display = 'none';
+            }
+        });
+        
+        // Закрытие по Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && cancelSubModal.style.display === 'flex') {
+                cancelSubModal.style.display = 'none';
+            }
+        });
+    }
 })();
 </script>
+
+{# --- Модальное окно подтверждения отмены подписки (в конце страницы для правильного z-index) --- #}
+{% if user.is_authenticated and player.user.subscription.is_valid and not player.user.subscription.is_cancelled %}
+<div id="cancel-sub-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-dialog">
+        <h3 class="modal-dialog__title">Отменить подписку?</h3>
+        <p class="modal-dialog__text">
+            Вы уверены, что хотите отменить подписку
+            «{{ player.user.subscription.tier.get_name_display }}»?
+        </p>
+        <p class="modal-dialog__text text-secondary">
+            Доступ ко всем функциям сохранится до
+            <strong>{{ player.user.subscription.end_date|date:"d.m.Y" }}</strong>.
+            После этой даты подписка не будет продлена.
+        </p>
+        <div class="modal-dialog__actions">
+            <form method="post" action="{% url 'cancel_subscription' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger">Да, отменить</button>
+            </form>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-sub-modal').style.display='none'">Не отменять</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}

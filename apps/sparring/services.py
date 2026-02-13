@@ -51,4 +51,4 @@ def create_match_from_response(sparring_response) -> Match:
         request.pk,
     )
 
-    return match
+    return match  # type: ignore[no-any-return]

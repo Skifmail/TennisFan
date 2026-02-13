@@ -336,9 +336,14 @@ def _create_support_message_and_send_to_admin(
 
     binding_url = None
     if request.user.is_authenticated and tg_support.is_telegram_configured():
+        import secrets as _secrets
+
         link, _ = UserTelegramLink.objects.get_or_create(
             user=request.user,
-            defaults={"telegram_chat_id": None},
+            defaults={
+                "telegram_chat_id": None,
+                "binding_token": _secrets.token_urlsafe(32),
+            },
         )
         # Если пользователь уже привязал бота, проверяем гостевые сообщения
         if link.telegram_chat_id:
@@ -461,7 +466,8 @@ def _support_webhook_secret_ok(request) -> bool:
     secret = getattr(settings, "TELEGRAM_SUPPORT_WEBHOOK_SECRET", None) or ""
     if not secret:
         return True
-    return request.headers.get("X-Telegram-Bot-Api-Secret-Token") == secret
+    token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+    return bool(token == secret)
 
 
 @csrf_exempt
@@ -729,23 +735,36 @@ def feedback_threads(request):
     """
     API: список обращений пользователя (SupportMessage) для виджета.
     Поддерживает как авторизованных пользователей, так и гостей (через session).
+    Для гостей возвращаются и их сообщения, и ответы админа (по совпадению guest_*).
     """
     threads = []
     messages = []
 
     if request.user.is_authenticated:
-        # Для авторизованных пользователей - получаем все их сообщения
+        # Для авторизованных пользователей - получаем все их сообщения и ответы админа
         messages = SupportMessage.objects.filter(user=request.user).order_by(
             "created_at"
         )[:50]
     else:
-        # Для гостей - получаем сообщения из session или по guest_binding_token
+        # Для гостей - сообщения из session + ответы админа с тем же guest_*
         guest_message_ids = request.session.get("feedback_guest_message_ids", [])
         if guest_message_ids:
-            messages = SupportMessage.objects.filter(
-                pk__in=guest_message_ids,
-                user__isnull=True,
-            ).order_by("created_at")[:50]
+            guest_msgs = list(
+                SupportMessage.objects.filter(
+                    pk__in=guest_message_ids,
+                    user__isnull=True,
+                ).values_list("guest_name", "guest_contact", "guest_telegram_username")
+            )
+            triplets = set(guest_msgs)
+            q = Q(pk__in=guest_message_ids)
+            for gn, gc, gt in triplets:
+                q = q | Q(
+                    user__isnull=True,
+                    guest_name=gn,
+                    guest_contact=gc,
+                    guest_telegram_username=gt,
+                )
+            messages = SupportMessage.objects.filter(q).order_by("created_at")[:50]
 
     current_thread = []
     for m in messages:

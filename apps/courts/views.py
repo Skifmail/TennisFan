@@ -4,7 +4,6 @@ Courts views.
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404, redirect, render
@@ -21,12 +20,9 @@ def court_list(request):
     city = request.GET.get("city", "")
     surface = request.GET.get("surface", "")
 
-    courts = (
-        Court.objects.filter(is_active=True)
-        .annotate(
-            average_rating=Avg("ratings__score"),
-            rating_count=Count("ratings"),
-        )
+    courts = Court.objects.filter(is_active=True).annotate(
+        average_rating=Avg("ratings__score"),
+        rating_count=Count("ratings"),
     )
 
     if city:
@@ -36,7 +32,7 @@ def court_list(request):
 
     courts = list(courts)
     for c in courts:
-        avg_rating = getattr(c, "average_rating")
+        avg_rating = c.average_rating
         if avg_rating is not None:
             c.average_rating = round(float(avg_rating), 1)
         else:
@@ -87,7 +83,11 @@ def court_detail(request, slug):
         c.author_rating_percent = (c.author_score or 0) * 20
 
     # POST: submit comment + rating (оценка ставится только вместе с комментарием)
-    if request.method == "POST" and request.POST.get("action") == "comment" and request.user.is_authenticated:
+    if (
+        request.method == "POST"
+        and request.POST.get("action") == "comment"
+        and request.user.is_authenticated
+    ):
         text = (request.POST.get("text") or "").strip()
         score_raw = request.POST.get("score")
         try:
@@ -102,7 +102,9 @@ def court_detail(request, slug):
             try:
                 player = request.user.player
             except Player.DoesNotExist:
-                messages.error(request, "Чтобы оставить комментарий, нужен профиль игрока.")
+                messages.error(
+                    request, "Чтобы оставить комментарий, нужен профиль игрока."
+                )
             else:
                 comment = Comment.objects.create(
                     content_type=ct,
@@ -118,6 +120,7 @@ def court_detail(request, slug):
                 )
                 try:
                     from apps.core.telegram_notify import notify_court_comment
+
                     notify_court_comment(comment=comment, court=court, score=score)
                 except Exception:
                     pass

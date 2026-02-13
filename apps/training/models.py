@@ -2,6 +2,8 @@
 Training models for adult tennis training.
 """
 
+from typing import cast
+
 from django.db import models
 from django.utils.text import slugify
 
@@ -58,14 +60,14 @@ class Coach(models.Model):
         ordering = ["name"]
 
     def __str__(self) -> str:
-        return self.name
+        return str(self.name)
 
     @property
     def telegram_url(self) -> str | None:
         if not self.telegram:
             return None
         u = self.telegram.strip().lstrip("@")
-        return f"https://t.me/{u}" if u else None
+        return str(f"https://t.me/{u}") if u else None
 
     @property
     def whatsapp_url(self) -> str | None:
@@ -80,7 +82,7 @@ class Coach(models.Model):
             phone = "7" + phone
         else:
             return None
-        return f"https://wa.me/{phone}"
+        return str(f"https://wa.me/{phone}")
 
     @property
     def max_url(self) -> str | None:
@@ -88,7 +90,7 @@ class Coach(models.Model):
             return None
         s = self.max_contact.strip()
         if s.startswith(("http://", "https://")):
-            return s
+            return str(s)
         return None
 
 
@@ -159,7 +161,9 @@ class CoachApplication(CompressImageFieldsMixin, models.Model):
 
     def approve_and_create_coach(self) -> Coach:
         if self.status != CoachApplicationStatus.PENDING:
-            raise ValueError("Можно одобрять только заявки со статусом «На рассмотрении».")
+            raise ValueError(
+                "Можно одобрять только заявки со статусом «На рассмотрении»."
+            )
         base_slug = slugify(self.name, allow_unicode=True) or "coach"
         slug = base_slug
         n = 0
@@ -186,7 +190,7 @@ class CoachApplication(CompressImageFieldsMixin, models.Model):
         self.coach = coach
         self.status = CoachApplicationStatus.APPROVED
         self.save(update_fields=["coach", "status", "updated_at"])
-        return coach
+        return cast(Coach, coach)
 
 
 class Training(CompressImageFieldsMixin, models.Model):
@@ -198,7 +202,10 @@ class Training(CompressImageFieldsMixin, models.Model):
     short_description = models.CharField("Краткое описание", max_length=300, blank=True)
 
     training_type = models.CharField(
-        "Тип тренировки", max_length=20, choices=TrainingType.choices, default=TrainingType.INDIVIDUAL
+        "Тип тренировки",
+        max_length=20,
+        choices=TrainingType.choices,
+        default=TrainingType.INDIVIDUAL,
     )
     skill_level = models.CharField(
         "Уровень", max_length=20, choices=SkillLevel.choices, default=SkillLevel.AMATEUR
@@ -208,18 +215,34 @@ class Training(CompressImageFieldsMixin, models.Model):
     )
 
     coach = models.ForeignKey(
-        Coach, on_delete=models.SET_NULL, null=True, blank=True, related_name="trainings", verbose_name="Тренер"
+        Coach,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="trainings",
+        verbose_name="Тренер",
     )
     court = models.ForeignKey(
-        "courts.Court", on_delete=models.SET_NULL, null=True, blank=True, related_name="trainings", verbose_name="Корт"
+        "courts.Court",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="trainings",
+        verbose_name="Корт",
     )
     city = models.CharField("Город", max_length=100)
 
-    duration_minutes = models.PositiveSmallIntegerField("Длительность (мин)", default=60)
+    duration_minutes = models.PositiveSmallIntegerField(
+        "Длительность (мин)", default=60
+    )
     max_participants = models.PositiveSmallIntegerField("Макс. участников", default=1)
-    price = models.DecimalField("Цена", max_digits=10, decimal_places=2, null=True, blank=True)
+    price = models.DecimalField(
+        "Цена", max_digits=10, decimal_places=2, null=True, blank=True
+    )
 
-    schedule = models.TextField("Расписание", blank=True, help_text="Дни и время проведения")
+    schedule = models.TextField(
+        "Расписание", blank=True, help_text="Дни и время проведения"
+    )
     image = models.ImageField(
         "Изображение",
         upload_to="trainings/",
@@ -239,7 +262,7 @@ class Training(CompressImageFieldsMixin, models.Model):
         ordering = ["-is_featured", "-created_at"]
 
     def __str__(self) -> str:
-        return self.title
+        return str(self.title)
 
 
 class TrainingEnrollment(models.Model):
@@ -253,10 +276,16 @@ class TrainingEnrollment(models.Model):
         COMPLETED = "completed", "Завершено"
 
     training = models.ForeignKey(
-        Training, on_delete=models.CASCADE, related_name="enrollments", verbose_name="Тренировка"
+        Training,
+        on_delete=models.CASCADE,
+        related_name="enrollments",
+        verbose_name="Тренировка",
     )
     player = models.ForeignKey(
-        "users.Player", on_delete=models.CASCADE, related_name="training_enrollments", verbose_name="Игрок"
+        "users.Player",
+        on_delete=models.CASCADE,
+        related_name="training_enrollments",
+        verbose_name="Игрок",
     )
     status = models.CharField(
         "Статус", max_length=20, choices=Status.choices, default=Status.PENDING
@@ -265,7 +294,9 @@ class TrainingEnrollment(models.Model):
     telegram = models.CharField("Telegram", max_length=100, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
     email = models.EmailField("Email", blank=True)
-    preferred_datetime = models.DateTimeField("Предпочтительное время", null=True, blank=True)
+    preferred_datetime = models.DateTimeField(
+        "Предпочтительное время", null=True, blank=True
+    )
     desired_court = models.ForeignKey(
         "courts.Court",
         on_delete=models.SET_NULL,
@@ -292,7 +323,7 @@ class TrainingEnrollment(models.Model):
         if not self.telegram:
             return None
         u = self.telegram.strip().lstrip("@")
-        return f"https://t.me/{u}" if u else None
+        return str(f"https://t.me/{u}") if u else None
 
     @property
     def whatsapp_url(self) -> str | None:

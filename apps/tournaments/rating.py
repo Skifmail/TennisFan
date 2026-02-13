@@ -19,19 +19,18 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-ELO_DIVISOR: int = 800          # Rating gap divisor for expected score calculation
-K_CALIBRATION: int = 250        # K-factor during first 10 matches
-K_STABLE: int = 50              # K-factor after 10+ matches
+ELO_DIVISOR: int = 800  # Rating gap divisor for expected score calculation
+K_CALIBRATION: int = 250  # K-factor during first 10 matches
+K_STABLE: int = 50  # K-factor after 10+ matches
 CALIBRATION_THRESHOLD: int = 10  # Number of matches before K stabilises
-GAMES_WEIGHT: float = 0.7       # Weight of game percentage in S
-WIN_BONUS_WEIGHT: float = 0.3   # Weight of match-win bonus in S
+GAMES_WEIGHT: float = 0.7  # Weight of game percentage in S
+WIN_BONUS_WEIGHT: float = 0.3  # Weight of match-win bonus in S
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +99,7 @@ def expected_score(rating_a: float, rating_b: float) -> float:
         Expected score for player A in range (0, 1).
     """
     exponent = (rating_b - rating_a) / ELO_DIVISOR
-    return 1.0 / (1.0 + 10 ** exponent)
+    return 1.0 / (1.0 + 10**exponent)
 
 
 def actual_score(games_won: int, total_games: int, won_match: bool) -> float:
@@ -164,9 +163,18 @@ def calculate_new_ratings(
     logger.info(
         "Rating calc: A(%.1f, K=%d) vs B(%.1f, K=%d) | "
         "E(%.3f/%.3f) S(%.3f/%.3f) | Δ(%.1f/%.1f) → (%.1f/%.1f)",
-        player_a.rating, k_a, player_b.rating, k_b,
-        e_a, e_b, s_a, s_b,
-        delta_a, delta_b, new_a, new_b,
+        player_a.rating,
+        k_a,
+        player_b.rating,
+        k_b,
+        e_a,
+        e_b,
+        s_a,
+        s_b,
+        delta_a,
+        delta_b,
+        new_a,
+        new_b,
     )
 
     return RatingDelta(

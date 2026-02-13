@@ -8,9 +8,8 @@
   */10 * * * * cd /path/to/project && venv/bin/python manage.py fan_generate_past_deadlines
 """
 
-from django.utils import timezone
-
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from apps.tournaments.fan import generate_bracket
 from apps.tournaments.models import Tournament
@@ -33,7 +32,9 @@ class Command(BaseCommand):
             )
         )
         if not qs:
-            self.stdout.write("Нет турниров с истёкшим дедлайном регистрации (FAN, сетка ещё не сформирована).")
+            self.stdout.write(
+                "Нет турниров с истёкшим дедлайном регистрации (FAN, сетка ещё не сформирована)."
+            )
             return
         total = 0
         for t in qs:
@@ -44,4 +45,6 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.WARNING(f"{t.slug}: {msg}"))
         if total == 0:
-            self.stdout.write("Ни для одного турнира сетка не сформирована (см. предупреждения выше).")
+            self.stdout.write(
+                "Ни для одного турнира сетка не сформирована (см. предупреждения выше)."
+            )

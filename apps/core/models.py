@@ -3,9 +3,9 @@ Core models.
 """
 
 import secrets
+
 from django.conf import settings
 from django.db import models
-
 
 # ---------------------------------------------------------------------------
 # Новая система обратной связи через Telegram (пользователь ↔ админ в Telegram)
@@ -18,6 +18,7 @@ class UserTelegramLink(models.Model):
     Telegram не позволяет писать пользователю первым — пользователь должен
     хотя бы раз написать боту (например /start с токеном с сайта).
     """
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -59,16 +60,21 @@ class UserTelegramLink(models.Model):
 
     def get_or_create_binding_token(self):
         """Вернуть токен для привязки; создать новый, если нет или просрочен (24 ч)."""
-        from django.utils import timezone
         from datetime import timedelta
+
+        from django.utils import timezone
+
         if self.binding_token:
-            if self.token_created_at and timezone.now() - self.token_created_at < timedelta(hours=24):
+            if (
+                self.token_created_at
+                and timezone.now() - self.token_created_at < timedelta(hours=24)
+            ):
                 return self.binding_token
         self.binding_token = secrets.token_urlsafe(32)
         self.token_created_at = timezone.now()
         self.save(update_fields=["binding_token", "token_created_at"])
         return self.binding_token
-    
+
     def migrate_guest_messages(self):
         """
         Переносит гостевые SupportMessage к этому пользователю, если они связаны с тем же chat_id.
@@ -77,20 +83,19 @@ class UserTelegramLink(models.Model):
         """
         if not self.telegram_chat_id:
             return 0
-        
+
         # Ищем гостевые сообщения с таким же chat_id
         guest_messages = SupportMessage.objects.filter(
-            user__isnull=True,
-            guest_telegram_chat_id=self.telegram_chat_id
+            user__isnull=True, guest_telegram_chat_id=self.telegram_chat_id
         )
-        
+
         # Переносим найденные сообщения к пользователю
         updated_count = guest_messages.update(
             user=self.user,
             guest_telegram_chat_id=None,  # Очищаем, так как теперь это зарегистрированный пользователь
             guest_binding_token="",  # Очищаем токен
         )
-        
+
         return updated_count
 
 
@@ -99,6 +104,7 @@ class TelegramTransferConsentLog(models.Model):
     Журнал согласий на передачу данных в Telegram.
     Хранит юридически значимые атрибуты согласия для возможных споров/проверок.
     """
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -124,7 +130,9 @@ class TelegramTransferConsentLog(models.Model):
         verbose_name_plural = "согласия на передачу данных в Telegram"
 
     def __str__(self):
-        return f"{self.user} / {self.consent_version} / {self.consented_at:%d.%m.%Y %H:%M}"
+        return (
+            f"{self.user} / {self.consent_version} / {self.consented_at:%d.%m.%Y %H:%M}"
+        )
 
 
 class SupportMessage(models.Model):
@@ -133,6 +141,7 @@ class SupportMessage(models.Model):
     или от администратора (ответ в Telegram).
     Поддерживает как зарегистрированных пользователей, так и гостей (незарегистрированных).
     """
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

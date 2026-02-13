@@ -2,6 +2,8 @@
 Courts models.
 """
 
+from typing import cast
+
 from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
@@ -29,7 +31,10 @@ class Court(CompressImageFieldsMixin, models.Model):
     description = models.TextField("Описание", blank=True)
 
     surface = models.CharField(
-        "Покрытие", max_length=20, choices=CourtSurface.choices, default=CourtSurface.HARD
+        "Покрытие",
+        max_length=20,
+        choices=CourtSurface.choices,
+        default=CourtSurface.HARD,
     )
     courts_count = models.PositiveSmallIntegerField("Количество кортов", default=1)
     has_lighting = models.BooleanField("Освещение", default=True)
@@ -47,10 +52,16 @@ class Court(CompressImageFieldsMixin, models.Model):
     image = models.ImageField(
         "Фото", upload_to="courts/", blank=True, validators=[validate_image_max_2mb]
     )
-    latitude = models.DecimalField("Широта", max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField("Долгота", max_digits=9, decimal_places=6, null=True, blank=True)
+    latitude = models.DecimalField(
+        "Широта", max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    longitude = models.DecimalField(
+        "Долгота", max_digits=9, decimal_places=6, null=True, blank=True
+    )
 
-    price_per_hour = models.DecimalField("Цена/час", max_digits=8, decimal_places=2, null=True, blank=True)
+    price_per_hour = models.DecimalField(
+        "Цена/час", max_digits=8, decimal_places=2, null=True, blank=True
+    )
     is_active = models.BooleanField("Активен", default=True)
 
     created_at = models.DateTimeField("Создан", auto_now_add=True)
@@ -159,7 +170,9 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
     def approve_and_create_court(self) -> Court:
         """Создать Court из заявки, привязать к заявке, пометить одобренной."""
         if self.status != CourtApplicationStatus.PENDING:
-            raise ValueError("Можно одобрять только заявки со статусом «На рассмотрении».")
+            raise ValueError(
+                "Можно одобрять только заявки со статусом «На рассмотрении»."
+            )
         base_slug = slugify(self.name, allow_unicode=True) or "court"
         slug = base_slug
         n = 0
@@ -190,7 +203,7 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
         self.court = court
         self.status = CourtApplicationStatus.APPROVED
         self.save(update_fields=["court", "status", "updated_at"])
-        return court
+        return cast(Court, court)
 
 
 class CourtRating(models.Model):

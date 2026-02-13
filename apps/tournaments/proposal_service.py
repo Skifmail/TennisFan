@@ -8,9 +8,6 @@ from django.utils import timezone
 
 from apps.users.models import Notification
 
-from .fan import _is_fan
-from .olympic_consolation import _is_olympic
-from .round_robin import _is_round_robin
 from .models import Match, MatchResultProposal
 
 
@@ -39,15 +36,25 @@ def _compute_result(proposal: MatchResultProposal):
     else:
         opponent = match.player2 if proposer == match.player1 else match.player1
         if proposer == match.player1:
-            winner = match.player1 if result in (
-                Match.ResultChoice.WIN,
-                Match.ResultChoice.WALKOVER_WIN,
-            ) else match.player2
+            winner = (
+                match.player1
+                if result
+                in (
+                    Match.ResultChoice.WIN,
+                    Match.ResultChoice.WALKOVER_WIN,
+                )
+                else match.player2
+            )
         else:
-            winner = match.player2 if result in (
-                Match.ResultChoice.WIN,
-                Match.ResultChoice.WALKOVER_WIN,
-            ) else match.player1
+            winner = (
+                match.player2
+                if result
+                in (
+                    Match.ResultChoice.WIN,
+                    Match.ResultChoice.WALKOVER_WIN,
+                )
+                else match.player1
+            )
         loser = opponent if winner == proposer else proposer
         winner_team = None
         loser_team = None
@@ -66,7 +73,7 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     """
     match = proposal.match
     winner, loser, walkover, winner_team, loser_team = _compute_result(proposal)
-    
+
     # При тех.поражении / тех.победе записываем счёт 6:0 6:0 в пользу победителя
     is_walkover_retired = proposal.result in (
         Match.ResultChoice.WALKOVER_LOSS,
@@ -91,22 +98,32 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     else:
         # Для обычных матчей используем счёт из proposal
         for field in [
-            "player1_set1", "player2_set1", "player1_set2", "player2_set2",
-            "player1_set3", "player2_set3",
+            "player1_set1",
+            "player2_set1",
+            "player1_set2",
+            "player2_set2",
+            "player1_set3",
+            "player2_set3",
         ]:
             setattr(match, field, getattr(proposal, field))
-    
+
     match.winner = winner
     if winner_team is not None:
         match.winner_team = winner_team
-    match.status = Match.MatchStatus.WALKOVER if walkover else Match.MatchStatus.COMPLETED
-    match.completed_datetime = match.completed_datetime or match.scheduled_datetime or timezone.now()
+    match.status = (
+        Match.MatchStatus.WALKOVER if walkover else Match.MatchStatus.COMPLETED
+    )
+    match.completed_datetime = (
+        match.completed_datetime or match.scheduled_datetime or timezone.now()
+    )
 
     # Mark match for Elo rating calculation
     match.rating_status = Match.RatingCalcStatus.PENDING
     match.save()
 
-    match.result_proposals.exclude(pk=proposal.pk).update(status=Match.ProposalStatus.REJECTED)
+    match.result_proposals.exclude(pk=proposal.pk).update(
+        status=Match.ProposalStatus.REJECTED
+    )
     proposal.status = Match.ProposalStatus.ACCEPTED
     proposal.save(update_fields=["status"])
 
@@ -120,7 +137,9 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
                     message="Результат матча подтверждён: тех. поражение.",
                     url=url,
                 )
-        for p in (winner_team.player1, winner_team.player2) if winner_team else [winner]:
+        for p in (
+            (winner_team.player1, winner_team.player2) if winner_team else [winner]
+        ):
             if p and not getattr(p, "is_bye", False):
                 Notification.objects.create(
                     user=p.user,
@@ -128,7 +147,9 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
                     url=url,
                 )
     else:
-        for p in (winner_team.player1, winner_team.player2) if winner_team else [winner]:
+        for p in (
+            (winner_team.player1, winner_team.player2) if winner_team else [winner]
+        ):
             if p and not getattr(p, "is_bye", False):
                 Notification.objects.create(
                     user=p.user,

@@ -4,10 +4,8 @@
 """
 
 import logging
-from typing import Tuple
 
 import requests
-
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -37,7 +35,7 @@ def send_message(
     chat_id: int | str,
     text: str,
     parse_mode: str = "HTML",
-) -> Tuple[int | None, bool]:
+) -> tuple[int | None, bool]:
     """
     Отправить сообщение в Telegram в указанный chat_id.
     Возвращает (message_id из ответа API, success).
@@ -66,7 +64,7 @@ def send_message(
         return None, False
 
 
-def send_to_admin(text: str) -> Tuple[int | None, bool]:
+def send_to_admin(text: str) -> tuple[int | None, bool]:
     """Отправить сообщение администратору. Возвращает (message_id, success)."""
     chat_id = _get_admin_chat_id()
     if not chat_id:
@@ -109,12 +107,7 @@ def send_to_user(telegram_chat_id: int, text: str) -> bool:
 def _escape(s: str) -> str:
     if not s:
         return ""
-    return (
-        str(s)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def format_support_message_to_admin(
@@ -137,7 +130,7 @@ def format_support_message_to_admin(
     user_d = _escape(user_display or "—")
     email = _escape(user_email or "—")
     contact = _escape(guest_contact or "—")
-    
+
     if is_guest:
         tg_info = ""
         if guest_telegram_username:

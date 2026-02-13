@@ -8,7 +8,6 @@ from datetime import timedelta
 
 from django.contrib import admin, messages
 from django.http import HttpResponseRedirect
-from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
 
@@ -40,9 +39,9 @@ def _send_broadcast_in_background(broadcast_pk: int) -> None:
         text = (broadcast.text or "").strip()
         if not text:
             return
-        links = UserTelegramLink.objects.filter(
-            user_bot_chat_id__isnull=False
-        ).exclude(user_bot_chat_id=0)
+        links = UserTelegramLink.objects.filter(user_bot_chat_id__isnull=False).exclude(
+            user_bot_chat_id=0
+        )
         total = links.count()
         sent = 0
         for link in links:
@@ -91,19 +90,29 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
             None,
             {
                 "fields": ("text", "image"),
-                "description": "Текст поддерживает HTML: <b>, <i>, <a href=\"...\">. "
+                "description": 'Текст поддерживает HTML: <b>, <i>, <a href="...">. '
                 "Если указано фото — отправляется пост с подписью. "
                 "Отправка только по кнопке «Сохранить» — случайное нажатие Enter не отправит форму.",
             },
         ),
-        ("Служебные", {"fields": ("sent_at", "created_at", "created_by"), "classes": ("collapse",)}),
+        (
+            "Служебные",
+            {
+                "fields": ("sent_at", "created_at", "created_by"),
+                "classes": ("collapse",),
+            },
+        ),
     )
 
     class Media:
         js = ("js/admin_broadcast.js",)
 
     def text_short(self, obj):
-        return ((obj.text or "")[:60] + "…") if (obj.text and len(obj.text) > 60) else (obj.text or "—")
+        return (
+            ((obj.text or "")[:60] + "…")
+            if (obj.text and len(obj.text) > 60)
+            else (obj.text or "—")
+        )
 
     text_short.short_description = "Текст"
 
@@ -178,7 +187,13 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
 class UserTelegramLinkProxyAdmin(admin.ModelAdmin):
     """Привязки пользователей к Telegram (отображаются в разделе «Телеграм»)."""
 
-    list_display = ("user", "telegram_chat_id", "user_bot_chat_id", "has_binding_token", "created_at")
+    list_display = (
+        "user",
+        "telegram_chat_id",
+        "user_bot_chat_id",
+        "has_binding_token",
+        "created_at",
+    )
     search_fields = ("user__email",)
     readonly_fields = ("created_at", "updated_at", "token_created_at")
 
@@ -219,9 +234,13 @@ def approve_extension_action(modeladmin, request, queryset):
             pass
         count += 1
     if count:
-        messages.success(request, f"Одобрено запросов: {count}. Дедлайн продлён на 24 ч.")
+        messages.success(
+            request, f"Одобрено запросов: {count}. Дедлайн продлён на 24 ч."
+        )
     else:
-        messages.warning(request, "Нет запросов для одобрения (или матчи уже завершены).")
+        messages.warning(
+            request, "Нет запросов для одобрения (или матчи уже завершены)."
+        )
 
 
 @admin.register(DeadlineExtensionRequestProxy)

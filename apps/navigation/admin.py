@@ -3,6 +3,7 @@ Navigation admin configuration.
 """
 
 from django.contrib import admin
+
 from .models import MenuItem
 
 

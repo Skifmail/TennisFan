@@ -3,7 +3,6 @@
 from django.contrib.auth.hashers import make_password
 from django.db import migrations
 
-
 BYE_EMAIL = "bye@tennisfan.local"
 
 

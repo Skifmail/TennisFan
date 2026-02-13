@@ -2,31 +2,28 @@
 Tournaments admin configuration.
 """
 
-from datetime import timedelta
-
 from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
-from django.utils import timezone
 
 from apps.users.models import SkillLevel
 
 from .fan import generate_bracket
-from .olympic_consolation import generate_bracket as generate_olympic_bracket
-from .round_robin import generate_bracket as generate_round_robin_bracket
-from .proposal_service import apply_proposal
 from .models import (
     HeadToHead,
     Match,
     MatchResultProposal,
-    SeasonRating,
-    SeasonPoints,
     SeasonArchive,
+    SeasonPoints,
+    SeasonRating,
     Tournament,
     TournamentAllowedCategory,
     TournamentPlayerResult,
     TournamentTeam,
 )
+from .olympic_consolation import generate_bracket as generate_olympic_bracket
+from .proposal_service import apply_proposal
+from .round_robin import generate_bracket as generate_round_robin_bracket
 
 
 @admin.action(description="Подтвердить результат матча")
@@ -42,7 +39,9 @@ def accept_proposal_action(modeladmin, request, queryset):
     if count:
         messages.success(request, f"Подтверждено заявок: {count}.")
     else:
-        messages.warning(request, "Нет заявок для подтверждения (или матчи уже завершены).")
+        messages.warning(
+            request, "Нет заявок для подтверждения (или матчи уже завершены)."
+        )
 
 
 @admin.action(description="Сформировать сетку FAN")
@@ -157,7 +156,11 @@ class TournamentAdmin(admin.ModelAdmin):
     filter_horizontal = ("participants",)
     date_hierarchy = "start_date"
     readonly_fields = ("insufficient_participants_notified_at",)
-    actions = [generate_fan_bracket_action, generate_olympic_bracket_action, generate_round_robin_bracket_action]
+    actions = [
+        generate_fan_bracket_action,
+        generate_olympic_bracket_action,
+        generate_round_robin_bracket_action,
+    ]
 
     fieldsets = (
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
@@ -208,7 +211,11 @@ class TournamentAdmin(admin.ModelAdmin):
                     "Внутри кругового турнира места определяются по победам (1 очко за победу, 0 за поражение), эти значения не редактируются.\n\n"
                     "<b>Значения по умолчанию:</b> 10–25–45–70–100."
                 ),
-                "classes": ("format-fan-section", "format-olympic-section", "format-round-robin-section"),
+                "classes": (
+                    "format-fan-section",
+                    "format-olympic-section",
+                    "format-round-robin-section",
+                ),
             },
         ),
         (
@@ -236,7 +243,8 @@ class TournamentAdmin(admin.ModelAdmin):
         if db_field.name == "format":
             resolver_match = getattr(request, "resolver_match", None)
             is_add_page = "/add/" in (request.path or "") or (
-                resolver_match and "add" in (getattr(resolver_match, "url_name", "") or "")
+                resolver_match
+                and "add" in (getattr(resolver_match, "url_name", "") or "")
             )
             if is_add_page:
                 kwargs["choices"] = [("", "---------")] + list(db_field.choices)
@@ -263,8 +271,20 @@ class MatchAdminForm(forms.ModelForm):
         self.fields["player2_set2"].label = "Игрок 2 — 2‑й сет (геймы)"
         self.fields["player1_set3"].label = "Игрок 1 — 3‑й сет (геймы)"
         self.fields["player2_set3"].label = "Игрок 2 — 3‑й сет (геймы)"
-        for i, name in enumerate(["player1_set1", "player2_set1", "player1_set2", "player2_set2", "player1_set3", "player2_set3"], 1):
-            self.fields[name].help_text = "Количество выигранных геймов в сете. Игрок 1 и 2 — первая и вторая сторона в матче (см. выше)."
+        for _i, name in enumerate(
+            [
+                "player1_set1",
+                "player2_set1",
+                "player1_set2",
+                "player2_set2",
+                "player1_set3",
+                "player2_set3",
+            ],
+            1,
+        ):
+            self.fields[name].help_text = (
+                "Количество выигранных геймов в сете. Игрок 1 и 2 — первая и вторая сторона в матче (см. выше)."
+            )
 
 
 @admin.register(Match)
@@ -295,8 +315,15 @@ class MatchAdmin(admin.ModelAdmin):
         "player2__user__last_name",
     )
     raw_id_fields = (
-        "player1", "player2", "team1", "team2", "winner", "winner_team",
-        "court", "next_match", "loser_next_match",
+        "player1",
+        "player2",
+        "team1",
+        "team2",
+        "winner",
+        "winner_team",
+        "court",
+        "next_match",
+        "loser_next_match",
     )
     date_hierarchy = "scheduled_datetime"
 
@@ -305,12 +332,32 @@ class MatchAdmin(admin.ModelAdmin):
             "Турнир",
             {
                 "fields": (
-                    "tournament", "court", "round_name", "round_index", "round_order",
-                    "is_consolation", "next_match", "loser_next_match", "placement_min", "placement_max",
+                    "tournament",
+                    "court",
+                    "round_name",
+                    "round_index",
+                    "round_order",
+                    "is_consolation",
+                    "next_match",
+                    "loser_next_match",
+                    "placement_min",
+                    "placement_max",
                 )
             },
         ),
-        ("Игроки / Команды", {"fields": ("player1", "player2", "team1", "team2", "winner", "winner_team")}),
+        (
+            "Игроки / Команды",
+            {
+                "fields": (
+                    "player1",
+                    "player2",
+                    "team1",
+                    "team2",
+                    "winner",
+                    "winner_team",
+                )
+            },
+        ),
         (
             "Счёт по сетам",
             {
@@ -323,7 +370,17 @@ class MatchAdmin(admin.ModelAdmin):
             },
         ),
         ("Очки рейтинга", {"fields": ("points_player1", "points_player2")}),
-        ("Время", {"fields": ("scheduled_datetime", "deadline", "completed_datetime", "status")}),
+        (
+            "Время",
+            {
+                "fields": (
+                    "scheduled_datetime",
+                    "deadline",
+                    "completed_datetime",
+                    "status",
+                )
+            },
+        ),
     )
 
 
@@ -394,16 +451,33 @@ class MatchResultProposalAdmin(admin.ModelAdmin):
 class TournamentPlayerResultAdmin(admin.ModelAdmin):
     """FAN / Олимпийская: результаты игроков в турнире (раунд вылета или итоговое место)."""
 
-    list_display = ("tournament", "player", "place", "round_eliminated", "fan_points", "is_consolation")
+    list_display = (
+        "tournament",
+        "player",
+        "place",
+        "round_eliminated",
+        "fan_points",
+        "is_consolation",
+    )
 
 
 @admin.register(SeasonPoints)
 class SeasonPointsAdmin(admin.ModelAdmin):
     """Админка для сезонных очков игроков."""
 
-    list_display = ("player", "current_season_points", "season_name", "season_year", "updated_at")
+    list_display = (
+        "player",
+        "current_season_points",
+        "season_name",
+        "season_year",
+        "updated_at",
+    )
     list_filter = ("season_name", "season_year")
-    search_fields = ("player__user__first_name", "player__user__last_name", "player__user__email")
+    search_fields = (
+        "player__user__first_name",
+        "player__user__last_name",
+        "player__user__email",
+    )
     readonly_fields = ("updated_at",)
     ordering = ("-current_season_points", "-season_year", "-season_name")
 
@@ -412,9 +486,20 @@ class SeasonPointsAdmin(admin.ModelAdmin):
 class SeasonArchiveAdmin(admin.ModelAdmin):
     """Админка для архива результатов сезонов."""
 
-    list_display = ("player", "season_name", "season_year", "final_points", "final_rank", "archived_at")
+    list_display = (
+        "player",
+        "season_name",
+        "season_year",
+        "final_points",
+        "final_rank",
+        "archived_at",
+    )
     list_filter = ("season_name", "season_year", "final_rank")
-    search_fields = ("player__user__first_name", "player__user__last_name", "player__user__email")
+    search_fields = (
+        "player__user__first_name",
+        "player__user__last_name",
+        "player__user__email",
+    )
     readonly_fields = ("archived_at",)
     raw_id_fields = ("player",)
     ordering = ("-season_year", "-season_name", "final_rank", "-final_points")

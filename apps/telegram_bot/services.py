@@ -6,7 +6,7 @@
 import json
 import logging
 import time
-from typing import Any, Tuple
+from typing import Any, cast
 
 import requests
 from django.conf import settings
@@ -165,7 +165,7 @@ def send_message(
     text: str,
     parse_mode: str = "HTML",
     reply_markup: dict | None = None,
-) -> Tuple[int | None, bool]:
+) -> tuple[int | None, bool]:
     """
     Отправить сообщение пользователю от имени пользовательского бота.
     Возвращает (message_id, success).
@@ -249,7 +249,7 @@ def send_photo(
     photo: str | bytes,
     caption: str | None = None,
     parse_mode: str = "HTML",
-) -> Tuple[int | None, bool]:
+) -> tuple[int | None, bool]:
     """
     Отправить фото пользователю от имени пользовательского бота.
     photo: путь к файлу (str), HTTP(S) URL (str) или bytes.
@@ -264,7 +264,7 @@ def send_photo(
     if caption:
         payload["caption"] = caption
         payload["parse_mode"] = parse_mode
-    files = None
+    files: dict[str, object] | None = None
     if isinstance(photo, str) and (
         photo.startswith("http://") or photo.startswith("https://")
     ):
@@ -284,7 +284,7 @@ def send_photo(
         return None, False
     try:
         if files:
-            r = requests.post(api_url, data=payload, files=files, timeout=30)
+            r = requests.post(api_url, data=payload, files=cast(Any, files), timeout=30)
         else:
             r = requests.post(api_url, json=payload, timeout=10)
         if not r.ok:

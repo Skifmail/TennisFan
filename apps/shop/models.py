@@ -2,6 +2,8 @@
 Shop models: ShopPage, Product, ProductPhoto, PurchaseRequest.
 """
 
+from typing import cast
+
 from django.db import models
 
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
@@ -33,7 +35,7 @@ class ShopPage(models.Model):
         obj = cls.objects.first()
         if obj is None:
             obj = cls.objects.create(intro_text="")
-        return obj
+        return cast("ShopPage", obj)
 
 
 class Product(models.Model):
@@ -59,7 +61,7 @@ class Product(models.Model):
         ordering = ["order", "id"]
 
     def __str__(self) -> str:
-        return self.name
+        return str(self.name)
 
     @property
     def main_image(self):
@@ -68,7 +70,7 @@ class Product(models.Model):
 
     def is_available(self) -> bool:
         """Есть ли товар в наличии."""
-        return self.quantity > 0
+        return bool(self.quantity > 0)
 
 
 class ProductPhoto(CompressImageFieldsMixin, models.Model):

@@ -8,7 +8,7 @@ from django.urls import reverse
 
 from apps.users.models import Notification
 
-from .models import Tournament, TournamentTeam
+from .models import Tournament
 
 logger = logging.getLogger(__name__)
 

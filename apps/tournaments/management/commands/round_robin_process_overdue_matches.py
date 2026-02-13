@@ -10,11 +10,11 @@
   0 */6 * * * ...
 """
 
-from django.utils import timezone
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
-from apps.tournaments.round_robin import process_overdue_match
 from apps.tournaments.models import Match
+from apps.tournaments.round_robin import process_overdue_match
 
 
 class Command(BaseCommand):

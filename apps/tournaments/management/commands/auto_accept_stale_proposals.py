@@ -17,9 +17,9 @@ from django.core.management.base import BaseCommand
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.users.models import Notification
 from apps.tournaments.models import Match, MatchResultProposal
 from apps.tournaments.proposal_service import apply_proposal
+from apps.users.models import Notification
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,10 @@ class Command(BaseCommand):
                 created_at__lte=deadline,
             )
             .exclude(
-                match__status__in=(Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER),
+                match__status__in=(
+                    Match.MatchStatus.COMPLETED,
+                    Match.MatchStatus.WALKOVER,
+                ),
             )
             .select_related(
                 "match",
@@ -73,19 +76,28 @@ class Command(BaseCommand):
                 if match.team1_id and match.team2_id:
                     proposer_team = (
                         match.team1
-                        if proposal.proposer in (match.team1.player1, match.team1.player2)
+                        if proposal.proposer
+                        in (match.team1.player1, match.team1.player2)
                         else match.team2
                     )
-                    opponent_team = match.team2 if proposer_team == match.team1 else match.team1
+                    opponent_team = (
+                        match.team2 if proposer_team == match.team1 else match.team1
+                    )
                     for p in (opponent_team.player1, opponent_team.player2):
                         if p and not getattr(p, "is_bye", False):
-                            Notification.objects.create(user=p.user, message=msg, url=url)
+                            Notification.objects.create(
+                                user=p.user, message=msg, url=url
+                            )
                 else:
                     opponent = (
-                        match.player2 if proposal.proposer == match.player1 else match.player1
+                        match.player2
+                        if proposal.proposer == match.player1
+                        else match.player1
                     )
                     if opponent and not getattr(opponent, "is_bye", False):
-                        Notification.objects.create(user=opponent.user, message=msg, url=url)
+                        Notification.objects.create(
+                            user=opponent.user, message=msg, url=url
+                        )
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"Заявка {proposal.pk} (матч {proposal.match_id}) автоматически подтверждена."

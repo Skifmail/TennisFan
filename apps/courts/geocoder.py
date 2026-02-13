@@ -4,14 +4,16 @@
 """
 
 import logging
-from typing import Optional, Tuple
+from typing import Any, cast
 
 import requests
 
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 10
-REQUEST_HEADERS = {"User-Agent": "TennisFan/1.0 (courts geocoding; contact: site admin)"}
+REQUEST_HEADERS = {
+    "User-Agent": "TennisFan/1.0 (courts geocoding; contact: site admin)"
+}
 
 YANDEX_GEOCODER_URL = "https://geocode-maps.yandex.ru/v1/"
 
@@ -29,7 +31,14 @@ KIND_RANK = {
     "country": 8,
     "other": 9,
 }
-PRECISION_RANK = {"exact": 1, "number": 2, "near": 3, "range": 4, "street": 5, "other": 6}
+PRECISION_RANK = {
+    "exact": 1,
+    "number": 2,
+    "near": 3,
+    "range": 4,
+    "street": 5,
+    "other": 6,
+}
 
 
 def _request_yandex(
@@ -37,14 +46,14 @@ def _request_yandex(
     *,
     api_key: str,
     lang: str,
-    referer: Optional[str],
-    ll: Optional[Tuple[float, float]] = None,
-    spn: Optional[Tuple[float, float]] = None,
+    referer: str | None,
+    ll: tuple[float, float] | None = None,
+    spn: tuple[float, float] | None = None,
     rspn: int = 0,
     results: int = 10,
-) -> Optional[list]:
+) -> list | None:
     """Один запрос к Yandex Geocoder. Возвращает featureMember или None."""
-    params = {
+    params: dict[str, str | int] = {
         "apikey": api_key,
         "geocode": geocode_query,
         "lang": lang,
@@ -68,18 +77,31 @@ def _request_yandex(
         if resp.status_code != 200:
             try:
                 err_body = resp.json()
-                logger.warning("Yandex Geocoder error %s: %s", resp.status_code, err_body.get("message", err_body))
+                logger.warning(
+                    "Yandex Geocoder error %s: %s",
+                    resp.status_code,
+                    err_body.get("message", err_body),
+                )
             except Exception:
-                logger.warning("Yandex Geocoder error %s: %s", resp.status_code, resp.text[:200] if resp.text else "")
+                logger.warning(
+                    "Yandex Geocoder error %s: %s",
+                    resp.status_code,
+                    resp.text[:200] if resp.text else "",
+                )
             return None
         data = resp.json()
-        return data.get("response", {}).get("GeoObjectCollection", {}).get("featureMember", [])
+        members = (
+            data.get("response", {})
+            .get("GeoObjectCollection", {})
+            .get("featureMember", [])
+        )
+        return cast(list[Any], members) if members is not None else None
     except (requests.RequestException, ValueError, KeyError) as e:
         logger.warning("Yandex Geocoder request failed: %s", e)
         return None
 
 
-def _pick_best_member(members: list) -> Optional[dict]:
+def _pick_best_member(members: list) -> dict | None:
     """Выбрать из списка GeoObject наиболее точный (дом > улица > район > город)."""
     if not members:
         return None
@@ -93,10 +115,11 @@ def _pick_best_member(members: list) -> Optional[dict]:
         if (kind_r, prec_r) < best_rank:
             best_rank = (kind_r, prec_r)
             best = geo
-    return best or members[0].get("GeoObject")
+    result = best or members[0].get("GeoObject")
+    return cast(dict | None, result)
 
 
-def _pos_to_lat_lon(geo: dict) -> Tuple[Optional[float], Optional[float]]:
+def _pos_to_lat_lon(geo: dict) -> tuple[float | None, float | None]:
     """Из GeoObject извлечь (lat, lon)."""
     try:
         pos = geo["Point"]["pos"]  # "longitude latitude"
@@ -114,9 +137,9 @@ def _geocode_yandex(
     *,
     api_key: str,
     lang: str = "ru_RU",
-    referer: Optional[str] = None,
-    hint_city: Optional[str] = None,
-) -> Tuple[Optional[float], Optional[float]]:
+    referer: str | None = None,
+    hint_city: str | None = None,
+) -> tuple[float | None, float | None]:
     """
     Координаты через Yandex Geocoder API.
     Если задан hint_city — сначала получаем центр города, затем ищем адрес только в этой области (rspn=1),
@@ -132,7 +155,9 @@ def _geocode_yandex(
     ll, spn = None, None
     if hint_city and (hint_city := hint_city.strip()):
         city_query = f"{hint_city}, Россия"
-        city_members = _request_yandex(city_query, api_key=api_key, lang=lang, referer=referer, results=1)
+        city_members = _request_yandex(
+            city_query, api_key=api_key, lang=lang, referer=referer, results=1
+        )
         if city_members:
             city_geo = city_members[0].get("GeoObject", {})
             lat, lon = _pos_to_lat_lon(city_geo)
@@ -151,7 +176,9 @@ def _geocode_yandex(
     )
     if not members and ll and spn:
         # В области города ничего не нашли — пробуем без ограничения (на случай ошибки границ)
-        members = _request_yandex(geocode_query, api_key=api_key, lang=lang, referer=referer)
+        members = _request_yandex(
+            geocode_query, api_key=api_key, lang=lang, referer=referer
+        )
     if not members:
         return None, None
     best = _pick_best_member(members)
@@ -171,7 +198,9 @@ def _normalize_address_for_geocode(city: str, address: str) -> str:
         return city
     if not city:
         return address
-    if address.lower().startswith(city.lower() + ",") or address.lower().startswith(city.lower() + " "):
+    if address.lower().startswith(city.lower() + ",") or address.lower().startswith(
+        city.lower() + " "
+    ):
         return address
     return f"{city}, {address}"
 
@@ -181,9 +210,9 @@ def geocode_address(
     *,
     api_key: str = "",
     lang: str = "ru_RU",
-    referer: Optional[str] = None,
-    hint_city: Optional[str] = None,
-) -> Tuple[Optional[float], Optional[float]]:
+    referer: str | None = None,
+    hint_city: str | None = None,
+) -> tuple[float | None, float | None]:
     """
     Преобразовать адрес в координаты (широта, долгота) через Yandex Geocoder API.
     hint_city: если задан, поиск ограничивается областью этого города (~15 км), чтобы не получить точку в другом регионе.

@@ -1,7 +1,8 @@
 """Map legacy skill levels to 5 unified labels."""
+
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.db import migrations
 

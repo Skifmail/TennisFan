@@ -4,8 +4,9 @@
 """
 
 import logging
-import requests
+from typing import cast
 
+import requests
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ def send_admin_message(text: str, parse_mode: str = "HTML") -> bool:
     Возвращает True при успехе, False при отключённом боте или ошибке.
     """
     _, ok = _send_admin_message_raw(text, parse_mode)
-    return ok
+    return bool(ok)
 
 
 def _send_admin_message_raw(text: str, parse_mode: str = "HTML"):
@@ -28,7 +29,9 @@ def _send_admin_message_raw(text: str, parse_mode: str = "HTML"):
     token = getattr(settings, "TELEGRAM_BOT_TOKEN", None) or ""
     chat_id = getattr(settings, "TELEGRAM_ADMIN_CHAT_ID", None) or ""
     if not token.strip() or not chat_id.strip():
-        logger.debug("Telegram notify skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID not set")
+        logger.debug(
+            "Telegram notify skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID not set"
+        )
         return None, False
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -53,12 +56,7 @@ def _send_admin_message_raw(text: str, parse_mode: str = "HTML"):
 def _escape(s: str) -> str:
     if not s:
         return ""
-    return (
-        str(s)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def notify_new_registration(user, player) -> bool:
@@ -128,19 +126,23 @@ def notify_court_application(app) -> bool:
     ]
     if app.price_per_hour:
         lines.append(f"  • Цена/час: {app.price_per_hour} ₽")
-    lines.extend([
-        "",
-        "<b>Контакты:</b>",
-        f"  • Телефон: {_escape(app.phone) or '—'}",
-        f"  • WhatsApp: {_escape(app.whatsapp) or '—'}",
-        f"  • Сайт: {_escape(app.website) or '—'}",
-        "",
-        f"Описание: {_escape((app.description or '')[:200])}{'…' if (app.description or '') and len(app.description or '') > 200 else ''}",
-    ])
+    lines.extend(
+        [
+            "",
+            "<b>Контакты:</b>",
+            f"  • Телефон: {_escape(app.phone) or '—'}",
+            f"  • WhatsApp: {_escape(app.whatsapp) or '—'}",
+            f"  • Сайт: {_escape(app.website) or '—'}",
+            "",
+            f"Описание: {_escape((app.description or '')[:200])}{'…' if (app.description or '') and len(app.description or '') > 200 else ''}",
+        ]
+    )
     return send_admin_message("\n".join(lines))
 
 
-def notify_feedback(user, subject: str, message: str, feedback_id: int | None = None) -> bool:
+def notify_feedback(
+    user, subject: str, message: str, feedback_id: int | None = None
+) -> bool:
     """Уведомление об обратной связи от пользователя."""
     name = _escape(user.get_full_name() or "—")
     email = _escape(user.email or "—")
@@ -152,8 +154,7 @@ def notify_feedback(user, subject: str, message: str, feedback_id: int | None = 
         header += f" #{feedback_id}"
     header += "\n\n"
     text = (
-        header
-        + f"От: {name}\n"
+        header + f"От: {name}\n"
         f"Email: {email}\n"
         f"Тема: {subj}\n\n"
         f"Сообщение:\n{msg}\n\n"
@@ -162,7 +163,9 @@ def notify_feedback(user, subject: str, message: str, feedback_id: int | None = 
     return send_admin_message(text)
 
 
-def send_feedback_to_telegram(user, feedback_id: int, subject: str, message: str) -> int | None:
+def send_feedback_to_telegram(
+    user, feedback_id: int, subject: str, message: str
+) -> int | None:
     """
     Отправить обратную связь в Telegram админу с номером #feedback_id.
     Возвращает message_id из Telegram для сохранения в Feedback.telegram_message_id.
@@ -181,7 +184,7 @@ def send_feedback_to_telegram(user, feedback_id: int, subject: str, message: str
         "<i>Ответьте на это сообщение — ответ придёт пользователю на сайт.</i>"
     )
     message_id, _ = _send_admin_message_raw(text)
-    return message_id
+    return cast(int | None, message_id)
 
 
 def notify_court_comment(comment, court, score: int | None = None) -> bool:
@@ -285,7 +288,6 @@ def notify_purchase_request(pr) -> bool:
 
 def notify_tournament_insufficient_participants(tournament) -> bool:
     """Уведомление админу: недостаточно участников/команд к дедлайну, турнир отменят через 3 ч без продления."""
-    from django.utils import timezone
     from django.conf import settings
 
     name = _escape(getattr(tournament, "name", "") or "—")
@@ -349,7 +351,9 @@ def notify_stringer_rating(rating, created: bool = True) -> bool:
     company_name = _escape(getattr(company, "name", "") or "—")
     score = getattr(rating, "score", None)
     comment_text = _escape((getattr(rating, "comment", "") or "")[:500])
-    if (getattr(rating, "comment", "") or "") and len(getattr(rating, "comment", "") or "") > 500:
+    if (getattr(rating, "comment", "") or "") and len(
+        getattr(rating, "comment", "") or ""
+    ) > 500:
         comment_text += "…"
 
     action = "Новая оценка" if created else "Обновлена оценка"

@@ -4,9 +4,8 @@ User forms.
 
 from django import forms
 from django.contrib.auth import get_user_model
-from django.core.validators import RegexValidator
 
-from .models import Forehand, Gender, Player, SkillLevel
+from .models import Player
 
 User = get_user_model()
 
@@ -22,7 +21,9 @@ class UserRegistrationForm(forms.ModelForm):
         label="Город *",
         required=True,
         max_length=100,
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Например: Москва"}),
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Например: Москва"}
+        ),
     )
     ntrp_level = forms.DecimalField(
         label="Уровень силы",
@@ -50,8 +51,8 @@ class UserRegistrationForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ("email",)
-        widgets = {}
-        labels = {}
+        widgets: dict = {}
+        labels: dict = {}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -67,25 +68,31 @@ class UserRegistrationForm(forms.ModelForm):
 
         val = self.cleaned_data.get("ntrp_level")
         if val is None or val == "":
-            raise forms.ValidationError("Пройдите тест уровня силы и нажмите «Рассчитать» перед регистрацией.")
+            raise forms.ValidationError(
+                "Пройдите тест уровня силы и нажмите «Рассчитать» перед регистрацией."
+            )
         try:
             v = Decimal(str(val))
             if v < Decimal("1.0") or v > Decimal("7.0"):
-                raise forms.ValidationError("Некорректный результат теста. Пройдите тест заново.")
+                raise forms.ValidationError(
+                    "Некорректный результат теста. Пройдите тест заново."
+                )
             return v
-        except (TypeError, ValueError, InvalidOperation):
-            raise forms.ValidationError("Пройдите тест уровня силы и нажмите «Рассчитать» перед регистрацией.")
+        except (TypeError, ValueError, InvalidOperation) as err:
+            raise forms.ValidationError(
+                "Пройдите тест уровня силы и нажмите «Рассчитать» перед регистрацией."
+            ) from err
 
     def clean_password_confirm(self):
-        password = self.cleaned_data.get('password')
-        password_confirm = self.cleaned_data.get('password_confirm')
+        password = self.cleaned_data.get("password")
+        password_confirm = self.cleaned_data.get("password_confirm")
         if password and password_confirm and password != password_confirm:
-            raise forms.ValidationError('Пароли не совпадают')
+            raise forms.ValidationError("Пароли не совпадают")
         return password_confirm
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.set_password(self.cleaned_data['password'])
+        user.set_password(self.cleaned_data["password"])
         if commit:
             user.save()
         return user
@@ -95,17 +102,19 @@ class PlayerProfileForm(forms.ModelForm):
     """Player profile edit form."""
 
     first_name = forms.CharField(
-        label='Имя',
-        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        label="Имя",
+        widget=forms.TextInput(attrs={"class": "form-control"}),
     )
     last_name = forms.CharField(
-        label='Фамилия',
-        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        label="Фамилия",
+        widget=forms.TextInput(attrs={"class": "form-control"}),
     )
     phone = forms.CharField(
-        label='Телефон',
+        label="Телефон",
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+7XXXXXXXXXX'}),
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "+7XXXXXXXXXX"}
+        ),
     )
 
     class Meta:
@@ -128,7 +137,9 @@ class PlayerProfileForm(forms.ModelForm):
             ),
             "gender": forms.Select(attrs={"class": "form-control"}),
             "forehand": forms.Select(attrs={"class": "form-control"}),
-            "city": forms.TextInput(attrs={"class": "form-control", "placeholder": "Город"}),
+            "city": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Город"}
+            ),
             "bio": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
             "telegram": forms.TextInput(attrs={"class": "form-control"}),
             "whatsapp": forms.TextInput(attrs={"class": "form-control"}),
@@ -168,9 +179,9 @@ class PlayerProfileForm(forms.ModelForm):
     def save(self, commit=True):
         player = super().save(commit=False)
         if self.user:
-            self.user.first_name = self.cleaned_data['first_name']
-            self.user.last_name = self.cleaned_data['last_name']
-            self.user.phone = self.cleaned_data['phone']
+            self.user.first_name = self.cleaned_data["first_name"]
+            self.user.last_name = self.cleaned_data["last_name"]
+            self.user.phone = self.cleaned_data["phone"]
             if commit:
                 self.user.save()
         if commit:

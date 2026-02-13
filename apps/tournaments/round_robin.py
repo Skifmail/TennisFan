@@ -4,15 +4,14 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, cast
 
+from django.urls import reverse
 from django.utils import timezone
 
-from apps.users.models import Player
+from apps.users.models import Notification, Player
 
-from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam
-from django.urls import reverse
-from apps.users.models import Notification
+from .models import Match, Tournament, TournamentPlayerResult
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +19,15 @@ logger = logging.getLogger(__name__)
 def _round_robin_points_for_place(tournament: Tournament, place: int) -> int:
     """Очки в общий рейтинг за занятое место в круговом турнире (те же поля, что FAN/Олимпийская)."""
     if place == 1:
-        return tournament.fan_points_winner
+        return int(tournament.fan_points_winner)
     if place == 2:
-        return tournament.fan_points_final
+        return int(tournament.fan_points_final)
     if 3 <= place <= 4:
-        return tournament.fan_points_sf
+        return int(tournament.fan_points_sf)
     if 5 <= place <= 8:
-        return tournament.fan_points_r2
-    return tournament.fan_points_r1  # 9+
+        return int(tournament.fan_points_r2)
+    return int(tournament.fan_points_r1)  # 9+
+
 
 ROUND_ROBIN_FORMAT = "round_robin"
 BYE_EMAIL = "bye@tennisfan.local"
@@ -37,9 +37,14 @@ def _is_round_robin(t: Tournament) -> bool:
     return getattr(t, "format", None) == ROUND_ROBIN_FORMAT
 
 
-def _get_bye_player() -> Optional[Player]:
+def _get_bye_player() -> Player | None:
     """Служебный игрок «Свободный круг» для тура при нечётном числе участников."""
-    return Player.objects.filter(user__email=BYE_EMAIL, is_bye=True).select_related("user").first()
+    return cast(
+        Player | None,
+        Player.objects.filter(user__email=BYE_EMAIL, is_bye=True)
+        .select_related("user")
+        .first(),
+    )
 
 
 def _tournament_start_dt(tournament: Tournament):
@@ -99,7 +104,11 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     if is_doubles:
         removed = remove_solo_teams_from_doubles_tournament(tournament)
         if removed:
-            logger.info("Removed %d solo teams from round-robin doubles tournament %s", removed, tournament.slug)
+            logger.info(
+                "Removed %d solo teams from round-robin doubles tournament %s",
+                removed,
+                tournament.slug,
+            )
     if is_doubles:
         entities = list(
             tournament.teams.filter(player2__isnull=False)
@@ -109,7 +118,9 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
         max_n = tournament.max_teams
         entity_name = "команд"
     else:
-        entities = list(tournament.participants.order_by("user__last_name", "user__first_name"))
+        entities = list(
+            tournament.participants.order_by("user__last_name", "user__first_name")
+        )
         max_n = tournament.max_participants
         entity_name = "участников"
 
@@ -122,7 +133,10 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
 
     bye_player = _get_bye_player()
     if n % 2 == 1 and not bye_player:
-        return False, "Не найден служебный игрок «Свободный круг» (bye). Выполните: python manage.py ensure_bye_player"
+        return (
+            False,
+            "Не найден служебный игрок «Свободный круг» (bye). Выполните: python manage.py ensure_bye_player",
+        )
 
     schedule = _circle_schedule(entities)
     start = _tournament_start_dt(tournament)
@@ -138,7 +152,9 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
                 continue
             if is_doubles:
                 team1, team2 = (e1, e2) if e1.pk < e2.pk else (e2, e1)
-                if getattr(team1.player1, "is_bye", False) or getattr(team2.player1, "is_bye", False):
+                if getattr(team1.player1, "is_bye", False) or getattr(
+                    team2.player1, "is_bye", False
+                ):
                     continue
                 if Match.objects.filter(
                     tournament=tournament,
@@ -188,13 +204,22 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     tournament.bracket_generated = True
     tournament.save(update_fields=["bracket_generated"])
     total_expected = n * (n - 1) // 2
-    logger.info("Round-robin bracket created for %s: %d matches (n=%d)", tournament.name, created, n)
+    logger.info(
+        "Round-robin bracket created for %s: %d matches (n=%d)",
+        tournament.name,
+        created,
+        n,
+    )
     try:
         from apps.telegram_bot.notifications import notify_bracket_formed
+
         notify_bracket_formed(tournament)
     except Exception as e:
         logger.exception("notify_bracket_formed for %s: %s", tournament.slug, e)
-    return True, f"Сетка сформирована: {created} матчей (ожидалось {total_expected}), {entity_name} {n}."
+    return (
+        True,
+        f"Сетка сформирована: {created} матчей (ожидалось {total_expected}), {entity_name} {n}.",
+    )
 
 
 def _get_winner_entity(match: Match, is_doubles: bool):
@@ -217,7 +242,7 @@ def _get_loser_entity(match: Match, is_doubles: bool):
     return None
 
 
-def _entity_id(entity) -> Optional[int]:
+def _entity_id(entity) -> int | None:
     """ID сущности (player или team) для использования как ключа."""
     return entity.pk if entity else None
 
@@ -283,7 +308,9 @@ def compute_standings(tournament: Tournament) -> list[dict]:
         if not w or not los:
             continue
         if is_doubles:
-            if getattr(w.player1, "is_bye", False) or getattr(los.player1, "is_bye", False):
+            if getattr(w.player1, "is_bye", False) or getattr(
+                los.player1, "is_bye", False
+            ):
                 continue
         else:
             if getattr(w, "is_bye", False) or getattr(los, "is_bye", False):
@@ -370,17 +397,19 @@ def compute_standings(tournament: Tournament) -> list[dict]:
     has_completed_matches = any(r["matches"] > 0 for r in rows)
     standings = []
     for i, row in enumerate(rows, 1):
-        standings.append({
-            "place": i if has_completed_matches else None,
-            "player": row["player"],
-            "team": row["team"],
-            "matches": row["matches"],
-            "wins": row["wins"],
-            "losses": row["losses"],
-            "sets": f"{row['sets_won']}–{row['sets_lost']}",
-            "games": f"{row['games_won']}–{row['games_lost']}",
-            "points": row["wins"],
-        })
+        standings.append(
+            {
+                "place": i if has_completed_matches else None,
+                "player": row["player"],
+                "team": row["team"],
+                "matches": row["matches"],
+                "wins": row["wins"],
+                "losses": row["losses"],
+                "sets": f"{row['sets_won']}–{row['sets_lost']}",
+                "games": f"{row['games_won']}–{row['games_lost']}",
+                "points": row["wins"],
+            }
+        )
     return standings
 
 
@@ -398,11 +427,15 @@ def get_match_matrix(tournament: Tournament) -> tuple[list, list]:
             .select_related("player1__user", "player2__user")
             .order_by("player1__user__last_name", "player1__user__first_name")
         )
-        participants = [t for t in participants if not getattr(t.player1, "is_bye", False)]
+        participants = [
+            t for t in participants if not getattr(t.player1, "is_bye", False)
+        ]
         id_field = "id"
     else:
         participants = list(
-            tournament.participants.select_related("user").order_by("user__last_name", "user__first_name")
+            tournament.participants.select_related("user").order_by(
+                "user__last_name", "user__first_name"
+            )
         )
         participants = [p for p in participants if not getattr(p, "is_bye", False)]
         id_field = "id"
@@ -410,7 +443,9 @@ def get_match_matrix(tournament: Tournament) -> tuple[list, list]:
     n = len(participants)
     pid_to_idx = {getattr(p, id_field): i for i, p in enumerate(participants)}
 
-    matrix = [[{"win": None, "games": None} for _ in range(n)] for _ in range(n)]
+    matrix: list[list[dict[str, Any]]] = [
+        [{"win": None, "games": None} for _ in range(n)] for _ in range(n)
+    ]
 
     matches = tournament.matches.filter(
         is_consolation=False,
@@ -421,17 +456,19 @@ def get_match_matrix(tournament: Tournament) -> tuple[list, list]:
         if is_doubles:
             if not m.team1_id or not m.team2_id or not m.winner_team_id:
                 continue
-            if getattr(m.team1.player1, "is_bye", False) or getattr(m.team2.player1, "is_bye", False):
+            if getattr(m.team1.player1, "is_bye", False) or getattr(
+                m.team2.player1, "is_bye", False
+            ):
                 continue
             i = pid_to_idx.get(m.team1_id)
             j = pid_to_idx.get(m.team2_id)
-            winner_team = m.winner_team
         else:
-            if getattr(m.player1, "is_bye", False) or getattr(m.player2, "is_bye", False):
+            if getattr(m.player1, "is_bye", False) or getattr(
+                m.player2, "is_bye", False
+            ):
                 continue
             i = pid_to_idx.get(m.player1_id)
             j = pid_to_idx.get(m.player2_id)
-            winner_team = m.winner
         if i is None or j is None:
             continue
         g1 = (m.player1_set1 or 0) + (m.player1_set2 or 0) + (m.player1_set3 or 0)
@@ -440,12 +477,14 @@ def get_match_matrix(tournament: Tournament) -> tuple[list, list]:
             side1_won = m.winner_team_id == m.team1_id
         else:
             side1_won = m.winner_id == m.player1_id
+        cell_win: dict[str, Any] = {"win": 1, "games": f"{g1}/{g2}"}
+        cell_loss: dict[str, Any] = {"win": 0, "games": f"{g2}/{g1}"}
         if side1_won:
-            matrix[i][j] = {"win": 1, "games": f"{g1}/{g2}"}
-            matrix[j][i] = {"win": 0, "games": f"{g2}/{g1}"}
+            matrix[i][j] = cell_win
+            matrix[j][i] = cell_loss
         else:
-            matrix[i][j] = {"win": 0, "games": f"{g1}/{g2}"}
-            matrix[j][i] = {"win": 1, "games": f"{g2}/{g1}"}
+            matrix[i][j] = cell_loss
+            matrix[j][i] = cell_win
 
     return participants, matrix
 
@@ -461,9 +500,13 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
     total = main_matches.count()
     if total == 0:
         return False
-    completed = main_matches.filter(
-        status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
-    ).exclude(winner__isnull=True).count()
+    completed = (
+        main_matches.filter(
+            status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
+        )
+        .exclude(winner__isnull=True)
+        .count()
+    )
     if completed < total:
         return False
 
@@ -507,7 +550,9 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
         points = _round_robin_points_for_place(tournament, place)
         if is_doubles and row.get("team"):
             team = row["team"]
-            if getattr(team.player1, "is_bye", False) or getattr(team.player2, "is_bye", False):
+            if getattr(team.player1, "is_bye", False) or getattr(
+                team.player2, "is_bye", False
+            ):
                 continue
             for player in (team.player1, team.player2):
                 if not player or getattr(player, "is_bye", False):
@@ -517,11 +562,16 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
                 TournamentPlayerResult.objects.update_or_create(
                     tournament=tournament,
                     player=player,
-                    defaults={"place": place, "fan_points": award, "is_consolation": False},
+                    defaults={
+                        "place": place,
+                        "fan_points": award,
+                        "is_consolation": False,
+                    },
                 )
                 # Обновляем сезонные очки
                 if award > 0:
                     from .fan import _update_season_points
+
                     _update_season_points(player, award)
         elif row.get("player"):
             player = row["player"]
@@ -537,6 +587,7 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
             # Обновляем сезонные очки
             if award > 0:
                 from .fan import _update_season_points
+
                 _update_season_points(player, award)
 
     tournament.status = "completed"
@@ -549,29 +600,45 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
     return True
 
 
-def _overdue_winner_round_robin(match: Match) -> Optional[Player]:
+def _overdue_winner_round_robin(match: Match) -> Player | None:
     """
     При просрочке дедлайна в круговом турнире победа присуждается игроку с более высоким рейтингом.
     При равенстве — с меньшим id. Поддерживает одиночные и парные матчи.
     """
-    if match.team1_id and match.team2_id:
+    if match.team1_id and match.team2_id and match.team1 and match.team2:
         # Парный матч: сравниваем сумму рейтингов команд
-        t1_pts = match.team1.player1.total_points + (match.team1.player2.total_points if match.team1.player2_id else 0)
-        t2_pts = match.team2.player1.total_points + (match.team2.player2.total_points if match.team2.player2_id else 0)
+        t1_pts = match.team1.player1.total_points + (
+            match.team1.player2.total_points if match.team1.player2_id else 0
+        )
+        t2_pts = match.team2.player1.total_points + (
+            match.team2.player2.total_points if match.team2.player2_id else 0
+        )
         if t1_pts != t2_pts:
-            return match.team1.player1 if t1_pts > t2_pts else match.team2.player1
+            return cast(
+                Player | None,
+                match.team1.player1 if t1_pts > t2_pts else match.team2.player1,
+            )
         # При равенстве — команда с меньшим id первого игрока
-        return match.team1.player1 if match.team1.player1_id < match.team2.player1_id else match.team2.player1
+        return cast(
+            Player | None,
+            (
+                match.team1.player1
+                if match.team1.player1_id < match.team2.player1_id
+                else match.team2.player1
+            ),
+        )
     else:
         # Одиночный матч
         a, b = match.player1, match.player2
+        if a is None or b is None:
+            return None
         if getattr(a, "is_bye", False):
-            return b
+            return cast(Player | None, b)
         if getattr(b, "is_bye", False):
-            return a
+            return cast(Player | None, a)
         if a.total_points != b.total_points:
-            return a if a.total_points > b.total_points else b
-        return a if a.pk < b.pk else b
+            return cast(Player | None, a if a.total_points > b.total_points else b)
+        return cast(Player | None, a if a.pk < b.pk else b)
 
 
 def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
@@ -579,7 +646,7 @@ def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
     Оформить тех. победу в круговом турнире (дедлайн истёк): обновить матч, отклонить заявки, уведомить игроков.
     """
     is_doubles = match.tournament.is_doubles() and match.team1_id and match.team2_id
-    
+
     winner_team = None
     if is_doubles:
         winner_team = match.team1 if winner == match.team1.player1 else match.team2
@@ -587,7 +654,7 @@ def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
         match.winner = winner
     else:
         match.winner = winner
-    
+
     match.status = Match.MatchStatus.WALKOVER
     match.completed_datetime = timezone.now()
     update_fields = ["winner", "status", "completed_datetime"]
@@ -598,9 +665,9 @@ def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
     match.result_proposals.filter(status=Match.ProposalStatus.PENDING).update(
         status=Match.ProposalStatus.REJECTED
     )
-    
+
     url = reverse("match_detail", args=[match.pk])
-    if is_doubles:
+    if is_doubles and match.team1 and match.team2 and winner_team is not None:
         # Для парных: уведомляем обоих игроков команды-победителя и обоих игроков команды-проигравшего
         loser_team = match.team2 if winner_team == match.team1 else match.team1
         for player in (winner_team.player1, winner_team.player2):
@@ -608,29 +675,31 @@ def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
                 Notification.objects.create(
                     user=player.user,
                     message="Дедлайн матча истёк. Вам присуждена тех. победа.",
-                    url=url
+                    url=url,
                 )
         for player in (loser_team.player1, loser_team.player2):
             if player and not getattr(player, "is_bye", False):
                 Notification.objects.create(
                     user=player.user,
                     message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
-                    url=url
+                    url=url,
                 )
     else:
         winner_user = winner.user
         loser = match.player2 if winner == match.player1 else match.player1
+        if loser is None:
+            return
         loser_user = loser.user
-        
+
         Notification.objects.create(
             user=winner_user,
             message="Дедлайн матча истёк. Вам присуждена тех. победа.",
-            url=url
+            url=url,
         )
         Notification.objects.create(
             user=loser_user,
             message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
-            url=url
+            url=url,
         )
     logger.info("Round-robin overdue walkover: match %s → winner %s", match.pk, winner)
 
@@ -647,20 +716,33 @@ def process_overdue_match(match: Match) -> tuple[bool, str]:
         return False, "Матч уже завершён."
     if not match.deadline or match.deadline > timezone.now():
         return False, "Дедлайн не истёк."
-    
+
     is_doubles = match.tournament.is_doubles() and match.team1_id and match.team2_id
     if is_doubles:
-        if getattr(match.team1.player1, "is_bye", False) and getattr(match.team2.player1, "is_bye", False):
+        if getattr(match.team1.player1, "is_bye", False) and getattr(
+            match.team2.player1, "is_bye", False
+        ):
             return False, "Служебный матч."
     else:
-        if getattr(match.player1, "is_bye", False) and getattr(match.player2, "is_bye", False):
+        if getattr(match.player1, "is_bye", False) and getattr(
+            match.player2, "is_bye", False
+        ):
             return False, "Служебный матч."
 
     winner = _overdue_winner_round_robin(match)
+    if winner is None:
+        return False, "Не удалось определить победителя по рейтингу."
     apply_overdue_walkover_round_robin(match, winner)
-    
+
     # Проверяем, завершён ли турнир после этого матча
     check_and_finalize_if_complete(match.tournament)
 
-    match_display = f"{match.team1} vs {match.team2}" if is_doubles else f"{match.player1} vs {match.player2}"
-    return True, f"Матч {match.pk} ({match_display}): тех. победа {winner} (дедлайн истёк)."
+    match_display = (
+        f"{match.team1} vs {match.team2}"
+        if is_doubles
+        else f"{match.player1} vs {match.player2}"
+    )
+    return (
+        True,
+        f"Матч {match.pk} ({match_display}): тех. победа {winner} (дедлайн истёк).",
+    )

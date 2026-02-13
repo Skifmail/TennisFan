@@ -4,11 +4,11 @@ Users views.
 
 import json
 from datetime import date
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from django.contrib import messages
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.db.models import Q
@@ -20,15 +20,16 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from apps.core.decorators import login_required_with_message
-
 from apps.core.models import UserTelegramLink
+
 from .forms import PlayerProfileForm, UserRegistrationForm
-from .models import Notification, Player, SkillLevel, User
+from .models import Notification, Player
 
 
 def _map_ntrp_to_skill_level(level: Decimal) -> str:
     """Map NTRP decimal level to SkillLevel category (delegates to rating_utils)."""
     from .rating_utils import map_ntrp_to_skill_level
+
     return map_ntrp_to_skill_level(level)
 
 
@@ -40,7 +41,9 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
     """
     from apps.tournaments.models import Match, TournamentPlayerResult
 
-    events: list[tuple[date, int, int, int]] = []  # (date, points_delta, matches_delta, wins_delta)
+    events: list[tuple[date, int, int, int]] = (
+        []
+    )  # (date, points_delta, matches_delta, wins_delta)
 
     # Completed matches (singles: player1/player2; doubles: team1/team2)
     match_qs = (
@@ -52,11 +55,17 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
             | Q(team2__player1=player)
             | Q(team2__player2=player)
         )
-        .filter(
-            status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
-        )
+        .filter(status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER])
         .distinct()
-        .select_related("tournament", "winner", "winner_team", "player1", "player2", "team1", "team2")
+        .select_related(
+            "tournament",
+            "winner",
+            "winner_team",
+            "player1",
+            "player2",
+            "team1",
+            "team2",
+        )
         .order_by("completed_datetime", "scheduled_datetime", "pk")
     )
 
@@ -68,14 +77,26 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         )
         # Points for this player in this match (non-FAN/round_robin store in match)
         if m.team1_id and m.team2_id:
-            on_team1 = (m.team1 and (m.team1.player1_id == player.pk or m.team1.player2_id == player.pk))
+            on_team1 = m.team1 and (
+                m.team1.player1_id == player.pk or m.team1.player2_id == player.pk
+            )
             pts = m.points_player1 if on_team1 else m.points_player2
         else:
             pts = m.points_player1 if m.player1_id == player.pk else m.points_player2
         won = bool(
             (m.winner_id == player.pk)
-            or (m.winner_team_id and m.team1_id and m.winner_team_id == m.team1_id and (m.team1.player1_id == player.pk or m.team1.player2_id == player.pk))
-            or (m.winner_team_id and m.team2_id and m.winner_team_id == m.team2_id and (m.team2.player1_id == player.pk or m.team2.player2_id == player.pk))
+            or (
+                m.winner_team_id
+                and m.team1_id
+                and m.winner_team_id == m.team1_id
+                and (m.team1.player1_id == player.pk or m.team1.player2_id == player.pk)
+            )
+            or (
+                m.winner_team_id
+                and m.team2_id
+                and m.winner_team_id == m.team2_id
+                and (m.team2.player1_id == player.pk or m.team2.player2_id == player.pk)
+            )
         )
         events.append((event_date, pts or 0, 1, 1 if won else 0))
 
@@ -86,7 +107,9 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         .order_by("tournament__end_date", "tournament__pk")
     )
     for r in fan_results:
-        event_date = (r.tournament.end_date or r.tournament.start_date or timezone.now().date())
+        event_date = (
+            r.tournament.end_date or r.tournament.start_date or timezone.now().date()
+        )
         events.append((event_date, r.fan_points, 0, 0))
 
     events.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
@@ -103,21 +126,29 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         cum_matches += d_m
         cum_wins += d_w
         wr = round(cum_wins / cum_matches * 100, 1) if cum_matches else 0.0
-        result.append({
-            "date": event_date.isoformat(),
-            "points": cum_pts,
-            "matches": cum_matches,
-            "win_rate": wr,
-        })
+        result.append(
+            {
+                "date": event_date.isoformat(),
+                "points": cum_pts,
+                "matches": cum_matches,
+                "win_rate": wr,
+            }
+        )
 
     today = timezone.now().date()
-    if result and result[-1]["date"] != today.isoformat() and (cum_matches > 0 or cum_pts != 0):
-        result.append({
-            "date": today.isoformat(),
-            "points": player.total_points,
-            "matches": player.matches_played,
-            "win_rate": float(player.win_rate),
-        })
+    if (
+        result
+        and result[-1]["date"] != today.isoformat()
+        and (cum_matches > 0 or cum_pts != 0)
+    ):
+        result.append(
+            {
+                "date": today.isoformat(),
+                "points": player.total_points,
+                "matches": player.matches_played,
+                "win_rate": float(player.win_rate),
+            }
+        )
 
     # Ensure series matches current totals: fix last point and scale if cumulative was wrong
     if result:
@@ -143,18 +174,18 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
 def auth(request):
     """Объединённая страница регистрации и входа с анимацией переключения."""
     # Определяем активный режим из GET параметра или по умолчанию register
-    active_mode = request.GET.get('mode', 'register')
-    if active_mode not in ('register', 'login'):
-        active_mode = 'register'
-    
+    active_mode = request.GET.get("mode", "register")
+    if active_mode not in ("register", "login"):
+        active_mode = "register"
+
     register_form = None
     login_form = None
-    
+
     if request.method == "POST":
         # Проверяем какая форма была отправлена по наличию полей
-        if 'email' in request.POST and 'city' in request.POST:
+        if "email" in request.POST and "city" in request.POST:
             # Форма регистрации
-            active_mode = 'register'
+            active_mode = "register"
             register_form = UserRegistrationForm(request.POST)
             if register_form.is_valid():
                 from .rating_utils import get_starting_points
@@ -176,31 +207,38 @@ def auth(request):
                     is_verified=True,  # Новые пользователи автоматически верифицированы
                 )
                 from apps.core.telegram_notify import notify_new_registration
+
                 notify_new_registration(user, player)
                 login(request, user)
                 messages.success(request, "Регистрация успешна! Добро пожаловать.")
                 return redirect("home")
-        elif 'username' in request.POST and 'password' in request.POST:
+        elif "username" in request.POST and "password" in request.POST:
             # Форма входа
-            active_mode = 'login'
+            active_mode = "login"
             login_form = AuthenticationForm(request, data=request.POST)
             if login_form.is_valid():
                 user = login_form.get_user()
                 login(request, user)
-                messages.success(request, f"Добро пожаловать, {user.get_full_name() or user.email}!")
+                messages.success(
+                    request, f"Добро пожаловать, {user.get_full_name() or user.email}!"
+                )
                 return redirect("home")
-    
+
     # Инициализируем формы если они не были созданы выше
     if register_form is None:
         register_form = UserRegistrationForm()
     if login_form is None:
         login_form = AuthenticationForm(request)
-    
-    return render(request, "users/auth.html", {
-        "register_form": register_form,
-        "login_form": login_form,
-        "active_mode": active_mode,
-    })
+
+    return render(
+        request,
+        "users/auth.html",
+        {
+            "register_form": register_form,
+            "login_form": login_form,
+            "active_mode": active_mode,
+        },
+    )
 
 
 def register(request):
@@ -213,39 +251,53 @@ def login_view(request):
     return redirect(reverse("auth") + "?mode=login")
 
 
-@login_required_with_message("Профиль игрока доступен только для зарегистрированных пользователей.")
+@login_required_with_message(
+    "Профиль игрока доступен только для зарегистрированных пользователей."
+)
 def profile(request, pk):
     """User profile view."""
     player = get_object_or_404(
         Player.objects.select_related(
-            'user', 'user__subscription', 'user__subscription__tier'
+            "user", "user__subscription", "user__subscription__tier"
         ),
         pk=pk,
     )
 
     from apps.tournaments.models import Match
 
-    all_matches_qs = Match.objects.filter(
-        Q(player1=player)
-        | Q(player2=player)
-        | Q(team1__player1=player)
-        | Q(team1__player2=player)
-        | Q(team2__player1=player)
-        | Q(team2__player2=player)
-    ).select_related(
-        "tournament", "player1", "player2", "winner", "team1", "team2", "winner_team"
-    ).annotate(
-        effective_date=Coalesce("scheduled_datetime", "deadline", "completed_datetime"),
-    ).order_by("-effective_date")
+    all_matches_qs = (
+        Match.objects.filter(
+            Q(player1=player)
+            | Q(player2=player)
+            | Q(team1__player1=player)
+            | Q(team1__player2=player)
+            | Q(team2__player1=player)
+            | Q(team2__player2=player)
+        )
+        .select_related(
+            "tournament",
+            "player1",
+            "player2",
+            "winner",
+            "team1",
+            "team2",
+            "winner_team",
+        )
+        .annotate(
+            effective_date=Coalesce(
+                "scheduled_datetime", "deadline", "completed_datetime"
+            ),
+        )
+        .order_by("-effective_date")
+    )
 
     # ---------- Фильтрация по месяцу/году/статусу ----------
-    now = timezone.now()
     filter_year = request.GET.get("year")
     filter_month = request.GET.get("month")
     filter_status = request.GET.get("status")
 
     # Допустимые годы из реальных данных
-    from django.db.models import Min, Max
+    from django.db.models import Max, Min
 
     date_range = all_matches_qs.aggregate(
         min_date=Min("effective_date"),
@@ -293,9 +345,18 @@ def profile(request, pk):
     recent_matches = all_matches_qs
 
     MONTHS_RU = [
-        (1, "Январь"), (2, "Февраль"), (3, "Март"), (4, "Апрель"),
-        (5, "Май"), (6, "Июнь"), (7, "Июль"), (8, "Август"),
-        (9, "Сентябрь"), (10, "Октябрь"), (11, "Ноябрь"), (12, "Декабрь"),
+        (1, "Январь"),
+        (2, "Февраль"),
+        (3, "Март"),
+        (4, "Апрель"),
+        (5, "Май"),
+        (6, "Июнь"),
+        (7, "Июль"),
+        (8, "Август"),
+        (9, "Сентябрь"),
+        (10, "Октябрь"),
+        (11, "Ноябрь"),
+        (12, "Декабрь"),
     ]
 
     progress_data = _get_profile_progress_data(player)
@@ -305,7 +366,7 @@ def profile(request, pk):
         """Собрать данные о сезонных очках по датам для графика."""
         from apps.tournaments.models import TournamentPlayerResult
         from apps.tournaments.season_utils import get_current_season
-        
+
         current_season = get_current_season()
         # Получаем все результаты турниров игрока за текущий сезон
         fan_results = (
@@ -314,21 +375,21 @@ def profile(request, pk):
                 tournament__status="completed",
             )
             .select_related("tournament")
-            .order_by("tournament__end_date", "tournament__start_date", "tournament__pk")
+            .order_by(
+                "tournament__end_date", "tournament__start_date", "tournament__pk"
+            )
         )
-        
+
         # Фильтруем только результаты за текущий сезон
-        season_start_month = current_season.start_month
-        season_end_month = current_season.end_month
         season_year = current_season.year
-        
+
         events: list[tuple[date, int]] = []  # (date, points)
-        
+
         for r in fan_results:
             tourn_date = r.tournament.end_date or r.tournament.start_date
             if not tourn_date:
                 continue
-            
+
             # Проверяем, что турнир в текущем сезоне
             if current_season.name == "Зима":
                 # Зима: октябрь (год начала) - апрель (год начала + 1)
@@ -338,62 +399,79 @@ def profile(request, pk):
                     events.append((tourn_date, r.fan_points))
             else:  # Лето
                 # Лето: май - сентябрь (один год)
-                if tourn_date.month >= 5 and tourn_date.month <= 9 and tourn_date.year == season_year:
+                if (
+                    tourn_date.month >= 5
+                    and tourn_date.month <= 9
+                    and tourn_date.year == season_year
+                ):
                     events.append((tourn_date, r.fan_points))
-        
+
         events.sort(key=lambda x: x[0])
-        
+
         # Строим кумулятивный ряд
         start_date = current_season.start_month
-        start_year = season_year if current_season.name == "Лето" or start_date == 10 else season_year + 1
+        start_year = (
+            season_year
+            if current_season.name == "Лето" or start_date == 10
+            else season_year + 1
+        )
         if start_date == 10:  # Зима начинается в октябре
             season_start = date(start_year, 10, 1)
         else:  # Лето начинается в мае
             season_start = date(start_year, 5, 1)
-        
+
         result = [{"date": season_start.isoformat(), "season_points": 0}]
         cum_points = 0
-        
+
         for event_date, points in events:
             cum_points += points
-            result.append({
-                "date": event_date.isoformat(),
-                "season_points": cum_points,
-            })
-        
+            result.append(
+                {
+                    "date": event_date.isoformat(),
+                    "season_points": cum_points,
+                }
+            )
+
         # Добавляем текущую дату с актуальными очками
         today = timezone.now().date()
         try:
             season_points_obj = player.season_points
-            if (season_points_obj.season_name == current_season.name and 
-                season_points_obj.season_year == current_season.year):
+            if (
+                season_points_obj.season_name == current_season.name
+                and season_points_obj.season_year == current_season.year
+            ):
                 current_points = season_points_obj.current_season_points
             else:
                 current_points = 0
-        except:
+        except Exception:
             current_points = 0
-        
+
         if not result or result[-1]["date"] != today.isoformat():
-            result.append({
-                "date": today.isoformat(),
-                "season_points": current_points,
-            })
+            result.append(
+                {
+                    "date": today.isoformat(),
+                    "season_points": current_points,
+                }
+            )
         else:
             result[-1]["season_points"] = current_points
-        
+
         return result
-    
+
     season_points_data = _get_season_points_data(player)
 
     # Получаем сезонные очки
-    from apps.tournaments.models import SeasonPoints, SeasonArchive
+    from apps.tournaments.models import SeasonArchive, SeasonPoints
     from apps.tournaments.season_utils import get_current_season, get_season_display
-    
+
     try:
         season_points = player.season_points
         current_season = get_current_season()
         # Проверяем, что сезон совпадает
-        if season_points.season_name != current_season.name or season_points.season_year != current_season.year:
+        if (
+            season_points.season_name != current_season.name
+            or season_points.season_year != current_season.year
+        ):
             # Создаём новую запись для нового сезона
             season_points = SeasonPoints.objects.create(
                 player=player,
@@ -409,9 +487,9 @@ def profile(request, pk):
             season_name=current_season.name,
             season_year=current_season.year,
         )
-    
+
     current_season_display = get_season_display(current_season)
-    
+
     # Получаем архивные результаты (чемпионские бейджи)
     season_championships = SeasonArchive.objects.filter(
         player=player,
@@ -440,6 +518,7 @@ def profile(request, pk):
         if telegram_user_bot_connected:
             try:
                 from apps.telegram_bot import services as bot_services
+
                 telegram_bot_username = bot_services.get_bot_username() or ""
             except Exception:
                 pass
@@ -473,12 +552,14 @@ def profile_edit(request):
     except Player.DoesNotExist:
         player = Player.objects.create(user=request.user)
 
-    if request.method == 'POST':
-        form = PlayerProfileForm(request.POST, request.FILES, instance=player, user=request.user)
+    if request.method == "POST":
+        form = PlayerProfileForm(
+            request.POST, request.FILES, instance=player, user=request.user
+        )
         if form.is_valid():
             form.save()
-            messages.success(request, 'Профиль обновлён.')
-            return redirect('profile', pk=player.pk)
+            messages.success(request, "Профиль обновлён.")
+            return redirect("profile", pk=player.pk)
     else:
         form = PlayerProfileForm(instance=player, user=request.user)
 
@@ -493,28 +574,28 @@ def profile_edit(request):
 def notifications(request):
     """User notifications inbox."""
 
-    notes = Notification.objects.filter(user=request.user).order_by('-created_at')
+    notes = Notification.objects.filter(user=request.user).order_by("-created_at")
     # mark all as read when viewed
     notes.filter(is_read=False).update(is_read=True)
-    return render(request, 'users/notifications.html', {'notifications': notes})
+    return render(request, "users/notifications.html", {"notifications": notes})
 
 
 def ntrp_test(request):
     """Public NTRP test page.
-    
+
     Note: Test result can only be saved during registration.
     For registered users, the test is informational only and does not affect their rating.
     """
     # Test can only be saved during registration (via auth view), not after
     can_save = False
-    return render(request, 'users/ntrp_test.html', {'can_save': can_save})
+    return render(request, "users/ntrp_test.html", {"can_save": can_save})
 
 
 @login_required
 @require_POST
 def save_ntrp(request):
     """Save NTRP level ONLY during registration.
-    
+
     After registration, NTRP test results cannot be saved.
     Rating is determined solely by match results.
     """
@@ -543,11 +624,14 @@ def save_ntrp(request):
     # CRITICAL: Do not allow saving test results after registration
     # Rating is determined only by match results after initial registration
     if player.matches_played > 0:
-        return JsonResponse({
-            "ok": False,
-            "error": "test_already_saved",
-            "message": "NTRP тест можно пройти только один раз при регистрации. Рейтинг формируется только по результатам матчей."
-        }, status=403)
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "test_already_saved",
+                "message": "NTRP тест можно пройти только один раз при регистрации. Рейтинг формируется только по результатам матчей.",
+            },
+            status=403,
+        )
 
     from .rating_utils import get_starting_points
 
@@ -557,5 +641,7 @@ def save_ntrp(request):
     player.total_points = starting_pts
     player.hidden_rating = float(starting_pts)
 
-    player.save(update_fields=["ntrp_level", "skill_level", "total_points", "hidden_rating"])
+    player.save(
+        update_fields=["ntrp_level", "skill_level", "total_points", "hidden_rating"]
+    )
     return JsonResponse({"ok": True, "ntrp_level": f"{level:.1f}"})

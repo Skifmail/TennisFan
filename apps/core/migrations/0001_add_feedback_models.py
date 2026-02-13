@@ -1,8 +1,8 @@
 # Generated manually for Feedback and FeedbackReply
 
+import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
@@ -17,10 +17,24 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Feedback",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("subject", models.CharField(blank=True, max_length=200, verbose_name="Тема")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "subject",
+                    models.CharField(blank=True, max_length=200, verbose_name="Тема"),
+                ),
                 ("message", models.TextField(verbose_name="Сообщение")),
-                ("created_at", models.DateTimeField(auto_now_add=True, verbose_name="Создано")),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Создано"),
+                ),
                 (
                     "telegram_message_id",
                     models.BigIntegerField(
@@ -48,9 +62,20 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="FeedbackReply",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("text", models.TextField(verbose_name="Текст ответа")),
-                ("created_at", models.DateTimeField(auto_now_add=True, verbose_name="Создано")),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Создано"),
+                ),
                 (
                     "feedback",
                     models.ForeignKey(

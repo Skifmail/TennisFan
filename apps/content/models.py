@@ -2,6 +2,8 @@
 Content models: News, Gallery, Pages.
 """
 
+from typing import cast
+
 from django.db import models
 from django.utils.text import slugify
 
@@ -16,7 +18,10 @@ class News(CompressImageFieldsMixin, models.Model):
     excerpt = models.CharField("Краткое описание", max_length=300, blank=True)
     content = models.TextField("Содержание")
     image = models.ImageField(
-        "Изображение", upload_to="news/", blank=True, validators=[validate_image_max_2mb]
+        "Изображение",
+        upload_to="news/",
+        blank=True,
+        validators=[validate_image_max_2mb],
     )
 
     is_published = models.BooleanField("Опубликовано", default=True)
@@ -34,7 +39,7 @@ class News(CompressImageFieldsMixin, models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return self.title
+        return str(self.title)
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -97,7 +102,7 @@ class Gallery(CompressImageFieldsMixin, models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return self.title
+        return str(self.title)
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -106,7 +111,7 @@ class Gallery(CompressImageFieldsMixin, models.Model):
 
     @property
     def photos_count(self) -> int:
-        return self.photos.count()
+        return int(self.photos.count())
 
 
 class Photo(CompressImageFieldsMixin, models.Model):
@@ -162,7 +167,7 @@ class AboutUs(CompressImageFieldsMixin, models.Model):
         obj = cls.objects.first()
         if obj is None:
             obj = cls.objects.create(subtitle="", body="")
-        return obj
+        return cast("AboutUs", obj)
 
 
 class ContactPage(models.Model):
@@ -191,7 +196,7 @@ class ContactPage(models.Model):
         obj = cls.objects.first()
         if obj is None:
             obj = cls.objects.create(intro_text="")
-        return obj
+        return cast("ContactPage", obj)
 
 
 class ContactItem(models.Model):
@@ -208,6 +213,7 @@ class ContactItem(models.Model):
         null=True,
         blank=True,
     )
+
     class ItemType(models.TextChoices):
         ADDRESS = "address", "Адрес"
         PHONE = "phone", "Телефон"
@@ -251,18 +257,18 @@ class ContactItem(models.Model):
 
     def __str__(self) -> str:
         label = self.label or self.get_item_type_display()
-        return f"{label}: {self.value[:50]}{'…' if len(self.value) > 50 else ''}"
+        return f"{str(label)}: {self.value[:50]}{'…' if len(self.value) > 50 else ''}"
 
     @property
     def display_label(self) -> str:
         """Подпись для отображения."""
-        return self.label or self.get_item_type_display()
+        return str(self.label or self.get_item_type_display())
 
     @property
     def clickable_url(self) -> str | None:
         """URL для перехода или None."""
         if self.url:
-            return self.url
+            return str(self.url)
         if self.item_type == self.ItemType.EMAIL and self.value:
             return f"mailto:{self.value.strip()}"
         if self.item_type == self.ItemType.PHONE and self.value:
@@ -277,16 +283,18 @@ class ContactItem(models.Model):
         if self.item_type == self.ItemType.MAX and self.value:
             v = self.value.strip()
             if v.startswith("http"):
-                return v
-            return None  # Для MAX укажите ссылку в поле «Ссылка» или полный URL в значении
+                return str(v)
+            return (
+                None  # Для MAX укажите ссылку в поле «Ссылка» или полный URL в значении
+            )
         if self.item_type == self.ItemType.VK and self.value:
             v = self.value.strip()
             if v.startswith("http"):
-                return v
+                return str(v)
             return f"https://vk.com/{v.lstrip('/')}" if v else None
         if self.item_type == self.ItemType.WEBSITE and self.value:
             v = self.value.strip()
-            return v if v.startswith("http") else f"https://{v}"
+            return str(v) if v.startswith("http") else f"https://{v}"
         return None
 
 
@@ -313,7 +321,7 @@ class RulesSection(models.Model):
         ordering = ["slug"]
 
     def __str__(self) -> str:
-        return self.title
+        return str(self.title)
 
 
 class Page(models.Model):
@@ -339,7 +347,7 @@ class Page(models.Model):
         ordering = ["order"]
 
     def __str__(self) -> str:
-        return self.title
+        return str(self.title)
 
 
 class VideoPage(models.Model):
@@ -376,7 +384,7 @@ class VideoPage(models.Model):
                 live_streams_title="Прямые трансляции",
                 playlist_title="Плейлист",
             )
-        return obj
+        return cast("VideoPage", obj)
 
 
 class VideoPlatform(models.TextChoices):
@@ -423,7 +431,8 @@ class LiveStream(models.Model):
         ordering = ["order", "-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.title} ({self.get_platform_display()})"
+        disp = self.get_platform_display()
+        return f"{self.title} ({disp[1] if isinstance(disp, tuple) else disp})"
 
     def save(self, *args, **kwargs):
         """Автоматически определяем платформу по URL при сохранении."""
@@ -436,18 +445,18 @@ class LiveStream(models.Model):
         """Определяет платформу по URL."""
         url_lower = url.lower()
         if "youtube.com" in url_lower or "youtu.be" in url_lower:
-            return VideoPlatform.YOUTUBE
+            return str(VideoPlatform.YOUTUBE)
         if "vk.com" in url_lower or "vk.ru" in url_lower:
-            return VideoPlatform.VK
+            return str(VideoPlatform.VK)
         if "rutube.ru" in url_lower:
-            return VideoPlatform.RUTUBE
-        return VideoPlatform.YOUTUBE  # По умолчанию
+            return str(VideoPlatform.RUTUBE)
+        return str(VideoPlatform.YOUTUBE)  # По умолчанию
 
     def get_embed_url(self) -> str | None:
         """Возвращает URL для встраивания трансляции."""
         from apps.content.utils import get_video_embed_url
 
-        return get_video_embed_url(self.url, self.platform)
+        return cast(str | None, get_video_embed_url(self.url, self.platform))
 
 
 class Video(models.Model):
@@ -494,7 +503,8 @@ class Video(models.Model):
         ordering = ["order", "-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.title} ({self.get_platform_display()})"
+        disp = self.get_platform_display()
+        return f"{self.title} ({disp[1] if isinstance(disp, tuple) else disp})"
 
     def save(self, *args, **kwargs):
         """Автоматически определяем платформу по URL при сохранении."""
@@ -507,18 +517,18 @@ class Video(models.Model):
         """Определяет платформу по URL."""
         url_lower = url.lower()
         if "youtube.com" in url_lower or "youtu.be" in url_lower:
-            return VideoPlatform.YOUTUBE
+            return str(VideoPlatform.YOUTUBE)
         if "vk.com" in url_lower or "vk.ru" in url_lower:
-            return VideoPlatform.VK
+            return str(VideoPlatform.VK)
         if "rutube.ru" in url_lower:
-            return VideoPlatform.RUTUBE
-        return VideoPlatform.YOUTUBE  # По умолчанию
+            return str(VideoPlatform.RUTUBE)
+        return str(VideoPlatform.YOUTUBE)  # По умолчанию
 
     def get_embed_url(self) -> str | None:
         """Возвращает URL для встраивания видео."""
         from apps.content.utils import get_video_embed_url
 
-        return get_video_embed_url(self.url, self.platform)
+        return cast(str | None, get_video_embed_url(self.url, self.platform))
 
 
 # ---------------------------------------------------------------------------
@@ -547,7 +557,7 @@ class StringerPage(models.Model):
         verbose_name_plural = "Страница «Стрингеры»"
 
     def __str__(self) -> str:
-        return self.title
+        return str(self.title)
 
     def save(self, *args, **kwargs):
         """Обеспечиваем singleton: всегда только одна запись."""
@@ -555,10 +565,10 @@ class StringerPage(models.Model):
         super().save(*args, **kwargs)
 
     @classmethod
-    def get_singleton(cls):
+    def get_singleton(cls) -> "StringerPage":
         """Получить или создать единственный экземпляр."""
         obj, _ = cls.objects.get_or_create(pk=1, defaults={"title": "Стрингеры"})
-        return obj
+        return cast("StringerPage", obj)
 
 
 class StringerCompanyContactType(models.TextChoices):
@@ -602,18 +612,18 @@ class StringerCompany(CompressImageFieldsMixin, models.Model):
         ordering = ["order", "name"]
 
     def __str__(self) -> str:
-        return self.name
+        return str(self.name)
 
     def get_average_rating(self) -> float | None:
         """Возвращает средний рейтинг компании."""
         from django.db.models import Avg
 
         avg = self.ratings.aggregate(Avg("score"))["score__avg"]
-        return round(avg, 1) if avg is not None else None
+        return float(round(avg, 1)) if avg is not None else None
 
     def get_rating_count(self) -> int:
         """Возвращает количество оценок."""
-        return self.ratings.count()
+        return int(self.ratings.count())
 
 
 class StringerCompanyContact(models.Model):
@@ -681,8 +691,8 @@ class StringerCompanyContact(models.Model):
             return f"https://wa.me/{phone}"
         if self.contact_type == StringerCompanyContactType.MAX:
             if v.startswith(("http://", "https://")):
-                return v
-            return v if v else None
+                return str(v)
+            return str(v) if v else None
         return None
 
     def get_icon_path(self) -> str:
@@ -693,7 +703,7 @@ class StringerCompanyContact(models.Model):
             StringerCompanyContactType.WHATSAPP: "images/WhatsApp.svg",
             StringerCompanyContactType.MAX: "images/Max_logo_2025.png",
         }
-        return icons.get(self.contact_type, "images/chat_icon.png")
+        return str(icons.get(self.contact_type, "images/chat_icon.png"))
 
 
 class StringerCompanyPhoto(CompressImageFieldsMixin, models.Model):

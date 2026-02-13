@@ -1,36 +1,40 @@
-from django.db import models
-from django.conf import settings
-from django.utils import timezone
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
 
 
 class SubscriptionTier(models.Model):
     """Subscription tier levels."""
-    
-    class Level(models.TextChoices):
-        FREE = 'free', 'Free'
-        SILVER = 'silver', 'Silver'
-        GOLD = 'gold', 'Gold'
-        DIAMOND = 'diamond', 'Diamond'
 
-    name = models.CharField("Название тарифа", max_length=50, choices=Level.choices, unique=True)
-    price = models.DecimalField("Стоимость (руб)", max_digits=10, decimal_places=2, default=0)
-    
+    class Level(models.TextChoices):
+        FREE = "free", "Free"
+        SILVER = "silver", "Silver"
+        GOLD = "gold", "Gold"
+        DIAMOND = "diamond", "Diamond"
+
+    name = models.CharField(
+        "Название тарифа", max_length=50, choices=Level.choices, unique=True
+    )
+    price = models.DecimalField(
+        "Стоимость (руб)", max_digits=10, decimal_places=2, default=0
+    )
+
     # Registration limits
     max_tournaments = models.PositiveIntegerField(
-        "Максимум турниров в месяц", 
+        "Максимум турниров в месяц",
         help_text="Количество турниров, на которые можно зарегистрироваться в месяц. 0 = регистрации запрещены.",
-        default=0
+        default=0,
     )
     is_unlimited = models.BooleanField("Неограниченные регистрации", default=False)
-    
+
     # Discounts
     one_day_tournament_discount = models.PositiveIntegerField(
-        "Скидка на однодневные турниры (%)", 
+        "Скидка на однодневные турниры (%)",
         default=0,
-        help_text="Процент скидки (0-100)"
+        help_text="Процент скидки (0-100)",
     )
-    
+
     # Features (booleans for easier permission checks)
     can_see_stats = models.BooleanField("Видеть статистику", default=True)
     can_read_comments = models.BooleanField("Читать комментарии", default=True)
@@ -44,7 +48,7 @@ class SubscriptionTier(models.Model):
     class Meta:
         verbose_name = "Тариф"
         verbose_name_plural = "Тарифы"
-        ordering = ['price']
+        ordering = ["price"]
 
     def __str__(self):
         return self.get_name_display()
@@ -56,7 +60,7 @@ class UserSubscription(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='subscription',
+        related_name="subscription",
         verbose_name="Пользователь",
     )
     tier = models.ForeignKey(
@@ -131,7 +135,7 @@ class UserSubscription(models.Model):
         до end_date — пользователь сохраняет доступ до конца оплаченного
         периода.
         """
-        return self.is_active and self.end_date > timezone.now()
+        return bool(self.is_active and self.end_date > timezone.now())
 
     def can_register_for_tournament(self) -> bool:
         """Check if user has registration slots left."""
@@ -139,35 +143,40 @@ class UserSubscription(models.Model):
             return True
         if self.tier.max_tournaments == 0:
             return False
-        return self.tournaments_registered_count < self.tier.max_tournaments
+        return bool(self.tournaments_registered_count < self.tier.max_tournaments)
 
     def increment_usage(self) -> None:
         self.tournaments_registered_count += 1
-        self.save(update_fields=['tournaments_registered_count'])
+        self.save(update_fields=["tournaments_registered_count"])
 
     def decrement_usage(self) -> None:
         """Восстановить одну регистрацию (например, при удалении из турнира)."""
         if self.tournaments_registered_count > 0:
             self.tournaments_registered_count -= 1
-            self.save(update_fields=['tournaments_registered_count'])
+            self.save(update_fields=["tournaments_registered_count"])
 
     def get_remaining_slots(self) -> int:
         if self.tier.is_unlimited:
             return 999
         if self.tier.max_tournaments == 0:
             return 0
-        return max(0, self.tier.max_tournaments - self.tournaments_registered_count)
+        return int(
+            max(0, self.tier.max_tournaments - self.tournaments_registered_count)
+        )
 
 
 class RegionalTierPrice(models.Model):
     """Regional price override for a subscription tier."""
+
     tier = models.ForeignKey(
         SubscriptionTier,
         on_delete=models.CASCADE,
-        related_name='regional_prices',
-        verbose_name="Тариф"
+        related_name="regional_prices",
+        verbose_name="Тариф",
     )
-    price = models.DecimalField("Стоимость (руб)", max_digits=10, decimal_places=2, default=0)
+    price = models.DecimalField(
+        "Стоимость (руб)", max_digits=10, decimal_places=2, default=0
+    )
     name = models.CharField("Название региона", max_length=100, default="Регионы")
 
     class Meta:

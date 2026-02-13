@@ -1332,14 +1332,15 @@ button {
 
 /* --- Modal overlay --- */
 .modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 10001;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 10001 !important;
     display: flex;
     align-items: center;
     justify-content: center;
     background: rgb(0 0 0 / 50%);
     padding: var(--spacing-md);
+    overflow-y: auto;
 }
 
 .modal-dialog {
@@ -1349,6 +1350,8 @@ button {
     max-width: 440px;
     width: 100%;
     box-shadow: 0 8px 32px rgb(0 0 0 / 24%);
+    position: relative;
+    z-index: 10002;
 }
 
 .modal-dialog__title {

@@ -3,6 +3,7 @@ Sparring views.
 """
 
 import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
@@ -16,15 +17,22 @@ from .forms import SparringRequestForm
 from .models import SparringRequest, SparringResponse
 from .utils import user_has_sparring_access
 
+# Импорт для Telegram уведомлений
+try:
+    from apps.telegram_bot.notifications import notify_sparring_response
+except ImportError:
+    notify_sparring_response = None  # type: ignore[assignment]
+
 logger = logging.getLogger(__name__)
 
 
 def _get_contact_url(player: Player, method: str) -> str | None:
     """Return contact URL for player and method (telegram/whatsapp/max), or None."""
-    if method == SparringResponse.ContactMethod.TELEGRAM and player.telegram:
+    # TextChoices возвращает кортеж (value, label), используем строковые значения напрямую
+    if method == "telegram" and player.telegram:
         uname = player.telegram.strip().lstrip("@")
         return f"https://t.me/{uname}"
-    if method == SparringResponse.ContactMethod.WHATSAPP and player.whatsapp:
+    if method == "whatsapp" and player.whatsapp:
         phone = "".join(c for c in player.whatsapp if c.isdigit())
         if phone.startswith("8") and len(phone) == 11:
             phone = "7" + phone[1:]
@@ -35,12 +43,14 @@ def _get_contact_url(player: Player, method: str) -> str | None:
         else:
             return None
         return f"https://wa.me/{phone}"
-    if method == SparringResponse.ContactMethod.MAX:
+    if method == "max":
         return player.max_url
     return None
 
 
-@login_required_with_message("Раздел спарринга доступен только для зарегистрированных пользователей.")
+@login_required_with_message(
+    "Раздел спарринга доступен только для зарегистрированных пользователей."
+)
 def sparring_list(request):
     """List of active sparring requests. Только для авторизованных пользователей."""
     city = request.GET.get("city", "")
@@ -48,7 +58,11 @@ def sparring_list(request):
 
     requests_qs = (
         SparringRequest.objects.filter(status=SparringRequest.Status.ACTIVE)
-        .select_related("player__user", "player__user__subscription", "player__user__subscription__tier")
+        .select_related(
+            "player__user",
+            "player__user__subscription",
+            "player__user__subscription__tier",
+        )
         .prefetch_related("responses")
     )
     if city:
@@ -186,7 +200,8 @@ def sparring_respond(request, pk):
         status=SparringRequest.Status.ACTIVE,
     )
     method = (request.GET.get("method") or "").lower()
-    if method not in (SparringResponse.ContactMethod.TELEGRAM, SparringResponse.ContactMethod.WHATSAPP, SparringResponse.ContactMethod.MAX):
+    valid_methods = ("telegram", "whatsapp", "max")
+    if method not in valid_methods:
         messages.error(request, "Укажите способ связи: telegram, whatsapp или max.")
         return redirect("sparring_list")
 
@@ -203,12 +218,24 @@ def sparring_respond(request, pk):
     obj, created = SparringResponse.objects.update_or_create(
         sparring_request=sparring,
         respondent=respondent,
-        defaults={"contact_method": method},
+        defaults={
+            "contact_method": method,
+            "status": SparringResponse.ResponseStatus.PENDING,
+        },
     )
+
+    # Отправляем уведомление автору заявки в Telegram
+    if created and notify_sparring_response is not None:
+        try:
+            notify_sparring_response(obj)
+        except Exception as e:
+            logger.warning(
+                "Failed to send Telegram notification for sparring response: %s", e
+            )
 
     url = _get_contact_url(sparring.player, method)
     if url:
         return redirect(url)
     if created:
-        messages.success(request, "Отклик записан. Свяжитесь с автором заявки удобным способом.")
+        messages.success(request, "Отклик записан. Автор заявки получит уведомление.")
     return redirect("sparring_list")

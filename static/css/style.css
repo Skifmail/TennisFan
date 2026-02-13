@@ -6328,56 +6328,53 @@ select.form-control {
     margin-left: 0;
 }
 
-.feedback-modal {
+/* Виджет чата */
+.feedback-chat-widget {
     position: fixed;
-    inset: 0;
+    right: var(--spacing-lg);
+    bottom: calc(var(--spacing-lg) + 60px); /* Над кнопкой */
+    width: 380px;
+    max-height: 500px;
     z-index: 1001;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-lg);
-    visibility: hidden;
-    opacity: 0;
-    transition: visibility 0.2s, opacity 0.2s;
-}
-
-.feedback-modal--open {
-    visibility: visible;
-    opacity: 1;
-}
-
-.feedback-modal__backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgb(0 0 0 / 60%);
-}
-
-.feedback-modal__box {
-    position: relative;
-    width: 100%;
-    max-width: 480px;
-    max-height: 90vh;
-    overflow: auto;
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-xl);
+    display: flex;
+    flex-direction: column;
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+    transition: visibility 0.2s, opacity 0.2s, transform 0.2s;
+    overflow: hidden;
 }
 
-.feedback-modal__header {
+.feedback-chat-widget[aria-hidden="false"] {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.feedback-chat-widget__header {
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--color-border-light);
+    background: var(--color-bg-card);
+}
+
+.feedback-chat-widget__header-content {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing-lg);
-    border-bottom: 1px solid var(--color-border-light);
+    padding: var(--spacing-md) var(--spacing-lg);
 }
 
-.feedback-modal__title {
+.feedback-chat-widget__title {
     margin: 0;
-    font-size: var(--font-size-xl);
+    font-size: var(--font-size-lg);
+    font-weight: 600;
 }
 
-.feedback-modal__close {
+.feedback-chat-widget__close {
     background: none;
     border: none;
     font-size: 1.5rem;
@@ -6385,16 +6382,216 @@ select.form-control {
     color: var(--color-text-muted);
     cursor: pointer;
     padding: 0 var(--spacing-xs);
+    transition: color 0.2s;
 }
 
-.feedback-modal__close:hover {
+.feedback-chat-widget__close:hover {
     color: var(--color-text);
 }
 
-.feedback-modal__body {
-    padding: var(--spacing-lg);
+.feedback-chat-widget__telegram-banner {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background: var(--color-primary-light);
+    border-top: 1px solid var(--color-border-light);
 }
 
+.feedback-chat-widget__telegram-text {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+}
+
+.feedback-chat-widget__telegram-link {
+    color: var(--color-primary);
+    text-decoration: underline;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.feedback-chat-widget__telegram-link:hover {
+    color: var(--color-primary-dark);
+}
+
+/* Область сообщений с прокруткой */
+.feedback-chat-widget__messages {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 200px;
+    max-height: 350px;
+    background: var(--color-bg);
+}
+
+.feedback-chat-widget__messages-list {
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.feedback-chat-widget__welcome {
+    padding: var(--spacing-md);
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.feedback-chat-widget__message {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    max-width: 80%;
+    animation: feedback-message-appear 0.2s ease-out;
+}
+
+@keyframes feedback-message-appear {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.feedback-chat-widget__message--user {
+    align-self: flex-end;
+    align-items: flex-end;
+}
+
+.feedback-chat-widget__message--admin {
+    align-self: flex-start;
+    align-items: flex-start;
+}
+
+.feedback-chat-widget__message-bubble {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    word-wrap: break-word;
+    line-height: 1.5;
+}
+
+.feedback-chat-widget__message--user .feedback-chat-widget__message-bubble {
+    background: var(--color-primary);
+    color: var(--color-bg);
+    border-bottom-right-radius: var(--radius-xs);
+}
+
+.feedback-chat-widget__message--admin .feedback-chat-widget__message-bubble {
+    background: var(--color-bg-elevated);
+    color: var(--color-text);
+    border: 1px solid var(--color-border-light);
+    border-bottom-left-radius: var(--radius-xs);
+}
+
+.feedback-chat-widget__message-time {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    padding: 0 var(--spacing-xs);
+}
+
+.feedback-chat-widget__message-status {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    padding: 0 var(--spacing-xs);
+    font-style: italic;
+}
+
+/* Форма для гостей (показывается только один раз) */
+.feedback-chat-widget__guest-form {
+    flex-shrink: 0;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--color-border-light);
+    background: var(--color-bg-elevated);
+    display: none;
+}
+
+.feedback-chat-widget__guest-form--visible {
+    display: block;
+}
+
+.feedback-chat-widget__guest-form .form-group {
+    margin-bottom: var(--spacing-sm);
+}
+
+.feedback-chat-widget__guest-form .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.feedback-chat-widget__guest-form .form-control {
+    font-size: var(--font-size-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+/* Поле ввода сообщения */
+.feedback-chat-widget__input-area {
+    flex-shrink: 0;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--color-border-light);
+    background: var(--color-bg-card);
+}
+
+.feedback-chat-widget__input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xs);
+}
+
+.feedback-chat-widget__input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    resize: none;
+    outline: none;
+}
+
+.feedback-chat-widget__input::placeholder {
+    color: var(--color-text-muted);
+}
+
+.feedback-chat-widget__send-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-primary);
+    color: var(--color-bg);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.feedback-chat-widget__send-btn:hover:not(:disabled) {
+    background: var(--color-primary-dark);
+    transform: scale(1.05);
+}
+
+.feedback-chat-widget__send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.feedback-chat-widget__error {
+    margin-top: var(--spacing-xs);
+    font-size: var(--font-size-xs);
+    color: var(--color-error);
+}
+
+/* Старые стили для обратной совместимости (можно удалить позже) */
 .feedback-form .form-group {
     margin-bottom: var(--spacing-md);
 }
@@ -6402,11 +6599,6 @@ select.form-control {
 .feedback-success {
     padding: var(--spacing-md) 0;
     color: var(--color-success);
-}
-
-.feedback-modal__threads-title {
-    margin: var(--spacing-xl) 0 var(--spacing-sm);
-    font-size: var(--font-size-base);
 }
 
 .feedback-thread {

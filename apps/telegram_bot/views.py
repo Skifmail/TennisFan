@@ -8,28 +8,37 @@ import logging
 import requests
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
+from django.db.models import Q
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from django.core.cache import cache
-from django.db.models import Q
-from django.urls import reverse
-from django.utils import timezone
-
-from apps.core.models import TelegramTransferConsentLog, UserTelegramLink
-from apps.users.models import Notification, Player
-from apps.tournaments.models import DeadlineExtensionRequest, Match, MatchResultProposal
-from apps.tournaments.utils import get_match_opponent_users, get_match_participants
-from apps.tournaments.proposal_service import apply_proposal
 from apps.core import telegram_notify as admin_notify
+from apps.core.models import TelegramTransferConsentLog, UserTelegramLink
+from apps.tournaments.models import DeadlineExtensionRequest, Match, MatchResultProposal
+from apps.tournaments.proposal_service import apply_proposal
+from apps.tournaments.utils import get_match_opponent_users, get_match_participants
+from apps.users.models import Notification, Player
 
-from . import services as bot
 from . import notifications as tg_notify
+from . import services as bot
 from .private_chat import get_private_chat_access_status
+
+
+def _get_site_base_url() -> str:
+    """Получить базовый URL сайта для ссылок."""
+    from django.conf import settings
+
+    base = getattr(settings, "TELEGRAM_BOT_SITE_BASE_URL", None) or ""
+    if base:
+        return base.rstrip("/") + "/"
+    return "http://localhost:8000/" if settings.DEBUG else "https://tennisfan.ru/"
+
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +58,7 @@ def _parse_score_input(text: str):
     if not parts or len(parts) > 3:
         return None, "Укажите 1–3 сета через пробел, например: 6:4 6:3"
     sets_list = []
-    for i, part in enumerate(parts):
+    for part in parts:
         if ":" in part:
             a, _, b = part.partition(":")
         elif "-" in part:
@@ -160,7 +169,9 @@ def _get_site_base_url() -> str:
     return "https://tennisfan.ru/" if not settings.DEBUG else "http://localhost:8000/"
 
 
-def _answer_callback(callback_query_id: str, text: str | None = None, show_alert: bool = False) -> None:
+def _answer_callback(
+    callback_query_id: str, text: str | None = None, show_alert: bool = False
+) -> None:
     """Ответить на callback_query в Telegram (убрать «часики», опционально показать текст)."""
     token = bot._get_bot_token()
     if not token or not callback_query_id:
@@ -189,7 +200,11 @@ def _edit_message_remove_reply_markup(chat_id: int, message_id: int) -> None:
     try:
         r = requests.post(
             f"https://api.telegram.org/bot{token}/editMessageReplyMarkup",
-            json={"chat_id": chat_id, "message_id": message_id, "reply_markup": {"inline_keyboard": []}},
+            json={
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "reply_markup": {"inline_keyboard": []},
+            },
             timeout=5,
         )
         r.raise_for_status()
@@ -208,21 +223,31 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
     chat_id = message.get("chat", {}).get("id")
     message_id = message.get("message_id")
 
-    if not callback_data.startswith("proposal_confirm_") and not callback_data.startswith("proposal_reject_"):
+    if not callback_data.startswith(
+        "proposal_confirm_"
+    ) and not callback_data.startswith("proposal_reject_"):
         return False
 
-    prefix = "proposal_confirm_" if callback_data.startswith("proposal_confirm_") else "proposal_reject_"
+    prefix = (
+        "proposal_confirm_"
+        if callback_data.startswith("proposal_confirm_")
+        else "proposal_reject_"
+    )
     try:
-        pk = int(callback_data[len(prefix):])
+        pk = int(callback_data[len(prefix) :])
     except (ValueError, TypeError):
         _answer_callback(cq_id, "Неверные данные.", show_alert=True)
         return True
 
     proposal = (
         MatchResultProposal.objects.select_related(
-            "match__tournament", "match__player1", "match__player2",
-            "match__team1__player1", "match__team1__player2",
-            "match__team2__player1", "match__team2__player2",
+            "match__tournament",
+            "match__player1",
+            "match__player2",
+            "match__team1__player1",
+            "match__team1__player2",
+            "match__team2__player1",
+            "match__team2__player2",
             "proposer__user",
         )
         .filter(pk=pk)
@@ -241,7 +266,9 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
 
     link = _get_link_by_chat_id(chat_id)
     if not link:
-        _answer_callback(cq_id, "Подключите бота с сайта (профиль → Telegram).", show_alert=True)
+        _answer_callback(
+            cq_id, "Подключите бота с сайта (профиль → Telegram).", show_alert=True
+        )
         return True
 
     user = link.user
@@ -255,7 +282,9 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
         _answer_callback(cq_id, "Вы не участвуете в этом матче.", show_alert=True)
         return True
     if proposal.proposer_id == player.pk:
-        _answer_callback(cq_id, "Вы не можете подтверждать свой запрос.", show_alert=True)
+        _answer_callback(
+            cq_id, "Вы не можете подтверждать свой запрос.", show_alert=True
+        )
         return True
     opponent_users = get_match_opponent_users(proposal.match, proposal.proposer)
     if user not in opponent_users:
@@ -291,15 +320,15 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
         # 4. Отправляем сообщение-подтверждение нажавшему (OPPONENT)
         try:
             from apps.telegram_bot.notifications import _get_penalty_text_for_player
-            
+
             match = proposal.match
             score = match.score_display() if match.winner else "—"
             winner_name = str(match.winner) if match.winner else "—"
-            
+
             # Получаем текст о штрафе для подтвердившего (opponent)
             opponent_player = player  # Тот, кто подтвердил
             penalty_text = _get_penalty_text_for_player(match, opponent_player)
-            
+
             bot.send_message(
                 chat_id,
                 f"✅ <b>Результат подтверждён.</b>\n\n"
@@ -315,7 +344,11 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
         if apply_ok:
             _answer_callback(cq_id, "✅ Результат подтверждён.")
         else:
-            _answer_callback(cq_id, "⚠️ Результат обработан с ошибкой. Проверьте матч.", show_alert=True)
+            _answer_callback(
+                cq_id,
+                "⚠️ Результат обработан с ошибкой. Проверьте матч.",
+                show_alert=True,
+            )
     else:
         # 1. Уведомляем инициатора (PROPOSER) в Telegram
         try:
@@ -379,13 +412,15 @@ def _handle_extension_request_callback(callback_query: dict, base_url: str) -> b
     chat_id = message.get("chat", {}).get("id")
 
     try:
-        match_pk = int(callback_data[len("extension_request_"):])
+        match_pk = int(callback_data[len("extension_request_") :])
     except (ValueError, TypeError):
         _answer_callback(cq_id, "Неверные данные.", show_alert=True)
         return True
 
     match = (
-        Match.objects.select_related("tournament", "player1", "player2", "team1", "team2")
+        Match.objects.select_related(
+            "tournament", "player1", "player2", "team1", "team2"
+        )
         .filter(
             pk=match_pk,
             status=Match.MatchStatus.SCHEDULED,
@@ -394,7 +429,9 @@ def _handle_extension_request_callback(callback_query: dict, base_url: str) -> b
         .first()
     )
     if not match:
-        _answer_callback(cq_id, "Матч не найден или дедлайн уже прошёл.", show_alert=True)
+        _answer_callback(
+            cq_id, "Матч не найден или дедлайн уже прошёл.", show_alert=True
+        )
         return True
 
     if not chat_id:
@@ -403,7 +440,9 @@ def _handle_extension_request_callback(callback_query: dict, base_url: str) -> b
 
     link = _get_link_by_chat_id(chat_id)
     if not link:
-        _answer_callback(cq_id, "Подключите бота с сайта (профиль → Telegram).", show_alert=True)
+        _answer_callback(
+            cq_id, "Подключите бота с сайта (профиль → Telegram).", show_alert=True
+        )
         return True
 
     user = link.user
@@ -427,27 +466,30 @@ def _handle_extension_request_callback(callback_query: dict, base_url: str) -> b
         _answer_callback(cq_id, "Запрос на продление уже отправлен.", show_alert=True)
         return True
 
-    ext = DeadlineExtensionRequest.objects.create(
+    DeadlineExtensionRequest.objects.create(
         match=match,
         requested_by=player,
         status=DeadlineExtensionRequest.Status.PENDING,
     )
-    admin_url = base_url.rstrip("/") + f"/admin/tournaments/deadlineextensionrequest/{ext.pk}/change/"
-    admin_list_url = base_url.rstrip("/") + "/admin/tournaments/deadlineextensionrequest/"
+    admin_list_url = (
+        base_url.rstrip("/") + "/admin/tournaments/deadlineextensionrequest/"
+    )
     deadline_str = match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else "—"
     text_for_admin = (
         f"🔄 <b>Запрос на продление дедлайна</b>\n\n"
         f"Игрок: {player}\n"
         f"Матч: {match} ({match.tournament.name})\n"
         f"Текущий дедлайн: {deadline_str}\n\n"
-        f"<a href=\"{admin_list_url}\">Список запросов в админке</a>"
+        f'<a href="{admin_list_url}">Список запросов в админке</a>'
     )
     try:
         admin_notify.send_admin_message(text_for_admin)
     except Exception as e:
         logger.warning("Notify admin about extension request: %s", e)
 
-    _answer_callback(cq_id, "Запрос отправлен. Администратор рассмотрит его в ближайшее время.")
+    _answer_callback(
+        cq_id, "Запрос отправлен. Администратор рассмотрит его в ближайшее время."
+    )
     return True
 
 
@@ -466,7 +508,7 @@ def _handle_result_enter_callback(callback_query: dict) -> bool:
         return False
 
     try:
-        match_pk = int(callback_data[len("result_enter_"):])
+        match_pk = int(callback_data[len("result_enter_") :])
     except (ValueError, TypeError):
         _answer_callback(cq_id, "Ошибка данных.", show_alert=True)
         return True
@@ -507,21 +549,34 @@ def _handle_result_enter_callback(callback_query: dict) -> bool:
         _answer_callback(cq_id, "Матч уже завершён.", show_alert=True)
         return True
 
-    side_text = "первую ({}).".format(match.get_player1_display()) if _proposer_is_side1(match, player) else "вторую ({}).".format(match.get_player2_display())
-    
+    side_text = (
+        f"первую ({match.get_player1_display()})."
+        if _proposer_is_side1(match, player)
+        else f"вторую ({match.get_player2_display()})."
+    )
+
     # Показываем кнопки выбора типа результата
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": "📝 Обычный матч (ввести счёт)", "callback_data": f"result_type_{match_pk}_normal"}
+                {
+                    "text": "📝 Обычный матч (ввести счёт)",
+                    "callback_data": f"result_type_{match_pk}_normal",
+                }
             ],
             [
-                {"text": "✅ Тех. победа (соперник не вышел)", "callback_data": f"result_type_{match_pk}_walkover_win"},
-                {"text": "❌ Тех. поражение (мы не вышли)", "callback_data": f"result_type_{match_pk}_walkover_loss"}
+                {
+                    "text": "✅ Тех. победа (соперник не вышел)",
+                    "callback_data": f"result_type_{match_pk}_walkover_win",
+                },
+                {
+                    "text": "❌ Тех. поражение (мы не вышли)",
+                    "callback_data": f"result_type_{match_pk}_walkover_loss",
+                },
             ],
         ]
     }
-    
+
     bot.send_message(
         chat_id,
         f"📝 <b>Внести результат</b>\n\n"
@@ -556,7 +611,9 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
             _answer_callback(cq_id, "Ошибка данных.", show_alert=True)
             return True
         match_pk = int(parts[2])
-        result_type = "_".join(parts[3:])  # Может быть "normal", "walkover_win", "walkover_loss"
+        result_type = "_".join(
+            parts[3:]
+        )  # Может быть "normal", "walkover_win", "walkover_loss"
     except (ValueError, TypeError, IndexError):
         _answer_callback(cq_id, "Ошибка данных.", show_alert=True)
         return True
@@ -599,8 +656,14 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
 
     # Если выбран обычный матч - просим ввести счёт
     if result_type == "normal":
-        cache.set(CACHE_KEY_RESULT_ENTRY % chat_id, match_pk, CACHE_RESULT_ENTRY_TIMEOUT)
-        side_text = "первую ({}).".format(match.get_player1_display()) if _proposer_is_side1(match, player) else "вторую ({}).".format(match.get_player2_display())
+        cache.set(
+            CACHE_KEY_RESULT_ENTRY % chat_id, match_pk, CACHE_RESULT_ENTRY_TIMEOUT
+        )
+        side_text = (
+            f"первую ({match.get_player1_display()})."
+            if _proposer_is_side1(match, player)
+            else f"вторую ({match.get_player2_display()})."
+        )
         bot.send_message(
             chat_id,
             f"📝 <b>Внести результат</b>\n\n"
@@ -617,7 +680,11 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
 
     # Если выбрана тех. победа или тех. поражение - создаём proposal сразу
     if result_type in ("walkover_win", "walkover_loss"):
-        result_choice = Match.ResultChoice.WALKOVER_WIN if result_type == "walkover_win" else Match.ResultChoice.WALKOVER_LOSS
+        result_choice = (
+            Match.ResultChoice.WALKOVER_WIN
+            if result_type == "walkover_win"
+            else Match.ResultChoice.WALKOVER_LOSS
+        )
         proposal = MatchResultProposal.objects.create(
             match=match,
             proposer=player,
@@ -639,7 +706,11 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
             tg_notify.notify_result_proposal(proposal)
         except Exception as e:
             logger.exception("notify_result_proposal failed: %s", e)
-        result_text = "техническую победу" if result_type == "walkover_win" else "техническое поражение"
+        result_text = (
+            "техническую победу"
+            if result_type == "walkover_win"
+            else "техническое поражение"
+        )
         bot.send_message(
             chat_id,
             f"✅ Результат отправлен на подтверждение сопернику.\n\n"
@@ -651,6 +722,170 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
 
     _answer_callback(cq_id, "Неизвестный тип результата.", show_alert=True)
     return True
+
+
+def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
+    """
+    Обработка callback для спаррингов:
+    - contact_{response_id} - выдать контакт откликнувшегося
+    - confirm_match_{response_id} - подтвердить игру и создать матч
+    """
+    callback_data = (callback_query.get("callback_data") or "").strip()
+    cq_id = callback_query.get("id")
+    message = callback_query.get("message") or {}
+    chat_id = message.get("chat", {}).get("id")
+    message_id = message.get("message_id")
+
+    if not callback_data.startswith("contact_") and not callback_data.startswith(
+        "confirm_match_"
+    ):
+        return False
+
+    if not chat_id:
+        _answer_callback(cq_id, "Ошибка чата.", show_alert=True)
+        return True
+
+    link = _get_link_by_chat_id(chat_id)
+    if not link:
+        _answer_callback(
+            cq_id, "Подключите бота с сайта (профиль → Telegram).", show_alert=True
+        )
+        return True
+
+    user = link.user
+    player = getattr(user, "player", None)
+    if not player:
+        _answer_callback(cq_id, "Создайте профиль игрока на сайте.", show_alert=True)
+        return True
+
+    # Извлекаем ID отклика
+    prefix = "contact_" if callback_data.startswith("contact_") else "confirm_match_"
+    try:
+        response_id = int(callback_data[len(prefix) :])
+    except (ValueError, TypeError):
+        _answer_callback(cq_id, "Неверные данные.", show_alert=True)
+        return True
+
+    # Получаем отклик
+    from apps.sparring.models import SparringRequest, SparringResponse
+
+    try:
+        response = SparringResponse.objects.select_related(
+            "sparring_request__player__user",
+            "respondent",
+        ).get(pk=response_id)
+    except SparringResponse.DoesNotExist:
+        _answer_callback(cq_id, "Отклик не найден.", show_alert=True)
+        return True
+
+    # Проверяем, что пользователь - автор заявки
+    if response.sparring_request.player.user_id != user.id:
+        _answer_callback(cq_id, "Вы не являетесь автором этой заявки.", show_alert=True)
+        return True
+
+    # Обработка "Получить контакт"
+    if callback_data.startswith("contact_"):
+        respondent = response.respondent
+        contact_method = response.contact_method
+        contact_info = ""
+
+        if contact_method == "telegram" and respondent.telegram:
+            uname = respondent.telegram.strip().lstrip("@")
+            contact_info = f"Telegram: @{uname}\nСсылка: https://t.me/{uname}"
+        elif contact_method == "whatsapp" and respondent.whatsapp:
+            phone = "".join(c for c in respondent.whatsapp if c.isdigit())
+            if phone.startswith("8") and len(phone) == 11:
+                phone = "7" + phone[1:]
+            elif phone.startswith("7") and len(phone) == 11:
+                pass
+            elif len(phone) == 10:
+                phone = "7" + phone
+            else:
+                contact_info = f"WhatsApp: {respondent.whatsapp}"
+            if phone:
+                contact_info = (
+                    f"WhatsApp: {respondent.whatsapp}\nСсылка: https://wa.me/{phone}"
+                )
+        elif contact_method == "max" and respondent.max_contact:
+            contact_info = f"MAX: {respondent.max_contact}"
+
+        if contact_info:
+            bot.send_message(
+                chat_id, f"📱 <b>Контакт игрока {respondent}:</b>\n\n{contact_info}"
+            )
+            _answer_callback(cq_id, "Контакт отправлен.")
+        else:
+            _answer_callback(cq_id, "Контакт не указан.", show_alert=True)
+        return True
+
+    # Обработка "Подтвердить игру"
+    if callback_data.startswith("confirm_match_"):
+        # Проверяем, что отклик еще не обработан
+        if response.status != SparringResponse.ResponseStatus.PENDING:
+            _answer_callback(cq_id, "Этот отклик уже обработан.", show_alert=True)
+            return True
+
+        # Проверяем, что заявка еще активна
+        if response.sparring_request.status != SparringRequest.Status.ACTIVE:
+            _answer_callback(cq_id, "Заявка уже закрыта.", show_alert=True)
+            return True
+
+        # Создаем матч
+        try:
+            from apps.sparring.services import create_match_from_response
+
+            match = create_match_from_response(response)
+
+            # Обновляем статус отклика
+            response.status = SparringResponse.ResponseStatus.ACCEPTED
+            response.save(update_fields=["status", "updated_at"])
+
+            # Закрываем заявку
+            response.sparring_request.status = SparringRequest.Status.CLOSED
+            response.sparring_request.save(update_fields=["status"])
+
+            # Убираем кнопки из сообщения
+            if message_id:
+                _edit_message_remove_reply_markup(chat_id, message_id)
+
+            # Отправляем подтверждение
+            base_url_str = base_url or _get_site_base_url()
+            match_url = f"{base_url_str.rstrip('/')}/matches/{match.pk}/"
+            bot.send_message(
+                chat_id,
+                f"✅ <b>Игра подтверждена!</b>\n\n"
+                f"Матч создан: {match.get_player1_display()} vs {match.get_player2_display()}\n"
+                f"Дедлайн: {match.deadline.strftime('%d.%m.%Y') if match.deadline else 'Не установлен'}\n\n"
+                f"<a href='{match_url}'>Открыть матч на сайте</a>",
+            )
+
+            # Уведомляем откликнувшегося игрока
+            try:
+                from apps.telegram_bot.notifications import send_to_user_by_user
+
+                send_to_user_by_user(
+                    response.respondent.user,
+                    f"✅ <b>Ваш отклик принят!</b>\n\n"
+                    f"Автор заявки подтвердил игру.\n"
+                    f"Матч создан: {match.get_player1_display()} vs {match.get_player2_display()}\n"
+                    f"Дедлайн: {match.deadline.strftime('%d.%m.%Y') if match.deadline else 'Не установлен'}\n\n"
+                    f"<a href='{match_url}'>Открыть матч на сайте</a>",
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to notify respondent about match confirmation: %s", e
+                )
+
+            _answer_callback(cq_id, "Игра подтверждена, матч создан!")
+        except Exception as e:
+            logger.exception("Failed to create match from sparring response: %s", e)
+            _answer_callback(
+                cq_id, "Ошибка при создании матча. Попробуйте позже.", show_alert=True
+            )
+
+        return True
+
+    return False
 
 
 def _handle_menu_callback(callback_query: dict, base_url: str = "") -> bool:
@@ -678,12 +913,18 @@ def _handle_menu_callback(callback_query: dict, base_url: str = "") -> bool:
     try:
         link = _get_link_by_chat_id(chat_id)
         if not link:
-            _answer_callback(cq_id, "Сначала подключите бота с сайта (профиль → Telegram).", show_alert=True)
+            _answer_callback(
+                cq_id,
+                "Сначала подключите бота с сайта (профиль → Telegram).",
+                show_alert=True,
+            )
             return True
 
         user = link.user
         if callback_data == "menu_go_to_site":
-            _handle_menu_callback_action(chat_id, cq_id, callback_data, user, None, base_url=base_url)
+            _handle_menu_callback_action(
+                chat_id, cq_id, callback_data, user, None, base_url=base_url
+            )
         else:
             player = getattr(user, "player", None)
             if not player:
@@ -692,7 +933,9 @@ def _handle_menu_callback(callback_query: dict, base_url: str = "") -> bool:
                 except Exception:
                     _answer_callback(cq_id, "Ошибка профиля игрока.", show_alert=True)
                     return True
-            _handle_menu_callback_action(chat_id, cq_id, callback_data, user, player, base_url=base_url)
+            _handle_menu_callback_action(
+                chat_id, cq_id, callback_data, user, player, base_url=base_url
+            )
     except Exception as e:
         logger.exception("_handle_menu_callback failed: %s", e)
         _answer_callback(cq_id, "Ошибка. Попробуйте ещё раз.", show_alert=True)
@@ -708,6 +951,7 @@ def _handle_menu_callback_action(
     base_url: str = "",
 ) -> None:
     """Отправка контента по выбранному пункту меню. cq_id=None при нажатии реплай-кнопки."""
+
     def _answer(caption: str) -> None:
         if cq_id:
             _answer_callback(cq_id, caption)
@@ -715,9 +959,12 @@ def _handle_menu_callback_action(
     if callback_data == "menu_my_matches":
         scheduled = (
             Match.objects.filter(
-                Q(player1=player) | Q(player2=player)
-                | Q(team1__player1=player) | Q(team1__player2=player)
-                | Q(team2__player1=player) | Q(team2__player2=player),
+                Q(player1=player)
+                | Q(player2=player)
+                | Q(team1__player1=player)
+                | Q(team1__player2=player)
+                | Q(team2__player1=player)
+                | Q(team2__player2=player),
                 status=Match.MatchStatus.SCHEDULED,
             )
             # Если по матчу уже отправлен результат и он ждёт подтверждения — не показываем
@@ -738,7 +985,9 @@ def _handle_menu_callback_action(
             lines.append("Нет предстоящих матчей.")
         else:
             for i, m in enumerate(scheduled_list, 1):
-                deadline_str = m.deadline.strftime("%d.%m.%Y %H:%M") if m.deadline else "—"
+                deadline_str = (
+                    m.deadline.strftime("%d.%m.%Y %H:%M") if m.deadline else "—"
+                )
                 round_name = m.round_name or "—"
                 p1 = m.get_player1_display()
                 p2 = m.get_player2_display()
@@ -761,32 +1010,38 @@ def _handle_menu_callback_action(
                 btn_text = f"📝 Матч {i}: {label}"
                 if len(btn_text) > 64:
                     btn_text = (f"📝 Матч {i}: {label}"[:61]).rstrip() + "…"
-                keyboard.append([{"text": btn_text, "callback_data": f"result_enter_{m.pk}"}])
+                keyboard.append(
+                    [{"text": btn_text, "callback_data": f"result_enter_{m.pk}"}]
+                )
             reply_markup = {"inline_keyboard": keyboard}
 
         ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
         _answer("Список матчей" if ok else "Сообщение не отправлено")
         if not ok:
-            logger.warning("menu_my_matches: send_message failed for chat_id=%s", chat_id)
+            logger.warning(
+                "menu_my_matches: send_message failed for chat_id=%s", chat_id
+            )
 
     elif callback_data == "menu_my_profile":
         try:
             # Получаем сезонные очки
             from apps.tournaments.season_utils import get_current_season
-            from apps.tournaments.models import SeasonPoints
-            
+
             current_season = get_current_season()
             season_points = 0
             try:
                 # Используем getattr для безопасного доступа к OneToOneField
-                sp = getattr(player, 'season_points', None)
-                if sp and hasattr(sp, 'season_name') and hasattr(sp, 'season_year'):
-                    if sp.season_name == current_season.name and sp.season_year == current_season.year:
+                sp = getattr(player, "season_points", None)
+                if sp and hasattr(sp, "season_name") and hasattr(sp, "season_year"):
+                    if (
+                        sp.season_name == current_season.name
+                        and sp.season_year == current_season.year
+                    ):
                         season_points = sp.current_season_points
             except Exception as e:
                 logger.debug("Error getting season points: %s", e)
                 season_points = 0
-            
+
             # Получаем информацию о подписке
             try:
                 sub = getattr(user, "subscription", None)
@@ -803,7 +1058,7 @@ def _handle_menu_callback_action(
             except Exception as e:
                 logger.debug("Error getting subscription: %s", e)
                 sub_status = "❌ Нет подписки"
-            
+
             # Формируем красивую таблицу
             lines = [
                 "👤 <b>МОЙ ПРОФИЛЬ</b>",
@@ -816,66 +1071,86 @@ def _handle_menu_callback_action(
                 f"🎯 Уровень: <b>{player.get_skill_level_display()}</b>",
                 f"📈 NTRP: <b>{player.ntrp_level}</b>",
             ]
-            
+
             # Добавляем дополнительную информацию, если есть
             try:
                 if player.birth_date:
                     from datetime import date
+
                     today = date.today()
-                    age = today.year - player.birth_date.year - ((today.month, today.day) < (player.birth_date.month, player.birth_date.day))
+                    age = (
+                        today.year
+                        - player.birth_date.year
+                        - (
+                            (today.month, today.day)
+                            < (player.birth_date.month, player.birth_date.day)
+                        )
+                    )
                     lines.append(f"🎂 Возраст: <b>{age} лет</b>")
             except Exception:
                 pass
-            
+
             try:
                 if player.gender:
                     from apps.users.models import Gender
-                    gender_display = dict(Gender.choices).get(player.gender, player.gender)
+
+                    gender_display = dict(Gender.choices).get(
+                        player.gender, player.gender
+                    )
                     lines.append(f"⚧️ Пол: <b>{gender_display}</b>")
             except Exception:
                 pass
-            
+
             try:
                 if player.forehand:
                     from apps.users.models import Forehand
-                    forehand_display = dict(Forehand.choices).get(player.forehand, player.forehand)
+
+                    forehand_display = dict(Forehand.choices).get(
+                        player.forehand, player.forehand
+                    )
                     lines.append(f"✋ Ведущая рука: <b>{forehand_display}</b>")
             except Exception:
                 pass
-            
-            lines.extend([
-                "",
-                "🏆 <b>РЕЙТИНГ И СТАТИСТИКА</b>",
-                "━━━━━━━━━━━━━━━━━━",
-                f"💎 Очки Elo: <b>{player.total_points:.1f}</b>",
-                f"🎖️ Очки сезона: <b>{season_points}</b>",
-                f"🎾 Матчей: <b>{player.matches_played}</b>",
-                f"✅ Побед: <b>{player.matches_won}</b>",
-                f"📊 Процент побед: <b>{player.win_rate}%</b>",
-                "",
-                "💳 <b>ПОДПИСКА</b>",
-                "━━━━━━━━━━━━━━━━━━",
-                f"{sub_status}",
-            ])
-            
+
+            lines.extend(
+                [
+                    "",
+                    "🏆 <b>РЕЙТИНГ И СТАТИСТИКА</b>",
+                    "━━━━━━━━━━━━━━━━━━",
+                    f"💎 Очки Elo: <b>{player.total_points:.1f}</b>",
+                    f"🎖️ Очки сезона: <b>{season_points}</b>",
+                    f"🎾 Матчей: <b>{player.matches_played}</b>",
+                    f"✅ Побед: <b>{player.matches_won}</b>",
+                    f"📊 Процент побед: <b>{player.win_rate}%</b>",
+                    "",
+                    "💳 <b>ПОДПИСКА</b>",
+                    "━━━━━━━━━━━━━━━━━━",
+                    f"{sub_status}",
+                ]
+            )
+
             text = "\n".join(lines)
             ok = bot.send_to_user(chat_id, text)
             _answer("Профиль" if ok else "Ошибка отправки")
             if not ok:
-                logger.warning("menu_my_profile: send_message failed for chat_id=%s", chat_id)
+                logger.warning(
+                    "menu_my_profile: send_message failed for chat_id=%s", chat_id
+                )
         except Exception as e:
             logger.exception("menu_my_profile: error for chat_id=%s: %s", chat_id, e)
             _answer("Ошибка загрузки профиля")
-            bot.send_to_user(chat_id, "❌ Произошла ошибка при загрузке профиля. Попробуйте позже.")
+            bot.send_to_user(
+                chat_id, "❌ Произошла ошибка при загрузке профиля. Попробуйте позже."
+            )
 
     elif callback_data == "menu_my_subscription":
         try:
             sub = getattr(user, "subscription", None)
         except Exception:
             sub = None
-        
+
         reply_markup = None
-        
+
         if not sub:
             text = (
                 "📋 <b>Моя подписка</b>\n\n"
@@ -895,18 +1170,20 @@ def _handle_menu_callback_action(
             tier_name = tier.get_name_display()
             is_valid = sub.is_valid()
             is_cancelled = sub.is_cancelled
-            
+
             # Статус подписки
             if is_cancelled and is_valid:
                 status_emoji = "⚠️"
-                status_text = f"Отменена (действует до {sub.end_date.strftime('%d.%m.%Y')})"
+                status_text = (
+                    f"Отменена (действует до {sub.end_date.strftime('%d.%m.%Y')})"
+                )
             elif is_valid:
                 status_emoji = "✅"
                 status_text = "Активна"
             else:
                 status_emoji = "❌"
                 status_text = "Истекла"
-            
+
             # Дата окончания
             now = timezone.now()
             end_str = sub.end_date.strftime("%d.%m.%Y") if sub.end_date else "—"
@@ -916,7 +1193,7 @@ def _handle_menu_callback_action(
                 days_left = delta.days
                 if days_left <= 3 and days_left >= 0:
                     end_str = f"{end_str} (через {days_left} дн.)"
-            
+
             # Регистрации на турниры
             if tier.is_unlimited:
                 reg_text = "♾️ Безлимит"
@@ -927,7 +1204,7 @@ def _handle_menu_callback_action(
                 total = tier.max_tournaments
                 remaining = sub.get_remaining_slots()
                 reg_text = f"{used}/{total} (осталось: {remaining})"
-            
+
             # Список возможностей тарифа
             features = []
             if tier.can_see_stats:
@@ -943,14 +1220,16 @@ def _handle_menu_callback_action(
             if tier.has_sparring:
                 features.append("✅ Организация спаррингов")
             if tier.one_day_tournament_discount > 0:
-                features.append(f"✅ Скидка {tier.one_day_tournament_discount}% на однодневные турниры")
+                features.append(
+                    f"✅ Скидка {tier.one_day_tournament_discount}% на однодневные турниры"
+                )
             if tier.has_admin_support:
                 features.append("✅ Приоритетная поддержка администратора")
             if tier.has_badge:
                 features.append("✅ Особый статус в профиле")
-            
+
             features_text = "\n".join(features) if features else "• Базовые функции"
-            
+
             # Формирование сообщения
             lines = [
                 "📋 <b>Моя подписка</b>",
@@ -965,9 +1244,14 @@ def _handle_menu_callback_action(
                 "✨ <b>Ваши возможности:</b>",
                 features_text,
             ]
-            
+
             # Предупреждение если истекает скоро
-            if days_left is not None and days_left <= 3 and days_left >= 0 and not is_cancelled:
+            if (
+                days_left is not None
+                and days_left <= 3
+                and days_left >= 0
+                and not is_cancelled
+            ):
                 lines.append("")
                 if days_left == 0:
                     lines.append("🚨 <b>Подписка истекает сегодня!</b>")
@@ -976,24 +1260,28 @@ def _handle_menu_callback_action(
                 else:
                     lines.append(f"⚠️ <b>Подписка истекает через {days_left} дн.</b>")
                 lines.append("Продлите сейчас, чтобы не потерять доступ!")
-            
+
             text = "\n".join(lines)
-            
+
             # Кнопки действий
             if base_url:
                 pricing_url = f"{base_url.rstrip('/')}/subscriptions/pricing/"
                 keyboard = []
                 if not is_valid or (days_left is not None and days_left <= 3):
-                    keyboard.append([{"text": "💳 Продлить подписку", "url": pricing_url}])
+                    keyboard.append(
+                        [{"text": "💳 Продлить подписку", "url": pricing_url}]
+                    )
                 if is_valid and not is_cancelled:
                     keyboard.append([{"text": "🔄 Сменить тариф", "url": pricing_url}])
                 if keyboard:
                     reply_markup = {"inline_keyboard": keyboard}
-        
+
         ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
         _answer("Подписка" if ok else "Ошибка отправки")
         if not ok:
-            logger.warning("menu_my_subscription: send_message failed for chat_id=%s", chat_id)
+            logger.warning(
+                "menu_my_subscription: send_message failed for chat_id=%s", chat_id
+            )
 
     elif callback_data == "menu_private_chat":
         has_access, reason = get_private_chat_access_status(user)
@@ -1013,9 +1301,15 @@ def _handle_menu_callback_action(
             )
             if base_url:
                 pricing_url = f"{base_url.rstrip('/')}/subscriptions/pricing/"
-                reply_markup = {"inline_keyboard": [[{"text": "💳 Выбрать тариф", "url": pricing_url}]]}
+                reply_markup = {
+                    "inline_keyboard": [
+                        [{"text": "💳 Выбрать тариф", "url": pricing_url}]
+                    ]
+                }
         else:
-            invite_link = bot.create_private_chat_invite_link(expire_seconds=1800, member_limit=1)
+            invite_link = bot.create_private_chat_invite_link(
+                expire_seconds=1800, member_limit=1
+            )
             if invite_link:
                 text = (
                     "💬 <b>Закрытый чат сообщества</b>\n\n"
@@ -1023,7 +1317,11 @@ def _handle_menu_callback_action(
                     "Ниже ваша персональная ссылка для входа в чат.\n\n"
                     "⚠️ Ссылка одноразовая и действует 30 минут."
                 )
-                reply_markup = {"inline_keyboard": [[{"text": "➡️ Войти в закрытый чат", "url": invite_link}]]}
+                reply_markup = {
+                    "inline_keyboard": [
+                        [{"text": "➡️ Войти в закрытый чат", "url": invite_link}]
+                    ]
+                }
             else:
                 text = (
                     "⚠️ <b>Не удалось создать приглашение в чат</b>\n\n"
@@ -1033,13 +1331,15 @@ def _handle_menu_callback_action(
         ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
         _answer("Закрытый чат" if ok else "Ошибка отправки")
         if not ok:
-            logger.warning("menu_private_chat: send_message failed for chat_id=%s", chat_id)
+            logger.warning(
+                "menu_private_chat: send_message failed for chat_id=%s", chat_id
+            )
 
     elif callback_data == "menu_go_to_site" and base_url:
         site_url = base_url.rstrip("/")
         bot.send_to_user(
             chat_id,
-            f"🌐 <b>Перейти на сайт</b>\n\n<a href=\"{site_url}\">{site_url}</a>",
+            f'🌐 <b>Перейти на сайт</b>\n\n<a href="{site_url}">{site_url}</a>',
             reply_markup=_reply_menu_keyboard(),
         )
         _answer("Ссылка отправлена")
@@ -1071,10 +1371,16 @@ def user_bot_webhook(request):
         if "data" in callback_query:
             callback_query.setdefault("callback_data", callback_query["data"])
         callback_data = (callback_query.get("callback_data") or "")[:50]
-        logger.info("user_bot callback_query: chat_id=%s data=%s", callback_query.get("message", {}).get("chat", {}).get("id"), callback_data)
+        logger.info(
+            "user_bot callback_query: chat_id=%s data=%s",
+            callback_query.get("message", {}).get("chat", {}).get("id"),
+            callback_data,
+        )
         handled = _handle_proposal_callback(callback_query, base_url)
         if not handled:
             handled = _handle_extension_request_callback(callback_query, base_url)
+        if not handled:
+            handled = _handle_sparring_callback(callback_query, base_url)
         if not handled:
             handled = _handle_result_type_callback(callback_query)
         if not handled:
@@ -1119,7 +1425,13 @@ def user_bot_webhook(request):
                 link.user_bot_chat_id = chat_id
                 link.binding_token = ""
                 link.token_created_at = None
-                link.save(update_fields=["user_bot_chat_id", "binding_token", "token_created_at"])
+                link.save(
+                    update_fields=[
+                        "user_bot_chat_id",
+                        "binding_token",
+                        "token_created_at",
+                    ]
+                )
                 welcome = (
                     "✅ <b>Бот подключён</b>\n\n"
                     "Теперь вы будете получать уведомления о регистрациях на турниры, "
@@ -1168,10 +1480,15 @@ def user_bot_webhook(request):
                     return JsonResponse({"ok": True})
                 match = (
                     Match.objects.filter(pk=match_pk)
-                    .select_related("tournament", "player1", "player2", "team1", "team2")
+                    .select_related(
+                        "tournament", "player1", "player2", "team1", "team2"
+                    )
                     .first()
                 )
-                if not match or match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
+                if not match or match.status in (
+                    Match.MatchStatus.COMPLETED,
+                    Match.MatchStatus.WALKOVER,
+                ):
                     cache.delete(cache_key)
                     bot.send_message(chat_id, "Матч не найден или уже завершён.")
                     return JsonResponse({"ok": True})
@@ -1180,7 +1497,9 @@ def user_bot_webhook(request):
                     cache.delete(cache_key)
                     bot.send_message(chat_id, "Вы не участвуете в этом матче.")
                     return JsonResponse({"ok": True})
-                if match.result_proposals.filter(status=Match.ProposalStatus.PENDING).exists():
+                if match.result_proposals.filter(
+                    status=Match.ProposalStatus.PENDING
+                ).exists():
                     cache.delete(cache_key)
                     bot.send_message(
                         chat_id,
@@ -1202,7 +1521,12 @@ def user_bot_webhook(request):
                 else:
                     sets_won_p1 = sum(1 for (a, b) in sets_list if b > a)
                 sets_won_p2 = len(sets_list) - sets_won_p1
-                result = Match.ResultChoice.WIN if (is_p1 and sets_won_p1 > sets_won_p2) or (not is_p1 and sets_won_p2 > sets_won_p1) else Match.ResultChoice.LOSS
+                result = (
+                    Match.ResultChoice.WIN
+                    if (is_p1 and sets_won_p1 > sets_won_p2)
+                    or (not is_p1 and sets_won_p2 > sets_won_p1)
+                    else Match.ResultChoice.LOSS
+                )
                 proposal = MatchResultProposal.objects.create(
                     match=match,
                     proposer=player,
@@ -1225,7 +1549,10 @@ def user_bot_webhook(request):
                 except Exception as e:
                     logger.exception("notify_result_proposal failed: %s", e)
                 cache.delete(cache_key)
-                bot.send_message(chat_id, "✅ Результат отправлен на подтверждение сопернику. Ожидайте подтверждения в боте.")
+                bot.send_message(
+                    chat_id,
+                    "✅ Результат отправлен на подтверждение сопернику. Ожидайте подтверждения в боте.",
+                )
                 return JsonResponse({"ok": True})
         cache.delete(cache_key)
 
@@ -1235,14 +1562,16 @@ def user_bot_webhook(request):
             site_url = base_url.rstrip("/")
             bot.send_message(
                 chat_id,
-                f"🌐 <b>Перейти на сайт</b>\n\n<a href=\"{site_url}\">{site_url}</a>",
+                f'🌐 <b>Перейти на сайт</b>\n\n<a href="{site_url}">{site_url}</a>',
                 reply_markup=_reply_menu_keyboard(),
             )
             return JsonResponse({"ok": True})
         else:
             link = _get_link_by_chat_id(chat_id)
             if not link:
-                bot.send_message(chat_id, "Сначала подключите бота с сайта (профиль → Telegram).")
+                bot.send_message(
+                    chat_id, "Сначала подключите бота с сайта (профиль → Telegram)."
+                )
             else:
                 user = link.user
                 player = getattr(user, "player", None)
@@ -1305,10 +1634,17 @@ def connect_redirect(request):
             user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:1000],
         )
     except Exception as exc:
-        logger.warning("Failed to log Telegram transfer consent for user=%s: %s", request.user.pk, exc)
+        logger.warning(
+            "Failed to log Telegram transfer consent for user=%s: %s",
+            request.user.pk,
+            exc,
+        )
 
     if not bot.is_configured():
-        messages.error(request, "Telegram-бот временно недоступен. Проверьте TELEGRAM_USER_BOT_TOKEN в .env и перезапустите сервер.")
+        messages.error(
+            request,
+            "Telegram-бот временно недоступен. Проверьте TELEGRAM_USER_BOT_TOKEN в .env и перезапустите сервер.",
+        )
         try:
             return redirect("profile", pk=request.user.player.pk)
         except Exception:
@@ -1348,5 +1684,8 @@ def disconnect_user_bot(request):
     link.token_created_at = None
     link.save(update_fields=["user_bot_chat_id", "binding_token", "token_created_at"])
 
-    messages.success(request, "Telegram-бот отключён. Уведомления в Telegram больше не будут приходить.")
+    messages.success(
+        request,
+        "Telegram-бот отключён. Уведомления в Telegram больше не будут приходить.",
+    )
     return redirect("profile", pk=request.user.player.pk)

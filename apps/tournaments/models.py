@@ -46,7 +46,10 @@ class TournamentFormat(models.TextChoices):
     """Формат проведения турнира."""
 
     SINGLE_ELIMINATION = "single_elimination", "FAN (одноэтапная сетка)"
-    OLYMPIC_CONSOLATION = "olympic_consolation", "Олимпийская система (утешительная сетка)"
+    OLYMPIC_CONSOLATION = (
+        "olympic_consolation",
+        "Олимпийская система (утешительная сетка)",
+    )
     ROUND_ROBIN = "round_robin", "Круговой"
 
 
@@ -101,19 +104,34 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     slug = models.SlugField("URL", unique=True)
     description = models.TextField("Описание", blank=True)
     city = models.CharField("Город", max_length=100)
-    
+
     # Subscription & Entry Fee fields
-    entry_fee = models.DecimalField("Вступительный взнос (руб)", max_digits=10, decimal_places=2, default=0)
-    is_one_day = models.BooleanField("Однодневный турнир", default=False, help_text="Если отмечено, взнос платный для всех (с учетом скидок)")
+    entry_fee = models.DecimalField(
+        "Вступительный взнос (руб)", max_digits=10, decimal_places=2, default=0
+    )
+    is_one_day = models.BooleanField(
+        "Однодневный турнир",
+        default=False,
+        help_text="Если отмечено, взнос платный для всех (с учетом скидок)",
+    )
 
     gender = models.CharField(
-        "Категория по полу", max_length=10, choices=TournamentGender.choices, default=TournamentGender.MALE
+        "Категория по полу",
+        max_length=10,
+        choices=TournamentGender.choices,
+        default=TournamentGender.MALE,
     )
     duration = models.CharField(
-        "Продолжительность", max_length=10, choices=TournamentDuration.choices, default=TournamentDuration.MULTI_DAY
+        "Продолжительность",
+        max_length=10,
+        choices=TournamentDuration.choices,
+        default=TournamentDuration.MULTI_DAY,
     )
     tournament_type = models.CharField(
-        "Тип турнира", max_length=20, choices=TournamentType.choices, default=TournamentType.REGULAR
+        "Тип турнира",
+        max_length=20,
+        choices=TournamentType.choices,
+        default=TournamentType.REGULAR,
     )
     format = models.CharField(
         "Формат",
@@ -130,7 +148,10 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         help_text="Одиночный: 1 на 1. Парный: команды по 2 человека.",
     )
     status = models.CharField(
-        "Статус", max_length=20, choices=TournamentStatus.choices, default=TournamentStatus.UPCOMING
+        "Статус",
+        max_length=20,
+        choices=TournamentStatus.choices,
+        default=TournamentStatus.UPCOMING,
     )
     points_winner = models.IntegerField(
         "Очки за победу",
@@ -193,14 +214,22 @@ class Tournament(CompressImageFieldsMixin, models.Model):
 
     start_date = models.DateField("Дата начала")
     end_date = models.DateField("Дата окончания", null=True, blank=True)
-    registration_deadline = models.DateTimeField("Дедлайн регистрации", null=True, blank=True)
+    registration_deadline = models.DateTimeField(
+        "Дедлайн регистрации", null=True, blank=True
+    )
 
     # FAN: очки за раунд (начисляются при вылете / в конце турнира)
     fan_points_r1 = models.PositiveSmallIntegerField("FAN: очки за 1 круг", default=10)
     fan_points_r2 = models.PositiveSmallIntegerField("FAN: очки за 2 круг", default=25)
-    fan_points_sf = models.PositiveSmallIntegerField("FAN: очки за полуфинал", default=45)
-    fan_points_final = models.PositiveSmallIntegerField("FAN: очки финалисту", default=70)
-    fan_points_winner = models.PositiveSmallIntegerField("FAN: очки победителю", default=100)
+    fan_points_sf = models.PositiveSmallIntegerField(
+        "FAN: очки за полуфинал", default=45
+    )
+    fan_points_final = models.PositiveSmallIntegerField(
+        "FAN: очки финалисту", default=70
+    )
+    fan_points_winner = models.PositiveSmallIntegerField(
+        "FAN: очки победителю", default=100
+    )
 
     # Круговой: формат матча
     match_format = models.CharField(
@@ -273,6 +302,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
 
     def save(self, *args, **kwargs):
         from django.utils import timezone
+
         if self.registration_deadline and self.insufficient_participants_notified_at:
             if self.registration_deadline > timezone.now():
                 self.insufficient_participants_notified_at = None
@@ -347,8 +377,34 @@ class Match(models.Model):
         ACCEPTED = "accepted", "Подтверждено"
         REJECTED = "rejected", "Отклонено"
 
+    class MatchType(models.TextChoices):
+        TOURNAMENT = "tournament", "Турнирный матч"
+        SPARRING = "sparring", "Спарринг (личная встреча)"
+
     tournament = models.ForeignKey(
-        Tournament, on_delete=models.CASCADE, related_name="matches", verbose_name="Турнир"
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="matches",
+        verbose_name="Турнир",
+        null=True,
+        blank=True,
+        help_text="Для турнирных матчей. Для спаррингов оставить пустым.",
+    )
+    match_type = models.CharField(
+        "Тип матча",
+        max_length=20,
+        choices=MatchType.choices,
+        default=MatchType.TOURNAMENT,
+        help_text="Турнирный матч или спарринг (личная встреча)",
+    )
+    sparring_response = models.ForeignKey(
+        "sparring.SparringResponse",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="matches",
+        verbose_name="Отклик на спарринг",
+        help_text="Связь с откликом на спарринг, если матч создан из спарринга",
     )
     court = models.ForeignKey(
         "courts.Court",
@@ -472,7 +528,10 @@ class Match(models.Model):
     scheduled_datetime = models.DateTimeField("Дата и время", null=True, blank=True)
     completed_datetime = models.DateTimeField("Завершён", null=True, blank=True)
     status = models.CharField(
-        "Статус", max_length=20, choices=MatchStatus.choices, default=MatchStatus.SCHEDULED
+        "Статус",
+        max_length=20,
+        choices=MatchStatus.choices,
+        default=MatchStatus.SCHEDULED,
     )
 
     points_player1 = models.IntegerField("Очки П1", default=0)
@@ -493,11 +552,13 @@ class Match(models.Model):
         help_text="pending_calc — матч ждёт ежемесячного пересчёта; calculated — рейтинг обновлён.",
     )
     rating_delta_player1 = models.FloatField(
-        "Изменение рейтинга П1", default=0.0,
+        "Изменение рейтинга П1",
+        default=0.0,
         help_text="Дельта рейтинга для игрока 1 / команды 1 после расчёта.",
     )
     rating_delta_player2 = models.FloatField(
-        "Изменение рейтинга П2", default=0.0,
+        "Изменение рейтинга П2",
+        default=0.0,
         help_text="Дельта рейтинга для игрока 2 / команды 2 после расчёта.",
     )
 
@@ -514,6 +575,17 @@ class Match(models.Model):
         if self.player1 and self.player2:
             return f"{self.player1} vs {self.player2}"
         return "Матч"
+
+    def is_sparring(self) -> bool:
+        """Проверка, является ли матч спаррингом (личной встречей)."""
+        return self.match_type == self.MatchType.SPARRING
+
+    def is_tournament_match(self) -> bool:
+        """Проверка, является ли матч турнирным."""
+        return (
+            self.match_type == self.MatchType.TOURNAMENT
+            and self.tournament_id is not None
+        )
 
     def get_player1_display(self) -> str:
         """Отображаемое имя стороны 1 (игрок или команда)."""
@@ -560,16 +632,24 @@ class Match(models.Model):
             result__in=[
                 Match.ResultChoice.WALKOVER_LOSS,
                 Match.ResultChoice.WALKOVER_WIN,
-            ]
+            ],
         ).exists():
             return True
         # Альтернативная проверка: статус WALKOVER и счёт 6:0 6:0 или 0:6 0:6
         if self.status == Match.MatchStatus.WALKOVER:
-            if (self.player1_set1 == 6 and self.player2_set1 == 0 and
-                self.player1_set2 == 6 and self.player2_set2 == 0):
+            if (
+                self.player1_set1 == 6
+                and self.player2_set1 == 0
+                and self.player1_set2 == 6
+                and self.player2_set2 == 0
+            ):
                 return True
-            if (self.player1_set1 == 0 and self.player2_set1 == 6 and
-                self.player1_set2 == 0 and self.player2_set2 == 6):
+            if (
+                self.player1_set1 == 0
+                and self.player2_set1 == 6
+                and self.player1_set2 == 0
+                and self.player2_set2 == 6
+            ):
                 return True
         return False
 
@@ -578,10 +658,16 @@ class MatchResultProposal(models.Model):
     """Pending match result that requires opponent confirmation."""
 
     match = models.ForeignKey(
-        Match, on_delete=models.CASCADE, related_name="result_proposals", verbose_name="Матч"
+        Match,
+        on_delete=models.CASCADE,
+        related_name="result_proposals",
+        verbose_name="Матч",
     )
     proposer = models.ForeignKey(
-        Player, on_delete=models.CASCADE, related_name="proposed_results", verbose_name="Инициатор"
+        Player,
+        on_delete=models.CASCADE,
+        related_name="proposed_results",
+        verbose_name="Инициатор",
     )
     result = models.CharField(
         "Результат",
@@ -612,7 +698,9 @@ class MatchResultProposal(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.match} — {self.get_result_display()} ({self.get_status_display()})"
+        return (
+            f"{self.match} — {self.get_result_display()} ({self.get_status_display()})"
+        )
 
 
 class DeadlineExtensionRequest(models.Model):
@@ -682,9 +770,7 @@ class SeasonRating(models.Model):
         Player, on_delete=models.CASCADE, related_name="season_ratings"
     )
     season = models.CharField("Сезон", max_length=20)  # e.g., "2026"
-    category = models.CharField(
-        "Категория", max_length=20, choices=SkillLevel.choices
-    )
+    category = models.CharField("Категория", max_length=20, choices=SkillLevel.choices)
     points = models.IntegerField("Очки", default=0)
     rank = models.PositiveIntegerField("Место", default=0)
 
@@ -741,11 +827,11 @@ class TournamentPlayerResult(models.Model):
 
 class SeasonPoints(models.Model):
     """Сезонные FAN очки игрока за текущий сезон.
-    
+
     Очки накапливаются в течение сезона (Зима: Октябрь-Апрель, Лето: Май-Сентябрь)
     и сбрасываются в ноль в конце сезона с архивацией результатов.
     """
-    
+
     player = models.OneToOneField(
         Player,
         on_delete=models.CASCADE,
@@ -785,10 +871,10 @@ class SeasonPoints(models.Model):
 
 class SeasonArchive(models.Model):
     """Архив результатов сезонов для Зала Славы.
-    
+
     Сохраняет итоговые результаты игроков по завершении сезона.
     """
-    
+
     player = models.ForeignKey(
         Player,
         on_delete=models.CASCADE,

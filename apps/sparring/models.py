@@ -15,7 +15,10 @@ class SparringRequest(models.Model):
         CLOSED = "closed", "Закрыта"
 
     player = models.ForeignKey(
-        Player, on_delete=models.CASCADE, related_name="sparring_requests", verbose_name="Игрок"
+        Player,
+        on_delete=models.CASCADE,
+        related_name="sparring_requests",
+        verbose_name="Игрок",
     )
     city = models.CharField("Город", max_length=100)
     desired_category = models.CharField(
@@ -24,9 +27,35 @@ class SparringRequest(models.Model):
         choices=SkillLevel.choices,
         blank=True,
     )
-    description = models.TextField("Описание", help_text="Опишите себя, когда и где хотите играть")
-    preferred_days = models.CharField("Предпочтительные дни", max_length=100, blank=True)
-    preferred_time = models.CharField("Предпочтительное время", max_length=100, blank=True)
+    description = models.TextField(
+        "Описание", help_text="Опишите себя, когда и где хотите играть"
+    )
+    preferred_days = models.CharField(
+        "Предпочтительные дни", max_length=100, blank=True
+    )
+    preferred_time = models.CharField(
+        "Предпочтительное время", max_length=100, blank=True
+    )
+
+    # Детальные предпочтения
+    desired_partner_age_min = models.PositiveIntegerField(
+        "Минимальный возраст партнера",
+        null=True,
+        blank=True,
+        help_text="Желаемый минимальный возраст партнера для спарринга",
+    )
+    desired_partner_age_max = models.PositiveIntegerField(
+        "Максимальный возраст партнера",
+        null=True,
+        blank=True,
+        help_text="Желаемый максимальный возраст партнера для спарринга",
+    )
+    preferred_location = models.CharField(
+        "Предпочтительное место",
+        max_length=200,
+        blank=True,
+        help_text="Конкретное место или район для игры (например, название корта или района)",
+    )
 
     status = models.CharField(
         "Статус", max_length=20, choices=Status.choices, default=Status.ACTIVE
@@ -56,6 +85,11 @@ class SparringResponse(models.Model):
         WHATSAPP = "whatsapp", "WhatsApp"
         MAX = "max", "Max"
 
+    class ResponseStatus(models.TextChoices):
+        PENDING = "pending", "Ожидает рассмотрения"
+        ACCEPTED = "accepted", "Принят"
+        REJECTED = "rejected", "Отклонен"
+
     sparring_request = models.ForeignKey(
         SparringRequest,
         on_delete=models.CASCADE,
@@ -73,7 +107,14 @@ class SparringResponse(models.Model):
         max_length=20,
         choices=ContactMethod.choices,
     )
+    status = models.CharField(
+        "Статус отклика",
+        max_length=20,
+        choices=ResponseStatus.choices,
+        default=ResponseStatus.PENDING,
+    )
     created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
 
     class Meta:
         verbose_name = "Отклик на спарринг"

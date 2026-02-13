@@ -1,7 +1,7 @@
 import logging
+
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from django.utils import timezone
 
 from .fan import (
     _is_fan,
@@ -9,10 +9,14 @@ from .fan import (
     ensure_consolation_created,
     finalize_tournament,
 )
-from .olympic_consolation import _is_olympic, advance_winner_olympic, ensure_consolation_created_for_round
-from .round_robin import _is_round_robin, check_and_finalize_if_complete
 from .models import Match, MatchResultProposal
+from .olympic_consolation import (
+    _is_olympic,
+    advance_winner_olympic,
+    ensure_consolation_created_for_round,
+)
 from .proposal_service import apply_proposal
+from .round_robin import _is_round_robin, check_and_finalize_if_complete
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,7 @@ def notify_telegram_match_created(sender, instance, created, **kwargs):
         return
     try:
         from apps.telegram_bot.notifications import notify_match_created
+
         notify_match_created(instance)
     except Exception as e:
         logger.exception("Telegram notify_match_created failed: %s", e)
@@ -50,8 +55,14 @@ def prepare_match_completion(sender, instance, **kwargs):
     # If match is transitioning to completed, mark for Elo calculation
     if instance.status in [Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]:
         old_status = getattr(instance, "_old_status", None)
-        was_completed = old_status in [Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
-        if not was_completed and instance.rating_status == Match.RatingCalcStatus.NOT_APPLICABLE:
+        was_completed = old_status in [
+            Match.MatchStatus.COMPLETED,
+            Match.MatchStatus.WALKOVER,
+        ]
+        if (
+            not was_completed
+            and instance.rating_status == Match.RatingCalcStatus.NOT_APPLICABLE
+        ):
             instance.rating_status = Match.RatingCalcStatus.PENDING
 
 
@@ -62,8 +73,14 @@ def update_player_stats(sender, instance, created, **kwargs):
     Apply shadow Elo rating calculation to hidden_rating.
     """
     old_status = getattr(instance, "_old_status", None)
-    is_completed = instance.status in [Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
-    was_completed = old_status in [Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
+    is_completed = instance.status in [
+        Match.MatchStatus.COMPLETED,
+        Match.MatchStatus.WALKOVER,
+    ]
+    was_completed = old_status in [
+        Match.MatchStatus.COMPLETED,
+        Match.MatchStatus.WALKOVER,
+    ]
     if not is_completed or was_completed:
         return
 
@@ -116,7 +133,12 @@ def update_player_stats(sender, instance, created, **kwargs):
 
     # ------------------------------------------------------------------
     # 3) Format-specific bracket advancement (FAN / Olympic / Round Robin)
+    # Только для турнирных матчей, не для спаррингов
     # ------------------------------------------------------------------
+    if instance.is_sparring():
+        # Спарринговые матчи не участвуют в турнирной логике
+        return
+
     if t and _is_olympic(t):
         advance_winner_olympic(instance, skip_points=_walkover_loss)
         if instance.round_index >= 1 and not instance.is_consolation:
@@ -158,7 +180,7 @@ def _apply_elo_shadow(match: Match) -> None:
     # если hidden_rating не был правильно инициализирован
     rating_a = p1.hidden_rating
     rating_b = p2.hidden_rating
-    
+
     if matches_before_a == 0:
         # Первый матч: если hidden_rating сильно отличается от total_points,
         # используем total_points как начальный рейтинг
@@ -167,9 +189,11 @@ def _apply_elo_shadow(match: Match) -> None:
             logger.warning(
                 "Player %s: hidden_rating (%.1f) не соответствует total_points (%d) для первого матча. "
                 "Используем total_points как начальный рейтинг.",
-                p1.pk, p1.hidden_rating, p1.total_points
+                p1.pk,
+                p1.hidden_rating,
+                p1.total_points,
             )
-    
+
     if matches_before_b == 0:
         # Первый матч: если hidden_rating сильно отличается от total_points,
         # используем total_points как начальный рейтинг
@@ -178,7 +202,9 @@ def _apply_elo_shadow(match: Match) -> None:
             logger.warning(
                 "Player %s: hidden_rating (%.1f) не соответствует total_points (%d) для первого матча. "
                 "Используем total_points как начальный рейтинг.",
-                p2.pk, p2.hidden_rating, p2.total_points
+                p2.pk,
+                p2.hidden_rating,
+                p2.total_points,
             )
 
     snap_a = PlayerRatingSnapshot(rating=rating_a, total_matches=matches_before_a)
@@ -204,10 +230,10 @@ def _apply_elo_shadow(match: Match) -> None:
     result = calculate_new_ratings(snap_a, snap_b, score_a, score_b, a_won)
 
     is_doubles = match.team1_id and match.team2_id
-    
+
     # Проверяем, является ли это техническим поражением (Retired)
     is_walkover_loss = match.is_walkover_loss()
-    
+
     # Определяем проигравшего для применения штрафа
     if is_doubles:
         # Для парных: определяем проигравшую команду
@@ -230,9 +256,15 @@ def _apply_elo_shadow(match: Match) -> None:
             if p and not getattr(p, "is_bye", False):
                 new_rating = result.new_rating_a
                 # Применяем штраф -40 очков для проигравшего при тех. поражении
-                if is_walkover_loss and loser_team and p in (loser_team.player1, loser_team.player2):
+                if (
+                    is_walkover_loss
+                    and loser_team
+                    and p in (loser_team.player1, loser_team.player2)
+                ):
                     new_rating = max(0, new_rating - 40.0)
-                    logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk)
+                    logger.info(
+                        "Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk
+                    )
                 p.hidden_rating = new_rating
                 p.total_points = float(new_rating)
                 p.save(update_fields=["hidden_rating", "total_points"])
@@ -252,9 +284,15 @@ def _apply_elo_shadow(match: Match) -> None:
             if p and not getattr(p, "is_bye", False):
                 new_rating = result.new_rating_b
                 # Применяем штраф -40 очков для проигравшего при тех. поражении
-                if is_walkover_loss and loser_team and p in (loser_team.player1, loser_team.player2):
+                if (
+                    is_walkover_loss
+                    and loser_team
+                    and p in (loser_team.player1, loser_team.player2)
+                ):
                     new_rating = max(0, new_rating - 40.0)
-                    logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk)
+                    logger.info(
+                        "Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk
+                    )
                 p.hidden_rating = new_rating
                 p.total_points = float(new_rating)
                 p.save(update_fields=["hidden_rating", "total_points"])

@@ -1,6 +1,7 @@
 /**
- * Виджет обратной связи: плавающая кнопка и модальное окно с формой.
+ * Виджет чата обратной связи: плавающая кнопка и виджет чата в правом нижнем углу.
  * Отправка в Telegram админу; ответы подгружаются из API.
+ * Стиль JivoSite/Intercom - неинтрузивный виджет без backdrop.
  */
 (function () {
     "use strict";
@@ -9,99 +10,40 @@
     if (!widget) return;
 
     var btn = document.getElementById("feedback-widget-btn");
-    var modal = document.getElementById("feedback-modal");
-    var backdrop = document.getElementById("feedback-modal-backdrop");
-    var closeBtn = document.getElementById("feedback-modal-close");
-    var form = document.getElementById("feedback-form");
-    var formWrap = document.getElementById("feedback-form-wrap");
-    var successBlock = document.getElementById("feedback-success");
+    var chatWidget = document.getElementById("feedback-chat-widget");
+    var closeBtn = document.getElementById("feedback-chat-close");
+    var messagesList = document.getElementById("feedback-messages-list");
+    var messagesContainer = document.getElementById("feedback-messages-container");
+    var messageInput = document.getElementById("feedback-message-input");
+    var sendBtn = document.getElementById("feedback-send-btn");
     var formError = document.getElementById("feedback-form-error");
-    var threadsList = document.getElementById("feedback-threads-list");
-    var threadsWrap = document.getElementById("feedback-threads-wrap");
+    var guestForm = document.getElementById("feedback-guest-form");
+    var telegramBanner = document.getElementById("feedback-telegram-banner");
+    var telegramLink = document.getElementById("feedback-telegram-link");
+    var welcomeMessage = document.getElementById("feedback-welcome-message");
+
+    // Поля для гостей
+    var guestNameInput = document.getElementById("feedback-guest-name");
+    var guestTelegramInput = document.getElementById("feedback-guest-telegram");
+    var guestContactInput = document.getElementById("feedback-guest-contact");
 
     var submitUrl = widget.getAttribute("data-submit-url");
     var threadsUrl = widget.getAttribute("data-threads-url");
     var csrfToken = widget.getAttribute("data-csrf");
     var isAuth = widget.getAttribute("data-is-authenticated") === "1";
 
+    // Состояние чата
+    var chatState = {
+        isOpen: false,
+        messages: [],
+        guestInfoCollected: false,
+        pollingInterval: null,
+        lastMessageId: null,
+    };
+
     function getCookie(name) {
         var match = document.cookie.match(new RegExp("(?:^|; )" + name.replace(/([.$?*|{}()[\]\\/+^])/g, "\\$1") + "=([^;]*)"));
         return match ? decodeURIComponent(match[1]) : null;
-    }
-
-    function openModal() {
-        if (!modal) return;
-        modal.setAttribute("aria-hidden", "false");
-        modal.classList.add("feedback-modal--open");
-        document.body.style.overflow = "hidden";
-        if (isAuth && threadsUrl) loadThreads();
-    }
-
-    function closeModal() {
-        if (!modal) return;
-        modal.setAttribute("aria-hidden", "true");
-        modal.classList.remove("feedback-modal--open");
-        document.body.style.overflow = "";
-    }
-
-    function loadThreads() {
-        if (!threadsList || !threadsUrl) return;
-        threadsList.innerHTML = "<p class=\"text-muted\">Загрузка…</p>";
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", threadsUrl);
-        xhr.onload = function () {
-            try {
-                var data = JSON.parse(xhr.responseText);
-                renderThreads(data.threads || []);
-            } catch (e) {
-                threadsList.innerHTML = "<p class=\"text-muted\">Не удалось загрузить обращения.</p>";
-            }
-        };
-        xhr.onerror = function () {
-            threadsList.innerHTML = "<p class=\"text-muted\">Ошибка загрузки.</p>";
-        };
-        xhr.send();
-    }
-
-    function formatDate(iso) {
-        if (!iso) return "";
-        var d = new Date(iso);
-        return d.toLocaleDateString("ru-RU", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit"
-        });
-    }
-
-    function renderThreads(threads) {
-        if (!threadsList) return;
-        if (!threads || threads.length === 0) {
-            threadsList.innerHTML = "<p class=\"text-muted\">Пока нет обращений. Ответы приходят в Telegram.</p>";
-            return;
-        }
-        var html = "";
-        threads.forEach(function (t) {
-            html += "<div class=\"feedback-thread\">";
-            if (t.messages && t.messages.length) {
-                t.messages.forEach(function (m) {
-                    var label = m.is_from_admin ? "Поддержка" : "Вы";
-                    html += "<div class=\"feedback-thread__meta\">" + label + " · " + formatDate(m.created_at) + "</div>";
-                    html += "<div class=\"feedback-thread__message\">" + escapeHtml(m.text) + "</div>";
-                });
-            } else {
-                html += "<div class=\"feedback-thread__meta\">#" + (t.id || "") + " · " + formatDate(t.created_at) + "</div>";
-                html += "<div class=\"feedback-thread__message\">" + escapeHtml(t.message || "") + "</div>";
-                if (t.replies && t.replies.length) {
-                    t.replies.forEach(function (r) {
-                        html += "<div class=\"feedback-thread__reply\"><strong>Ответ:</strong> " + escapeHtml(r.text) + " <span class=\"feedback-thread__reply-date\">" + formatDate(r.created_at) + "</span></div>";
-                    });
-                }
-            }
-            html += "</div>";
-        });
-        threadsList.innerHTML = html;
     }
 
     function escapeHtml(s) {
@@ -111,103 +53,396 @@
         return div.innerHTML;
     }
 
-    if (btn) {
-        btn.addEventListener("click", openModal);
-    }
-    if (backdrop) backdrop.addEventListener("click", closeModal);
-    if (closeBtn) closeBtn.addEventListener("click", closeModal);
+    function formatTime(dateStr) {
+        if (!dateStr) return "";
+        try {
+            var d = new Date(dateStr);
+            var now = new Date();
+            var diffMs = now - d;
+            var diffMins = Math.floor(diffMs / 60000);
 
-    if (form && submitUrl) {
-        form.addEventListener("submit", function (e) {
-            e.preventDefault();
-            var messageEl = form.querySelector("[name=message]");
-            var subjectEl = form.querySelector("[name=subject]");
-            var guestNameEl = form.querySelector("[name=guest_name]");
-            var guestContactEl = form.querySelector("[name=guest_contact]");
-            var guestTelegramEl = form.querySelector("[name=guest_telegram_username]");
-            var message = (messageEl && messageEl.value || "").trim();
-            if (!message) {
+            // Если меньше минуты - "только что"
+            if (diffMins < 1) return "только что";
+            // Если меньше часа - "N мин назад"
+            if (diffMins < 60) return diffMins + " мин назад";
+            // Если сегодня - время
+            if (d.toDateString() === now.toDateString()) {
+                return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+            }
+            // Иначе дата и время
+            return d.toLocaleDateString("ru-RU", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        } catch (e) {
+            return "";
+        }
+    }
+
+    function openChat() {
+        if (!chatWidget) return;
+        chatState.isOpen = true;
+        chatWidget.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = ""; // Не блокируем скролл страницы
+
+        // Загружаем историю сообщений (для всех пользователей)
+        if (threadsUrl) {
+            loadMessages();
+            if (isAuth) {
+                startPolling();
+            }
+        }
+
+        // Показываем форму для гостя только если еще не собирали информацию
+        if (!isAuth && !chatState.guestInfoCollected) {
+            if (guestForm) {
+                guestForm.classList.add("feedback-chat-widget__guest-form--visible");
+            }
+        }
+
+        // Фокус на поле ввода
+        if (messageInput) {
+            setTimeout(function () {
+                messageInput.focus();
+            }, 100);
+        }
+    }
+
+    function closeChat() {
+        if (!chatWidget) return;
+        chatState.isOpen = false;
+        chatWidget.setAttribute("aria-hidden", "true");
+        stopPolling();
+    }
+
+    function toggleChat() {
+        if (chatState.isOpen) {
+            closeChat();
+        } else {
+            openChat();
+        }
+    }
+
+    function loadMessages() {
+        if (!threadsUrl) return;
+        if (!messagesList) return;
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", threadsUrl);
+        xhr.onload = function () {
+            try {
+                var data = JSON.parse(xhr.responseText);
+                var threads = data.threads || [];
+                chatState.messages = [];
+
+                // Собираем все сообщения из всех threads в один массив
+                threads.forEach(function (thread) {
+                    if (thread.messages && thread.messages.length) {
+                        thread.messages.forEach(function (msg) {
+                            chatState.messages.push({
+                                id: msg.id,
+                                text: msg.text,
+                                isFromAdmin: msg.is_from_admin,
+                                createdAt: msg.created_at,
+                            });
+                            if (!chatState.lastMessageId || msg.id > chatState.lastMessageId) {
+                                chatState.lastMessageId = msg.id;
+                            }
+                        });
+                    }
+                });
+
+                // Сортируем по времени
+                chatState.messages.sort(function (a, b) {
+                    return new Date(a.createdAt) - new Date(b.createdAt);
+                });
+
+                renderMessages();
+            } catch (e) {
+                console.error("Failed to load messages:", e);
+            }
+        };
+        xhr.onerror = function () {
+            console.error("Error loading messages");
+        };
+        xhr.send();
+    }
+
+    function renderMessages() {
+        if (!messagesList) return;
+
+        // Скрываем welcome message если есть сообщения
+        if (chatState.messages.length > 0 && welcomeMessage) {
+            welcomeMessage.style.display = "none";
+        } else if (chatState.messages.length === 0 && welcomeMessage) {
+            welcomeMessage.style.display = "block";
+        }
+
+        var html = "";
+        chatState.messages.forEach(function (msg) {
+            var isUser = !msg.isFromAdmin;
+            var messageClass = isUser ? "feedback-chat-widget__message--user" : "feedback-chat-widget__message--admin";
+            var timeStr = formatTime(msg.createdAt);
+
+            html += '<div class="feedback-chat-widget__message ' + messageClass + '">';
+            html += '<div class="feedback-chat-widget__message-bubble">' + escapeHtml(msg.text) + "</div>";
+            if (timeStr) {
+                html += '<div class="feedback-chat-widget__message-time">' + escapeHtml(timeStr) + "</div>";
+            }
+            html += "</div>";
+        });
+
+        messagesList.innerHTML = (welcomeMessage && chatState.messages.length === 0 ? welcomeMessage.outerHTML : "") + html;
+
+        // Прокрутка вниз
+        scrollToBottom();
+    }
+
+    function scrollToBottom() {
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    }
+
+    function addMessage(text, isFromAdmin, messageId, createdAt) {
+        var newMsg = {
+            id: messageId || Date.now(),
+            text: text,
+            isFromAdmin: isFromAdmin || false,
+            createdAt: createdAt || new Date().toISOString(),
+        };
+
+        chatState.messages.push(newMsg);
+        if (messageId && (!chatState.lastMessageId || messageId > chatState.lastMessageId)) {
+            chatState.lastMessageId = messageId;
+        }
+
+        renderMessages();
+    }
+
+    function sendMessage() {
+        if (!messageInput || !submitUrl) return;
+
+        var message = (messageInput.value || "").trim();
+        if (!message) return;
+
+        // Для гостей проверяем имя
+        if (!isAuth && !chatState.guestInfoCollected) {
+            if (!guestNameInput || !(guestNameInput.value || "").trim()) {
                 if (formError) {
-                    formError.textContent = "Введите сообщение.";
+                    formError.textContent = "Введите ваше имя.";
                     formError.style.display = "block";
                 }
                 return;
             }
-            // Для незарегистрированных пользователей проверяем имя
-            if (!isAuth && guestNameEl) {
-                var guestName = (guestNameEl.value || "").trim();
-                if (!guestName) {
-                    if (formError) {
-                        formError.textContent = "Введите ваше имя.";
-                        formError.style.display = "block";
-                    }
-                    return;
+        }
+
+        if (formError) formError.style.display = "none";
+
+        // Optimistic update - добавляем сообщение сразу
+        addMessage(message, false);
+
+        // Очищаем поле ввода
+        messageInput.value = "";
+        if (sendBtn) sendBtn.disabled = true;
+
+        // Собираем данные для отправки
+        var payload = {
+            message: message,
+        };
+
+        // Данные гостя (только при первом сообщении)
+        if (!isAuth && !chatState.guestInfoCollected) {
+            if (guestNameInput) {
+                payload.guest_name = (guestNameInput.value || "").trim();
+            }
+            if (guestContactInput) {
+                payload.guest_contact = (guestContactInput.value || "").trim();
+            }
+            if (guestTelegramInput) {
+                var tgUsername = (guestTelegramInput.value || "").trim().replace(/^@/, "");
+                if (tgUsername) {
+                    payload.guest_telegram_username = tgUsername;
                 }
             }
-            if (formError) formError.style.display = "none";
+            chatState.guestInfoCollected = true;
+            // Скрываем форму гостя
+            if (guestForm) {
+                guestForm.classList.remove("feedback-chat-widget__guest-form--visible");
+            }
+        }
 
-            var token = csrfToken || getCookie("csrftoken");
+        // Отправка на сервер
+        var token = csrfToken || getCookie("csrftoken");
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", submitUrl);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("X-CSRFToken", token || "");
+        xhr.onload = function () {
+            if (sendBtn) sendBtn.disabled = false;
+            try {
+                var data = JSON.parse(xhr.responseText);
+                if (data.success) {
+                    // Обновляем последнее сообщение с реальным ID если есть
+                    if (data.message_id && chatState.messages.length > 0) {
+                        var lastMsg = chatState.messages[chatState.messages.length - 1];
+                        if (lastMsg && (!lastMsg.id || lastMsg.id >= Date.now() - 1000)) {
+                            lastMsg.id = data.message_id;
+                            if (!chatState.lastMessageId || data.message_id > chatState.lastMessageId) {
+                                chatState.lastMessageId = data.message_id;
+                            }
+                        }
+                    }
+
+                    // Показываем баннер с ссылкой на Telegram если есть
+                    if (data.telegram_binding_url) {
+                        if (telegramBanner) {
+                            telegramBanner.style.display = "block";
+                        }
+                        if (telegramLink) {
+                            telegramLink.href = data.telegram_binding_url;
+                        }
+                    }
+
+                    // Начинаем polling для получения новых сообщений
+                    if (threadsUrl) {
+                        if (isAuth) {
+                            startPolling();
+                        } else {
+                            // Для гостей тоже можно делать polling, но реже
+                            // Или можно обновлять историю при следующем открытии чата
+                        }
+                    }
+                } else {
+                    // Удаляем последнее сообщение при ошибке
+                    chatState.messages.pop();
+                    renderMessages();
+                    if (formError) {
+                        formError.textContent = data.error || "Ошибка отправки.";
+                        formError.style.display = "block";
+                    }
+                }
+            } catch (err) {
+                // Удаляем последнее сообщение при ошибке
+                chatState.messages.pop();
+                renderMessages();
+                if (formError) {
+                    formError.textContent = "Ошибка отправки.";
+                    formError.style.display = "block";
+                }
+            }
+        };
+        xhr.onerror = function () {
+            if (sendBtn) sendBtn.disabled = false;
+            // Удаляем последнее сообщение при ошибке
+            chatState.messages.pop();
+            renderMessages();
+            if (formError) {
+                formError.textContent = "Ошибка сети.";
+                formError.style.display = "block";
+            }
+        };
+        xhr.send(JSON.stringify(payload));
+    }
+
+    function startPolling() {
+        // Останавливаем предыдущий polling если есть
+        stopPolling();
+
+        // Polling каждые 10 секунд для новых сообщений (только для авторизованных)
+        if (!isAuth || !threadsUrl) return;
+
+        chatState.pollingInterval = setInterval(function () {
+            if (!chatState.isOpen) return;
+
             var xhr = new XMLHttpRequest();
-            xhr.open("POST", submitUrl);
-            xhr.setRequestHeader("Content-Type", "application/json");
-            xhr.setRequestHeader("X-CSRFToken", token || "");
+            xhr.open("GET", threadsUrl);
             xhr.onload = function () {
                 try {
                     var data = JSON.parse(xhr.responseText);
-                    if (data.success) {
-                        if (formWrap) formWrap.style.display = "none";
-                        if (successBlock) {
-                            successBlock.style.display = "block";
-                            var msg = data.message || "Сообщение отправлено. Ответ придёт в Telegram.";
-                            var link = data.telegram_binding_url;
-                            successBlock.innerHTML = "<p>" + escapeHtml(msg) + "</p>" +
-                                (link ? "<p><a href=\"" + escapeHtml(link) + "\" class=\"btn btn-primary\" target=\"_blank\" rel=\"noopener noreferrer\">Привязать аккаунт в Telegram</a></p>" : "");
+                    var threads = data.threads || [];
+                    var newMessages = [];
+
+                    threads.forEach(function (thread) {
+                        if (thread.messages && thread.messages.length) {
+                            thread.messages.forEach(function (msg) {
+                                // Проверяем, есть ли это сообщение уже в нашем списке
+                                var exists = chatState.messages.some(function (m) {
+                                    return m.id === msg.id;
+                                });
+                                if (!exists) {
+                                    newMessages.push({
+                                        id: msg.id,
+                                        text: msg.text,
+                                        isFromAdmin: msg.is_from_admin,
+                                        createdAt: msg.created_at,
+                                    });
+                                }
+                            });
                         }
-                        if (messageEl) messageEl.value = "";
-                        if (subjectEl) subjectEl.value = "";
-                        if (guestNameEl) guestNameEl.value = "";
-                        if (guestContactEl) guestContactEl.value = "";
-                        if (guestTelegramEl) guestTelegramEl.value = "";
-                        if (threadsList && threadsUrl && isAuth) loadThreads();
-                    } else {
-                        if (formError) {
-                            formError.textContent = data.error || "Ошибка отправки.";
-                            formError.style.display = "block";
-                        }
+                    });
+
+                    // Добавляем новые сообщения
+                    if (newMessages.length > 0) {
+                        newMessages.forEach(function (msg) {
+                            chatState.messages.push(msg);
+                            if (!chatState.lastMessageId || msg.id > chatState.lastMessageId) {
+                                chatState.lastMessageId = msg.id;
+                            }
+                        });
+                        // Сортируем по времени
+                        chatState.messages.sort(function (a, b) {
+                            return new Date(a.createdAt) - new Date(b.createdAt);
+                        });
+                        renderMessages();
                     }
-                } catch (err) {
-                    if (formError) {
-                        formError.textContent = "Ошибка отправки.";
-                        formError.style.display = "block";
-                    }
+                } catch (e) {
+                    console.error("Polling error:", e);
                 }
             };
-            xhr.onerror = function () {
-                if (formError) {
-                    formError.textContent = "Ошибка сети.";
-                    formError.style.display = "block";
-                }
-            };
-            var payload = {
-                message: message,
-                subject: (subjectEl && subjectEl.value || "").trim()
-            };
-            // Добавляем данные гостя, если пользователь не авторизован
-            if (!isAuth) {
-                if (guestNameEl) {
-                    payload.guest_name = (guestNameEl.value || "").trim();
-                }
-                if (guestContactEl) {
-                    payload.guest_contact = (guestContactEl.value || "").trim();
-                }
-                if (guestTelegramEl) {
-                    var tgUsername = (guestTelegramEl.value || "").trim().replace(/^@/, "");
-                    if (tgUsername) {
-                        payload.guest_telegram_username = tgUsername;
-                    }
-                }
+            xhr.send();
+        }, 10000); // 10 секунд
+    }
+
+    function stopPolling() {
+        if (chatState.pollingInterval) {
+            clearInterval(chatState.pollingInterval);
+            chatState.pollingInterval = null;
+        }
+    }
+
+    // Обработчики событий
+    if (btn) {
+        btn.addEventListener("click", toggleChat);
+    }
+    if (closeBtn) {
+        closeBtn.addEventListener("click", closeChat);
+    }
+
+    // Отправка по Enter
+    if (messageInput) {
+        messageInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
             }
-            xhr.send(JSON.stringify(payload));
+        });
+
+        // Включаем кнопку отправки когда есть текст
+        messageInput.addEventListener("input", function () {
+            if (sendBtn) {
+                sendBtn.disabled = !(messageInput.value || "").trim();
+            }
         });
     }
+
+    if (sendBtn) {
+        sendBtn.addEventListener("click", sendMessage);
+        sendBtn.disabled = true; // Начинаем с отключенной кнопки
+    }
+
+    // Закрытие по клику вне виджета (опционально, но лучше не делать для виджета)
+    // Оставляем только закрытие по кнопке
 })();

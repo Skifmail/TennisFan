@@ -8,7 +8,6 @@ import logging
 import threading
 
 from apps.core.models import UserTelegramLink
-from apps.tournaments.models import Match
 from apps.tournaments.utils import (
     get_match_opponent_users,
     get_match_participant_users,
@@ -42,6 +41,7 @@ def send_to_user_by_user(user, text: str, reply_markup: dict | None = None) -> b
 
 def _get_site_base_url() -> str:
     from django.conf import settings
+
     base = getattr(settings, "TELEGRAM_BOT_SITE_BASE_URL", None) or ""
     if base:
         return base.rstrip("/") + "/"
@@ -53,7 +53,9 @@ def notify_tournament_registered(user, tournament) -> None:
     if not bot.is_configured():
         return
     deadline = tournament.registration_deadline
-    deadline_str = f"до {deadline.strftime('%d.%m.%Y')}" if deadline else "в ближайшее время"
+    deadline_str = (
+        f"до {deadline.strftime('%d.%m.%Y')}" if deadline else "в ближайшее время"
+    )
     text = (
         f"🎾 <b>Вы зарегистрированы на турнир</b>\n\n"
         f"«{tournament.name}» ({tournament.city})\n\n"
@@ -67,7 +69,9 @@ def _match_info_text(match) -> str:
     """Текст с информацией о матче для уведомления (без ссылки на сайт)."""
     side1 = match.get_player1_display()
     side2 = match.get_player2_display()
-    deadline_str = match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else "не указан"
+    deadline_str = (
+        match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else "не указан"
+    )
     return (
         f"🎾 <b>Новый матч</b>\n\n"
         f"Турнир: {match.tournament.name}\n"
@@ -95,7 +99,9 @@ def notify_bracket_formed(tournament) -> None:
         try:
             Notification.objects.create(user=user, message=message_lk, url=url)
         except Exception as e:
-            logger.warning("notify_bracket_formed Notification for user %s: %s", user.pk, e)
+            logger.warning(
+                "notify_bracket_formed Notification for user %s: %s", user.pk, e
+            )
 
     if not bot.is_configured():
         return
@@ -120,7 +126,12 @@ def notify_match_created(match) -> None:
     text = _match_info_text(match)
     reply_markup = {
         "inline_keyboard": [
-            [{"text": "📝 Внести результат", "callback_data": f"result_enter_{match.pk}"}],
+            [
+                {
+                    "text": "📝 Внести результат",
+                    "callback_data": f"result_enter_{match.pk}",
+                }
+            ],
             [{"text": "📅 Мои матчи", "callback_data": "menu_my_matches"}],
         ],
     }
@@ -166,11 +177,14 @@ def notify_result_proposal(proposal) -> None:
     else:
         result_text = proposal.get_result_display()
         try:
-            score = " / ".join(
-                f"{getattr(proposal, f'player1_set{i}')}:{getattr(proposal, f'player2_set{i}')}"
-                for i in (1, 2, 3)
-                if getattr(proposal, f"player1_set{i}") is not None
-            ) or "—"
+            score = (
+                " / ".join(
+                    f"{getattr(proposal, f'player1_set{i}')}:{getattr(proposal, f'player2_set{i}')}"
+                    for i in (1, 2, 3)
+                    if getattr(proposal, f"player1_set{i}") is not None
+                )
+                or "—"
+            )
         except Exception:
             score = "—"
         warning_text = ""
@@ -187,8 +201,14 @@ def notify_result_proposal(proposal) -> None:
     reply_markup = {
         "inline_keyboard": [
             [
-                {"text": "✅ Подтвердить", "callback_data": f"proposal_confirm_{proposal.pk}"},
-                {"text": "❌ Отклонить", "callback_data": f"proposal_reject_{proposal.pk}"},
+                {
+                    "text": "✅ Подтвердить",
+                    "callback_data": f"proposal_confirm_{proposal.pk}",
+                },
+                {
+                    "text": "❌ Отклонить",
+                    "callback_data": f"proposal_reject_{proposal.pk}",
+                },
             ],
         ],
     }
@@ -216,10 +236,8 @@ def _proposal_opponent_name(proposal) -> str:
         if not match.team1 or not match.team2:
             return "Соперник"
         if proposer in (match.team1.player1, match.team1.player2):
-            proposer_team = match.team1
             opponent_team = match.team2
         elif proposer in (match.team2.player1, match.team2.player2):
-            proposer_team = match.team2
             opponent_team = match.team1
         else:
             return "Соперник"
@@ -252,24 +270,24 @@ def _proposal_result_text(proposal) -> str:
 def _get_penalty_text_for_player(match, player) -> str:
     """
     Получить текст о штрафе для конкретного игрока.
-    
+
     Args:
         match: Объект Match (уже должен иметь установленные winner и winner_team)
         player: Player объект, для которого нужно определить штраф
-    
+
     Returns:
         Строка с информацией о штрафе или пустая строка, если штраф не применяется
     """
     if not match.is_walkover_loss():
         return ""
-    
+
     is_doubles = match.team1_id and match.team2_id
-    
+
     if is_doubles:
         # Проверяем наличие команд
         if not match.team1 or not match.team2:
             return ""
-        
+
         # Определяем команду игрока
         if player in (match.team1.player1, match.team1.player2):
             player_team = match.team1
@@ -278,12 +296,12 @@ def _get_penalty_text_for_player(match, player) -> str:
         else:
             # Игрок не найден в командах (не должен происходить в нормальной ситуации)
             return ""
-        
+
         winner_team = match.winner_team
         if not winner_team:
             return ""
         loser_team = match.team2 if winner_team == match.team1 else match.team1
-        
+
         # Если команда игрока проиграла - он получил штраф
         if player_team == loser_team:
             return "\n\n⚠️ <b>Штраф:</b> Из вашего рейтинга силы вычтено <b>40 очков</b> за тех. поражение."
@@ -315,7 +333,7 @@ def notify_proposal_confirmed(proposal) -> None:
     result = _proposal_result_text(proposal)
     score = match.score_display() if match.winner else _proposal_score_text(proposal)
     winner_name = str(match.winner) if match.winner else "—"
-    
+
     # Получаем текст о штрафе для инициатора (proposer)
     proposer_player = proposal.proposer
     penalty_text = _get_penalty_text_for_player(match, proposer_player)
@@ -332,7 +350,9 @@ def notify_proposal_confirmed(proposal) -> None:
     ok = send_to_user_by_user(proposer_user, text)
     logger.info(
         "notify_proposal_confirmed: proposer=%s, user=%s, sent=%s",
-        proposal.proposer, proposer_user, ok,
+        proposal.proposer,
+        proposer_user,
+        ok,
     )
 
 
@@ -362,7 +382,9 @@ def notify_proposal_rejected(proposal) -> None:
     ok = send_to_user_by_user(proposer_user, text)
     logger.info(
         "notify_proposal_rejected: proposer=%s, user=%s, sent=%s",
-        proposal.proposer, proposer_user, ok,
+        proposal.proposer,
+        proposer_user,
+        ok,
     )
 
 
@@ -388,10 +410,18 @@ def notify_match_deadline_reminder(match, days_left: int) -> None:
     reply_markup = {
         "inline_keyboard": [
             [
-                {"text": "📝 Внести результат", "callback_data": f"result_enter_{match.pk}"},
+                {
+                    "text": "📝 Внести результат",
+                    "callback_data": f"result_enter_{match.pk}",
+                },
                 {"text": "📅 Мои матчи", "callback_data": "menu_my_matches"},
             ],
-            [{"text": "🔄 Запросить продление", "callback_data": f"extension_request_{match.pk}"}],
+            [
+                {
+                    "text": "🔄 Запросить продление",
+                    "callback_data": f"extension_request_{match.pk}",
+                }
+            ],
         ],
     }
     for user in get_match_participant_users(match):
@@ -441,7 +471,10 @@ def _format_new_tournament_message(tournament) -> str:
     if tournament.entry_fee and tournament.entry_fee > 0:
         parts.append(f"💰 Взнос: {tournament.entry_fee} ₽")
     if tournament.is_singles():
-        if tournament.min_participants is not None or tournament.max_participants is not None:
+        if (
+            tournament.min_participants is not None
+            or tournament.max_participants is not None
+        ):
             min_m = tournament.min_participants or "—"
             max_m = tournament.max_participants or "—"
             parts.append(f"Участники: от {min_m} до {max_m}")
@@ -481,17 +514,25 @@ def _send_new_tournament_to_all(tournament_pk: int) -> None:
             .first()
         )
         if not tournament:
-            logger.warning("New tournament notify: tournament pk=%s not found", tournament_pk)
+            logger.warning(
+                "New tournament notify: tournament pk=%s not found", tournament_pk
+            )
             return
         if not bot.is_configured():
-            logger.warning("New tournament notify: bot not configured (TELEGRAM_USER_BOT_TOKEN), pk=%s", tournament_pk)
+            logger.warning(
+                "New tournament notify: bot not configured (TELEGRAM_USER_BOT_TOKEN), pk=%s",
+                tournament_pk,
+            )
             return
-        links = UserTelegramLink.objects.filter(
-            user_bot_chat_id__isnull=False
-        ).exclude(user_bot_chat_id=0)
+        links = UserTelegramLink.objects.filter(user_bot_chat_id__isnull=False).exclude(
+            user_bot_chat_id=0
+        )
         total = links.count()
         if total == 0:
-            logger.info("New tournament pk=%s: no users with bot linked, skip send", tournament_pk)
+            logger.info(
+                "New tournament pk=%s: no users with bot linked, skip send",
+                tournament_pk,
+            )
             return
         text = _format_new_tournament_message(tournament)
         sent = 0
@@ -500,10 +541,16 @@ def _send_new_tournament_to_all(tournament_pk: int) -> None:
                 if bot.send_to_user(link.user_bot_chat_id, text):
                     sent += 1
             except Exception as e:
-                logger.warning("New tournament notify to %s failed: %s", link.user_bot_chat_id, e)
-        logger.info("New tournament pk=%s notified to %s/%s users", tournament_pk, sent, total)
+                logger.warning(
+                    "New tournament notify to %s failed: %s", link.user_bot_chat_id, e
+                )
+        logger.info(
+            "New tournament pk=%s notified to %s/%s users", tournament_pk, sent, total
+        )
     except Exception as e:
-        logger.exception("_send_new_tournament_to_all pk=%s failed: %s", tournament_pk, e)
+        logger.exception(
+            "_send_new_tournament_to_all pk=%s failed: %s", tournament_pk, e
+        )
 
 
 def notify_new_tournament(tournament) -> None:
@@ -535,11 +582,17 @@ def notify_tournament_start(tournament) -> None:
         try:
             Notification.objects.create(user=user, message=message_lk, url=url)
         except Exception as e:
-            logger.warning("notify_tournament_start Notification for user %s: %s", user.pk, e)
+            logger.warning(
+                "notify_tournament_start Notification for user %s: %s", user.pk, e
+            )
 
     if not bot.is_configured():
         return
-    start_str = tournament.start_date.strftime("%d.%m.%Y") if tournament.start_date else "сегодня"
+    start_str = (
+        tournament.start_date.strftime("%d.%m.%Y")
+        if tournament.start_date
+        else "сегодня"
+    )
     text = (
         f"🏟 <b>Турнир начинается</b>\n\n"
         f"«{tournament.name}»\n"
@@ -550,7 +603,12 @@ def notify_tournament_start(tournament) -> None:
     reply_markup = {
         "inline_keyboard": [
             [{"text": "📅 Мои матчи", "callback_data": "menu_my_matches"}],
-            [{"text": "🔗 Страница турнира", "url": _get_site_base_url().rstrip("/") + url}],
+            [
+                {
+                    "text": "🔗 Страница турнира",
+                    "url": _get_site_base_url().rstrip("/") + url,
+                }
+            ],
         ],
     }
     for user in users:
@@ -563,7 +621,9 @@ def notify_new_tournament_by_pk(tournament_pk: int) -> None:
     чтобы турнир был уже закоммичен и виден в фоновом потоке.
     """
     if not bot.is_configured():
-        logger.warning("notify_new_tournament_by_pk: bot not configured, pk=%s", tournament_pk)
+        logger.warning(
+            "notify_new_tournament_by_pk: bot not configured, pk=%s", tournament_pk
+        )
         return
     logger.info("New tournament pk=%s, starting background notify", tournament_pk)
     thread = threading.Thread(
@@ -578,7 +638,7 @@ def notify_new_tournament_by_pk(tournament_pk: int) -> None:
 def notify_subscription_expiring(user, subscription, days_left: int) -> None:
     """
     Уведомление пользователю об истечении подписки за N дней.
-    
+
     Args:
         user: User объект
         subscription: UserSubscription объект
@@ -586,11 +646,11 @@ def notify_subscription_expiring(user, subscription, days_left: int) -> None:
     """
     if not bot.is_configured():
         return
-    
+
     tier = subscription.tier
     tier_name = tier.get_name_display()
     end_date_str = subscription.end_date.strftime("%d.%m.%Y")
-    
+
     # Продающий текст о том, чего лишится игрок
     features_lost = []
     if tier.can_write_comments:
@@ -605,23 +665,29 @@ def notify_subscription_expiring(user, subscription, days_left: int) -> None:
         if tier.is_unlimited:
             features_lost.append("• Регистрация на турниры (безлимит)")
         else:
-            features_lost.append(f"• Регистрация на турниры ({tier.max_tournaments} в месяц)")
+            features_lost.append(
+                f"• Регистрация на турниры ({tier.max_tournaments} в месяц)"
+            )
     if tier.one_day_tournament_discount > 0:
-        features_lost.append(f"• Скидка {tier.one_day_tournament_discount}% на однодневные турниры")
+        features_lost.append(
+            f"• Скидка {tier.one_day_tournament_discount}% на однодневные турниры"
+        )
     if tier.has_admin_support:
         features_lost.append("• Приоритетная поддержка администратора")
     if tier.has_badge:
         features_lost.append("• Особый статус в профиле")
-    
-    features_text = "\n".join(features_lost) if features_lost else "• Все функции тарифа"
-    
+
+    features_text = (
+        "\n".join(features_lost) if features_lost else "• Все функции тарифа"
+    )
+
     if days_left == 3:
         urgency_text = "⏰ <b>Ваша подписка истекает через 3 дня!</b>"
     elif days_left == 1:
         urgency_text = "🚨 <b>Ваша подписка истекает завтра!</b>"
     else:
         urgency_text = f"⏰ <b>Ваша подписка истекает через {days_left} дн.</b>"
-    
+
     text = (
         f"{urgency_text}\n\n"
         f"Тариф: <b>{tier_name}</b>\n"
@@ -631,19 +697,136 @@ def notify_subscription_expiring(user, subscription, days_left: int) -> None:
         f"💡 <b>Продлите подписку сейчас</b> и сохраните доступ ко всем функциям!\n"
         f"Не упустите возможность участвовать в турнирах и общаться с сообществом."
     )
-    
+
     site_base_url = _get_site_base_url()
     pricing_url = f"{site_base_url.rstrip('/')}/subscriptions/pricing/"
-    
+
     reply_markup = {
         "inline_keyboard": [
             [{"text": "💳 Продлить подписку", "url": pricing_url}],
             [{"text": "📋 Моя подписка", "callback_data": "menu_my_subscription"}],
         ],
     }
-    
+
     ok = send_to_user_by_user(user, text, reply_markup=reply_markup)
     logger.info(
         "notify_subscription_expiring: user=%s, tier=%s, days_left=%s, sent=%s",
-        user, tier_name, days_left, ok,
+        user,
+        tier_name,
+        days_left,
+        ok,
+    )
+
+
+def notify_sparring_response(sparring_response) -> None:
+    """
+    Уведомление автору заявки о новом отклике на спарринг.
+
+    Отправляет сообщение с данными откликнувшегося игрока и кнопками:
+    - Получить контакт
+    - Профиль игрока
+    - Подтвердить игру
+    """
+    if not bot.is_configured():
+        return
+
+    request = sparring_response.sparring_request
+    respondent = sparring_response.respondent
+    author = request.player.user
+
+    # Формируем текст сообщения
+    lines = [
+        "🎾 <b>Новый отклик на вашу заявку!</b>",
+        "",
+        f"<b>Игрок:</b> {respondent}",
+    ]
+
+    # Добавляем возраст, если есть
+    if respondent.age:
+        lines.append(f"<b>Возраст:</b> {respondent.age} лет")
+
+    # Добавляем уровень NTRP
+    if respondent.skill_level:
+        skill_display = dict(SkillLevel.choices).get(
+            respondent.skill_level, respondent.skill_level
+        )
+        lines.append(f"<b>Уровень:</b> {skill_display}")
+
+    # Добавляем ELO рейтинг
+    if respondent.total_points:
+        lines.append(f"<b>Рейтинг (ELO):</b> {int(respondent.total_points)}")
+
+    # Добавляем статистику
+    if respondent.matches_played:
+        win_rate = (
+            (respondent.matches_won / respondent.matches_played * 100)
+            if respondent.matches_played > 0
+            else 0
+        )
+        lines.append(
+            f"<b>Статистика:</b> {respondent.matches_won}/{respondent.matches_played} побед ({win_rate:.0f}%)"
+        )
+
+    lines.append("")
+    lines.append("Выберите действие:")
+
+    text = "\n".join(lines)
+
+    # Формируем inline-кнопки
+    base_url = _get_site_base_url()
+    profile_url = f"{base_url.rstrip('/')}/players/{respondent.pk}/"
+
+    keyboard = []
+
+    # Кнопка "Получить контакт"
+    contact_method = sparring_response.contact_method
+    if contact_method == "telegram" and respondent.telegram:
+        keyboard.append(
+            [
+                {
+                    "text": "📱 Получить контакт",
+                    "callback_data": f"contact_{sparring_response.pk}",
+                }
+            ]
+        )
+    elif contact_method == "whatsapp" and respondent.whatsapp:
+        keyboard.append(
+            [
+                {
+                    "text": "📱 Получить контакт",
+                    "callback_data": f"contact_{sparring_response.pk}",
+                }
+            ]
+        )
+    elif contact_method == "max" and respondent.max_contact:
+        keyboard.append(
+            [
+                {
+                    "text": "📱 Получить контакт",
+                    "callback_data": f"contact_{sparring_response.pk}",
+                }
+            ]
+        )
+
+    # Кнопка "Профиль игрока"
+    keyboard.append([{"text": "👤 Профиль игрока", "url": profile_url}])
+
+    # Кнопка "Подтвердить игру"
+    keyboard.append(
+        [
+            {
+                "text": "✅ Подтвердить игру",
+                "callback_data": f"confirm_match_{sparring_response.pk}",
+            }
+        ]
+    )
+
+    reply_markup = {"inline_keyboard": keyboard}
+
+    ok = send_to_user_by_user(author, text, reply_markup=reply_markup)
+    logger.info(
+        "notify_sparring_response: request=%s, respondent=%s, sent=%s",
+        request.pk,
+        respondent.pk,
+        ok,
     )

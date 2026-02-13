@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Личные встречи{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Личные встречи</h1>
+    <p class="text-secondary">Спарринговые матчи (личные встречи) не дают сезонные очки, но влияют на рейтинг ELO и статистику.</p>
+</div>
+<div class="container">
+    {% if matches %}
+    <div class="my-matches-grid">
+        {% for match in matches %}
+        <div class="card match-card-item">
+            <div class="card-body match-card-item__body">
+                <div class="match-meta">
+                    <div class="text-secondary" style="font-size: var(--font-size-sm);">
+                        {% if match.sparring_response %}
+                            Спарринг
+                        {% else %}
+                            Личная встреча
+                        {% endif %}
+                    </div>
+                    <div style="font-size: var(--font-size-sm);">
+                        {% if match.deadline %}
+                            Дедлайн: {{ match.deadline|date:"d.m.Y" }}
+                        {% elif match.scheduled_datetime %}
+                            {{ match.scheduled_datetime|date:"d.m.Y H:i" }}
+                        {% else %}
+                            Дата не установлена
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="match-players">
+                    <div class="match-player {% if match.player1 and match.winner == match.player1 %}winner{% endif %}">
+                        <span class="player-name">{{ match.get_player1_display }}</span>
+                        {% if match.player1 and match.winner == match.player1 %}
+                            {% if match.status == 'completed' or match.status == 'walkover' %}
+                            <span class="win-badge">WIN</span>
+                            {% endif %}
+                        {% elif match.is_walkover_loss %}
+                            {% if match.player2 and match.winner == match.player2 %}
+                            <span class="retired-badge">Rt.</span>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    <div class="match-player {% if match.player2 and match.winner == match.player2 %}winner{% endif %}">
+                        <span class="player-name">{{ match.get_player2_display }}</span>
+                        {% if match.player2 and match.winner == match.player2 %}
+                            {% if match.status == 'completed' or match.status == 'walkover' %}
+                            <span class="win-badge">WIN</span>
+                            {% endif %}
+                        {% elif match.is_walkover_loss %}
+                            {% if match.player1 and match.winner == match.player1 %}
+                            <span class="retired-badge">Rt.</span>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="text-secondary" style="font-size: var(--font-size-sm);">
+                    Текущий счёт: {{ match.score_display }}
+                </div>
+
+                <div class="match-card-item__actions">
+                    <span class="badge match-card-item__badge">{{ match.get_status_display }}</span>
+                    <a href="{% url 'match_detail' pk=match.pk %}" class="btn btn-outline match-card-item__btn">Подробнее</a>
+                </div>
+
+                {% if match.pending_proposals %}
+                {% for proposal in match.pending_proposals %}
+                <div class="match-proposal-card">
+                    <div class="match-proposal-card__body">
+                        <div class="match-proposal-card__text">
+                            <div><strong>{{ proposal.proposer }}</strong> предложил: {{ proposal.get_result_display }}</div>
+                            <div class="text-secondary match-proposal-card__score">
+                                Счёт по сетам:
+                                {% if proposal.player1_set1 is not None %} 1‑й сет {{ proposal.player1_set1 }}:{{ proposal.player2_set1 }}{% endif %}
+                                {% if proposal.player1_set2 is not None %} · 2‑й сет {{ proposal.player1_set2 }}:{{ proposal.player2_set2 }}{% endif %}
+                                {% if proposal.player1_set3 is not None %} · 3‑й сет {{ proposal.player1_set3 }}:{{ proposal.player2_set3 }}{% endif %}
+                            </div>
+                        </div>
+                        {% if proposal.proposer != player %}
+                        <div class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">
+                            ⏰ У вас есть 3 часа на подтверждение. Если не ответите, результат будет подтверждён автоматически.
+                        </div>
+                        <form method="post" action="{% url 'confirm_proposal' proposal.pk %}" class="match-proposal-card__form">
+                            {% csrf_token %}
+                            <div class="match-proposal-card__form-row">
+                                <a href="{% url 'match_detail' pk=match.pk %}" class="btn btn-outline match-proposal-card__btn">Подробнее</a>
+                                <button type="submit" name="action" value="accept" class="btn btn-primary match-proposal-card__btn">Подтвердить</button>
+                                <button type="submit" name="action" value="reject" class="btn btn-ghost match-proposal-card__btn">Отклонить</button>
+                            </div>
+                        </form>
+                        {% else %}
+                        <span class="text-secondary match-proposal-card__waiting">Ожидание подтверждения (3 часа)</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+
+                {% if match.status != 'completed' and match.status != 'walkover' and not match.winner %}
+                {% if not match.has_pending %}
+                <form method="post" action="{% url 'propose_result' match.pk %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label class="form-label">Кто победил?</label>
+                        <select name="result" class="form-control">
+                            <option value="win">Я победил</option>
+                            <option value="loss">Соперник победил</option>
+                            <option value="walkover_win">Техническая победа (соперник не вышел)</option>
+                            <option value="walkover_loss">Техническое поражение (я не вышел)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Счёт по сетам</label>
+                        <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">Укажите, сколько геймов выиграла каждая сторона в каждом сете. Например: 6:4, 6:3 — значит первый игрок выиграл первый сет 6–4 и второй 6–3. Третий сет заполняйте только если играли тай-брейк или полный третий сет.</p>
+                        <div class="match-score-input">
+                            <div class="match-score-input__row match-score-input__header">
+                                <span class="match-score-input__label"></span>
+                                <span class="match-score-input__cell">1‑й сет (геймы)</span>
+                                <span class="match-score-input__cell">2‑й сет (геймы)</span>
+                                <span class="match-score-input__cell">3‑й сет (геймы)</span>
+                            </div>
+                            <div class="match-score-input__row">
+                                <span class="match-score-input__label">{{ match.get_player1_display }} — геймы</span>
+                                <input class="form-control match-score-input__cell" name="p1s1" type="number" min="0" placeholder="0" title="Первый игрок (слева выше), 1-й сет">
+                                <input class="form-control match-score-input__cell" name="p1s2" type="number" min="0" placeholder="0" title="Первый игрок, 2-й сет">
+                                <input class="form-control match-score-input__cell" name="p1s3" type="number" min="0" placeholder="—" title="Первый игрок, 3-й сет (если был)">
+                            </div>
+                            <div class="match-score-input__row">
+                                <span class="match-score-input__label">{{ match.get_player2_display }} — геймы</span>
+                                <input class="form-control match-score-input__cell" name="p2s1" type="number" min="0" placeholder="0" title="Второй игрок (справа выше), 1-й сет">
+                                <input class="form-control match-score-input__cell" name="p2s2" type="number" min="0" placeholder="0" title="Второй игрок, 2-й сет">
+                                <input class="form-control match-score-input__cell" name="p2s3" type="number" min="0" placeholder="—" title="Второй игрок, 3-й сет (если был)">
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="margin-top: var(--spacing-md); width: 100%;">Отправить на подтверждение</button>
+                </form>
+                {% endif %}
+                {% else %}
+                <div class="text-secondary" style="font-size: var(--font-size-sm);">Матч завершён, изменение счёта недоступно.</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-secondary">Личные встречи не найдены.</p>
+    <p class="text-secondary">Создайте заявку на спарринг, чтобы найти партнера для игры.</p>
+    {% endif %}
+</div>
+{% endblock %}

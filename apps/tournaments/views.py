@@ -14,30 +14,21 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .fan import _is_fan
 from apps.core.decorators import require_filled_profile
+from apps.users.models import Notification, Player, SkillLevel
 
-
-def login_required_with_message(message="Данная информация доступна только для зарегистрированных пользователей."):
-    """
-    Декоратор, требующий авторизации и показывающий сообщение при редиректе.
-    """
-    def decorator(view_func):
-        @wraps(view_func)
-        def wrapper(request, *args, **kwargs):
-            if not request.user.is_authenticated:
-                messages.info(request, message)
-                from django.conf import settings
-                login_url = getattr(settings, 'LOGIN_URL', 'login')
-                from django.urls import reverse
-                next_url = request.get_full_path()
-                return redirect(f"{reverse(login_url)}?next={next_url}")
-            return view_func(request, *args, **kwargs)
-        return wrapper
-    return decorator
+from .fan import _is_fan
+from .models import (
+    Match,
+    MatchResultProposal,
+    Tournament,
+    TournamentTeam,
+    TournamentType,
+)
 from .olympic_consolation import _is_olympic
+from .proposal_service import apply_proposal
 from .round_robin import _is_round_robin, compute_standings, get_match_matrix
-from .models import Match, MatchResultProposal, Tournament, TournamentTeam, TournamentType
+from .utils import get_match_opponent_users
 
 MATCH_FORMAT_DESCRIPTIONS = {
     "1_set_6": "1 сет до 6 геймов. Матч до 6 выигранных геймов (при счёте 6:6 — игра до 7).",
@@ -45,9 +36,31 @@ MATCH_FORMAT_DESCRIPTIONS = {
     "2_sets": "2 сета до победы. Побеждает тот, кто выиграет 2 сета. При 1:1 — третий сет (тай-брейк).",
     "fast4": "2 коротких сета + супертай-брейк. Сеты до 4 геймов, при 1:1 — супертай-брейк до 10 очков.",
 }
-from .proposal_service import apply_proposal
-from .utils import get_match_opponent_users
-from apps.users.models import Notification, Player, SkillLevel
+
+
+def login_required_with_message(
+    message="Данная информация доступна только для зарегистрированных пользователей.",
+):
+    """
+    Декоратор, требующий авторизации и показывающий сообщение при редиректе.
+    """
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                messages.info(request, message)
+                from django.conf import settings
+
+                login_url = getattr(settings, "LOGIN_URL", "login")
+
+                next_url = request.get_full_path()
+                return redirect(f"{reverse(login_url)}?next={next_url}")
+            return view_func(request, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def _match_participants(match):
@@ -68,8 +81,6 @@ def _match_participants(match):
         if match.player2_id:
             participants.add(match.player2)
     return participants
-
-
 
 
 def _build_bracket_standings(tournament, is_fan, is_olympic):
@@ -94,16 +105,22 @@ def _build_bracket_standings(tournament, is_fan, is_olympic):
                 if r.place in seen_places:
                     continue
                 seen_places.add(r.place)
-                team = tournament.teams.filter(
-                    Q(player1=r.player) | Q(player2=r.player), player2__isnull=False
-                ).select_related("player1__user", "player2__user").first()
-                standings.append({
-                    "place": r.place,
-                    "player": team.player1 if team else r.player,
-                    "team": team,
-                    "fan_points": r.fan_points,
-                    "round_eliminated": f"Место {r.place}",
-                })
+                team = (
+                    tournament.teams.filter(
+                        Q(player1=r.player) | Q(player2=r.player), player2__isnull=False
+                    )
+                    .select_related("player1__user", "player2__user")
+                    .first()
+                )
+                standings.append(
+                    {
+                        "place": r.place,
+                        "player": team.player1 if team else r.player,
+                        "team": team,
+                        "fan_points": r.fan_points,
+                        "round_eliminated": f"Место {r.place}",
+                    }
+                )
         else:
             standings = [
                 {
@@ -122,28 +139,39 @@ def _build_bracket_standings(tournament, is_fan, is_olympic):
         fan_results[r.player_id] = r
     if tournament.is_doubles():
         teams = list(
-            tournament.teams.filter(player2__isnull=False)
-            .select_related("player1__user", "player2__user")
+            tournament.teams.filter(player2__isnull=False).select_related(
+                "player1__user", "player2__user"
+            )
         )
         teams_sorted = sorted(
             teams,
             key=lambda t: (
-                -(fan_results.get(t.player1_id).fan_points if fan_results.get(t.player1_id) else 0),
+                -(
+                    fan_results.get(t.player1_id).fan_points
+                    if fan_results.get(t.player1_id)
+                    else 0
+                ),
                 -t.player1.total_points,
             ),
         )
         standings = []
         for i, team in enumerate(teams_sorted, 1):
             fr = fan_results.get(team.player1_id)
-            standings.append({
-                "place": i,
-                "player": team.player1,
-                "team": team,
-                "fan_points": fr.fan_points if fr else 0,
-                "round_eliminated": fr.get_round_eliminated_display() if fr else "—",
-            })
+            standings.append(
+                {
+                    "place": i,
+                    "player": team.player1,
+                    "team": team,
+                    "fan_points": fr.fan_points if fr else 0,
+                    "round_eliminated": (
+                        fr.get_round_eliminated_display() if fr else "—"
+                    ),
+                }
+            )
     else:
-        participants = list(tournament.participants.select_related("user").order_by("-total_points"))
+        participants = list(
+            tournament.participants.select_related("user").order_by("-total_points")
+        )
         participants_sorted = sorted(
             participants,
             key=lambda p: (
@@ -154,13 +182,17 @@ def _build_bracket_standings(tournament, is_fan, is_olympic):
         standings = []
         for i, p in enumerate(participants_sorted, 1):
             fr = fan_results.get(p.id)
-            standings.append({
-                "place": i,
-                "player": p,
-                "team": None,
-                "fan_points": fr.fan_points if fr else 0,
-                "round_eliminated": fr.get_round_eliminated_display() if fr else "—",
-            })
+            standings.append(
+                {
+                    "place": i,
+                    "player": p,
+                    "team": None,
+                    "fan_points": fr.fan_points if fr else 0,
+                    "round_eliminated": (
+                        fr.get_round_eliminated_display() if fr else "—"
+                    ),
+                }
+            )
     return standings
 
 
@@ -170,9 +202,9 @@ def tournament_list(request):
 
     check_and_generate_past_deadline_brackets()
 
-    city = request.GET.get('city', '')
-    category = request.GET.get('category', '')
-    status = request.GET.get('status', '')
+    city = request.GET.get("city", "")
+    category = request.GET.get("category", "")
+    status = request.GET.get("status", "")
 
     tournaments = Tournament.objects.all().prefetch_related(
         "participants__user", "allowed_categories"
@@ -181,29 +213,34 @@ def tournament_list(request):
     if city:
         tournaments = tournaments.filter(city__icontains=city)
     if category:
-        tournaments = tournaments.filter(allowed_categories__category=category).distinct()
+        tournaments = tournaments.filter(
+            allowed_categories__category=category
+        ).distinct()
     if status:
         tournaments = tournaments.filter(status=status)
 
-    tournaments = tournaments.order_by('-start_date')
+    tournaments = tournaments.order_by("-start_date")
 
     context = {
-        'tournaments': tournaments,
-        'current_city': city,
-        'current_category': category,
-        'current_status': status,
-        'category_choices': SkillLevel.choices,
+        "tournaments": tournaments,
+        "current_city": city,
+        "current_category": category,
+        "current_status": status,
+        "category_choices": SkillLevel.choices,
     }
-    return render(request, 'tournaments/list.html', context)
+    return render(request, "tournaments/list.html", context)
 
 
-@login_required_with_message("Детали турнира доступны только для зарегистрированных пользователей.")
+@login_required_with_message(
+    "Детали турнира доступны только для зарегистрированных пользователей."
+)
 def tournament_detail(request, slug):
     """Tournament detail page. Только для авторизованных пользователей."""
     # Проверяем и формируем сетки для турниров с истёкшим дедлайном регистрации
     from apps.tournaments.fan import check_and_generate_past_deadline_brackets
+
     check_and_generate_past_deadline_brackets()
-    
+
     tournament = get_object_or_404(
         Tournament.objects.prefetch_related(
             "matches__player1__user",
@@ -226,9 +263,13 @@ def tournament_detail(request, slug):
     is_round_robin = _is_round_robin(tournament)
 
     if is_fan or is_olympic:
-        matches = tournament.matches.order_by("is_consolation", "round_index", "round_order")
+        matches = tournament.matches.order_by(
+            "is_consolation", "round_index", "round_order"
+        )
+
         def round_key(m):
             return (m.round_name, m.is_consolation)
+
         matches_by_round = []
         for k, group in groupby(matches, key=round_key):
             matches_by_round.append((k[0], k[1], list(group)))
@@ -239,31 +280,46 @@ def tournament_detail(request, slug):
         # Турнирная таблица для FAN и Олимпийской системы (на странице турнира)
         standings = _build_bracket_standings(tournament, is_fan, is_olympic)
     elif is_round_robin:
-        matches = tournament.matches.filter(is_consolation=False).order_by("round_index", "round_order")
+        matches = tournament.matches.filter(is_consolation=False).order_by(
+            "round_index", "round_order"
+        )
         matches_by_round = []
         for _, g in groupby(matches, key=lambda m: m.round_index):
             round_matches = list(g)
             if round_matches:
-                matches_by_round.append((round_matches[0].round_name, False, round_matches))
+                matches_by_round.append(
+                    (round_matches[0].round_name, False, round_matches)
+                )
         matrix_participants, matrix_data = get_match_matrix(tournament)
         rr_standings = compute_standings(tournament)
         if tournament.status == "completed":
             fan_results_map = {
-                r.player_id: r.fan_points for r in tournament.fan_results.select_related("player")
+                r.player_id: r.fan_points
+                for r in tournament.fan_results.select_related("player")
             }
             for row in rr_standings:
-                pid = (row["team"].player1_id if row.get("team") else row["player"].id)
+                pid = row["team"].player1_id if row.get("team") else row["player"].id
                 row["rating_points"] = fan_results_map.get(pid)
         else:
             for row in rr_standings:
                 row["rating_points"] = None
-        entity_id = lambda r: (r["team"] or r["player"]).id
+
+        def entity_id(r):
+            return (r["team"] or r["player"]).id
+
         standings_by_entity = {entity_id(row): row for row in rr_standings}
         matrix_rows = []
         for i, p in enumerate(matrix_participants):
             row_cells = matrix_data[i] if i < len(matrix_data) else []
             st = standings_by_entity.get(p.id, {})
-            matrix_rows.append({"participant": p, "cells": row_cells, "place": st.get("place"), "points": st.get("points")})
+            matrix_rows.append(
+                {
+                    "participant": p,
+                    "cells": row_cells,
+                    "place": st.get("place"),
+                    "points": st.get("points"),
+                }
+            )
         standings = None
     else:
         matches_by_round = None
@@ -276,16 +332,22 @@ def tournament_detail(request, slug):
 
     if tournament.is_doubles():
         participants_qs = []
-        for team in tournament.teams.select_related("player1__user", "player2__user").order_by("created_at"):
+        for team in tournament.teams.select_related(
+            "player1__user", "player2__user"
+        ).order_by("created_at"):
             participants_qs.append(team)
         solo_teams = [t for t in participants_qs if not t.player2_id]
-        
+
         # Для микст-турниров фильтруем команды по противоположному полу
         if tournament.is_mixed_doubles() and request.user.is_authenticated:
             current_player = getattr(request.user, "player", None)
             if current_player and current_player.gender:
-                solo_teams = [t for t in solo_teams if t.player1.gender and t.player1.gender != current_player.gender]
-        
+                solo_teams = [
+                    t
+                    for t in solo_teams
+                    if t.player1.gender and t.player1.gender != current_player.gender
+                ]
+
         can_join_team = (
             request.user.is_authenticated
             and getattr(request.user, "player", None)
@@ -299,7 +361,9 @@ def tournament_detail(request, slug):
         if is_fan or is_olympic:
             participants_qs = participants_qs.order_by("-total_points")
         else:
-            participants_qs = participants_qs.order_by("user__last_name", "user__first_name")
+            participants_qs = participants_qs.order_by(
+                "user__last_name", "user__first_name"
+            )
 
     match_format_description = None
     if is_round_robin and tournament.match_format:
@@ -311,15 +375,19 @@ def tournament_detail(request, slug):
     user_is_registered = False
     can_register = False
     registration_closed = tournament.bracket_generated or tournament.is_full()
-    
+
     if request.user.is_authenticated:
         current_player = getattr(request.user, "player", None)
         if current_player:
             if tournament.is_doubles():
-                user_is_registered = _is_player_registered_in_doubles(tournament, current_player)
+                user_is_registered = _is_player_registered_in_doubles(
+                    tournament, current_player
+                )
             else:
-                user_is_registered = tournament.participants.filter(id=current_player.id).exists()
-            
+                user_is_registered = tournament.participants.filter(
+                    id=current_player.id
+                ).exists()
+
             # Может зарегистрироваться, если не зарегистрирован и регистрация открыта
             can_register = not user_is_registered and not registration_closed
 
@@ -350,7 +418,9 @@ def tournament_tables_list(request):
     """Страница «Турнирные таблицы» — список турниров с краткой статистикой."""
     tournaments = (
         Tournament.objects.all()
-        .prefetch_related("participants__user", "matches", "fan_results", "allowed_categories")
+        .prefetch_related(
+            "participants__user", "matches", "fan_results", "allowed_categories"
+        )
         .order_by("-start_date")
     )
     # Добавляем статистику для каждого турнира
@@ -365,15 +435,15 @@ def tournament_tables_list(request):
         t.matches_completed = matches_completed
         t.matches_pending = matches_total - matches_completed
         t.progress_pct = (
-            int(100 * matches_completed / matches_total)
-            if matches_total > 0
-            else 0
+            int(100 * matches_completed / matches_total) if matches_total > 0 else 0
         )
     context = {"tournaments": tournaments}
     return render(request, "tournaments/tables_list.html", context)
 
 
-@login_required_with_message("Детали турнирной таблицы доступны только для зарегистрированных пользователей.")
+@login_required_with_message(
+    "Детали турнирной таблицы доступны только для зарегистрированных пользователей."
+)
 def tournament_tables_detail(request, slug):
     """Детальная страница турнирной таблицы: графики, диаграммы, полная статистика."""
     tournament = get_object_or_404(
@@ -396,7 +466,9 @@ def tournament_tables_detail(request, slug):
     is_round_robin = _is_round_robin(tournament)
     if tournament.is_doubles():
         participants = []
-        for team in tournament.teams.filter(player2__isnull=False).select_related("player1__user", "player2__user"):
+        for team in tournament.teams.filter(player2__isnull=False).select_related(
+            "player1__user", "player2__user"
+        ):
             participants.extend([team.player1, team.player2])
         participants = list({p.id: p for p in participants}.values())
         participants.sort(key=lambda p: -p.total_points)
@@ -443,17 +515,23 @@ def tournament_tables_detail(request, slug):
                 if r.place in seen_places:
                     continue
                 seen_places.add(r.place)
-                team = tournament.teams.filter(
-                    Q(player1=r.player) | Q(player2=r.player), player2__isnull=False
-                ).select_related("player1__user", "player2__user").first()
-                standings.append({
-                    "place": r.place,
-                    "player": team.player1 if team else r.player,
-                    "team": team,
-                    "fan_result": r,
-                    "fan_points": r.fan_points,
-                    "round_eliminated": f"Место {r.place}",
-                })
+                team = (
+                    tournament.teams.filter(
+                        Q(player1=r.player) | Q(player2=r.player), player2__isnull=False
+                    )
+                    .select_related("player1__user", "player2__user")
+                    .first()
+                )
+                standings.append(
+                    {
+                        "place": r.place,
+                        "player": team.player1 if team else r.player,
+                        "team": team,
+                        "fan_result": r,
+                        "fan_points": r.fan_points,
+                        "round_eliminated": f"Место {r.place}",
+                    }
+                )
         else:
             standings = [
                 {
@@ -487,12 +565,16 @@ def tournament_tables_detail(request, slug):
                     "player": p,
                     "fan_result": fr,
                     "fan_points": fr.fan_points if fr else 0,
-                    "round_eliminated": fr.get_round_eliminated_display() if fr else "—",
+                    "round_eliminated": (
+                        fr.get_round_eliminated_display() if fr else "—"
+                    ),
                 }
             )
 
     # Матчи по раундам
-    matches = tournament.matches.order_by("is_consolation", "round_index", "round_order")
+    matches = tournament.matches.order_by(
+        "is_consolation", "round_index", "round_order"
+    )
     matches_by_round = []
     for k, group in groupby(matches, key=lambda m: (m.round_name, m.is_consolation)):
         matches_by_round.append((k[0], k[1], list(group)))
@@ -560,7 +642,11 @@ def tournament_tables_detail(request, slug):
             status__in=["completed", "walkover"]
         ).count(),
         "progress_pct": (
-            int(100 * main_matches.filter(status__in=["completed", "walkover"]).count() / main_matches.count())
+            int(
+                100
+                * main_matches.filter(status__in=["completed", "walkover"]).count()
+                / main_matches.count()
+            )
             if main_matches.count() > 0
             else 0
         ),
@@ -575,17 +661,27 @@ def champions_league(request):
         .prefetch_related("allowed_categories")
         .order_by("-start_date")
     )
-    return render(request, "tournaments/champions_league.html", {"tournaments": tournaments})
+    return render(
+        request, "tournaments/champions_league.html", {"tournaments": tournaments}
+    )
 
 
-@login_required_with_message("Детали матча доступны только для зарегистрированных пользователей.")
+@login_required_with_message(
+    "Детали матча доступны только для зарегистрированных пользователей."
+)
 def match_detail(request, pk):
     """Match detail page. Только для авторизованных пользователей."""
     match = get_object_or_404(
         Match.objects.select_related(
-            "player1__user", "player2__user", "winner__user", "tournament", "court",
-            "team1__player1__user", "team1__player2__user",
-            "team2__player1__user", "team2__player2__user",
+            "player1__user",
+            "player2__user",
+            "winner__user",
+            "tournament",
+            "court",
+            "team1__player1__user",
+            "team1__player2__user",
+            "team2__player1__user",
+            "team2__player2__user",
         ).prefetch_related("tournament__allowed_categories"),
         pk=pk,
     )
@@ -604,21 +700,34 @@ def match_detail(request, pk):
 def my_matches(request):
     """List matches for current player."""
 
-    player = getattr(request.user, 'player', None)
+    player = getattr(request.user, "player", None)
     if player is None:
         player = Player.objects.create(user=request.user)
 
-    matches = Match.objects.filter(
-        models.Q(player1=player) | models.Q(player2=player)
-        | models.Q(team1__player1=player) | models.Q(team1__player2=player)
-        | models.Q(team2__player1=player) | models.Q(team2__player2=player)
-    ).select_related(
-        'player1__user', 'player2__user', 'tournament',
-        'team1__player1__user', 'team1__player2__user',
-        'team2__player1__user', 'team2__player2__user',
-    ).order_by('-scheduled_datetime')
+    matches = (
+        Match.objects.filter(
+            models.Q(player1=player)
+            | models.Q(player2=player)
+            | models.Q(team1__player1=player)
+            | models.Q(team1__player2=player)
+            | models.Q(team2__player1=player)
+            | models.Q(team2__player2=player)
+        )
+        .select_related(
+            "player1__user",
+            "player2__user",
+            "tournament",
+            "team1__player1__user",
+            "team1__player2__user",
+            "team2__player1__user",
+            "team2__player2__user",
+        )
+        .order_by("-scheduled_datetime")
+    )
 
-    proposals = MatchResultProposal.objects.filter(match__in=matches).select_related('proposer', 'match')
+    proposals = MatchResultProposal.objects.filter(match__in=matches).select_related(
+        "proposer", "match"
+    )
     # Group all pending proposals by match_id
     pending_by_match = {}
     for p in proposals:
@@ -633,10 +742,56 @@ def my_matches(request):
 
     return render(
         request,
-        'tournaments/my_matches.html',
+        "tournaments/my_matches.html",
         {
-            'matches': matches,
-            'player': player,
+            "matches": matches,
+            "player": player,
+        },
+    )
+
+
+@login_required
+def my_sparring_matches(request):
+    """List sparring matches (personal meetings) for current player."""
+
+    player = getattr(request.user, "player", None)
+    if player is None:
+        player = Player.objects.create(user=request.user)
+
+    matches = (
+        Match.objects.filter(
+            models.Q(player1=player) | models.Q(player2=player),
+            match_type=Match.MatchType.SPARRING,
+        )
+        .select_related(
+            "player1__user",
+            "player2__user",
+            "sparring_response__sparring_request",
+        )
+        .order_by("-scheduled_datetime", "-created_at")
+    )
+
+    proposals = MatchResultProposal.objects.filter(match__in=matches).select_related(
+        "proposer", "match"
+    )
+    # Group all pending proposals by match_id
+    pending_by_match = {}
+    for p in proposals:
+        if p.status == Match.ProposalStatus.PENDING:
+            if p.match_id not in pending_by_match:
+                pending_by_match[p.match_id] = []
+            pending_by_match[p.match_id].append(p)
+
+    for m in matches:
+        m.pending_proposals = pending_by_match.get(m.id, [])
+        m.has_pending = len(m.pending_proposals) > 0
+
+    return render(
+        request,
+        "tournaments/my_sparring_matches.html",
+        {
+            "matches": matches,
+            "player": player,
         },
     )
 
@@ -647,26 +802,29 @@ def propose_result(request, pk):
 
     match = get_object_or_404(
         Match.objects.select_related(
-            "team1__player1__user", "team1__player2__user",
-            "team2__player1__user", "team2__player2__user",
-            "player1", "player2",
+            "team1__player1__user",
+            "team1__player2__user",
+            "team2__player1__user",
+            "team2__player2__user",
+            "player1",
+            "player2",
         ),
         pk=pk,
     )
     if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-        messages.info(request, 'Матч уже завершён.')
-        return redirect('my_matches')
+        messages.info(request, "Матч уже завершён.")
+        return redirect("my_matches")
 
-    if request.method != 'POST':
-        return redirect('my_matches')
-    player = getattr(request.user, 'player', None)
+    if request.method != "POST":
+        return redirect("my_matches")
+    player = getattr(request.user, "player", None)
     if player is None:
-        messages.error(request, 'Создайте профиль игрока, чтобы предложить результат.')
-        return redirect('profile_edit')
+        messages.error(request, "Создайте профиль игрока, чтобы предложить результат.")
+        return redirect("profile_edit")
 
     if player not in _match_participants(match):
-        messages.error(request, 'Вы не участвуете в этом матче.')
-        return redirect('my_matches')
+        messages.error(request, "Вы не участвуете в этом матче.")
+        return redirect("my_matches")
 
     if match.result_proposals.filter(status=Match.ProposalStatus.PENDING).exists():
         messages.info(
@@ -674,9 +832,9 @@ def propose_result(request, pk):
             "По этому матчу уже отправлен результат и он ожидает подтверждения соперником. "
             "Если соперник отклонит результат и не отправит свой — вы сможете отправить результат снова.",
         )
-        return redirect('my_matches')
+        return redirect("my_matches")
 
-    result = request.POST.get('result') or Match.ResultChoice.WIN
+    result = request.POST.get("result") or Match.ResultChoice.WIN
 
     def _to_int(value):
         try:
@@ -688,29 +846,30 @@ def propose_result(request, pk):
         match=match,
         proposer=player,
         result=result,
-        player1_set1=_to_int(request.POST.get('p1s1')),
-        player1_set2=_to_int(request.POST.get('p1s2')),
-        player1_set3=_to_int(request.POST.get('p1s3')),
-        player2_set1=_to_int(request.POST.get('p2s1')),
-        player2_set2=_to_int(request.POST.get('p2s2')),
-        player2_set3=_to_int(request.POST.get('p2s3')),
+        player1_set1=_to_int(request.POST.get("p1s1")),
+        player1_set2=_to_int(request.POST.get("p1s2")),
+        player1_set3=_to_int(request.POST.get("p1s3")),
+        player2_set1=_to_int(request.POST.get("p2s1")),
+        player2_set2=_to_int(request.POST.get("p2s2")),
+        player2_set3=_to_int(request.POST.get("p2s3")),
     )
 
     for opponent_user in get_match_opponent_users(match, player):
         Notification.objects.create(
             user=opponent_user,
             message=f"{player} предложил результат матча в турнире {match.tournament.name}. У вас 3 часа на подтверждение.",
-            url=reverse('my_matches'),
+            url=reverse("my_matches"),
         )
 
     try:
         from apps.telegram_bot import notifications as tg
+
         tg.notify_result_proposal(proposal)
     except Exception:
         pass
 
-    messages.success(request, 'Результат отправлен на подтверждение сопернику.')
-    return redirect('my_matches')
+    messages.success(request, "Результат отправлен на подтверждение сопернику.")
+    return redirect("my_matches")
 
 
 @login_required
@@ -719,47 +878,55 @@ def confirm_proposal(request, pk):
 
     proposal = get_object_or_404(
         MatchResultProposal.objects.select_related(
-            'match__player1', 'match__player2', 'proposer',
-            'match__team1__player1', 'match__team1__player2',
-            'match__team2__player1', 'match__team2__player2',
+            "match__player1",
+            "match__player2",
+            "proposer",
+            "match__team1__player1",
+            "match__team1__player2",
+            "match__team2__player1",
+            "match__team2__player2",
         ),
         pk=pk,
     )
 
-    if request.method != 'POST':
-        return redirect('my_matches')
+    if request.method != "POST":
+        return redirect("my_matches")
 
     match = proposal.match
-    player = getattr(request.user, 'player', None)
+    player = getattr(request.user, "player", None)
     if player is None or player not in _match_participants(match):
-        messages.error(request, 'Вы не участвуете в этом матче.')
-        return redirect('my_matches')
+        messages.error(request, "Вы не участвуете в этом матче.")
+        return redirect("my_matches")
 
     if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-        messages.info(request, 'Матч уже завершён.')
-        return redirect('my_matches')
+        messages.info(request, "Матч уже завершён.")
+        return redirect("my_matches")
 
     if proposal.status != Match.ProposalStatus.PENDING:
-        messages.info(request, 'Этот результат уже обработан.')
-        return redirect('my_matches')
+        messages.info(request, "Этот результат уже обработан.")
+        return redirect("my_matches")
 
     if proposal.proposer == player:
-        messages.error(request, 'Вы не можете подтверждать свой же запрос.')
-        return redirect('my_matches')
+        messages.error(request, "Вы не можете подтверждать свой же запрос.")
+        return redirect("my_matches")
 
     opponent_users = get_match_opponent_users(match, proposal.proposer)
     if request.user not in opponent_users:
-        messages.error(request, 'Подтвердить результат может только соперник (в парной игре — игрок противоположной команды).')
-        return redirect('my_matches')
+        messages.error(
+            request,
+            "Подтвердить результат может только соперник (в парной игре — игрок противоположной команды).",
+        )
+        return redirect("my_matches")
 
-    action = request.POST.get('action')
-    if action == 'accept':
+    action = request.POST.get("action")
+    if action == "accept":
         apply_proposal(proposal)
         # FAN-логика (advance, consolation, finalize) вызывается из post_save сигнала Match
         messages.success(request, "Результат подтверждён.")
         # Telegram-уведомление инициатору
         try:
             from apps.telegram_bot.notifications import notify_proposal_confirmed
+
             notify_proposal_confirmed(proposal)
         except Exception:
             pass  # Telegram-уведомление не критично
@@ -767,18 +934,19 @@ def confirm_proposal(request, pk):
         # Telegram-уведомление инициатору (до удаления proposal)
         try:
             from apps.telegram_bot.notifications import notify_proposal_rejected
+
             notify_proposal_rejected(proposal)
         except Exception:
             pass  # Telegram-уведомление не критично
         proposal.delete()
         Notification.objects.create(
             user=proposal.proposer.user,
-            message=f'{player} отклонил результат матча. Введите свой результат.',
-            url=reverse('my_matches'),
+            message=f"{player} отклонил результат матча. Введите свой результат.",
+            url=reverse("my_matches"),
         )
-        messages.info(request, 'Результат отклонён. Введите свой результат матча.')
+        messages.info(request, "Результат отклонён. Введите свой результат матча.")
 
-    return redirect('my_matches')
+    return redirect("my_matches")
 
 
 def _check_tournament_registration_eligibility(request, tournament, player):
@@ -802,9 +970,13 @@ def _check_tournament_registration_eligibility(request, tournament, player):
         tournament.allowed_categories.values_list("category", flat=True)
     )
     if not allowed_categories:
-        return False, "В турнире не указаны допустимые категории участников. Обратитесь к организатору."
+        return (
+            False,
+            "В турнире не указаны допустимые категории участников. Обратитесь к организатору.",
+        )
     if player.skill_level not in allowed_categories:
         from apps.users.models import SkillLevel
+
         allowed_labels = [SkillLevel(c).label for c in allowed_categories]
         player_label = SkillLevel(player.skill_level).label
         return (
@@ -825,15 +997,20 @@ def _check_tournament_registration_eligibility(request, tournament, player):
         return False, "Для участия в многодневных турнирах требуется подписка."
 
     if not sub.can_register_for_tournament():
-        return False, "Вы исчерпали лимит регистрации на турниры в этом месяце. Обновите подписку."
+        return (
+            False,
+            "Вы исчерпали лимит регистрации на турниры в этом месяце. Обновите подписку.",
+        )
 
     return True, None
 
 
 def _check_user_can_register_for_tournament(user, tournament):
     """Проверка возможности регистрации пользователя (для партнёра)."""
+
     class Req:
         pass
+
     r = Req()
     r.user = user
     try:
@@ -847,9 +1024,7 @@ def _check_user_can_register_for_tournament(user, tournament):
 
 def _is_player_registered_in_doubles(tournament, player):
     """Проверка: зарегистрирован ли игрок в парном турнире (в любой команде)."""
-    return tournament.teams.filter(
-        Q(player1=player) | Q(player2=player)
-    ).exists()
+    return tournament.teams.filter(Q(player1=player) | Q(player2=player)).exists()
 
 
 @login_required
@@ -858,7 +1033,7 @@ def tournament_register(request, slug):
     """Register authenticated user to a tournament."""
 
     tournament = get_object_or_404(Tournament, slug=slug)
-    player = getattr(request.user, 'player', None)
+    player = getattr(request.user, "player", None)
     if player is None:
         player = Player.objects.create(user=request.user)
 
@@ -875,69 +1050,77 @@ def tournament_register(request, slug):
         return redirect("tournament_register_doubles", slug=tournament.slug)
 
     # Check gender compatibility
-    if tournament.gender != 'mixed':
-        if (tournament.gender == 'male' and player.gender != 'male') or \
-           (tournament.gender == 'female' and player.gender != 'female'):
-            gender_text = 'мужской' if tournament.gender == 'male' else 'женский'
-            messages.error(request, f'Этот турнир только для {gender_text} категории.')
-            return redirect('tournament_detail', slug=tournament.slug)
+    if tournament.gender != "mixed":
+        if (tournament.gender == "male" and player.gender != "male") or (
+            tournament.gender == "female" and player.gender != "female"
+        ):
+            gender_text = "мужской" if tournament.gender == "male" else "женский"
+            messages.error(request, f"Этот турнир только для {gender_text} категории.")
+            return redirect("tournament_detail", slug=tournament.slug)
 
     # Check if player is already registered
     if tournament.participants.filter(id=player.id).exists():
-        messages.info(request, 'Вы уже зарегистрированы на этот турнир.')
-        return redirect('tournament_detail', slug=tournament.slug)
+        messages.info(request, "Вы уже зарегистрированы на этот турнир.")
+        return redirect("tournament_detail", slug=tournament.slug)
 
     # SUBSCRIPTION CHECK
     try:
         sub = request.user.subscription
         if not sub.is_valid():
             sub = None
-    except:
+    except Exception:
         sub = None
 
     # Проверка всех условий регистрации (включая категории)
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         messages.error(request, err)
-        if 'подписк' in (err or ''):
-            return redirect('pricing')
-        return redirect('tournament_detail', slug=tournament.slug)
+        if "подписк" in (err or ""):
+            return redirect("pricing")
+        return redirect("tournament_detail", slug=tournament.slug)
 
     # Администраторы обходят только проверку подписки (внутри функции),
     # но проходят проверку категорий как обычные игроки
     is_admin = request.user.is_superuser or request.user.is_staff
-    
+
     if tournament.is_one_day:
         # One-day tournament: Redirect to payment preview
-        from django.urls import reverse
         from urllib.parse import urlencode
-        
-        params = {'type': 'tournament', 'id': tournament.id}
-        base_url = reverse('payment_preview')
+
+        from django.urls import reverse
+
+        params = {"type": "tournament", "id": tournament.id}
+        base_url = reverse("payment_preview")
         query_string = urlencode(params)
-        return redirect(f'{base_url}?{query_string}')
+        return redirect(f"{base_url}?{query_string}")
     else:
         # Multi-day tournament: subscription already checked in eligibility function
         if is_admin:
-            messages.success(request, 'Регистрация администратора (бесплатно/безлимитно).')
+            messages.success(
+                request, "Регистрация администратора (бесплатно/безлимитно)."
+            )
         else:
             try:
                 sub = request.user.subscription
                 if sub and sub.is_valid():
                     sub.increment_usage()
-                    messages.success(request, f'Вы зарегистрированы! Осталось регистраций в этом месяце: {sub.get_remaining_slots()}')
+                    messages.success(
+                        request,
+                        f"Вы зарегистрированы! Осталось регистраций в этом месяце: {sub.get_remaining_slots()}",
+                    )
                 else:
-                    messages.success(request, 'Вы зарегистрированы!')
+                    messages.success(request, "Вы зарегистрированы!")
             except Exception:
-                messages.success(request, 'Вы зарегистрированы!')
-        
+                messages.success(request, "Вы зарегистрированы!")
+
         tournament.participants.add(player)
         try:
             from apps.telegram_bot import notifications as tg
+
             tg.notify_tournament_registered(request.user, tournament)
         except Exception:
             pass
-        return redirect('tournament_detail', slug=tournament.slug)
+        return redirect("tournament_detail", slug=tournament.slug)
 
 
 @login_required
@@ -981,25 +1164,34 @@ def tournament_register_doubles(request, slug):
             return redirect("pricing")
         return redirect("tournament_detail", slug=slug)
 
-    solo_teams = list(tournament.teams.filter(player2__isnull=True).select_related("player1__user"))
-    
+    solo_teams = list(
+        tournament.teams.filter(player2__isnull=True).select_related("player1__user")
+    )
+
     # Для микст-турниров фильтруем команды по противоположному полу
     if tournament.is_mixed_doubles() and player.gender:
-        solo_teams = [t for t in solo_teams if t.player1.gender and t.player1.gender != player.gender]
-    
+        solo_teams = [
+            t
+            for t in solo_teams
+            if t.player1.gender and t.player1.gender != player.gender
+        ]
+
     partner_search_results = []
 
     if request.method == "GET" and request.GET.get("q"):
         q = request.GET.get("q", "").strip()
         if q:
             from django.db.models import Q
-            
-            filters = Q(user__first_name__icontains=q) | Q(user__last_name__icontains=q) | Q(
-                user__email__icontains=q
-            ) | Q(user__phone__icontains=q)
+
+            filters = (
+                Q(user__first_name__icontains=q)
+                | Q(user__last_name__icontains=q)
+                | Q(user__email__icontains=q)
+                | Q(user__phone__icontains=q)
+            )
             if str(q).isdigit():
                 filters = filters | Q(id=int(q))
-            
+
             # Выполняем поиск
             all_results = list(
                 Player.objects.filter(filters)
@@ -1007,13 +1199,16 @@ def tournament_register_doubles(request, slug):
                 .select_related("user")
                 .distinct()[:10]
             )
-            
+
             partner_search_results = all_results
-            
+
             # Для микст-турниров фильтруем результаты поиска по противоположному полу
             if tournament.is_mixed_doubles():
                 if not player.gender:
-                    messages.warning(request, "Для участия в микст-турнире укажите свой пол в профиле.")
+                    messages.warning(
+                        request,
+                        "Для участия в микст-турнире укажите свой пол в профиле.",
+                    )
                     partner_search_results = []
                 else:
                     # Фильтруем по противоположному полу
@@ -1024,17 +1219,27 @@ def tournament_register_doubles(request, slug):
                         if p.gender != player.gender:
                             filtered_results.append(p)
                     partner_search_results = filtered_results
-                    
+
                     if not partner_search_results:
                         if all_results:
-                            gender_text = "женщину" if player.gender == "male" else "мужчину"
-                            messages.info(request, f"Найдено игроков: {len(all_results)}, но для микст-турнира нужен партнёр противоположного пола ({gender_text}).")
+                            gender_text = (
+                                "женщину" if player.gender == "male" else "мужчину"
+                            )
+                            messages.info(
+                                request,
+                                f"Найдено игроков: {len(all_results)}, но для микст-турнира нужен партнёр противоположного пола ({gender_text}).",
+                            )
                         else:
-                            messages.info(request, f"По запросу «{q}» игроки не найдены.")
+                            messages.info(
+                                request, f"По запросу «{q}» игроки не найдены."
+                            )
             else:
                 # Для обычных парных турниров показываем сообщение если ничего не найдено
                 if not partner_search_results:
-                    messages.info(request, f"По запросу «{q}» игроки не найдены. Попробуйте другой поиск.")
+                    messages.info(
+                        request,
+                        f"По запросу «{q}» игроки не найдены. Попробуйте другой поиск.",
+                    )
 
     # POST: обработка выбора
     if request.method == "POST":
@@ -1050,10 +1255,14 @@ def tournament_register_doubles(request, slug):
                 pass
             try:
                 from apps.telegram_bot import notifications as tg
+
                 tg.notify_tournament_registered(request.user, tournament)
             except Exception:
                 pass
-            messages.success(request, "Вы зарегистрированы. Партнёр может присоединиться к вам со своей страницы турнира.")
+            messages.success(
+                request,
+                "Вы зарегистрированы. Партнёр может присоединиться к вам со своей страницы турнира.",
+            )
             return redirect("tournament_detail", slug=slug)
 
         if action == "join" and solo_teams:
@@ -1083,17 +1292,22 @@ def _do_join_team(request, tournament, player, team):
     if not ok:
         messages.error(request, err)
         return redirect("tournament_detail", slug=tournament.slug)
-    
+
     # Проверка пола для микст-турниров
     if tournament.is_mixed_doubles():
         if not player.gender or not team.player1.gender:
-            messages.error(request, "Для участия в микст-турнире необходимо указать пол в профиле.")
+            messages.error(
+                request, "Для участия в микст-турнире необходимо указать пол в профиле."
+            )
             return redirect("tournament_detail", slug=tournament.slug)
         if player.gender == team.player1.gender:
             gender_text = "женщину" if player.gender == "male" else "мужчину"
-            messages.error(request, f"Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола ({gender_text}).")
+            messages.error(
+                request,
+                f"Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола ({gender_text}).",
+            )
             return redirect("tournament_detail", slug=tournament.slug)
-    
+
     team.player2 = player
     team.save()
     try:
@@ -1109,10 +1323,13 @@ def _do_join_team(request, tournament, player, team):
     )
     try:
         from apps.telegram_bot import notifications as tg
+
         tg.notify_tournament_registered(request.user, tournament)
     except Exception:
         pass
-    messages.success(request, f"Вы присоединились к команде с {team.player1}. Регистрация завершена.")
+    messages.success(
+        request, f"Вы присоединились к команде с {team.player1}. Регистрация завершена."
+    )
     return redirect("tournament_detail", slug=tournament.slug)
 
 
@@ -1135,11 +1352,17 @@ def _do_add_partner(request, tournament, player, partner_id):
     # Проверка пола для микст-турниров
     if tournament.is_mixed_doubles():
         if not player.gender or not partner.gender:
-            messages.error(request, "Для участия в микст-турнире необходимо указать пол в профиле (у вас и у партнёра).")
+            messages.error(
+                request,
+                "Для участия в микст-турнире необходимо указать пол в профиле (у вас и у партнёра).",
+            )
             return redirect("tournament_register_doubles", slug=tournament.slug)
         if player.gender == partner.gender:
             gender_text = "женщину" if player.gender == "male" else "мужчину"
-            messages.error(request, f"Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола ({gender_text}).")
+            messages.error(
+                request,
+                f"Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола ({gender_text}).",
+            )
             return redirect("tournament_register_doubles", slug=tournament.slug)
 
     # Проверка всех условий регистрации для текущего игрока (включая категории)
@@ -1148,12 +1371,16 @@ def _do_add_partner(request, tournament, player, partner_id):
         messages.error(request, err)
         return redirect("tournament_detail", slug=tournament.slug)
 
-    partner_ok, partner_err = _check_user_can_register_for_tournament(partner.user, tournament)
+    partner_ok, partner_err = _check_user_can_register_for_tournament(
+        partner.user, tournament
+    )
     if not partner_ok:
         messages.error(request, f"Партнёр не может участвовать: {partner_err}")
         return redirect("tournament_register_doubles", slug=tournament.slug)
 
-    TournamentTeam.objects.create(tournament=tournament, player1=player, player2=partner)
+    TournamentTeam.objects.create(
+        tournament=tournament, player1=player, player2=partner
+    )
     try:
         sub = request.user.subscription
         if sub and sub.is_valid():
@@ -1173,6 +1400,7 @@ def _do_add_partner(request, tournament, player, partner_id):
     )
     try:
         from apps.telegram_bot import notifications as tg
+
         tg.notify_tournament_registered(request.user, tournament)
         tg.notify_tournament_registered(partner.user, tournament)
     except Exception:
@@ -1188,7 +1416,9 @@ def tournament_join_team(request, slug, team_id):
     if request.method != "POST":
         return redirect("tournament_detail", slug=slug)
     tournament = get_object_or_404(Tournament, slug=slug)
-    team = get_object_or_404(TournamentTeam, tournament=tournament, pk=team_id, player2__isnull=True)
+    team = get_object_or_404(
+        TournamentTeam, tournament=tournament, pk=team_id, player2__isnull=True
+    )
     player = getattr(request.user, "player", None)
     if player is None:
         player = Player.objects.create(user=request.user)

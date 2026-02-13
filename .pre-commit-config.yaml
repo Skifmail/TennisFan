@@ -14,3 +14,5 @@ repos:
     rev: v1.8.0
     hooks:
       - id: mypy
+        args: [--explicit-package-bases]
+        additional_dependencies: [types-requests, types-python-dateutil, types-Pillow]

@@ -7,13 +7,19 @@ import math
 from datetime import datetime, timedelta
 from typing import Optional
 
-from django.db import models
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.users.models import Notification, Player
 
-from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam, TournamentStatus, SeasonPoints
+from .models import (
+    Match,
+    SeasonPoints,
+    Tournament,
+    TournamentPlayerResult,
+    TournamentStatus,
+    TournamentTeam,
+)
 from .season_utils import get_current_season, get_season_display
 
 logger = logging.getLogger(__name__)
@@ -22,19 +28,27 @@ FAN_FORMAT = "single_elimination"
 BYE_EMAIL = "bye@tennisfan.local"
 
 
-def _update_season_points(player: Player, points: int) -> None:
+def _update_season_points(
+    player: Player, points: int, match: Match | None = None
+) -> None:
     """Обновить сезонные очки игрока.
-    
+
     Args:
         player: Игрок, которому начисляются очки.
         points: Количество FAN очков для добавления.
+        match: Опциональный объект матча для проверки типа (спарринги не дают очки).
     """
     if not player or getattr(player, "is_bye", False):
         return
-    
+
     if points <= 0:
         return
-    
+
+    # Спарринговые матчи не дают сезонные очки
+    if match and match.is_sparring():
+        logger.debug("Skipping season points for sparring match %s", match.pk)
+        return
+
     current_season = get_current_season()
     season_points, created = SeasonPoints.objects.get_or_create(
         player=player,
@@ -42,20 +56,33 @@ def _update_season_points(player: Player, points: int) -> None:
             "current_season_points": 0,
             "season_name": current_season.name,
             "season_year": current_season.year,
-        }
+        },
     )
-    
+
     # Если сезон изменился, сбросить очки (должно происходить через команду, но на всякий случай)
-    if season_points.season_name != current_season.name or season_points.season_year != current_season.year:
+    if (
+        season_points.season_name != current_season.name
+        or season_points.season_year != current_season.year
+    ):
         season_points.current_season_points = 0
         season_points.season_name = current_season.name
         season_points.season_year = current_season.year
-    
+
     season_points.current_season_points += points
-    season_points.save(update_fields=["current_season_points", "season_name", "season_year", "updated_at"])
+    season_points.save(
+        update_fields=[
+            "current_season_points",
+            "season_name",
+            "season_year",
+            "updated_at",
+        ]
+    )
     logger.debug(
         "Season points updated: %s +%d = %d (%s)",
-        player, points, season_points.current_season_points, get_season_display(current_season)
+        player,
+        points,
+        season_points.current_season_points,
+        get_season_display(current_season),
     )
 
 
@@ -65,10 +92,16 @@ def _is_fan(t: Tournament) -> bool:
 
 def _get_bye_player() -> Optional[Player]:
     """Служебный игрок «Свободный круг» для матчей при нечётном числе участников."""
-    return Player.objects.filter(user__email=BYE_EMAIL, is_bye=True).select_related("user").first()
+    return (
+        Player.objects.filter(user__email=BYE_EMAIL, is_bye=True)
+        .select_related("user")
+        .first()
+    )
 
 
-def _get_or_create_bye_team(tournament: Tournament, bye_player: Player) -> TournamentTeam:
+def _get_or_create_bye_team(
+    tournament: Tournament, bye_player: Player
+) -> TournamentTeam:
     """Команда «Свободный круг» для парного турнира при нечётном числе команд."""
     team, _ = TournamentTeam.objects.get_or_create(
         tournament=tournament,
@@ -95,8 +128,12 @@ def _fan_points_for_round(t: Tournament, round_index: int) -> int:
 
 
 def _round_eliminated(round_index: int) -> str:
-    m = {1: TournamentPlayerResult.RoundEliminated.R1, 2: TournamentPlayerResult.RoundEliminated.R2,
-         3: TournamentPlayerResult.RoundEliminated.SF, 4: TournamentPlayerResult.RoundEliminated.FINAL}
+    m = {
+        1: TournamentPlayerResult.RoundEliminated.R1,
+        2: TournamentPlayerResult.RoundEliminated.R2,
+        3: TournamentPlayerResult.RoundEliminated.SF,
+        4: TournamentPlayerResult.RoundEliminated.FINAL,
+    }
     return m.get(round_index, TournamentPlayerResult.RoundEliminated.R1)
 
 
@@ -117,8 +154,8 @@ def check_and_generate_past_deadline_brackets() -> int:
     Вызывать при загрузке страниц турниров (или по cron).
     Возвращает количество сформированных сеток.
     """
-    from django.core.cache import cache
     from django.conf import settings
+    from django.core.cache import cache
 
     from .round_robin import generate_bracket as generate_round_robin_bracket
 
@@ -127,9 +164,16 @@ def check_and_generate_past_deadline_brackets() -> int:
     cache_timeout = 10 if settings.DEBUG else 60
     if cache.get(cache_key):
         return 0
-    cache.set(cache_key, True, cache_timeout)  # не чаще раза в минуту (или 10 сек в DEBUG)
+    cache.set(
+        cache_key, True, cache_timeout
+    )  # не чаще раза в минуту (или 10 сек в DEBUG)
 
-    from .olympic_consolation import _is_olympic, generate_bracket as generate_olympic_bracket
+    from .olympic_consolation import (
+        _is_olympic,
+    )
+    from .olympic_consolation import (
+        generate_bracket as generate_olympic_bracket,
+    )
 
     now = timezone.now()
     qs = list(
@@ -149,20 +193,28 @@ def check_and_generate_past_deadline_brackets() -> int:
             if count < min_required:
                 notified_at = t.insufficient_participants_notified_at
                 if notified_at is None:
-                    from apps.core.telegram_notify import notify_tournament_insufficient_participants
+                    from apps.core.telegram_notify import (
+                        notify_tournament_insufficient_participants,
+                    )
+
                     notify_tournament_insufficient_participants(t)
                     t.insufficient_participants_notified_at = now
                     t.save(update_fields=["insufficient_participants_notified_at"])
                     logger.info(
                         "Insufficient participants for %s: %s/%s, notified admin",
-                        t.slug, count, min_required,
+                        t.slug,
+                        count,
+                        min_required,
                     )
                 elif (notified_at + timedelta(hours=3)) <= now:
                     from .cancel import cancel_tournament
+
                     cancel_tournament(t)
                     logger.info(
                         "Cancelled tournament %s: still insufficient after 3h (%s/%s)",
-                        t.slug, count, min_required,
+                        t.slug,
+                        count,
+                        min_required,
                     )
                 continue
 
@@ -191,13 +243,16 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     if tournament.bracket_generated:
         return False, "Сетка уже сформирована."
 
-    from .models import TournamentTeam
     from .solo_teams import remove_solo_teams_from_doubles_tournament
 
     if tournament.is_doubles():
         removed = remove_solo_teams_from_doubles_tournament(tournament)
         if removed:
-            logger.info("Removed %d solo teams from FAN doubles tournament %s", removed, tournament.slug)
+            logger.info(
+                "Removed %d solo teams from FAN doubles tournament %s",
+                removed,
+                tournament.slug,
+            )
 
     if tournament.is_doubles():
         entities = list(
@@ -224,7 +279,10 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     bye_player = _get_bye_player()
     odd = n % 2 == 1
     if odd and not bye_player:
-        return False, "Не найден служебный игрок «Свободный круг» (bye). Выполните миграции users."
+        return (
+            False,
+            "Не найден служебный игрок «Свободный круг» (bye). Выполните миграции users.",
+        )
 
     num_real = n // 2
     created = 0
@@ -251,7 +309,9 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
             round_index=1,
             round_order=round_order,
             is_consolation=False,
-            status=Match.MatchStatus.WALKOVER if walkover else Match.MatchStatus.SCHEDULED,
+            status=(
+                Match.MatchStatus.WALKOVER if walkover else Match.MatchStatus.SCHEDULED
+            ),
             deadline=start + delta,
             completed_datetime=timezone.now() if walkover else None,
             **kw,
@@ -260,7 +320,15 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
         round_order += 1
 
     if odd:
-        _create_match(entities[0], bye_player if not is_doubles else _get_or_create_bye_team(tournament, bye_player), walkover=True)
+        _create_match(
+            entities[0],
+            (
+                bye_player
+                if not is_doubles
+                else _get_or_create_bye_team(tournament, bye_player)
+            ),
+            walkover=True,
+        )
 
     for i in range(num_real):
         lo, hi = (i + 1, n - 1 - i) if odd else (i, n - 1 - i)
@@ -271,9 +339,16 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
 
     tournament.bracket_generated = True
     tournament.save(update_fields=["bracket_generated"])
-    logger.info("FAN bracket R1 created for %s: %d matches (n=%d, odd=%s)", tournament.name, created, n, odd)
+    logger.info(
+        "FAN bracket R1 created for %s: %d matches (n=%d, odd=%s)",
+        tournament.name,
+        created,
+        n,
+        odd,
+    )
     try:
         from apps.telegram_bot.notifications import notify_bracket_formed
+
         notify_bracket_formed(tournament)
     except Exception as e:
         logger.exception("notify_bracket_formed for %s: %s", tournament.slug, e)
@@ -292,7 +367,11 @@ def create_consolation_matches(tournament: Tournament) -> tuple[bool, str]:
     r1 = tournament.matches.filter(round_index=1, is_consolation=False)
     if r1.count() == 0:
         return False, "Нет матчей 1-го круга."
-    unfinished = [m for m in r1 if m.status not in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)]
+    unfinished = [
+        m
+        for m in r1
+        if m.status not in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
+    ]
     if unfinished:
         return False, "Не все матчи 1-го круга завершены."
 
@@ -402,12 +481,14 @@ def _next_match_pair(next_round_index: int, next_round_order: int) -> tuple[int,
     return (p1, p2)
 
 
-def advance_winner_and_award_loser(match: Match, skip_points: bool = False) -> Optional[Match]:
+def advance_winner_and_award_loser(
+    match: Match, skip_points: bool = False
+) -> Optional[Match]:
     """
     После подтверждения результата матча: выдать очки проигравшему,
     при необходимости создать матч следующего раунда и «перевести» победителя.
     Поддерживает одиночные и парные турниры.
-    
+
     Args:
         skip_points: Если True, не начислять очки проигравшему (для просроченных матчей).
     Возвращает созданный next_match или None.
@@ -446,10 +527,14 @@ def advance_winner_and_award_loser(match: Match, skip_points: bool = False) -> O
             TournamentPlayerResult.objects.update_or_create(
                 tournament=t,
                 player=loser,
-                defaults={"round_eliminated": round_elim, "fan_points": points, "is_consolation": is_cons},
+                defaults={
+                    "round_eliminated": round_elim,
+                    "fan_points": points,
+                    "is_consolation": is_cons,
+                },
             )
-            # Обновляем сезонные очки
-            _update_season_points(loser, points)
+            # Обновляем сезонные очки (только для турнирных матчей)
+            _update_season_points(loser, points, match=match)
 
     # Подвал: один круг. Проигравшие подвала уже вылетели в R1 и имеют запись. Обновляем очки? Нет — они уже 10.
     if is_cons:
@@ -464,7 +549,9 @@ def advance_winner_and_award_loser(match: Match, skip_points: bool = False) -> O
         return None
 
     prev_matches = list(
-        t.matches.filter(round_index=ri, round_order__in=(prev1, prev2), is_consolation=False)
+        t.matches.filter(
+            round_index=ri, round_order__in=(prev1, prev2), is_consolation=False
+        )
     )
     existing = t.matches.filter(
         round_index=next_ri, round_order=next_ro, is_consolation=False
@@ -484,14 +571,20 @@ def advance_winner_and_award_loser(match: Match, skip_points: bool = False) -> O
             t2_bye = m.team2_id and getattr(m.team2.player1, "is_bye", False)
             return bool(t1_bye or t2_bye)
         return m.winner_id is None and (
-            (bye_player and (m.player1_id == bye_player.pk or m.player2_id == bye_player.pk))
+            bye_player
+            and (m.player1_id == bye_player.pk or m.player2_id == bye_player.pk)
         )
 
     # Слот следующего раунда уже занят заглушкой (игрок vs Bye). Оба матча текущего раунда
     # завершены — подставляем победителя «не-bye» матча в заглушку.
     if existing and len(prev_matches) == 2 and _is_bye_placeholder(existing):
         bye_prev = next(
-            (m for m in prev_matches if getattr(m.player1, "is_bye", False) or getattr(m.player2, "is_bye", False)),
+            (
+                m
+                for m in prev_matches
+                if getattr(m.player1, "is_bye", False)
+                or getattr(m.player2, "is_bye", False)
+            ),
             None,
         )
         if bye_prev is not None:
@@ -499,13 +592,19 @@ def advance_winner_and_award_loser(match: Match, skip_points: bool = False) -> O
             if other_prev.winner_id or other_prev.winner_team_id:
                 if is_doubles:
                     other_winner_team = other_prev.winner_team
-                    if getattr(existing.team2.player1, "is_bye", False) if existing.team2_id else False:
+                    if (
+                        getattr(existing.team2.player1, "is_bye", False)
+                        if existing.team2_id
+                        else False
+                    ):
                         existing.team2 = other_winner_team
                         existing.player2 = other_winner_team.player1
                     else:
                         existing.team1 = other_winner_team
                         existing.player1 = other_winner_team.player1
-                    existing.save(update_fields=["team1", "team2", "player1", "player2"])
+                    existing.save(
+                        update_fields=["team1", "team2", "player1", "player2"]
+                    )
                 else:
                     other_winner = other_prev.winner
                     if existing.player2_id == bye_player.pk:
@@ -573,7 +672,9 @@ def advance_winner_and_award_loser(match: Match, skip_points: bool = False) -> O
             return None
         if is_doubles:
             other_winner_team = other_match.winner_team
-            if bye_placeholder.team2_id and getattr(bye_placeholder.team2.player1, "is_bye", False):
+            if bye_placeholder.team2_id and getattr(
+                bye_placeholder.team2.player1, "is_bye", False
+            ):
                 bye_placeholder.team2 = other_winner_team
                 bye_placeholder.player2 = other_winner_team.player1
             else:
@@ -667,20 +768,42 @@ def finalize_tournament(tournament: Tournament) -> tuple[bool, str]:
     if max_ri < expected_final_ri:
         return False, "Финал ещё не сыгран."
     final = tournament.matches.filter(is_consolation=False, round_index=max_ri).first()
-    if not final or final.status not in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER) or not final.winner:
+    if (
+        not final
+        or final.status not in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
+        or not final.winner
+    ):
         return False, "Финал не завершён."
 
     is_doubles = tournament.is_doubles() and final.team1_id and final.team2_id
     if is_doubles:
         winner_team = final.winner_team
         loser_team = final.team2 if winner_team == final.team1 else final.team1
-        if getattr(winner_team.player1, "is_bye", False) or getattr(loser_team.player1, "is_bye", False):
+        if getattr(winner_team.player1, "is_bye", False) or getattr(
+            loser_team.player1, "is_bye", False
+        ):
             return False, "Финал не может быть с участием служебного игрока."
         finalists = [
-            (loser_team.player1, TournamentPlayerResult.RoundEliminated.FINAL, tournament.fan_points_final),
-            (loser_team.player2, TournamentPlayerResult.RoundEliminated.FINAL, tournament.fan_points_final),
-            (winner_team.player1, TournamentPlayerResult.RoundEliminated.WINNER, tournament.fan_points_winner),
-            (winner_team.player2, TournamentPlayerResult.RoundEliminated.WINNER, tournament.fan_points_winner),
+            (
+                loser_team.player1,
+                TournamentPlayerResult.RoundEliminated.FINAL,
+                tournament.fan_points_final,
+            ),
+            (
+                loser_team.player2,
+                TournamentPlayerResult.RoundEliminated.FINAL,
+                tournament.fan_points_final,
+            ),
+            (
+                winner_team.player1,
+                TournamentPlayerResult.RoundEliminated.WINNER,
+                tournament.fan_points_winner,
+            ),
+            (
+                winner_team.player2,
+                TournamentPlayerResult.RoundEliminated.WINNER,
+                tournament.fan_points_winner,
+            ),
         ]
     else:
         winner = final.winner
@@ -688,8 +811,16 @@ def finalize_tournament(tournament: Tournament) -> tuple[bool, str]:
         if getattr(winner, "is_bye", False) or getattr(loser, "is_bye", False):
             return False, "Финал не может быть с участием служебного игрока."
         finalists = [
-            (loser, TournamentPlayerResult.RoundEliminated.FINAL, tournament.fan_points_final),
-            (winner, TournamentPlayerResult.RoundEliminated.WINNER, tournament.fan_points_winner),
+            (
+                loser,
+                TournamentPlayerResult.RoundEliminated.FINAL,
+                tournament.fan_points_final,
+            ),
+            (
+                winner,
+                TournamentPlayerResult.RoundEliminated.WINNER,
+                tournament.fan_points_winner,
+            ),
         ]
 
     for player, round_elim, points in finalists:
@@ -698,10 +829,16 @@ def finalize_tournament(tournament: Tournament) -> tuple[bool, str]:
         TournamentPlayerResult.objects.update_or_create(
             tournament=tournament,
             player=player,
-            defaults={"round_eliminated": round_elim, "fan_points": points, "is_consolation": False},
+            defaults={
+                "round_eliminated": round_elim,
+                "fan_points": points,
+                "is_consolation": False,
+            },
         )
-        # Обновляем сезонные очки
-        _update_season_points(player, points)
+        # Обновляем сезонные очки (только для турнирных матчей)
+        _update_season_points(
+            player, points, match=None
+        )  # В финале match уже завершен, но это турнирный матч
 
     tournament.status = "completed"
     tournament.save(update_fields=["status"])
@@ -748,8 +885,16 @@ def apply_overdue_walkover(match: Match, winner: Player) -> None:
         status=Match.ProposalStatus.REJECTED
     )
     url = reverse("match_detail", args=[match.pk])
-    Notification.objects.create(user=winner.user, message="Дедлайн матча истёк. Вам присуждена тех. победа.", url=url)
-    Notification.objects.create(user=loser.user, message="Дедлайн матча истёк. Вам засчитано тех. поражение.", url=url)
+    Notification.objects.create(
+        user=winner.user,
+        message="Дедлайн матча истёк. Вам присуждена тех. победа.",
+        url=url,
+    )
+    Notification.objects.create(
+        user=loser.user,
+        message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
+        url=url,
+    )
     logger.info("Overdue walkover: match %s → winner %s", match.pk, winner)
 
 
@@ -764,7 +909,9 @@ def process_overdue_match(match: Match) -> tuple[bool, str]:
         return False, "Матч уже завершён."
     if not match.deadline or match.deadline > timezone.now():
         return False, "Дедлайн не истёк."
-    if getattr(match.player1, "is_bye", False) and getattr(match.player2, "is_bye", False):
+    if getattr(match.player1, "is_bye", False) and getattr(
+        match.player2, "is_bye", False
+    ):
         return False, "Служебный матч."
 
     winner = _overdue_winner(match)
@@ -776,4 +923,7 @@ def process_overdue_match(match: Match) -> tuple[bool, str]:
         ensure_consolation_created(match.tournament)
     finalize_tournament(match.tournament)
 
-    return True, f"Матч {match.pk} ({match.player1} vs {match.player2}): тех. победа {winner} (дедлайн истёк)."
+    return (
+        True,
+        f"Матч {match.pk} ({match.player1} vs {match.player2}): тех. победа {winner} (дедлайн истёк).",
+    )

@@ -11,18 +11,24 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.utils.html import linebreaks
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_safe
-from django.utils.html import linebreaks
 
 from apps.content.models import News, RulesSection
-from apps.tournaments.models import Match, Tournament, TournamentDuration, TournamentGender, TournamentStatus, SeasonArchive
+from apps.tournaments.models import (
+    Match,
+    SeasonArchive,
+    Tournament,
+    TournamentDuration,
+    TournamentGender,
+    TournamentStatus,
+)
 from apps.users.models import Player, SkillLevel
 
-from .forms import FeedbackForm
-from .models import Feedback, FeedbackReply, SupportMessage, UserTelegramLink
-from .telegram_notify import send_feedback_to_telegram
 from . import telegram_support as tg_support
+from .forms import FeedbackForm
+from .models import SupportMessage, UserTelegramLink
 
 logger = logging.getLogger(__name__)
 
@@ -39,75 +45,85 @@ def home(request):
         .order_by("start_date")[:6]
     )
 
-    city = request.GET.get('city', '')
-    category = request.GET.get('category', '')
-    gender = request.GET.get('gender', '')
-    duration = request.GET.get('duration', '')
+    city = request.GET.get("city", "")
+    category = request.GET.get("category", "")
+    gender = request.GET.get("gender", "")
+    duration = request.GET.get("duration", "")
 
     if city:
         tournaments = tournaments.filter(city__icontains=city)
     if category:
-        tournaments = tournaments.filter(allowed_categories__category=category).distinct()
+        tournaments = tournaments.filter(
+            allowed_categories__category=category
+        ).distinct()
     if gender:
         tournaments = tournaments.filter(gender=gender)
     if duration:
         tournaments = tournaments.filter(duration=duration)
 
-    tournaments = tournaments.order_by('start_date')
+    tournaments = tournaments.order_by("start_date")
 
     # Получаем топ игроков по сезонным очкам
-    from apps.tournaments.models import SeasonPoints
+    from django.db.models import Case, F, IntegerField, Value, When
+
     from apps.tournaments.season_utils import get_current_season
-    from django.db.models import Case, When, Value, IntegerField, F
-    
+
     current_season = get_current_season()
-    top_players = Player.objects.filter(is_verified=True, is_bye=False).select_related(
-        'user', 'user__subscription', 'user__subscription__tier', 'season_points'
-    ).annotate(
-        season_pts=Case(
-            When(
-                season_points__season_name=current_season.name,
-                season_points__season_year=current_season.year,
-                then=F('season_points__current_season_points')
-            ),
-            default=Value(0),
-            output_field=IntegerField()
+    top_players = (
+        Player.objects.filter(is_verified=True, is_bye=False)
+        .select_related(
+            "user", "user__subscription", "user__subscription__tier", "season_points"
         )
-    ).order_by('-season_pts', '-total_points')[:10]
+        .annotate(
+            season_pts=Case(
+                When(
+                    season_points__season_name=current_season.name,
+                    season_points__season_year=current_season.year,
+                    then=F("season_points__current_season_points"),
+                ),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        )
+        .order_by("-season_pts", "-total_points")[:10]
+    )
 
     context = {
-        'filtered_tournaments': tournaments,
-        'upcoming_tournaments': upcoming_tournaments,
-        'top_players': top_players,
-        'latest_news': News.objects.filter(is_published=True)[:4],
-        'current_filters': {
-            'city': city,
-            'category': category,
-            'gender': gender,
-            'duration': duration,
+        "filtered_tournaments": tournaments,
+        "upcoming_tournaments": upcoming_tournaments,
+        "top_players": top_players,
+        "latest_news": News.objects.filter(is_published=True)[:4],
+        "current_filters": {
+            "city": city,
+            "category": category,
+            "gender": gender,
+            "duration": duration,
         },
-        'category_choices': SkillLevel.choices,
-        'gender_choices': TournamentGender.choices,
-        'duration_choices': TournamentDuration.choices,
+        "category_choices": SkillLevel.choices,
+        "gender_choices": TournamentGender.choices,
+        "duration_choices": TournamentDuration.choices,
     }
-    return render(request, 'core/home.html', context)
+    return render(request, "core/home.html", context)
 
 
 def rating(request):
     """Player rating page - сортировка по сезонным очкам."""
-    from apps.tournaments.models import SeasonPoints
     from apps.tournaments.season_utils import get_current_season
-    
-    city = request.GET.get('city', '')
-    skill_level = request.GET.get('skill_level', '') or request.GET.get('category', '')
-    search = request.GET.get('q', '')
+
+    city = request.GET.get("city", "")
+    skill_level = request.GET.get("skill_level", "") or request.GET.get("category", "")
+    search = request.GET.get("q", "")
 
     current_season = get_current_season()
-    
+
     # Получаем игроков с сезонными очками (исключаем служебного игрока "Свободный круг")
-    players = Player.objects.filter(is_bye=False).select_related(
-        'user', 'user__subscription', 'user__subscription__tier', 'season_points'
-    ).prefetch_related('season_points')
+    players = (
+        Player.objects.filter(is_bye=False)
+        .select_related(
+            "user", "user__subscription", "user__subscription__tier", "season_points"
+        )
+        .prefetch_related("season_points")
+    )
 
     if city:
         players = players.filter(city__icontains=city)
@@ -115,55 +131,62 @@ def rating(request):
         players = players.filter(skill_level=skill_level)
     if search:
         players = players.filter(
-            Q(user__first_name__icontains=search) |
-            Q(user__last_name__icontains=search)
+            Q(user__first_name__icontains=search) | Q(user__last_name__icontains=search)
         )
 
     # Сортируем по сезонным очкам текущего сезона
     # Используем аннотацию для получения сезонных очков
-    from django.db.models import Case, When, Value, IntegerField, F
-    
+    from django.db.models import Case, F, IntegerField, Value, When
+
     players = players.annotate(
         season_pts=Case(
             When(
                 season_points__season_name=current_season.name,
                 season_points__season_year=current_season.year,
-                then=F('season_points__current_season_points')
+                then=F("season_points__current_season_points"),
             ),
             default=Value(0),
-            output_field=IntegerField()
+            output_field=IntegerField(),
         )
-    ).order_by('-season_pts', '-total_points')
+    ).order_by("-season_pts", "-total_points")
 
     context = {
-        'players': players,
-        'current_city': city,
-        'current_skill_level': skill_level,
-        'search_query': search,
-        'skill_level_choices': SkillLevel.choices,
-        'current_season_display': f"{current_season.name} {current_season.year}",
+        "players": players,
+        "current_city": city,
+        "current_skill_level": skill_level,
+        "search_query": search,
+        "skill_level_choices": SkillLevel.choices,
+        "current_season_display": f"{current_season.name} {current_season.year}",
     }
-    return render(request, 'core/rating.html', context)
+    return render(request, "core/rating.html", context)
 
 
 def hall_of_fame(request):
     """Зал Славы - архив результатов сезонов."""
-    season_filter = request.GET.get('season', '')
-    
+    season_filter = request.GET.get("season", "")
+
     # Получаем все уникальные сезоны из архива
-    seasons = SeasonArchive.objects.values('season_name', 'season_year').distinct().order_by('-season_year', '-season_name')
-    
+    seasons = (
+        SeasonArchive.objects.values("season_name", "season_year")
+        .distinct()
+        .order_by("-season_year", "-season_name")
+    )
+
     # Если выбран конкретный сезон, фильтруем
     if season_filter:
-        parts = season_filter.split('_')
+        parts = season_filter.split("_")
         if len(parts) == 2:
             try:
                 season_name = "Зима" if parts[0] == "winter" else "Лето"
                 season_year = int(parts[1])
-                archives = SeasonArchive.objects.filter(
-                    season_name=season_name,
-                    season_year=season_year,
-                ).select_related('player', 'player__user').order_by('final_rank', '-final_points')
+                archives = (
+                    SeasonArchive.objects.filter(
+                        season_name=season_name,
+                        season_year=season_year,
+                    )
+                    .select_related("player", "player__user")
+                    .order_by("final_rank", "-final_points")
+                )
             except (ValueError, KeyError):
                 archives = SeasonArchive.objects.none()
         else:
@@ -172,41 +195,49 @@ def hall_of_fame(request):
         # Показываем последний сезон по умолчанию
         if seasons:
             last_season = seasons[0]
-            archives = SeasonArchive.objects.filter(
-                season_name=last_season['season_name'],
-                season_year=last_season['season_year'],
-            ).select_related('player', 'player__user').order_by('final_rank', '-final_points')
+            archives = (
+                SeasonArchive.objects.filter(
+                    season_name=last_season["season_name"],
+                    season_year=last_season["season_year"],
+                )
+                .select_related("player", "player__user")
+                .order_by("final_rank", "-final_points")
+            )
         else:
             archives = SeasonArchive.objects.none()
-    
+
     # Формируем список сезонов для выпадающего списка
     season_list = []
     for s in seasons:
-        season_key = f"{'winter' if s['season_name'] == 'Зима' else 'summer'}_{s['season_year']}"
+        season_key = (
+            f"{'winter' if s['season_name'] == 'Зима' else 'summer'}_{s['season_year']}"
+        )
         season_display = f"{s['season_name']} {s['season_year']}"
-        season_list.append({
-            'key': season_key,
-            'display': season_display,
-            'name': s['season_name'],
-            'year': s['season_year'],
-        })
-    
+        season_list.append(
+            {
+                "key": season_key,
+                "display": season_display,
+                "name": s["season_name"],
+                "year": s["season_year"],
+            }
+        )
+
     context = {
-        'archives': archives,
-        'seasons': season_list,
-        'current_season': season_filter,
+        "archives": archives,
+        "seasons": season_list,
+        "current_season": season_filter,
     }
-    return render(request, 'core/hall_of_fame.html', context)
+    return render(request, "core/hall_of_fame.html", context)
 
 
 def results(request):
     """Match results page."""
-    matches = Match.objects.filter(
-        status=Match.MatchStatus.COMPLETED
-    ).select_related(
-        'player1__user', 'player2__user', 'winner__user', 'tournament'
-    ).order_by('-completed_datetime')[:50]
-    return render(request, 'core/results.html', {'matches': matches})
+    matches = (
+        Match.objects.filter(status=Match.MatchStatus.COMPLETED)
+        .select_related("player1__user", "player2__user", "winner__user", "tournament")
+        .order_by("-completed_datetime")[:50]
+    )
+    return render(request, "core/results.html", {"matches": matches})
 
 
 def _is_html_content(text: str) -> bool:
@@ -233,7 +264,12 @@ def rules(request):
 
 
 def _create_support_message_and_send_to_admin(
-    request, subject: str, message: str, guest_name: str = None, guest_contact: str = None, guest_telegram_username: str = None
+    request,
+    subject: str,
+    message: str,
+    guest_name: str | None = None,
+    guest_contact: str | None = None,
+    guest_telegram_username: str | None = None,
 ):
     """
     Создать SupportMessage, отправить админу в Telegram, сохранить admin_telegram_message_id.
@@ -241,8 +277,7 @@ def _create_support_message_and_send_to_admin(
     Поддерживает как зарегистрированных пользователей, так и гостей.
     """
     import secrets
-    from django.utils import timezone
-    
+
     if request.user.is_authenticated:
         support_msg = SupportMessage.objects.create(
             user=request.user,
@@ -259,11 +294,11 @@ def _create_support_message_and_send_to_admin(
         # Незарегистрированный пользователь (гость)
         guest_tg_username = (guest_telegram_username or "").strip().lstrip("@")
         binding_token = None
-        
+
         # Если гость указал Telegram username, создаем токен привязки
         if guest_tg_username and tg_support.is_telegram_configured():
             binding_token = secrets.token_urlsafe(32)
-        
+
         support_msg = SupportMessage.objects.create(
             user=None,
             guest_name=(guest_name or "")[:200].strip(),
@@ -279,7 +314,7 @@ def _create_support_message_and_send_to_admin(
         is_guest = True
         guest_contact_val = guest_contact or ""
         guest_telegram_val = guest_tg_username
-    
+
     text_for_admin = tg_support.format_support_message_to_admin(
         support_message_id=support_msg.pk,
         user_display=user_display,
@@ -295,7 +330,9 @@ def _create_support_message_and_send_to_admin(
     if ok and msg_id is not None:
         support_msg.admin_telegram_message_id = msg_id
         support_msg.admin_telegram_text = text_for_admin
-        support_msg.save(update_fields=["admin_telegram_message_id", "admin_telegram_text"])
+        support_msg.save(
+            update_fields=["admin_telegram_message_id", "admin_telegram_text"]
+        )
 
     binding_url = None
     if request.user.is_authenticated and tg_support.is_telegram_configured():
@@ -311,11 +348,17 @@ def _create_support_message_and_send_to_admin(
             bot_username = tg_support.get_bot_username()
             if bot_username:
                 binding_url = f"https://t.me/{bot_username}?start={token}"
-    elif is_guest and support_msg.guest_binding_token and tg_support.is_telegram_configured():
+    elif (
+        is_guest
+        and support_msg.guest_binding_token
+        and tg_support.is_telegram_configured()
+    ):
         # Для гостя создаем ссылку привязки, если указан Telegram username
         bot_username = tg_support.get_bot_username()
         if bot_username:
-            binding_url = f"https://t.me/{bot_username}?start={support_msg.guest_binding_token}"
+            binding_url = (
+                f"https://t.me/{bot_username}?start={support_msg.guest_binding_token}"
+            )
 
     return support_msg, binding_url
 
@@ -337,7 +380,9 @@ def support_feedback(request):
 
     subject = (form.cleaned_data.get("subject") or "").strip()
     message = (form.cleaned_data.get("message") or "").strip()
-    _, binding_url = _create_support_message_and_send_to_admin(request, subject, message)
+    _, binding_url = _create_support_message_and_send_to_admin(
+        request, subject, message
+    )
 
     return render(
         request,
@@ -364,38 +409,52 @@ def support_feedback_submit(request):
         guest_contact = (data.get("guest_contact") or "").strip()
         guest_telegram_username = (data.get("guest_telegram_username") or "").strip()
     except (json.JSONDecodeError, TypeError):
-        return JsonResponse({"success": False, "error": "Неверный формат запроса"}, status=400)
+        return JsonResponse(
+            {"success": False, "error": "Неверный формат запроса"}, status=400
+        )
 
     if not message:
-        return JsonResponse({"success": False, "error": "Введите сообщение."}, status=400)
+        return JsonResponse(
+            {"success": False, "error": "Введите сообщение."}, status=400
+        )
 
     # Для незарегистрированных пользователей имя обязательно
     if not request.user.is_authenticated:
         if not guest_name:
-            return JsonResponse({"success": False, "error": "Введите ваше имя."}, status=400)
+            return JsonResponse(
+                {"success": False, "error": "Введите ваше имя."}, status=400
+            )
 
-    _, binding_url = _create_support_message_and_send_to_admin(
-        request, subject, message, guest_name=guest_name, guest_contact=guest_contact, guest_telegram_username=guest_telegram_username
+    support_msg, binding_url = _create_support_message_and_send_to_admin(
+        request,
+        subject,
+        message,
+        guest_name=guest_name,
+        guest_contact=guest_contact,
+        guest_telegram_username=guest_telegram_username,
     )
 
-    payload = {"success": True}
+    # Для гостей сохраняем message_id в session для получения истории
+    if not request.user.is_authenticated:
+        guest_message_ids = request.session.get("feedback_guest_message_ids", [])
+        if support_msg.pk not in guest_message_ids:
+            guest_message_ids.append(support_msg.pk)
+            request.session["feedback_guest_message_ids"] = guest_message_ids
+            request.session.modified = True
+
+    payload = {
+        "success": True,
+        "message_id": support_msg.pk,
+    }
     if binding_url:
         payload["telegram_binding_url"] = binding_url
-        if request.user.is_authenticated:
-            payload["message"] = "Ваше сообщение принято. Ответ придёт в Telegram. Привяжите аккаунт по ссылке, чтобы получать ответы."
-        else:
-            payload["message"] = "Ваше сообщение принято. Перейдите по ссылке ниже, чтобы привязать Telegram бота и получать ответы администратора в Telegram."
-    else:
-        if request.user.is_authenticated:
-            payload["message"] = "Ваше сообщение принято. Ответ придёт в Telegram."
-        else:
-            payload["message"] = "Ваше сообщение принято. Администратор свяжется с вами по указанным контактам. Рекомендуем указать Telegram username при следующем обращении для быстрого ответа."
     return JsonResponse(payload)
 
 
 # ---------------------------------------------------------------------------
 # Telegram Webhook: /start, сообщения пользователя, ответы админа
 # ---------------------------------------------------------------------------
+
 
 def _support_webhook_secret_ok(request) -> bool:
     """Проверка секрета webhook бота поддержки (X-Telegram-Bot-Api-Secret-Token)."""
@@ -438,48 +497,73 @@ def telegram_support_webhook(request):
         if not original_message_id:
             return JsonResponse({"ok": True})
 
-        support_msg = SupportMessage.objects.filter(
-            admin_telegram_message_id=original_message_id,
-        ).select_related("user").first()
+        support_msg = (
+            SupportMessage.objects.filter(
+                admin_telegram_message_id=original_message_id,
+            )
+            .select_related("user")
+            .first()
+        )
         if not support_msg:
-            logger.debug("Webhook: no SupportMessage for message_id=%s", original_message_id)
+            logger.debug(
+                "Webhook: no SupportMessage for message_id=%s", original_message_id
+            )
             return JsonResponse({"ok": True})
 
         user = support_msg.user
         is_guest = user is None
         sent_via_telegram = False
-        
+
         # Если это зарегистрированный пользователь с привязанным Telegram, отправляем ответ
         if user:
             link = getattr(user, "telegram_link", None)
             if link and link.telegram_chat_id:
-                safe_text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                tg_support.send_to_user(link.telegram_chat_id, f"📩 <b>Ответ поддержки:</b>\n\n{safe_text}")
+                safe_text = (
+                    text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                )
+                tg_support.send_to_user(
+                    link.telegram_chat_id, f"📩 <b>Ответ поддержки:</b>\n\n{safe_text}"
+                )
                 sent_via_telegram = True
         elif is_guest and support_msg.guest_telegram_chat_id:
             # Если гость привязал Telegram, отправляем ответ через бот
-            safe_text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            tg_support.send_to_user(support_msg.guest_telegram_chat_id, f"📩 <b>Ответ поддержки:</b>\n\n{safe_text}")
+            safe_text = (
+                text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            )
+            tg_support.send_to_user(
+                support_msg.guest_telegram_chat_id,
+                f"📩 <b>Ответ поддержки:</b>\n\n{safe_text}",
+            )
             sent_via_telegram = True
-        
+
         # Сохраняем ответ админа в БД
         SupportMessage.objects.create(
             user=user,
             guest_name=support_msg.guest_name if is_guest else "",
             guest_contact=support_msg.guest_contact if is_guest else "",
-            guest_telegram_username=support_msg.guest_telegram_username if is_guest else "",
-            guest_telegram_chat_id=support_msg.guest_telegram_chat_id if is_guest else None,
+            guest_telegram_username=(
+                support_msg.guest_telegram_username if is_guest else ""
+            ),
+            guest_telegram_chat_id=(
+                support_msg.guest_telegram_chat_id if is_guest else None
+            ),
             text=text,
             is_from_admin=True,
         )
-        
+
         # Обновляем сообщение админу с пометкой об отправке ответа
         if support_msg.admin_telegram_text and support_msg.admin_telegram_message_id:
             if is_guest:
                 if sent_via_telegram:
-                    new_text = support_msg.admin_telegram_text + "\n\n✅ Ответ отправлен в Telegram"
+                    new_text = (
+                        support_msg.admin_telegram_text
+                        + "\n\n✅ Ответ отправлен в Telegram"
+                    )
                 else:
-                    new_text = support_msg.admin_telegram_text + "\n\n✅ Ответ сохранён. Свяжитесь с пользователем по указанным контактам (Telegram не привязан)."
+                    new_text = (
+                        support_msg.admin_telegram_text
+                        + "\n\n✅ Ответ сохранён. Свяжитесь с пользователем по указанным контактам (Telegram не привязан)."
+                    )
             else:
                 new_text = support_msg.admin_telegram_text + "\n\n✅ Ответ отправлен"
             tg_support.edit_message(admin_chat_id, original_message_id, new_text)
@@ -511,48 +595,64 @@ def telegram_support_webhook(request):
                 link.telegram_chat_id = chat_id_int
                 link.binding_token = ""
                 link.token_created_at = None
-                link.save(update_fields=["telegram_chat_id", "binding_token", "token_created_at"])
+                link.save(
+                    update_fields=[
+                        "telegram_chat_id",
+                        "binding_token",
+                        "token_created_at",
+                    ]
+                )
                 # Переносим гостевые сообщения к этому пользователю, если они есть
                 migrated_count = link.migrate_guest_messages()
                 if migrated_count > 0:
                     tg_support.send_message(
                         chat_id_int,
                         f"✅ Ваш аккаунт успешно привязан.\n"
-                        f"📨 Найдено и привязано {migrated_count} обращений, отправленных до регистрации."
+                        f"📨 Найдено и привязано {migrated_count} обращений, отправленных до регистрации.",
                     )
                 else:
-                    tg_support.send_message(chat_id_int, "✅ Ваш аккаунт успешно привязан.")
+                    tg_support.send_message(
+                        chat_id_int, "✅ Ваш аккаунт успешно привязан."
+                    )
             else:
                 # Проверяем токен для гостей
-                guest_msg = SupportMessage.objects.filter(guest_binding_token=token, user__isnull=True).first()
+                guest_msg = SupportMessage.objects.filter(
+                    guest_binding_token=token, user__isnull=True
+                ).first()
                 if guest_msg:
                     guest_msg.guest_telegram_chat_id = chat_id_int
                     guest_msg.guest_binding_token = ""
-                    guest_msg.save(update_fields=["guest_telegram_chat_id", "guest_binding_token"])
+                    guest_msg.save(
+                        update_fields=["guest_telegram_chat_id", "guest_binding_token"]
+                    )
                     tg_support.send_message(
                         chat_id_int,
                         f"✅ Ваш Telegram успешно привязан для получения ответов на обращение #{guest_msg.pk}.\n"
-                        f"Администратор сможет ответить вам здесь в Telegram."
+                        f"Администратор сможет ответить вам здесь в Telegram.",
                     )
                 else:
-                    tg_support.send_message(chat_id_int, "Токен не найден или устарел. Отправьте форму на сайте заново и перейдите по новой ссылке.")
+                    tg_support.send_message(
+                        chat_id_int,
+                        "Токен не найден или устарел. Отправьте форму на сайте заново и перейдите по новой ссылке.",
+                    )
         else:
             # /start без токена — проверяем, привязан ли уже этот чат
-            existing = UserTelegramLink.objects.filter(telegram_chat_id=chat_id_int).first()
+            existing = UserTelegramLink.objects.filter(
+                telegram_chat_id=chat_id_int
+            ).first()
             if existing:
                 tg_support.send_message(chat_id_int, "✅ Ваш аккаунт уже привязан.")
             else:
                 # Проверяем, есть ли гостевые сообщения с таким chat_id
                 guest_messages = SupportMessage.objects.filter(
-                    user__isnull=True,
-                    guest_telegram_chat_id=chat_id_int
+                    user__isnull=True, guest_telegram_chat_id=chat_id_int
                 ).first()
                 if guest_messages:
                     tg_support.send_message(
                         chat_id_int,
                         "Вы отправили обращение как незарегистрированный пользователь. "
                         "Зарегистрируйтесь на сайте и привяжите аккаунт по ссылке из профиля, "
-                        "чтобы ваши обращения были привязаны к вашему аккаунту."
+                        "чтобы ваши обращения были привязаны к вашему аккаунту.",
                     )
                 else:
                     tg_support.send_message(
@@ -595,7 +695,9 @@ def telegram_support_webhook(request):
         if ok and msg_id is not None:
             support_msg.admin_telegram_message_id = msg_id
             support_msg.admin_telegram_text = text_for_admin
-            support_msg.save(update_fields=["admin_telegram_message_id", "admin_telegram_text"])
+            support_msg.save(
+                update_fields=["admin_telegram_message_id", "admin_telegram_text"]
+            )
 
         return JsonResponse({"ok": True})
 
@@ -605,6 +707,7 @@ def telegram_support_webhook(request):
 # ---------------------------------------------------------------------------
 # Старые эндпоинты (виджет на сайте — можно переключить на support_feedback_submit)
 # ---------------------------------------------------------------------------
+
 
 @require_http_methods(["GET"])
 def feedback(request):
@@ -621,23 +724,39 @@ def feedback_submit(request):
     return support_feedback_submit(request)
 
 
-@login_required
 @require_safe
 def feedback_threads(request):
-    """API: список обращений пользователя (SupportMessage) для виджета."""
+    """
+    API: список обращений пользователя (SupportMessage) для виджета.
+    Поддерживает как авторизованных пользователей, так и гостей (через session).
+    """
     threads = []
-    messages = (
-        SupportMessage.objects.filter(user=request.user)
-        .order_by("created_at")[:50]
-    )
+    messages = []
+
+    if request.user.is_authenticated:
+        # Для авторизованных пользователей - получаем все их сообщения
+        messages = SupportMessage.objects.filter(user=request.user).order_by(
+            "created_at"
+        )[:50]
+    else:
+        # Для гостей - получаем сообщения из session или по guest_binding_token
+        guest_message_ids = request.session.get("feedback_guest_message_ids", [])
+        if guest_message_ids:
+            messages = SupportMessage.objects.filter(
+                pk__in=guest_message_ids,
+                user__isnull=True,
+            ).order_by("created_at")[:50]
+
     current_thread = []
     for m in messages:
-        current_thread.append({
-            "id": m.pk,
-            "text": m.text,
-            "is_from_admin": m.is_from_admin,
-            "created_at": m.created_at.isoformat(),
-        })
+        current_thread.append(
+            {
+                "id": m.pk,
+                "text": m.text,
+                "is_from_admin": m.is_from_admin,
+                "created_at": m.created_at.isoformat(),
+            }
+        )
     if current_thread:
         threads.append({"messages": current_thread})
     return JsonResponse({"threads": threads})

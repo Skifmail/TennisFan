@@ -68,6 +68,7 @@
                             {% endif %}
                             <li><a href="{% url 'pricing' %}">Купить подписку</a></li>
                             <li><a href="{% url 'my_matches' %}">Мои матчи</a></li>
+                            <li><a href="{% url 'my_sparring_matches' %}">Личные встречи</a></li>
                             <li><a href="{% url 'my_trainings' %}">Мои тренировки</a></li>
                             <li><a href="{% url 'notifications' %}" class="nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a></li>
                             {% if user.is_staff or user.is_superuser %}
@@ -180,61 +181,66 @@
 
     <!-- Плавающая кнопка «Написать нам» -->
     <div id="feedback-widget" class="feedback-widget" data-submit-url="{% url 'feedback_submit' %}" data-threads-url="{% url 'feedback_threads' %}" data-csrf="{{ csrf_token }}" data-is-authenticated="{% if user.is_authenticated %}1{% else %}0{% endif %}">
+        <!-- Кнопка открытия чата -->
         <button type="button" class="feedback-widget__btn" id="feedback-widget-btn" aria-label="Написать нам">
             <span class="feedback-widget__icon" aria-hidden="true">
                 <img src="{% static 'images/chat_icon.png' %}" alt="" class="feedback-widget__icon-img" width="24" height="24">
             </span>
             <span class="feedback-widget__label">НАПИСАТЬ НАМ</span>
         </button>
-    </div>
 
-    <div id="feedback-modal" class="feedback-modal" aria-hidden="true">
-        <div class="feedback-modal__backdrop" id="feedback-modal-backdrop"></div>
-        <div class="feedback-modal__box">
-            <div class="feedback-modal__header">
-                <h2 class="feedback-modal__title">Обратная связь</h2>
-                <button type="button" class="feedback-modal__close" id="feedback-modal-close" aria-label="Закрыть">&times;</button>
+        <!-- Виджет чата (скрыт по умолчанию) -->
+        <div id="feedback-chat-widget" class="feedback-chat-widget" aria-hidden="true">
+            <div class="feedback-chat-widget__header">
+                <div class="feedback-chat-widget__header-content">
+                    <h3 class="feedback-chat-widget__title">Обратная связь</h3>
+                    <button type="button" class="feedback-chat-widget__close" id="feedback-chat-close" aria-label="Закрыть">&times;</button>
+                </div>
+                <div class="feedback-chat-widget__telegram-banner" id="feedback-telegram-banner" style="display:none;">
+                    <p class="feedback-chat-widget__telegram-text">
+                        <span>📱 Привяжите Telegram, чтобы получать ответы быстрее</span>
+                        <a href="#" id="feedback-telegram-link" class="feedback-chat-widget__telegram-link" target="_blank" rel="noopener noreferrer">Привязать</a>
+                    </p>
+                </div>
             </div>
-            <div class="feedback-modal__body">
-                <div id="feedback-form-wrap">
-                    <form id="feedback-form" class="feedback-form">
-                        {% csrf_token %}
-                        {% if not user.is_authenticated %}
-                        <div class="form-group">
-                            <label class="form-label" for="feedback-guest-name">Ваше имя *</label>
-                            <input type="text" id="feedback-guest-name" name="guest_name" class="form-control" maxlength="200" required placeholder="Как к вам обращаться?">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="feedback-guest-telegram">Telegram username (необязательно, но рекомендуется)</label>
-                            <input type="text" id="feedback-guest-telegram" name="guest_telegram_username" class="form-control" maxlength="100" placeholder="@username (без @)">
-                            <small class="text-muted" style="font-size: 0.85rem; display: block; margin-top: 0.25rem;">Укажите ваш Telegram username, чтобы получать ответы в Telegram. После отправки вы получите ссылку для привязки бота.</small>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="feedback-guest-contact">Email или телефон (необязательно)</label>
-                            <input type="text" id="feedback-guest-contact" name="guest_contact" class="form-control" maxlength="200" placeholder="Для связи с вами">
-                        </div>
-                        {% endif %}
-                        <div class="form-group">
-                            <label class="form-label" for="feedback-subject">Тема (необязательно)</label>
-                            <input type="text" id="feedback-subject" name="subject" class="form-control" maxlength="200" placeholder="Кратко о чём">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="feedback-message">Сообщение *</label>
-                            <textarea id="feedback-message" name="message" class="form-control" rows="4" required placeholder="Ваше сообщение"></textarea>
-                            <p id="feedback-form-error" class="text-error" style="display:none; margin-top: var(--spacing-xs); font-size: var(--font-size-sm);"></p>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Отправить</button>
-                    </form>
+
+            <!-- Область сообщений с прокруткой -->
+            <div class="feedback-chat-widget__messages" id="feedback-messages-container">
+                <div class="feedback-chat-widget__messages-list" id="feedback-messages-list">
+                    <!-- Сообщения будут добавляться динамически -->
+                    <div class="feedback-chat-widget__welcome" id="feedback-welcome-message">
+                        <p>Здравствуйте! Напишите ваш вопрос, и мы ответим в ближайшее время.</p>
+                    </div>
                 </div>
-                <div id="feedback-success" class="feedback-success" style="display:none;">
-                    <p>Сообщение отправлено. {% if user.is_authenticated %}Ответ администратора появится здесь после ответа в Telegram.{% else %}Если вы указали Telegram username, перейдите по ссылке для привязки бота, чтобы получать ответы в Telegram.{% endif %}</p>
+            </div>
+
+            <!-- Форма ввода (только для первого сообщения от гостя) -->
+            {% if not user.is_authenticated %}
+            <div class="feedback-chat-widget__guest-form" id="feedback-guest-form">
+                <div class="form-group">
+                    <input type="text" id="feedback-guest-name" name="guest_name" class="form-control" maxlength="200" required placeholder="Ваше имя *">
                 </div>
-                {% if user.is_authenticated %}
-                <div class="feedback-modal__threads" id="feedback-threads-wrap">
-                    <h3 class="feedback-modal__threads-title">Ваши обращения</h3>
-                    <div id="feedback-threads-list"></div>
+                <div class="form-group">
+                    <input type="text" id="feedback-guest-telegram" name="guest_telegram_username" class="form-control" maxlength="100" placeholder="Telegram @username (необязательно)">
                 </div>
-                {% endif %}
+                <div class="form-group">
+                    <input type="text" id="feedback-guest-contact" name="guest_contact" class="form-control" maxlength="200" placeholder="Email или телефон (необязательно)">
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Поле ввода сообщения -->
+            <div class="feedback-chat-widget__input-area">
+                <div class="feedback-chat-widget__input-wrapper">
+                    <input type="text" id="feedback-message-input" class="feedback-chat-widget__input" placeholder="Введите сообщение..." maxlength="2000" autocomplete="off">
+                    <button type="button" id="feedback-send-btn" class="feedback-chat-widget__send-btn" aria-label="Отправить">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+                <p id="feedback-form-error" class="feedback-chat-widget__error" style="display:none;"></p>
             </div>
         </div>
     </div>

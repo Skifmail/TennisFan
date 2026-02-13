@@ -42,6 +42,23 @@
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <label class="form-label">Предпочтительное место</label>
+                    {{ form.preferred_location }}
+                    <p class="text-muted mt-1" style="font-size: var(--font-size-xs);">Название корта или района (необязательно)</p>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Возраст партнёра (от)</label>
+                        {{ form.desired_partner_age_min }}
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Возраст партнёра (до)</label>
+                        {{ form.desired_partner_age_max }}
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary btn-lg" style="flex: 1;">Создать заявку</button>
                     <a href="{% url 'sparring_list' %}" class="btn btn-ghost btn-lg">Отмена</a>

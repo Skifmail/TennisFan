@@ -91,14 +91,9 @@
                     <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline">Редактировать</a>
                     <a href="{% url 'sparring_my_requests' %}" class="btn btn-ghost">Мои заявки</a>
                     {% elif has_sparring_access %}
-                        {% if req.player.telegram or req.player.whatsapp or req.player.max_url %}
-                    <button type="button" class="btn btn-primary sparring-respond-btn" data-id="{{ req.pk }}"
-                            data-has-telegram="{% if req.player.telegram %}1{% else %}0{% endif %}"
-                            data-has-whatsapp="{% if req.player.whatsapp %}1{% else %}0{% endif %}"
-                            data-has-max="{% if req.player.max_url %}1{% else %}0{% endif %}">
+                    <button type="button" class="btn btn-primary sparring-respond-btn" data-id="{{ req.pk }}">
                         Откликнуться
                     </button>
-                        {% endif %}
                     {% endif %}
                 </div>
             </div>
@@ -112,23 +107,23 @@
     </div>
 </div>
 
-<div class="sparring-modal hidden" id="sparring-respond-modal" role="dialog" aria-label="Выберите способ связи">
+<div class="sparring-modal hidden" id="sparring-respond-modal" role="dialog" aria-label="Отклик записан">
     <div class="sparring-modal__backdrop" id="sparring-modal-backdrop"></div>
     <div class="sparring-modal__box">
-        <h3 class="sparring-modal__title">Связаться с автором заявки</h3>
-        <p class="text-secondary sparring-modal__sub">Выберите способ связи:</p>
-        <div class="sparring-modal__buttons">
-            <a href="#" class="btn sparring-modal__link sparring-modal__link--tg messenger-btn" data-method="telegram" target="_blank" rel="noopener">
+        <h3 class="sparring-modal__title" id="sparring-modal-title">Отклик записан!</h3>
+        <p class="text-secondary sparring-modal__sub" id="sparring-modal-sub">Автор заявки получит уведомление. Хотите связаться с ним?</p>
+        <div class="sparring-modal__buttons" id="sparring-modal-buttons">
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--tg messenger-btn" data-method="telegram" target="_blank" rel="noopener" style="display: none;">
                 <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> Telegram
             </a>
-            <a href="#" class="btn sparring-modal__link sparring-modal__link--wa messenger-btn" data-method="whatsapp" target="_blank" rel="noopener">
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--wa messenger-btn" data-method="whatsapp" target="_blank" rel="noopener" style="display: none;">
                 <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> WhatsApp
             </a>
-            <a href="#" class="btn sparring-modal__link sparring-modal__link--max messenger-btn" data-method="max">
+            <a href="#" class="btn sparring-modal__link sparring-modal__link--max messenger-btn" data-method="max" style="display: none;">
                 <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> MAX
             </a>
         </div>
-        <button type="button" class="btn btn-ghost sparring-modal__close" id="sparring-modal-close">Закрыть</button>
+        <button type="button" class="btn btn-ghost sparring-modal__close" id="sparring-modal-close">Позже</button>
     </div>
 </div>
 {% endblock %}
@@ -140,51 +135,78 @@
     const backdrop = document.getElementById('sparring-modal-backdrop');
     const closeBtn = document.getElementById('sparring-modal-close');
     const respondBtns = document.querySelectorAll('.sparring-respond-btn');
+    const modalTitle = document.getElementById('sparring-modal-title');
+    const modalSub = document.getElementById('sparring-modal-sub');
     const baseUrl = '{% url "sparring_list" %}'.replace(/\/$/, '');
     const prefix = baseUrl.replace(/\/sparring\/?$/, '') || '';
-    let currentId = null;
 
-    function respondUrl(id, method) {
-        return prefix + '/sparring/' + id + '/respond/?method=' + method;
+    function getCookie(name) {
+        var m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)'));
+        return m ? decodeURIComponent(m[1]) : null;
     }
 
-    function openModal(id, hasTg, hasWa, hasMax) {
-        currentId = id;
+    function openSuccessModal(contactUrls) {
         var tg = modal.querySelector('.sparring-modal__link--tg');
         var wa = modal.querySelector('.sparring-modal__link--wa');
         var mx = modal.querySelector('.sparring-modal__link--max');
-        tg.href = respondUrl(id, 'telegram');
-        tg.style.display = hasTg === '1' ? '' : 'none';
-        wa.href = respondUrl(id, 'whatsapp');
-        wa.style.display = hasWa === '1' ? '' : 'none';
-        mx.href = respondUrl(id, 'max');
-        mx.style.display = (hasMax === '1' ? '' : 'none');
+        if (modalTitle) modalTitle.textContent = 'Отклик записан!';
+        if (modalSub) modalSub.textContent = 'Автор заявки получит уведомление. Хотите связаться с ним?';
+        tg.href = contactUrls.telegram || '#';
+        tg.style.display = contactUrls.telegram ? '' : 'none';
+        wa.href = contactUrls.whatsapp || '#';
+        wa.style.display = contactUrls.whatsapp ? '' : 'none';
+        mx.href = contactUrls.max || '#';
+        mx.style.display = contactUrls.max ? '' : 'none';
         modal.classList.remove('hidden');
     }
 
     function closeModal() {
         modal.classList.add('hidden');
-        currentId = null;
     }
 
     respondBtns.forEach(function(btn) {
         btn.addEventListener('click', function() {
-            openModal(this.dataset.id, this.dataset.hasTelegram || '0', this.dataset.hasWhatsapp || '0', this.dataset.hasMax || '0');
+            var id = this.dataset.id;
+            if (!id) return;
+            var url = prefix + '/sparring/' + id + '/respond/';
+            var csrf = getCookie('csrftoken');
+            this.disabled = true;
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrf || ''
+                },
+                body: '{}'
+            }).then(function(r) {
+                return r.json().then(function(data) {
+                    if (r.ok && data.success) {
+                        openSuccessModal(data.contact_urls || {});
+                    } else {
+                        alert(data.error || 'Ошибка отправки отклика.');
+                    }
+                }).catch(function() {
+                    alert('Ошибка отправки отклика.');
+                });
+            }).catch(function() {
+                alert('Ошибка сети.');
+            }).then(function() {
+                btn.disabled = false;
+            });
         });
     });
 
     modal.querySelectorAll('.sparring-modal__link').forEach(function(link) {
         link.addEventListener('click', function(e) {
-            e.preventDefault();
-            var method = this.dataset.method;
-            if (!currentId) return;
-            var url = respondUrl(currentId, method);
-            if (method === 'max') {
-                window.location.href = url;
-            } else {
-                window.open(url, '_blank', 'noopener');
+            if (this.getAttribute('href') === '#') {
+                e.preventDefault();
+                return;
             }
-            closeModal();
+            if (this.dataset.method === 'max') {
+                window.location.href = this.href;
+                e.preventDefault();
+                closeModal();
+            }
         });
     });
 

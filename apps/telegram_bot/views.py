@@ -4,6 +4,7 @@ Webhook пользовательского Telegram-бота и редирект
 
 import json
 import logging
+from typing import Any
 
 import requests
 from django.conf import settings
@@ -145,13 +146,16 @@ def _main_menu_keyboard(site_base_url: str):
                 {"text": "💬 Закрытый чат", "callback_data": "menu_private_chat"},
             ],
             [
+                {"text": "🎾 Спарринг", "callback_data": "menu_sparring"},
+            ],
+            [
                 {"text": "🌐 На сайт", "url": site_base_url.rstrip("/")},
             ],
         ]
     }
 
 
-def _get_link_by_chat_id(chat_id) -> UserTelegramLink | None:
+def _get_link_by_chat_id(chat_id: int | None) -> UserTelegramLink | None:
     """Найти привязку по chat_id (бот поддержки или пользовательский бот)."""
     if chat_id is None:
         return None
@@ -160,23 +164,16 @@ def _get_link_by_chat_id(chat_id) -> UserTelegramLink | None:
     ).first()
 
 
-def _get_site_base_url() -> str:
-    """Базовый URL сайта для ссылок в боте (без слэжа в конце)."""
-    base = getattr(settings, "TELEGRAM_BOT_SITE_BASE_URL", None) or ""
-    if base:
-        return base.rstrip("/") + "/"
-    # Fallback для разработки
-    return "https://tennisfan.ru/" if not settings.DEBUG else "http://localhost:8000/"
-
-
 def _answer_callback(
-    callback_query_id: str, text: str | None = None, show_alert: bool = False
+    callback_query_id: str | int | None,
+    text: str | None = None,
+    show_alert: bool = False,
 ) -> None:
     """Ответить на callback_query в Telegram (убрать «часики», опционально показать текст)."""
     token = bot._get_bot_token()
-    if not token or not callback_query_id:
+    if not token or callback_query_id is None:
         return
-    payload = {"callback_query_id": str(callback_query_id)}
+    payload: dict[str, Any] = {"callback_query_id": str(callback_query_id)}
     if text:
         payload["text"] = text[:200]
     if show_alert:
@@ -724,21 +721,55 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
     return True
 
 
+def _format_sparring_player_card(player: Player) -> str:
+    """Форматирует карточку игрока для бота (моноширинный блок)."""
+    from apps.users.models import SkillLevel
+
+    name = str(player)
+    age = player.age or "—"
+    ntrp = float(player.ntrp_level) if player.ntrp_level else "—"
+    elo = int(player.total_points) if player.total_points else "—"
+    played = player.matches_played or 0
+    won = player.matches_won or 0
+    skill = (
+        dict(SkillLevel.choices).get(player.skill_level, player.skill_level)
+        if player.skill_level
+        else "—"
+    )
+    lines = [
+        f"Имя: {name}",
+        f"Возраст: {age}",
+        f"NTRP: {ntrp}",
+        f"Уровень: {skill}",
+        f"ELO: {elo}",
+        f"Игр: {played} (W:{won} / L:{played - won})",
+    ]
+    body = "\n".join(lines)
+    return f"👤 <b>Профиль игрока</b>\n\n<pre>{body}</pre>"
+
+
 def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
     """
     Обработка callback для спаррингов:
-    - contact_{response_id} - выдать контакт откликнувшегося
-    - confirm_match_{response_id} - подтвердить игру и создать матч
+    - sparring_my_requests, sparring_my_responses, sparring_responses_to_me
+    - sparring_del_req_<id>, sparring_cancel_resp_<id>
+    - sparring_req_<id>, sparring_cand_<id>, sparring_profile_<id>
+    - contact_{response_id}, confirm_match_{response_id}
     """
+    from apps.sparring.models import SparringRequest, SparringResponse
+
     callback_data = (callback_query.get("callback_data") or "").strip()
     cq_id = callback_query.get("id")
     message = callback_query.get("message") or {}
     chat_id = message.get("chat", {}).get("id")
     message_id = message.get("message_id")
 
-    if not callback_data.startswith("contact_") and not callback_data.startswith(
-        "confirm_match_"
-    ):
+    is_sparring = (
+        callback_data.startswith("contact_")
+        or callback_data.startswith("confirm_match_")
+        or callback_data.startswith("sparring_")
+    )
+    if not is_sparring:
         return False
 
     if not chat_id:
@@ -758,16 +789,284 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
         _answer_callback(cq_id, "Создайте профиль игрока на сайте.", show_alert=True)
         return True
 
-    # Извлекаем ID отклика
-    prefix = "contact_" if callback_data.startswith("contact_") else "confirm_match_"
+    # ——— A. Мои заявки ———
+    if callback_data == "sparring_my_requests":
+        requests_list = list(
+            SparringRequest.objects.filter(
+                player=player, status=SparringRequest.Status.ACTIVE
+            ).order_by("-created_at")[:20]
+        )
+        if not requests_list:
+            bot.send_to_user(chat_id, "📝 <b>Мои заявки</b>\n\nНет активных заявок.")
+            _answer_callback(cq_id, "Мои заявки")
+            return True
+        lines = ["📝 <b>Мои заявки</b>", ""]
+        keyboard = []
+        for i, req in enumerate(requests_list, 1):
+            short = (
+                (req.description[:50] + "…")
+                if len(req.description or "") > 50
+                else (req.description or "—")
+            )
+            lines.append(f"<b>{i}.</b> {req.city} · {short}")
+            lines.append("")
+            keyboard.append(
+                [
+                    {
+                        "text": f"🗑 Удалить заявку {i}",
+                        "callback_data": f"sparring_del_req_{req.pk}",
+                    }
+                ]
+            )
+        text = "\n".join(lines)
+        reply_markup = {"inline_keyboard": keyboard}
+        bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer_callback(cq_id, "Мои заявки")
+        return True
+
+    # ——— Удалить заявку ———
+    if callback_data.startswith("sparring_del_req_"):
+        try:
+            req_id = int(callback_data[len("sparring_del_req_") :])
+        except (ValueError, TypeError):
+            _answer_callback(cq_id, "Неверные данные.", show_alert=True)
+            return True
+        req = SparringRequest.objects.filter(pk=req_id, player=player).first()
+        if not req:
+            _answer_callback(cq_id, "Заявка не найдена.", show_alert=True)
+            return True
+        req.status = SparringRequest.Status.CLOSED
+        req.save(update_fields=["status"])
+        if message_id:
+            bot.edit_message_text(
+                chat_id,
+                message_id,
+                "📝 <b>Мои заявки</b>\n\n✅ Заявка удалена.",
+                reply_markup={"inline_keyboard": []},
+            )
+        _answer_callback(cq_id, "Заявка удалена")
+        return True
+
+    # ——— B. Мои отклики ———
+    if callback_data == "sparring_my_responses":
+        responses_list = list(
+            SparringResponse.objects.filter(respondent=player)
+            .select_related("sparring_request__player")
+            .order_by("-created_at")[:20]
+        )
+        if not responses_list:
+            bot.send_to_user(
+                chat_id, "🙋 <b>Мои отклики</b>\n\nВы ещё не откликались на заявки."
+            )
+            _answer_callback(cq_id, "Мои отклики")
+            return True
+        status_labels = {
+            SparringResponse.ResponseStatus.PENDING: "На рассмотрении",
+            SparringResponse.ResponseStatus.ACCEPTED: "Принят",
+            SparringResponse.ResponseStatus.REJECTED: "Отклонен",
+        }
+        lines = ["🙋 <b>Мои отклики</b>", ""]
+        keyboard = []
+        for i, resp in enumerate(responses_list, 1):
+            author = resp.sparring_request.player
+            st = status_labels.get(resp.status, resp.status)
+            lines.append(f"<b>{i}.</b> Заявка: {author} ({resp.sparring_request.city})")
+            lines.append(f"   Статус: <b>{st}</b>")
+            lines.append("")
+            if resp.status == SparringResponse.ResponseStatus.PENDING:
+                keyboard.append(
+                    [
+                        {
+                            "text": f"❌ Отменить отклик {i}",
+                            "callback_data": f"sparring_cancel_resp_{resp.pk}",
+                        }
+                    ]
+                )
+        text = "\n".join(lines)
+        reply_markup: dict[str, Any] | None = (
+            {"inline_keyboard": keyboard} if keyboard else None
+        )
+        bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer_callback(cq_id, "Мои отклики")
+        return True
+
+    # ——— Отменить отклик ———
+    if callback_data.startswith("sparring_cancel_resp_"):
+        try:
+            resp_id = int(callback_data[len("sparring_cancel_resp_") :])
+        except (ValueError, TypeError):
+            _answer_callback(cq_id, "Неверные данные.", show_alert=True)
+            return True
+        resp = SparringResponse.objects.filter(pk=resp_id, respondent=player).first()
+        if not resp:
+            _answer_callback(cq_id, "Отклик не найден.", show_alert=True)
+            return True
+        if resp.status != SparringResponse.ResponseStatus.PENDING:
+            _answer_callback(cq_id, "Отклик уже обработан.", show_alert=True)
+            return True
+        resp.status = SparringResponse.ResponseStatus.REJECTED
+        resp.save(update_fields=["status"])
+        _answer_callback(cq_id, "Отклик отменён")
+        bot.send_to_user(chat_id, "❌ Отклик отменён.")
+        return True
+
+    # ——— C. Отклики на мои заявки ———
+    if callback_data == "sparring_responses_to_me":
+        from django.db.models import Count
+
+        my_requests_with_responses = list(
+            SparringRequest.objects.filter(
+                player=player,
+                status=SparringRequest.Status.ACTIVE,
+            )
+            .annotate(resp_count=Count("responses"))
+            .filter(resp_count__gt=0)
+            .order_by("-created_at")[:20]
+        )
+        if not my_requests_with_responses:
+            bot.send_to_user(
+                chat_id, "📬 <b>Отклики на мои заявки</b>\n\nНет заявок с откликами."
+            )
+            _answer_callback(cq_id, "Отклики на мои заявки")
+            return True
+        lines = ["📬 <b>Отклики на мои заявки</b>", ""]
+        keyboard = []
+        for i, req in enumerate(my_requests_with_responses, 1):
+            cnt = req.responses.count()
+            lines.append(f"<b>{i}.</b> {req.city} — откликов: {cnt}")
+            lines.append("")
+            keyboard.append(
+                [{"text": f"📋 Заявка {i}", "callback_data": f"sparring_req_{req.pk}"}]
+            )
+        text = "\n".join(lines)
+        reply_markup = {"inline_keyboard": keyboard}
+        bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer_callback(cq_id, "Отклики на мои заявки")
+        return True
+
+    # ——— Список кандидатов по заявке ———
+    if callback_data.startswith("sparring_req_"):
+        try:
+            req_id = int(callback_data[len("sparring_req_") :])
+        except (ValueError, TypeError):
+            _answer_callback(cq_id, "Неверные данные.", show_alert=True)
+            return True
+        req = SparringRequest.objects.filter(pk=req_id, player=player).first()
+        if not req:
+            _answer_callback(cq_id, "Заявка не найдена.", show_alert=True)
+            return True
+        candidates = list(
+            req.responses.select_related("respondent").order_by("-created_at")[:15]
+        )
+        lines = ["📬 <b>Кандидаты</b>", f"Заявка: {req.city}", ""]
+        keyboard = []
+        for i, resp in enumerate(candidates, 1):
+            r = resp.respondent
+            elo = int(r.total_points) if r.total_points else "—"
+            lines.append(f"<b>{i}.</b> {r} · ELO: {elo}")
+            keyboard.append(
+                [{"text": f"👤 {i}. {r}", "callback_data": f"sparring_cand_{resp.pk}"}]
+            )
+        text = "\n".join(lines)
+        reply_markup = {"inline_keyboard": keyboard}
+        bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer_callback(cq_id, "Кандидаты")
+        return True
+
+    # ——— Карточка кандидата + действия ———
+    if callback_data.startswith("sparring_cand_"):
+        try:
+            resp_id = int(callback_data[len("sparring_cand_") :])
+        except (ValueError, TypeError):
+            _answer_callback(cq_id, "Неверные данные.", show_alert=True)
+            return True
+        response = (
+            SparringResponse.objects.select_related(
+                "sparring_request__player", "respondent"
+            )
+            .filter(sparring_request__player=player, pk=resp_id)
+            .first()
+        )
+        if not response:
+            _answer_callback(cq_id, "Отклик не найден.", show_alert=True)
+            return True
+        respondent = response.respondent
+        text = _format_sparring_player_card(respondent)
+        keyboard = []
+        keyboard.append(
+            [
+                {
+                    "text": "👤 Профиль игрока",
+                    "callback_data": f"sparring_profile_{response.pk}",
+                }
+            ]
+        )
+        keyboard.append(
+            [
+                {
+                    "text": "✅ Подтвердить",
+                    "callback_data": f"confirm_match_{response.pk}",
+                }
+            ]
+        )
+        keyboard.append(
+            [{"text": "💬 Связаться", "callback_data": f"contact_{response.pk}"}]
+        )
+        reply_markup = {"inline_keyboard": keyboard}
+        bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer_callback(cq_id, "Игрок")
+        return True
+
+    # ——— Профиль игрока (редактируем сообщение — карточка + кнопки действий) ———
+    if callback_data.startswith("sparring_profile_"):
+        try:
+            resp_id = int(callback_data[len("sparring_profile_") :])
+        except (ValueError, TypeError):
+            _answer_callback(cq_id, "Неверные данные.", show_alert=True)
+            return True
+        response = (
+            SparringResponse.objects.select_related("respondent")
+            .filter(sparring_request__player=player, pk=resp_id)
+            .first()
+        )
+        if not response:
+            _answer_callback(cq_id, "Отклик не найден.", show_alert=True)
+            return True
+        respondent = response.respondent
+        text = _format_sparring_player_card(respondent)
+        keyboard = [
+            [
+                {
+                    "text": "✅ Подтвердить",
+                    "callback_data": f"confirm_match_{response.pk}",
+                }
+            ],
+            [{"text": "💬 Связаться", "callback_data": f"contact_{response.pk}"}],
+        ]
+        reply_markup = {"inline_keyboard": keyboard}
+        edited = message_id and bot.edit_message_text(
+            chat_id, message_id, text, reply_markup=reply_markup
+        )
+        if not edited:
+            bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer_callback(cq_id, "Профиль")
+        return True
+
+    # ——— contact_ и confirm_match_ (ниже — существующая логика) ———
+    if not callback_data.startswith("contact_") and not callback_data.startswith(
+        "confirm_match_"
+    ):
+        return False
+
     try:
-        response_id = int(callback_data[len(prefix) :])
+        response_id = int(
+            callback_data[len("contact_") :]
+            if callback_data.startswith("contact_")
+            else callback_data[len("confirm_match_") :]
+        )
     except (ValueError, TypeError):
         _answer_callback(cq_id, "Неверные данные.", show_alert=True)
         return True
-
-    # Получаем отклик
-    from apps.sparring.models import SparringRequest, SparringResponse
 
     try:
         response = SparringResponse.objects.select_related(
@@ -778,12 +1077,11 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
         _answer_callback(cq_id, "Отклик не найден.", show_alert=True)
         return True
 
-    # Проверяем, что пользователь - автор заявки
     if response.sparring_request.player.user_id != user.id:
         _answer_callback(cq_id, "Вы не являетесь автором этой заявки.", show_alert=True)
         return True
 
-    # Обработка "Получить контакт"
+    # Обработка "Получить контакт" / "Связаться"
     if callback_data.startswith("contact_"):
         respondent = response.respondent
         contact_method = response.contact_method
@@ -810,7 +1108,7 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
             contact_info = f"MAX: {respondent.max_contact}"
 
         if contact_info:
-            bot.send_message(
+            bot.send_to_user(
                 chat_id, f"📱 <b>Контакт игрока {respondent}:</b>\n\n{contact_info}"
             )
             _answer_callback(cq_id, "Контакт отправлен.")
@@ -848,15 +1146,17 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
             if message_id:
                 _edit_message_remove_reply_markup(chat_id, message_id)
 
-            # Отправляем подтверждение
-            base_url_str = base_url or _get_site_base_url()
-            match_url = f"{base_url_str.rstrip('/')}/matches/{match.pk}/"
-            bot.send_message(
+            # Отправляем подтверждение (без ссылки на сайт — всё в боте)
+            deadline_str = (
+                match.deadline.strftime("%d.%m.%Y")
+                if match.deadline
+                else "Не установлен"
+            )
+            bot.send_to_user(
                 chat_id,
                 f"✅ <b>Игра подтверждена!</b>\n\n"
                 f"Матч создан: {match.get_player1_display()} vs {match.get_player2_display()}\n"
-                f"Дедлайн: {match.deadline.strftime('%d.%m.%Y') if match.deadline else 'Не установлен'}\n\n"
-                f"<a href='{match_url}'>Открыть матч на сайте</a>",
+                f"Дедлайн: {deadline_str}",
             )
 
             # Уведомляем откликнувшегося игрока
@@ -867,9 +1167,8 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
                     response.respondent.user,
                     f"✅ <b>Ваш отклик принят!</b>\n\n"
                     f"Автор заявки подтвердил игру.\n"
-                    f"Матч создан: {match.get_player1_display()} vs {match.get_player2_display()}\n"
-                    f"Дедлайн: {match.deadline.strftime('%d.%m.%Y') if match.deadline else 'Не установлен'}\n\n"
-                    f"<a href='{match_url}'>Открыть матч на сайте</a>",
+                    f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
+                    f"Дедлайн: {deadline_str}",
                 )
             except Exception as e:
                 logger.warning(
@@ -901,6 +1200,7 @@ def _handle_menu_callback(callback_query: dict, base_url: str = "") -> bool:
         "menu_my_subscription",
         "menu_private_chat",
         "menu_go_to_site",
+        "menu_sparring",
     ):
         return False
 
@@ -955,6 +1255,45 @@ def _handle_menu_callback_action(
     def _answer(caption: str) -> None:
         if cq_id:
             _answer_callback(cq_id, caption)
+
+    if callback_data == "menu_sparring":
+        from apps.sparring.utils import user_has_sparring_access
+
+        if not user_has_sparring_access(user):
+            text = (
+                "❌ <b>Спарринг</b>\n\n"
+                "Оформите подписку для доступа к разделу спаррингов."
+            )
+            reply_markup = None
+            if base_url:
+                pricing_url = f"{base_url.rstrip('/')}/subscriptions/pricing/"
+                reply_markup = {
+                    "inline_keyboard": [[{"text": "💳 Тарифы", "url": pricing_url}]]
+                }
+            bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+            _answer("Нет доступа")
+            return
+        text = "🎾 <b>Спарринг</b>\n\nВыберите раздел:"
+        reply_markup = {
+            "inline_keyboard": [
+                [{"text": "📝 Мои заявки", "callback_data": "sparring_my_requests"}],
+                [
+                    {
+                        "text": "🙋\u200d♂️ Мои отклики",
+                        "callback_data": "sparring_my_responses",
+                    }
+                ],
+                [
+                    {
+                        "text": "📬 Отклики на мои заявки",
+                        "callback_data": "sparring_responses_to_me",
+                    }
+                ],
+            ]
+        }
+        ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer("Спарринг" if ok else "Ошибка")
+        return
 
     if callback_data == "menu_my_matches":
         scheduled = (

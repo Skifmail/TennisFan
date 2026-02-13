@@ -430,14 +430,24 @@ def support_feedback_submit(request):
                 {"success": False, "error": "Введите ваше имя."}, status=400
             )
 
-    support_msg, binding_url = _create_support_message_and_send_to_admin(
-        request,
-        subject,
-        message,
-        guest_name=guest_name,
-        guest_contact=guest_contact,
-        guest_telegram_username=guest_telegram_username,
-    )
+    try:
+        support_msg, binding_url = _create_support_message_and_send_to_admin(
+            request,
+            subject,
+            message,
+            guest_name=guest_name,
+            guest_contact=guest_contact,
+            guest_telegram_username=guest_telegram_username,
+        )
+    except Exception as e:
+        logger.exception(
+            "support_feedback_submit failed for user=%s",
+            getattr(request.user, "pk", None),
+        )
+        return JsonResponse(
+            {"success": False, "error": f"Ошибка отправки: {e!s}"},
+            status=500,
+        )
 
     # Для гостей сохраняем message_id в session для получения истории
     if not request.user.is_authenticated:

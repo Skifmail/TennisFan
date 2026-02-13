@@ -9,7 +9,6 @@ import time
 from typing import Any, Tuple
 
 import requests
-
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,9 @@ def is_private_chat_configured() -> bool:
     return _get_private_chat_id() is not None
 
 
-def _api_post(method: str, payload: dict[str, Any], timeout: int = 10) -> tuple[Any, bool]:
+def _api_post(
+    method: str, payload: dict[str, Any], timeout: int = 10
+) -> tuple[Any, bool]:
     """Унифицированный POST в Telegram Bot API с проверкой `ok` в JSON-ответе."""
     token = _get_bot_token()
     if not token:
@@ -51,7 +52,9 @@ def _api_post(method: str, payload: dict[str, Any], timeout: int = 10) -> tuple[
     try:
         r = requests.post(url, json=payload, timeout=timeout)
         if not r.ok:
-            logger.warning("Telegram API %s failed: %s %s", method, r.status_code, r.text[:300])
+            logger.warning(
+                "Telegram API %s failed: %s %s", method, r.status_code, r.text[:300]
+            )
             return None, False
         data = r.json()
         if not data.get("ok", False):
@@ -67,14 +70,18 @@ def _api_post(method: str, payload: dict[str, Any], timeout: int = 10) -> tuple[
         return None, False
 
 
-def create_private_chat_invite_link(expire_seconds: int = 1800, member_limit: int = 1) -> str | None:
+def create_private_chat_invite_link(
+    expire_seconds: int = 1800, member_limit: int = 1
+) -> str | None:
     """
     Создать одноразовую ссылку-приглашение в закрытый чат сообщества.
     По умолчанию действует 30 минут и на 1 участника.
     """
     chat_id = _get_private_chat_id()
     if chat_id is None:
-        logger.warning("create_private_chat_invite_link: private chat is not configured")
+        logger.warning(
+            "create_private_chat_invite_link: private chat is not configured"
+        )
         return None
 
     expire_date = int(time.time()) + max(60, int(expire_seconds))
@@ -206,6 +213,37 @@ def send_to_user(chat_id: int, text: str, reply_markup: dict | None = None) -> b
     return ok
 
 
+def edit_message_text(
+    chat_id: int | str,
+    message_id: int,
+    text: str,
+    parse_mode: str = "HTML",
+    reply_markup: dict | None = None,
+) -> bool:
+    """Редактировать текст и/или кнопки сообщения."""
+    token = _get_bot_token()
+    if not token:
+        return False
+    url = f"https://api.telegram.org/bot{token}/editMessageText"
+    payload = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": text,
+        "parse_mode": parse_mode,
+    }
+    if reply_markup:
+        payload["reply_markup"] = json.dumps(reply_markup)
+    try:
+        r = requests.post(url, json=payload, timeout=10)
+        if not r.ok:
+            logger.warning("editMessageText failed: %s %s", r.status_code, r.text[:200])
+            return False
+        return True
+    except Exception as e:
+        logger.warning("editMessageText failed: %s", e)
+        return False
+
+
 def send_photo(
     chat_id: int | str,
     photo: str | bytes,
@@ -227,7 +265,9 @@ def send_photo(
         payload["caption"] = caption
         payload["parse_mode"] = parse_mode
     files = None
-    if isinstance(photo, str) and (photo.startswith("http://") or photo.startswith("https://")):
+    if isinstance(photo, str) and (
+        photo.startswith("http://") or photo.startswith("https://")
+    ):
         payload["photo"] = photo
     elif isinstance(photo, str):
         try:
@@ -237,6 +277,7 @@ def send_photo(
             return None, False
     elif isinstance(photo, bytes):
         from io import BytesIO
+
         files = {"photo": BytesIO(photo)}
     else:
         logger.warning("send_photo: unsupported photo type %s", type(photo))

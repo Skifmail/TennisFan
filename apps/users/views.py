@@ -152,7 +152,7 @@ def auth(request):
     
     if request.method == "POST":
         # Проверяем какая форма была отправлена по наличию полей
-        if 'email' in request.POST and 'first_name' in request.POST:
+        if 'email' in request.POST and 'city' in request.POST:
             # Форма регистрации
             active_mode = 'register'
             register_form = UserRegistrationForm(request.POST)
@@ -167,7 +167,7 @@ def auth(request):
                 starting_pts = get_starting_points(level_decimal)
                 player = Player.objects.create(
                     user=user,
-                    birth_date=register_form.cleaned_data["birth_date"],
+                    # birth_date заполняется позже в профиле
                     city=register_form.cleaned_data["city"].strip(),
                     ntrp_level=level_decimal,
                     skill_level=skill,

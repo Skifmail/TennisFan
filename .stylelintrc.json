@@ -1,0 +1,14 @@
+{
+    "extends": "stylelint-config-standard",
+    "ignoreFiles": [
+        "**/node_modules/**",
+        "**/venv/**",
+        "**/env/**",
+        "**/site-packages/**",
+        "**/static/admin/**"
+    ],
+    "rules": {
+        "selector-class-pattern": null,
+        "no-descending-specificity": null
+    }
+}

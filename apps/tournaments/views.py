@@ -15,6 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from .fan import _is_fan
+from apps.core.decorators import require_filled_profile
 
 
 def login_required_with_message(message="Данная информация доступна только для зарегистрированных пользователей."):
@@ -852,6 +853,7 @@ def _is_player_registered_in_doubles(tournament, player):
 
 
 @login_required
+@require_filled_profile
 def tournament_register(request, slug):
     """Register authenticated user to a tournament."""
 
@@ -939,6 +941,7 @@ def tournament_register(request, slug):
 
 
 @login_required
+@require_filled_profile
 def tournament_register_doubles(request, slug):
     """Регистрация на парный турнир: solo, с партнёром или присоединение к существующей паре."""
 
@@ -1179,6 +1182,7 @@ def _do_add_partner(request, tournament, player, partner_id):
 
 
 @login_required
+@require_filled_profile
 def tournament_join_team(request, slug, team_id):
     """Присоединиться к команде (партнёр без пары)."""
     if request.method != "POST":

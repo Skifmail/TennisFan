@@ -111,10 +111,10 @@ fieldset .inline-heading,
     padding: 4px 10px 0 0;
     min-width: 160px;
     width: 160px;
-    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
-.aligned label:not(.vCheckboxLabel):after {
+.aligned label:not(.vCheckboxLabel)::after {
     content: '';
     display: inline-block;
     vertical-align: middle;
@@ -241,7 +241,7 @@ form div.help ul {
 .collapse summary .inline-heading {
     background: transparent;
     border: none;
-    color: currentColor;
+    color: currentcolor;
     display: inline;
     margin: 0;
     padding: 0;
@@ -256,7 +256,7 @@ fieldset.monospace textarea {
 /* SUBMIT ROW */
 
 .submit-row {
-    padding: 12px 14px 12px;
+    padding: 12px 14px;
     margin: 0 0 20px;
     background: var(--darkened-bg);
     border: 1px solid var(--hairline-color);
@@ -445,12 +445,12 @@ body.popup .submit-row {
 }
 
 .inline-group .tabular tr td.original {
-    padding: 2px 0 0 0;
+    padding: 2px 0 0;
     width: 0;
 }
 
 .inline-group .tabular th.original {
-    width: 0px;
+    width: 0;
     padding: 0;
 }
 
@@ -504,7 +504,7 @@ body.popup .submit-row {
 .related-lookup {
     width: 1rem;
     height: 1rem;
-    background-image: url(../img/search.svg);
+    background-image: url("../img/search.svg");
 }
 
 form .related-widget-wrapper ul {

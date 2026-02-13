@@ -157,3 +157,22 @@ class UserSubscription(models.Model):
         if self.tier.max_tournaments == 0:
             return 0
         return max(0, self.tier.max_tournaments - self.tournaments_registered_count)
+
+
+class RegionalTierPrice(models.Model):
+    """Regional price override for a subscription tier."""
+    tier = models.ForeignKey(
+        SubscriptionTier,
+        on_delete=models.CASCADE,
+        related_name='regional_prices',
+        verbose_name="Тариф"
+    )
+    price = models.DecimalField("Стоимость (руб)", max_digits=10, decimal_places=2, default=0)
+    name = models.CharField("Название региона", max_length=100, default="Регионы")
+
+    class Meta:
+        verbose_name = "Региональная цена"
+        verbose_name_plural = "Региональные цены"
+
+    def __str__(self):
+        return f"{self.tier} - {self.name}: {self.price}"

@@ -1,5 +1,11 @@
 from django.contrib import admin
-from .models import SubscriptionTier, UserSubscription
+from .models import SubscriptionTier, UserSubscription, RegionalTierPrice
+
+
+class RegionalTierPriceInline(admin.TabularInline):
+    model = RegionalTierPrice
+    extra = 1
+
 
 @admin.register(SubscriptionTier)
 class SubscriptionTierAdmin(admin.ModelAdmin):
@@ -11,6 +17,7 @@ class SubscriptionTierAdmin(admin.ModelAdmin):
     )
     list_editable = ('price', 'max_tournaments', 'is_unlimited', 'one_day_tournament_discount')
     ordering = ('price',)
+    inlines = [RegionalTierPriceInline]
 
 @admin.register(UserSubscription)
 class UserSubscriptionAdmin(admin.ModelAdmin):

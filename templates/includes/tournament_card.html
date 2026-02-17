@@ -12,7 +12,7 @@
                 <div class="d-flex gap-1 flex-wrap">
                     <span class="badge" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_variant_display }}</span>
                     {% if tournament.format == 'single_elimination' %}
-                    <span class="badge" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">FAN</span>
+                    <span class="badge" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;" title="Турнир на выбывание с подвалом для проигравших в 1-м круге">{{ tournament.get_format_display }}</span>
                     {% elif tournament.format == 'olympic_consolation' %}
                     <span class="badge" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">Олимпийская</span>
                     {% elif tournament.format == 'round_robin' %}

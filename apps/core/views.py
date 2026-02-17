@@ -249,7 +249,7 @@ def _is_html_content(text: str) -> bool:
 
 
 def rules(request):
-    """Rules page: tournament formats (FAN, etc.) with detailed descriptions. Content is editable via admin (RulesSection)."""
+    """Rules page: tournament formats (одноэтапная сетка, олимпийская, круговой) with detailed descriptions. Content is editable via admin (RulesSection)."""
     rules_content = {}
     for s in RulesSection.objects.all():
         body = s.body or ""

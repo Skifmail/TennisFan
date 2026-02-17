@@ -25,7 +25,10 @@
                                 {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
                             </span>
                             {% endif %}
-                            <span class="player-category">{{ player.get_skill_level_display }}</span>
+                            <div style="display: flex; align-items: center; gap: var(--spacing-xs); flex-wrap: wrap;">
+                                <span class="player-category">{{ player.get_skill_level_display }}</span>
+                                {% include 'includes/rating_badge.html' with player=player %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -41,13 +44,13 @@
                     <p><strong>Forehand:</strong> {{ player.get_forehand_display }}</p>
                 </div>
 
-                <!-- Статистика в виде таблицы (две строки: уровень/NTRP/Elo и очки сезона/матчей/побед) -->
+                <!-- Статистика в виде таблицы (две строки: уровень/NTRP/FAN и очки сезона/матчей/побед) -->
                 <div class="profile-stats-table">
                     <table class="stats-table stats-table--two-rows">
                         <tr class="stats-table__header-row">
                             <td>Уровень</td>
                             <td>NTRP</td>
-                            <td>Очки (Elo)</td>
+                            <td>Очки (FAN)</td>
                         </tr>
                         <tr class="stats-table__data-row">
                             <td><strong>{{ player.get_skill_level_display }}</strong></td>
@@ -226,9 +229,11 @@
                     </div>
                 </div>
                 <div class="profile-chart profile-chart--points">
-                    <div class="profile-chart__label">Очки Elo</div>
-                    <div class="profile-chart__canvas-wrap">
-                        <canvas id="chartProfilePoints" aria-label="График очков Elo"></canvas>
+                    <div class="profile-chart__label">Очки FAN</div>
+                    <div class="profile-chart__canvas-scroll" id="fanChartScrollWrap">
+                        <div class="profile-chart__canvas-wrap profile-chart__canvas-wrap--fan" id="fanChartInnerWrap">
+                            <canvas id="chartProfilePoints" aria-label="График очков FAN"></canvas>
+                        </div>
                     </div>
                 </div>
                 <div class="profile-chart profile-chart--matches">
@@ -576,7 +581,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
     var charts = { points: null, matches: null, winrate: null, season: null };
 
     function updateCharts(selectedYear, selectedMonth, selectedSeason) {
-        // Фильтруем основные данные (Elo, матчи, % побед)
+        // Фильтруем основные данные (FAN, матчи, % побед)
         var data = progressData;
         if (selectedYear) {
             data = filterByYear(data, selectedYear);
@@ -593,14 +598,63 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         var pointsData = data.map(function(d) { return d.points; });
         var matchesData = data.map(function(d) { return d.matches; });
         var winRateData = data.map(function(d) { return d.win_rate; });
+        
+        // Для FAN-диаграммы: только свершившиеся матчи (1 столбец = 1 матч), без синтетических записей
+        var fanMatchData = data.filter(function(d) {
+            return (d.matches || 0) > 0 && (d.won === true || d.won === false);
+        });
+        var fanLabels = fanMatchData.map(function(d) { return d.date; });
+        var fanPointsData = fanMatchData.map(function(d) { return d.points; });
+        var barColors = fanMatchData.map(function(d) {
+            var delta = d.fan_delta || 0;
+            if (delta > 0) return 'rgb(14, 203, 129)';   // Зелёный — прирост рейтинга
+            if (delta < 0) return 'rgb(230, 67, 90)';     // Красный — потеря рейтинга
+            return 'rgba(128, 128, 128, 0.6)';            // Серый — без изменения
+        });
 
-        var chartOpts = buildChartOptions('Очков Elo', '');
+        var chartOpts = buildChartOptions('Очков FAN', '');
         var winRateOpts = buildChartOptions('% побед', '%');
         winRateOpts.scales = { x: chartOpts.scales.x, y: { display: true, beginAtZero: true, max: 100 } };
 
         if (charts.points && document.getElementById('chartProfilePoints')) {
-            charts.points.data.labels = labels;
-            charts.points.data.datasets[0].data = pointsData;
+            charts.points.data.labels = fanLabels;
+            charts.points.data.datasets[0].data = fanPointsData;
+            charts.points.data.datasets[0].backgroundColor = barColors;
+            charts.points.data.datasets[0].borderColor = barColors;
+            // Ширина контейнера для прокрутки: узкие столбцы
+            var fanWrap = document.getElementById('fanChartInnerWrap');
+            if (fanWrap) {
+                fanWrap.style.minWidth = Math.max(fanMatchData.length * 10, 150) + 'px';
+                fanWrap.style.cursor = fanMatchData.some(function(d) { return d.match_id; }) ? 'pointer' : 'default';
+                charts.points.resize();
+            }
+            
+            charts.points.options.plugins.tooltip.callbacks = charts.points.options.plugins.tooltip.callbacks || {};
+            charts.points.options.plugins.tooltip.callbacks.title = function(items) {
+                if (items.length && items[0].label) return formatDateLabel(items[0].label);
+                return '';
+            };
+            charts.points.options.plugins.tooltip.callbacks.label = function(context) {
+                var index = context.dataIndex;
+                var d = fanMatchData[index];
+                var ntrpDelta = (d.ntrp_after || 0) - (d.ntrp_before || 0);
+                var fanDelta = d.fan_delta || 0;
+                var ntrpSign = ntrpDelta >= 0 ? '+' : '';
+                var fanSign = fanDelta >= 0 ? '+' : '';
+                var lines = [
+                    'NTRP ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' + 
+                    (d.points || 0).toFixed(1) + ' (' + fanSign + fanDelta.toFixed(1) + ')'
+                ];
+                if (d.match_opponent) lines.push('Матч: vs ' + d.match_opponent + ' — ' + (d.match_score || ''));
+                if (d.match_id) lines.push('Клик — подробнее');
+                return lines;
+            };
+            charts.points.options.onClick = function(ev, elements) {
+                if (elements.length && fanMatchData[elements[0].index] && fanMatchData[elements[0].index].match_id) {
+                    window.location.href = '/tournaments/match/' + fanMatchData[elements[0].index].match_id + '/';
+                }
+            };
+            
             charts.points.update('none');
         }
         if (charts.matches && document.getElementById('chartProfileMatches')) {
@@ -646,12 +700,70 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
     }
 
     if (document.getElementById('chartProfilePoints')) {
-        var labels0 = progressData.map(function(d) { return d.date; });
-        var pts0 = progressData.map(function(d) { return d.points; });
+        // Только свершившиеся матчи (без синтетических записей)
+        var fanMatchData0 = progressData.filter(function(d) {
+            return (d.matches || 0) > 0 && (d.won === true || d.won === false);
+        });
+        var labels0 = fanMatchData0.map(function(d) { return d.date; });
+        var pts0 = fanMatchData0.map(function(d) { return d.points; });
+        var barColors0 = fanMatchData0.map(function(d) {
+            var delta = d.fan_delta || 0;
+            if (delta > 0) return 'rgb(14, 203, 129)';
+            if (delta < 0) return 'rgb(230, 67, 90)';
+            return 'rgba(128, 128, 128, 0.6)';
+        });
+        
+        var chartOpts = buildChartOptions('Очков FAN', '');
+        chartOpts.datasets = chartOpts.datasets || {};
+        chartOpts.datasets.bar = { barPercentage: 0.6, categoryPercentage: 0.7 };
+        chartOpts.plugins.tooltip = {
+            callbacks: {
+                title: function(items) {
+                    if (items.length && items[0].label) return formatDateLabel(items[0].label);
+                    return '';
+                },
+                label: function(context) {
+                    var index = context.dataIndex;
+                    var d = fanMatchData0[index];
+                    var ntrpDelta = (d.ntrp_after || 0) - (d.ntrp_before || 0);
+                    var fanDelta = d.fan_delta || 0;
+                    var ntrpSign = ntrpDelta >= 0 ? '+' : '';
+                    var fanSign = fanDelta >= 0 ? '+' : '';
+                    var lines = [
+                        'NTRP ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' + 
+                        (d.points || 0).toFixed(1) + ' (' + fanSign + fanDelta.toFixed(1) + ')'
+                    ];
+                    if (d.match_opponent) lines.push('Матч: vs ' + d.match_opponent + ' — ' + (d.match_score || ''));
+                    if (d.match_id) lines.push('Клик — подробнее');
+                    return lines;
+                }
+            }
+        };
+        chartOpts.onClick = function(ev, elements) {
+            if (elements.length && fanMatchData0[elements[0].index] && fanMatchData0[elements[0].index].match_id) {
+                window.location.href = '/tournaments/match/' + fanMatchData0[elements[0].index].match_id + '/';
+            }
+        };
+        
+        var fanWrap0 = document.getElementById('fanChartInnerWrap');
+        if (fanWrap0) {
+            fanWrap0.style.minWidth = Math.max(fanMatchData0.length * 10, 150) + 'px';
+            fanWrap0.style.cursor = fanMatchData0.some(function(d) { return d.match_id; }) ? 'pointer' : 'default';
+        }
+        
         charts.points = new Chart(document.getElementById('chartProfilePoints'), {
-            type: 'line',
-            options: buildChartOptions('Очков Elo', ''),
-            data: { labels: labels0, datasets: [{ ...lineDataset, data: pts0 }] }
+            type: 'bar',
+            options: chartOpts,
+            data: { 
+                labels: labels0, 
+                datasets: [{ 
+                    data: pts0,
+                    backgroundColor: barColors0,
+                    borderColor: barColors0,
+                    borderWidth: 0,
+                    borderRadius: 2
+                }] 
+            }
         });
     }
     if (document.getElementById('chartProfileMatches')) {

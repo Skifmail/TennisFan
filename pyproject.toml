@@ -5,6 +5,7 @@ target-version = ["py311"]
 [tool.ruff]
 line-length = 88
 fix = true
+exclude = ["docs_venv", "venv", ".venv", "__pycache__", "*.pyc", ".git"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
@@ -18,7 +19,7 @@ warn_unused_ignores = true
 explicit_package_bases = true
 namespace_packages = true
 ignore_missing_imports = true
-exclude = [".*migrations.*"]
+exclude = [".*migrations.*", "docs_venv", "venv", ".venv"]
 
 [[tool.mypy.overrides]]
 module = ["*.admin"]

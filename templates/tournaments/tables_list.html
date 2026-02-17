@@ -16,7 +16,7 @@
             <div class="card-body">
                 <div class="tournament-table-badges d-flex gap-2 mb-2 flex-wrap align-items-center">
                     {% if t.format == 'single_elimination' %}
-                    <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">FAN</span>
+                    <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;" title="Турнир на выбывание с подвалом">{{ t.get_format_display }}</span>
                     {% elif t.format == 'olympic_consolation' %}
                     <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">Олимпийская</span>
                     {% elif t.format == 'round_robin' %}

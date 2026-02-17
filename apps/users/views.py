@@ -37,13 +37,15 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
     """
     Build time series for profile charts: from registration to today,
     cumulative points, matches count, win rate %.
-    Returns list of {"date": "YYYY-MM-DD", "points": int, "matches": int, "win_rate": float}.
+    Returns list with match-by-match data including rating changes.
+    Each match entry: {"date": "YYYY-MM-DD", "points": int, "matches": int, "win_rate": float,
+                       "won": bool, "fan_delta": float, "ntrp_before": float, "ntrp_after": float}.
     """
     from apps.tournaments.models import Match, TournamentPlayerResult
+    from apps.users.rating_utils import rating_to_ntrp_level
 
-    events: list[tuple[date, int, int, int]] = (
-        []
-    )  # (date, points_delta, matches_delta, wins_delta)
+    # Events: (date, rating_after, matches_delta, wins_delta, won, fan_delta, ntrp_before, ntrp_after, match_id, opponent, score, event_dt)
+    events: list[tuple[Any, ...]] = []
 
     # Completed matches (singles: player1/player2; doubles: team1/team2)
     match_qs = (
@@ -69,7 +71,14 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         .order_by("completed_datetime", "scheduled_datetime", "pk")
     )
 
-    for m in match_qs:
+    # Текущий рейтинг для расчета изменений
+    current_rating = float(player.total_points)
+
+    # Проходим матчи в обратном порядке, чтобы вычислить рейтинг до каждого матча
+    matches_list = list(match_qs)
+    matches_list.reverse()
+
+    for m in matches_list:
         event_date = (
             (m.completed_datetime and m.completed_datetime.date())
             or (m.scheduled_datetime and m.scheduled_datetime.date())
@@ -80,9 +89,14 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
             on_team1 = m.team1 and (
                 m.team1.player1_id == player.pk or m.team1.player2_id == player.pk
             )
-            pts = m.points_player1 if on_team1 else m.points_player2
+            fan_delta = m.rating_delta_player1 if on_team1 else m.rating_delta_player2
         else:
-            pts = m.points_player1 if m.player1_id == player.pk else m.points_player2
+            fan_delta = (
+                m.rating_delta_player1
+                if m.player1_id == player.pk
+                else m.rating_delta_player2
+            )
+
         won = bool(
             (m.winner_id == player.pk)
             or (
@@ -98,9 +112,49 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
                 and (m.team2.player1_id == player.pk or m.team2.player2_id == player.pk)
             )
         )
-        events.append((event_date, pts or 0, 1, 1 if won else 0))
 
-    # FAN tournament results (points awarded at tournament end)
+        # Вычисляем рейтинг до матча (вычитаем дельту из текущего)
+        rating_after = current_rating
+        rating_before = current_rating - (fan_delta or 0.0)
+
+        # Вычисляем NTRP до и после матча
+        ntrp_before_val = rating_to_ntrp_level(rating_before)
+        ntrp_after_val = rating_to_ntrp_level(rating_after)
+        ntrp_before = float(ntrp_before_val) if ntrp_before_val else 0.0
+        ntrp_after = float(ntrp_after_val) if ntrp_after_val else 0.0
+
+        # Обновляем текущий рейтинг для следующей итерации
+        current_rating = rating_before
+
+        # Соперник и счёт для tooltip
+        on_team1 = (
+            m.team1_id
+            and (m.team1.player1_id == player.pk or m.team1.player2_id == player.pk)
+        ) or (m.player1_id == player.pk)
+        opponent = m.get_player2_display() if on_team1 else m.get_player1_display()
+        event_dt = m.completed_datetime or m.scheduled_datetime or timezone.now()
+        # Для графика FAN используем фактический рейтинг после матча (points_player1/2 часто 0)
+        events.append(
+            (
+                event_date,
+                rating_after,
+                1,
+                1 if won else 0,
+                won,
+                fan_delta or 0.0,
+                ntrp_before,
+                ntrp_after,
+                m.pk,
+                opponent,
+                m.score_display,
+                event_dt,
+            )
+        )
+
+    # Переворачиваем обратно для правильного порядка (от старых к новым)
+    events.reverse()
+
+    # FAN tournament results (points awarded at tournament end) - добавляем в конец
     fan_results = (
         TournamentPlayerResult.objects.filter(player=player)
         .select_related("tournament")
@@ -110,30 +164,84 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         event_date = (
             r.tournament.end_date or r.tournament.start_date or timezone.now().date()
         )
-        events.append((event_date, r.fan_points, 0, 0))
+        event_dt = timezone.now()
+        if r.tournament.end_date:
+            from datetime import datetime
 
-    events.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
+            event_dt = timezone.make_aware(
+                datetime.combine(r.tournament.end_date, datetime.min.time())
+            )
+        elif r.tournament.start_date:
+            from datetime import datetime
 
-    # Cumulative series from registration
+            event_dt = timezone.make_aware(
+                datetime.combine(r.tournament.start_date, datetime.min.time())
+            )
+        events.append(
+            (
+                event_date,
+                r.fan_points,
+                0,
+                0,
+                None,
+                0.0,
+                0.0,
+                0.0,
+                None,
+                "",
+                "",
+                event_dt,
+            )
+        )
+
+    # Сортировка: по дате, затем по времени (сохраняем хронологический порядок матчей в один день)
+    events.sort(key=lambda x: (x[0], x[11] if len(x) > 11 else timezone.now()))
+
+    # Cumulative series from registration (match_id, opponent, score для матчей)
     start = player.created_at.date() if player.created_at else timezone.now().date()
-    result = [{"date": start.isoformat(), "points": 0, "matches": 0, "win_rate": 0.0}]
-    cum_pts = 0
+    result = [
+        {
+            "date": start.isoformat(),
+            "points": 0.0,
+            "matches": 0,
+            "win_rate": 0.0,
+            "won": None,
+            "fan_delta": 0.0,
+            "ntrp_before": 0.0,
+            "ntrp_after": 0.0,
+        }
+    ]
+    cum_pts = 0.0
     cum_matches = 0
     cum_wins = 0
 
-    for event_date, d_pts, d_m, d_w in events:
-        cum_pts += d_pts
+    for ev in events:
+        event_date, d_pts, d_m, d_w, won, fan_delta, ntrp_before, ntrp_after = ev[:8]
+        match_id = ev[8] if len(ev) > 8 else None
+        opponent = ev[9] if len(ev) > 9 else ""
+        score = ev[10] if len(ev) > 10 else ""
         cum_matches += d_m
         cum_wins += d_w
         wr = round(cum_wins / cum_matches * 100, 1) if cum_matches else 0.0
-        result.append(
-            {
-                "date": event_date.isoformat(),
-                "points": cum_pts,
-                "matches": cum_matches,
-                "win_rate": wr,
-            }
-        )
+        # Для матчей: points = фактический рейтинг (total_points) после матча
+        # Для турнирных очков: cum_pts не меняем (это сезонные очки, не FAN-рейтинг)
+        if d_m > 0:
+            cum_pts = float(d_pts)  # d_pts = rating_after, храним точное значение
+        entry = {
+            "date": event_date.isoformat(),
+            "points": cum_pts,
+            "matches": cum_matches,
+            "win_rate": wr,
+            "won": won if d_m > 0 else None,  # Только для матчей
+            "fan_delta": fan_delta if d_m > 0 else 0.0,
+            "ntrp_before": ntrp_before if d_m > 0 else 0.0,
+            "ntrp_after": ntrp_after if d_m > 0 else 0.0,
+        }
+        if d_m > 0 and match_id:
+            entry["match_id"] = match_id
+            entry["match_opponent"] = opponent
+            entry["match_score"] = score
+        result.append(entry)
 
     today = timezone.now().date()
     if (
@@ -147,6 +255,10 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
                 "points": player.total_points,
                 "matches": player.matches_played,
                 "win_rate": float(player.win_rate),
+                "won": None,
+                "fan_delta": 0.0,
+                "ntrp_before": 0.0,
+                "ntrp_after": float(player.ntrp_level),
             }
         )
 
@@ -157,9 +269,9 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         if last_pts > 0 and last_pts != player.total_points:
             ratio_pts = player.total_points / last_pts
             for r in result:
-                r["points"] = int(round(r["points"] * ratio_pts))
+                r["points"] = round(float(r["points"]) * ratio_pts, 1)
         else:
-            result[-1]["points"] = player.total_points
+            result[-1]["points"] = float(player.total_points)
         if last_matches > 0 and last_matches != player.matches_played:
             ratio_m = player.matches_played / last_matches
             for r in result:
@@ -167,6 +279,9 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         else:
             result[-1]["matches"] = player.matches_played
         result[-1]["win_rate"] = round(float(player.win_rate), 1)
+        # Обновляем NTRP для последней точки
+        if result[-1].get("ntrp_after") == 0.0:
+            result[-1]["ntrp_after"] = float(player.ntrp_level)
 
     return result
 

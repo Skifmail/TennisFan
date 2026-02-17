@@ -24,7 +24,10 @@
                 </div>
                 <div class="match-players">
                     <div class="match-player {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}winner{% endif %}">
-                        <span class="player-name">{{ match.get_player1_display }}</span>
+                        <div style="display: flex; align-items: center; gap: var(--spacing-xs); flex-wrap: wrap;">
+                            <span class="player-name">{{ match.get_player1_display }}</span>
+                            {% include 'includes/match_fan_delta.html' with match=match is_side1=True %}
+                        </div>
                         {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}
                             {% if match.status == 'completed' or match.status == 'walkover' %}
                             <span class="win-badge">WIN</span>
@@ -36,7 +39,10 @@
                         {% endif %}
                     </div>
                     <div class="match-player {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}winner{% endif %}">
-                        <span class="player-name">{{ match.get_player2_display }}</span>
+                        <div style="display: flex; align-items: center; gap: var(--spacing-xs); flex-wrap: wrap;">
+                            <span class="player-name">{{ match.get_player2_display }}</span>
+                            {% include 'includes/match_fan_delta.html' with match=match is_side1=False %}
+                        </div>
                         {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}
                             {% if match.status == 'completed' or match.status == 'walkover' %}
                             <span class="win-badge">WIN</span>

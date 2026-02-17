@@ -11,4 +11,5 @@ class TournamentsConfig(AppConfig):
     verbose_name = "Турниры"
 
     def ready(self):
-        pass
+        # Импортируем сигналы, чтобы они были зарегистрированы
+        import apps.tournaments.signals  # noqa: F401

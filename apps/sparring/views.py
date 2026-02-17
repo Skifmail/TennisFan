@@ -19,14 +19,16 @@ from django.shortcuts import (
 )
 
 # pyright: ignore[reportMissingImports]
+from django.urls import reverse
+
+# pyright: ignore[reportMissingImports]
 from django.views.decorators.http import (
     require_http_methods,
     require_POST,
 )
 
-# pyright: ignore[reportMissingImports]
 from apps.core.decorators import login_required_with_message, require_filled_profile
-from apps.users.models import Player
+from apps.users.models import Notification, Player
 
 from .forms import SparringRequestForm
 from .models import SparringRequest, SparringResponse
@@ -244,6 +246,23 @@ def sparring_confirm_response(request, response_id):
         response.sparring_request.status = SparringRequest.Status.CLOSED
         response.sparring_request.save(update_fields=["status"])
 
+        # Создаем уведомление в личном кабинете для откликнувшегося игрока
+        try:
+            deadline_str = (
+                match.deadline.strftime("%d.%m.%Y")
+                if match.deadline
+                else "Не установлен"
+            )
+            Notification.objects.create(
+                user=response.respondent.user,
+                message=f"Ваш отклик на заявку на спарринг принят! Матч создан. Дедлайн: {deadline_str}.",
+                url=reverse("match_detail", args=[match.pk]),
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to create notification for sparring response acceptance: %s", e
+            )
+
         messages.success(
             request,
             f"Матч создан! Вы играете с {response.respondent}. Дедлайн: {match.deadline.strftime('%d.%m.%Y')}.",
@@ -284,6 +303,13 @@ def sparring_respond(request, pk):
     GET /sparring/<id>/respond/?method=telegram|whatsapp|max — редирект на мессенджер.
     POST /sparring/<id>/respond/ — только записать отклик, уведомить автора; JSON с contact_urls.
     """
+    logger.debug(
+        "sparring_respond: user=%s, pk=%s, method=%s",
+        request.user.id,
+        pk,
+        request.method,
+    )
+
     if not user_has_sparring_access(request.user):
         if request.method == "POST":
             return JsonResponse(
@@ -293,11 +319,23 @@ def sparring_respond(request, pk):
         messages.error(request, "Доступ к спаррингам по подписке.")
         return redirect("pricing")
 
-    sparring = get_object_or_404(
-        SparringRequest.objects.select_related("player"),
-        pk=pk,
-        status=SparringRequest.Status.ACTIVE,
-    )
+    try:
+        sparring = SparringRequest.objects.select_related("player").get(
+            pk=pk,
+            status=SparringRequest.Status.ACTIVE,
+        )
+        logger.debug("sparring_respond: found sparring request %s", sparring.pk)
+    except SparringRequest.DoesNotExist:
+        logger.warning(
+            "sparring_respond: sparring request %s not found or not active", pk
+        )
+        if request.method == "POST":
+            return JsonResponse(
+                {"success": False, "error": "Заявка не найдена или уже закрыта."},
+                status=404,
+            )
+        messages.error(request, "Заявка не найдена или уже закрыта.")
+        return redirect("sparring_list")
     valid_methods = ("telegram", "whatsapp", "max")
 
     if request.method == "GET":
@@ -319,7 +357,11 @@ def sparring_respond(request, pk):
 
     try:
         respondent = request.user.player
+        logger.debug("sparring_respond: respondent=%s", respondent.pk)
     except (AttributeError, Player.DoesNotExist):
+        logger.warning(
+            "sparring_respond: user %s has no player profile", request.user.id
+        )
         if request.method == "POST":
             return JsonResponse(
                 {"success": False, "error": "Заполните профиль игрока."},
@@ -329,6 +371,9 @@ def sparring_respond(request, pk):
         return redirect("profile_edit")
 
     if respondent.id == sparring.player_id:
+        logger.warning(
+            "sparring_respond: user %s tried to respond to own request", request.user.id
+        )
         if request.method == "POST":
             return JsonResponse(
                 {"success": False, "error": "Нельзя откликнуться на свою заявку."},
@@ -337,30 +382,76 @@ def sparring_respond(request, pk):
         messages.error(request, "Нельзя откликнуться на свою заявку.")
         return redirect("sparring_list")
 
-    obj, created = SparringResponse.objects.update_or_create(
-        sparring_request=sparring,
-        respondent=respondent,
-        defaults={
-            "contact_method": method,
-            "status": SparringResponse.ResponseStatus.PENDING,
-        },
-    )
-
-    if created and notify_sparring_response is not None:
-        try:
-            notify_sparring_response(obj)
-        except Exception as e:
-            logger.warning(
-                "Failed to send Telegram notification for sparring response: %s", e
+    try:
+        obj, created = SparringResponse.objects.update_or_create(
+            sparring_request=sparring,
+            respondent=respondent,
+            defaults={
+                "contact_method": method,
+                "status": SparringResponse.ResponseStatus.PENDING,
+            },
+        )
+        logger.info(
+            "sparring_respond: response %s %s (sparring=%s, respondent=%s)",
+            "created" if created else "updated",
+            obj.pk,
+            sparring.pk,
+            respondent.pk,
+        )
+    except Exception as e:
+        logger.error("Failed to create/update sparring response: %s", e, exc_info=True)
+        if request.method == "POST":
+            return JsonResponse(
+                {"success": False, "error": f"Ошибка при сохранении отклика: {str(e)}"},
+                status=500,
             )
+        messages.error(request, "Ошибка при сохранении отклика. Попробуйте позже.")
+        return redirect("sparring_list")
+
+    if created:
+        # Создаем уведомление в личном кабинете для автора заявки
+        try:
+            Notification.objects.create(
+                user=sparring.player.user,
+                message=f"{respondent} откликнулся на вашу заявку на спарринг.",
+                url=reverse("sparring_my_requests"),
+            )
+        except Exception as e:
+            logger.warning("Failed to create notification for sparring response: %s", e)
+
+        # Отправляем Telegram уведомление
+        if notify_sparring_response is not None:
+            try:
+                notify_sparring_response(obj)
+            except Exception as e:
+                logger.warning(
+                    "Failed to send Telegram notification for sparring response: %s", e
+                )
 
     if request.method == "POST":
-        return JsonResponse(
-            {
-                "success": True,
-                "contact_urls": _build_contact_urls(sparring.player),
-            }
-        )
+        try:
+            contact_urls = _build_contact_urls(sparring.player)
+            return JsonResponse(
+                {
+                    "success": True,
+                    "contact_urls": contact_urls,
+                    "message": (
+                        "Отклик успешно отправлен!" if created else "Отклик обновлен."
+                    ),
+                }
+            )
+        except Exception as e:
+            logger.error("Failed to build contact URLs: %s", e, exc_info=True)
+            return JsonResponse(
+                {
+                    "success": True,
+                    "contact_urls": {},
+                    "message": (
+                        "Отклик успешно отправлен!" if created else "Отклик обновлен."
+                    ),
+                    "warning": "Не удалось получить контакты для связи.",
+                }
+            )
 
     url = _get_contact_url(sparring.player, method)
     if url:

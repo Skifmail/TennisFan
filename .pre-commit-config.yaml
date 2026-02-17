@@ -9,10 +9,12 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
+        exclude: ^docs_venv/
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.8.0
     hooks:
       - id: mypy
         args: [--explicit-package-bases]
+        exclude: ^docs_venv/
         additional_dependencies: [types-requests, types-python-dateutil, types-Pillow]

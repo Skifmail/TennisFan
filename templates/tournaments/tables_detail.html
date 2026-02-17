@@ -57,7 +57,7 @@
             {% endif %}
             <div class="d-flex gap-2 mb-2 flex-wrap">
                 {% if tournament.format == 'single_elimination' %}
-                <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">FAN</span>
+                <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;" title="Турнир на выбывание с подвалом">{{ tournament.get_format_display }}</span>
                 {% elif tournament.format == 'olympic_consolation' %}
                 <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">Олимпийская система</span>
                 {% elif tournament.format == 'round_robin' %}
@@ -87,7 +87,7 @@
             {% endif %}
             {% if is_fan %}
             <div class="tables-fan-points mt-3">
-                <h4 class="mb-2">Очки FAN по раундам</h4>
+                <h4 class="mb-2">Сезонные очки по раундам</h4>
                 <div class="fan-points-grid">
                     <span>1 круг: {{ tournament.fan_points_r1 }} очков</span>
                     <span>2 круг: {{ tournament.fan_points_r2 }} очков</span>
@@ -144,7 +144,7 @@
                             <th>Рейтинг</th>
                             {% if is_fan %}
                             <th>Раунд вылета</th>
-                            <th>Очки FAN</th>
+                            <th>Сезонные очки</th>
                             {% elif is_olympic %}
                             <th>Очки за место</th>
                             {% elif is_round_robin %}
@@ -180,7 +180,7 @@
                                 </a>
                                 {% endif %}
                             </td>
-                            <td>{% if s.team %}{{ s.team.player1.total_points }}{% else %}{{ s.player.total_points }}{% endif %}</td>
+                            <td>{% if s.team %}{{ s.team.player1.total_points|floatformat:1 }}{% else %}{{ s.player.total_points|floatformat:1 }}{% endif %}</td>
                             {% if is_fan %}
                             <td>{{ s.round_eliminated }}</td>
                             <td class="fan-points">{{ s.fan_points }}</td>

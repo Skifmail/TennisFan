@@ -3,6 +3,7 @@ Tournaments views.
 """
 
 import json
+import logging
 from collections import defaultdict
 from functools import wraps
 from itertools import groupby
@@ -22,6 +23,7 @@ from .models import (
     Match,
     MatchResultProposal,
     Tournament,
+    TournamentPlayerResult,
     TournamentTeam,
     TournamentType,
 )
@@ -29,6 +31,8 @@ from .olympic_consolation import _is_olympic
 from .proposal_service import apply_proposal
 from .round_robin import _is_round_robin, compute_standings, get_match_matrix
 from .utils import get_match_opponent_users
+
+logger = logging.getLogger(__name__)
 
 MATCH_FORMAT_DESCRIPTIONS = {
     "1_set_6": "1 сет до 6 геймов. Матч до 6 выигранных геймов (при счёте 6:6 — игра до 7).",
@@ -685,6 +689,30 @@ def match_detail(request, pk):
         ).prefetch_related("tournament__allowed_categories"),
         pk=pk,
     )
+    # Сезонные очки за матч: проигравший получает очки при вылете (FAN/Olympic)
+    season_points_p1 = None
+    season_points_p2 = None
+    show_season_pts = (
+        match.tournament_id
+        and (_is_fan(match.tournament) or _is_olympic(match.tournament))
+        and match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
+    )
+    if show_season_pts:
+        p1_for_result = match.team1.player1 if match.team1_id else match.player1
+        p2_for_result = match.team2.player1 if match.team2_id else match.player2
+        # Оба игрока могут иметь TournamentPlayerResult: проигравший — при вылете,
+        # победитель финала — при завершении турнира (fan_points_winner)
+        if p1_for_result:
+            r1 = TournamentPlayerResult.objects.filter(
+                tournament=match.tournament, player=p1_for_result
+            ).first()
+            season_points_p1 = r1.fan_points if r1 else 0
+        if p2_for_result:
+            r2 = TournamentPlayerResult.objects.filter(
+                tournament=match.tournament, player=p2_for_result
+            ).first()
+            season_points_p2 = r2.fan_points if r2 else 0
+
     return render(
         request,
         "tournaments/match_detail.html",
@@ -692,6 +720,8 @@ def match_detail(request, pk):
             "match": match,
             "is_fan": _is_fan(match.tournament),
             "is_olympic": _is_olympic(match.tournament),
+            "season_points_player1": season_points_p1,
+            "season_points_player2": season_points_p2,
         },
     )
 
@@ -855,9 +885,17 @@ def propose_result(request, pk):
     )
 
     for opponent_user in get_match_opponent_users(match, player):
+        # Определяем текст сообщения в зависимости от типа матча
+        if match.tournament:
+            match_context = f"в турнире {match.tournament.name}"
+        elif match.is_sparring():
+            match_context = "спаррингового матча"
+        else:
+            match_context = "матча"
+
         Notification.objects.create(
             user=opponent_user,
-            message=f"{player} предложил результат матча в турнире {match.tournament.name}. У вас 3 часа на подтверждение.",
+            message=f"{player} предложил результат {match_context}. У вас 3 часа на подтверждение.",
             url=reverse("my_matches"),
         )
 
@@ -923,6 +961,28 @@ def confirm_proposal(request, pk):
         apply_proposal(proposal)
         # FAN-логика (advance, consolation, finalize) вызывается из post_save сигнала Match
         messages.success(request, "Результат подтверждён.")
+
+        # Создаем уведомление в личном кабинете для инициатора
+        try:
+            match = proposal.match
+            # Определяем контекст матча для сообщения
+            if match.tournament:
+                match_context = f"в турнире {match.tournament.name}"
+            elif match.is_sparring():
+                match_context = "спаррингового матча"
+            else:
+                match_context = "матча"
+
+            Notification.objects.create(
+                user=proposal.proposer.user,
+                message=f"{player} подтвердил результат {match_context}.",
+                url=reverse("match_detail", args=[match.pk]),
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to create notification for proposal confirmation: %s", e
+            )
+
         # Telegram-уведомление инициатору
         try:
             from apps.telegram_bot.notifications import notify_proposal_confirmed
@@ -1050,7 +1110,8 @@ def tournament_register(request, slug):
         return redirect("tournament_register_doubles", slug=tournament.slug)
 
     # Check gender compatibility
-    if tournament.gender != "mixed":
+    # "open" — смешанный (любой пол), "mixed" — микст (для парных: М+Ж в команде)
+    if tournament.gender not in ("mixed", "open"):
         if (tournament.gender == "male" and player.gender != "male") or (
             tournament.gender == "female" and player.gender != "female"
         ):
@@ -1144,7 +1205,8 @@ def tournament_register_doubles(request, slug):
         messages.error(request, "Регистрация закрыта: все места заняты.")
         return redirect("tournament_detail", slug=slug)
 
-    if tournament.gender != "mixed":
+    # "open" — смешанный (любой пол), "mixed" — микст (для парных: М+Ж в команде)
+    if tournament.gender not in ("mixed", "open"):
         if (tournament.gender == "male" and player.gender != "male") or (
             tournament.gender == "female" and player.gender != "female"
         ):

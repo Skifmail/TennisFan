@@ -86,7 +86,9 @@ def _update_season_points(
     )
 
 
-def _is_fan(t: Tournament) -> bool:
+def _is_fan(t: Tournament | None) -> bool:
+    if t is None:
+        return False
     return getattr(t, "format", None) == FAN_FORMAT
 
 
@@ -322,6 +324,7 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
         round_order += 1
 
     if odd and bye_player is not None:
+        # Создаем матч с BYE для первого участника
         _create_match(
             entities[0],
             (
@@ -331,13 +334,25 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
             ),
             walkover=True,
         )
-
-    for i in range(num_real):
-        lo, hi = (i + 1, n - 1 - i) if odd else (i, n - 1 - i)
-        a, b = entities[lo], entities[hi]
-        if not is_doubles and (getattr(b, "is_bye", False) or b == bye_player):
-            continue
-        _create_match(a, b)
+        # Для нечетного количества: создаем матчи для оставшихся участников
+        # entities[0] уже обработан, осталось n-1 участников, нужно создать (n-1)//2 матчей
+        remaining = n - 1
+        for i in range(remaining // 2):
+            lo = 1 + i
+            hi = n - 1 - i
+            a, b = entities[lo], entities[hi]
+            if not is_doubles and (getattr(b, "is_bye", False) or b == bye_player):
+                continue
+            _create_match(a, b)
+    else:
+        # Для четного количества: создаем пары обычным способом
+        for i in range(num_real):
+            lo = i
+            hi = n - 1 - i
+            a, b = entities[lo], entities[hi]
+            if not is_doubles and (getattr(b, "is_bye", False) or b == bye_player):
+                continue
+            _create_match(a, b)
 
     tournament.bracket_generated = True
     tournament.save(update_fields=["bracket_generated"])
@@ -626,43 +641,101 @@ def advance_winner_and_award_loser(
     if existing:
         return None
 
-    # Один матч в паре: это «игрок vs Bye», второй слот пуст. Создаём только заглушку (SCHEDULED),
-    # без победителя — соперник подставится, когда сыграет другая пара. Иначе игрок получал бы bye
-    # в каждом раунде и выходил в финал без игр.
+    # Один матч в паре: второй слот пуст. Либо это «игрок vs Bye» (результат известен),
+    # либо «победитель vs игрок, получивший bye в R1» (реальный матч).
     if len(prev_matches) == 1:
-        if next_ri >= _expected_final_round(t):
+        # Пропускаем только если мы уже за пределами финала (next_ri > expected).
+        if next_ri > _expected_final_round(t):
             return None
-        if not bye_player:
-            return None
+        orphan = prev_matches[0].winner
+        orphan_team = prev_matches[0].winner_team
+
+        # Ищем участника, который не играл в R1 (получил bye при чётном N с bye в списке)
+        r1_players = set()
+        for m in t.matches.filter(round_index=ri, is_consolation=False):
+            if is_doubles and m.team1_id and m.team2_id:
+                r1_players.add(m.team1_id)
+                r1_players.add(m.team2_id)
+            elif m.player1_id and m.player2_id:
+                r1_players.add(m.player1_id)
+                r1_players.add(m.player2_id)
+        player_who_had_bye = None
         if is_doubles:
-            bye_entity = _get_or_create_bye_team(t, bye_player)
-            orphan_team = prev_matches[0].winner_team
-            next_m = Match.objects.create(
-                tournament=t,
-                round_name=next_name,
-                round_index=next_ri,
-                round_order=next_ro,
-                is_consolation=False,
-                team1=orphan_team,
-                team2=bye_entity,
-                player1=orphan_team.player1,
-                player2=bye_entity.player1,
-                status=Match.MatchStatus.SCHEDULED,
-                deadline=deadline,
-            )
+            for team in t.teams.filter(player2__isnull=False):
+                if team.pk not in r1_players:
+                    if not getattr(team.player1, "is_bye", False):
+                        player_who_had_bye = team
+                        break
         else:
-            orphan = prev_matches[0].winner
-            next_m = Match.objects.create(
-                tournament=t,
-                round_name=next_name,
-                round_index=next_ri,
-                round_order=next_ro,
-                is_consolation=False,
-                player1=orphan,
-                player2=bye_player,
-                status=Match.MatchStatus.SCHEDULED,
-                deadline=deadline,
-            )
+            for p in t.participants.all():
+                if p.pk not in r1_players and not getattr(p, "is_bye", False):
+                    player_who_had_bye = p
+                    break
+
+        if player_who_had_bye is not None:
+            # Реальный матч: победитель vs игрок, получивший bye
+            if is_doubles:
+                next_m = Match.objects.create(
+                    tournament=t,
+                    round_name=next_name,
+                    round_index=next_ri,
+                    round_order=next_ro,
+                    is_consolation=False,
+                    team1=orphan_team,
+                    team2=player_who_had_bye,
+                    player1=orphan_team.player1,
+                    player2=player_who_had_bye.player1,
+                    status=Match.MatchStatus.SCHEDULED,
+                    deadline=deadline,
+                )
+            else:
+                next_m = Match.objects.create(
+                    tournament=t,
+                    round_name=next_name,
+                    round_index=next_ri,
+                    round_order=next_ro,
+                    is_consolation=False,
+                    player1=orphan,
+                    player2=player_who_had_bye,
+                    status=Match.MatchStatus.SCHEDULED,
+                    deadline=deadline,
+                )
+        else:
+            # Истинный bye: соперник — «Свободный круг», результат известен априори
+            if not bye_player:
+                return None
+            if is_doubles:
+                bye_entity = _get_or_create_bye_team(t, bye_player)
+                next_m = Match.objects.create(
+                    tournament=t,
+                    round_name=next_name,
+                    round_index=next_ri,
+                    round_order=next_ro,
+                    is_consolation=False,
+                    team1=orphan_team,
+                    team2=bye_entity,
+                    player1=orphan_team.player1,
+                    player2=bye_entity.player1,
+                    winner_team=orphan_team,
+                    winner=orphan_team.player1,
+                    status=Match.MatchStatus.WALKOVER,
+                    deadline=deadline,
+                    completed_datetime=timezone.now(),
+                )
+            else:
+                next_m = Match.objects.create(
+                    tournament=t,
+                    round_name=next_name,
+                    round_index=next_ri,
+                    round_order=next_ro,
+                    is_consolation=False,
+                    player1=orphan,
+                    player2=bye_player,
+                    winner=orphan,
+                    status=Match.MatchStatus.WALKOVER,
+                    deadline=deadline,
+                    completed_datetime=timezone.now(),
+                )
         prev_matches[0].next_match = next_m
         prev_matches[0].save(update_fields=["next_match"])
         return cast(Match | None, next_m)

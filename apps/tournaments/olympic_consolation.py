@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 OLYMPIC_FORMAT = "olympic_consolation"
 
 
-def _is_olympic(t: Tournament) -> bool:
+def _is_olympic(t: Tournament | None) -> bool:
+    if t is None:
+        return False
     return getattr(t, "format", None) == OLYMPIC_FORMAT
 
 
@@ -492,7 +494,7 @@ def finalize_olympic(tournament: Tournament) -> tuple[bool, str]:
         return False, "Турнир уже завершён."
 
     # FAN очки не влияют на рейтинг (total_points) - только для отображения результатов турнира
-    # Рейтинг обновляется только через Elo-алгоритм после каждого матча
+    # Рейтинг обновляется только через FAN-алгоритм после каждого матча
 
     tournament.status = "completed"
     tournament.save(update_fields=["status"])

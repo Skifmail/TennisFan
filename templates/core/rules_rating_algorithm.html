@@ -1,0 +1,267 @@
+<h2 class="rules-doc__title">Алгоритм расчета рейтинга FAN</h2>
+<p class="rules-doc__meta">Математическая модель и алгоритм пересчета рейтинга силы игрока</p>
+
+<p>Эта страница описывает математические основы системы расчета рейтинга FAN (FAN-очки), используемой в TennisFan для определения уровня силы игроков.</p>
+
+<h3 class="rules-doc__heading">1. Начальный рейтинг</h3>
+<p><strong>1.1.</strong> При регистрации каждый игрок проходит тест NTRP (National Tennis Rating Program) для определения начального уровня силы от 1.0 до 7.0.</p>
+<p><strong>1.2.</strong> На основе результата теста игроку присваивается начальный рейтинг FAN (FAN-очки) в диапазоне от 1000 до 7000 очков согласно следующей таблице:</p>
+
+<table class="rules-summary-table" style="width:100%; border-collapse: collapse; margin: var(--spacing-lg) 0;">
+<thead>
+<tr style="background: var(--color-bg-elevated);">
+<th style="padding: 12px; border: 1px solid var(--color-border); text-align: left;">NTRP уровень</th>
+<th style="padding: 12px; border: 1px solid var(--color-border); text-align: left;">FAN очки</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">1.0 – 1.4</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">1000</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">1.5 – 1.8</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">1500</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">1.9 – 2.0</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">2000</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">2.1 – 2.5</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">2500</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">2.6 – 3.0</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">3000</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">3.1 – 3.5</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">3500</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">3.6 – 4.0</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">4000</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">4.1 – 4.5</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">4500</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">4.6 – 5.0</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">5000</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">5.1 – 5.5</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">5500</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">5.6 – 6.0</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">6000</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">6.1 – 6.5</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">6500</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">6.6 – 7.0</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">7000</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>1.3.</strong> Для уровней внутри диапазона (например, 2.8 или 3.0) рейтинг интерполируется линейно между границами диапазона для обеспечения точного соответствия между NTRP уровнем и FAN очками.</p>
+
+<hr>
+
+<h3 class="rules-doc__heading">2. Основной алгоритм расчета рейтинга после матча</h3>
+<p>После каждого завершенного матча рейтинг обоих игроков пересчитывается по формуле:</p>
+
+<div style="background: var(--color-bg-elevated); padding: var(--spacing-lg); border-radius: var(--border-radius); margin: var(--spacing-lg) 0;">
+<p style="margin: 0; font-family: monospace; font-size: 1.1em; text-align: center;"><strong>R<sub>новый</sub> = R<sub>старый</sub> + K × (S<sub>реальное</sub> - S<sub>ожидаемое</sub>)</strong></p>
+</div>
+
+<p>где:</p>
+<ul>
+    <li><strong>R<sub>новый</sub></strong> — новый рейтинг игрока после матча</li>
+    <li><strong>R<sub>старый</sub></strong> — текущий рейтинг игрока до матча</li>
+    <li><strong>K</strong> — коэффициент динамичности (K-фактор)</li>
+    <li><strong>S<sub>реальное</sub></strong> — реальный результат игрока в матче</li>
+    <li><strong>S<sub>ожидаемое</sub></strong> — ожидаемый результат, рассчитанный системой до матча</li>
+</ul>
+
+<hr>
+
+<h3 class="rules-doc__heading">3. Ожидаемый результат (S<sub>ожидаемое</sub>)</h3>
+<p><strong>3.1.</strong> Перед матчем система рассчитывает вероятность победы каждого игрока на основе разницы в их рейтингах по формуле:</p>
+
+<div style="background: var(--color-bg-elevated); padding: var(--spacing-lg); border-radius: var(--border-radius); margin: var(--spacing-lg) 0;">
+<p style="margin: 0; font-family: monospace; font-size: 1.1em; text-align: center;"><strong>E<sub>A</sub> = 1 / (1 + 10<sup>((R<sub>B</sub> - R<sub>A</sub>) / 800)</sup>)</strong></p>
+</div>
+
+<p>где:</p>
+<ul>
+    <li><strong>E<sub>A</sub></strong> — ожидаемый результат игрока A (вероятность победы или доля очков)</li>
+    <li><strong>R<sub>A</sub></strong> — рейтинг игрока A</li>
+    <li><strong>R<sub>B</sub></strong> — рейтинг игрока B</li>
+    <li><strong>800</strong> — делитель, определяющий чувствительность системы к разнице в рейтингах</li>
+</ul>
+
+<p><strong>3.2.</strong> Делитель 800 означает, что разница в 800 очков дает сильнейшему игроку примерно 90% вероятность победы. Это настроено для любительского тенниса, где результаты более непредсказуемы, чем в профессиональном.</p>
+
+<p><strong>3.3.</strong> Примеры:</p>
+<ul>
+    <li>Если рейтинги равны (R<sub>A</sub> = R<sub>B</sub>): E<sub>A</sub> = 0.5 (50% вероятность)</li>
+    <li>Если разница 200 очков: E<sub>A</sub> ≈ 0.75 (75% вероятность для сильнейшего)</li>
+    <li>Если разница 400 очков: E<sub>A</sub> ≈ 0.88 (88% вероятность для сильнейшего)</li>
+</ul>
+
+<hr>
+
+<h3 class="rules-doc__heading">4. Реальный результат (S<sub>реальное</sub>)</h3>
+<p><strong>4.1.</strong> Реальный результат рассчитывается на основе счета матча и учитывает два фактора:</p>
+
+<div style="background: var(--color-bg-elevated); padding: var(--spacing-lg); border-radius: var(--border-radius); margin: var(--spacing-lg) 0;">
+<p style="margin: 0; font-family: monospace; font-size: 1.1em; text-align: center;"><strong>S<sub>реальное</sub> = 0.7 × (геймы выиграно / всего геймов) + 0.3 × бонус за победу</strong></p>
+</div>
+
+<p>где:</p>
+<ul>
+    <li><strong>0.7</strong> — вес доли выигранных геймов (70%)</li>
+    <li><strong>0.3</strong> — вес бонуса за победу в матче (30%)</li>
+    <li><strong>бонус за победу</strong> = 1.0, если игрок выиграл матч, и 0.0, если проиграл</li>
+</ul>
+
+<p><strong>4.2.</strong> Примеры расчета:</p>
+<ul>
+    <li><strong>Победа 6:2, 6:2</strong>: S = 0.7 × (12/16) + 0.3 × 1.0 = 0.7 × 0.75 + 0.3 = 0.825</li>
+    <li><strong>Победа 7:6, 7:6</strong>: S = 0.7 × (14/26) + 0.3 × 1.0 = 0.7 × 0.538 + 0.3 = 0.677</li>
+    <li><strong>Поражение 4:6, 2:6</strong>: S = 0.7 × (6/18) + 0.3 × 0.0 = 0.7 × 0.333 + 0.0 = 0.233</li>
+</ul>
+
+<p><strong>4.3.</strong> Система учитывает не только факт победы/поражения, но и счет по геймам, что делает расчет более справедливым. Уверенная победа дает больше очков, чем победа в упорной борьбе.</p>
+
+<hr>
+
+<h3 class="rules-doc__heading">5. Коэффициент динамичности (K-фактор)</h3>
+<p><strong>5.1.</strong> K-фактор определяет, насколько сильно изменяется рейтинг после каждого матча. Он зависит от количества сыгранных матчей:</p>
+
+<table class="rules-summary-table" style="width:100%; border-collapse: collapse; margin: var(--spacing-lg) 0;">
+<thead>
+<tr style="background: var(--color-bg-elevated);">
+<th style="padding: 12px; border: 1px solid var(--color-border); text-align: left;">Количество матчей</th>
+<th style="padding: 12px; border: 1px solid var(--color-border); text-align: left;">K-фактор</th>
+<th style="padding: 12px; border: 1px solid var(--color-border); text-align: left;">Описание</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">Меньше 10</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">250</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">Фаза калибровки — рейтинг быстро корректируется</td>
+</tr>
+<tr>
+<td style="padding: 12px; border: 1px solid var(--color-border);">10 и больше</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">50</td>
+<td style="padding: 12px; border: 1px solid var(--color-border);">Стабилизированный рейтинг — изменения плавные</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>5.2.</strong> Логика K-фактора:</p>
+<ul>
+    <li><strong>Для новичков (менее 10 матчей)</strong>: K = 250 позволяет системе быстро корректировать "ошибки" начальной оценки. Один матч может изменить рейтинг на 50-100 очков, что помогает игроку быстро достичь своего реального уровня.</li>
+    <li><strong>Для опытных игроков (10+ матчей)</strong>: K = 50 обеспечивает стабильность рейтинга. Изменения становятся плавными и отражают реальный прогресс, а не случайности одного матча.</li>
+</ul>
+
+<hr>
+
+<h3 class="rules-doc__heading">6. Примеры расчета</h3>
+
+<h4>Пример 1: Новичок против опытного игрока</h4>
+<p><strong>Условия:</strong></p>
+<ul>
+    <li>Игрок A (новичок): рейтинг 3000, сыграно 3 матча (K = 250)</li>
+    <li>Игрок B (опытный): рейтинг 4000, сыграно 25 матчей (K = 50)</li>
+    <li>Результат: Игрок A выиграл 6:4, 6:4</li>
+</ul>
+
+<p><strong>Расчет:</strong></p>
+<ul>
+    <li><strong>Ожидаемый результат A</strong>: E<sub>A</sub> = 1 / (1 + 10<sup>((4000-3000)/800)</sup>) = 1 / (1 + 10<sup>1.25</sup>) ≈ 0.06 (6%)</li>
+    <li><strong>Реальный результат A</strong>: S<sub>A</sub> = 0.7 × (12/20) + 0.3 × 1.0 = 0.7 × 0.6 + 0.3 = 0.72</li>
+    <li><strong>Изменение рейтинга A</strong>: ΔR<sub>A</sub> = 250 × (0.72 - 0.06) = 250 × 0.66 = <strong>+165 очков</strong></li>
+    <li><strong>Новый рейтинг A</strong>: 3000 + 165 = <strong>3165 очков</strong></li>
+</ul>
+
+<p><strong>Для игрока B:</strong></p>
+<ul>
+    <li><strong>Ожидаемый результат B</strong>: E<sub>B</sub> = 1 - E<sub>A</sub> = 0.94 (94%)</li>
+    <li><strong>Реальный результат B</strong>: S<sub>B</sub> = 0.7 × (8/20) + 0.3 × 0.0 = 0.28</li>
+    <li><strong>Изменение рейтинга B</strong>: ΔR<sub>B</sub> = 50 × (0.28 - 0.94) = 50 × (-0.66) = <strong>-33 очка</strong></li>
+    <li><strong>Новый рейтинг B</strong>: 4000 - 33 = <strong>3967 очков</strong></li>
+</ul>
+
+<p><strong>Вывод:</strong> Новичок получил значительно больше очков (+165), так как его победа была неожиданной. Опытный игрок потерял меньше очков (-33), так как его рейтинг уже стабилизирован.</p>
+
+<h4>Пример 2: Равные игроки</h4>
+<p><strong>Условия:</strong></p>
+<ul>
+    <li>Игрок A: рейтинг 3500, сыграно 15 матчей (K = 50)</li>
+    <li>Игрок B: рейтинг 3500, сыграно 20 матчей (K = 50)</li>
+    <li>Результат: Игрок A выиграл 7:6, 5:7, 7:6</li>
+</ul>
+
+<p><strong>Расчет:</strong></p>
+<ul>
+    <li><strong>Ожидаемый результат A</strong>: E<sub>A</sub> = 1 / (1 + 10<sup>0</sup>) = 0.5 (50%)</li>
+    <li><strong>Реальный результат A</strong>: S<sub>A</sub> = 0.7 × (19/38) + 0.3 × 1.0 = 0.7 × 0.5 + 0.3 = 0.65</li>
+    <li><strong>Изменение рейтинга A</strong>: ΔR<sub>A</sub> = 50 × (0.65 - 0.5) = 50 × 0.15 = <strong>+7.5 очков</strong></li>
+    <li><strong>Новый рейтинг A</strong>: 3500 + 7.5 = <strong>3507.5 очков</strong></li>
+</ul>
+
+<p><strong>Для игрока B:</strong></p>
+<ul>
+    <li><strong>Реальный результат B</strong>: S<sub>B</sub> = 0.7 × (19/38) + 0.3 × 0.0 = 0.35</li>
+    <li><strong>Изменение рейтинга B</strong>: ΔR<sub>B</sub> = 50 × (0.35 - 0.5) = 50 × (-0.15) = <strong>-7.5 очков</strong></li>
+    <li><strong>Новый рейтинг B</strong>: 3500 - 7.5 = <strong>3492.5 очков</strong></li>
+</ul>
+
+<p><strong>Вывод:</strong> При равных рейтингах изменения минимальны, так как результат был ожидаемым. Победитель получил небольшой бонус за победу в упорной борьбе.</p>
+
+<hr>
+
+<h3 class="rules-doc__heading">7. Пересчет NTRP уровня</h3>
+<p><strong>7.1.</strong> После каждого матча система автоматически пересчитывает NTRP уровень игрока на основе его текущего FAN рейтинга.</p>
+<p><strong>7.2.</strong> Пересчет происходит по обратной формуле к таблице начальных очков с линейной интерполяцией между диапазонами.</p>
+<p><strong>7.3.</strong> Примеры соответствия:</p>
+<ul>
+    <li>3000 очков → NTRP 2.6</li>
+    <li>3222 очков → NTRP 3.0</li>
+    <li>3500 очков → NTRP 3.1</li>
+    <li>4000 очков → NTRP 3.6</li>
+    <li>5000 очков → NTRP 4.6</li>
+</ul>
+
+<hr>
+
+<h3 class="rules-doc__heading">8. Особенности системы</h3>
+
+<h4>8.1. Самокоррекция</h4>
+<p>Если игрок завысил свой уровень при регистрации (например, получил NTRP 5.0, а играет на уровне 3.0), система быстро скорректирует рейтинг. При большом K-факторе (250) игрок будет терять по 100-200 очков за матч, и через 3-4 игры его рейтинг упадет до реального уровня.</p>
+
+<h4>8.2. Справедливость счета</h4>
+<p>Проигрыш 0:6 наказывает сильнее, чем проигрыш 6:7. Система учитывает не только факт победы/поражения, но и счет по геймам, что делает оценку более точной.</p>
+
+<h4>8.3. Защита опытных игроков</h4>
+<p>Игрок, сыгравший 50+ матчей, имеет стабильный рейтинг (K = 50). Один плохой день не обрушит его статистику, в отличие от новичка с K = 250.</p>
+
+<h4>8.4. Нулевая сумма изменений</h4>
+<p>В матче между двумя игроками с одинаковым K-фактором сумма изменений рейтингов равна нулю: сколько очков получил один игрок, столько же потерял другой. Это обеспечивает баланс системы.</p>
+
+<hr>
+
+<h3 class="rules-doc__heading">9. Обновление рейтинга</h3>
+<p><strong>9.1.</strong> Рейтинг обновляется сразу после завершения каждого матча, что позволяет игрокам видеть свой текущий прогресс в реальном времени.</p>
+<p><strong>9.2.</strong> Рейтинг является постоянным показателем уровня игрока и не сбрасывается между сезонами. Это ваш "паспорт" как теннисиста — если вы достигли уровня 4.0, вы остаётесь на этом уровне и в новом сезоне.</p>
+<p><strong>9.3.</strong> Рейтинг используется для определения уровня силы (категории: Новичок, Любитель, Опытный, Мастерс, Профессионал), который пересчитывается ежемесячно, 1-го числа каждого месяца.</p>

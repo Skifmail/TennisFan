@@ -98,7 +98,7 @@ class SkillLevel(models.TextChoices):
     NOVICE = "novice", "Новичок"
     AMATEUR = "amateur", "Любитель"
     EXPERIENCED = "experienced", "Опытный"
-    ADVANCED = "advanced", "Продвинутый"
+    ADVANCED = "advanced", "Мастерс"
     PROFESSIONAL = "professional", "Профессионал"
 
 
@@ -150,9 +150,9 @@ class Player(CompressImageFieldsMixin, models.Model):
 
     # Statistics / Rating
     total_points = models.FloatField(
-        "Рейтинг (отображаемый)",
+        "Рейтинг FAN",
         default=0.0,
-        help_text="Публичный рейтинг. Обновляется после каждого матча.",
+        help_text="Рейтинг силы (FAN). Обновляется после каждого матча.",
     )
     hidden_rating = models.FloatField(
         "Скрытый рейтинг",
@@ -260,6 +260,88 @@ class Player(CompressImageFieldsMixin, models.Model):
         if self.matches_played == 0:
             return 0.0
         return float(round(self.matches_won / self.matches_played * 100, 1))
+
+    def get_rating_changes(self) -> dict[str, dict]:
+        """
+        Получить информацию об изменениях рейтинга после последнего матча.
+        Возвращает:
+        {
+            'ntrp': {'delta': float, 'direction': 'up'|'down'|'none'},
+            'fan': {'delta': float, 'direction': 'up'|'down'|'none'}
+        }
+        """
+        from django.db.models import Q
+
+        from apps.tournaments.models import Match
+
+        # Находим последний завершенный матч игрока
+        last_match = (
+            Match.objects.filter(
+                Q(player1=self)
+                | Q(player2=self)
+                | Q(team1__player1=self)
+                | Q(team1__player2=self)
+                | Q(team2__player1=self)
+                | Q(team2__player2=self)
+            )
+            .filter(
+                status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
+            )
+            .order_by("-completed_datetime", "-scheduled_datetime", "-pk")
+            .first()
+        )
+
+        result = {
+            "ntrp": {"delta": 0.0, "direction": "none"},
+            "fan": {"delta": 0.0, "direction": "none"},
+        }
+
+        if not last_match:
+            return result
+
+        # Определяем, на какой стороне был игрок
+        is_player1 = False
+        if last_match.player1_id == self.pk:
+            is_player1 = True
+        elif last_match.player2_id == self.pk:
+            is_player1 = False
+        elif last_match.team1_id and (
+            last_match.team1.player1_id == self.pk
+            or last_match.team1.player2_id == self.pk
+        ):
+            is_player1 = True
+        elif last_match.team2_id and (
+            last_match.team2.player1_id == self.pk
+            or last_match.team2.player2_id == self.pk
+        ):
+            is_player1 = False
+
+        # Получаем дельту FAN рейтинга
+        fan_delta = (
+            last_match.rating_delta_player1
+            if is_player1
+            else last_match.rating_delta_player2
+        )
+        if fan_delta:
+            result["fan"]["delta"] = float(fan_delta)
+            if fan_delta > 0:
+                result["fan"]["direction"] = "up"
+            elif fan_delta < 0:
+                result["fan"]["direction"] = "down"
+
+        # Для NTRP используем изменение FAN рейтинга как индикатор
+        # (они обычно коррелируют, так как оба зависят от результатов матчей)
+        # Если есть изменение FAN рейтинга, предполагаем аналогичное изменение NTRP
+        if fan_delta:
+            result["ntrp"]["delta"] = (
+                abs(float(fan_delta)) * 0.1
+            )  # Примерное соотношение
+            if fan_delta > 0:
+                result["ntrp"]["direction"] = "up"
+            elif fan_delta < 0:
+                result["ntrp"]["direction"] = "down"
+
+        return result
 
 
 class Notification(models.Model):

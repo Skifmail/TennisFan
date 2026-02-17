@@ -1,5 +1,5 @@
 """
-Elo-based rating calculation engine for tennis matches.
+FAN-based rating calculation engine for tennis matches.
 
 Algorithm (per plan):
     1. Expected result  E_A = 1 / (1 + 10^((R_B - R_A) / 750))
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-ELO_DIVISOR: int = 800  # Rating gap divisor for expected score calculation
+FAN_DIVISOR: int = 800  # Rating gap divisor for expected score calculation
 K_CALIBRATION: int = 250  # K-factor during first 10 matches
 K_STABLE: int = 50  # K-factor after 10+ matches
 CALIBRATION_THRESHOLD: int = 10  # Number of matches before K stabilises
@@ -98,7 +98,7 @@ def expected_score(rating_a: float, rating_b: float) -> float:
     Returns:
         Expected score for player A in range (0, 1).
     """
-    exponent = (rating_b - rating_a) / ELO_DIVISOR
+    exponent = (rating_b - rating_a) / FAN_DIVISOR
     return 1.0 / (1.0 + 10**exponent)
 
 
@@ -129,7 +129,7 @@ def calculate_new_ratings(
     score_b: MatchScore,
     a_won_match: bool,
 ) -> RatingDelta:
-    """Calculate new Elo-based ratings for both players after a match.
+    """Calculate new FAN-based ratings for both players after a match.
 
     Args:
         player_a: Rating snapshot for player A.

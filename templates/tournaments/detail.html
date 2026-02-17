@@ -12,7 +12,7 @@
         <div class="d-flex gap-2 mb-2 flex-wrap">
         <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_variant_display }}</span>
         {% if tournament.format == 'single_elimination' %}
-        <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">FAN</span>
+        <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;" title="Турнир на выбывание с подвалом для проигравших в 1-м круге">{{ tournament.get_format_display }}</span>
         {% elif tournament.format == 'olympic_consolation' %}
         <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">Олимпийская система</span>
         {% elif tournament.format == 'round_robin' %}
@@ -193,7 +193,7 @@
                             {{ participant.user.first_name }} {{ participant.user.last_name }}
                         </div>
                         <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
-                            {{ participant.get_skill_level_display }} • {{ participant.total_points }} очков
+                            {{ participant.get_skill_level_display }} • {{ participant.total_points|floatformat:1 }} очков
                         </div>
                     </div>
                 </a>
@@ -311,7 +311,7 @@
                             {% if is_fan %}
                             <th style="padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); font-weight: 600;">Раунд вылета</th>
                             {% endif %}
-                            <th style="padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); font-weight: 600;">{% if is_olympic %}Очки за место{% else %}Очки FAN{% endif %}</th>
+                            <th style="padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); font-weight: 600;">{% if is_olympic %}Очки за место{% else %}Сезонные очки{% endif %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -340,7 +340,7 @@
     </div>
     {% endif %}
 
-    <h2 class="section-title mb-3">{% if is_fan %}Сетка FAN{% elif is_olympic %}Сетка (основная и за места){% elif is_round_robin %}Матчи по турам{% else %}Матчи турнира{% endif %}</h2>
+    <h2 class="section-title mb-3">{% if is_fan %}Сетка турнира{% elif is_olympic %}Сетка (основная и за места){% elif is_round_robin %}Матчи по турам{% else %}Матчи турнира{% endif %}</h2>
     {% if is_fan and matches_by_round %}
     <div class="bracket-grid">
         {% for round_name, is_consolation, round_matches in matches_by_round %}

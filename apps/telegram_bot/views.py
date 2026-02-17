@@ -755,7 +755,7 @@ def _format_sparring_player_card(player: Player) -> str:
     name = str(player)
     age = player.age or "—"
     ntrp = float(player.ntrp_level) if player.ntrp_level else "—"
-    elo = int(player.total_points) if player.total_points else "—"
+    fan_rating = int(player.total_points) if player.total_points else "—"
     played = player.matches_played or 0
     won = player.matches_won or 0
     skill = (
@@ -768,7 +768,7 @@ def _format_sparring_player_card(player: Player) -> str:
         f"Возраст: {age}",
         f"NTRP: {ntrp}",
         f"Уровень: {skill}",
-        f"ELO: {elo}",
+        f"FAN: {fan_rating}",
         f"Игр: {played} (W:{won} / L:{played - won})",
     ]
     body = "\n".join(lines)
@@ -987,8 +987,8 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
         keyboard = []
         for i, resp in enumerate(candidates, 1):
             r = resp.respondent
-            elo = int(r.total_points) if r.total_points else "—"
-            lines.append(f"<b>{i}.</b> {r} · ELO: {elo}")
+            fan_rating = int(r.total_points) if r.total_points else "—"
+            lines.append(f"<b>{i}.</b> {r} · FAN: {fan_rating}")
             keyboard.append(
                 [{"text": f"👤 {i}. {r}", "callback_data": f"sparring_cand_{resp.pk}"}]
             )
@@ -1186,6 +1186,8 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
 
             # Уведомляем откликнувшегося игрока
             try:
+                from django.urls import reverse
+
                 from apps.telegram_bot.notifications import send_to_user_by_user
 
                 send_to_user_by_user(
@@ -1195,6 +1197,19 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
                     f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
                     f"Дедлайн: {deadline_str}",
                 )
+
+                # Создаем уведомление в личном кабинете для откликнувшегося игрока
+                try:
+                    Notification.objects.create(
+                        user=response.respondent.user,
+                        message=f"Ваш отклик на заявку на спарринг принят! Матч создан. Дедлайн: {deadline_str}.",
+                        url=reverse("match_detail", args=[match.pk]),
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to create notification for sparring response acceptance (telegram): %s",
+                        e,
+                    )
             except Exception as e:
                 logger.warning(
                     "Failed to notify respondent about match confirmation: %s", e
@@ -1483,7 +1498,7 @@ def _handle_menu_callback_action(
                     "",
                     "🏆 <b>РЕЙТИНГ И СТАТИСТИКА</b>",
                     "━━━━━━━━━━━━━━━━━━",
-                    f"💎 Очки Elo: <b>{player.total_points:.1f}</b>",
+                    f"💎 Очки FAN: <b>{player.total_points:.1f}</b>",
                     f"🎖️ Очки сезона: <b>{season_points}</b>",
                     f"🎾 Матчей: <b>{player.matches_played}</b>",
                     f"✅ Побед: <b>{player.matches_won}</b>",

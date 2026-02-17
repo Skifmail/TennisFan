@@ -22,3 +22,9 @@ ENV/
 *.swo
 .DS_Store
 node_modules/
+
+# Logs
+logs/
+*.log
+*.log.*
+*.log.zip

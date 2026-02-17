@@ -312,3 +312,109 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "home"
+
+# ------------------------------------------------------------------------------
+# LOGGING
+# ------------------------------------------------------------------------------
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
+        },
+    },
+    "filters": {
+        "require_debug_false": {
+            "()": "django.utils.log.RequireDebugFalse",
+        },
+    },
+    "handlers": {
+        "file_errors": {
+            "level": "ERROR",
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": BASE_DIR / "logs" / "django_errors.log",
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 7,  # Хранить 7 дней
+            "formatter": "verbose",
+            "encoding": "utf-8",
+        },
+        "file_warnings": {
+            "level": "WARNING",
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": BASE_DIR / "logs" / "django_warnings.log",
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 7,
+            "formatter": "verbose",
+            "encoding": "utf-8",
+        },
+        "file_info": {
+            "level": "INFO",
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": BASE_DIR / "logs" / "django_info.log",
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 7,
+            "formatter": "verbose",
+            "encoding": "utf-8",
+        },
+        "console": {
+            "level": "DEBUG" if DEBUG else "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "root": {
+        "handlers": ["file_info", "file_warnings", "file_errors"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["file_info", "file_warnings", "file_errors"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["file_errors"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["file_warnings", "file_errors"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "apps.tournaments": {
+            "handlers": ["file_info", "file_warnings", "file_errors"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "apps.users": {
+            "handlers": ["file_info", "file_warnings", "file_errors"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "apps.sparring": {
+            "handlers": ["file_info", "file_warnings", "file_errors"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "apps.telegram_bot": {
+            "handlers": ["file_info", "file_warnings", "file_errors"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
+
+# Создаем директорию для логов, если её нет
+(BASE_DIR / "logs").mkdir(exist_ok=True)

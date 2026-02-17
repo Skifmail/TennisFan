@@ -8,6 +8,7 @@ markdown>=3.5.0
 requests>=2.28.0
 python-dotenv>=1.0.0
 django-crontab>=0.7.1
+loguru>=0.7.0
 black
 ruff
 mypy

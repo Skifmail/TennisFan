@@ -376,7 +376,9 @@ def _apply_fan_shadow(match: Match) -> None:
                         "Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk
                     )
                 old_rating = p.total_points
-                old_ntrp = p.ntrp_level
+                old_ntrp = rating_to_ntrp_level(
+                    old_rating
+                )  # Вычисляем из рейтинга, а не берем из БД
                 p.hidden_rating = new_rating
                 p.total_points = float(new_rating)
                 # Обновляем skill_level и ntrp_level на основе нового рейтинга
@@ -395,12 +397,23 @@ def _apply_fan_shadow(match: Match) -> None:
                     f"[FAN_SHADOW] Player {p.pk} (doubles team1): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), NTRP {old_ntrp} -> {new_ntrp}"
                 )
                 logger.info(
-                    "Player %s (doubles team1): rating updated %.1f -> %.1f (delta: %.1f)",
+                    "Player %s (doubles team1): rating updated %.1f -> %.1f (delta: %.1f), NTRP %s -> %s",
                     p.pk,
                     old_rating,
                     new_rating,
                     new_rating - old_rating,
+                    old_ntrp,
+                    new_ntrp,
                 )
+                # Критическое событие: изменение рейтинга игрока
+                if abs(new_rating - old_rating) > 50:
+                    logger.warning(
+                        "CRITICAL: Large rating change for player %s: %.1f -> %.1f (delta: %.1f)",
+                        p.pk,
+                        old_rating,
+                        new_rating,
+                        new_rating - old_rating,
+                    )
     else:
         new_rating_a = result.new_rating_a
         # Применяем штраф -40 очков для проигравшего при тех. поражении
@@ -408,7 +421,9 @@ def _apply_fan_shadow(match: Match) -> None:
             new_rating_a = max(0, new_rating_a - 40.0)
             logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p1.pk)
         old_rating_p1 = p1.total_points
-        old_ntrp_p1 = p1.ntrp_level
+        old_ntrp_p1 = rating_to_ntrp_level(
+            old_rating_p1
+        )  # Вычисляем из рейтинга, а не берем из БД
         p1.hidden_rating = new_rating_a
         p1.total_points = float(new_rating_a)
         # Обновляем skill_level и ntrp_level на основе нового рейтинга
@@ -422,12 +437,23 @@ def _apply_fan_shadow(match: Match) -> None:
             f"[FAN_SHADOW] Player {p1.pk} (singles): rating {old_rating_p1:.1f} -> {new_rating_a:.1f} (delta: {new_rating_a - old_rating_p1:.1f}), NTRP {old_ntrp_p1} -> {new_ntrp_p1}"
         )
         logger.info(
-            "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f)",
+            "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f), NTRP %s -> %s",
             p1.pk,
             old_rating_p1,
             new_rating_a,
             new_rating_a - old_rating_p1,
+            old_ntrp_p1,
+            new_ntrp_p1,
         )
+        # Критическое событие: изменение рейтинга игрока
+        if abs(new_rating_a - old_rating_p1) > 50:
+            logger.warning(
+                "CRITICAL: Large rating change for player %s: %.1f -> %.1f (delta: %.1f)",
+                p1.pk,
+                old_rating_p1,
+                new_rating_a,
+                new_rating_a - old_rating_p1,
+            )
 
     # Update hidden_rating and total_points for player2 side
     if is_doubles:
@@ -445,7 +471,9 @@ def _apply_fan_shadow(match: Match) -> None:
                         "Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk
                     )
                 old_rating = p.total_points
-                old_ntrp = p.ntrp_level
+                old_ntrp = rating_to_ntrp_level(
+                    old_rating
+                )  # Вычисляем из рейтинга, а не берем из БД
                 p.hidden_rating = new_rating
                 p.total_points = float(new_rating)
                 # Обновляем skill_level и ntrp_level на основе нового рейтинга
@@ -461,15 +489,26 @@ def _apply_fan_shadow(match: Match) -> None:
                     ]
                 )
                 print(
-                    f"[FAN_SHADOW] Player {p.pk} (doubles team1): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), NTRP {old_ntrp} -> {new_ntrp}"
+                    f"[FAN_SHADOW] Player {p.pk} (doubles team2): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), NTRP {old_ntrp} -> {new_ntrp}"
                 )
                 logger.info(
-                    "Player %s (doubles team1): rating updated %.1f -> %.1f (delta: %.1f)",
+                    "Player %s (doubles team2): rating updated %.1f -> %.1f (delta: %.1f), NTRP %s -> %s",
                     p.pk,
                     old_rating,
                     new_rating,
                     new_rating - old_rating,
+                    old_ntrp,
+                    new_ntrp,
                 )
+                # Критическое событие: изменение рейтинга игрока
+                if abs(new_rating - old_rating) > 50:
+                    logger.warning(
+                        "CRITICAL: Large rating change for player %s: %.1f -> %.1f (delta: %.1f)",
+                        p.pk,
+                        old_rating,
+                        new_rating,
+                        new_rating - old_rating,
+                    )
     else:
         new_rating_b = result.new_rating_b
         # Применяем штраф -40 очков для проигравшего при тех. поражении
@@ -477,7 +516,9 @@ def _apply_fan_shadow(match: Match) -> None:
             new_rating_b = max(0, new_rating_b - 40.0)
             logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p2.pk)
         old_rating_p2 = p2.total_points
-        old_ntrp_p2 = p2.ntrp_level
+        old_ntrp_p2 = rating_to_ntrp_level(
+            old_rating_p2
+        )  # Вычисляем из рейтинга, а не берем из БД
         p2.hidden_rating = new_rating_b
         p2.total_points = float(new_rating_b)
         # Обновляем skill_level и ntrp_level на основе нового рейтинга
@@ -491,12 +532,23 @@ def _apply_fan_shadow(match: Match) -> None:
             f"[FAN_SHADOW] Player {p2.pk} (singles): rating {old_rating_p2:.1f} -> {new_rating_b:.1f} (delta: {new_rating_b - old_rating_p2:.1f}), NTRP {old_ntrp_p2} -> {new_ntrp_p2}"
         )
         logger.info(
-            "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f)",
+            "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f), NTRP %s -> %s",
             p2.pk,
             old_rating_p2,
             new_rating_b,
             new_rating_b - old_rating_p2,
+            old_ntrp_p2,
+            new_ntrp_p2,
         )
+        # Критическое событие: изменение рейтинга игрока
+        if abs(new_rating_b - old_rating_p2) > 50:
+            logger.warning(
+                "CRITICAL: Large rating change for player %s: %.1f -> %.1f (delta: %.1f)",
+                p2.pk,
+                old_rating_p2,
+                new_rating_b,
+                new_rating_b - old_rating_p2,
+            )
 
     # Store deltas and mark as calculated
     Match.objects.filter(pk=match.pk).update(

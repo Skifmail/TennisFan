@@ -329,17 +329,29 @@ class Player(CompressImageFieldsMixin, models.Model):
             elif fan_delta < 0:
                 result["fan"]["direction"] = "down"
 
-        # Для NTRP используем изменение FAN рейтинга как индикатор
-        # (они обычно коррелируют, так как оба зависят от результатов матчей)
-        # Если есть изменение FAN рейтинга, предполагаем аналогичное изменение NTRP
-        if fan_delta:
-            result["ntrp"]["delta"] = (
-                abs(float(fan_delta)) * 0.1
-            )  # Примерное соотношение
-            if fan_delta > 0:
+        # Вычисляем реальное изменение NTRP на основе рейтинга до и после матча
+        if fan_delta is not None:
+            from apps.users.rating_utils import rating_to_ntrp_level
+
+            # Текущий рейтинг (после матча)
+            rating_after = float(self.total_points)
+            # Рейтинг до матча
+            rating_before = rating_after - float(fan_delta)
+
+            # Вычисляем NTRP до и после матча
+            ntrp_before = rating_to_ntrp_level(rating_before)
+            ntrp_after = rating_to_ntrp_level(rating_after)
+
+            # Вычисляем дельту NTRP
+            ntrp_delta = float(ntrp_after) - float(ntrp_before)
+            result["ntrp"]["delta"] = round(ntrp_delta, 1)
+
+            if ntrp_delta > 0:
                 result["ntrp"]["direction"] = "up"
-            elif fan_delta < 0:
+            elif ntrp_delta < 0:
                 result["ntrp"]["direction"] = "down"
+            else:
+                result["ntrp"]["direction"] = "none"
 
         return result
 

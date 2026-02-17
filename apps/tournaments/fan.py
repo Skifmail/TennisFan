@@ -582,63 +582,121 @@ def advance_winner_and_award_loser(
     bye_player = _get_bye_player()
 
     def _is_bye_placeholder(m: Match) -> bool:
-        if m.status != Match.MatchStatus.SCHEDULED:
-            return False
+        """Проверяет, является ли матч заглушкой с Bye (включая walkover матчи)."""
         if is_doubles:
             if m.winner_team_id is not None:
-                return False
+                # Если есть победитель, проверяем, не является ли соперник Bye
+                loser_team = m.team2 if m.winner_team == m.team1 else m.team1
+                return bool(loser_team and getattr(loser_team.player1, "is_bye", False))
             t1_bye = m.team1_id and getattr(m.team1.player1, "is_bye", False)
             t2_bye = m.team2_id and getattr(m.team2.player1, "is_bye", False)
             return bool(t1_bye or t2_bye)
+        # Для одиночных матчей
+        if m.winner_id is not None:
+            # Если есть победитель, проверяем, не является ли соперник Bye
+            loser = m.player2 if m.winner == m.player1 else m.player1
+            return bool(bye_player and loser and loser.pk == bye_player.pk)
         return bool(
             m.winner_id is None
             and bye_player
             and (m.player1_id == bye_player.pk or m.player2_id == bye_player.pk)
         )
 
-    # Слот следующего раунда уже занят заглушкой (игрок vs Bye). Оба матча текущего раунда
-    # завершены — подставляем победителя «не-bye» матча в заглушку.
-    if existing and len(prev_matches) == 2 and _is_bye_placeholder(existing):
-        bye_prev = next(
-            (
-                m
-                for m in prev_matches
-                if getattr(m.player1, "is_bye", False)
-                or getattr(m.player2, "is_bye", False)
-            ),
-            None,
-        )
-        if bye_prev is not None and bye_player is not None:
-            other_prev = next(m for m in prev_matches if m.pk != bye_prev.pk)
-            if other_prev.winner_id or other_prev.winner_team_id:
-                if is_doubles:
-                    other_winner_team = other_prev.winner_team
-                    if (
-                        getattr(existing.team2.player1, "is_bye", False)
-                        if existing.team2_id
-                        else False
-                    ):
-                        existing.team2 = other_winner_team
-                        existing.player2 = other_winner_team.player1
-                    else:
-                        existing.team1 = other_winner_team
-                        existing.player1 = other_winner_team.player1
-                    existing.save(
-                        update_fields=["team1", "team2", "player1", "player2"]
-                    )
-                else:
-                    other_winner = other_prev.winner
-                    if other_winner is not None:
-                        if existing.player2_id == bye_player.pk:
-                            existing.player2 = other_winner
-                        else:
-                            existing.player1 = other_winner
-                        existing.save(update_fields=["player1", "player2"])
-                other_prev.next_match = existing
-                other_prev.save(update_fields=["next_match"])
-                return cast(Match | None, existing)
-
+    # Если матч следующего раунда уже существует, проверяем, нужно ли его обновить
     if existing:
+        # Случай 1: Существующий матч содержит Bye и оба матча текущего раунда завершены
+        if len(prev_matches) == 2 and _is_bye_placeholder(existing):
+            # Находим матч с Bye и матч без Bye
+            bye_prev = next(
+                (
+                    m
+                    for m in prev_matches
+                    if (
+                        is_doubles
+                        and (
+                            (m.team1_id and getattr(m.team1.player1, "is_bye", False))
+                            or (
+                                m.team2_id and getattr(m.team2.player1, "is_bye", False)
+                            )
+                        )
+                    )
+                    or (
+                        not is_doubles
+                        and (
+                            getattr(m.player1, "is_bye", False)
+                            or getattr(m.player2, "is_bye", False)
+                        )
+                    )
+                ),
+                None,
+            )
+            if bye_prev is not None:
+                other_prev = next(m for m in prev_matches if m.pk != bye_prev.pk)
+                if other_prev.winner_id or other_prev.winner_team_id:
+                    # Заменяем Bye на победителя матча без Bye
+                    if is_doubles:
+                        other_winner_team = other_prev.winner_team
+                        if existing.team2_id and getattr(
+                            existing.team2.player1, "is_bye", False
+                        ):
+                            existing.team2 = other_winner_team
+                            existing.player2 = other_winner_team.player1
+                        elif existing.team1_id and getattr(
+                            existing.team1.player1, "is_bye", False
+                        ):
+                            existing.team1 = other_winner_team
+                            existing.player1 = other_winner_team.player1
+                        # Если матч был walkover, меняем статус на SCHEDULED
+                        if existing.status == Match.MatchStatus.WALKOVER:
+                            existing.status = Match.MatchStatus.SCHEDULED
+                            existing.winner_team = None
+                            existing.winner = None
+                            existing.completed_datetime = None
+                        existing.save(
+                            update_fields=[
+                                "team1",
+                                "team2",
+                                "player1",
+                                "player2",
+                                "status",
+                                "winner_team",
+                                "winner",
+                                "completed_datetime",
+                            ]
+                        )
+                    else:
+                        other_winner = other_prev.winner
+                        if other_winner is not None:
+                            if (
+                                existing.player2_id
+                                and bye_player
+                                and existing.player2_id == bye_player.pk
+                            ):
+                                existing.player2 = other_winner
+                            elif (
+                                existing.player1_id
+                                and bye_player
+                                and existing.player1_id == bye_player.pk
+                            ):
+                                existing.player1 = other_winner
+                            # Если матч был walkover, меняем статус на SCHEDULED
+                            if existing.status == Match.MatchStatus.WALKOVER:
+                                existing.status = Match.MatchStatus.SCHEDULED
+                                existing.winner = None
+                                existing.completed_datetime = None
+                            existing.save(
+                                update_fields=[
+                                    "player1",
+                                    "player2",
+                                    "status",
+                                    "winner",
+                                    "completed_datetime",
+                                ]
+                            )
+                    other_prev.next_match = existing
+                    other_prev.save(update_fields=["next_match"])
+                    return cast(Match | None, existing)
+        # Случай 2: Матч уже существует и полностью заполнен - ничего не делаем
         return None
 
     # Один матч в паре: второй слот пуст. Либо это «игрок vs Bye» (результат известен),
@@ -743,8 +801,8 @@ def advance_winner_and_award_loser(
     if len(prev_matches) != 2:
         return None
 
-    # Оба матча есть. Один может быть заглушкой (игрок vs Bye, без победителя) — тогда
-    # не создаём новый матч, а подставляем в заглушку победителя второго матча.
+    # Оба матча есть. Один может быть заглушкой в текущем раунде (игрок vs Bye) —
+    # тогда подставляем в неё победителя второго матча (нет двойного bye во 2-м круге).
     bye_placeholder = next((m for m in prev_matches if _is_bye_placeholder(m)), None)
     if bye_placeholder is not None:
         other_match = next(m for m in prev_matches if m.pk != bye_placeholder.pk)
@@ -763,11 +821,35 @@ def advance_winner_and_award_loser(
             bye_placeholder.save(update_fields=["team1", "team2", "player1", "player2"])
         else:
             other_winner = other_match.winner
-            if bye_player is not None and bye_placeholder.player2_id == bye_player.pk:
-                bye_placeholder.player2 = other_winner
-            else:
-                bye_placeholder.player1 = other_winner
-            bye_placeholder.save(update_fields=["player1", "player2"])
+            if other_winner is not None:
+                if (
+                    bye_player is not None
+                    and bye_placeholder.player2_id == bye_player.pk
+                ):
+                    bye_placeholder.player2 = other_winner
+                elif (
+                    bye_player is not None
+                    and bye_placeholder.player1_id == bye_player.pk
+                ):
+                    bye_placeholder.player1 = other_winner
+                else:
+                    if getattr(bye_placeholder.player2, "is_bye", False):
+                        bye_placeholder.player2 = other_winner
+                    else:
+                        bye_placeholder.player1 = other_winner
+                if bye_placeholder.status == Match.MatchStatus.WALKOVER:
+                    bye_placeholder.status = Match.MatchStatus.SCHEDULED
+                    bye_placeholder.winner = None
+                    bye_placeholder.completed_datetime = None
+                bye_placeholder.save(
+                    update_fields=[
+                        "player1",
+                        "player2",
+                        "status",
+                        "winner",
+                        "completed_datetime",
+                    ]
+                )
         other_match.next_match = bye_placeholder
         other_match.save(update_fields=["next_match"])
         return cast(Match | None, bye_placeholder)

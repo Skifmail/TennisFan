@@ -18,7 +18,7 @@
                 <option value="novice" {% if current_category == 'novice' %}selected{% endif %}>Новичок</option>
                 <option value="amateur" {% if current_category == 'amateur' %}selected{% endif %}>Любитель</option>
                 <option value="experienced" {% if current_category == 'experienced' %}selected{% endif %}>Опытный</option>
-                <option value="advanced" {% if current_category == 'advanced' %}selected{% endif %}>Продвинутый</option>
+                <option value="advanced" {% if current_category == 'advanced' %}selected{% endif %}>Мастерс</option>
                 <option value="professional" {% if current_category == 'professional' %}selected{% endif %}>Профессионал</option>
             </select>
         </form>
@@ -179,17 +179,38 @@
                 },
                 body: '{}'
             }).then(function(r) {
+                // Проверяем Content-Type перед парсингом JSON
+                var contentType = r.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    // Если сервер вернул не JSON, пытаемся прочитать текст
+                    return r.text().then(function(text) {
+                        console.error('Server returned non-JSON response:', text);
+                        alert('Ошибка отправки отклика. Сервер вернул неожиданный ответ.');
+                        throw new Error('Non-JSON response');
+                    });
+                }
                 return r.json().then(function(data) {
                     if (r.ok && data.success) {
                         openSuccessModal(data.contact_urls || {});
                     } else {
-                        alert(data.error || 'Ошибка отправки отклика.');
+                        // Показываем конкретную ошибку от сервера
+                        var errorMsg = data.error || 'Ошибка отправки отклика.';
+                        console.error('Sparring respond error:', errorMsg, data);
+                        alert(errorMsg);
+                        // Если есть редирект, перенаправляем пользователя
+                        if (data.redirect) {
+                            setTimeout(function() {
+                                window.location.href = data.redirect;
+                            }, 1000);
+                        }
                     }
-                }).catch(function() {
-                    alert('Ошибка отправки отклика.');
+                }).catch(function(e) {
+                    console.error('JSON parse error:', e);
+                    alert('Ошибка отправки отклика. Не удалось обработать ответ сервера.');
                 });
-            }).catch(function() {
-                alert('Ошибка сети.');
+            }).catch(function(e) {
+                console.error('Network error:', e);
+                alert('Ошибка сети. Проверьте подключение к интернету.');
             }).then(function() {
                 btn.disabled = false;
             });

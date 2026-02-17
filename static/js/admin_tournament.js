@@ -1,7 +1,7 @@
 /**
  * Admin tournament: динамическое отображение полей в зависимости от формата и варианта.
  *
- * Формат: FAN — поля FAN, Круговой — поля кругового.
+ * Формат: Одноэтапная сетка — очки за раунды, Круговой — поля кругового.
  * Вариант: Одиночный — только участники, Парный — блок «Команды».
  */
 
@@ -163,9 +163,9 @@
             mixedOption.style.display = "none";
             mixedOption.setAttribute("hidden", "hidden");
             
-            // Если выбран "Микст", переключаем на "Мужчины"
+            // Если выбран "Микст", переключаем на "Смешанный" (open)
             if (currentValue === "mixed") {
-                genderSelect.value = "male";
+                genderSelect.value = "open";
                 // Триггерим событие change для обновления формы
                 const event = new Event("change", { bubbles: true });
                 genderSelect.dispatchEvent(event);
@@ -197,9 +197,9 @@
         const isFan = format === FAN_FORMAT;
         const isOlympic = format === OLYMPIC_FORMAT;
         const isRoundRobin = format === ROUND_ROBIN_FORMAT;
-        // Общие поля — при любом выбранном формате (FAN, Олимпийская, Круговой).
+        // Общие поля — при любом выбранном формате (одноэтапная, Олимпийская, Круговой).
         toggleSections(".format-common-section", isFan || isOlympic || isRoundRobin);
-        // Секция очков за раунды/места: FAN, Олимпийская и Круговой (одни и те же поля)
+        // Секция очков за раунды/места: одноэтапная сетка, Олимпийская и Круговой (одни и те же поля)
         // Эта секция имеет все три класса (format-fan-section, format-olympic-section, format-round-robin-section)
         // Показываем её для любого из форматов
         const showPointsSection = isFan || isOlympic || isRoundRobin;

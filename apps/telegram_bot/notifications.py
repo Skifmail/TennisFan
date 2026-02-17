@@ -347,9 +347,17 @@ def notify_proposal_confirmed(proposal) -> None:
     proposer_player = proposal.proposer
     penalty_text = _get_penalty_text_for_player(match, proposer_player)
 
+    # Определяем информацию о турнире/спарринге
+    if match.tournament:
+        tournament_info = f"Турнир: {match.tournament.name}"
+    elif match.is_sparring():
+        tournament_info = "Спарринг (личная встреча)"
+    else:
+        tournament_info = "Матч"
+
     text = (
         "✅ <b>Результат подтверждён</b>\n\n"
-        f"Турнир: {match.tournament.name}\n"
+        f"{tournament_info}\n"
         f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
         f"Результат: {result}\n"
         f"Счёт: {score}\n"
@@ -379,9 +387,17 @@ def notify_proposal_rejected(proposal) -> None:
     result = _proposal_result_text(proposal)
     score = _proposal_score_text(proposal)
 
+    # Определяем информацию о турнире/спарринге
+    if match.tournament:
+        tournament_info = f"Турнир: {match.tournament.name}"
+    elif match.is_sparring():
+        tournament_info = "Спарринг (личная встреча)"
+    else:
+        tournament_info = "Матч"
+
     text = (
         "❌ <b>Результат отклонён</b>\n\n"
-        f"Турнир: {match.tournament.name}\n"
+        f"{tournament_info}\n"
         f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
         f"Ваш результат: {result}\n"
         f"Счёт: {score}\n\n"
@@ -409,9 +425,18 @@ def notify_match_deadline_reminder(match, days_left: int) -> None:
     deadline_str = match.deadline.strftime("%d.%m.%Y %H:%M")
     side1 = match.get_player1_display()
     side2 = match.get_player2_display()
+
+    # Определяем информацию о турнире/спарринге
+    if match.tournament:
+        tournament_info = f"Турнир: {match.tournament.name}"
+    elif match.is_sparring():
+        tournament_info = "Спарринг (личная встреча)"
+    else:
+        tournament_info = "Матч"
+
     text = (
         f"⏰ <b>Напоминание: до дедлайна матча {days_left} дн.</b>\n\n"
-        f"Турнир: {match.tournament.name}\n"
+        f"{tournament_info}\n"
         f"Этап: {match.round_name or '—'}\n"
         f"{side1} — {side2}\n"
         f"Дедлайн: {deadline_str}"
@@ -446,9 +471,18 @@ def notify_extension_approved(extension_request) -> None:
         return
     match = extension_request.match
     new_deadline = match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else "—"
+
+    # Определяем информацию о турнире/спарринге
+    if match.tournament:
+        match_info = f"Матч «{match.tournament.name}»"
+    elif match.is_sparring():
+        match_info = "Спарринговый матч"
+    else:
+        match_info = "Матч"
+
     text = (
         "✅ <b>Продление дедлайна одобрено</b>\n\n"
-        f"Матч «{match.tournament.name}». Новый дедлайн: {new_deadline}"
+        f"{match_info}. Новый дедлайн: {new_deadline}"
     )
     send_to_user_by_user(user, text)
 
@@ -761,9 +795,9 @@ def notify_sparring_response(sparring_response) -> None:
         )
         lines.append(f"<b>Уровень:</b> {skill_display}")
 
-    # Добавляем ELO рейтинг
+    # Добавляем FAN рейтинг
     if respondent.total_points:
-        lines.append(f"<b>Рейтинг (ELO):</b> {int(respondent.total_points)}")
+        lines.append(f"<b>Рейтинг (FAN):</b> {int(respondent.total_points)}")
 
     # Добавляем статистику
     if respondent.matches_played:

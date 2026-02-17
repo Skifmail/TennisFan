@@ -113,7 +113,10 @@
                         <span class="player-name">{{ player }}</span>
                         {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
                     </div>
-                    <span class="player-category">{{ player.get_skill_level_display }}</span>
+                    <div style="display: flex; align-items: center; gap: var(--spacing-xs); flex-wrap: wrap;">
+                        <span class="player-category">{{ player.get_skill_level_display }}</span>
+                        {% include 'includes/rating_badge.html' with player=player %}
+                    </div>
                 </div>
                 <div class="player-stats">
                     <div>
@@ -121,7 +124,7 @@
                         <div class="stat-value">{{ player.ntrp_level }}</div>
                     </div>
                     <div>
-                        <div class="stat-label">Очки Elo</div>
+                        <div class="stat-label">Очки FAN</div>
                         <div class="stat-value">{{ player.total_points|floatformat:1 }}</div>
                     </div>
                     <div>

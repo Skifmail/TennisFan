@@ -44,7 +44,7 @@ def accept_proposal_action(modeladmin, request, queryset):
         )
 
 
-@admin.action(description="Сформировать сетку FAN")
+@admin.action(description="Сформировать сетку (одноэтапная)")
 def generate_fan_bracket_action(modeladmin, request, queryset):
     for t in queryset:
         ok, msg = generate_bracket(t)
@@ -113,6 +113,18 @@ class TournamentAdminForm(forms.ModelForm):
             raise ValidationError("Можно выбрать не более 5 категорий.")
         return value
 
+    def clean(self):
+        cleaned_data = super().clean()
+        variant = cleaned_data.get("variant")
+        gender = cleaned_data.get("gender")
+        # "Микст" доступен только для парных турниров
+        if variant == "singles" and gender == "mixed":
+            raise ValidationError(
+                "Категория «Микст» доступна только для парных турниров. "
+                "Для одиночных используйте «Смешанный» (любой пол)."
+            )
+        return cleaned_data
+
 
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
@@ -122,7 +134,7 @@ class TournamentAdmin(admin.ModelAdmin):
     """Admin for Tournament model.
 
     Страница добавления турнира: базовая информация + выбор формата.
-    Поля формата появляются динамически при выборе (FAN и др.).
+    Поля формата появляются динамически при выборе (одноэтапная сетка, олимпийская, круговой).
     """
 
     list_display = (
@@ -166,7 +178,7 @@ class TournamentAdmin(admin.ModelAdmin):
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
         ("Формат турнира", {"fields": ("format", "variant")}),
         (
-            "Общие поля (FAN, Олимпийская, Круговой)",
+            "Общие поля (одноэтапная сетка, Олимпийская, Круговой)",
             {
                 "fields": (
                     "entry_fee",
@@ -189,12 +201,12 @@ class TournamentAdmin(admin.ModelAdmin):
                     "match_days_per_round",
                     "participants",
                 ),
-                "description": "Блок отображается после выбора формата турнира (FAN, Олимпийская система или Круговой).",
+                "description": "Блок отображается после выбора формата турнира (Одноэтапная сетка, Олимпийская система или Круговой).",
                 "classes": ("format-common-section",),
             },
         ),
         (
-            "FAN / Олимпийская / Круговой: очки за раунды и места",
+            "Одноэтапная сетка / Олимпийская / Круговой: очки за раунды и места",
             {
                 "fields": (
                     "fan_points_r1",
@@ -204,7 +216,7 @@ class TournamentAdmin(admin.ModelAdmin):
                     "fan_points_winner",
                 ),
                 "description": (
-                    "<b>FAN:</b> очки начисляются при вылете из раунда. "
+                    "<b>Одноэтапная сетка:</b> очки начисляются при вылете из раунда. "
                     "<b>Олимпийская система:</b> очки по итоговому месту (1–2–3–4–5–8–9+). "
                     "<b>Круговой:</b> очки в общий рейтинг начисляются по итоговому месту после завершения турнира "
                     "(1 место = победитель, 2 = финалист, 3–4 = полуфинал, 5–8 = 2 круг, 9+ = 1 круг). "
@@ -449,7 +461,7 @@ class MatchResultProposalAdmin(admin.ModelAdmin):
 
 @admin.register(TournamentPlayerResult)
 class TournamentPlayerResultAdmin(admin.ModelAdmin):
-    """FAN / Олимпийская: результаты игроков в турнире (раунд вылета или итоговое место)."""
+    """Результаты игроков в турнире (раунд вылета или итоговое место)."""
 
     list_display = (
         "tournament",

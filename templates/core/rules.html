@@ -63,7 +63,7 @@
                 <div class="rules-subtabs">
                     <div class="rules-subtabs__nav" role="tablist">
                         <button class="rules-subtabs__btn rules-subtabs__btn--active" data-subtab="fan" role="tab" aria-selected="true">
-                            FAN (одноэтапная сетка)
+                            Одноэтапная сетка
                         </button>
                         <button class="rules-subtabs__btn" data-subtab="round-robin" role="tab" aria-selected="false">
                             Круговой
@@ -118,11 +118,32 @@
             </div>
 
             <div class="rules-tabs__content" id="rating-rules" role="tabpanel" style="display: none;">
-                <article class="rules-doc card">
-                    <div class="card-body rules-doc__body">
-                        {% if rules_content.rating_rules %}{{ rules_content.rating_rules|safe }}{% else %}{% include 'core/rules_rating.html' %}{% endif %}
+                <!-- Вкладки второго уровня: рейтинг -->
+                <div class="rules-subtabs">
+                    <div class="rules-subtabs__nav" role="tablist">
+                        <button class="rules-subtabs__btn rules-subtabs__btn--active" data-subtab="rating-general" role="tab" aria-selected="true">
+                            Рейтинг и очки
+                        </button>
+                        <button class="rules-subtabs__btn" data-subtab="rating-algorithm" role="tab" aria-selected="false">
+                            Алгоритм расчета
+                        </button>
                     </div>
-                </article>
+
+                    <div class="rules-subtabs__content" id="rating-general" role="tabpanel">
+                        <article class="rules-doc card">
+                            <div class="card-body rules-doc__body">
+                                {% if rules_content.rating_rules %}{{ rules_content.rating_rules|safe }}{% else %}{% include 'core/rules_rating.html' %}{% endif %}
+                            </div>
+                        </article>
+                    </div>
+                    <div class="rules-subtabs__content" id="rating-algorithm" role="tabpanel" style="display: none;">
+                        <article class="rules-doc card">
+                            <div class="card-body rules-doc__body">
+                                {% if rules_content.rules_rating_algorithm %}{{ rules_content.rules_rating_algorithm|safe }}{% else %}{% include 'core/rules_rating_algorithm.html' %}{% endif %}
+                            </div>
+                        </article>
+                    </div>
+                </div>
             </div>
 
             <div class="rules-tabs__content" id="site-usage-rules" role="tabpanel" style="display: none;">
@@ -172,7 +193,7 @@
         });
     });
 
-    // Вкладки второго уровня: FAN / Круговой / Парные
+    // Вкладки второго уровня: Одноэтапная сетка / Круговой / Парные
     const subtabBtns = document.querySelectorAll('.rules-subtabs__btn');
     const subtabPanels = document.querySelectorAll('.rules-subtabs__content');
     subtabBtns.forEach(function(btn) {

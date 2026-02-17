@@ -31,7 +31,8 @@ class TournamentGender(models.TextChoices):
 
     MALE = "male", "Мужчины"
     FEMALE = "female", "Женщины"
-    MIXED = "mixed", "Микст"
+    OPEN = "open", "Смешанный"
+    MIXED = "mixed", "Микст"  # только для парных: М + Ж в команде
 
 
 class TournamentDuration(models.TextChoices):
@@ -45,7 +46,7 @@ class TournamentDuration(models.TextChoices):
 class TournamentFormat(models.TextChoices):
     """Формат проведения турнира."""
 
-    SINGLE_ELIMINATION = "single_elimination", "FAN (одноэтапная сетка)"
+    SINGLE_ELIMINATION = "single_elimination", "Одноэтапная сетка"
     OLYMPIC_CONSOLATION = (
         "olympic_consolation",
         "Олимпийская система (утешительная сетка)",
@@ -120,6 +121,11 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         max_length=10,
         choices=TournamentGender.choices,
         default=TournamentGender.MALE,
+        help_text=(
+            "Мужчины/Женщины — только указанный пол. "
+            "Смешанный — любой пол (М против Ж, пары ММ против ЖЖ и т.д.). "
+            "Микст — только для парных: в команде должны быть М + Ж."
+        ),
     )
     duration = models.CharField(
         "Продолжительность",
@@ -138,7 +144,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         max_length=20,
         choices=TournamentFormat.choices,
         default=TournamentFormat.SINGLE_ELIMINATION,
-        help_text="FAN: одноэтапная сетка, посев по рейтингу, очки при вылете. \nКруговой: все играют со всеми, итоговая таблица по очкам.",
+        help_text="Одноэтапная сетка: турнир на выбывание с подвалом, посев по рейтингу, очки при вылете. \nКруговой: все играют со всеми, итоговая таблица по очкам.",
     )
     variant = models.CharField(
         "Вариант",
@@ -157,7 +163,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         "Очки за победу",
         default=100,
         help_text=(
-            "Используется для круговых и других форматов (не FAN/Олимпийская). "
+            "Используется для круговых и других форматов (не одноэтапная/Олимпийская). "
             "Для кругового по умолчанию: 1 очко. Для других форматов: 100 очков."
         ),
     )
@@ -165,10 +171,10 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         "Очки за проигрыш",
         default=-50,
         help_text=(
-            "Используется для круговых и других форматов (не FAN/Олимпийская). "
+            "Используется для круговых и других форматов (не одноэтапная/Олимпийская). "
             "Для кругового по умолчанию: 0 очков (можно настроить отрицательные, например -1). "
             "Для других форматов: -50 очков (очки отнимаются). "
-            "FAN и Олимпийская система используют только положительные очки за раунды/места."
+            "Одноэтапная сетка и Олимпийская система используют только положительные очки за раунды/места."
         ),
     )
     min_participants = models.PositiveIntegerField(
@@ -181,7 +187,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         "Максимальное количество участников",
         null=True,
         blank=True,
-        help_text="Для одиночных: обязателен для FAN и круговых. Оставьте пустым для неограниченного.",
+        help_text="Для одиночных: обязателен для одноэтапной сетки и круговых. Оставьте пустым для неограниченного.",
     )
     min_teams = models.PositiveIntegerField(
         "Минимальное количество команд",
@@ -218,18 +224,12 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         "Дедлайн регистрации", null=True, blank=True
     )
 
-    # FAN: очки за раунд (начисляются при вылете / в конце турнира)
-    fan_points_r1 = models.PositiveSmallIntegerField("FAN: очки за 1 круг", default=10)
-    fan_points_r2 = models.PositiveSmallIntegerField("FAN: очки за 2 круг", default=25)
-    fan_points_sf = models.PositiveSmallIntegerField(
-        "FAN: очки за полуфинал", default=45
-    )
-    fan_points_final = models.PositiveSmallIntegerField(
-        "FAN: очки финалисту", default=70
-    )
-    fan_points_winner = models.PositiveSmallIntegerField(
-        "FAN: очки победителю", default=100
-    )
+    # Одноэтапная сетка / Олимпийская: очки за раунд (начисляются при вылете / в конце турнира)
+    fan_points_r1 = models.PositiveSmallIntegerField("Очки за 1 круг", default=10)
+    fan_points_r2 = models.PositiveSmallIntegerField("Очки за 2 круг", default=25)
+    fan_points_sf = models.PositiveSmallIntegerField("Очки за полуфинал", default=45)
+    fan_points_final = models.PositiveSmallIntegerField("Очки финалисту", default=70)
+    fan_points_winner = models.PositiveSmallIntegerField("Очки победителю", default=100)
 
     # Круговой: формат матча
     match_format = models.CharField(
@@ -420,7 +420,7 @@ class Match(models.Model):
     round_index = models.PositiveSmallIntegerField(
         "Индекс раунда (1=1 круг, 2=2 круг, …)",
         default=1,
-        help_text="Для сортировки и FAN-очков.",
+        help_text="Для сортировки и начисления сезонных очков.",
     )
     round_order = models.PositiveSmallIntegerField(
         "Порядок матча в раунде",
@@ -435,7 +435,7 @@ class Match(models.Model):
         "Дедлайн матча",
         null=True,
         blank=True,
-        help_text="До этой даты матч должен быть сыгран (FAN).",
+        help_text="До этой даты матч должен быть сыгран (одноэтапная сетка).",
     )
     next_match = models.ForeignKey(
         "self",
@@ -539,7 +539,7 @@ class Match(models.Model):
     points_player1 = models.IntegerField("Очки П1", default=0)
     points_player2 = models.IntegerField("Очки П2", default=0)
 
-    # Elo rating tracking
+    # FAN rating tracking
     class RatingCalcStatus(models.TextChoices):
         NOT_APPLICABLE = "na", "Не применимо"
         PENDING = "pending_calc", "Ожидает расчёта"
@@ -787,7 +787,7 @@ class SeasonRating(models.Model):
 
 
 class TournamentPlayerResult(models.Model):
-    """FAN: результат игрока в турнире — раунд вылета и начисленные очки."""
+    """Результат игрока в турнире (одноэтапная сетка / олимпийская) — раунд вылета или место и начисленные очки."""
 
     class RoundEliminated(models.TextChoices):
         R1 = "r1", "1 круг"
@@ -814,12 +814,12 @@ class TournamentPlayerResult(models.Model):
         blank=True,
         help_text="Олимпийская система: занятое место (1, 2, 3, …).",
     )
-    fan_points = models.PositiveIntegerField("Начислено очков FAN", default=0)
+    fan_points = models.PositiveIntegerField("Начислено сезонных очков", default=0)
     is_consolation = models.BooleanField("Вылет в подвале", default=False)
 
     class Meta:
-        verbose_name = "Результат в турнире (FAN)"
-        verbose_name_plural = "Результаты в турнирах (FAN)"
+        verbose_name = "Результат в турнире"
+        verbose_name_plural = "Результаты в турнирах"
         unique_together = ("tournament", "player")
         ordering = ["-fan_points"]
 
@@ -828,7 +828,7 @@ class TournamentPlayerResult(models.Model):
 
 
 class SeasonPoints(models.Model):
-    """Сезонные FAN очки игрока за текущий сезон.
+    """Сезонные очки игрока за текущий сезон.
 
     Очки накапливаются в течение сезона (Зима: Октябрь-Апрель, Лето: Май-Сентябрь)
     и сбрасываются в ноль в конце сезона с архивацией результатов.
@@ -843,7 +843,7 @@ class SeasonPoints(models.Model):
     current_season_points = models.PositiveIntegerField(
         "Очки текущего сезона",
         default=0,
-        help_text="FAN очки, накопленные в текущем сезоне. Сбрасываются в конце сезона.",
+        help_text="Сезонные очки, накопленные в текущем сезоне. Сбрасываются в конце сезона.",
     )
     season_name = models.CharField(
         "Название сезона",
@@ -894,7 +894,7 @@ class SeasonArchive(models.Model):
     )
     final_points = models.PositiveIntegerField(
         "Итоговые очки",
-        help_text="Количество FAN очков, накопленных за сезон",
+        help_text="Количество сезонных очков, накопленных за сезон",
     )
     final_rank = models.PositiveIntegerField(
         "Итоговое место",

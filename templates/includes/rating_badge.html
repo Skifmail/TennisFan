@@ -1,0 +1,24 @@
+{% load humanize %}
+{% with rating_changes=player.get_rating_changes %}
+<span class="rating-badge">
+    {% comment %} NTRP {% endcomment %}
+    {% if rating_changes.ntrp.direction == 'up' %}
+        <span class="rating-badge__arrow rating-badge__arrow--up">↑</span>
+    {% elif rating_changes.ntrp.direction == 'down' %}
+        <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
+    {% endif %}
+    <span class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}">
+        {{ player.ntrp_level|floatformat:1 }}
+    </span>
+    <span class="rating-badge__separator">/</span>
+    {% comment %} FAN {% endcomment %}
+    {% if rating_changes.fan.direction == 'up' %}
+        <span class="rating-badge__arrow rating-badge__arrow--up">↑</span>
+    {% elif rating_changes.fan.direction == 'down' %}
+        <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
+    {% endif %}
+    <span class="rating-badge__value rating-badge__value--{{ rating_changes.fan.direction }}">
+        {{ player.total_points|floatformat:1 }}
+    </span>
+</span>
+{% endwith %}

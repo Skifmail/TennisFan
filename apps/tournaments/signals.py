@@ -41,7 +41,7 @@ def prepare_match_completion(sender, instance, **kwargs):
     """
     Handle pre-save logic:
     1. Store old status to detect transitions.
-    2. Mark completed matches as pending_calc for Elo rating.
+    2. Mark completed matches as pending_calc for FAN rating.
     """
     if instance.pk:
         try:
@@ -52,7 +52,7 @@ def prepare_match_completion(sender, instance, **kwargs):
     else:
         instance._old_status = None
 
-    # If match is transitioning to completed, mark for Elo calculation
+    # If match is transitioning to completed, mark for FAN calculation
     if instance.status in [Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]:
         old_status = getattr(instance, "_old_status", None)
         was_completed = old_status in [
@@ -70,7 +70,7 @@ def prepare_match_completion(sender, instance, **kwargs):
 def update_player_stats(sender, instance, created, **kwargs):
     """
     Update matches_played / matches_won when match is completed.
-    Apply shadow Elo rating calculation to hidden_rating.
+    Apply shadow FAN rating calculation to hidden_rating.
     """
     old_status = getattr(instance, "_old_status", None)
     is_completed = instance.status in [
@@ -81,15 +81,65 @@ def update_player_stats(sender, instance, created, **kwargs):
         Match.MatchStatus.COMPLETED,
         Match.MatchStatus.WALKOVER,
     ]
+
+    # Используем print для немедленного вывода в консоль для отладки
+    print(
+        f"[SIGNAL] Match {instance.pk}: status={instance.status}, old_status={old_status}, is_completed={is_completed}, was_completed={was_completed}"
+    )
+    logger.info(
+        "Match %s: status=%s, old_status=%s, is_completed=%s, was_completed=%s",
+        instance.pk,
+        instance.status,
+        old_status,
+        is_completed,
+        was_completed,
+    )
+
     if not is_completed or was_completed:
+        print(
+            f"[SIGNAL] Match {instance.pk}: Skipping - not completed or already was completed"
+        )
         return
 
-    winner = instance.winner
-    winner_team = getattr(instance, "winner_team", None)
-    t = getattr(instance, "tournament", None)
-    is_doubles = t and t.is_doubles() and instance.team1_id and instance.team2_id
+    # Перезагружаем матч с связанными объектами для правильной работы
+    match = Match.objects.select_related(
+        "player1",
+        "player2",
+        "winner",
+        "tournament",
+        "team1__player1",
+        "team1__player2",
+        "team2__player1",
+        "team2__player2",
+        "winner_team__player1",
+        "winner_team__player2",
+    ).get(pk=instance.pk)
+
+    winner = match.winner
+    winner_team = match.winner_team
+    t = match.tournament
+    # Для спарринговых матчей tournament может быть None, проверяем наличие команд напрямую
+    is_doubles = bool(match.team1_id and match.team2_id)
+
+    print(
+        f"[SIGNAL] Match {match.pk}: winner={winner.pk if winner else None}, winner_team={winner_team.pk if winner_team else None}, is_doubles={is_doubles}, is_sparring={match.is_sparring()}"
+    )
+    logger.info(
+        "Match %s: winner=%s, winner_team=%s, is_doubles=%s, is_sparring=%s",
+        match.pk,
+        winner.pk if winner else None,
+        winner_team.pk if winner_team else None,
+        is_doubles,
+        match.is_sparring(),
+    )
 
     if not winner and not winner_team:
+        print(
+            f"[SIGNAL] Match {match.pk}: ERROR - no winner or winner_team, skipping rating update"
+        )
+        logger.warning(
+            "Match %s: no winner or winner_team, skipping rating update", match.pk
+        )
         return
 
     _walkover_loss = instance.is_walkover_loss()
@@ -122,53 +172,110 @@ def update_player_stats(sender, instance, created, **kwargs):
                 p.save(update_fields=["matches_played"])
 
     if is_doubles:
-        _update_stats_doubles(instance)
+        _update_stats_doubles(match)
     else:
-        _update_stats_singles(instance)
+        _update_stats_singles(match)
 
     # ------------------------------------------------------------------
-    # 2) Shadow Elo calculation (updates hidden_rating immediately)
+    # 2) Shadow FAN calculation (updates hidden_rating immediately)
     # ------------------------------------------------------------------
-    _apply_elo_shadow(instance)
+    logger.info("Match %s: applying FAN shadow calculation", match.pk)
+    _apply_fan_shadow(match)
 
     # ------------------------------------------------------------------
     # 3) Format-specific bracket advancement (FAN / Olympic / Round Robin)
     # Только для турнирных матчей, не для спаррингов
     # ------------------------------------------------------------------
-    if instance.is_sparring():
+    if match.is_sparring():
         # Спарринговые матчи не участвуют в турнирной логике
+        logger.info("Match %s: sparring match, skipping tournament logic", match.pk)
         return
 
     if t and _is_olympic(t):
-        advance_winner_olympic(instance, skip_points=_walkover_loss)
-        if instance.round_index >= 1 and not instance.is_consolation:
-            ensure_consolation_created_for_round(t, instance.round_index)
+        advance_winner_olympic(match, skip_points=_walkover_loss)
+        if match.round_index >= 1 and not match.is_consolation:
+            ensure_consolation_created_for_round(t, match.round_index)
     elif t and _is_fan(t):
-        advance_winner_and_award_loser(instance, skip_points=_walkover_loss)
-        if instance.round_index == 1 and not instance.is_consolation:
+        advance_winner_and_award_loser(match, skip_points=_walkover_loss)
+        if match.round_index == 1 and not match.is_consolation:
             ensure_consolation_created(t)
         finalize_tournament(t)
     elif t and _is_round_robin(t):
         check_and_finalize_if_complete(t)
 
 
-def _apply_elo_shadow(match: Match) -> None:
-    """Apply shadow Elo rating calculation to both players' hidden_rating.
+def _apply_fan_shadow(match: Match) -> None:
+    """Apply shadow FAN rating calculation to both players' hidden_rating.
 
     For doubles: delta is applied to both members of each team.
     Bye players are skipped.
     """
+    from apps.users.rating_utils import rating_to_ntrp_level, rating_to_skill_level
+
     from .rating import (
         MatchScore,
         PlayerRatingSnapshot,
         calculate_new_ratings,
     )
 
-    p1 = match.player1
-    p2 = match.player2
-    if not p1 or not p2:
-        return
+    is_doubles = bool(match.team1_id and match.team2_id)
+
+    print(f"[FAN_SHADOW] Match {match.pk}, is_doubles={is_doubles}")
+    logger.info("_apply_fan_shadow: match %s, is_doubles=%s", match.pk, is_doubles)
+
+    # Для парных матчей используем первого игрока команды для расчета рейтинга
+    # Для одиночных используем player1 и player2
+    if is_doubles:
+        # Для парных матчей используем команды
+        team1 = match.team1
+        team2 = match.team2
+        if not team1 or not team2:
+            print(
+                f"[FAN_SHADOW] ERROR: Match {match.pk} has teams but team1={team1}, team2={team2}"
+            )
+            logger.warning(
+                "_apply_fan_shadow: match %s has teams but team1=%s, team2=%s",
+                match.pk,
+                team1,
+                team2,
+            )
+            return
+        p1 = team1.player1
+        p2 = team2.player1
+        if not p1 or not p2:
+            print(
+                f"[FAN_SHADOW] ERROR: Match {match.pk} has teams but p1={p1}, p2={p2}"
+            )
+            logger.warning(
+                "_apply_fan_shadow: match %s has teams but p1=%s, p2=%s",
+                match.pk,
+                p1,
+                p2,
+            )
+            return
+        print(f"[FAN_SHADOW] Doubles match, p1={p1.pk}, p2={p2.pk}")
+        logger.info("_apply_fan_shadow: doubles match, p1=%s, p2=%s", p1.pk, p2.pk)
+    else:
+        # Для одиночных матчей используем player1 и player2
+        p1 = match.player1
+        p2 = match.player2
+        if not p1 or not p2:
+            print(
+                f"[FAN_SHADOW] ERROR: Match {match.pk} has no players: p1={p1}, p2={p2}"
+            )
+            logger.warning(
+                "_apply_fan_shadow: match %s has no players: p1=%s, p2=%s",
+                match.pk,
+                p1,
+                p2,
+            )
+            return
+        print(f"[FAN_SHADOW] Singles match, p1={p1.pk}, p2={p2.pk}")
+        logger.info("_apply_fan_shadow: singles match, p1=%s, p2=%s", p1.pk, p2.pk)
+
     if getattr(p1, "is_bye", False) or getattr(p2, "is_bye", False):
+        print(f"[FAN_SHADOW] Match {match.pk} has bye players, skipping")
+        logger.info("_apply_fan_shadow: match %s has bye players, skipping", match.pk)
         return
 
     # K-factor определяется по количеству матчей ДО этого матча
@@ -184,10 +291,10 @@ def _apply_elo_shadow(match: Match) -> None:
     if matches_before_a == 0:
         # Первый матч: если hidden_rating сильно отличается от total_points,
         # используем total_points как начальный рейтинг
-        if abs(rating_a - float(p1.total_points)) > 100:
+        if abs(rating_a - float(p1.total_points)) > 200:
             rating_a = float(p1.total_points)
             logger.warning(
-                "Player %s: hidden_rating (%.1f) не соответствует total_points (%d) для первого матча. "
+                "Player %s: hidden_rating (%.1f) не соответствует total_points (%.1f) для первого матча. "
                 "Используем total_points как начальный рейтинг.",
                 p1.pk,
                 p1.hidden_rating,
@@ -197,10 +304,10 @@ def _apply_elo_shadow(match: Match) -> None:
     if matches_before_b == 0:
         # Первый матч: если hidden_rating сильно отличается от total_points,
         # используем total_points как начальный рейтинг
-        if abs(rating_b - float(p2.total_points)) > 100:
+        if abs(rating_b - float(p2.total_points)) > 200:
             rating_b = float(p2.total_points)
             logger.warning(
-                "Player %s: hidden_rating (%.1f) не соответствует total_points (%d) для первого матча. "
+                "Player %s: hidden_rating (%.1f) не соответствует total_points (%.1f) для первого матча. "
                 "Используем total_points как начальный рейтинг.",
                 p2.pk,
                 p2.hidden_rating,
@@ -228,8 +335,11 @@ def _apply_elo_shadow(match: Match) -> None:
     )
 
     result = calculate_new_ratings(snap_a, snap_b, score_a, score_b, a_won)
+    print(
+        f"[FAN_SHADOW] Calculated ratings: p1 {result.new_rating_a:.1f} (delta: {result.delta_a:.1f}), p2 {result.new_rating_b:.1f} (delta: {result.delta_b:.1f})"
+    )
 
-    is_doubles = match.team1_id and match.team2_id
+    # is_doubles уже определен выше
 
     # Проверяем, является ли это техническим поражением (Retired)
     is_walkover_loss = match.is_walkover_loss()
@@ -265,18 +375,59 @@ def _apply_elo_shadow(match: Match) -> None:
                     logger.info(
                         "Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk
                     )
+                old_rating = p.total_points
+                old_ntrp = p.ntrp_level
                 p.hidden_rating = new_rating
                 p.total_points = float(new_rating)
-                p.save(update_fields=["hidden_rating", "total_points"])
+                # Обновляем skill_level и ntrp_level на основе нового рейтинга
+                p.skill_level = rating_to_skill_level(new_rating)
+                new_ntrp = rating_to_ntrp_level(new_rating)
+                p.ntrp_level = new_ntrp
+                p.save(
+                    update_fields=[
+                        "hidden_rating",
+                        "total_points",
+                        "skill_level",
+                        "ntrp_level",
+                    ]
+                )
+                print(
+                    f"[FAN_SHADOW] Player {p.pk} (doubles team1): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), NTRP {old_ntrp} -> {new_ntrp}"
+                )
+                logger.info(
+                    "Player %s (doubles team1): rating updated %.1f -> %.1f (delta: %.1f)",
+                    p.pk,
+                    old_rating,
+                    new_rating,
+                    new_rating - old_rating,
+                )
     else:
         new_rating_a = result.new_rating_a
         # Применяем штраф -40 очков для проигравшего при тех. поражении
         if is_walkover_loss and loser == p1:
             new_rating_a = max(0, new_rating_a - 40.0)
             logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p1.pk)
+        old_rating_p1 = p1.total_points
+        old_ntrp_p1 = p1.ntrp_level
         p1.hidden_rating = new_rating_a
         p1.total_points = float(new_rating_a)
-        p1.save(update_fields=["hidden_rating", "total_points"])
+        # Обновляем skill_level и ntrp_level на основе нового рейтинга
+        p1.skill_level = rating_to_skill_level(new_rating_a)
+        new_ntrp_p1 = rating_to_ntrp_level(new_rating_a)
+        p1.ntrp_level = new_ntrp_p1
+        p1.save(
+            update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
+        )
+        print(
+            f"[FAN_SHADOW] Player {p1.pk} (singles): rating {old_rating_p1:.1f} -> {new_rating_a:.1f} (delta: {new_rating_a - old_rating_p1:.1f}), NTRP {old_ntrp_p1} -> {new_ntrp_p1}"
+        )
+        logger.info(
+            "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f)",
+            p1.pk,
+            old_rating_p1,
+            new_rating_a,
+            new_rating_a - old_rating_p1,
+        )
 
     # Update hidden_rating and total_points for player2 side
     if is_doubles:
@@ -293,18 +444,59 @@ def _apply_elo_shadow(match: Match) -> None:
                     logger.info(
                         "Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk
                     )
+                old_rating = p.total_points
+                old_ntrp = p.ntrp_level
                 p.hidden_rating = new_rating
                 p.total_points = float(new_rating)
-                p.save(update_fields=["hidden_rating", "total_points"])
+                # Обновляем skill_level и ntrp_level на основе нового рейтинга
+                p.skill_level = rating_to_skill_level(new_rating)
+                new_ntrp = rating_to_ntrp_level(new_rating)
+                p.ntrp_level = new_ntrp
+                p.save(
+                    update_fields=[
+                        "hidden_rating",
+                        "total_points",
+                        "skill_level",
+                        "ntrp_level",
+                    ]
+                )
+                print(
+                    f"[FAN_SHADOW] Player {p.pk} (doubles team1): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), NTRP {old_ntrp} -> {new_ntrp}"
+                )
+                logger.info(
+                    "Player %s (doubles team1): rating updated %.1f -> %.1f (delta: %.1f)",
+                    p.pk,
+                    old_rating,
+                    new_rating,
+                    new_rating - old_rating,
+                )
     else:
         new_rating_b = result.new_rating_b
         # Применяем штраф -40 очков для проигравшего при тех. поражении
         if is_walkover_loss and loser == p2:
             new_rating_b = max(0, new_rating_b - 40.0)
             logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p2.pk)
+        old_rating_p2 = p2.total_points
+        old_ntrp_p2 = p2.ntrp_level
         p2.hidden_rating = new_rating_b
         p2.total_points = float(new_rating_b)
-        p2.save(update_fields=["hidden_rating", "total_points"])
+        # Обновляем skill_level и ntrp_level на основе нового рейтинга
+        p2.skill_level = rating_to_skill_level(new_rating_b)
+        new_ntrp_p2 = rating_to_ntrp_level(new_rating_b)
+        p2.ntrp_level = new_ntrp_p2
+        p2.save(
+            update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
+        )
+        print(
+            f"[FAN_SHADOW] Player {p2.pk} (singles): rating {old_rating_p2:.1f} -> {new_rating_b:.1f} (delta: {new_rating_b - old_rating_p2:.1f}), NTRP {old_ntrp_p2} -> {new_ntrp_p2}"
+        )
+        logger.info(
+            "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f)",
+            p2.pk,
+            old_rating_p2,
+            new_rating_b,
+            new_rating_b - old_rating_p2,
+        )
 
     # Store deltas and mark as calculated
     Match.objects.filter(pk=match.pk).update(

@@ -117,7 +117,7 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
         match.completed_datetime or match.scheduled_datetime or timezone.now()
     )
 
-    # Mark match for Elo rating calculation
+    # Mark match for FAN rating calculation
     match.rating_status = Match.RatingCalcStatus.PENDING
     match.save()
 

@@ -5,13 +5,25 @@
 {% block content %}
 <div class="container" style="padding-top: var(--spacing-2xl);">
     <div class="mb-4">
-        <a href="{% url 'tournament_detail' slug=match.tournament.slug %}" class="text-secondary">&larr; {{ match.tournament.name }}</a>
+        {% if match.tournament %}
+            <a href="{% url 'tournament_detail' slug=match.tournament.slug %}" class="text-secondary">&larr; {{ match.tournament.name }}</a>
+        {% elif match.is_sparring %}
+            <a href="{% url 'my_matches' %}" class="text-secondary">&larr; Спарринг</a>
+        {% else %}
+            <a href="{% url 'my_matches' %}" class="text-secondary">&larr; Мои матчи</a>
+        {% endif %}
     </div>
 
     <div class="card" style="max-width: 700px; margin: 0 auto;">
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <div class="text-center mb-4">
-                <span class="player-category">{% for ac in match.tournament.allowed_categories.all %}{{ ac.get_category_display }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if match.round_name %} · {{ match.round_name }}{% endif %}</span>
+                {% if match.tournament %}
+                    <span class="player-category">{% for ac in match.tournament.allowed_categories.all %}{{ ac.get_category_display }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if match.round_name %} · {{ match.round_name }}{% endif %}</span>
+                {% elif match.is_sparring %}
+                    <span class="player-category">Спарринг{% if match.round_name %} · {{ match.round_name }}{% endif %}</span>
+                {% else %}
+                    <span class="player-category">{% if match.round_name %}{{ match.round_name }}{% endif %}</span>
+                {% endif %}
                 <p class="text-muted mt-2">
                     {% if match.deadline %}Дедлайн: {{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}
                 </p>
@@ -32,8 +44,16 @@
                     {% else %}{% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);">{% else %}<div class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);"></div>{% endif %}{% endif %}
                     <div class="{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player1_display }}</div>
                     {% if match.is_walkover_loss %}{% if match.team1 and match.winner_team == match.team2 or match.player1 and match.winner == match.player2 %}<span class="retired-badge">Rt.</span>{% endif %}{% endif %}
-                    {% if match.team1 %}<div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.team1.player1.get_skill_level_display }}</div>{% else %}<div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.player1.get_skill_level_display }}</div>{% endif %}
-                    {% if match.status == 'completed' or match.status == 'walkover' %}{% if not is_fan %}<div class="mt-1" style="font-size: var(--font-size-sm); font-weight: 600;">{% if match.points_player1 >= 0 %}+{% endif %}{{ match.points_player1 }} очков</div>{% endif %}{% endif %}
+                    {% if match.status == 'completed' or match.status == 'walkover' %}
+                    <div class="mt-1 match-points-display">
+                        {% with delta=match.rating_delta_player1|default:0 %}
+                            <span class="match-points match-points--{% if delta > 0 %}up{% elif delta < 0 %}down{% else %}neutral{% endif %}">{% if delta > 0 %}+{% endif %}{{ delta|floatformat:1 }} FAN</span>
+                        {% endwith %}
+                        {% if season_points_player1 is not None and season_points_player1 > 0 %}
+                            <div class="match-season-points">+{{ season_points_player1 }} сезон</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </a>
 
                 <!-- Score -->
@@ -71,8 +91,16 @@
                     {% else %}{% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);">{% else %}<div class="player-avatar" style="width: 80px; height: 80px; margin: 0 auto var(--spacing-md);"></div>{% endif %}{% endif %}
                     <div class="{% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player2_display }}</div>
                     {% if match.is_walkover_loss %}{% if match.team2 and match.winner_team == match.team1 or match.player2 and match.winner == match.player1 %}<span class="retired-badge">Rt.</span>{% endif %}{% endif %}
-                    {% if match.team2 %}<div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.team2.player1.get_skill_level_display }}</div>{% else %}<div class="text-muted" style="font-size: var(--font-size-sm);">{{ match.player2.get_skill_level_display }}</div>{% endif %}
-                    {% if match.status == 'completed' or match.status == 'walkover' %}{% if not is_fan %}<div class="mt-1" style="font-size: var(--font-size-sm); font-weight: 600;">{% if match.points_player2 >= 0 %}+{% endif %}{{ match.points_player2 }} очков</div>{% endif %}{% endif %}
+                    {% if match.status == 'completed' or match.status == 'walkover' %}
+                    <div class="mt-1 match-points-display">
+                        {% with delta=match.rating_delta_player2|default:0 %}
+                            <span class="match-points match-points--{% if delta > 0 %}up{% elif delta < 0 %}down{% else %}neutral{% endif %}">{% if delta > 0 %}+{% endif %}{{ delta|floatformat:1 }} FAN</span>
+                        {% endwith %}
+                        {% if season_points_player2 is not None and season_points_player2 > 0 %}
+                            <div class="match-season-points">+{{ season_points_player2 }} сезон</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </a>
             </div>
 
@@ -86,6 +114,7 @@
 
             <h3 class="h5 mb-3">Подробная информация</h3>
             <div class="match-details-grid">
+                {% if match.tournament %}
                 <section class="match-details-section">
                     <h4 class="text-muted" style="font-size: var(--font-size-sm); font-weight: 600; margin-bottom: var(--spacing-sm);">Турнир</h4>
                     <dl class="match-details-dl">
@@ -123,6 +152,17 @@
                         {% endif %}
                     </dl>
                 </section>
+                {% elif match.is_sparring %}
+                <section class="match-details-section">
+                    <h4 class="text-muted" style="font-size: var(--font-size-sm); font-weight: 600; margin-bottom: var(--spacing-sm);">Спарринг</h4>
+                    <dl class="match-details-dl">
+                        <dt>Тип матча</dt>
+                        <dd>Спарринг (личная встреча)</dd>
+                        <dt>Описание</dt>
+                        <dd>Матч создан из заявки на спарринг. Результат влияет на рейтинг FAN и статистику игроков.</dd>
+                    </dl>
+                </section>
+                {% endif %}
                 <section class="match-details-section">
                     <h4 class="text-muted" style="font-size: var(--font-size-sm); font-weight: 600; margin-bottom: var(--spacing-sm);">Матч</h4>
                     <dl class="match-details-dl">
@@ -152,8 +192,14 @@
                         <dd>{{ match.get_status_display }}</dd>
                         <dt>Счёт</dt>
                         <dd>{{ match.score_display }}</dd>
-                        <dt>Очки рейтинга (игрок 1 / игрок 2)</dt>
-                        <dd>{{ match.points_player1 }} / {{ match.points_player2 }}</dd>
+                        {% if match.status == 'completed' or match.status == 'walkover' %}
+                        <dt>Изменение FAN (игрок 1 / игрок 2)</dt>
+                        <dd>{% if match.rating_delta_player1 > 0 %}+{% endif %}{{ match.rating_delta_player1|floatformat:1 }} / {% if match.rating_delta_player2 > 0 %}+{% endif %}{{ match.rating_delta_player2|floatformat:1 }}</dd>
+                        {% if season_points_player1 is not None or season_points_player2 is not None %}
+                        <dt>Сезонные очки (игрок 1 / игрок 2)</dt>
+                        <dd>{{ season_points_player1|default:0 }} / {{ season_points_player2|default:0 }}</dd>
+                        {% endif %}
+                        {% endif %}
                         <dt>Создан</dt>
                         <dd>{{ match.created_at|date:"d.m.Y H:i" }}</dd>
                     </dl>

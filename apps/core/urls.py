@@ -22,4 +22,5 @@ urlpatterns = [
         views.telegram_support_webhook,
         name="telegram_support_webhook",
     ),
+    path("private-chat/", views.private_chat_access, name="private_chat_access"),
 ]

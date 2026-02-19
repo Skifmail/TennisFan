@@ -10,9 +10,22 @@
 </div>
 
 <div class="container">
+    <div class="sparring-tabs mb-4">
+        <a href="?type=singles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}" 
+           class="sparring-tab {% if sparring_type == 'singles' %}sparring-tab--active{% endif %}">
+            Одиночный 1×1
+        </a>
+        <a href="?type=doubles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}" 
+           class="sparring-tab {% if sparring_type == 'doubles' %}sparring-tab--active{% endif %}">
+            Парный 2×2
+        </a>
+    </div>
+
     <div class="sparring-toolbar d-flex flex-wrap gap-2 mb-4">
         <form method="get" class="filter-bar sparring-filters">
+            <input type="hidden" name="type" value="{{ sparring_type }}">
             <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
+            {% if sparring_type == 'singles' %}
             <select name="category" class="form-control" onchange="this.form.submit()">
                 <option value="">Все уровни силы</option>
                 <option value="novice" {% if current_category == 'novice' %}selected{% endif %}>Новичок</option>
@@ -21,6 +34,16 @@
                 <option value="advanced" {% if current_category == 'advanced' %}selected{% endif %}>Мастерс</option>
                 <option value="professional" {% if current_category == 'professional' %}selected{% endif %}>Профессионал</option>
             </select>
+            {% else %}
+            <select name="level" class="form-control" onchange="this.form.submit()">
+                <option value="">Все уровни силы</option>
+                <option value="novice" {% if current_level == 'novice' %}selected{% endif %}>Новичок</option>
+                <option value="amateur" {% if current_level == 'amateur' %}selected{% endif %}>Любитель</option>
+                <option value="experienced" {% if current_level == 'experienced' %}selected{% endif %}>Опытный</option>
+                <option value="advanced" {% if current_level == 'advanced' %}selected{% endif %}>Мастерс</option>
+                <option value="professional" {% if current_level == 'professional' %}selected{% endif %}>Профессионал</option>
+            </select>
+            {% endif %}
             <select name="preferred_gender" class="form-control" onchange="this.form.submit()">
                 <option value="">Любой пол</option>
                 <option value="male" {% if current_preferred_gender == 'male' %}selected{% endif %}>Мужчины</option>
@@ -30,25 +53,26 @@
             </select>
         </form>
         <div class="sparring-toolbar__actions">
-            <a href="{% url 'doubles_list' %}" class="btn btn-ghost">Парный 2×2</a>
             <a href="{% url 'sparring_my_requests' %}" class="btn btn-ghost">Мои заявки</a>
             {% if has_sparring_access %}
-            <a href="{% url 'sparring_create' %}" class="btn btn-primary">Создать заявку</a>
+            <a href="{% url 'sparring_create' %}?type={{ sparring_type }}" class="btn btn-primary">Создать заявку</a>
             {% else %}
             <a href="{% url 'pricing' %}" class="btn btn-outline">Подписка для доступа</a>
             {% endif %}
         </div>
     </div>
 
+    {% if sparring_type == 'singles' %}
     <div class="grid grid-2">
         {% for req in sparring_requests %}
         <div class="card sparring-card">
             <div class="card-body">
                 <div class="sparring-card__flags">
+                    <span class="sparring-flag sparring-flag--type">Одиночный 1×1</span>
                     <span class="sparring-flag sparring-flag--recruiting">Идёт набор</span>
                     <span class="sparring-flag sparring-flag--gender">{{ req.get_preferred_gender_display }}</span>
                     {% if req.is_friendly %}
-                    <span class="sparring-flag sparring-flag--friendly" title="Результат не влияет на рейтинг">Дружеский матч</span>
+                    <span class="sparring-flag sparring-flag--friendly" title="Результат не влияет на рейтинг">Дружеский</span>
                     {% endif %}
                     {% if req.has_responses %}
                     <span class="sparring-flag sparring-flag--responses">Есть отклики</span>
@@ -108,11 +132,79 @@
         </div>
         {% empty %}
         <p class="text-secondary" style="grid-column: 1 / -1;">
-            Заявок на спарринг пока нет.
-            {% if has_sparring_access %}<a href="{% url 'sparring_create' %}" class="text-primary">Создайте первую!</a>{% else %}<a href="{% url 'pricing' %}" class="text-primary">Оформите подписку</a>, чтобы создавать заявки.{% endif %}
+            Заявок на одиночный спарринг пока нет.
+            {% if has_sparring_access %}<a href="{% url 'sparring_create' %}?type=singles" class="text-primary">Создайте первую!</a>{% else %}<a href="{% url 'pricing' %}" class="text-primary">Оформите подписку</a>, чтобы создавать заявки.{% endif %}
         </p>
         {% endfor %}
     </div>
+    {% else %}
+    <div class="grid grid-2">
+        {% for req in doubles_requests %}
+        <div class="card sparring-card">
+            <div class="card-body">
+                <div class="sparring-card__flags">
+                    <span class="sparring-flag sparring-flag--type">Парный 2×2</span>
+                    <span class="sparring-flag sparring-flag--gender">{{ req.get_status_display }}</span>
+                    {% if req.is_friendly %}
+                    <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex gap-3 sparring-card__main" style="align-items: flex-start;">
+                    {% include 'includes/avatar.html' with avatar=req.created_by.avatar class="player-avatar sparring-card__avatar" %}
+                    <div class="sparring-card__content">
+                        <div class="player-name-block">
+                            <a href="{% url 'profile' pk=req.created_by.pk %}" class="player-name">{{ req.created_by }}</a>
+                            {% include 'includes/subscription_badge.html' with tier=req.created_by.paid_subscription_tier %}
+                        </div>
+                        <div class="d-flex gap-1 mt-1 mb-2 flex-wrap">
+                            <span class="player-category">{{ req.created_by.get_skill_level_display }}</span>
+                            {% if req.desired_level %}
+                            <span class="sparring-desired-category">Партнёры: {{ req.get_desired_level_display }}</span>
+                            {% endif %}
+                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ req.city|default:"Город не указан" }}</span>
+                        </div>
+                        {% if req.description %}
+                        <p class="text-secondary sparring-card__desc">{{ req.description|truncatewords:20 }}</p>
+                        {% endif %}
+                        <div class="sparring-card__details mt-2" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                            {% if req.preferred_days or req.preferred_time %}
+                            <p>
+                                {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
+                                {% if req.preferred_time %} • {{ req.preferred_time }}{% endif %}
+                            </p>
+                            {% endif %}
+                            {% if req.preferred_location %}
+                            <p>📍 {{ req.preferred_location }}</p>
+                            {% endif %}
+                            {% if req.desired_age_min or req.desired_age_max %}
+                            <p>
+                                👤 Возраст партнёров:
+                                {% if req.desired_age_min and req.desired_age_max %}
+                                    {{ req.desired_age_min }}-{{ req.desired_age_max }} лет
+                                {% elif req.desired_age_min %}
+                                    от {{ req.desired_age_min }} лет
+                                {% elif req.desired_age_max %}
+                                    до {{ req.desired_age_max }} лет
+                                {% endif %}
+                            </p>
+                            {% endif %}
+                            <p>Команда: {% for team in req.teams.all %}{% if team.side == 'author' %}{% for tm in team.members.all %}{{ tm.player }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}{% endfor %}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="sparring-card__actions mt-3">
+                    <a href="{% url 'doubles_detail' pk=req.pk %}" class="btn btn-primary">Подробнее</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-secondary" style="grid-column: 1 / -1;">
+            Заявок на парный матч 2×2 пока нет.
+            {% if has_sparring_access %}<a href="{% url 'sparring_create' %}?type=doubles" class="text-primary">Создайте первую!</a>{% else %}<a href="{% url 'pricing' %}" class="text-primary">Оформите подписку</a>, чтобы создавать заявки.{% endif %}
+        </p>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
 
 <div class="sparring-modal hidden" id="sparring-respond-modal" role="dialog" aria-label="Отклик записан">
@@ -187,10 +279,8 @@
                 },
                 body: '{}'
             }).then(function(r) {
-                // Проверяем Content-Type перед парсингом JSON
                 var contentType = r.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {
-                    // Если сервер вернул не JSON, пытаемся прочитать текст
                     return r.text().then(function(text) {
                         console.error('Server returned non-JSON response:', text);
                         alert('Ошибка отправки отклика. Сервер вернул неожиданный ответ.');
@@ -201,11 +291,9 @@
                     if (r.ok && data.success) {
                         openSuccessModal(data.contact_urls || {});
                     } else {
-                        // Показываем конкретную ошибку от сервера
                         var errorMsg = data.error || 'Ошибка отправки отклика.';
                         console.error('Sparring respond error:', errorMsg, data);
                         alert(errorMsg);
-                        // Если есть редирект, перенаправляем пользователя
                         if (data.redirect) {
                             setTimeout(function() {
                                 window.location.href = data.redirect;

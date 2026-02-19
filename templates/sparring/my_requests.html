@@ -10,18 +10,29 @@
 </div>
 
 <div class="container">
+    <div class="sparring-tabs mb-4">
+        <a href="?type=singles" class="sparring-tab {% if sparring_type == 'singles' %}sparring-tab--active{% endif %}">
+            Одиночный 1×1
+        </a>
+        <a href="?type=doubles" class="sparring-tab {% if sparring_type == 'doubles' %}sparring-tab--active{% endif %}">
+            Парный 2×2
+        </a>
+    </div>
+
     <div class="d-flex flex-wrap gap-2 mb-4" style="align-items: center;">
-        <a href="{% url 'sparring_list' %}" class="btn btn-ghost">← Все заявки</a>
+        <a href="{% url 'sparring_list' %}?type={{ sparring_type }}" class="btn btn-ghost">← Все заявки</a>
         {% if has_sparring_access %}
-        <a href="{% url 'sparring_create' %}" class="btn btn-primary">Создать заявку</a>
+        <a href="{% url 'sparring_create' %}?type={{ sparring_type }}" class="btn btn-primary">Создать заявку</a>
         {% endif %}
     </div>
 
+    {% if sparring_type == 'singles' %}
     <div class="grid grid-2">
         {% for req in sparring_requests %}
         <div class="card sparring-card {% if req.status == 'closed' %}sparring-card--closed{% endif %}">
             <div class="card-body">
                 <div class="sparring-card__flags">
+                    <span class="sparring-flag sparring-flag--type">Одиночный 1×1</span>
                     {% if req.status == 'active' %}
                     <span class="sparring-flag sparring-flag--recruiting">Идёт набор</span>
                     {% endif %}
@@ -135,9 +146,50 @@
             </div>
         </div>
         {% empty %}
-        <p class="text-secondary" style="grid-column: 1 / -1;">У вас пока нет заявок. {% if has_sparring_access %}<a href="{% url 'sparring_create' %}" class="text-primary">Создать заявку</a>{% else %}<a href="{% url 'pricing' %}" class="text-primary">Оформите подписку</a> для доступа.{% endif %}</p>
+        <p class="text-secondary" style="grid-column: 1 / -1;">У вас пока нет заявок на одиночный спарринг. {% if has_sparring_access %}<a href="{% url 'sparring_create' %}?type=singles" class="text-primary">Создать заявку</a>{% else %}<a href="{% url 'pricing' %}" class="text-primary">Оформите подписку</a> для доступа.{% endif %}</p>
         {% endfor %}
     </div>
+    {% else %}
+    <div class="grid grid-2">
+        {% for req in doubles_requests %}
+        <div class="card sparring-card">
+            <div class="card-body">
+                <div class="sparring-card__flags">
+                    <span class="sparring-flag sparring-flag--type">Парный 2×2</span>
+                    <span class="sparring-flag sparring-flag--gender">{{ req.get_status_display }}</span>
+                    {% if req.is_friendly %}
+                    <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
+                    {% endif %}
+                </div>
+                <p class="text-secondary mb-1">{{ req.city|default:"Город не указан" }}</p>
+                {% if req.description %}
+                <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ req.description|truncatewords:15 }}</p>
+                {% endif %}
+                <div class="mt-2" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                    Создано {{ req.created_at|date:"d.m.Y H:i" }}
+                    {% if req.match %}
+                    · <a href="{% url 'match_detail' pk=req.match_id %}">Матч создан</a>
+                    {% endif %}
+                </div>
+                <div class="sparring-card__actions mt-3">
+                    <a href="{% url 'doubles_detail' pk=req.pk %}" class="btn btn-outline">Подробнее</a>
+                    {% if req.status != 'completed' and req.status != 'cancelled' %}
+                    <form action="{% url 'doubles_cancel_request' pk=req.pk %}" method="post" class="d-inline" onsubmit="return confirm('Отменить заявку?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-ghost text-error">Отменить</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-secondary" style="grid-column: 1 / -1;">
+            У вас пока нет заявок на парный матч 2×2.
+            {% if has_sparring_access %}<a href="{% url 'sparring_create' %}?type=doubles" class="text-primary">Создать заявку</a>{% endif %}
+        </p>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
 
 <div class="sparring-modal hidden" id="sparring-contact-modal" role="dialog" aria-label="Выберите способ связи">
@@ -180,7 +232,6 @@
             tgLink.style.display = 'none';
         }
         if (whatsapp) {
-            // Форматируем WhatsApp URL
             let phone = whatsapp.replace(/\D/g, '');
             if (phone.startsWith('8') && phone.length === 11) {
                 phone = '7' + phone.substring(1);

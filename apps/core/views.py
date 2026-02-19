@@ -900,3 +900,74 @@ def feedback_threads(request):
     if current_thread:
         threads.append({"messages": current_thread})
     return JsonResponse({"threads": threads})
+
+
+@require_safe
+def private_chat_access(request):
+    """
+    Обработка ссылки на закрытый канал @TennisFanru.
+    Проверяет подписку пользователя и либо создаёт одноразовую ссылку,
+    либо показывает сообщение о необходимости приобрести подписку.
+    """
+    if not request.user.is_authenticated:
+        return render(
+            request,
+            "core/private_chat_access.html",
+            {
+                "has_access": False,
+                "reason": "Необходимо войти в аккаунт.",
+                "is_authenticated": False,
+            },
+            status=403,
+        )
+
+    from apps.telegram_bot import services as bot_services
+    from apps.telegram_bot.private_chat import get_private_chat_access_status
+
+    has_access, reason = get_private_chat_access_status(request.user)
+
+    if not has_access:
+        return render(
+            request,
+            "core/private_chat_access.html",
+            {
+                "has_access": False,
+                "reason": reason,
+                "is_authenticated": True,
+            },
+            status=403,
+        )
+
+    # Создаём одноразовую ссылку на канал
+    logger.info(
+        "private_chat_access: creating invite link for user_id=%s, username=%s",
+        request.user.id,
+        request.user.username,
+    )
+    invite_link = bot_services.create_private_chat_invite_link(
+        expire_seconds=1800, member_limit=1
+    )
+
+    if not invite_link:
+        logger.error(
+            "private_chat_access: failed to create invite link for user_id=%s",
+            request.user.id,
+        )
+        return render(
+            request,
+            "core/private_chat_access.html",
+            {
+                "has_access": True,
+                "error": "Не удалось создать ссылку для входа. Возможно, бот не имеет необходимых прав администратора канала. Обратитесь в поддержку.",
+                "is_authenticated": True,
+            },
+            status=500,
+        )
+
+    logger.info(
+        "private_chat_access: successfully created invite link for user_id=%s",
+        request.user.id,
+    )
+
+    # Редиректим на одноразовую ссылку
+    return redirect(invite_link)

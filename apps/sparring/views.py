@@ -93,45 +93,78 @@ def _get_contact_url(player: Player, method: str) -> str | None:
     "Раздел спарринга доступен только для зарегистрированных пользователей."
 )
 def sparring_list(request):
-    """Список активных заявок на одиночный спарринг (1×1). Парный 2×2 — отдельно в разделе «Парный 2×2»."""
+    """Объединённый список заявок на спарринг: одиночный (1×1) и парный (2×2)."""
+    sparring_type = request.GET.get("type", "singles")
+    if sparring_type not in ("singles", "doubles"):
+        sparring_type = "singles"
+
     city = request.GET.get("city", "")
     category = request.GET.get("category", "")
+    level = request.GET.get("level", "")
     preferred_gender = request.GET.get("preferred_gender", "")
-
-    requests_qs = (
-        SparringRequest.objects.filter(
-            status=SparringRequest.Status.ACTIVE,
-            match_type="singles",
-        )
-        .select_related(
-            "player__user",
-            "player__user__subscription",
-            "player__user__subscription__tier",
-        )
-        .prefetch_related("responses")
-    )
-    if city:
-        requests_qs = requests_qs.filter(city__icontains=city)
-    if category:
-        requests_qs = requests_qs.filter(desired_category=category)
-    if preferred_gender:
-        requests_qs = requests_qs.filter(preferred_gender=preferred_gender)
-
     has_access = user_has_sparring_access(request.user)
+
     context = {
-        "sparring_requests": requests_qs,
+        "sparring_type": sparring_type,
         "current_city": city,
         "current_category": category,
+        "current_level": level,
         "current_preferred_gender": preferred_gender,
         "has_sparring_access": has_access,
     }
+
+    if sparring_type == "singles":
+        requests_qs = (
+            SparringRequest.objects.filter(
+                status=SparringRequest.Status.ACTIVE,
+                match_type="singles",
+            )
+            .select_related(
+                "player__user",
+                "player__user__subscription",
+                "player__user__subscription__tier",
+            )
+            .prefetch_related("responses")
+        )
+        if city:
+            requests_qs = requests_qs.filter(city__icontains=city)
+        if category:
+            requests_qs = requests_qs.filter(desired_category=category)
+        if preferred_gender:
+            requests_qs = requests_qs.filter(preferred_gender=preferred_gender)
+        context["sparring_requests"] = requests_qs
+    else:
+        doubles_qs = (
+            DoublesMatchRequest.objects.filter(
+                status__in=(
+                    DoublesMatchRequestStatus.OPEN,
+                    DoublesMatchRequestStatus.FORMING,
+                    DoublesMatchRequestStatus.READY,
+                )
+            )
+            .select_related(
+                "created_by__user",
+                "created_by__user__subscription",
+                "created_by__user__subscription__tier",
+            )
+            .prefetch_related("teams__members__player__user")
+            .order_by("-created_at")
+        )
+        if city:
+            doubles_qs = doubles_qs.filter(city__icontains=city)
+        if level:
+            doubles_qs = doubles_qs.filter(desired_level=level)
+        if preferred_gender:
+            doubles_qs = doubles_qs.filter(preferred_gender=preferred_gender)
+        context["doubles_requests"] = doubles_qs
+
     return render(request, "sparring/list.html", context)
 
 
 @login_required
 @require_filled_profile
 def sparring_create(request):
-    """Создать заявку на одиночный спарринг (1×1). Парный 2×2 — через раздел «Парный 2×2»."""
+    """Создать заявку на спарринг: одиночный (1×1) или парный (2×2)."""
     if not user_has_sparring_access(request.user):
         messages.error(
             request,
@@ -145,19 +178,59 @@ def sparring_create(request):
         messages.error(request, "Заполните профиль игрока.")
         return redirect("profile_edit")
 
+    sparring_type = request.GET.get("type", "singles")
     if request.method == "POST":
-        form = SparringRequestForm(request.POST)
-        if form.is_valid():
-            sparring = form.save(commit=False)
-            sparring.player = player
-            sparring.match_type = SparringMatchType.SINGLES
-            sparring.save()
-            messages.success(request, "Заявка на спарринг создана.")
-            return redirect("sparring_list")
-    else:
-        form = SparringRequestForm(initial={"city": player.city})
+        sparring_type = request.POST.get("sparring_type", "singles")
 
-    return render(request, "sparring/create.html", {"form": form})
+    if sparring_type not in ("singles", "doubles"):
+        sparring_type = "singles"
+
+    if sparring_type == "doubles":
+        if request.method == "POST":
+            form = DoublesMatchRequestForm(request.POST)
+            if form.is_valid():
+                try:
+                    req = create_doubles_request(
+                        created_by=player,
+                        city=form.cleaned_data.get("city", ""),
+                        preferred_gender=form.cleaned_data.get("preferred_gender", ""),
+                        is_friendly=form.cleaned_data.get("is_friendly", False),
+                        description=form.cleaned_data.get("description", ""),
+                        preferred_days=form.cleaned_data.get("preferred_days", ""),
+                        preferred_time=form.cleaned_data.get("preferred_time", ""),
+                        desired_level=form.cleaned_data.get("desired_level", ""),
+                        desired_age_min=form.cleaned_data.get("desired_age_min"),
+                        desired_age_max=form.cleaned_data.get("desired_age_max"),
+                        preferred_location=form.cleaned_data.get(
+                            "preferred_location", ""
+                        ),
+                    )
+                    messages.success(request, "Заявка на парный матч создана.")
+                    return redirect("doubles_detail", pk=req.pk)
+                except Exception as e:
+                    messages.error(request, str(e))
+        else:
+            form = DoublesMatchRequestForm(
+                initial={"city": getattr(player, "city", "")}
+            )
+    else:
+        if request.method == "POST":
+            form = SparringRequestForm(request.POST)
+            if form.is_valid():
+                sparring = form.save(commit=False)
+                sparring.player = player
+                sparring.match_type = SparringMatchType.SINGLES
+                sparring.save()
+                messages.success(request, "Заявка на спарринг создана.")
+                return redirect("sparring_list")
+        else:
+            form = SparringRequestForm(initial={"city": player.city})
+
+    return render(
+        request,
+        "sparring/create.html",
+        {"form": form, "sparring_type": sparring_type},
+    )
 
 
 @require_http_methods(["GET", "POST"])
@@ -211,24 +284,42 @@ def sparring_cancel(request, pk):
 
 @login_required
 def sparring_my_requests(request):
-    """List current user's sparring requests (active + closed)."""
+    """Объединённый список заявок пользователя: одиночный (1×1) и парный (2×2)."""
     try:
         player = request.user.player
     except (AttributeError, Player.DoesNotExist):
         messages.error(request, "Заполните профиль игрока.")
         return redirect("profile_edit")
 
-    requests_qs = (
-        SparringRequest.objects.filter(player=player)
-        .prefetch_related("responses__respondent__user")
-        .order_by("-created_at")
-    )
+    sparring_type = request.GET.get("type", "singles")
+    if sparring_type not in ("singles", "doubles"):
+        sparring_type = "singles"
+
     has_access = user_has_sparring_access(request.user)
-    return render(
-        request,
-        "sparring/my_requests.html",
-        {"sparring_requests": requests_qs, "has_sparring_access": has_access},
-    )
+    context = {
+        "sparring_type": sparring_type,
+        "has_sparring_access": has_access,
+    }
+
+    if sparring_type == "singles":
+        requests_qs = (
+            SparringRequest.objects.filter(player=player)
+            .prefetch_related("responses__respondent__user")
+            .order_by("-created_at")
+        )
+        context["sparring_requests"] = requests_qs
+    else:
+        doubles_qs = (
+            DoublesMatchRequest.objects.filter(created_by=player)
+            .select_related("created_by__user", "match")
+            .prefetch_related(
+                "teams__members__player__user", "join_requests__members__player__user"
+            )
+            .order_by("-created_at")
+        )
+        context["doubles_requests"] = doubles_qs
+
+    return render(request, "sparring/my_requests.html", context)
 
 
 @require_POST
@@ -509,98 +600,6 @@ def sparring_respond(request, pk):
 # ---------------------------------------------------------------------------
 # Парный спарринг 2×2
 # ---------------------------------------------------------------------------
-
-
-@login_required_with_message(
-    "Раздел спарринга доступен только для зарегистрированных пользователей."
-)
-def doubles_list(request):
-    """Список заявок на парный матч 2×2 (открытые и в формировании)."""
-    city = request.GET.get("city", "")
-    qs = (
-        DoublesMatchRequest.objects.filter(
-            status__in=(
-                DoublesMatchRequestStatus.OPEN,
-                DoublesMatchRequestStatus.FORMING,
-                DoublesMatchRequestStatus.READY,
-            )
-        )
-        .select_related("created_by__user")
-        .prefetch_related("teams__members__player__user")
-        .order_by("-created_at")
-    )
-    if city:
-        qs = qs.filter(city__icontains=city)
-    has_access = user_has_sparring_access(request.user)
-    return render(
-        request,
-        "sparring/doubles_list.html",
-        {
-            "doubles_requests": qs,
-            "current_city": city,
-            "has_sparring_access": has_access,
-        },
-    )
-
-
-@login_required
-def doubles_my_requests(request):
-    """Мои заявки на парный матч 2×2."""
-    try:
-        player = request.user.player
-    except (AttributeError, Player.DoesNotExist):
-        messages.error(request, "Заполните профиль игрока.")
-        return redirect("profile_edit")
-
-    qs = (
-        DoublesMatchRequest.objects.filter(created_by=player)
-        .select_related("created_by__user", "match")
-        .prefetch_related(
-            "teams__members__player__user", "join_requests__members__player__user"
-        )
-        .order_by("-created_at")
-    )
-    has_access = user_has_sparring_access(request.user)
-    return render(
-        request,
-        "sparring/doubles_my_requests.html",
-        {"doubles_requests": qs, "has_sparring_access": has_access},
-    )
-
-
-@login_required
-@require_filled_profile
-@require_http_methods(["GET", "POST"])
-def doubles_create(request):
-    """Создать заявку на парный матч 2×2."""
-    if not user_has_sparring_access(request.user):
-        messages.error(request, "Доступ к спаррингам по подписке. Оформите подписку.")
-        return redirect("pricing")
-    try:
-        player = request.user.player
-    except (AttributeError, Player.DoesNotExist):
-        messages.error(request, "Заполните профиль игрока.")
-        return redirect("profile_edit")
-
-    if request.method == "POST":
-        form = DoublesMatchRequestForm(request.POST)
-        if form.is_valid():
-            try:
-                req = create_doubles_request(
-                    created_by=player,
-                    city=form.cleaned_data.get("city", ""),
-                    preferred_gender=form.cleaned_data.get("preferred_gender", ""),
-                    is_friendly=form.cleaned_data.get("is_friendly", False),
-                    description=form.cleaned_data.get("description", ""),
-                )
-                messages.success(request, "Заявка на парный матч создана.")
-                return redirect("doubles_detail", pk=req.pk)
-            except Exception as e:
-                messages.error(request, str(e))
-    else:
-        form = DoublesMatchRequestForm(initial={"city": getattr(player, "city", "")})
-
-    return render(request, "sparring/doubles_create.html", {"form": form})
 
 
 @login_required

@@ -37,6 +37,12 @@ def create_doubles_request(
     is_friendly: bool = False,
     description: str = "",
     partner: "Player | None" = None,
+    preferred_days: str = "",
+    preferred_time: str = "",
+    desired_level: str = "",
+    desired_age_min: int | None = None,
+    desired_age_max: int | None = None,
+    preferred_location: str = "",
 ) -> DoublesMatchRequest:
     """Создать заявку на парный матч 2×2. Автор — капитан своей команды, опционально с партнёром."""
     with transaction.atomic():
@@ -47,6 +53,12 @@ def create_doubles_request(
             preferred_gender=preferred_gender,
             is_friendly=is_friendly,
             description=description,
+            preferred_days=preferred_days,
+            preferred_time=preferred_time,
+            desired_level=desired_level,
+            desired_age_min=desired_age_min,
+            desired_age_max=desired_age_max,
+            preferred_location=preferred_location,
         )
         author_team = DoublesTeam.objects.create(
             match_request=req,

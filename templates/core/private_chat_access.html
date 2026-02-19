@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Доступ к закрытому каналу{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container">
+        <div class="card" style="max-width: 600px; margin: 0 auto;">
+            <div class="card-body">
+                {% if has_access and not error %}
+                    <h2 class="card-title">Доступ к закрытому каналу</h2>
+                    <p class="text-secondary">Перенаправление...</p>
+                {% elif error %}
+                    <h2 class="card-title text-error">Ошибка</h2>
+                    <p class="text-secondary">{{ error }}</p>
+                {% else %}
+                    <h2 class="card-title">🔒 Доступ к закрытому каналу</h2>
+                    <div class="alert alert-warning">
+                        <p><strong>Доступ ограничен</strong></p>
+                        <p>{{ reason }}</p>
+                    </div>
+                    {% if is_authenticated %}
+                        <p class="text-secondary">
+                            Для доступа к закрытому каналу сообщества @TennisFanru необходимо оформить подписку с соответствующим тарифом.
+                        </p>
+                        <div style="margin-top: var(--spacing-lg);">
+                            <a href="{% url 'pricing' %}" class="btn btn-primary">Выбрать тариф</a>
+                        </div>
+                    {% else %}
+                        <p class="text-secondary">
+                            Для доступа к закрытому каналу сообщества @TennisFanru необходимо войти в аккаунт и оформить подписку.
+                        </p>
+                        <div style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-md); flex-wrap: wrap;">
+                            <a href="{% url 'login' %}" class="btn btn-primary">Войти</a>
+                            <a href="{% url 'pricing' %}" class="btn btn-outline">Тарифы</a>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

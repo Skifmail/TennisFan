@@ -11,7 +11,15 @@
         <div class="card match-card-item">
             <div class="card-body match-card-item__body">
                 <div class="match-meta">
-                    <div class="text-secondary" style="font-size: var(--font-size-sm);">{{ match.tournament.name }}{% if match.round_name %} · {{ match.round_name }}{% endif %}</div>
+                    <div class="text-secondary" style="font-size: var(--font-size-sm);">
+                        {% if match.tournament %}
+                            {{ match.tournament.name }}{% if match.round_name %} · {{ match.round_name }}{% endif %}
+                        {% elif match.is_sparring %}
+                            Спарринг{% if match.is_doubles_sparring %} · Парный{% endif %}
+                        {% else %}
+                            Матч
+                        {% endif %}
+                    </div>
                     <div style="font-size: var(--font-size-sm);">
                         {% if match.deadline %}
                             Дедлайн: {{ match.deadline|date:"d.m.Y" }}

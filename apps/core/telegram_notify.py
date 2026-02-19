@@ -74,7 +74,7 @@ def notify_new_registration(user, player) -> bool:
         f"Email: {email}\n"
         f"Телефон: {phone}\n"
         f"Город: {city}\n"
-        f"NTRP: {ntrp_s}"
+        f"Сила: {ntrp_s}"
     )
     return send_admin_message(text)
 

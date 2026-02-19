@@ -61,7 +61,7 @@ class User(AbstractUser):
 
 
 class PlayerCategory(models.TextChoices):
-    """Player skill categories based on NTRP."""
+    """Player skill categories based on level of strength."""
 
     FUTURES = "futures", "Фьючерс"
     BASE = "base", "База"
@@ -120,7 +120,7 @@ class Player(CompressImageFieldsMixin, models.Model):
     )
     city = models.CharField("Город", max_length=100, blank=True, default="")
     ntrp_level = models.DecimalField(
-        "Уровень силы (NTRP)", max_digits=3, decimal_places=1, default=1.0
+        "Уровень силы", max_digits=3, decimal_places=1, default=1.0
     )
     skill_level = models.CharField(
         "Уровень силы",
@@ -301,7 +301,9 @@ class Player(CompressImageFieldsMixin, models.Model):
 
         # Определяем, на какой стороне был игрок
         is_player1 = False
-        if last_match.player1_id == self.pk:
+        if last_match.partner1_id and last_match.partner2_id:
+            is_player1 = self.pk in (last_match.player1_id, last_match.partner1_id)
+        elif last_match.player1_id == self.pk:
             is_player1 = True
         elif last_match.player2_id == self.pk:
             is_player1 = False
@@ -329,7 +331,7 @@ class Player(CompressImageFieldsMixin, models.Model):
             elif fan_delta < 0:
                 result["fan"]["direction"] = "down"
 
-        # Вычисляем реальное изменение NTRP на основе рейтинга до и после матча
+        # Вычисляем реальное изменение уровня силы на основе рейтинга до и после матча
         if fan_delta is not None:
             from apps.users.rating_utils import rating_to_ntrp_level
 
@@ -338,11 +340,11 @@ class Player(CompressImageFieldsMixin, models.Model):
             # Рейтинг до матча
             rating_before = rating_after - float(fan_delta)
 
-            # Вычисляем NTRP до и после матча
+            # Вычисляем силу до и после матча
             ntrp_before = rating_to_ntrp_level(rating_before)
             ntrp_after = rating_to_ntrp_level(rating_after)
 
-            # Вычисляем дельту NTRP
+            # Вычисляем дельту уровня силы
             ntrp_delta = float(ntrp_after) - float(ntrp_before)
             result["ntrp"]["delta"] = round(ntrp_delta, 1)
 

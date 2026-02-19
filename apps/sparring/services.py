@@ -32,16 +32,22 @@ def create_match_from_response(sparring_response) -> Match:
     if author.id == respondent.id:
         raise ValueError("Нельзя создать матч с самим собой")
 
-    # Создаем матч
+    # Дружеский матч не влияет на рейтинг и силу
+    rating_status = (
+        Match.RatingCalcStatus.NOT_APPLICABLE
+        if request.is_friendly
+        else Match.RatingCalcStatus.PENDING
+    )
+
     match = Match.objects.create(
-        tournament=None,  # Спарринговые матчи не связаны с турниром
+        tournament=None,
         match_type=Match.MatchType.SPARRING,
         sparring_response=sparring_response,
         player1=author,
         player2=respondent,
         status=Match.MatchStatus.SCHEDULED,
-        deadline=timezone.now() + timedelta(days=7),  # Дедлайн +7 дней
-        rating_status=Match.RatingCalcStatus.PENDING,  # Рейтинг будет рассчитан
+        deadline=timezone.now() + timedelta(days=7),
+        rating_status=rating_status,
     )
 
     logger.info(

@@ -6,7 +6,7 @@ from datetime import date
 
 from django.test import TestCase
 
-from apps.tournaments.fan import _expected_final_round
+from apps.tournaments.fan import _bracket_r1_count, _expected_final_round
 from apps.tournaments.fan import generate_bracket as fan_generate_bracket
 from apps.tournaments.models import Match, Tournament
 from apps.tournaments.olympic_consolation import (
@@ -341,8 +341,8 @@ class FanBracketToFinalTestCase(TestCase):
                 ok, msg = fan_generate_bracket(t)
                 self.assertTrue(ok, f"N={n}: сетка должна сформироваться: {msg}")
 
-                # Ожидаемое количество матчей R1
-                r1_expected = (n + 1) // 2 if n % 2 == 1 else n // 2
+                # Ожидаемое количество матчей R1 (бинарное дерево: bracket_size/2)
+                r1_expected = _bracket_r1_count(n)
                 r1_matches = t.matches.filter(
                     round_index=1, is_consolation=False
                 ).order_by("round_order")
@@ -477,7 +477,7 @@ class OlympicBracketToFinalTestCase(TestCase):
                     f"N={n}: олимпийская сетка должна сформироваться: {msg}",
                 )
 
-                r1_expected = (n + 1) // 2 if n % 2 == 1 else n // 2
+                r1_expected = _bracket_r1_count(n)
                 r1_matches = t.matches.filter(
                     round_index=1, is_consolation=False
                 ).order_by("round_order")

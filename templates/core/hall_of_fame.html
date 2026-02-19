@@ -38,11 +38,7 @@
                         {{ archive.final_rank }}
                     {% endif %}
                 </span>
-                {% if archive.player.avatar %}
-                <img src="{{ archive.player.avatar.url }}" alt="" class="player-avatar">
-                {% else %}
-                <div class="player-avatar"></div>
-                {% endif %}
+                {% include 'includes/avatar.html' with avatar=archive.player.avatar %}
                 <div class="player-info">
                     <div class="player-name-block">
                         <span class="player-name">{{ archive.player }}</span>

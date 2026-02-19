@@ -18,11 +18,7 @@
             </div>
             <div class="match-players">
                 <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
-                    {% if match.player1.avatar %}
-                    <img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">
-                    {% else %}
-                    <div class="player-avatar"></div>
-                    {% endif %}
+                    {% include 'includes/avatar.html' with avatar=match.player1.avatar %}
                     <div class="player-name" style="display:flex;align-items:center;gap:5px;">
                         {{ match.player1 }}
                         {% with tier=match.player1.active_subscription_tier %}
@@ -51,11 +47,7 @@
                     </div>
                 </div>
                 <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
-                    {% if match.player2.avatar %}
-                    <img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">
-                    {% else %}
-                    <div class="player-avatar"></div>
-                    {% endif %}
+                    {% include 'includes/avatar.html' with avatar=match.player2.avatar %}
                     <div class="player-name" style="display:flex;align-items:center;gap:5px;">
                         {{ match.player2 }}
                         {% with tier=match.player2.active_subscription_tier %}

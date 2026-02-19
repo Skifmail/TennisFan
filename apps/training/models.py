@@ -211,7 +211,7 @@ class Training(CompressImageFieldsMixin, models.Model):
         "Уровень", max_length=20, choices=SkillLevel.choices, default=SkillLevel.AMATEUR
     )
     target_category = models.CharField(
-        "Целевой уровень (NTRP)", max_length=20, choices=SkillLevel.choices, blank=True
+        "Целевой уровень силы", max_length=20, choices=SkillLevel.choices, blank=True
     )
 
     coach = models.ForeignKey(

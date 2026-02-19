@@ -1,5 +1,5 @@
 <div class="card tournament-card" data-url="{% url 'tournament_detail' slug=tournament.slug %}" onclick="window.location.href=this.dataset.url;">
-    <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}">{{ tournament.get_status_display }}</span>
+    <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}"></span>
     <div class="card-body tournament-card-body">
         {% if tournament.image %}
         <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img">
@@ -55,7 +55,7 @@
                     <div class="tournament-participants-grid">
                         {% for team in tournament.teams.all|slice:":5" %}
                         <div class="participant-badge">
-                            <div class="player-avatar"></div>
+                            {% include 'includes/avatar.html' with avatar=team.player1.avatar %}
                             <span class="participant-name">{% if team.player2 %}{{ team.player1.user.last_name|slice:":1" }}./{{ team.player2.user.last_name|slice:":1" }}.{% else %}{{ team.player1.user.last_name }} (ищет пару){% endif %}</span>
                         </div>
                         {% endfor %}
@@ -75,11 +75,7 @@
                     <div class="tournament-participants-grid">
                         {% for participant in tournament.participants.all|slice:":10" %}
                         <div class="participant-badge">
-                            {% if participant.avatar %}
-                            <img src="{{ participant.avatar.url|default:'/static/images/avatar-placeholder.png' }}" alt="" class="player-avatar">
-                            {% else %}
-                            <div class="player-avatar"></div>
-                            {% endif %}
+                            {% include 'includes/avatar.html' with avatar=participant.avatar %}
                             <span class="participant-name">{{ participant.user.first_name }} {{ participant.user.last_name }}</span>
                         </div>
                         {% endfor %}

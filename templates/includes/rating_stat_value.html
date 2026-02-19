@@ -1,0 +1,31 @@
+{% with rating_changes=player.get_rating_changes %}
+{% if stat_type == 'ntrp' %}
+<div>
+    <div class="stat-label">Сила</div>
+    <div class="stat-value stat-value--rating">
+        {% if rating_changes.ntrp.direction == 'up' %}
+            <span class="rating-badge__arrow rating-badge__arrow--up">↑</span>
+        {% elif rating_changes.ntrp.direction == 'down' %}
+            <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
+        {% endif %}
+        <span class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}" title="После последнего матча{% if rating_changes.ntrp.direction != 'none' %}: {% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta }}{% endif %}">
+            {{ value }}
+        </span>
+    </div>
+</div>
+{% else %}
+<div>
+    <div class="stat-label">Рейтинг</div>
+    <div class="stat-value stat-value--rating">
+        {% if rating_changes.fan.direction == 'up' %}
+            <span class="rating-badge__arrow rating-badge__arrow--up">↑</span>
+        {% elif rating_changes.fan.direction == 'down' %}
+            <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
+        {% endif %}
+        <span class="rating-badge__value rating-badge__value--{{ rating_changes.fan.direction }}" title="После последнего матча{% if rating_changes.fan.direction != 'none' %}: {% if rating_changes.fan.direction == 'up' %}+{% endif %}{{ rating_changes.fan.delta|floatformat:0 }}{% endif %}">
+            {{ value }}
+        </span>
+    </div>
+</div>
+{% endif %}
+{% endwith %}

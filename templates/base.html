@@ -116,14 +116,16 @@
         <div class="container">
             <div class="footer-grid">
                 <div class="footer-brand">
-                    <a href="{% url 'home' %}" class="logo">
-                        <span class="logo-text">Tennis<span class="logo-accent">Fan</span></span>
-                    </a>
+                    <h3 class="footer-brand-title">
+                        <a href="{% url 'home' %}" style="text-decoration: none; color: inherit;">
+                            Tennis<span class="footer-brand-accent">Fan</span>
+                        </a>
+                    </h3>
                     <p class="footer-desc">Платформа любительских теннисных турниров по всей России</p>
                     {% if not user.is_authenticated %}
                     <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2">Пройти тест уровня силы</a>
                     {% endif %}
-                    <a href="{% url 'donate' %}" class="btn btn-donate mt-2">ОТПРАВИТЬ ДОНАТ</a>
+                    <a href="{% url 'donate' %}" class="btn btn-donate footer-donate mt-2">ОТПРАВИТЬ ДОНАТ</a>
                 </div>
 
                 <div class="footer-links">
@@ -171,10 +173,17 @@
             </div>
 
             <div class="footer-bottom">
-                <p>&copy; 2026 TennisFan. Все права защищены.</p>
-                <p class="text-secondary" style="margin-top: 6px; font-size: 0.9rem;">
-                    ИП Ермолаев Леонид · ИНН 561417897115 · ОГРНИП 325508100579372
-                </p>
+                <div class="footer-copy">
+                    <p>&copy; 2026 TennisFan. Все права защищены.</p>
+                    <p>ИП Ермолаев Леонид · ИНН 561417897115</p>
+                    <p>ОГРНИП 325508100579372</p>
+                </div>
+                <div class="footer-credit">
+                    Разработка и поддержка —
+                    <a href="https://aleks-shataylo.ru" target="_blank" class="skifmail">
+                        <span class="skif">SKIF</span><span class="mail">MAIL</span>
+                    </a>
+                </div>
             </div>
         </div>
     </footer>

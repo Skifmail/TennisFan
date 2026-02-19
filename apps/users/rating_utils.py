@@ -1,12 +1,12 @@
 """
-Utility functions for mapping NTRP levels to starting points and skill levels.
+Utility functions for mapping strength levels (1.0-7.0) to starting points and skill levels.
 
-Linear mapping: NTRP * 1000 = FAN points
-    NTRP 1.0  → 1000 FAN points
-    NTRP 1.1  → 1100 FAN points
-    NTRP 2.0  → 2000 FAN points
+Linear mapping: strength * 1000 = FAN points
+    Сила 1.0  → 1000 FAN points
+    Сила 1.1  → 1100 FAN points
+    Сила 2.0  → 2000 FAN points
     ...
-    NTRP 7.0  → 7000 FAN points
+    Сила 7.0  → 7000 FAN points
 
 This provides a stable, predictable mapping without jumps or interpolation issues.
 """
@@ -17,12 +17,12 @@ from .models import SkillLevel
 
 
 def get_starting_points(ntrp_level: Decimal) -> int:
-    """Return starting rating points for a given NTRP level.
+    """Return starting rating points for a given strength level.
 
-    Uses linear mapping: FAN points = NTRP * 1000
+    Uses linear mapping: FAN points = strength * 1000
 
     Args:
-        ntrp_level: Decimal NTRP value in range [1.0, 7.0].
+        ntrp_level: Decimal strength value in range [1.0, 7.0].
 
     Returns:
         Starting points as an integer.
@@ -33,15 +33,15 @@ def get_starting_points(ntrp_level: Decimal) -> int:
     level = Decimal(str(ntrp_level))
 
     if level < Decimal("1.0") or level > Decimal("7.0"):
-        raise ValueError(f"NTRP level {ntrp_level} is out of valid range [1.0, 7.0].")
+        raise ValueError(f"Level {ntrp_level} is out of valid range [1.0, 7.0].")
 
-    # Linear mapping: NTRP * 1000 = FAN points
+    # Linear mapping: strength * 1000 = FAN points
     points = level * Decimal("1000")
     return int(round(points))
 
 
 def map_ntrp_to_skill_level(level: Decimal) -> str:
-    """Map NTRP decimal level to SkillLevel category.
+    """Map strength decimal level to SkillLevel category.
 
     Ranges:
         1.0–2.0 → Новичок
@@ -66,19 +66,19 @@ def map_ntrp_to_skill_level(level: Decimal) -> str:
 
 
 def rating_to_ntrp_level(rating: int | float) -> Decimal:
-    """Convert rating points back to NTRP level (inverse of get_starting_points).
+    """Convert rating points back to strength level (inverse of get_starting_points).
 
-    Uses linear mapping: NTRP = FAN points / 1000
+    Uses linear mapping: strength = FAN points / 1000
 
     Args:
         rating: Current rating points.
 
     Returns:
-        NTRP level as Decimal in range [1.0, 7.0] (clamped).
+        Strength level as Decimal in range [1.0, 7.0] (clamped).
     """
     rating_val = Decimal(str(rating))
 
-    # Linear mapping: NTRP = FAN points / 1000
+    # Linear mapping: strength = FAN points / 1000
     ntrp = rating_val / Decimal("1000")
 
     # Clamp to valid range [1.0, 7.0]

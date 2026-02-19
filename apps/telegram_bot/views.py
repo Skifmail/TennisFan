@@ -327,11 +327,7 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
         except Exception as e:
             logger.exception("apply_proposal in webhook: %s", e)
 
-        # 2. Уведомляем инициатора (PROPOSER) в Telegram — независимо от п.1
-        try:
-            tg_notify.notify_proposal_confirmed(proposal)
-        except Exception as e:
-            logger.exception("notify_proposal_confirmed failed: %s", e)
+        # 2. Уведомления в ЛК и Telegram (с рейтингом и силой) обоим участникам создаются внутри apply_proposal
 
         # 3. Убираем кнопки из исходного сообщения
         try:
@@ -340,30 +336,7 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
         except Exception as e:
             logger.exception("edit_message_remove_reply_markup failed: %s", e)
 
-        # 4. Отправляем сообщение-подтверждение нажавшему (OPPONENT)
-        try:
-            from apps.telegram_bot.notifications import _get_penalty_text_for_player
-
-            match = proposal.match
-            score = match.score_display() if match.winner else "—"
-            winner_name = str(match.winner) if match.winner else "—"
-
-            # Получаем текст о штрафе для подтвердившего (opponent)
-            opponent_player = player  # Тот, кто подтвердил
-            penalty_text = _get_penalty_text_for_player(match, opponent_player)
-
-            bot.send_message(
-                chat_id,
-                f"✅ <b>Результат подтверждён.</b>\n\n"
-                f"Турнир: {match.tournament.name}\n"
-                f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
-                f"Счёт: {score}\n"
-                f"Победитель: {winner_name}{penalty_text}",
-            )
-        except Exception as e:
-            logger.exception("send confirm message to opponent failed: %s", e)
-
-        # 5. Callback-ответ (всплывающий тост)
+        # 4. Callback-ответ (всплывающий тост)
         if apply_ok:
             _answer_callback(cq_id, "✅ Результат подтверждён.")
         else:
@@ -766,7 +739,7 @@ def _format_sparring_player_card(player: Player) -> str:
     lines = [
         f"Имя: {name}",
         f"Возраст: {age}",
-        f"NTRP: {ntrp}",
+        f"Сила: {ntrp}",
         f"Уровень: {skill}",
         f"FAN: {fan_rating}",
         f"Игр: {played} (W:{won} / L:{played - won})",
@@ -1450,7 +1423,7 @@ def _handle_menu_callback_action(
                 "━━━━━━━━━━━━━━━━━━",
                 f"📍 Город: <b>{player.city or '—'}</b>",
                 f"🎯 Уровень: <b>{player.get_skill_level_display()}</b>",
-                f"📈 NTRP: <b>{player.ntrp_level}</b>",
+                f"📈 Сила: <b>{player.ntrp_level}</b>",
             ]
 
             # Добавляем дополнительную информацию, если есть
@@ -1498,7 +1471,7 @@ def _handle_menu_callback_action(
                     "",
                     "🏆 <b>РЕЙТИНГ И СТАТИСТИКА</b>",
                     "━━━━━━━━━━━━━━━━━━",
-                    f"💎 Очки FAN: <b>{player.total_points:.1f}</b>",
+                    f"💎 Рейтинг: <b>{player.total_points:.1f}</b>",
                     f"🎖️ Очки сезона: <b>{season_points}</b>",
                     f"🎾 Матчей: <b>{player.matches_played}</b>",
                     f"✅ Побед: <b>{player.matches_won}</b>",

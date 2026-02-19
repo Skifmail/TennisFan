@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender=Match)
 def notify_telegram_match_created(sender, instance, created, **kwargs):
-    """После создания матча с участниками — уведомление в Telegram."""
+    """После создания матча с участниками — уведомление в Telegram и в ЛК."""
     if not created:
         return
     if not instance.player1_id and not instance.team1_id:
@@ -34,6 +34,36 @@ def notify_telegram_match_created(sender, instance, created, **kwargs):
         notify_match_created(instance)
     except Exception as e:
         logger.exception("Telegram notify_match_created failed: %s", e)
+
+    try:
+        from django.urls import reverse
+
+        from apps.tournaments.utils import get_match_participant_users
+        from apps.users.models import Notification
+
+        deadline_str = (
+            instance.deadline.strftime("%d.%m.%Y %H:%M")
+            if instance.deadline
+            else "не указан"
+        )
+        msg = (
+            f"Новый матч: {instance.get_player1_display()} — {instance.get_player2_display()}. "
+            f"Дедлайн: {deadline_str}. Внесите результат в «Мои матчи»."
+        )
+        if len(msg) > 255:
+            msg = msg[:252] + "..."
+        url = reverse("match_detail", args=[instance.pk])
+        for user in get_match_participant_users(instance):
+            try:
+                Notification.objects.create(user=user, message=msg, url=url)
+            except Exception as e:
+                logger.warning(
+                    "notify_match_created LK for user %s: %s",
+                    getattr(user, "pk", None),
+                    e,
+                )
+    except Exception as e:
+        logger.exception("LK notify_match_created failed: %s", e)
 
 
 @receiver(pre_save, sender=Match)
@@ -105,6 +135,8 @@ def update_player_stats(sender, instance, created, **kwargs):
     match = Match.objects.select_related(
         "player1",
         "player2",
+        "partner1",
+        "partner2",
         "winner",
         "tournament",
         "team1__player1",
@@ -113,13 +145,14 @@ def update_player_stats(sender, instance, created, **kwargs):
         "team2__player2",
         "winner_team__player1",
         "winner_team__player2",
+        "sparring_response__sparring_request",
     ).get(pk=instance.pk)
 
     winner = match.winner
     winner_team = match.winner_team
     t = match.tournament
-    # Для спарринговых матчей tournament может быть None, проверяем наличие команд напрямую
-    is_doubles = bool(match.team1_id and match.team2_id)
+    # Парный матч: по командам (team1/team2) или по парному спаррингу (player1/partner1 vs player2/partner2)
+    is_doubles = bool(match.team1_id and match.team2_id) or match.is_doubles_sparring()
 
     print(
         f"[SIGNAL] Match {match.pk}: winner={winner.pk if winner else None}, winner_team={winner_team.pk if winner_team else None}, is_doubles={is_doubles}, is_sparring={match.is_sparring()}"
@@ -133,12 +166,21 @@ def update_player_stats(sender, instance, created, **kwargs):
         match.is_sparring(),
     )
 
+    # Для парного спарринга winner есть, winner_team нет
     if not winner and not winner_team:
         print(
             f"[SIGNAL] Match {match.pk}: ERROR - no winner or winner_team, skipping rating update"
         )
         logger.warning(
             "Match %s: no winner or winner_team, skipping rating update", match.pk
+        )
+        return
+
+    # Дружеский спарринг (одиночный и парный): не влияет на рейтинг и статистику
+    if match.is_friendly_sparring():
+        logger.info(
+            "Match %s: friendly sparring, skipping stats and rating update",
+            match.pk,
         )
         return
 
@@ -171,7 +213,30 @@ def update_player_stats(sender, instance, created, **kwargs):
                 p.matches_played += 1
                 p.save(update_fields=["matches_played"])
 
-    if is_doubles:
+    def _update_stats_doubles_sparring(match):
+        win_side = (
+            (match.player1, match.partner1)
+            if winner in (match.player1, match.partner1)
+            else (match.player2, match.partner2)
+        )
+        lose_side = (
+            (match.player2, match.partner2)
+            if winner in (match.player1, match.partner1)
+            else (match.player1, match.partner1)
+        )
+        for p in win_side:
+            if p and not getattr(p, "is_bye", False):
+                p.matches_played += 1
+                p.matches_won += 1
+                p.save(update_fields=["matches_played", "matches_won"])
+        for p in lose_side:
+            if p and not getattr(p, "is_bye", False):
+                p.matches_played += 1
+                p.save(update_fields=["matches_played"])
+
+    if match.is_doubles_sparring():
+        _update_stats_doubles_sparring(match)
+    elif is_doubles:
         _update_stats_doubles(match)
     else:
         _update_stats_singles(match)
@@ -218,21 +283,31 @@ def _apply_fan_shadow(match: Match) -> None:
         calculate_new_ratings,
     )
 
-    is_doubles = bool(match.team1_id and match.team2_id)
+    is_doubles_sparring = bool(match.partner1_id and match.partner2_id)
+    is_doubles = bool(match.team1_id and match.team2_id) or is_doubles_sparring
 
-    print(f"[FAN_SHADOW] Match {match.pk}, is_doubles={is_doubles}")
+    print(
+        f"[FAN_SHADOW] Match {match.pk}, is_doubles={is_doubles}, is_doubles_sparring={is_doubles_sparring}"
+    )
     logger.info("_apply_fan_shadow: match %s, is_doubles=%s", match.pk, is_doubles)
 
-    # Для парных матчей используем первого игрока команды для расчета рейтинга
-    # Для одиночных используем player1 и player2
-    if is_doubles:
-        # Для парных матчей используем команды
+    # Для парных матчей используем первого игрока команды (или стороны) для расчёта рейтинга
+    if is_doubles_sparring:
+        p1 = match.player1
+        p2 = match.player2
+        if not p1 or not p2 or not match.partner1 or not match.partner2:
+            logger.warning(
+                "_apply_fan_shadow: match %s doubles sparring has missing players",
+                match.pk,
+            )
+            return
+        print(f"[FAN_SHADOW] Doubles sparring, p1={p1.pk}, p2={p2.pk}")
+        logger.info("_apply_fan_shadow: doubles sparring, p1=%s, p2=%s", p1.pk, p2.pk)
+    elif is_doubles:
+        # Парные матчи турнира (team1/team2)
         team1 = match.team1
         team2 = match.team2
         if not team1 or not team2:
-            print(
-                f"[FAN_SHADOW] ERROR: Match {match.pk} has teams but team1={team1}, team2={team2}"
-            )
             logger.warning(
                 "_apply_fan_shadow: match %s has teams but team1=%s, team2=%s",
                 match.pk,
@@ -243,9 +318,6 @@ def _apply_fan_shadow(match: Match) -> None:
         p1 = team1.player1
         p2 = team2.player1
         if not p1 or not p2:
-            print(
-                f"[FAN_SHADOW] ERROR: Match {match.pk} has teams but p1={p1}, p2={p2}"
-            )
             logger.warning(
                 "_apply_fan_shadow: match %s has teams but p1=%s, p2=%s",
                 match.pk,
@@ -328,11 +400,14 @@ def _apply_fan_shadow(match: Match) -> None:
         set3=match.player2_set3 or 0,
     )
 
-    a_won = (
-        match.winner_team_id == match.team1_id
-        if match.team1_id and match.team2_id and match.winner_team_id
-        else match.winner_id == p1.pk
-    )
+    if is_doubles_sparring:
+        a_won = match.winner_id in (match.player1_id, match.partner1_id)
+    else:
+        a_won = (
+            match.winner_team_id == match.team1_id
+            if match.team1_id and match.team2_id and match.winner_team_id
+            else match.winner_id == p1.pk
+        )
 
     result = calculate_new_ratings(snap_a, snap_b, score_a, score_b, a_won)
     print(
@@ -345,31 +420,46 @@ def _apply_fan_shadow(match: Match) -> None:
     is_walkover_loss = match.is_walkover_loss()
 
     # Определяем проигравшего для применения штрафа
-    if is_doubles:
-        # Для парных: определяем проигравшую команду
+    if is_doubles_sparring:
+        loser_team = None
+        loser = None
+        side_a_players = (match.player1, match.partner1)
+        side_b_players = (match.player2, match.partner2)
+        loser_side_players = side_b_players if a_won else side_a_players
+    elif is_doubles:
         winner_team = match.winner_team
         if winner_team:
             loser_team = match.team2 if winner_team == match.team1 else match.team1
         else:
-            # Если winner_team не установлен, определяем по a_won
             loser_team = match.team2 if a_won else match.team1
-        loser = None  # Не используется для парных
+        loser = None
+        side_a_players = (
+            (match.team1.player1, match.team1.player2) if match.team1 else ()
+        )
+        side_b_players = (
+            (match.team2.player1, match.team2.player2) if match.team2 else ()
+        )
+        loser_side_players = None
     else:
-        # Для одиночных: определяем проигравшего игрока
         loser = p2 if a_won else p1
         loser_team = None
+        side_a_players = None
+        side_b_players = None
+        loser_side_players = None
 
     # Update hidden_rating and total_points for player1 side
-    # total_points обновляется сразу после каждого матча для видимости прогресса
     if is_doubles:
-        for p in (match.team1.player1, match.team1.player2):
+        for p in (
+            (side_a_players or ())
+            if is_doubles_sparring
+            else (match.team1.player1, match.team1.player2)
+        ):
             if p and not getattr(p, "is_bye", False):
                 new_rating = result.new_rating_a
                 # Применяем штраф -40 очков для проигравшего при тех. поражении
-                if (
-                    is_walkover_loss
-                    and loser_team
-                    and p in (loser_team.player1, loser_team.player2)
+                if is_walkover_loss and (
+                    (loser_team and p in (loser_team.player1, loser_team.player2))
+                    or (loser_side_players and p in loser_side_players)
                 ):
                     new_rating = max(0, new_rating - 40.0)
                     logger.info(
@@ -394,10 +484,10 @@ def _apply_fan_shadow(match: Match) -> None:
                     ]
                 )
                 print(
-                    f"[FAN_SHADOW] Player {p.pk} (doubles team1): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), NTRP {old_ntrp} -> {new_ntrp}"
+                    f"[FAN_SHADOW] Player {p.pk} (doubles team1): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), Сила {old_ntrp} -> {new_ntrp}"
                 )
                 logger.info(
-                    "Player %s (doubles team1): rating updated %.1f -> %.1f (delta: %.1f), NTRP %s -> %s",
+                    "Player %s (doubles team1): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
                     p.pk,
                     old_rating,
                     new_rating,
@@ -434,10 +524,10 @@ def _apply_fan_shadow(match: Match) -> None:
             update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
         )
         print(
-            f"[FAN_SHADOW] Player {p1.pk} (singles): rating {old_rating_p1:.1f} -> {new_rating_a:.1f} (delta: {new_rating_a - old_rating_p1:.1f}), NTRP {old_ntrp_p1} -> {new_ntrp_p1}"
+            f"[FAN_SHADOW] Player {p1.pk} (singles): rating {old_rating_p1:.1f} -> {new_rating_a:.1f} (delta: {new_rating_a - old_rating_p1:.1f}), Сила {old_ntrp_p1} -> {new_ntrp_p1}"
         )
         logger.info(
-            "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f), NTRP %s -> %s",
+            "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
             p1.pk,
             old_rating_p1,
             new_rating_a,
@@ -457,14 +547,17 @@ def _apply_fan_shadow(match: Match) -> None:
 
     # Update hidden_rating and total_points for player2 side
     if is_doubles:
-        for p in (match.team2.player1, match.team2.player2):
+        for p in (
+            (side_b_players or ())
+            if is_doubles_sparring
+            else (match.team2.player1, match.team2.player2)
+        ):
             if p and not getattr(p, "is_bye", False):
                 new_rating = result.new_rating_b
                 # Применяем штраф -40 очков для проигравшего при тех. поражении
-                if (
-                    is_walkover_loss
-                    and loser_team
-                    and p in (loser_team.player1, loser_team.player2)
+                if is_walkover_loss and (
+                    (loser_team and p in (loser_team.player1, loser_team.player2))
+                    or (loser_side_players and p in loser_side_players)
                 ):
                     new_rating = max(0, new_rating - 40.0)
                     logger.info(
@@ -489,10 +582,10 @@ def _apply_fan_shadow(match: Match) -> None:
                     ]
                 )
                 print(
-                    f"[FAN_SHADOW] Player {p.pk} (doubles team2): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), NTRP {old_ntrp} -> {new_ntrp}"
+                    f"[FAN_SHADOW] Player {p.pk} (doubles team2): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), Сила {old_ntrp} -> {new_ntrp}"
                 )
                 logger.info(
-                    "Player %s (doubles team2): rating updated %.1f -> %.1f (delta: %.1f), NTRP %s -> %s",
+                    "Player %s (doubles team2): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
                     p.pk,
                     old_rating,
                     new_rating,
@@ -529,10 +622,10 @@ def _apply_fan_shadow(match: Match) -> None:
             update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
         )
         print(
-            f"[FAN_SHADOW] Player {p2.pk} (singles): rating {old_rating_p2:.1f} -> {new_rating_b:.1f} (delta: {new_rating_b - old_rating_p2:.1f}), NTRP {old_ntrp_p2} -> {new_ntrp_p2}"
+            f"[FAN_SHADOW] Player {p2.pk} (singles): rating {old_rating_p2:.1f} -> {new_rating_b:.1f} (delta: {new_rating_b - old_rating_p2:.1f}), Сила {old_ntrp_p2} -> {new_ntrp_p2}"
         )
         logger.info(
-            "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f), NTRP %s -> %s",
+            "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
             p2.pk,
             old_rating_p2,
             new_rating_b,

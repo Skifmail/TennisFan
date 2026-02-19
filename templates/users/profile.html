@@ -12,11 +12,7 @@
             <!-- Left: player info -->
             <div class="profile-info">
                 <div class="profile-info__header">
-                    {% if player.avatar %}
-                    <img src="{{ player.avatar.url }}" alt="" class="player-avatar profile-info__avatar">
-                    {% else %}
-                    <div class="player-avatar profile-info__avatar"></div>
-                    {% endif %}
+                    {% include 'includes/avatar.html' with avatar=player.avatar class="player-avatar profile-info__avatar" %}
                     <div class="profile-info__title">
                         <h1 class="profile-info__name">{{ player }}</h1>
                         <div class="profile-info__badges">
@@ -44,18 +40,38 @@
                     <p><strong>Forehand:</strong> {{ player.get_forehand_display }}</p>
                 </div>
 
-                <!-- Статистика в виде таблицы (две строки: уровень/NTRP/FAN и очки сезона/матчей/побед) -->
+                <!-- Статистика в виде таблицы (две строки: уровень/сила/FAN и очки сезона/матчей/побед) -->
                 <div class="profile-stats-table">
                     <table class="stats-table stats-table--two-rows">
                         <tr class="stats-table__header-row">
                             <td>Уровень</td>
-                            <td>NTRP</td>
-                            <td>Очки (FAN)</td>
+                            <td>Сила</td>
+                            <td>Рейтинг</td>
                         </tr>
                         <tr class="stats-table__data-row">
                             <td><strong>{{ player.get_skill_level_display }}</strong></td>
-                            <td><strong>{{ player.ntrp_level }}</strong></td>
-                            <td><strong>{{ player.total_points|floatformat:1 }}</strong></td>
+                            {% with rating_changes=player.get_rating_changes %}
+                            <td>
+                                <span class="profile-stats__rating-val">
+                                    {% if rating_changes.ntrp.direction == 'up' %}
+                                        <span class="rating-badge__arrow rating-badge__arrow--up">↑</span>
+                                    {% elif rating_changes.ntrp.direction == 'down' %}
+                                        <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
+                                    {% endif %}
+                                    <strong class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}" title="После последнего матча{% if rating_changes.ntrp.direction != 'none' %}: {% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta }}{% endif %}">{{ player.ntrp_level }}</strong>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="profile-stats__rating-val">
+                                    {% if rating_changes.fan.direction == 'up' %}
+                                        <span class="rating-badge__arrow rating-badge__arrow--up">↑</span>
+                                    {% elif rating_changes.fan.direction == 'down' %}
+                                        <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
+                                    {% endif %}
+                                    <strong class="rating-badge__value rating-badge__value--{{ rating_changes.fan.direction }}" title="После последнего матча{% if rating_changes.fan.direction != 'none' %}: {% if rating_changes.fan.direction == 'up' %}+{% endif %}{{ rating_changes.fan.delta|floatformat:0 }}{% endif %}">{{ player.total_points|floatformat:1 }}</strong>
+                                </span>
+                            </td>
+                            {% endwith %}
                         </tr>
                         <tr class="stats-table__header-row">
                             <td>Очки сезона</td>
@@ -229,10 +245,10 @@
                     </div>
                 </div>
                 <div class="profile-chart profile-chart--points">
-                    <div class="profile-chart__label">Очки FAN</div>
+                    <div class="profile-chart__label">Рейтинг</div>
                     <div class="profile-chart__canvas-scroll" id="fanChartScrollWrap">
                         <div class="profile-chart__canvas-wrap profile-chart__canvas-wrap--fan" id="fanChartInnerWrap">
-                            <canvas id="chartProfilePoints" aria-label="График очков FAN"></canvas>
+                            <canvas id="chartProfilePoints" aria-label="График рейтинга"></canvas>
                         </div>
                     </div>
                 </div>
@@ -612,7 +628,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
             return 'rgba(128, 128, 128, 0.6)';            // Серый — без изменения
         });
 
-        var chartOpts = buildChartOptions('Очков FAN', '');
+        var chartOpts = buildChartOptions('Рейтинг', '');
         var winRateOpts = buildChartOptions('% побед', '%');
         winRateOpts.scales = { x: chartOpts.scales.x, y: { display: true, beginAtZero: true, max: 100 } };
 
@@ -642,7 +658,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                 var ntrpSign = ntrpDelta >= 0 ? '+' : '';
                 var fanSign = fanDelta >= 0 ? '+' : '';
                 var lines = [
-                    'NTRP ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' + 
+                    'Сила ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' + 
                     (d.points || 0).toFixed(1) + ' (' + fanSign + fanDelta.toFixed(1) + ')'
                 ];
                 if (d.match_opponent) lines.push('Матч: vs ' + d.match_opponent + ' — ' + (d.match_score || ''));
@@ -713,7 +729,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
             return 'rgba(128, 128, 128, 0.6)';
         });
         
-        var chartOpts = buildChartOptions('Очков FAN', '');
+        var chartOpts = buildChartOptions('Рейтинг', '');
         chartOpts.datasets = chartOpts.datasets || {};
         chartOpts.datasets.bar = { barPercentage: 0.6, categoryPercentage: 0.7 };
         chartOpts.plugins.tooltip = {
@@ -730,7 +746,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                     var ntrpSign = ntrpDelta >= 0 ? '+' : '';
                     var fanSign = fanDelta >= 0 ? '+' : '';
                     var lines = [
-                        'NTRP ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' + 
+                        'Сила ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' + 
                         (d.points || 0).toFixed(1) + ' (' + fanSign + fanDelta.toFixed(1) + ')'
                     ];
                     if (d.match_opponent) lines.push('Матч: vs ' + d.match_opponent + ' — ' + (d.match_score || ''));

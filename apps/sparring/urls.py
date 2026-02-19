@@ -19,4 +19,41 @@ urlpatterns = [
         views.sparring_confirm_response,
         name="sparring_confirm_response",
     ),
+    # Парный спарринг 2×2
+    path("doubles/", views.doubles_list, name="doubles_list"),
+    path("doubles/my/", views.doubles_my_requests, name="doubles_my_requests"),
+    path("doubles/create/", views.doubles_create, name="doubles_create"),
+    path("doubles/<int:pk>/", views.doubles_detail, name="doubles_detail"),
+    path("doubles/<int:pk>/join/", views.doubles_join, name="doubles_join"),
+    path(
+        "doubles/<int:pk>/add-partner/",
+        views.doubles_add_partner,
+        name="doubles_add_partner",
+    ),
+    path(
+        "doubles/<int:pk>/remove-member/",
+        views.doubles_remove_member,
+        name="doubles_remove_member",
+    ),
+    path("doubles/<int:pk>/confirm/", views.doubles_confirm, name="doubles_confirm"),
+    path(
+        "doubles/<int:pk>/cancel/",
+        views.doubles_cancel_request,
+        name="doubles_cancel_request",
+    ),
+    path(
+        "doubles/<int:pk>/join/<int:join_request_id>/accept/",
+        views.doubles_accept_join,
+        name="doubles_accept_join",
+    ),
+    path(
+        "doubles/<int:pk>/join/<int:join_request_id>/reject/",
+        views.doubles_reject_join,
+        name="doubles_reject_join",
+    ),
+    path(
+        "doubles/join/<int:join_request_id>/cancel/",
+        views.doubles_cancel_join,
+        name="doubles_cancel_join",
+    ),
 ]

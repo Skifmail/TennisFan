@@ -1,6 +1,6 @@
 """
 Команда для полной очистки БД от всех турниров, матчей, результатов и уведомлений.
-Обновляет FAN очки существующих игроков на основе их текущего NTRP уровня.
+Обновляет рейтинг существующих игроков на основе их текущего уровня силы.
 """
 
 import logging
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     help = (
-        "Очистить БД от всех турниров, матчей, результатов и обновить FAN очки игроков"
+        "Очистить БД от всех турниров, матчей, результатов и обновить рейтинг игроков"
     )
 
     def add_arguments(self, parser):
@@ -173,7 +173,7 @@ class Command(BaseCommand):
                 f"   Удалено откликов на спарринг: {sparring_responses_deleted}"
             )
 
-            # 14. Обновляем статистику игроков и FAN очки
+            # 14. Обновляем статистику игроков и рейтинг
             self.stdout.write("\n" + "=" * 60)
             self.stdout.write("ОБНОВЛЕНИЕ ИГРОКОВ...")
             self.stdout.write("=" * 60)
@@ -184,18 +184,18 @@ class Command(BaseCommand):
 
             for player in players:
                 try:
-                    # Получаем текущий NTRP уровень
+                    # Получаем текущий уровень силы
                     ntrp_level = player.ntrp_level
                     if not ntrp_level or ntrp_level == 0:
                         self.stdout.write(
                             self.style.WARNING(
-                                f"   Пропущен игрок {player.pk} ({player}): нет NTRP уровня"
+                                f"   Пропущен игрок {player.pk} ({player}): нет уровня силы"
                             )
                         )
                         skipped_count += 1
                         continue
 
-                    # Вычисляем новые FAN очки на основе NTRP
+                    # Вычисляем новый рейтинг на основе уровня силы
                     if isinstance(ntrp_level, (int, float)):
                         ntrp_decimal = Decimal(str(ntrp_level))
                     else:

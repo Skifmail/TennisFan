@@ -34,11 +34,7 @@
         {% for player in players %}
         <a href="{% url 'profile' pk=player.pk %}" class="player-card">
             <span class="player-rank">{{ forloop.counter }}</span>
-            {% if player.avatar %}
-            <img src="{{ player.avatar.url }}" alt="" class="player-avatar">
-            {% else %}
-            <div class="player-avatar"></div>
-            {% endif %}
+            {% include 'includes/avatar.html' with avatar=player.avatar %}
             <div class="player-info">
                 <div class="player-name-block">
                     <span class="player-name">{{ player }}</span>
@@ -50,14 +46,8 @@
                 </div>
             </div>
             <div class="player-stats">
-                <div>
-                    <div class="stat-label">NTRP</div>
-                    <div class="stat-value">{{ player.ntrp_level }}</div>
-                </div>
-                <div>
-                    <div class="stat-label">Очки FAN</div>
-                    <div class="stat-value">{{ player.total_points|floatformat:1 }}</div>
-                </div>
+                {% include 'includes/rating_stat_value.html' with player=player stat_type='ntrp' value=player.ntrp_level %}
+                {% include 'includes/rating_stat_value.html' with player=player stat_type='fan' value=player.total_points|floatformat:1 %}
                 <div>
                     <div class="stat-label">Матчей</div>
                     <div class="stat-value">{{ player.matches_played }}</div>

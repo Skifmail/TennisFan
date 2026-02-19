@@ -6,13 +6,13 @@
     {% if is_side1 %}
         {% with fan_delta=match.rating_delta_player1|default:0 %}
             <span class="match-fan-delta match-fan-delta--{% if fan_delta > 0 %}up{% elif fan_delta < 0 %}down{% else %}neutral{% endif %}">
-                {% if fan_delta > 0 %}+{% endif %}{{ fan_delta|floatformat:1 }} FAN
+                {% if fan_delta > 0 %}+{% endif %}{{ fan_delta|floatformat:1 }}
             </span>
         {% endwith %}
     {% else %}
         {% with fan_delta=match.rating_delta_player2|default:0 %}
             <span class="match-fan-delta match-fan-delta--{% if fan_delta > 0 %}up{% elif fan_delta < 0 %}down{% else %}neutral{% endif %}">
-                {% if fan_delta > 0 %}+{% endif %}{{ fan_delta|floatformat:1 }} FAN
+                {% if fan_delta > 0 %}+{% endif %}{{ fan_delta|floatformat:1 }}
             </span>
         {% endwith %}
     {% endif %}

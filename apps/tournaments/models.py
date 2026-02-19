@@ -362,6 +362,7 @@ class Match(models.Model):
     """Match between two players."""
 
     class MatchStatus(models.TextChoices):
+        PENDING = "pending", "Ожидает участников"
         SCHEDULED = "scheduled", "Запланирован"
         IN_PROGRESS = "in_progress", "В процессе"
         COMPLETED = "completed", "Завершён"
@@ -485,6 +486,24 @@ class Match(models.Model):
         blank=True,
         help_text="Для одиночных: игрок 2. Для парных: первый игрок команды 2 (player1 из team2).",
     )
+    partner1 = models.ForeignKey(
+        Player,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="matches_as_partner1",
+        verbose_name="Партнёр стороны 1",
+        help_text="Для парного спарринга: второй игрок команды 1.",
+    )
+    partner2 = models.ForeignKey(
+        Player,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="matches_as_partner2",
+        verbose_name="Партнёр стороны 2",
+        help_text="Для парного спарринга: второй игрок команды 2.",
+    )
     team1 = models.ForeignKey(
         TournamentTeam,
         on_delete=models.CASCADE,
@@ -582,6 +601,37 @@ class Match(models.Model):
         """Проверка, является ли матч спаррингом (личной встречей)."""
         return bool(self.match_type == self.MatchType.SPARRING)
 
+    def is_friendly_sparring(self) -> bool:
+        """Проверка, является ли матч дружеским спаррингом (результат не влияет на рейтинг)."""
+        if not self.is_sparring():
+            return False
+        try:
+            if self.sparring_response_id:
+                request = self.sparring_response.sparring_request
+                return bool(getattr(request, "is_friendly", False))
+            rel = getattr(self, "doubles_match_request", None)
+            if rel is not None:
+                req = rel.first() if hasattr(rel, "first") else rel
+                if req is not None:
+                    return bool(getattr(req, "is_friendly", False))
+        except Exception:
+            pass
+        return False
+
+    def is_doubles_sparring(self) -> bool:
+        """Проверка, создан ли матч из заявки на парный спарринг (2×2)."""
+        if not self.is_sparring():
+            return False
+        if self.partner1_id and self.partner2_id:
+            return True
+        if not self.sparring_response_id:
+            return False
+        try:
+            request = self.sparring_response.sparring_request
+            return getattr(request, "match_type", None) == "doubles"
+        except Exception:
+            return False
+
     def is_tournament_match(self) -> bool:
         """Проверка, является ли матч турнирным."""
         return (
@@ -593,12 +643,16 @@ class Match(models.Model):
         """Отображаемое имя стороны 1 (игрок или команда)."""
         if self.team1:
             return str(self.team1)
+        if self.partner1 and self.player1:
+            return f"{self.player1} / {self.partner1}"
         return str(self.player1) if self.player1 else "—"
 
     def get_player2_display(self) -> str:
         """Отображаемое имя стороны 2 (игрок или команда)."""
         if self.team2:
             return str(self.team2)
+        if self.partner2 and self.player2:
+            return f"{self.player2} / {self.partner2}"
         return str(self.player2) if self.player2 else "—"
 
     def get_side1_player(self):

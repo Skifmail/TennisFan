@@ -6,12 +6,14 @@ import json
 import logging
 import re
 import secrets
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.utils.html import linebreaks
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_safe
@@ -26,12 +28,80 @@ from apps.tournaments.models import (
     TournamentStatus,
 )
 from apps.users.models import Player, SkillLevel
+from apps.users.rating_utils import rating_to_ntrp_level
 
 from . import telegram_support as tg_support
 from .forms import FeedbackForm
 from .models import SupportMessage, UserTelegramLink
 
 logger = logging.getLogger(__name__)
+
+
+def _build_recent_matches(limit: int = 10, days: int = 5):
+    """Последние завершённые матчи за N дней для виджета на главной."""
+    since = timezone.now() - timedelta(days=days)
+    matches = (
+        Match.objects.filter(
+            status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER],
+            completed_datetime__gte=since,
+        )
+        .select_related(
+            "player1__user",
+            "player2__user",
+            "winner__user",
+            "team1__player1__user",
+            "team2__player1__user",
+        )
+        .order_by("-completed_datetime", "-pk")[:limit]
+    )
+    result = []
+    for m in matches:
+        p1 = m.get_side1_player()
+        p2 = m.get_side2_player()
+        if not p1 or not p2:
+            continue
+        if getattr(p1, "is_bye", False) or getattr(p2, "is_bye", False):
+            continue
+        delta1 = m.rating_delta_player1 or 0.0
+        delta2 = m.rating_delta_player2 or 0.0
+        r1_after = float(p1.total_points)
+        r2_after = float(p2.total_points)
+        r1_before = r1_after - delta1
+        r2_before = r2_after - delta2
+        n1_after = float(p1.ntrp_level or 0)
+        n2_after = float(p2.ntrp_level or 0)
+        n1_before = float(rating_to_ntrp_level(r1_before))
+        n2_before = float(rating_to_ntrp_level(r2_before))
+        n1_delta = round(n1_after - n1_before, 1)
+        n2_delta = round(n2_after - n2_before, 1)
+        avatar1 = p1.avatar.url if (hasattr(p1, "avatar") and p1.avatar) else None
+        avatar2 = p2.avatar.url if (hasattr(p2, "avatar") and p2.avatar) else None
+        result.append(
+            {
+                "id": m.pk,
+                "player1": m.get_player1_display(),
+                "player2": m.get_player2_display(),
+                "p1_avatar": avatar1,
+                "p2_avatar": avatar2,
+                "score": m.score_display,
+                "score_column": (m.score_display or "—").replace(" ", "\n"),
+                "p1_ntrp": n1_after,
+                "p1_ntrp_delta": n1_delta,
+                "p1_rating": r1_after,
+                "p1_rating_delta": round(delta1, 1),
+                "p2_ntrp": n2_after,
+                "p2_ntrp_delta": n2_delta,
+                "p2_rating": r2_after,
+                "p2_rating_delta": round(delta2, 1),
+                "date": (
+                    m.completed_datetime.strftime("%d.%m.%Y")
+                    if m.completed_datetime
+                    else ""
+                ),
+                "match_url": f"/tournaments/match/{m.pk}/",
+            }
+        )
+    return result
 
 
 def home(request):
@@ -89,11 +159,37 @@ def home(request):
         .order_by("-season_pts", "-total_points")[:10]
     )
 
+    recent_matches = _build_recent_matches(limit=10, days=5)
+
+    # Метрики для Hero-блока
+    def format_number(num):
+        """Форматирует число с пробелами для тысяч."""
+        return f"{num:,}".replace(",", " ")
+
+    hero_stats = {
+        "players_count": format_number(
+            Player.objects.filter(is_bye=False, is_verified=True).count()
+        ),
+        "tournaments_count": format_number(
+            Tournament.objects.filter(
+                status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE]
+            ).count()
+        ),
+        "matches_count": format_number(
+            Match.objects.filter(
+                status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
+            ).count()
+        ),
+    }
+
     context = {
         "filtered_tournaments": tournaments,
         "upcoming_tournaments": upcoming_tournaments,
         "top_players": top_players,
+        "recent_matches": recent_matches,
+        "recent_matches_json": json.dumps(recent_matches, default=str),
         "latest_news": News.objects.filter(is_published=True)[:4],
+        "hero_stats": hero_stats,
         "current_filters": {
             "city": city,
             "category": category,
@@ -105,6 +201,13 @@ def home(request):
         "duration_choices": TournamentDuration.choices,
     }
     return render(request, "core/home.html", context)
+
+
+@require_safe
+def api_recent_matches(request):
+    """API: последние матчи за 5 дней для live-тикера."""
+    matches = _build_recent_matches(limit=10, days=5)
+    return JsonResponse({"matches": matches})
 
 
 def rating(request):

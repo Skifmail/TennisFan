@@ -3447,6 +3447,10 @@ select.form-control {
     padding: var(--spacing-3xl) 0;
 }
 
+.section-tournaments-spaced {
+    padding-top: var(--spacing-3xl);
+}
+
 .section-header {
     display: flex;
     justify-content: space-between;
@@ -3468,6 +3472,10 @@ select.form-control {
 @media (width <= 768px) {
     .section {
         padding: var(--spacing-xl) 0;
+    }
+
+    .section-tournaments-spaced {
+        padding-top: calc(var(--spacing-xl) * 2);
     }
 
     .section-header {
@@ -4532,19 +4540,47 @@ select.form-control {
     position: relative;
     background: transparent;
     overflow: hidden;
+    display: block;
 }
 
 .hero.hero--premium::before {
     display: none;
 }
 
+/* Diagonal Grid: hero(r1,c1) + results(r1,c2 align-end) + video(r2,c1) */
+.hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    column-gap: var(--spacing-xl);
+    row-gap: 0;
+}
+
+.hero-grid .hero-content--premium {
+    grid-row: 1;
+    grid-column: 1;
+    align-self: start;
+    margin-top: 0;
+}
+
+.hero-grid .live-results {
+    grid-row: 1;
+    grid-column: 2;
+    align-self: end;
+    width: auto;
+    max-width: none;
+    margin: 0;
+}
+
+.hero-grid .hero-video-wrapper {
+    grid-row: 2;
+    grid-column: 1;
+}
+
 .hero-content--premium {
     position: relative;
     z-index: 1;
-    max-width: 900px;
-    margin: 0 auto;
     text-align: center;
-    padding: 0 var(--spacing-md);
 }
 
 .hero-title--premium {
@@ -4616,16 +4652,71 @@ select.form-control {
     color: #fff;
 }
 
+/* Hero Video */
+.hero-video-wrapper {
+    width: 100%;
+    margin-top: var(--spacing-xl);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    background: #000;
+}
+
+.hero-video {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+}
+
+/* Hero Grid - мобильная адаптация */
+@media (width <= 900px) {
+    .hero-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+        row-gap: var(--spacing-lg);
+    }
+
+    .hero-grid .hero-content--premium {
+        grid-row: auto;
+        grid-column: 1;
+    }
+
+    .hero-grid .live-results {
+        grid-row: auto;
+        grid-column: 1;
+        align-self: auto;
+    }
+
+    .hero-grid .hero-video-wrapper {
+        grid-row: auto;
+        grid-column: 1;
+    }
+
+    .hero-video-wrapper {
+        margin-top: 0;
+        border-radius: var(--radius-md);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+}
+
+@media (width <= 768px) {
+    .hero-video-wrapper {
+        border-radius: var(--radius-sm);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+}
+
 /* Метрики Hero */
 .hero-metrics--premium {
     display: flex;
     justify-content: center;
     align-items: center;
     gap: var(--spacing-lg);
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     padding-top: var(--spacing-xl);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    margin-bottom: var(--spacing-2xl);
+    margin-bottom: var(--spacing-lg);
 }
 
 .hero-metric {
@@ -4633,6 +4724,7 @@ select.form-control {
     flex-direction: column;
     align-items: center;
     gap: var(--spacing-xs);
+    flex: 1;
 }
 
 .hero-metric__value {
@@ -4711,7 +4803,6 @@ select.form-control {
     width: 100%;
     max-width: 1380px;
     margin: 0 auto;
-    margin-right: 24px;
     padding: var(--spacing-lg) var(--spacing-md);
     background: rgb(255 255 255 / 6%);
     backdrop-filter: blur(16px) saturate(120%);
@@ -4889,8 +4980,7 @@ select.form-control {
     .live-results {
         width: auto;
         max-width: none;
-        margin-left: var(--spacing-md);
-        margin-right: var(--spacing-md);
+        margin: 0;
         padding: var(--spacing-md);
     }
 
@@ -4910,8 +5000,7 @@ select.form-control {
         width: auto;
         max-width: none;
         padding: var(--spacing-md);
-        margin-left: var(--spacing-md);
-        margin-right: var(--spacing-md);
+        margin: 0;
         box-sizing: border-box;
     }
 }
@@ -4921,14 +5010,8 @@ select.form-control {
     .live-results {
         width: auto;
         max-width: none;
-        margin-left: var(--spacing-md);
-        margin-right: var(--spacing-md);
+        margin: 0;
         padding: var(--spacing-md);
-    }
-    
-    .live-results .container {
-        padding: 0;
-        max-width: 100%;
     }
 
     .live-results__row {
@@ -4964,13 +5047,7 @@ select.form-control {
         width: auto;
         max-width: none;
         padding: var(--spacing-sm);
-        margin-left: var(--spacing-md);
-        margin-right: var(--spacing-md);
-    }
-    
-    .live-results .container {
-        padding: 0;
-        max-width: 100%;
+        margin: 0;
     }
 
     .live-results__row {

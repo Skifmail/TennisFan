@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}TennisFan{% endblock %} - Любительские турниры по теннису</title>
+    <title>{% block title %}TennisFan{% endblock %} - Всероссийская теннисная платформа для игроков всех уровней</title>
     <meta name="description"
         content="{% block meta_description %}TennisFan - платформа любительских теннисных турниров по всей России. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
 
@@ -34,6 +34,7 @@
                 <a href="{% url 'home' %}" class="logo">
                     <span class="logo-text">Tennis<span class="logo-accent">Fan</span></span>
                     <img src="{% static 'images/logo.svg' %}" class="coin-logo" alt="TennisFan логотип">
+                    <span class="logo-text logo-text-ru">Теннис<span class="logo-accent">Фан</span></span>
                 </a>
 
                 <!-- Desktop Navigation Links (управляются в админке: Навигация → Пункты меню) -->
@@ -121,7 +122,7 @@
                             Tennis<span class="footer-brand-accent">Fan</span>
                         </a>
                     </h3>
-                    <p class="footer-desc">Платформа любительских теннисных турниров по всей России</p>
+                    <p class="footer-desc">Всероссийская теннисная платформа для игроков всех уровней</p>
                     {% if not user.is_authenticated %}
                     <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2">Пройти тест уровня силы</a>
                     {% endif %}
@@ -154,7 +155,7 @@
                 </div>
 
                 <div class="footer-social">
-                    <h4>Связаться</h4>
+                    <h4>Наши соцсети</h4>
                     <div class="social-links">
                         <a href="#" class="social-link" aria-label="Telegram">
                             <svg viewBox="0 0 24 24" fill="currentColor">

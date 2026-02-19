@@ -19,6 +19,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_safe
 
 from apps.content.models import News, RulesSection
+from apps.courts.models import Court
 from apps.tournaments.models import (
     Match,
     SeasonArchive,
@@ -27,6 +28,7 @@ from apps.tournaments.models import (
     TournamentGender,
     TournamentStatus,
 )
+from apps.training.models import Coach
 from apps.users.models import Player, SkillLevel
 from apps.users.rating_utils import rating_to_ntrp_level
 
@@ -180,6 +182,11 @@ def home(request):
                 status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
             ).count()
         ),
+        "courts_count": format_number(Court.objects.count()),
+        "cities_count": format_number(
+            Player.objects.exclude(city="").values("city").distinct().count()
+        ),
+        "coaches_count": format_number(Coach.objects.count()),
     }
 
     context = {

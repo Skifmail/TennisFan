@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
     "django_crontab",
+    "storages",
     # Local apps
     "apps.core",
     "apps.users",
@@ -187,9 +188,11 @@ if os.environ.get("USE_S3", "False") == "True":
     AWS_S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL")
     AWS_S3_REGION_NAME = os.environ.get("S3_REGION", "ru-1")
 
-    AWS_DEFAULT_ACL = None
+    AWS_DEFAULT_ACL = "public-read"
     AWS_S3_FILE_OVERWRITE = False
     AWS_QUERYSTRING_AUTH = False
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_S3_ADDRESSING_STYLE = "path"
 
     MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
 

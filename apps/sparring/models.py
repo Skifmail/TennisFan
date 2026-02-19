@@ -220,6 +220,34 @@ class DoublesMatchRequest(models.Model):
     is_friendly = models.BooleanField("Дружеский матч", default=False)
     description = models.TextField("Описание", blank=True)
 
+    preferred_days = models.CharField(
+        "Предпочтительные дни", max_length=100, blank=True
+    )
+    preferred_time = models.CharField(
+        "Предпочтительное время", max_length=100, blank=True
+    )
+    desired_level = models.CharField(
+        "Желаемый уровень партнёров",
+        max_length=20,
+        choices=SkillLevel.choices,
+        blank=True,
+    )
+    desired_age_min = models.PositiveIntegerField(
+        "Минимальный возраст партнёров",
+        null=True,
+        blank=True,
+    )
+    desired_age_max = models.PositiveIntegerField(
+        "Максимальный возраст партнёров",
+        null=True,
+        blank=True,
+    )
+    preferred_location = models.CharField(
+        "Предпочтительное место",
+        max_length=200,
+        blank=True,
+    )
+
     created_at = models.DateTimeField("Создано", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
     confirmed_at = models.DateTimeField("Подтверждено", null=True, blank=True)

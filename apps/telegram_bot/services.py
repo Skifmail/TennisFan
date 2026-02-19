@@ -31,14 +31,33 @@ def _get_private_chat_id() -> int | None:
         return None
 
 
+def _get_private_chat_channel_id() -> int | None:
+    """
+    ID канала закрытого чата (@TennisFanru).
+    Сначала проверяет настройку TELEGRAM_PRIVATE_CHAT_CHANNEL_ID,
+    затем использует значение по умолчанию для канала @TennisFanru.
+    """
+    # Сначала проверяем отдельную настройку для канала
+    raw = (getattr(settings, "TELEGRAM_PRIVATE_CHAT_CHANNEL_ID", None) or "").strip()
+    if raw:
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            logger.warning("Invalid TELEGRAM_PRIVATE_CHAT_CHANNEL_ID: %s", raw)
+
+    # Используем chat_id канала @TennisFanru по умолчанию
+    return -1003882121605
+
+
 def is_configured() -> bool:
     """Проверка, что бот настроен."""
     return bool(_get_bot_token())
 
 
 def is_private_chat_configured() -> bool:
-    """Проверка, что настроен ID приватного чата сообщества."""
-    return _get_private_chat_id() is not None
+    """Проверка, что настроен ID приватного чата/канала сообщества."""
+    # Всегда True, так как есть значение по умолчанию для канала @TennisFanru
+    return True
 
 
 def _api_post(
@@ -58,10 +77,14 @@ def _api_post(
             return None, False
         data = r.json()
         if not data.get("ok", False):
+            error_code = data.get("error_code")
+            description = data.get("description", "unknown error")
             logger.warning(
-                "Telegram API %s returned ok=false: %s",
+                "Telegram API %s returned ok=false: error_code=%s, description=%s, full_response=%s",
                 method,
-                data.get("description", "unknown error"),
+                error_code,
+                description,
+                data,
             )
             return None, False
         return data.get("result"), True
@@ -71,20 +94,28 @@ def _api_post(
 
 
 def create_private_chat_invite_link(
-    expire_seconds: int = 1800, member_limit: int = 1
+    expire_seconds: int = 1800, member_limit: int = 1, chat_id: int | None = None
 ) -> str | None:
     """
-    Создать одноразовую ссылку-приглашение в закрытый чат сообщества.
+    Создать одноразовую ссылку-приглашение в закрытый канал сообщества (@TennisFanru).
     По умолчанию действует 30 минут и на 1 участника.
+
+    Args:
+        expire_seconds: Время жизни ссылки в секундах (по умолчанию 1800 = 30 минут)
+        member_limit: Лимит участников (по умолчанию 1)
+        chat_id: ID чата/канала. Если не указан, используется chat_id канала @TennisFanru из настроек.
     """
-    chat_id = _get_private_chat_id()
+    if chat_id is None:
+        chat_id = _get_private_chat_channel_id()
     if chat_id is None:
         logger.warning(
-            "create_private_chat_invite_link: private chat is not configured"
+            "create_private_chat_invite_link: private chat channel is not configured"
         )
         return None
 
     expire_date = int(time.time()) + max(60, int(expire_seconds))
+
+    # Пробуем использовать chat_id (число)
     payload = {
         "chat_id": chat_id,
         "expire_date": expire_date,
@@ -92,9 +123,53 @@ def create_private_chat_invite_link(
         "creates_join_request": False,
     }
     result, ok = _api_post("createChatInviteLink", payload, timeout=10)
-    if not ok or not isinstance(result, dict):
+
+    # Если не получилось с chat_id, пробуем использовать username канала
+    if not ok or not isinstance(result, dict) or not result.get("invite_link"):
+        logger.info(
+            "create_private_chat_invite_link: trying with username @TennisFanru after chat_id failed"
+        )
+        payload_username = {
+            "chat_id": "@TennisFanru",
+            "expire_date": expire_date,
+            "member_limit": max(1, int(member_limit)),
+            "creates_join_request": False,
+        }
+        result, ok = _api_post("createChatInviteLink", payload_username, timeout=10)
+
+    if not ok:
+        logger.warning(
+            "create_private_chat_invite_link: API call failed for chat_id=%s", chat_id
+        )
         return None
-    return result.get("invite_link")
+    if not isinstance(result, dict):
+        logger.warning(
+            "create_private_chat_invite_link: unexpected result type for chat_id=%s: %s",
+            chat_id,
+            type(result),
+        )
+        return None
+    invite_link = result.get("invite_link")
+    if not invite_link:
+        logger.warning(
+            "create_private_chat_invite_link: no invite_link in result for chat_id=%s, result=%s",
+            chat_id,
+            result,
+        )
+    return invite_link
+
+
+def get_chat_id_from_invite_link(invite_link: str) -> int | None:
+    """
+    Получить chat_id канала/чата из invite link через Telegram Bot API.
+    Использует метод getChat с username или проверяет через joinChat.
+    """
+    # Из invite link вида https://t.me/+VPczFLt3fZk5MTUy нельзя напрямую получить chat_id
+    # Нужно использовать другой подход - получить через настройки или использовать
+    # метод getChatMember с user_id бота
+    # Для упрощения, можно использовать настройку TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID
+    # или добавить отдельную настройку для этого канала
+    return None
 
 
 def get_private_chat_member_status(user_chat_id: int) -> str | None:

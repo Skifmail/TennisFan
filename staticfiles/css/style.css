@@ -3875,9 +3875,11 @@ select.form-control {
     color: var(--color-bg);
 }
 
-.social-link svg {
+.social-link svg,
+.social-link img {
     width: 20px;
     height: 20px;
+    object-fit: contain;
 }
 
 .footer-donate,
@@ -4577,6 +4579,53 @@ select.form-control {
     grid-column: 1;
 }
 
+.hero-grid .hero-subscription {
+    grid-row: 2;
+    grid-column: 2;
+    align-self: end;
+}
+
+.hero-subscription {
+    
+    border: 1px solid var(--primary-gold);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-lg);
+    backdrop-filter: blur(8px);
+}
+
+.hero-subscription__title {
+    color: var(--primary-gold);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 var(--spacing-md) 0;
+}
+
+.hero-subscription__list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--spacing-lg) 0;
+}
+
+.hero-subscription__item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--text-light);
+    font-size: 0.95rem;
+    padding: var(--spacing-xs) 0;
+}
+
+.hero-subscription__icon {
+    color: var(--primary-gold);
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.hero-subscription__btn {
+    width: 100%;
+    text-align: center;
+}
+
 .hero-content--premium {
     position: relative;
     z-index: 1;
@@ -4691,6 +4740,12 @@ select.form-control {
     .hero-grid .hero-video-wrapper {
         grid-row: auto;
         grid-column: 1;
+    }
+
+    .hero-grid .hero-subscription {
+        grid-row: auto;
+        grid-column: 1;
+        align-self: auto;
     }
 
     .hero-video-wrapper {
@@ -6736,6 +6791,44 @@ select.form-control {
 /* ==========================================================================
    Sparring
    ========================================================================== */
+
+.sparring-tabs {
+    display: flex;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    background: var(--color-bg-elevated);
+    border-radius: var(--border-radius-lg);
+    width: fit-content;
+}
+
+.sparring-tab {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    background: transparent;
+    border-radius: var(--border-radius-md);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.sparring-tab:hover {
+    color: var(--color-text-primary);
+    background: var(--color-bg-surface);
+}
+
+.sparring-tab--active {
+    color: var(--color-primary);
+    background: var(--color-bg-surface);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+}
+
+.sparring-tab--active:hover {
+    color: var(--color-primary);
+}
+
 .sparring-toolbar {
     align-items: center;
     justify-content: space-between;

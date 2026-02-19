@@ -3,6 +3,7 @@ Sparring app URLs.
 """
 
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import views
 
@@ -19,10 +20,23 @@ urlpatterns = [
         views.sparring_confirm_response,
         name="sparring_confirm_response",
     ),
-    # Парный спарринг 2×2
-    path("doubles/", views.doubles_list, name="doubles_list"),
-    path("doubles/my/", views.doubles_my_requests, name="doubles_my_requests"),
-    path("doubles/create/", views.doubles_create, name="doubles_create"),
+    # Парный спарринг 2×2 — редиректы на объединённые страницы
+    path(
+        "doubles/",
+        RedirectView.as_view(url="/sparring/?type=doubles", permanent=False),
+        name="doubles_list",
+    ),
+    path(
+        "doubles/my/",
+        RedirectView.as_view(url="/sparring/my/?type=doubles", permanent=False),
+        name="doubles_my_requests",
+    ),
+    path(
+        "doubles/create/",
+        RedirectView.as_view(url="/sparring/create/?type=doubles", permanent=False),
+        name="doubles_create",
+    ),
+    # Doubles detail и действия остаются (для работы с существующими заявками)
     path("doubles/<int:pk>/", views.doubles_detail, name="doubles_detail"),
     path("doubles/<int:pk>/join/", views.doubles_join, name="doubles_join"),
     path(

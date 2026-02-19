@@ -1643,12 +1643,12 @@ def _handle_menu_callback_action(
 
         if not bot.is_private_chat_configured():
             text = (
-                "⚙️ <b>Закрытый чат сообщества</b>\n\n"
-                "Чат пока настраивается администратором. Попробуйте немного позже."
+                "⚙️ <b>Закрытый канал сообщества</b>\n\n"
+                "Канал пока настраивается администратором. Попробуйте немного позже."
             )
         elif not has_access:
             text = (
-                "💬 <b>Закрытый чат сообщества</b>\n\n"
+                "💬 <b>Закрытый канал сообщества</b>\n\n"
                 "🔒 Доступ сейчас недоступен.\n"
                 f"Причина: {reason}\n\n"
                 "Оформите/продлите подписку с доступом к сообществу, и бот сразу даст ссылку."
@@ -1661,29 +1661,33 @@ def _handle_menu_callback_action(
                     ]
                 }
         else:
+            # Используем chat_id канала для создания одноразовой ссылки
+            from apps.telegram_bot.services import _get_private_chat_channel_id
+
+            channel_chat_id = _get_private_chat_channel_id()
             invite_link = bot.create_private_chat_invite_link(
-                expire_seconds=1800, member_limit=1
+                expire_seconds=1800, member_limit=1, chat_id=channel_chat_id
             )
             if invite_link:
                 text = (
-                    "💬 <b>Закрытый чат сообщества</b>\n\n"
+                    "💬 <b>Закрытый канал сообщества</b>\n\n"
                     "✅ Доступ подтверждён.\n"
-                    "Ниже ваша персональная ссылка для входа в чат.\n\n"
+                    "Ниже ваша персональная ссылка для входа в канал @TennisFanru.\n\n"
                     "⚠️ Ссылка одноразовая и действует 30 минут."
                 )
                 reply_markup = {
                     "inline_keyboard": [
-                        [{"text": "➡️ Войти в закрытый чат", "url": invite_link}]
+                        [{"text": "➡️ Войти в закрытый канал", "url": invite_link}]
                     ]
                 }
             else:
                 text = (
-                    "⚠️ <b>Не удалось создать приглашение в чат</b>\n\n"
+                    "⚠️ <b>Не удалось создать приглашение в канал</b>\n\n"
                     "Попробуйте ещё раз через минуту. Если ошибка повторяется, обратитесь в поддержку."
                 )
 
         ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
-        _answer("Закрытый чат" if ok else "Ошибка отправки")
+        _answer("Закрытый канал" if ok else "Ошибка отправки")
         if not ok:
             logger.warning(
                 "menu_private_chat: send_message failed for chat_id=%s", chat_id

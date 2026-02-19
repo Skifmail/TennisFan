@@ -5,9 +5,9 @@
 {% block content %}
 <div class="container">
     <div class="mb-4">
-        <a href="{% url 'doubles_list' %}" class="text-secondary">← Все заявки 2×2</a>
+        <a href="{% url 'sparring_list' %}?type=doubles" class="text-secondary">← Все заявки 2×2</a>
         {% if is_author %}
-        · <a href="{% url 'doubles_my_requests' %}" class="text-secondary">Мои заявки</a>
+        · <a href="{% url 'sparring_my_requests' %}?type=doubles" class="text-secondary">Мои заявки</a>
         {% endif %}
     </div>
 
@@ -18,10 +18,47 @@
                 {% if doubles_request.is_friendly %}
                 <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
                 {% endif %}
-                <span class="text-muted" style="font-size: var(--font-size-sm);">{{ doubles_request.city|default:"" }}</span>
+                {% if doubles_request.desired_level %}
+                <span class="sparring-flag sparring-flag--gender">{{ doubles_request.get_desired_level_display }}</span>
+                {% endif %}
             </div>
 
-            <p class="text-secondary mb-3">{{ doubles_request.description|default:"" }}</p>
+            <div class="d-flex gap-1 mb-2 flex-wrap">
+                {% if doubles_request.city %}
+                <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ doubles_request.city }}</span>
+                {% endif %}
+                {% if doubles_request.preferred_gender %}
+                <span class="player-category">{{ doubles_request.get_preferred_gender_display }}</span>
+                {% endif %}
+            </div>
+
+            {% if doubles_request.description %}
+            <p class="text-secondary mb-3">{{ doubles_request.description }}</p>
+            {% endif %}
+
+            <div class="mb-3" style="font-size: var(--font-size-sm); color: var(--color-text-muted);">
+                {% if doubles_request.preferred_days or doubles_request.preferred_time %}
+                <p class="mb-1">
+                    🗓️ {% if doubles_request.preferred_days %}{{ doubles_request.preferred_days }}{% endif %}
+                    {% if doubles_request.preferred_time %} • {{ doubles_request.preferred_time }}{% endif %}
+                </p>
+                {% endif %}
+                {% if doubles_request.preferred_location %}
+                <p class="mb-1">📍 {{ doubles_request.preferred_location }}</p>
+                {% endif %}
+                {% if doubles_request.desired_age_min or doubles_request.desired_age_max %}
+                <p class="mb-1">
+                    👤 Возраст партнёров:
+                    {% if doubles_request.desired_age_min and doubles_request.desired_age_max %}
+                        {{ doubles_request.desired_age_min }}-{{ doubles_request.desired_age_max }} лет
+                    {% elif doubles_request.desired_age_min %}
+                        от {{ doubles_request.desired_age_min }} лет
+                    {% elif doubles_request.desired_age_max %}
+                        до {{ doubles_request.desired_age_max }} лет
+                    {% endif %}
+                </p>
+                {% endif %}
+            </div>
 
             <section class="mb-4">
                 <h4 class="text-muted" style="font-size: var(--font-size-sm); font-weight: 600;">Команда автора</h4>

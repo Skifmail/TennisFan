@@ -4,18 +4,19 @@ Sparring forms.
 
 from django import forms
 
-from apps.users.models import SkillLevel
+from apps.users.models import Player, SkillLevel
 
-from .models import SparringRequest
+from .models import SparringPreferredGender, SparringRequest
 
 
 class SparringRequestForm(forms.ModelForm):
-    """Form for creating/editing sparring request."""
+    """Форма создания/редактирования заявки на одиночный спарринг (1×1)."""
 
     class Meta:
         model = SparringRequest
         fields = (
             "city",
+            "preferred_gender",
             "desired_category",
             "description",
             "preferred_days",
@@ -23,11 +24,13 @@ class SparringRequestForm(forms.ModelForm):
             "desired_partner_age_min",
             "desired_partner_age_max",
             "preferred_location",
+            "is_friendly",
         )
         widgets = {
             "city": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Город"}
             ),
+            "preferred_gender": forms.Select(attrs={"class": "form-control"}),
             "desired_category": forms.Select(attrs={"class": "form-control"}),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
             "preferred_days": forms.TextInput(attrs={"class": "form-control"}),
@@ -44,6 +47,7 @@ class SparringRequestForm(forms.ModelForm):
                     "placeholder": "Название корта или района",
                 }
             ),
+            "is_friendly": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -67,3 +71,78 @@ class SparringRequestForm(forms.ModelForm):
             )
 
         return cleaned_data
+
+
+# ---------------------------------------------------------------------------
+# Парный спарринг 2×2
+# ---------------------------------------------------------------------------
+
+
+class DoublesMatchRequestForm(forms.Form):
+    """Форма создания заявки на парный матч 2×2."""
+
+    city = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Город"}),
+    )
+    preferred_gender = forms.ChoiceField(
+        label="Категория по полу",
+        choices=[("", "Любой (без ограничений)")]
+        + list(SparringPreferredGender.choices),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-control"}),
+        help_text="Любой — подходят любые составы. Смешанный — открытая категория. Микст — пары мужчина + женщина.",
+    )
+    is_friendly = forms.BooleanField(
+        required=False,
+        initial=False,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+    description = forms.CharField(
+        required=False,
+        widget=forms.Textarea(
+            attrs={"class": "form-control", "rows": 3, "placeholder": "Описание"}
+        ),
+    )
+
+
+class DoublesJoinRequestForm(forms.Form):
+    """Форма отклика на парный матч: в какую команду и с кем (один или пара)."""
+
+    TARGET_AUTHOR = "author"
+    TARGET_OPPONENT = "opponent"
+
+    target_side = forms.ChoiceField(
+        choices=[
+            (TARGET_OPPONENT, "Команда соперников (играть против автора)"),
+            (TARGET_AUTHOR, "В команду автора (играть вместе с автором)"),
+        ],
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    partner_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput,
+    )
+
+
+class DoublesAddPartnerForm(forms.Form):
+    """Добавить партнёра в команду автора (выбор игрока)."""
+
+    player_id = forms.ChoiceField(
+        label="Игрок",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
+    def __init__(self, *args, exclude_player_ids=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = (
+            Player.objects.filter(is_bye=False)
+            .select_related("user")
+            .order_by("user__last_name", "user__first_name")
+        )
+        if exclude_player_ids:
+            qs = qs.exclude(pk__in=exclude_player_ids)
+        self.fields["player_id"].choices = [("", "Выберите игрока")] + [
+            (str(p.pk), str(p)) for p in qs[:500]
+        ]

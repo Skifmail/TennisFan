@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Парный спарринг 2×2{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Парный спарринг 2×2</h1>
+    <p class="page-subtitle">Найдите пару или соперников для парной игры</p>
+</div>
+
+<div class="container">
+    <div class="d-flex flex-wrap gap-2 mb-4" style="align-items: center;">
+        <form method="get" class="d-flex gap-2">
+            <input name="city" class="form-control" placeholder="Город" value="{{ current_city }}" style="width: 180px;">
+            <button type="submit" class="btn btn-outline">Фильтр</button>
+        </form>
+        <a href="{% url 'sparring_list' %}" class="btn btn-ghost">← Обычный спарринг</a>
+        <a href="{% url 'doubles_my_requests' %}" class="btn btn-ghost">Мои заявки 2×2</a>
+        {% if has_sparring_access %}
+        <a href="{% url 'doubles_create' %}" class="btn btn-primary">Создать заявку 2×2</a>
+        {% else %}
+        <a href="{% url 'pricing' %}" class="btn btn-outline">Подписка для доступа</a>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-2">
+        {% for req in doubles_requests %}
+        <div class="card sparring-card">
+            <div class="card-body">
+                <div class="sparring-card__flags">
+                    <span class="sparring-flag sparring-flag--type">Парная 2×2</span>
+                    <span class="sparring-flag sparring-flag--gender">{{ req.get_status_display }}</span>
+                    {% if req.is_friendly %}
+                    <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
+                    {% endif %}
+                </div>
+                <p class="text-secondary mb-1" style="font-size: var(--font-size-sm);">
+                    <strong>{{ req.created_by }}</strong> · {{ req.city|default:"—" }}
+                </p>
+                {% if req.description %}
+                <p class="text-secondary sparring-card__desc">{{ req.description|truncatewords:20 }}</p>
+                {% endif %}
+                <div class="mt-2" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                    {% for team in req.teams.all %}{% if team.side == 'author' %}Команда: {% for tm in team.members.all %}{{ tm.player }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}{% endfor %}
+                </div>
+                <div class="sparring-card__actions mt-3">
+                    <a href="{% url 'doubles_detail' pk=req.pk %}" class="btn btn-primary">Подробнее</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-secondary" style="grid-column: 1 / -1;">
+            Заявок на парный матч 2×2 пока нет.
+            {% if has_sparring_access %}<a href="{% url 'doubles_create' %}" class="text-primary">Создать заявку</a>{% endif %}
+        </p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -5,26 +5,70 @@
 
 {% block content %}
 <!-- Hero Section -->
-<section class="hero">
-    <div class="hero-image-wrapper">
-        <img src="{% static 'images/hero_image_1.png' %}" alt="Tennis Player" class="hero-image">
-    </div>
+<section class="hero hero--premium">
     <div class="container">
-        <div class="hero-content">
-            <div class="hero-text-reveal">
-                <h1 class="hero-title reveal">
-                    <span style="--d: 0s">Любительские турниры</span>
-                    <span style="--d: 0.15s">по <span>теннису</span></span>
-                </h1>
-                <p class="hero-text reveal">
-                    <span style="--d: 0.3s">Аналог ATP Tour для любителей. Равные соперники, честная игра, сообщество игроков по всей России.</span>
-                </p>
+        <div class="hero-content hero-content--premium">
+            <h1 class="hero-title hero-title--premium">Играй. Побеждай. Расти в рейтинге.</h1>
+            <p class="hero-subtitle hero-subtitle--premium">Рейтинг любителей по всей России. Честная конкуренция. Настоящие турниры.</p>
+            <div class="hero-buttons hero-buttons--premium">
+                <a href="{% url 'tournament_list' %}" class="btn btn-primary btn-lg hero-btn-primary">Найти турнир</a>
+                <a href="{% url 'sparring_list' %}" class="btn btn-outline btn-lg hero-btn-outline">Найти соперника</a>
             </div>
-            <div class="hero-buttons">
-                {% if not user.is_authenticated %}
-                <a href="{% url 'register' %}" class="btn btn-primary btn-lg">Регистрация</a>
-                {% endif %}
-                <a href="{% url 'rules' %}" class="btn btn-outline btn-lg">Как это работает</a>
+            <div class="hero-metrics hero-metrics--premium">
+                <div class="hero-metric">
+                    <span class="hero-metric__value">{{ hero_stats.players_count|default:"0" }}</span>
+                    <span class="hero-metric__label">игрока</span>
+                </div>
+                <div class="hero-metric-divider"></div>
+                <div class="hero-metric">
+                    <span class="hero-metric__value">{{ hero_stats.tournaments_count|default:"0" }}</span>
+                    <span class="hero-metric__label">активных турниров</span>
+                </div>
+                <div class="hero-metric-divider"></div>
+                <div class="hero-metric">
+                    <span class="hero-metric__value">{{ hero_stats.matches_count|default:"0" }}</span>
+                    <span class="hero-metric__label">сыгранных матчей</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Results Ticker -->
+    <div class="live-results" id="live-results" data-avatar-placeholder="{% static 'images/avatar_placeholder.jpg' %}">
+        <div class="container">
+            <div class="live-results__header">
+                <span class="live-results__title">🎾 Результаты матчей</span>
+                <span class="live-results__subtitle">За последние 5 дней</span>
+            </div>
+            <div class="live-results__list" id="live-results-list">
+                {% for m in recent_matches %}
+                <div class="live-results__row-wrap">
+                <a href="{{ m.match_url }}" class="live-results__row" data-match-id="{{ m.id }}">
+                    <span class="live-results__player1">
+                        {% include 'includes/avatar.html' with url=m.p1_avatar class="live-results__avatar" %}
+                        <span class="live-results__name">{{ m.player1 }}</span>
+                    </span>
+                    <span class="live-results__vals live-results__vals--col">
+                        <span class="live-results__val live-results__val--{% if m.p1_ntrp_delta > 0 %}up{% elif m.p1_ntrp_delta < 0 %}down{% else %}none{% endif %}">{% if m.p1_ntrp_delta > 0 %}↑{% elif m.p1_ntrp_delta < 0 %}↓{% endif %} {{ m.p1_ntrp|floatformat:1 }}{% if m.p1_ntrp_delta %}({% if m.p1_ntrp_delta > 0 %}+{% endif %}{{ m.p1_ntrp_delta }}){% endif %}</span>
+                        <span class="live-results__val live-results__val--{% if m.p1_rating_delta > 0 %}up{% elif m.p1_rating_delta < 0 %}down{% else %}none{% endif %}">{% if m.p1_rating_delta > 0 %}↑{% elif m.p1_rating_delta < 0 %}↓{% endif %} {{ m.p1_rating|floatformat:1 }}{% if m.p1_rating_delta %}({% if m.p1_rating_delta > 0 %}+{% endif %}{{ m.p1_rating_delta }}){% endif %}</span>
+                    </span>
+                    <span class="live-results__center">
+                        <span class="live-results__date">{{ m.date }}</span>
+                        <span class="live-results__score">{{ m.score_column|default:m.score }}</span>
+                    </span>
+                    <span class="live-results__vals live-results__vals--col live-results__vals--right">
+                        <span class="live-results__val live-results__val--{% if m.p2_ntrp_delta > 0 %}up{% elif m.p2_ntrp_delta < 0 %}down{% else %}none{% endif %}">{% if m.p2_ntrp_delta > 0 %}↑{% elif m.p2_ntrp_delta < 0 %}↓{% endif %} {{ m.p2_ntrp|floatformat:1 }}{% if m.p2_ntrp_delta %}({% if m.p2_ntrp_delta > 0 %}+{% endif %}{{ m.p2_ntrp_delta }}){% endif %}</span>
+                        <span class="live-results__val live-results__val--{% if m.p2_rating_delta > 0 %}up{% elif m.p2_rating_delta < 0 %}down{% else %}none{% endif %}">{% if m.p2_rating_delta > 0 %}↑{% elif m.p2_rating_delta < 0 %}↓{% endif %} {{ m.p2_rating|floatformat:1 }}{% if m.p2_rating_delta %}({% if m.p2_rating_delta > 0 %}+{% endif %}{{ m.p2_rating_delta }}){% endif %}</span>
+                    </span>
+                    <span class="live-results__player2">
+                        <span class="live-results__name">{{ m.player2 }}</span>
+                        {% include 'includes/avatar.html' with url=m.p2_avatar class="live-results__avatar" %}
+                    </span>
+                </a>
+                </div>
+                {% empty %}
+                <div class="live-results__empty">Нет завершённых матчей за последние 5 дней</div>
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -92,7 +136,7 @@
 </section>
 
 <!-- Top Players -->
-<section class="section" style="background: var(--color-bg-secondary);">
+<section class="section">
     <div class="container">
         <div class="section-header">
             <h2 class="section-title">Топ рейтинга</h2>
@@ -103,11 +147,7 @@
             {% for player in top_players %}
             <a href="{% url 'profile' pk=player.pk %}" class="player-card">
                 <span class="player-rank">{{ forloop.counter }}</span>
-                {% if player.avatar %}
-                <img src="{{ player.avatar.url|default:'/static/images/avatar-placeholder.png' }}" alt="" class="player-avatar">
-                {% else %}
-                <div class="player-avatar"></div>
-                {% endif %}
+                {% include 'includes/avatar.html' with avatar=player.avatar %}
                 <div class="player-info">
                     <div class="player-name-block">
                         <span class="player-name">{{ player }}</span>
@@ -119,14 +159,8 @@
                     </div>
                 </div>
                 <div class="player-stats">
-                    <div>
-                        <div class="stat-label">NTRP</div>
-                        <div class="stat-value">{{ player.ntrp_level }}</div>
-                    </div>
-                    <div>
-                        <div class="stat-label">Очки FAN</div>
-                        <div class="stat-value">{{ player.total_points|floatformat:1 }}</div>
-                    </div>
+                    {% include 'includes/rating_stat_value.html' with player=player stat_type='ntrp' value=player.ntrp_level %}
+                    {% include 'includes/rating_stat_value.html' with player=player stat_type='fan' value=player.total_points|floatformat:1 %}
                     <div>
                         <div class="stat-label">Матчей</div>
                         <div class="stat-value">{{ player.matches_played }}</div>
@@ -169,7 +203,7 @@
         <div class="grid grid-3">
             {% for tournament in upcoming_tournaments %}
             <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card tournament-preview-card">
-                <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}">{{ tournament.get_status_display }}</span>
+                <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}"></span>
                 {% if tournament.image %}
                 <img src="{{ tournament.image.url }}" alt="" class="card-image">
                 {% endif %}
@@ -192,7 +226,7 @@
 
 <!-- Latest News -->
 {% if latest_news %}
-<section class="section" style="background: var(--color-bg-secondary);">
+<section class="section">
     <div class="container">
         <div class="section-header">
             <h2 class="section-title">Новости</h2>
@@ -218,4 +252,86 @@
     </div>
 </section>
 {% endif %}
+
+<script id="live-results-data" type="application/json">{{ recent_matches_json|safe }}</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var listEl = document.getElementById('live-results-list');
+    if (!listEl) return;
+
+    var dataEl = document.getElementById('live-results-data');
+    var matches = [];
+    try {
+        if (dataEl && dataEl.textContent) {
+            matches = JSON.parse(dataEl.textContent);
+        }
+    } catch (e) {}
+
+    function cls(v) { return v > 0 ? 'up' : (v < 0 ? 'down' : 'none'); }
+    function avatarHtml(url) {
+        var placeholder = (listEl.closest('.live-results') && listEl.closest('.live-results').getAttribute('data-avatar-placeholder')) || '/static/images/avatar_placeholder.jpg';
+        var src = url || placeholder;
+        return '<img src="' + src + '" alt="" class="live-results__avatar">';
+    }
+    function renderRow(m, isEntering) {
+        var n1d = m.p1_ntrp_delta != null ? (m.p1_ntrp_delta > 0 ? '+' : '') + m.p1_ntrp_delta : '';
+        var n2d = m.p2_ntrp_delta != null ? (m.p2_ntrp_delta > 0 ? '+' : '') + m.p2_ntrp_delta : '';
+        var r1d = m.p1_rating_delta != null ? (m.p1_rating_delta > 0 ? '+' : '') + Math.round(m.p1_rating_delta) : '';
+        var r2d = m.p2_rating_delta != null ? (m.p2_rating_delta > 0 ? '+' : '') + Math.round(m.p2_rating_delta) : '';
+        var a1n = (m.p1_ntrp_delta || 0) > 0 ? '↑' : ((m.p1_ntrp_delta || 0) < 0 ? '↓' : '');
+        var a1r = (m.p1_rating_delta || 0) > 0 ? '↑' : ((m.p1_rating_delta || 0) < 0 ? '↓' : '');
+        var a2n = (m.p2_ntrp_delta || 0) > 0 ? '↑' : ((m.p2_ntrp_delta || 0) < 0 ? '↓' : '');
+        var a2r = (m.p2_rating_delta || 0) > 0 ? '↑' : ((m.p2_rating_delta || 0) < 0 ? '↓' : '');
+        var rowHtml = '<a href="' + (m.match_url || '#') + '" class="live-results__row" data-match-id="' + m.id + '">' +
+            '<span class="live-results__player1">' + avatarHtml(m.p1_avatar) + '<span class="live-results__name">' + (m.player1 || '') + '</span></span>' +
+            '<span class="live-results__vals live-results__vals--col"><span class="live-results__val live-results__val--' + cls(m.p1_ntrp_delta) + '">' + a1n + ' ' + (m.p1_ntrp != null ? m.p1_ntrp.toFixed(1) : '—') + (n1d ? '(' + n1d + ')' : '') + '</span><span class="live-results__val live-results__val--' + cls(m.p1_rating_delta) + '">' + a1r + ' ' + (m.p1_rating != null ? m.p1_rating.toFixed(1) : '—') + (r1d ? '(' + r1d + ')' : '') + '</span></span>' +
+            '<span class="live-results__center"><span class="live-results__date">' + (m.date || '') + '</span><span class="live-results__score">' + ((m.score_column || m.score || '—').replace(/ /g, '\n')) + '</span></span>' +
+            '<span class="live-results__vals live-results__vals--col live-results__vals--right"><span class="live-results__val live-results__val--' + cls(m.p2_ntrp_delta) + '">' + a2n + ' ' + (m.p2_ntrp != null ? m.p2_ntrp.toFixed(1) : '—') + (n2d ? '(' + n2d + ')' : '') + '</span><span class="live-results__val live-results__val--' + cls(m.p2_rating_delta) + '">' + a2r + ' ' + (m.p2_rating != null ? m.p2_rating.toFixed(1) : '—') + (r2d ? '(' + r2d + ')' : '') + '</span></span>' +
+            '<span class="live-results__player2"><span class="live-results__name">' + (m.player2 || '') + '</span>' + avatarHtml(m.p2_avatar) + '</span></a>';
+        var wrapClass = 'live-results__row-wrap' + (isEntering ? ' live-results__row-wrap--entering' : '');
+        return '<div class="' + wrapClass + '">' + rowHtml + '</div>';
+    }
+    function renderAll(animateFirst) {
+        if (matches.length === 0) {
+            listEl.innerHTML = '<div class="live-results__empty">Нет завершённых матчей за последние 5 дней</div>';
+            return;
+        }
+        listEl.innerHTML = matches.map(function(m, i) { return renderRow(m, animateFirst && i === 0); }).join('');
+        if (animateFirst) {
+            var firstWrap = listEl.querySelector('.live-results__row-wrap--entering');
+            if (firstWrap) {
+                firstWrap.addEventListener('animationend', function onEnd() {
+                    firstWrap.classList.remove('live-results__row-wrap--entering');
+                    firstWrap.style.maxHeight = '';
+                    firstWrap.removeEventListener('animationend', onEnd);
+                });
+            }
+        }
+    }
+    function rotateTicker() {
+        if (matches.length < 2) return;
+        matches.unshift(matches.pop());
+        renderAll(true);
+    }
+    var rotStarted = false;
+    function startRotation() {
+        if (!rotStarted && matches.length > 1) {
+            rotStarted = true;
+            setInterval(rotateTicker, 3000);
+        }
+    }
+    if (matches.length > 0) {
+        renderAll();
+        startRotation();
+    }
+    fetch('{% url "api_recent_matches" %}').then(function(r) { return r.json(); }).then(function(data) {
+        var ms = data.matches || [];
+        if (ms.length > 0) {
+            matches = ms;
+            renderAll();
+            startRotation();
+        }
+    }).catch(function(){});
+});
+</script>
 {% endblock %}

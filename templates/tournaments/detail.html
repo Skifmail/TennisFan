@@ -169,7 +169,7 @@
                 {% for participant in participants %}
                 {% if tournament.variant == 'doubles' %}
                 <div style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md);">
-                    <div class="player-avatar" style="width: 48px; height: 48px;"></div>
+                    {% include 'includes/avatar.html' with avatar=participant.player1.avatar class="player-avatar" size="48" %}
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px;">
                             <a href="{% url 'profile' pk=participant.player1.pk %}">{{ participant.player1.user.last_name }} {{ participant.player1.user.first_name }}</a>
@@ -183,11 +183,7 @@
                 </div>
                 {% else %}
                 <a href="{% url 'profile' pk=participant.pk %}" style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md); transition: all var(--transition-fast); text-decoration: none;">
-                    {% if participant.avatar %}
-                    <img src="{{ participant.avatar.url|default:'/static/images/avatar-placeholder.png' }}" alt="" class="player-avatar" style="width: 48px; height: 48px;">
-                    {% else %}
-                    <div class="player-avatar" style="width: 48px; height: 48px;"></div>
-                    {% endif %}
+                    {% include 'includes/avatar.html' with avatar=participant.avatar class="player-avatar" size="48" %}
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                             {{ participant.user.first_name }} {{ participant.user.last_name }}
@@ -360,8 +356,8 @@
                     {% endif %}
                     <div class="match-players">
                         <div class="match-player {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}winner{% endif %}">
-                            {% if match.team1 %}{% if match.team1.player1.avatar %}<img src="{{ match.team1.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
-                            {% else %}{% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                            {% if match.team1 %}{% include 'includes/avatar.html' with avatar=match.team1.player1.avatar class="player-avatar" %}
+                            {% else %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" %}{% endif %}
                             <span class="player-name">{{ match.get_player1_display }}</span>
                             {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% endif %}
                             <div class="match-score">
@@ -371,8 +367,8 @@
                             </div>
                         </div>
                         <div class="match-player {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}winner{% endif %}">
-                            {% if match.team2 %}{% if match.team2.player1.avatar %}<img src="{{ match.team2.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
-                            {% else %}{% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                            {% if match.team2 %}{% include 'includes/avatar.html' with avatar=match.team2.player1.avatar class="player-avatar" %}
+                            {% else %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" %}{% endif %}
                             <span class="player-name">{{ match.get_player2_display }}</span>
                             {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% elif match.is_walkover_loss %}{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}<span class="retired-badge">Rt.</span>{% endif %}{% endif %}
                             <div class="match-score">
@@ -407,8 +403,8 @@
                     {% endif %}
                     <div class="match-players">
                         <div class="match-player {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}winner{% endif %}">
-                            {% if match.team1 %}{% if match.team1.player1.avatar %}<img src="{{ match.team1.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
-                            {% else %}{% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                            {% if match.team1 %}{% include 'includes/avatar.html' with avatar=match.team1.player1.avatar class="player-avatar" %}
+                            {% else %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" %}{% endif %}
                             <span class="player-name">{{ match.get_player1_display }}</span>
                             {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% endif %}
                             <div class="match-score">
@@ -418,8 +414,8 @@
                             </div>
                         </div>
                         <div class="match-player {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}winner{% endif %}">
-                            {% if match.team2 %}{% if match.team2.player1.avatar %}<img src="{{ match.team2.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
-                            {% else %}{% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                            {% if match.team2 %}{% include 'includes/avatar.html' with avatar=match.team2.player1.avatar class="player-avatar" %}
+                            {% else %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" %}{% endif %}
                             <span class="player-name">{{ match.get_player2_display }}</span>
                             {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% elif match.is_walkover_loss %}{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}<span class="retired-badge">Rt.</span>{% endif %}{% endif %}
                             <div class="match-score">
@@ -450,8 +446,8 @@
             {% endif %}
             <div class="match-players">
                 <div class="match-player {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}winner{% endif %}">
-                    {% if match.team1 %}{% if match.team1.player1.avatar %}<img src="{{ match.team1.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
-                    {% else %}{% if match.player1.avatar %}<img src="{{ match.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                    {% if match.team1 %}{% include 'includes/avatar.html' with avatar=match.team1.player1.avatar class="player-avatar" %}
+                    {% else %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" %}{% endif %}
                             <span class="player-name">{{ match.get_player1_display }}</span>
                             {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% elif match.is_walkover_loss %}{% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}<span class="retired-badge">Rt.</span>{% endif %}{% endif %}
                             <div class="match-score">
@@ -461,8 +457,8 @@
                             </div>
                         </div>
                         <div class="match-player {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}winner{% endif %}">
-                            {% if match.team2 %}{% if match.team2.player1.avatar %}<img src="{{ match.team2.player1.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}
-                            {% else %}{% if match.player2.avatar %}<img src="{{ match.player2.avatar.url }}" alt="" class="player-avatar">{% else %}<div class="player-avatar"></div>{% endif %}{% endif %}
+                            {% if match.team2 %}{% include 'includes/avatar.html' with avatar=match.team2.player1.avatar class="player-avatar" %}
+                            {% else %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" %}{% endif %}
                             <span class="player-name">{{ match.get_player2_display }}</span>
                             {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% elif match.is_walkover_loss %}{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}<span class="retired-badge">Rt.</span>{% endif %}{% endif %}
                     <div class="match-score">

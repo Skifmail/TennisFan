@@ -223,7 +223,7 @@ def tournament_list(request):
     if status:
         tournaments = tournaments.filter(status=status)
 
-    tournaments = tournaments.order_by("-start_date")
+    tournaments = tournaments.order_by("-created_at")
 
     context = {
         "tournaments": tournaments,
@@ -686,6 +686,7 @@ def match_detail(request, pk):
             "team1__player2__user",
             "team2__player1__user",
             "team2__player2__user",
+            "sparring_response__sparring_request",
         ).prefetch_related("tournament__allowed_categories"),
         pk=pk,
     )
@@ -751,8 +752,9 @@ def my_matches(request):
             "team1__player2__user",
             "team2__player1__user",
             "team2__player2__user",
+            "sparring_response__sparring_request",
         )
-        .order_by("-scheduled_datetime")
+        .order_by("deadline")
     )
 
     proposals = MatchResultProposal.objects.filter(match__in=matches).select_related(
@@ -960,36 +962,8 @@ def confirm_proposal(request, pk):
     if action == "accept":
         apply_proposal(proposal)
         # FAN-логика (advance, consolation, finalize) вызывается из post_save сигнала Match
+        # Уведомления в ЛК и Telegram (с рейтингом и силой) создаются внутри apply_proposal для обоих участников
         messages.success(request, "Результат подтверждён.")
-
-        # Создаем уведомление в личном кабинете для инициатора
-        try:
-            match = proposal.match
-            # Определяем контекст матча для сообщения
-            if match.tournament:
-                match_context = f"в турнире {match.tournament.name}"
-            elif match.is_sparring():
-                match_context = "спаррингового матча"
-            else:
-                match_context = "матча"
-
-            Notification.objects.create(
-                user=proposal.proposer.user,
-                message=f"{player} подтвердил результат {match_context}.",
-                url=reverse("match_detail", args=[match.pk]),
-            )
-        except Exception as e:
-            logger.warning(
-                "Failed to create notification for proposal confirmation: %s", e
-            )
-
-        # Telegram-уведомление инициатору
-        try:
-            from apps.telegram_bot.notifications import notify_proposal_confirmed
-
-            notify_proposal_confirmed(proposal)
-        except Exception:
-            pass  # Telegram-уведомление не критично
     else:
         # Telegram-уведомление инициатору (до удаления proposal)
         try:

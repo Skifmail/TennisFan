@@ -21,8 +21,16 @@
                 <option value="advanced" {% if current_category == 'advanced' %}selected{% endif %}>Мастерс</option>
                 <option value="professional" {% if current_category == 'professional' %}selected{% endif %}>Профессионал</option>
             </select>
+            <select name="preferred_gender" class="form-control" onchange="this.form.submit()">
+                <option value="">Любой пол</option>
+                <option value="male" {% if current_preferred_gender == 'male' %}selected{% endif %}>Мужчины</option>
+                <option value="female" {% if current_preferred_gender == 'female' %}selected{% endif %}>Женщины</option>
+                <option value="open" {% if current_preferred_gender == 'open' %}selected{% endif %}>Смешанный</option>
+                <option value="mixed" {% if current_preferred_gender == 'mixed' %}selected{% endif %}>Микст</option>
+            </select>
         </form>
         <div class="sparring-toolbar__actions">
+            <a href="{% url 'doubles_list' %}" class="btn btn-ghost">Парный 2×2</a>
             <a href="{% url 'sparring_my_requests' %}" class="btn btn-ghost">Мои заявки</a>
             {% if has_sparring_access %}
             <a href="{% url 'sparring_create' %}" class="btn btn-primary">Создать заявку</a>
@@ -38,16 +46,16 @@
             <div class="card-body">
                 <div class="sparring-card__flags">
                     <span class="sparring-flag sparring-flag--recruiting">Идёт набор</span>
+                    <span class="sparring-flag sparring-flag--gender">{{ req.get_preferred_gender_display }}</span>
+                    {% if req.is_friendly %}
+                    <span class="sparring-flag sparring-flag--friendly" title="Результат не влияет на рейтинг">Дружеский матч</span>
+                    {% endif %}
                     {% if req.has_responses %}
                     <span class="sparring-flag sparring-flag--responses">Есть отклики</span>
                     {% endif %}
                 </div>
                 <div class="d-flex gap-3 sparring-card__main" style="align-items: flex-start;">
-                    {% if req.player.avatar %}
-                    <img src="{{ req.player.avatar.url }}" alt="" class="player-avatar sparring-card__avatar">
-                    {% else %}
-                    <div class="player-avatar sparring-card__avatar"></div>
-                    {% endif %}
+                    {% include 'includes/avatar.html' with avatar=req.player.avatar class="player-avatar sparring-card__avatar" %}
                     <div class="sparring-card__content">
                         <div class="player-name-block">
                             <a href="{% url 'profile' pk=req.player.pk %}" class="player-name">{{ req.player }}</a>

@@ -27,7 +27,7 @@ from .models import Notification, Player
 
 
 def _map_ntrp_to_skill_level(level: Decimal) -> str:
-    """Map NTRP decimal level to SkillLevel category (delegates to rating_utils)."""
+    """Map strength level (1.0-7.0) to SkillLevel category (delegates to rating_utils)."""
     from .rating_utils import map_ntrp_to_skill_level
 
     return map_ntrp_to_skill_level(level)
@@ -117,7 +117,7 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         rating_after = current_rating
         rating_before = current_rating - (fan_delta or 0.0)
 
-        # Вычисляем NTRP до и после матча
+        # Вычисляем уровень силы до и после матча
         ntrp_before_val = rating_to_ntrp_level(rating_before)
         ntrp_after_val = rating_to_ntrp_level(rating_after)
         ntrp_before = float(ntrp_before_val) if ntrp_before_val else 0.0
@@ -279,7 +279,7 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         else:
             result[-1]["matches"] = player.matches_played
         result[-1]["win_rate"] = round(float(player.win_rate), 1)
-        # Обновляем NTRP для последней точки
+        # Обновляем уровень силы для последней точки
         if result[-1].get("ntrp_after") == 0.0:
             result[-1]["ntrp_after"] = float(player.ntrp_level)
 
@@ -696,7 +696,7 @@ def notifications(request):
 
 
 def ntrp_test(request):
-    """Public NTRP test page.
+    """Public strength level test page.
 
     Note: Test result can only be saved during registration.
     For registered users, the test is informational only and does not affect their rating.
@@ -709,9 +709,9 @@ def ntrp_test(request):
 @login_required
 @require_POST
 def save_ntrp(request):
-    """Save NTRP level ONLY during registration.
+    """Save strength level ONLY during registration.
 
-    After registration, NTRP test results cannot be saved.
+    After registration, strength test results cannot be saved.
     Rating is determined solely by match results.
     """
     try:
@@ -743,7 +743,7 @@ def save_ntrp(request):
             {
                 "ok": False,
                 "error": "test_already_saved",
-                "message": "NTRP тест можно пройти только один раз при регистрации. Рейтинг формируется только по результатам матчей.",
+                "message": "Тест силы можно пройти только один раз при регистрации. Рейтинг формируется только по результатам матчей.",
             },
             status=403,
         )

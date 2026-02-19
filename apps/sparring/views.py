@@ -30,8 +30,32 @@ from django.views.decorators.http import (
 from apps.core.decorators import login_required_with_message, require_filled_profile
 from apps.users.models import Notification, Player
 
-from .forms import SparringRequestForm
-from .models import SparringRequest, SparringResponse
+from .doubles_services import (
+    accept_join_request,
+    add_partner_to_author_team,
+    cancel_join_request,
+    cancel_match_request,
+    confirm_match,
+    create_doubles_request,
+    create_join_request,
+    reject_join_request,
+    remove_team_member,
+)
+from .forms import (
+    DoublesAddPartnerForm,
+    DoublesMatchRequestForm,
+    SparringRequestForm,
+)
+from .models import (
+    DoublesJoinRequest,
+    DoublesJoinRequestStatus,
+    DoublesMatchRequest,
+    DoublesMatchRequestStatus,
+    SparringMatchType,
+    SparringRequest,
+    SparringResponse,
+    TeamSide,
+)
 from .utils import user_has_sparring_access
 
 # Импорт для Telegram уведомлений
@@ -69,12 +93,16 @@ def _get_contact_url(player: Player, method: str) -> str | None:
     "Раздел спарринга доступен только для зарегистрированных пользователей."
 )
 def sparring_list(request):
-    """List of active sparring requests. Только для авторизованных пользователей."""
+    """Список активных заявок на одиночный спарринг (1×1). Парный 2×2 — отдельно в разделе «Парный 2×2»."""
     city = request.GET.get("city", "")
     category = request.GET.get("category", "")
+    preferred_gender = request.GET.get("preferred_gender", "")
 
     requests_qs = (
-        SparringRequest.objects.filter(status=SparringRequest.Status.ACTIVE)
+        SparringRequest.objects.filter(
+            status=SparringRequest.Status.ACTIVE,
+            match_type="singles",
+        )
         .select_related(
             "player__user",
             "player__user__subscription",
@@ -86,12 +114,15 @@ def sparring_list(request):
         requests_qs = requests_qs.filter(city__icontains=city)
     if category:
         requests_qs = requests_qs.filter(desired_category=category)
+    if preferred_gender:
+        requests_qs = requests_qs.filter(preferred_gender=preferred_gender)
 
     has_access = user_has_sparring_access(request.user)
     context = {
         "sparring_requests": requests_qs,
         "current_city": city,
         "current_category": category,
+        "current_preferred_gender": preferred_gender,
         "has_sparring_access": has_access,
     }
     return render(request, "sparring/list.html", context)
@@ -100,7 +131,7 @@ def sparring_list(request):
 @login_required
 @require_filled_profile
 def sparring_create(request):
-    """Create sparring request. Requires has_sparring_access."""
+    """Создать заявку на одиночный спарринг (1×1). Парный 2×2 — через раздел «Парный 2×2»."""
     if not user_has_sparring_access(request.user):
         messages.error(
             request,
@@ -119,6 +150,7 @@ def sparring_create(request):
         if form.is_valid():
             sparring = form.save(commit=False)
             sparring.player = player
+            sparring.match_type = SparringMatchType.SINGLES
             sparring.save()
             messages.success(request, "Заявка на спарринг создана.")
             return redirect("sparring_list")
@@ -246,7 +278,7 @@ def sparring_confirm_response(request, response_id):
         response.sparring_request.status = SparringRequest.Status.CLOSED
         response.sparring_request.save(update_fields=["status"])
 
-        # Создаем уведомление в личном кабинете для откликнувшегося игрока
+        # Уведомление в ЛК для откликнувшегося игрока
         try:
             deadline_str = (
                 match.deadline.strftime("%d.%m.%Y")
@@ -261,6 +293,19 @@ def sparring_confirm_response(request, response_id):
         except Exception as e:
             logger.warning(
                 "Failed to create notification for sparring response acceptance: %s", e
+            )
+
+        # Уведомление в Telegram откликнувшемуся
+        try:
+            from apps.telegram_bot.notifications import (
+                notify_sparring_response_accepted,
+            )
+
+            notify_sparring_response_accepted(response, match)
+        except Exception as e:
+            logger.warning(
+                "Failed to send Telegram notification for sparring response acceptance: %s",
+                e,
             )
 
         messages.success(
@@ -459,3 +504,380 @@ def sparring_respond(request, pk):
     if created:
         messages.success(request, "Отклик записан. Автор заявки получит уведомление.")
     return redirect("sparring_list")
+
+
+# ---------------------------------------------------------------------------
+# Парный спарринг 2×2
+# ---------------------------------------------------------------------------
+
+
+@login_required_with_message(
+    "Раздел спарринга доступен только для зарегистрированных пользователей."
+)
+def doubles_list(request):
+    """Список заявок на парный матч 2×2 (открытые и в формировании)."""
+    city = request.GET.get("city", "")
+    qs = (
+        DoublesMatchRequest.objects.filter(
+            status__in=(
+                DoublesMatchRequestStatus.OPEN,
+                DoublesMatchRequestStatus.FORMING,
+                DoublesMatchRequestStatus.READY,
+            )
+        )
+        .select_related("created_by__user")
+        .prefetch_related("teams__members__player__user")
+        .order_by("-created_at")
+    )
+    if city:
+        qs = qs.filter(city__icontains=city)
+    has_access = user_has_sparring_access(request.user)
+    return render(
+        request,
+        "sparring/doubles_list.html",
+        {
+            "doubles_requests": qs,
+            "current_city": city,
+            "has_sparring_access": has_access,
+        },
+    )
+
+
+@login_required
+def doubles_my_requests(request):
+    """Мои заявки на парный матч 2×2."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        messages.error(request, "Заполните профиль игрока.")
+        return redirect("profile_edit")
+
+    qs = (
+        DoublesMatchRequest.objects.filter(created_by=player)
+        .select_related("created_by__user", "match")
+        .prefetch_related(
+            "teams__members__player__user", "join_requests__members__player__user"
+        )
+        .order_by("-created_at")
+    )
+    has_access = user_has_sparring_access(request.user)
+    return render(
+        request,
+        "sparring/doubles_my_requests.html",
+        {"doubles_requests": qs, "has_sparring_access": has_access},
+    )
+
+
+@login_required
+@require_filled_profile
+@require_http_methods(["GET", "POST"])
+def doubles_create(request):
+    """Создать заявку на парный матч 2×2."""
+    if not user_has_sparring_access(request.user):
+        messages.error(request, "Доступ к спаррингам по подписке. Оформите подписку.")
+        return redirect("pricing")
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        messages.error(request, "Заполните профиль игрока.")
+        return redirect("profile_edit")
+
+    if request.method == "POST":
+        form = DoublesMatchRequestForm(request.POST)
+        if form.is_valid():
+            try:
+                req = create_doubles_request(
+                    created_by=player,
+                    city=form.cleaned_data.get("city", ""),
+                    preferred_gender=form.cleaned_data.get("preferred_gender", ""),
+                    is_friendly=form.cleaned_data.get("is_friendly", False),
+                    description=form.cleaned_data.get("description", ""),
+                )
+                messages.success(request, "Заявка на парный матч создана.")
+                return redirect("doubles_detail", pk=req.pk)
+            except Exception as e:
+                messages.error(request, str(e))
+    else:
+        form = DoublesMatchRequestForm(initial={"city": getattr(player, "city", "")})
+
+    return render(request, "sparring/doubles_create.html", {"form": form})
+
+
+@login_required
+def doubles_detail(request, pk):
+    """Детальная страница заявки на парный матч: команды, отклики, действия."""
+    req = get_object_or_404(
+        DoublesMatchRequest.objects.select_related(
+            "created_by__user", "match"
+        ).prefetch_related(
+            "teams__members__player__user",
+            "join_requests__members__player__user",
+        ),
+        pk=pk,
+    )
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        player = None
+
+    is_author = player and req.created_by_id == player.id
+    author_team = req.teams.filter(side=TeamSide.AUTHOR).first()
+    opponent_team = req.teams.filter(side=TeamSide.OPPONENT).first()
+    pending_join_requests = req.join_requests.filter(
+        status=DoublesJoinRequestStatus.PENDING
+    )
+
+    can_confirm = (
+        is_author
+        and req.status == DoublesMatchRequestStatus.READY
+        and author_team
+        and opponent_team
+        and author_team.members.count() == 2
+        and opponent_team.members.count() == 2
+    )
+    can_edit_teams = is_author and req.status in (
+        DoublesMatchRequestStatus.OPEN,
+        DoublesMatchRequestStatus.FORMING,
+        DoublesMatchRequestStatus.READY,
+    )
+    exclude_for_partner = set()
+    if author_team:
+        exclude_for_partner = set(
+            author_team.members.values_list("player_id", flat=True)
+        )
+    if opponent_team:
+        exclude_for_partner |= set(
+            opponent_team.members.values_list("player_id", flat=True)
+        )
+
+    add_partner_form = None
+    if can_edit_teams and author_team and author_team.members.count() < 2:
+        add_partner_form = DoublesAddPartnerForm(exclude_player_ids=exclude_for_partner)
+
+    return render(
+        request,
+        "sparring/doubles_detail.html",
+        {
+            "doubles_request": req,
+            "author_team": author_team,
+            "opponent_team": opponent_team,
+            "pending_join_requests": pending_join_requests,
+            "is_author": is_author,
+            "player": player,
+            "can_confirm": can_confirm,
+            "can_edit_teams": can_edit_teams,
+            "add_partner_form": add_partner_form,
+            "has_sparring_access": user_has_sparring_access(request.user),
+        },
+    )
+
+
+@require_POST
+@login_required
+def doubles_join(request, pk):
+    """Откликнуться на заявку: в команду автора или соперников, один или с партнёром."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        messages.error(request, "Заполните профиль игрока.")
+        return redirect("profile_edit")
+
+    target_side = request.POST.get("target_side")
+    partner_id = request.POST.get("partner_id")
+    if target_side not in (TeamSide.AUTHOR, TeamSide.OPPONENT):
+        messages.error(request, "Укажите, в какую команду хотите вступить.")
+        return redirect("doubles_detail", pk=pk)
+
+    players = [player]
+    if partner_id:
+        try:
+            partner = Player.objects.get(pk=int(partner_id))
+            if partner.id != player.id:
+                players.append(partner)
+        except (ValueError, Player.DoesNotExist):
+            pass
+
+    try:
+        create_join_request(
+            match_request_id=pk,
+            created_by=player,
+            target_side=target_side,
+            players=players,
+        )
+        messages.success(request, "Отклик отправлен. Ожидайте решения автора заявки.")
+    except (PermissionError, ValueError) as e:
+        messages.error(request, str(e))
+    return redirect("doubles_detail", pk=pk)
+
+
+@require_POST
+@login_required
+def doubles_accept_join(request, pk, join_request_id):
+    """Принять отклик (только автор). Уведомление в ЛК и Telegram всем из отклика."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        return redirect("profile_edit")
+    try:
+        accept_join_request(
+            match_request_id=pk,
+            join_request_id=join_request_id,
+            accepted_by=player,
+        )
+        jr = DoublesJoinRequest.objects.prefetch_related("members__player__user").get(
+            pk=join_request_id, match_request_id=pk
+        )
+        detail_url = reverse("doubles_detail", args=[pk])
+        msg = "Ваш отклик на парный матч 2×2 принят. Ожидайте подтверждения матча автором заявки."
+        if len(msg) > 255:
+            msg = msg[:252] + "..."
+        for m in jr.members.all():
+            if m.player and getattr(m.player, "user_id", None):
+                try:
+                    Notification.objects.create(
+                        user=m.player.user,
+                        message=msg,
+                        url=detail_url,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "doubles_accept_join Notification for user %s: %s",
+                        m.player.user_id,
+                        e,
+                    )
+        try:
+            from apps.telegram_bot.notifications import notify_doubles_join_accepted
+
+            notify_doubles_join_accepted(jr)
+        except Exception as e:
+            logger.warning("notify_doubles_join_accepted failed: %s", e)
+        messages.success(request, "Отклик принят.")
+    except (PermissionError, ValueError) as e:
+        messages.error(request, str(e))
+    return redirect("doubles_detail", pk=pk)
+
+
+@require_POST
+@login_required
+def doubles_reject_join(request, pk, join_request_id):
+    """Отклонить отклик (только автор)."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        return redirect("profile_edit")
+    try:
+        reject_join_request(
+            match_request_id=pk,
+            join_request_id=join_request_id,
+            rejected_by=player,
+        )
+        messages.info(request, "Отклик отклонён.")
+    except PermissionError as e:
+        messages.error(request, str(e))
+    return redirect("doubles_detail", pk=pk)
+
+
+@require_POST
+@login_required
+def doubles_cancel_join(request, join_request_id):
+    """Отменить свой отклик."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        return redirect("profile_edit")
+    try:
+        cancel_join_request(join_request_id=join_request_id, cancelled_by=player)
+        messages.success(request, "Отклик отменён.")
+    except (PermissionError, ValueError) as e:
+        messages.error(request, str(e))
+    next_url = (
+        request.POST.get("next")
+        or request.META.get("HTTP_REFERER")
+        or reverse("doubles_list")
+    )
+    return redirect(next_url)
+
+
+@require_POST
+@login_required
+def doubles_add_partner(request, pk):
+    """Добавить партнёра в команду автора."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        return redirect("profile_edit")
+    partner_id = request.POST.get("player_id")
+    if not partner_id:
+        messages.error(request, "Выберите игрока.")
+        return redirect("doubles_detail", pk=pk)
+    try:
+        add_partner_to_author_team(
+            match_request_id=pk,
+            player_id=int(partner_id),
+            added_by=player,
+        )
+        messages.success(request, "Партнёр добавлен в команду.")
+    except (PermissionError, ValueError) as e:
+        messages.error(request, str(e))
+    return redirect("doubles_detail", pk=pk)
+
+
+@require_POST
+@login_required
+def doubles_remove_member(request, pk):
+    """Удалить участника из команды (только автор)."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        return redirect("profile_edit")
+    team_side = request.POST.get("team_side")
+    member_player_id = request.POST.get("player_id")
+    if not team_side or not member_player_id:
+        messages.error(request, "Не указаны команда или игрок.")
+        return redirect("doubles_detail", pk=pk)
+    try:
+        remove_team_member(
+            match_request_id=pk,
+            team_side=team_side,
+            player_id=int(member_player_id),
+            removed_by=player,
+        )
+        messages.success(request, "Участник удалён из команды.")
+    except (PermissionError, ValueError) as e:
+        messages.error(request, str(e))
+    return redirect("doubles_detail", pk=pk)
+
+
+@require_POST
+@login_required
+def doubles_confirm(request, pk):
+    """Подтвердить состав и создать матч."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        return redirect("profile_edit")
+    try:
+        match = confirm_match(match_request_id=pk, confirmed_by=player)
+        messages.success(
+            request, "Матч создан! Перейдите в «Мои матчи» для внесения результата."
+        )
+        return redirect("match_detail", pk=match.pk)
+    except (PermissionError, ValueError) as e:
+        messages.error(request, str(e))
+        return redirect("doubles_detail", pk=pk)
+
+
+@require_POST
+@login_required
+def doubles_cancel_request(request, pk):
+    """Отменить заявку на парный матч."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        return redirect("profile_edit")
+    try:
+        cancel_match_request(match_request_id=pk, cancelled_by=player)
+        messages.success(request, "Заявка отменена.")
+    except (PermissionError, ValueError) as e:
+        messages.error(request, str(e))
+    return redirect("doubles_my_requests")

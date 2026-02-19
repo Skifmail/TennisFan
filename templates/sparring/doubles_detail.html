@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Парный матч 2×2 · Заявка #{{ doubles_request.pk }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="mb-4">
+        <a href="{% url 'doubles_list' %}" class="text-secondary">← Все заявки 2×2</a>
+        {% if is_author %}
+        · <a href="{% url 'doubles_my_requests' %}" class="text-secondary">Мои заявки</a>
+        {% endif %}
+    </div>
+
+    <div class="card" style="max-width: 700px;">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <div class="sparring-card__flags mb-3">
+                <span class="sparring-flag sparring-flag--type">{{ doubles_request.get_status_display }}</span>
+                {% if doubles_request.is_friendly %}
+                <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
+                {% endif %}
+                <span class="text-muted" style="font-size: var(--font-size-sm);">{{ doubles_request.city|default:"" }}</span>
+            </div>
+
+            <p class="text-secondary mb-3">{{ doubles_request.description|default:"" }}</p>
+
+            <section class="mb-4">
+                <h4 class="text-muted" style="font-size: var(--font-size-sm); font-weight: 600;">Команда автора</h4>
+                <ul class="list-unstyled">
+                    {% if author_team %}
+                        {% for tm in author_team.members.all %}
+                        <li class="d-flex align-items-center gap-2">
+                            <a href="{% url 'profile' pk=tm.player_id %}">{{ tm.player }}</a>
+                            {% if tm.is_captain %}<span class="badge" style="font-size: 0.7rem;">капитан</span>{% endif %}
+                            {% if can_edit_teams and not tm.is_captain %}
+                            <form method="post" action="{% url 'doubles_remove_member' pk=doubles_request.pk %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="team_side" value="author">
+                                <input type="hidden" name="player_id" value="{{ tm.player_id }}">
+                                <button type="submit" class="btn btn-ghost btn-sm text-error" onclick="return confirm('Удалить из команды?');">×</button>
+                            </form>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                        {% if add_partner_form and author_team.members.count < 2 %}
+                        <li class="mt-2">
+                            <form method="post" action="{% url 'doubles_add_partner' pk=doubles_request.pk %}" class="d-flex gap-2 align-items-center">
+                                {% csrf_token %}
+                                {{ add_partner_form.player_id }}
+                                <button type="submit" class="btn btn-sm btn-outline">Добавить партнёра</button>
+                            </form>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="text-muted">—</li>
+                    {% endif %}
+                </ul>
+            </section>
+
+            <section class="mb-4">
+                <h4 class="text-muted" style="font-size: var(--font-size-sm); font-weight: 600;">Команда соперников</h4>
+                <ul class="list-unstyled">
+                    {% if opponent_team %}
+                        {% for tm in opponent_team.members.all %}
+                        <li class="d-flex align-items-center gap-2">
+                            <a href="{% url 'profile' pk=tm.player_id %}">{{ tm.player }}</a>
+                            {% if can_edit_teams %}
+                            <form method="post" action="{% url 'doubles_remove_member' pk=doubles_request.pk %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="team_side" value="opponent">
+                                <input type="hidden" name="player_id" value="{{ tm.player_id }}">
+                                <button type="submit" class="btn btn-ghost btn-sm text-error" onclick="return confirm('Удалить из команды?');">×</button>
+                            </form>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    {% else %}
+                        <li class="text-muted">Пока никого</li>
+                    {% endif %}
+                </ul>
+            </section>
+
+            {% if pending_join_requests %}
+            <section class="mb-4 pt-3" style="border-top: 1px solid var(--color-border-light);">
+                <h4 class="text-muted mb-2" style="font-size: var(--font-size-sm); font-weight: 600;">Ожидающие отклики</h4>
+                {% for jr in pending_join_requests %}
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2" style="padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                    <span>
+                        {% for m in jr.members.all %}{{ m.player }}{% if not forloop.last %} + {% endif %}{% endfor %}
+                        → {{ jr.get_target_side_display }}
+                    </span>
+                    {% if is_author %}
+                    <form method="post" action="{% url 'doubles_accept_join' pk=doubles_request.pk join_request_id=jr.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-primary">Принять</button>
+                    </form>
+                    <form method="post" action="{% url 'doubles_reject_join' pk=doubles_request.pk join_request_id=jr.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-ghost">Отклонить</button>
+                    </form>
+                    {% endif %}
+                    {% if player and jr.created_by_id == player.id %}
+                    <form method="post" action="{% url 'doubles_cancel_join' join_request_id=jr.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.path }}">
+                        <button type="submit" class="btn btn-sm btn-ghost text-error">Отменить отклик</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </section>
+            {% endif %}
+
+            <div class="d-flex flex-wrap gap-2 mt-4">
+                {% if can_confirm %}
+                <form method="post" action="{% url 'doubles_confirm' pk=doubles_request.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary" onclick="return confirm('Подтвердить состав и создать матч?');">Подтвердить матч</button>
+                </form>
+                {% endif %}
+
+                {% if doubles_request.match %}
+                <a href="{% url 'match_detail' pk=doubles_request.match_id %}" class="btn btn-outline">Перейти к матчу</a>
+                {% endif %}
+
+                {% if player and not is_author and has_sparring_access %}
+                    {% if doubles_request.status == 'open' or doubles_request.status == 'forming' or doubles_request.status == 'ready' %}
+                    <form method="post" action="{% url 'doubles_join' pk=doubles_request.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="target_side" value="opponent">
+                        <button type="submit" class="btn btn-primary">Откликнуться (в команду соперников)</button>
+                    </form>
+                    <form method="post" action="{% url 'doubles_join' pk=doubles_request.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="target_side" value="author">
+                        <button type="submit" class="btn btn-outline">Откликнуться (в команду автора)</button>
+                    </form>
+                    {% endif %}
+                {% endif %}
+
+                {% if is_author and doubles_request.status != 'confirmed' and doubles_request.status != 'cancelled' %}
+                <form method="post" action="{% url 'doubles_cancel_request' pk=doubles_request.pk %}" class="d-inline" onsubmit="return confirm('Отменить заявку?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-ghost text-error">Отменить заявку</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -328,6 +328,80 @@ def _get_penalty_text_for_player(match, player) -> str:
             return "\n\n⚠️ <b>Штраф:</b> Из вашего рейтинга силы вычтено <b>40 очков</b> за тех. поражение."
 
 
+def notify_result_confirmed_to_participants(match) -> None:
+    """
+    Уведомление всем участникам матча в Telegram: результат подтверждён,
+    начислено/вычтено очков рейтинга, прогресс силы.
+    """
+    if not bot.is_configured():
+        return
+    from apps.tournaments.utils import get_match_participants
+
+    participants = [
+        p
+        for p in get_match_participants(match)
+        if p and not getattr(p, "is_bye", False) and getattr(p, "user_id", None)
+    ]
+    is_friendly = match.is_friendly_sparring()
+    winner = match.winner
+    winner_team = match.winner_team
+
+    for p in participants:
+        user = getattr(p, "user", None)
+        if not user:
+            continue
+        is_winner = (
+            p == winner
+            or (winner_team and p in (winner_team.player1, winner_team.player2))
+            or (
+                match.is_doubles_sparring()
+                and winner
+                and p.pk in (match.player1_id, match.partner1_id)
+                and winner.pk in (match.player1_id, match.partner1_id)
+            )
+            or (
+                match.is_doubles_sparring()
+                and winner
+                and p.pk in (match.player2_id, match.partner2_id)
+                and winner.pk in (match.player2_id, match.partner2_id)
+            )
+        )
+        if is_friendly:
+            result_line = "Вы выиграли." if is_winner else "Вы проиграли."
+        else:
+            p.refresh_from_db()
+            changes = p.get_rating_changes()
+            fan = changes.get("fan", {})
+            delta = fan.get("delta") or 0
+            from apps.users.rating_utils import rating_to_ntrp_level
+
+            if delta != 0:
+                d_str = f"+{int(delta)}" if delta > 0 else str(int(delta))
+                rating_before = float(p.total_points) - float(delta)
+                ntrp_before = rating_to_ntrp_level(rating_before)
+                ntrp_after = rating_to_ntrp_level(float(p.total_points))
+                result_line = (
+                    f"Вы выиграли. Вам начислено {d_str} очков рейтинга. Сила: {ntrp_before:.1f} → {ntrp_after:.1f}."
+                    if is_winner
+                    else f"Вы проиграли. У вас вычтено {abs(int(delta))} очков рейтинга. Сила: {ntrp_before:.1f} → {ntrp_after:.1f}."
+                )
+            else:
+                result_line = "Вы выиграли." if is_winner else "Вы проиграли."
+
+        text = (
+            "✅ <b>Результат матча подтверждён</b>\n\n"
+            f"Матч: {match.get_player1_display()} — {match.get_player2_display()}\n"
+            f"Счёт: {match.score_display() or '—'}\n\n"
+            f"{result_line}"
+        )
+        send_to_user_by_user(user, text)
+    logger.info(
+        "notify_result_confirmed_to_participants: match=%s, participants=%s",
+        match.pk,
+        len(participants),
+    )
+
+
 def notify_proposal_confirmed(proposal) -> None:
     """Уведомление инициатору о подтверждении результата."""
     if not bot.is_configured():
@@ -788,7 +862,7 @@ def notify_sparring_response(sparring_response) -> None:
     if respondent.age:
         lines.append(f"<b>Возраст:</b> {respondent.age} лет")
 
-    # Добавляем уровень NTRP
+    # Добавляем уровень силы
     if respondent.skill_level:
         skill_display = dict(SkillLevel.choices).get(
             respondent.skill_level, respondent.skill_level
@@ -854,4 +928,55 @@ def notify_sparring_response(sparring_response) -> None:
         request.pk,
         respondent.pk,
         ok,
+    )
+
+
+def notify_sparring_response_accepted(sparring_response, match) -> None:
+    """Уведомление откликнувшемуся игроку: ваш отклик принят, матч создан (в бот)."""
+    if not bot.is_configured():
+        return
+    respondent_user = getattr(sparring_response.respondent, "user", None)
+    if not respondent_user:
+        return
+    deadline_str = (
+        match.deadline.strftime("%d.%m.%Y") if match.deadline else "не указан"
+    )
+    text = (
+        "✅ <b>Ваш отклик на заявку на спарринг принят!</b>\n\n"
+        "Матч создан. Внесите результат до дедлайна в разделе «Мои матчи».\n"
+        f"Дедлайн: {deadline_str}."
+    )
+    reply_markup = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "📝 Внести результат",
+                    "callback_data": f"result_enter_{match.pk}",
+                }
+            ],
+            [{"text": "📅 Мои матчи", "callback_data": "menu_my_matches"}],
+        ],
+    }
+    send_to_user_by_user(respondent_user, text, reply_markup=reply_markup)
+    logger.info(
+        "notify_sparring_response_accepted: response=%s, respondent=%s",
+        sparring_response.pk,
+        sparring_response.respondent_id,
+    )
+
+
+def notify_doubles_join_accepted(join_request) -> None:
+    """Уведомление всем участникам отклика (парный 2×2): ваш отклик принят (в бот)."""
+    if not bot.is_configured():
+        return
+    text = (
+        "✅ <b>Ваш отклик на парный матч 2×2 принят!</b>\n\n"
+        "Ожидайте подтверждения матча автором заявки. После подтверждения матч появится в «Мои матчи»."
+    )
+    for m in join_request.members.select_related("player__user"):
+        if m.player and getattr(m.player, "user_id", None):
+            send_to_user_by_user(m.player.user, text)
+    logger.info(
+        "notify_doubles_join_accepted: join_request=%s",
+        join_request.pk,
     )

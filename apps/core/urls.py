@@ -8,6 +8,7 @@ from . import views
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("api/recent-matches/", views.api_recent_matches, name="api_recent_matches"),
     path("rating/", views.rating, name="rating"),
     path("hall-of-fame/", views.hall_of_fame, name="hall_of_fame"),
     path("results/", views.results, name="results"),
@@ -16,5 +17,9 @@ urlpatterns = [
     path("support/", views.support_feedback, name="support_feedback"),
     path("api/feedback/submit/", views.feedback_submit, name="feedback_submit"),
     path("api/feedback/threads/", views.feedback_threads, name="feedback_threads"),
-    path("telegram/support-webhook/", views.telegram_support_webhook, name="telegram_support_webhook"),
+    path(
+        "telegram/support-webhook/",
+        views.telegram_support_webhook,
+        name="telegram_support_webhook",
+    ),
 ]

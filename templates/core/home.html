@@ -6,7 +6,7 @@
 {% block content %}
 <!-- Hero Section -->
 <section class="hero hero--premium">
-    <div class="container">
+    <div class="container hero-grid">
         <div class="hero-content hero-content--premium">
             <h1 class="hero-title hero-title--premium">Играй. Побеждай. Расти в рейтинге.</h1>
             <p class="hero-subtitle hero-subtitle--premium">Рейтинг любителей по всей России. Честная конкуренция. Настоящие турниры.</p>
@@ -30,12 +30,25 @@
                     <span class="hero-metric__label">сыгранных матчей</span>
                 </div>
             </div>
+            <div class="hero-metrics hero-metrics--premium">
+                <div class="hero-metric">
+                    <span class="hero-metric__value">{{ hero_stats.courts_count|default:"0" }}</span>
+                    <span class="hero-metric__label">кортов</span>
+                </div>
+                <div class="hero-metric-divider"></div>
+                <div class="hero-metric">
+                    <span class="hero-metric__value">{{ hero_stats.cities_count|default:"0" }}</span>
+                    <span class="hero-metric__label">городов</span>
+                </div>
+                <div class="hero-metric-divider"></div>
+                <div class="hero-metric">
+                    <span class="hero-metric__value">{{ hero_stats.coaches_count|default:"0" }}</span>
+                    <span class="hero-metric__label">тренеров</span>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <!-- Live Results Ticker -->
-    <div class="live-results" id="live-results" data-avatar-placeholder="{% static 'images/avatar_placeholder.jpg' %}">
-        <div class="container">
+        <div class="live-results" id="live-results" data-avatar-placeholder="{% static 'images/avatar_placeholder.jpg' %}">
             <div class="live-results__header">
                 <span class="live-results__title">🎾 Результаты матчей</span>
                 <span class="live-results__subtitle">За последние 5 дней</span>
@@ -71,11 +84,17 @@
                 {% endfor %}
             </div>
         </div>
+
+        <div class="hero-video-wrapper">
+            <video class="hero-video" autoplay muted loop playsinline>
+                <source src="{% static 'video/hero_video.mp4' %}" type="video/mp4">
+            </video>
+        </div>
     </div>
 </section>
 
 <!-- Tournaments with filters -->
-<section class="section">
+<section class="section section-tournaments-spaced">
     <div class="container">
         <div class="section-header">
             <h2 class="section-title">Турниры</h2>

@@ -1,0 +1,79 @@
+x-app-env: &app-env
+  DEBUG: "False"
+  USE_POSTGRES: "True"
+  POSTGRES_DB: ${POSTGRES_DB}
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_HOST: db
+  POSTGRES_PORT: "5432"
+  SECRET_KEY: ${SECRET_KEY}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+  TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+  TELEGRAM_SUPPORT_BOT_TOKEN: ${TELEGRAM_SUPPORT_BOT_TOKEN}
+  TELEGRAM_USER_BOT_TOKEN: ${TELEGRAM_USER_BOT_TOKEN}
+  TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID}
+  TELEGRAM_BOT_SITE_BASE_URL: ${TELEGRAM_BOT_SITE_BASE_URL}
+  TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID: ${TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID}
+  YANDEX_MAPS_API_KEY: ${YANDEX_MAPS_API_KEY}
+  YANDEX_GEOCODER_API_KEY: ${YANDEX_GEOCODER_API_KEY}
+  YANDEX_GEOCODER_REFERER: ${YANDEX_GEOCODER_REFERER}
+  EMAIL_BACKEND: ${EMAIL_BACKEND}
+  EMAIL_HOST: ${EMAIL_HOST}
+  EMAIL_PORT: ${EMAIL_PORT}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS}
+  EMAIL_USE_SSL: ${EMAIL_USE_SSL}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL}
+  USE_S3: ${USE_S3:-False}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+  S3_SECRET_KEY: ${S3_SECRET_KEY}
+  S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
+  S3_REGION: ${S3_REGION:-ru-1}
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *app-env
+    volumes:
+      - static_data:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  cron:
+    build: .
+    entrypoint: ["/cron-entrypoint.sh"]
+    environment:
+      <<: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  static_data:

@@ -728,7 +728,7 @@ def save_ntrp(request):
     except (InvalidOperation, ValueError):
         return JsonResponse({"ok": False, "error": "invalid_level"}, status=400)
 
-    if level < Decimal("1.0") or level > Decimal("7.0"):
+    if level < Decimal("1.5") or level > Decimal("7.0"):
         return JsonResponse({"ok": False, "error": "out_of_range"}, status=400)
 
     try:

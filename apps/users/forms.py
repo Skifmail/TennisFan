@@ -74,7 +74,7 @@ class UserRegistrationForm(forms.ModelForm):
             )
         try:
             v = Decimal(str(val))
-            if v < Decimal("1.0") or v > Decimal("7.0"):
+            if v < Decimal("1.5") or v > Decimal("7.0"):
                 raise forms.ValidationError(
                     "Некорректный результат теста. Пройдите тест заново."
                 )

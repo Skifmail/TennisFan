@@ -120,7 +120,7 @@ class Player(CompressImageFieldsMixin, models.Model):
     )
     city = models.CharField("Город", max_length=100, blank=True, default="")
     ntrp_level = models.DecimalField(
-        "Уровень силы", max_digits=3, decimal_places=1, default=1.0
+        "Уровень силы", max_digits=3, decimal_places=1, default=1.5
     )
     skill_level = models.CharField(
         "Уровень силы",

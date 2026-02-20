@@ -80,11 +80,15 @@
 }
 .tournament-table-card {
     display: block;
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
     text-decoration: none;
     color: inherit;
 }
-.tournament-table-card:hover {
+.tournament-table-card.card-in-view {
+    transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow var(--transition-fast);
+}
+.tournament-table-card.card-in-view:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
 }

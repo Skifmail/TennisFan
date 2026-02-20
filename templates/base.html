@@ -124,38 +124,65 @@
                     </h3>
                     <p class="footer-desc">Всероссийская теннисная платформа для игроков всех уровней</p>
                     {% if not user.is_authenticated %}
-                    <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2">Пройти тест уровня силы</a>
+                    <a href="{% url 'ntrp_test' %}" class="btn btn-outline footer-btn-extra">Пройти тест уровня силы</a>
                     {% endif %}
-                    <a href="{% url 'donate' %}" class="btn btn-donate footer-donate mt-2">ОТПРАВИТЬ ДОНАТ</a>
+                    <a href="{% url 'donate' %}" class="btn btn-donate footer-donate footer-btn-extra">ОТПРАВИТЬ ДОНАТ</a>
                 </div>
 
-                <div class="footer-links">
-                    <h4>Навигация</h4>
-                    <ul>
+                <div class="footer-links footer-section">
+                    <button type="button" class="footer-section__toggle" aria-expanded="false" data-footer-toggle>
+                        <span>Навигация</span>
+                        <span class="footer-section__icon" aria-hidden="true"></span>
+                    </button>
+                    <ul class="footer-section__content">
+                        <li><a href="{% url 'home' %}">Главная</a></li>
                         <li><a href="{% url 'tournament_list' %}">Турниры</a></li>
                         <li><a href="{% url 'tournament_tables_list' %}">Турнирные таблицы</a></li>
+                        <li><a href="{% url 'champions_league' %}">Лига чемпионов</a></li>
                         <li><a href="{% url 'rating' %}">Рейтинг</a></li>
+                        <li><a href="{% url 'hall_of_fame' %}">Зал славы</a></li>
+                        <li><a href="{% url 'results' %}">Результаты</a></li>
                         <li><a href="{% url 'court_list' %}">Корты</a></li>
+                        <li><a href="{% url 'sparring_list' %}">Спарринг</a></li>
                         <li><a href="{% url 'training_list' %}">Тренировки</a></li>
+                        <li><a href="{% url 'coach_list' %}">Тренеры</a></li>
+                        <li><a href="{% url 'shop_list' %}">Магазин</a></li>
                     </ul>
                 </div>
 
-                <div class="footer-links">
-                    <h4>Информация</h4>
-                    <ul>
+                <div class="footer-links footer-section">
+                    <button type="button" class="footer-section__toggle" aria-expanded="false" data-footer-toggle>
+                        <span>Информация</span>
+                        <span class="footer-section__icon" aria-hidden="true"></span>
+                    </button>
+                    <ul class="footer-section__content">
                         <li><a href="{% url 'about_us' %}">О нас</a></li>
                         <li><a href="{% url 'contacts' %}">Контакты</a></li>
                         <li><a href="{% url 'pricing' %}">Тарифы и подписка</a></li>
                         <li><a href="{% url 'rules' %}">Правила</a></li>
                         <li><a href="{% url 'news_list' %}">Новости</a></li>
                         <li><a href="{% url 'gallery_list' %}">Фото</a></li>
-                        <li><a href="{% url 'legal_index' %}">Правовые документы</a></li>
+                        <li><a href="{% url 'videos' %}">Видео</a></li>
+                        <li><a href="{% url 'stringers' %}">Стрингеры</a></li>
+                        <li><a href="{% url 'support_feedback' %}">Поддержка</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-links footer-section">
+                    <button type="button" class="footer-section__toggle" aria-expanded="false" data-footer-toggle>
+                        <span>Документы</span>
+                        <span class="footer-section__icon" aria-hidden="true"></span>
+                    </button>
+                    <ul class="footer-section__content">
+                        <li><a href="{% url 'legal_privacy' %}">Политика конфиденциальности</a></li>
                         <li><a href="{% url 'legal_offer' %}">Публичная оферта</a></li>
+                        <li><a href="{% url 'legal_terms' %}">Условия использования</a></li>
+                        <li><a href="{% url 'legal_personal_data' %}">Обработка персональных данных</a></li>
                     </ul>
                 </div>
 
                 <div class="footer-social">
-                    <h4>Наши соцсети</h4>
+                    <h4 class="footer-social__title">Мы в соцсетях</h4>
                     <div class="social-links">
                         <a href="{% url 'private_chat_access' %}" class="social-link" aria-label="Telegram">
                             <img src="{% static 'images/Telegram_logo.svg' %}" alt="Telegram" width="20" height="20">

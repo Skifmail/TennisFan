@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env.local", override=True)  # локальная разработка
 
 # ------------------------------------------------------------------------------
 # CORE
@@ -57,6 +58,15 @@ SESSION_COOKIE_AGE = 1209600
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_SAVE_EVERY_REQUEST = True
 
+# Защита от перебора паролей (админка и вход на сайт)
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # часы блокировки по IP после превышения попыток
+AXES_LOCKOUT_TEMPLATE = None
+AXES_LOCKOUT_URL = None
+
+# Опционально: свой путь к админке (в .env задать, напр. ADMIN_URL=manage-secret-xyz)
+ADMIN_URL = os.environ.get("ADMIN_URL", "admin").strip("/") or "admin"
+
 # ------------------------------------------------------------------------------
 # APPLICATIONS
 # ------------------------------------------------------------------------------
@@ -71,6 +81,7 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "django_crontab",
     "storages",
+    "axes",
     # Local apps
     "apps.core",
     "apps.users",
@@ -101,6 +112,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "axes.middleware.AxesMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -158,6 +170,24 @@ else:
     }
 
 AUTH_USER_MODEL = "users.User"
+
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+# Валидаторы паролей (в т.ч. для суперпользователя и staff)
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 10},
+    },
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
 
 # ------------------------------------------------------------------------------
 # STATIC FILES
@@ -252,7 +282,11 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
 TELEGRAM_SUPPORT_BOT_TOKEN = os.environ.get("TELEGRAM_SUPPORT_BOT_TOKEN", "")
+TELEGRAM_SUPPORT_WEBHOOK_SECRET = os.environ.get("TELEGRAM_SUPPORT_WEBHOOK_SECRET", "")
 TELEGRAM_USER_BOT_TOKEN = os.environ.get("TELEGRAM_USER_BOT_TOKEN", "")
+TELEGRAM_USER_BOT_WEBHOOK_SECRET = os.environ.get(
+    "TELEGRAM_USER_BOT_WEBHOOK_SECRET", ""
+)
 TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID = os.environ.get(
     "TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID", ""
 )

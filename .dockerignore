@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+
+# Local files
+.env
+.env.local
+*.sqlite3
+db.sqlite3
+media/
+logs/
+staticfiles/
+
+# Docker
+docker-compose.yml
+docker-compose*.yml
+
+# Misc
+*.log
+*.md
+!requirements.txt

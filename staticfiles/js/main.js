@@ -57,13 +57,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Auto-hide alerts after 5 seconds
-    document.querySelectorAll('.alert').forEach(function(alert) {
+    document.querySelectorAll('.alert').forEach(function(el) {
         setTimeout(function() {
-            alert.style.opacity = '0';
-            alert.style.transition = 'opacity 0.3s ease';
-            setTimeout(function() {
-                alert.remove();
-            }, 300);
+            el.style.transition = 'opacity 0.3s ease';
+            el.style.opacity = '0';
+            el.addEventListener('transitionend', function() {
+                el.remove();
+            }, { once: true });
         }, 5000);
     });
 
@@ -82,42 +82,55 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Карточки: появление снизу вверх по очереди слева направо
-    var cards = document.querySelectorAll('.main .card');
-    var winH = window.innerHeight;
-    var staggerMs = 120;
-    function inViewport(el) {
-        var r = el.getBoundingClientRect();
-        return r.top < winH + 60;
-    }
+    var cards = document.querySelectorAll('.main .card, .main .match-card');
+    var staggerMs = 100;
+    var pendingReveal = false;
+
     function sortByPosition(nodes) {
-        return Array.prototype.slice.call(nodes).sort(function(a, b) {
-            var ra = a.getBoundingClientRect();
-            var rb = b.getBoundingClientRect();
-            var rowA = Math.round(ra.top / 30);
-            var rowB = Math.round(rb.top / 30);
+        var arr = Array.prototype.slice.call(nodes);
+        var rects = new Map();
+        arr.forEach(function(el) { rects.set(el, el.getBoundingClientRect()); });
+        return arr.sort(function(a, b) {
+            var ra = rects.get(a), rb = rects.get(b);
+            var rowA = Math.round(ra.top / 30), rowB = Math.round(rb.top / 30);
             if (rowA !== rowB) return rowA - rowB;
             return ra.left - rb.left;
         });
     }
+
     function revealBatch() {
+        pendingReveal = false;
+        var winH = window.innerHeight;
         var toReveal = [];
         cards.forEach(function(card) {
             if (card.classList.contains('card-in-view')) return;
-            if (inViewport(card)) toReveal.push(card);
+            var r = card.getBoundingClientRect();
+            if (r.top < winH + 60) toReveal.push(card);
         });
         if (toReveal.length === 0) return;
         toReveal = sortByPosition(toReveal);
         toReveal.forEach(function(card, i) {
             card.style.transitionDelay = (i * staggerMs) / 1000 + 's';
             card.classList.add('card-in-view');
+            if (observer) observer.unobserve(card);
+            card.addEventListener('transitionend', function onEnd() {
+                card.removeEventListener('transitionend', onEnd);
+                card.style.willChange = 'auto';
+            }, { once: true });
         });
     }
+
+    var observer = null;
     if (cards.length && 'IntersectionObserver' in window) {
-        var observer = new IntersectionObserver(function(entries) {
+        observer = new IntersectionObserver(function(entries) {
             var hasNew = entries.some(function(e) { return e.isIntersecting; });
-            if (hasNew) requestAnimationFrame(revealBatch);
-        }, { rootMargin: '0px 0px -60px 0px', threshold: 0.01 });
+            if (hasNew && !pendingReveal) {
+                pendingReveal = true;
+                requestAnimationFrame(revealBatch);
+            }
+        }, { rootMargin: '0px 0px -40px 0px', threshold: 0.01 });
         cards.forEach(function(card) {
+            card.style.willChange = 'transform, opacity';
             observer.observe(card);
         });
         requestAnimationFrame(revealBatch);
@@ -126,4 +139,15 @@ document.addEventListener('DOMContentLoaded', function() {
             card.classList.add('card-in-view');
         });
     }
+
+    // Footer accordion (mobile): сворачиваемые секции
+    document.querySelectorAll('.footer-section [data-footer-toggle]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var section = this.closest('.footer-section');
+            if (!section) return;
+            var isOpen = section.classList.toggle('is-open');
+            this.setAttribute('aria-expanded', isOpen === true ? 'true' : 'false');
+        });
+    });
 });

@@ -35,8 +35,9 @@ class UserRegistrationForm(forms.ModelForm):
     )
     password = forms.CharField(
         label="Пароль *",
-        widget=forms.PasswordInput(attrs={"class": "form-control"}),
-        min_length=8,
+        widget=forms.PasswordInput(attrs={"class": "form-control", "minlength": 10}),
+        min_length=10,
+        help_text="Минимум 10 символов, не только цифры.",
     )
     password_confirm = forms.CharField(
         label="Подтвердите пароль *",

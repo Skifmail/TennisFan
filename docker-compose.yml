@@ -1,10 +1,12 @@
+version: "3.9"
+
 x-app-env: &app-env
   DEBUG: "False"
   USE_POSTGRES: "True"
   POSTGRES_DB: ${POSTGRES_DB}
   POSTGRES_USER: ${POSTGRES_USER}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-  POSTGRES_HOST: db
+  POSTGRES_HOST: ${POSTGRES_HOST}
   POSTGRES_PORT: "5432"
   SECRET_KEY: ${SECRET_KEY}
   ALLOWED_HOSTS: ${ALLOWED_HOSTS}
@@ -36,44 +38,32 @@ x-app-env: &app-env
 services:
   web:
     build: .
-    ports:
-      - "8000:8000"
     environment:
       <<: *app-env
+    command: >
+      sh -c "
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput &&
+      gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+      "
+    expose:
+      - "8000"
     volumes:
       - static_data:/app/staticfiles
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
 
   cron:
     build: .
     entrypoint: ["/cron-entrypoint.sh"]
     environment:
       <<: *app-env
-    depends_on:
-      db:
-        condition: service_healthy
-      web:
-        condition: service_started
-    restart: unless-stopped
-
-  db:
-    image: postgres:16-alpine
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
 
 volumes:
-  postgres_data:
   static_data:

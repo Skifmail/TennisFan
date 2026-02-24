@@ -37,13 +37,12 @@ User = get_user_model()
 if not User.objects.filter(is_superuser=True).exists():
     User.objects.create_superuser(
         email=os.environ['DJANGO_SUPERUSER_EMAIL'],
-        password=os.environ['DJANGO_SUPERUSER_PASSWORD'],
-        username=os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
+        password=os.environ['DJANGO_SUPERUSER_PASSWORD']
     )
     print('Superuser created.')
 else:
     print('Superuser already exists.')
-" 2>/dev/null || true
+"
 fi
 
 echo "Collecting static files..."

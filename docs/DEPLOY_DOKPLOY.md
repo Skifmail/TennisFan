@@ -123,7 +123,7 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 
 | Переменная | Пример / описание |
 |------------|-------------------|
-| `SECRET_KEY` | Длинная случайная строка (Django) |
+| `SECRET_KEY` | Длинная случайная строка (Django). Если в строке есть символ `$`, в Dokploy замените его на `$$`, иначе Compose будет трактовать `$буквы` как переменную (например `$iu` → предупреждение и пустая подстановка). |
 | `ALLOWED_HOSTS` | `tennisfan.ru,www.tennisfan.ru` |
 | `CSRF_TRUSTED_ORIGINS` | `https://tennisfan.ru,https://www.tennisfan.ru` |
 | `POSTGRES_DB` | `tennisfan` |
@@ -147,9 +147,8 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 - **Опционально:** `TELEGRAM_USER_BOT_WEBHOOK_SECRET`, `TELEGRAM_SUPPORT_WEBHOOK_SECRET`, `ADMIN_URL`
 - **Первый вход в админку:** чтобы при первом деплое автоматически создать суперпользователя, добавьте в Environment:
   - `DJANGO_SUPERUSER_EMAIL` — email для входа (например `admin@tennisfan.ru`);
-  - `DJANGO_SUPERUSER_PASSWORD` — пароль;
-  - при желании `DJANGO_SUPERUSER_USERNAME` (по умолчанию `admin`).
-  После первого входа эти переменные можно удалить из Environment. Если суперпользователь уже есть, они игнорируются.
+  - `DJANGO_SUPERUSER_PASSWORD` — пароль.
+  В админку входите **по этому email и паролю** (логин = email). После первого входа переменные можно удалить из Environment. Если суперпользователь уже есть, они игнорируются.
 
 Можно взять полный список из `.env.example` в репозитории и перенести ключи и значения в Environment в Dokploy (значения — свои, продакшен).
 

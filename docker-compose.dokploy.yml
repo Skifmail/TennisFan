@@ -1,8 +1,7 @@
 # Docker Compose для деплоя через Dokploy.
 # Содержит PostgreSQL; переменные окружения задаются в Dokploy UI (вкладка Environment).
 # В General укажите: Compose file path = docker-compose.dokploy.yml
-
-version: "3.9"
+# (version убран — атрибут устарел в новых Docker Compose)
 
 x-app-env: &app-env
   DEBUG: "False"

@@ -4,6 +4,7 @@ set -e
 echo "Waiting for database..."
 while ! python -c "
 import os
+import sys
 import psycopg2
 try:
     conn = psycopg2.connect(
@@ -15,10 +16,11 @@ try:
     )
     conn.close()
     exit(0)
-except:
+except Exception as e:
+    print(f'DB connect failed: {e}', file=sys.stderr)
     exit(1)
-" 2>/dev/null; do
-    sleep 1
+"; do
+    sleep 2
 done
 
 echo "Database is ready!"

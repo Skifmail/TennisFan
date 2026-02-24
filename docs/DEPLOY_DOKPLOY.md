@@ -145,6 +145,11 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 - **Почта:** `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`
 - **S3:** `USE_S3`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET_NAME`, `S3_ENDPOINT_URL`, `S3_REGION`
 - **Опционально:** `TELEGRAM_USER_BOT_WEBHOOK_SECRET`, `TELEGRAM_SUPPORT_WEBHOOK_SECRET`, `ADMIN_URL`
+- **Первый вход в админку:** чтобы при первом деплое автоматически создать суперпользователя, добавьте в Environment:
+  - `DJANGO_SUPERUSER_EMAIL` — email для входа (например `admin@tennisfan.ru`);
+  - `DJANGO_SUPERUSER_PASSWORD` — пароль;
+  - при желании `DJANGO_SUPERUSER_USERNAME` (по умолчанию `admin`).
+  После первого входа эти переменные можно удалить из Environment. Если суперпользователь уже есть, они игнорируются.
 
 Можно взять полный список из `.env.example` в репозитории и перенести ключи и значения в Environment в Dokploy (значения — свои, продакшен).
 

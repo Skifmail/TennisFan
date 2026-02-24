@@ -38,10 +38,9 @@ x-app-env: &app-env
   S3_BUCKET_NAME: ${S3_BUCKET_NAME}
   S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
   S3_REGION: ${S3_REGION:-ru-1}
-  # Опционально: первый суперпользователь (создаётся только если суперпользователей ещё нет)
+  # Опционально: первый суперпользователь (создаётся только если суперпользователей ещё нет). Вход в админку — по email.
   DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-}
   DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
-  DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
 
 services:
   db:

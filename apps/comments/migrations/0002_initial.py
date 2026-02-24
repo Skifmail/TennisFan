@@ -9,24 +9,35 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('comments', '0001_initial'),
-        ('contenttypes', '0002_remove_content_type_name'),
-        ('users', '0001_initial'),
+        ("comments", "0001_initial"),
+        ("contenttypes", "0002_remove_content_type_name"),
+        ("users", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='comment',
-            name='author',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='comments', to='users.player', verbose_name='Автор'),
+            model_name="comment",
+            name="author",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="comments",
+                to="users.player",
+                verbose_name="Автор",
+            ),
         ),
         migrations.AddField(
-            model_name='comment',
-            name='content_type',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype'),
+            model_name="comment",
+            name="content_type",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                to="contenttypes.contenttype",
+            ),
         ),
         migrations.AddIndex(
-            model_name='comment',
-            index=models.Index(fields=['content_type', 'object_id'], name='comments_co_content_cff8bd_idx'),
+            model_name="comment",
+            index=models.Index(
+                fields=["content_type", "object_id"],
+                name="comments_co_content_cff8bd_idx",
+            ),
         ),
     ]

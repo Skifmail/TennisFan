@@ -30,15 +30,25 @@ class Command(BaseCommand):
             except Player.DoesNotExist:
                 player = None
             if player and player.is_bye:
-                self.stdout.write(self.style.SUCCESS("Служебный игрок «Свободный круг» уже существует."))
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        "Служебный игрок «Свободный круг» уже существует."
+                    )
+                )
                 return
             if player:
                 player.is_bye = True
                 player.save(update_fields=["is_bye"])
-                self.stdout.write(self.style.SUCCESS("Игрок восстановлен (is_bye=True)."))
+                self.stdout.write(
+                    self.style.SUCCESS("Игрок восстановлен (is_bye=True).")
+                )
                 return
             Player.objects.create(user=user, is_bye=True)
-            self.stdout.write(self.style.SUCCESS("Игрок «Свободный круг» создан (User существовал без Player)."))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "Игрок «Свободный круг» создан (User существовал без Player)."
+                )
+            )
             return
 
         user = User.objects.create(
@@ -49,4 +59,6 @@ class Command(BaseCommand):
             password=make_password(None),
         )
         Player.objects.create(user=user, is_bye=True)
-        self.stdout.write(self.style.SUCCESS("Служебный игрок «Свободный круг» создан."))
+        self.stdout.write(
+            self.style.SUCCESS("Служебный игрок «Свободный круг» создан.")
+        )

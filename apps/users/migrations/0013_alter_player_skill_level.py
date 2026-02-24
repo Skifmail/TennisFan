@@ -6,13 +6,24 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0012_remove_player_category'),
+        ("users", "0012_remove_player_category"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='player',
-            name='skill_level',
-            field=models.CharField(choices=[('novice', 'Новичок'), ('amateur', 'Любитель'), ('experienced', 'Опытный'), ('advanced', 'Продвинутый'), ('professional', 'Профессионал')], help_text='Единственный уровень игрока: Новичок, Любитель, Опытный, Продвинутый, Профессионал.', max_length=20, verbose_name='Уровень мастерства (NTRP)'),
+            model_name="player",
+            name="skill_level",
+            field=models.CharField(
+                choices=[
+                    ("novice", "Новичок"),
+                    ("amateur", "Любитель"),
+                    ("experienced", "Опытный"),
+                    ("advanced", "Продвинутый"),
+                    ("professional", "Профессионал"),
+                ],
+                help_text="Единственный уровень игрока: Новичок, Любитель, Опытный, Продвинутый, Профессионал.",
+                max_length=20,
+                verbose_name="Уровень мастерства (NTRP)",
+            ),
         ),
     ]

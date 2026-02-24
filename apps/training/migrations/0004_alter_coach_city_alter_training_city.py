@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('training', '0003_alter_training_target_category'),
+        ("training", "0003_alter_training_target_category"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='coach',
-            name='city',
-            field=models.CharField(max_length=100, verbose_name='Город'),
+            model_name="coach",
+            name="city",
+            field=models.CharField(max_length=100, verbose_name="Город"),
         ),
         migrations.AlterField(
-            model_name='training',
-            name='city',
-            field=models.CharField(max_length=100, verbose_name='Город'),
+            model_name="training",
+            name="city",
+            field=models.CharField(max_length=100, verbose_name="Город"),
         ),
     ]

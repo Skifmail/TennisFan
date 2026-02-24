@@ -21,6 +21,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         count = check_and_generate_past_deadline_brackets()
         if count == 0:
-            self.stdout.write("Нет турниров с истёкшим дедлайном регистрации (сетка уже сформирована или дедлайн не наступил).")
+            self.stdout.write(
+                "Нет турниров с истёкшим дедлайном регистрации (сетка уже сформирована или дедлайн не наступил)."
+            )
         else:
             self.stdout.write(self.style.SUCCESS(f"Сформировано сеток: {count}."))

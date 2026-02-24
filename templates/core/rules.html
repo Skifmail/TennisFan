@@ -77,6 +77,9 @@
                         <button class="rules-subtabs__btn" data-subtab="seeding" role="tab" aria-selected="false">
                             Правила посева
                         </button>
+                        <button class="rules-subtabs__btn" data-subtab="tvd" role="tab" aria-selected="false">
+                            ТВД
+                        </button>
                     </div>
 
                     <div class="rules-subtabs__content" id="fan" role="tabpanel">
@@ -111,6 +114,13 @@
                         <article class="rules-doc card">
                             <div class="card-body rules-doc__body">
                                 {% if rules_content.rules_seeding %}{{ rules_content.rules_seeding|safe }}{% else %}{% include 'core/rules_seeding.html' %}{% endif %}
+                            </div>
+                        </article>
+                    </div>
+                    <div class="rules-subtabs__content" id="tvd" role="tabpanel" style="display: none;">
+                        <article class="rules-doc card">
+                            <div class="card-body rules-doc__body">
+                                {% if rules_content.rules_tvd %}{{ rules_content.rules_tvd|safe }}{% else %}{% include 'core/rules_tvd.html' %}{% endif %}
                             </div>
                         </article>
                     </div>

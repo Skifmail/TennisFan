@@ -7,27 +7,67 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0015_add_stringer_company_fk'),
+        ("content", "0015_add_stringer_company_fk"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='StringerCompanyContact',
+            name="StringerCompanyContact",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('contact_type', models.CharField(choices=[('phone', 'Телефон'), ('telegram', 'Telegram'), ('whatsapp', 'WhatsApp'), ('max', 'MAX')], max_length=20, verbose_name='Тип контакта')),
-                ('value', models.CharField(help_text=('Телефон: номер (например 79991234567). Telegram: @username или username. WhatsApp: номер. MAX: ссылка на профиль или номер.',), max_length=300, verbose_name='Значение')),
-                ('order', models.PositiveSmallIntegerField(default=0, verbose_name='Порядок')),
-                ('company', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='contact_items', to='content.stringercompany', verbose_name='Компания')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "contact_type",
+                    models.CharField(
+                        choices=[
+                            ("phone", "Телефон"),
+                            ("telegram", "Telegram"),
+                            ("whatsapp", "WhatsApp"),
+                            ("max", "MAX"),
+                        ],
+                        max_length=20,
+                        verbose_name="Тип контакта",
+                    ),
+                ),
+                (
+                    "value",
+                    models.CharField(
+                        help_text=(
+                            "Телефон: номер (например 79991234567). Telegram: @username или username. WhatsApp: номер. MAX: ссылка на профиль или номер.",
+                        ),
+                        max_length=300,
+                        verbose_name="Значение",
+                    ),
+                ),
+                (
+                    "order",
+                    models.PositiveSmallIntegerField(default=0, verbose_name="Порядок"),
+                ),
+                (
+                    "company",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="contact_items",
+                        to="content.stringercompany",
+                        verbose_name="Компания",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Контакт компании',
-                'verbose_name_plural': 'Контакты компании',
-                'ordering': ['order', 'id'],
+                "verbose_name": "Контакт компании",
+                "verbose_name_plural": "Контакты компании",
+                "ordering": ["order", "id"],
             },
         ),
         migrations.RemoveField(
-            model_name='stringercompany',
-            name='contacts',
+            model_name="stringercompany",
+            name="contacts",
         ),
     ]

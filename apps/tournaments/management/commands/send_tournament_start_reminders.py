@@ -49,13 +49,17 @@ class Command(BaseCommand):
         sent = 0
         for tournament in tournaments:
             if dry_run:
-                self.stdout.write(f"  Турнир: {tournament.name} (slug={tournament.slug})")
+                self.stdout.write(
+                    f"  Турнир: {tournament.name} (slug={tournament.slug})"
+                )
                 continue
             try:
                 tg.notify_tournament_start(tournament)
                 sent += 1
             except Exception as e:
-                logger.exception("send_tournament_start_reminders %s: %s", tournament.slug, e)
+                logger.exception(
+                    "send_tournament_start_reminders %s: %s", tournament.slug, e
+                )
 
         if dry_run:
             self.stdout.write(f"Dry-run: турниров «начало сегодня»: {len(tournaments)}")

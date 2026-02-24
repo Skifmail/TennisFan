@@ -6,20 +6,30 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0016_add_stringer_company_contact'),
+        ("content", "0016_add_stringer_company_contact"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='aboutus',
-            options={'verbose_name': 'Страница «О нас»', 'verbose_name_plural': 'Страница «О нас»'},
+            name="aboutus",
+            options={
+                "verbose_name": "Страница «О нас»",
+                "verbose_name_plural": "Страница «О нас»",
+            },
         ),
         migrations.AlterModelOptions(
-            name='contactpage',
-            options={'verbose_name': 'Страница «Контакты»', 'verbose_name_plural': 'Страница «Контакты»'},
+            name="contactpage",
+            options={
+                "verbose_name": "Страница «Контакты»",
+                "verbose_name_plural": "Страница «Контакты»",
+            },
         ),
         migrations.AlterModelOptions(
-            name='page',
-            options={'ordering': ['order'], 'verbose_name': 'Страница (текстовая)', 'verbose_name_plural': 'Страницы (текстовые)'},
+            name="page",
+            options={
+                "ordering": ["order"],
+                "verbose_name": "Страница (текстовая)",
+                "verbose_name_plural": "Страницы (текстовые)",
+            },
         ),
     ]

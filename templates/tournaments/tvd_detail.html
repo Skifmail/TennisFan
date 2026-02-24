@@ -1,0 +1,584 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}{{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="mb-4">
+        <a href="{% url 'tournament_list' %}" class="text-secondary">&larr; Все турниры</a>
+    </div>
+
+    <div class="d-flex gap-2 mb-2 flex-wrap">
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_variant_display }}</span>
+        <span class="player-category" style="background: rgba(72, 61, 139, 0.25); color: #483d8b;">ТВД</span>
+        {% for ac in tournament.allowed_categories.all %}
+        <span class="player-category">{{ ac.get_category_display }}</span>
+        {% endfor %}
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_duration_display }}</span>
+        {% if tournament.max_participants %}
+        {% if tournament.is_full %}
+        <span class="player-category" style="background: rgba(255, 0, 0, 0.2); color: var(--color-error);">Мест: {{ tournament.participants.count }} из {{ tournament.max_participants }}</span>
+        {% else %}
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">Мест: {{ tournament.participants.count }} из {{ tournament.max_participants }}</span>
+        {% endif %}
+        {% endif %}
+        {% if tournament.entry_fee and tournament.entry_fee > 0 %}
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-success);">Взнос: {{ tournament.entry_fee|floatformat:0 }} ₽</span>
+        {% endif %}
+        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_status_display }}</span>
+    </div>
+
+    <h1 class="page-title" style="text-align: left;">{{ tournament.name }}</h1>
+    <p class="text-secondary mb-4 d-flex flex-wrap align-items-center gap-2">
+        {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
+        {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
+        {% if user.is_staff %}
+        <span class="btn-manage-tournament-wrap">
+            <a href="{% url 'tournament_manage' slug=tournament.slug %}" class="btn btn-manage-tournament">Управление турниром</a>
+        </span>
+        {% endif %}
+    </p>
+
+    {% if tournament.description %}
+    <div class="card mb-4">
+        <div class="card-body">
+            {{ tournament.description }}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if user.is_authenticated %}
+        {% if user_is_registered %}
+        <div class="card mb-4" style="background: rgba(166, 130, 74, 0.1); border-left: 3px solid var(--color-primary);">
+            <div class="card-body">
+                <p class="mb-0" style="color: var(--color-primary); font-weight: 600;">✓ Вы зарегистрированы на этот турнир</p>
+            </div>
+        </div>
+        {% elif can_register %}
+        <div class="card mb-4">
+            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h3 class="mb-1" style="font-size: var(--font-size-lg);">Регистрация на турнир</h3>
+                    <p class="text-secondary mb-0">Зарегистрируйтесь для участия в турнире выходного дня.</p>
+                </div>
+                <div>
+                    <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary">Зарегистрироваться</a>
+                </div>
+            </div>
+        </div>
+        {% elif registration_closed %}
+        <div class="card mb-4" style="background: rgba(255, 0, 0, 0.05); border-left: 3px solid var(--color-error);">
+            <div class="card-body">
+                <p class="mb-0" style="color: var(--color-error);">
+                    {% if tournament.bracket_generated %}Регистрация закрыта: группы сформированы.{% elif tournament.is_full %}Регистрация закрыта: все места заняты.{% else %}Регистрация закрыта.{% endif %}
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    {% else %}
+        {% if not registration_closed %}
+        <div class="card mb-4">
+            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h3 class="mb-1" style="font-size: var(--font-size-lg);">Регистрация на турнир</h3>
+                    <p class="text-secondary mb-0">Войдите или зарегистрируйтесь, чтобы принять участие.</p>
+                </div>
+                <div>
+                    <a href="{% url 'auth' %}?next={{ request.path }}" class="btn btn-primary">Войти / Регистрация</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
+
+    <div class="tvd-tabs mb-4" role="tablist" style="display: flex; gap: var(--spacing-sm); flex-wrap: wrap; border-bottom: 1px solid var(--color-border-light); padding-bottom: var(--spacing-sm);">
+        <button type="button" class="tvd-tab tvd-tab--active" data-tvd-tab="participants" role="tab">Участники</button>
+        <button type="button" class="tvd-tab" data-tvd-tab="groups" role="tab">Группы</button>
+        <button type="button" class="tvd-tab" data-tvd-tab="bracket" role="tab">Сетка</button>
+        <button type="button" class="tvd-tab" data-tvd-tab="results" role="tab">Итоги</button>
+    </div>
+
+    <div class="tvd-tab-content" id="participants" role="tabpanel">
+            <h2 class="section-title mb-3">Участники ({{ participants|length }})</h2>
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--spacing-md);">
+                        {% if tournament.is_doubles %}
+                        {% for team in participants %}
+                        <div style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px;">{{ team.get_display_name }}</div>
+                                {% if not team.player2_id %}<div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">Ожидает партнёра</div>{% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-secondary mb-0">Пока нет заявок (команд).</p>
+                        {% endfor %}
+                        {% else %}
+                        {% for participant in participants %}
+                        <a href="{% url 'profile' pk=participant.pk %}" style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md); transition: all var(--transition-fast); text-decoration: none;">
+                            {% include 'includes/avatar.html' with avatar=participant.avatar class="player-avatar" size="48" %}
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px;">{{ participant.user.first_name }} {{ participant.user.last_name }}</div>
+                                <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">{{ participant.get_skill_level_display }} • {{ participant.total_points|floatformat:1 }} очков</div>
+                            </div>
+                        </a>
+                        {% empty %}
+                        <p class="text-secondary mb-0">Пока нет участников.</p>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+    </div>
+
+    <div class="tvd-tab-content" id="groups" role="tabpanel" style="display: none;">
+            <h2 class="section-title mb-3">Группы</h2>
+            {% if tvd_groups %}
+            <div class="row g-4 tvd-groups-row">
+                {% for group in tvd_groups %}
+                <div class="col-12 col-lg-6 tvd-group-col">
+                    {% include 'includes/tvd_group_card.html' with group=group %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <p class="text-secondary mb-0">Группы ещё не сформированы.</p>
+                </div>
+            </div>
+            {% endif %}
+    </div>
+
+    <div class="tvd-tab-content" id="bracket" role="tabpanel" style="display: none;">
+            <h2 class="section-title mb-3">Плей-офф</h2>
+            {% include 'includes/tvd_bracket.html' with main_rounds=tvd_main_rounds consolation_rounds=tvd_consolation_rounds %}
+
+            {% if tvd_rr_1_3_standings %}
+            <h3 class="section-title mb-3 mt-4">Круг за 1–3 места</h3>
+            <h4 class="h5 mb-2">Матрица результатов</h4>
+            <div class="card mb-4 round-robin-table-wrapper">
+                <div class="card-body p-0">
+                    <table class="round-robin-matrix">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>{% if tournament.is_doubles %}Команда{% else %}Игрок{% endif %}</th>
+                                {% for p in tvd_rr_1_3_matrix_participants %}
+                                <th class="matrix-col">{{ forloop.counter }}</th>
+                                {% endfor %}
+                                <th>Очки</th>
+                                <th>Место</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in tvd_rr_1_3_matrix_rows %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td class="matrix-player-cell">
+                                    {% if tournament.is_doubles %}
+                                    <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                    {% else %}
+                                    <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                    {% endif %}
+                                </td>
+                                {% for cell in row.cells %}
+                                {% if forloop.counter0 == forloop.parentloop.counter0 %}
+                                <td class="matrix-cell matrix-cell--diagonal">—</td>
+                                {% else %}
+                                <td class="matrix-cell">
+                                    {% if cell.win is not None %}
+                                    <div class="matrix-cell-win">{{ cell.win }}</div>
+                                    <div class="matrix-cell-games">{{ cell.games|default:"—" }}</div>
+                                    {% else %}—{% endif %}
+                                </td>
+                                {% endif %}
+                                {% endfor %}
+                                <td class="matrix-points">{{ row.points|default:"—" }}</td>
+                                <td class="matrix-place">{{ row.place|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <h4 class="h5 mb-2">Таблица результатов</h4>
+            <div class="card mb-4 round-robin-table-wrapper">
+                <div class="card-body p-0">
+                    <table class="round-robin-standings">
+                        <thead>
+                            <tr>
+                                <th>Место</th>
+                                <th>{% if tournament.is_doubles %}Команда{% else %}Игрок{% endif %}</th>
+                                <th>Игр</th>
+                                <th>В</th>
+                                <th>П</th>
+                                <th>Сеты</th>
+                                <th>Геймы</th>
+                                <th>Очки (в турнире)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in tvd_rr_1_3_standings %}
+                            <tr>
+                                <td>{{ row.place|default:"—" }}</td>
+                                <td>
+                                    {% if row.team %}
+                                    <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                    {% else %}
+                                    <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.matches }}</td>
+                                <td>{{ row.wins }}</td>
+                                <td>{{ row.losses }}</td>
+                                <td>{{ row.sets }}</td>
+                                <td>{{ row.games }}</td>
+                                <td>{{ row.points }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if tvd_rr_4_6_standings %}
+            <h3 class="section-title mb-3 mt-4">Круг за 4–6 места</h3>
+            <h4 class="h5 mb-2">Матрица результатов</h4>
+            <div class="card mb-4 round-robin-table-wrapper">
+                <div class="card-body p-0">
+                    <table class="round-robin-matrix">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>{% if tournament.is_doubles %}Команда{% else %}Игрок{% endif %}</th>
+                                {% for p in tvd_rr_4_6_matrix_participants %}
+                                <th class="matrix-col">{{ forloop.counter }}</th>
+                                {% endfor %}
+                                <th>Очки</th>
+                                <th>Место</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in tvd_rr_4_6_matrix_rows %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td class="matrix-player-cell">
+                                    {% if tournament.is_doubles %}
+                                    <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                    {% else %}
+                                    <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                    {% endif %}
+                                </td>
+                                {% for cell in row.cells %}
+                                {% if forloop.counter0 == forloop.parentloop.counter0 %}
+                                <td class="matrix-cell matrix-cell--diagonal">—</td>
+                                {% else %}
+                                <td class="matrix-cell">
+                                    {% if cell.win is not None %}
+                                    <div class="matrix-cell-win">{{ cell.win }}</div>
+                                    <div class="matrix-cell-games">{{ cell.games|default:"—" }}</div>
+                                    {% else %}—{% endif %}
+                                </td>
+                                {% endif %}
+                                {% endfor %}
+                                <td class="matrix-points">{{ row.points|default:"—" }}</td>
+                                <td class="matrix-place">{{ row.place|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <h4 class="h5 mb-2">Таблица результатов</h4>
+            <div class="card mb-4 round-robin-table-wrapper">
+                <div class="card-body p-0">
+                    <table class="round-robin-standings">
+                        <thead>
+                            <tr>
+                                <th>Место</th>
+                                <th>{% if tournament.is_doubles %}Команда{% else %}Игрок{% endif %}</th>
+                                <th>Игр</th>
+                                <th>В</th>
+                                <th>П</th>
+                                <th>Сеты</th>
+                                <th>Геймы</th>
+                                <th>Очки (в турнире)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in tvd_rr_4_6_standings %}
+                            <tr>
+                                <td>{{ row.place|default:"—" }}</td>
+                                <td>
+                                    {% if row.team %}
+                                    <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                    {% else %}
+                                    <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.matches }}</td>
+                                <td>{{ row.wins }}</td>
+                                <td>{{ row.losses }}</td>
+                                <td>{{ row.sets }}</td>
+                                <td>{{ row.games }}</td>
+                                <td>{{ row.points }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if tvd_main_rr_standings %}
+            <h3 class="section-title mb-3 mt-4">Основная сетка (круговой формат)</h3>
+            <h4 class="h5 mb-2">Матрица результатов</h4>
+            <div class="card mb-4 round-robin-table-wrapper">
+                <div class="card-body p-0">
+                    <table class="round-robin-matrix">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>{% if tournament.is_doubles %}Команда{% else %}Игрок{% endif %}</th>
+                                {% for p in tvd_main_rr_matrix_participants %}
+                                <th class="matrix-col">{{ forloop.counter }}</th>
+                                {% endfor %}
+                                <th>Очки</th>
+                                <th>Место</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in tvd_main_rr_matrix_rows %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td class="matrix-player-cell">
+                                    {% if tournament.is_doubles %}
+                                    <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                    {% else %}
+                                    <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                    {% endif %}
+                                </td>
+                                {% for cell in row.cells %}
+                                {% if forloop.counter0 == forloop.parentloop.counter0 %}
+                                <td class="matrix-cell matrix-cell--diagonal">—</td>
+                                {% else %}
+                                <td class="matrix-cell">
+                                    {% if cell.win is not None %}
+                                    <div class="matrix-cell-win">{{ cell.win }}</div>
+                                    <div class="matrix-cell-games">{{ cell.games|default:"—" }}</div>
+                                    {% else %}
+                                    —
+                                    {% endif %}
+                                </td>
+                                {% endif %}
+                                {% endfor %}
+                                <td class="matrix-points">{{ row.points|default:"—" }}</td>
+                                <td class="matrix-place">{{ row.place|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <h4 class="h5 mb-2">Таблица результатов</h4>
+            <div class="card mb-4 round-robin-table-wrapper">
+                <div class="card-body p-0">
+                    <table class="round-robin-standings">
+                        <thead>
+                            <tr>
+                                <th>Место</th>
+                                <th>{% if tournament.is_doubles %}Команда{% else %}Игрок{% endif %}</th>
+                                <th>Игр</th>
+                                <th>В</th>
+                                <th>П</th>
+                                <th>Сеты</th>
+                                <th>Геймы</th>
+                                <th>Очки (в турнире)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in tvd_main_rr_standings %}
+                            <tr>
+                                <td>{{ row.place|default:"—" }}</td>
+                                <td>
+                                    {% if row.team %}
+                                    <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                    {% else %}
+                                    <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.matches }}</td>
+                                <td>{{ row.wins }}</td>
+                                <td>{{ row.losses }}</td>
+                                <td>{{ row.sets }}</td>
+                                <td>{{ row.games }}</td>
+                                <td>{{ row.points }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if tvd_cons_rr_standings %}
+            <h3 class="section-title mb-3 mt-4">Утешительная сетка (круговой формат)</h3>
+            <h4 class="h5 mb-2">Матрица результатов</h4>
+            <div class="card mb-4 round-robin-table-wrapper">
+                <div class="card-body p-0">
+                    <table class="round-robin-matrix">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>{% if tournament.is_doubles %}Команда{% else %}Игрок{% endif %}</th>
+                                {% for p in tvd_cons_rr_matrix_participants %}
+                                <th class="matrix-col">{{ forloop.counter }}</th>
+                                {% endfor %}
+                                <th>Очки</th>
+                                <th>Место</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in tvd_cons_rr_matrix_rows %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td class="matrix-player-cell">
+                                    {% if tournament.is_doubles %}
+                                    <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                    {% else %}
+                                    <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                    {% endif %}
+                                </td>
+                                {% for cell in row.cells %}
+                                {% if forloop.counter0 == forloop.parentloop.counter0 %}
+                                <td class="matrix-cell matrix-cell--diagonal">—</td>
+                                {% else %}
+                                <td class="matrix-cell">
+                                    {% if cell.win is not None %}
+                                    <div class="matrix-cell-win">{{ cell.win }}</div>
+                                    <div class="matrix-cell-games">{{ cell.games|default:"—" }}</div>
+                                    {% else %}
+                                    —
+                                    {% endif %}
+                                </td>
+                                {% endif %}
+                                {% endfor %}
+                                <td class="matrix-points">{{ row.points|default:"—" }}</td>
+                                <td class="matrix-place">{{ row.place|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <h4 class="h5 mb-2">Таблица результатов</h4>
+            <div class="card mb-4 round-robin-table-wrapper">
+                <div class="card-body p-0">
+                    <table class="round-robin-standings">
+                        <thead>
+                            <tr>
+                                <th>Место</th>
+                                <th>{% if tournament.is_doubles %}Команда{% else %}Игрок{% endif %}</th>
+                                <th>Игр</th>
+                                <th>В</th>
+                                <th>П</th>
+                                <th>Сеты</th>
+                                <th>Геймы</th>
+                                <th>Очки (в турнире)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in tvd_cons_rr_standings %}
+                            <tr>
+                                <td>{{ row.place|default:"—" }}</td>
+                                <td>
+                                    {% if row.team %}
+                                    <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                    {% else %}
+                                    <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.matches }}</td>
+                                <td>{{ row.wins }}</td>
+                                <td>{{ row.losses }}</td>
+                                <td>{{ row.sets }}</td>
+                                <td>{{ row.games }}</td>
+                                <td>{{ row.points }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+    </div>
+
+    <div class="tvd-tab-content" id="results" role="tabpanel" style="display: none;">
+            <h2 class="section-title mb-3">Итоги</h2>
+            {% if tvd_standings %}
+            <style>.standings-row-top-3 { background: rgba(166, 130, 74, 0.08); }</style>
+            <div class="card mb-4">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="standings-table round-robin-standings" style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); font-weight: 600;">Место</th>
+                                    <th style="padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); font-weight: 600;">Участник</th>
+                                    <th style="padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); font-weight: 600;">Очки</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in tvd_standings %}
+                                <tr class="{% if r.place <= 3 %}standings-row-top-3{% endif %}" style="border-bottom: 1px solid var(--color-border-light);">
+                                    <td style="padding: var(--spacing-sm) var(--spacing-md); font-weight: 600;">
+                                        {% if r.place == 1 %}🥇{% elif r.place == 2 %}🥈{% elif r.place == 3 %}🥉{% else %}{{ r.place }}{% endif %}
+                                    </td>
+                                    <td style="padding: var(--spacing-sm) var(--spacing-md);">
+                                        <a href="{% url 'profile' pk=r.player.pk %}">{{ r.player.user.last_name }} {{ r.player.user.first_name }}</a>
+                                    </td>
+                                    <td style="padding: var(--spacing-sm) var(--spacing-md); font-weight: 600; color: var(--color-primary);">{{ r.fan_points }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <p class="text-secondary mb-0">Итоги появятся после завершения турнира.</p>
+                </div>
+            </div>
+            {% endif %}
+    </div>
+
+    <style>
+        .tvd-tab { padding: var(--spacing-sm) var(--spacing-md); border: none; background: transparent; color: var(--color-text-secondary); cursor: pointer; border-radius: var(--radius-md); font-size: var(--font-size-sm); }
+        .tvd-tab:hover { color: var(--color-text); background: var(--color-bg-elevated); }
+        .tvd-tab--active { color: var(--color-primary); font-weight: 600; background: var(--color-bg-elevated); }
+    </style>
+    <script>
+        (function() {
+            var tabs = document.querySelectorAll('.tvd-tab');
+            var panels = document.querySelectorAll('.tvd-tab-content');
+            tabs.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var id = this.getAttribute('data-tvd-tab');
+                    tabs.forEach(function(b) {
+                        b.classList.toggle('tvd-tab--active', b.getAttribute('data-tvd-tab') === id);
+                    });
+                    panels.forEach(function(p) {
+                        p.style.display = p.id === id ? '' : 'none';
+                    });
+                });
+            });
+        })();
+    </script>
+</div>
+{% endblock %}

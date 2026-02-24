@@ -9,40 +9,40 @@ def fix_tier_settings(apps, schema_editor):
     - FREE: is_unlimited=False, max_tournaments=0 (нет регистраций)
     - DIAMOND: max_tournaments=100 (условный безлимит)
     """
-    SubscriptionTier = apps.get_model('subscriptions', 'SubscriptionTier')
+    SubscriptionTier = apps.get_model("subscriptions", "SubscriptionTier")
 
-    free_tier = SubscriptionTier.objects.filter(name='free').first()
+    free_tier = SubscriptionTier.objects.filter(name="free").first()
     if free_tier:
         free_tier.is_unlimited = False
         free_tier.max_tournaments = 0
-        free_tier.save(update_fields=['is_unlimited', 'max_tournaments'])
+        free_tier.save(update_fields=["is_unlimited", "max_tournaments"])
 
-    diamond_tier = SubscriptionTier.objects.filter(name='diamond').first()
+    diamond_tier = SubscriptionTier.objects.filter(name="diamond").first()
     if diamond_tier:
         diamond_tier.max_tournaments = 100
-        diamond_tier.save(update_fields=['max_tournaments'])
+        diamond_tier.save(update_fields=["max_tournaments"])
 
 
 def reverse_fix_tier_settings(apps, schema_editor):
     """Обратная операция."""
-    SubscriptionTier = apps.get_model('subscriptions', 'SubscriptionTier')
+    SubscriptionTier = apps.get_model("subscriptions", "SubscriptionTier")
 
-    free_tier = SubscriptionTier.objects.filter(name='free').first()
+    free_tier = SubscriptionTier.objects.filter(name="free").first()
     if free_tier:
         free_tier.is_unlimited = True
         free_tier.max_tournaments = 0
-        free_tier.save(update_fields=['is_unlimited', 'max_tournaments'])
+        free_tier.save(update_fields=["is_unlimited", "max_tournaments"])
 
-    diamond_tier = SubscriptionTier.objects.filter(name='diamond').first()
+    diamond_tier = SubscriptionTier.objects.filter(name="diamond").first()
     if diamond_tier:
         diamond_tier.max_tournaments = 0
-        diamond_tier.save(update_fields=['max_tournaments'])
+        diamond_tier.save(update_fields=["max_tournaments"])
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('subscriptions', '0002_set_has_sparring_for_paid_tiers'),
+        ("subscriptions", "0002_set_has_sparring_for_paid_tiers"),
     ]
 
     operations = [

@@ -12,7 +12,14 @@ from .models import Notification, Player, User
 class UserAdmin(BaseUserAdmin):
     """Admin configuration for User model."""
 
-    list_display = ("email", "first_name", "last_name", "phone", "is_staff", "is_active")
+    list_display = (
+        "email",
+        "first_name",
+        "last_name",
+        "phone",
+        "is_staff",
+        "is_active",
+    )
     list_filter = ("is_staff", "is_active")
     search_fields = ("email", "first_name", "last_name", "phone")
     ordering = ("email",)
@@ -22,7 +29,15 @@ class UserAdmin(BaseUserAdmin):
         ("Персональная информация", {"fields": ("first_name", "last_name", "phone")}),
         (
             "Права доступа",
-            {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")},
+            {
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                )
+            },
         ),
         ("Даты", {"fields": ("last_login", "date_joined")}),
     )
@@ -31,7 +46,13 @@ class UserAdmin(BaseUserAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("email", "password1", "password2", "first_name", "last_name"),
+                "fields": (
+                    "email",
+                    "password1",
+                    "password2",
+                    "first_name",
+                    "last_name",
+                ),
             },
         ),
     )
@@ -54,7 +75,15 @@ class PlayerAdmin(admin.ModelAdmin):
         "is_verified",
         "is_legend",
     )
-    list_filter = ("city", "skill_level", "gender", "forehand", "is_verified", "is_legend", "is_bye")
+    list_filter = (
+        "city",
+        "skill_level",
+        "gender",
+        "forehand",
+        "is_verified",
+        "is_legend",
+        "is_bye",
+    )
     search_fields = ("user__email", "user__first_name", "user__last_name")
     list_editable = ("is_verified", "is_legend")
     raw_id_fields = ("user",)

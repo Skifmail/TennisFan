@@ -6,18 +6,35 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0017_add_deadline_extension_request'),
+        ("users", "0017_add_deadline_extension_request"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='player',
-            name='ntrp_level',
-            field=models.DecimalField(decimal_places=1, default=1.0, max_digits=3, verbose_name='Уровень силы (NTRP)'),
+            model_name="player",
+            name="ntrp_level",
+            field=models.DecimalField(
+                decimal_places=1,
+                default=1.0,
+                max_digits=3,
+                verbose_name="Уровень силы (NTRP)",
+            ),
         ),
         migrations.AlterField(
-            model_name='player',
-            name='skill_level',
-            field=models.CharField(choices=[('novice', 'Новичок'), ('amateur', 'Любитель'), ('experienced', 'Опытный'), ('advanced', 'Продвинутый'), ('professional', 'Профессионал')], default='novice', help_text='Определяется тестом уровня силы или админкой. Пользователь не редактирует вручную.', max_length=20, verbose_name='Уровень силы'),
+            model_name="player",
+            name="skill_level",
+            field=models.CharField(
+                choices=[
+                    ("novice", "Новичок"),
+                    ("amateur", "Любитель"),
+                    ("experienced", "Опытный"),
+                    ("advanced", "Продвинутый"),
+                    ("professional", "Профессионал"),
+                ],
+                default="novice",
+                help_text="Определяется тестом уровня силы или админкой. Пользователь не редактирует вручную.",
+                max_length=20,
+                verbose_name="Уровень силы",
+            ),
         ),
     ]

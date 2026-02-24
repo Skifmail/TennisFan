@@ -6,18 +6,41 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tournaments', '0006_tournament_max_participants'),
+        ("tournaments", "0006_tournament_max_participants"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='seasonrating',
-            name='category',
-            field=models.CharField(choices=[('futures', 'Фьючерс'), ('base', 'База'), ('tour', 'Тур'), ('hard', 'Хард'), ('challenger', 'Челленджер'), ('masters', 'Мастерс')], max_length=20, verbose_name='Категория'),
+            model_name="seasonrating",
+            name="category",
+            field=models.CharField(
+                choices=[
+                    ("futures", "Фьючерс"),
+                    ("base", "База"),
+                    ("tour", "Тур"),
+                    ("hard", "Хард"),
+                    ("challenger", "Челленджер"),
+                    ("masters", "Мастерс"),
+                ],
+                max_length=20,
+                verbose_name="Категория",
+            ),
         ),
         migrations.AlterField(
-            model_name='tournament',
-            name='category',
-            field=models.CharField(choices=[('futures', 'Фьючерс'), ('base', 'База'), ('tour', 'Тур'), ('hard', 'Хард'), ('challenger', 'Челленджер'), ('masters', 'Мастерс')], default='base', max_length=20, verbose_name='Категория'),
+            model_name="tournament",
+            name="category",
+            field=models.CharField(
+                choices=[
+                    ("futures", "Фьючерс"),
+                    ("base", "База"),
+                    ("tour", "Тур"),
+                    ("hard", "Хард"),
+                    ("challenger", "Челленджер"),
+                    ("masters", "Мастерс"),
+                ],
+                default="base",
+                max_length=20,
+                verbose_name="Категория",
+            ),
         ),
     ]

@@ -17,6 +17,19 @@ from .olympic_consolation import (
 )
 from .proposal_service import apply_proposal
 from .round_robin import _is_round_robin, check_and_finalize_if_complete
+from .tvd import (
+    TVD_STAGE_GROUP,
+    _is_tvd,
+)
+from .tvd import (
+    advance_winner as tvd_advance_winner,
+)
+from .tvd import (
+    check_and_finalize as tvd_check_and_finalize,
+)
+from .tvd import (
+    recalculate_group_standings as tvd_recalculate_group_standings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,11 +125,7 @@ def update_player_stats(sender, instance, created, **kwargs):
         Match.MatchStatus.WALKOVER,
     ]
 
-    # Используем print для немедленного вывода в консоль для отладки
-    print(
-        f"[SIGNAL] Match {instance.pk}: status={instance.status}, old_status={old_status}, is_completed={is_completed}, was_completed={was_completed}"
-    )
-    logger.info(
+    logger.debug(
         "Match %s: status=%s, old_status=%s, is_completed=%s, was_completed=%s",
         instance.pk,
         instance.status,
@@ -126,8 +135,8 @@ def update_player_stats(sender, instance, created, **kwargs):
     )
 
     if not is_completed or was_completed:
-        print(
-            f"[SIGNAL] Match {instance.pk}: Skipping - not completed or already was completed"
+        logger.debug(
+            "Match %s: skipping - not completed or already was completed", instance.pk
         )
         return
 
@@ -139,6 +148,7 @@ def update_player_stats(sender, instance, created, **kwargs):
         "partner2",
         "winner",
         "tournament",
+        "tvd_group",
         "team1__player1",
         "team1__player2",
         "team2__player1",
@@ -154,10 +164,7 @@ def update_player_stats(sender, instance, created, **kwargs):
     # Парный матч: по командам (team1/team2) или по парному спаррингу (player1/partner1 vs player2/partner2)
     is_doubles = bool(match.team1_id and match.team2_id) or match.is_doubles_sparring()
 
-    print(
-        f"[SIGNAL] Match {match.pk}: winner={winner.pk if winner else None}, winner_team={winner_team.pk if winner_team else None}, is_doubles={is_doubles}, is_sparring={match.is_sparring()}"
-    )
-    logger.info(
+    logger.debug(
         "Match %s: winner=%s, winner_team=%s, is_doubles=%s, is_sparring=%s",
         match.pk,
         winner.pk if winner else None,
@@ -168,9 +175,6 @@ def update_player_stats(sender, instance, created, **kwargs):
 
     # Для парного спарринга winner есть, winner_team нет
     if not winner and not winner_team:
-        print(
-            f"[SIGNAL] Match {match.pk}: ERROR - no winner or winner_team, skipping rating update"
-        )
         logger.warning(
             "Match %s: no winner or winner_team, skipping rating update", match.pk
         )
@@ -244,7 +248,7 @@ def update_player_stats(sender, instance, created, **kwargs):
     # ------------------------------------------------------------------
     # 2) Shadow FAN calculation (updates hidden_rating immediately)
     # ------------------------------------------------------------------
-    logger.info("Match %s: applying FAN shadow calculation", match.pk)
+    logger.debug("Match %s: applying FAN shadow calculation", match.pk)
     _apply_fan_shadow(match)
 
     # ------------------------------------------------------------------
@@ -253,7 +257,7 @@ def update_player_stats(sender, instance, created, **kwargs):
     # ------------------------------------------------------------------
     if match.is_sparring():
         # Спарринговые матчи не участвуют в турнирной логике
-        logger.info("Match %s: sparring match, skipping tournament logic", match.pk)
+        logger.debug("Match %s: sparring match, skipping tournament logic", match.pk)
         return
 
     if t and _is_olympic(t):
@@ -267,6 +271,12 @@ def update_player_stats(sender, instance, created, **kwargs):
         finalize_tournament(t)
     elif t and _is_round_robin(t):
         check_and_finalize_if_complete(t)
+    elif t and _is_tvd(t):
+        if getattr(match, "tvd_stage", None) == TVD_STAGE_GROUP and match.tvd_group_id:
+            tvd_recalculate_group_standings(match.tvd_group)
+        else:
+            tvd_advance_winner(match)
+        tvd_check_and_finalize(t)
 
 
 def _apply_fan_shadow(match: Match) -> None:
@@ -286,10 +296,7 @@ def _apply_fan_shadow(match: Match) -> None:
     is_doubles_sparring = bool(match.partner1_id and match.partner2_id)
     is_doubles = bool(match.team1_id and match.team2_id) or is_doubles_sparring
 
-    print(
-        f"[FAN_SHADOW] Match {match.pk}, is_doubles={is_doubles}, is_doubles_sparring={is_doubles_sparring}"
-    )
-    logger.info("_apply_fan_shadow: match %s, is_doubles=%s", match.pk, is_doubles)
+    logger.debug("_apply_fan_shadow: match %s, is_doubles=%s", match.pk, is_doubles)
 
     # Для парных матчей используем первого игрока команды (или стороны) для расчёта рейтинга
     if is_doubles_sparring:
@@ -301,8 +308,7 @@ def _apply_fan_shadow(match: Match) -> None:
                 match.pk,
             )
             return
-        print(f"[FAN_SHADOW] Doubles sparring, p1={p1.pk}, p2={p2.pk}")
-        logger.info("_apply_fan_shadow: doubles sparring, p1=%s, p2=%s", p1.pk, p2.pk)
+        logger.debug("_apply_fan_shadow: doubles sparring, p1=%s, p2=%s", p1.pk, p2.pk)
     elif is_doubles:
         # Парные матчи турнира (team1/team2)
         team1 = match.team1
@@ -325,16 +331,12 @@ def _apply_fan_shadow(match: Match) -> None:
                 p2,
             )
             return
-        print(f"[FAN_SHADOW] Doubles match, p1={p1.pk}, p2={p2.pk}")
-        logger.info("_apply_fan_shadow: doubles match, p1=%s, p2=%s", p1.pk, p2.pk)
+        logger.debug("_apply_fan_shadow: doubles match, p1=%s, p2=%s", p1.pk, p2.pk)
     else:
         # Для одиночных матчей используем player1 и player2
         p1 = match.player1
         p2 = match.player2
         if not p1 or not p2:
-            print(
-                f"[FAN_SHADOW] ERROR: Match {match.pk} has no players: p1={p1}, p2={p2}"
-            )
             logger.warning(
                 "_apply_fan_shadow: match %s has no players: p1=%s, p2=%s",
                 match.pk,
@@ -342,12 +344,10 @@ def _apply_fan_shadow(match: Match) -> None:
                 p2,
             )
             return
-        print(f"[FAN_SHADOW] Singles match, p1={p1.pk}, p2={p2.pk}")
-        logger.info("_apply_fan_shadow: singles match, p1=%s, p2=%s", p1.pk, p2.pk)
+        logger.debug("_apply_fan_shadow: singles match, p1=%s, p2=%s", p1.pk, p2.pk)
 
     if getattr(p1, "is_bye", False) or getattr(p2, "is_bye", False):
-        print(f"[FAN_SHADOW] Match {match.pk} has bye players, skipping")
-        logger.info("_apply_fan_shadow: match %s has bye players, skipping", match.pk)
+        logger.debug("_apply_fan_shadow: match %s has bye players, skipping", match.pk)
         return
 
     # K-factor определяется по количеству матчей ДО этого матча
@@ -410,8 +410,12 @@ def _apply_fan_shadow(match: Match) -> None:
         )
 
     result = calculate_new_ratings(snap_a, snap_b, score_a, score_b, a_won)
-    print(
-        f"[FAN_SHADOW] Calculated ratings: p1 {result.new_rating_a:.1f} (delta: {result.delta_a:.1f}), p2 {result.new_rating_b:.1f} (delta: {result.delta_b:.1f})"
+    logger.debug(
+        "_apply_fan_shadow: calculated ratings p1 %.1f (delta %.1f), p2 %.1f (delta %.1f)",
+        result.new_rating_a,
+        result.delta_a,
+        result.new_rating_b,
+        result.delta_b,
     )
 
     # is_doubles уже определен выше
@@ -483,10 +487,7 @@ def _apply_fan_shadow(match: Match) -> None:
                         "ntrp_level",
                     ]
                 )
-                print(
-                    f"[FAN_SHADOW] Player {p.pk} (doubles team1): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), Сила {old_ntrp} -> {new_ntrp}"
-                )
-                logger.info(
+                logger.debug(
                     "Player %s (doubles team1): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
                     p.pk,
                     old_rating,
@@ -523,10 +524,7 @@ def _apply_fan_shadow(match: Match) -> None:
         p1.save(
             update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
         )
-        print(
-            f"[FAN_SHADOW] Player {p1.pk} (singles): rating {old_rating_p1:.1f} -> {new_rating_a:.1f} (delta: {new_rating_a - old_rating_p1:.1f}), Сила {old_ntrp_p1} -> {new_ntrp_p1}"
-        )
-        logger.info(
+        logger.debug(
             "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
             p1.pk,
             old_rating_p1,
@@ -581,10 +579,7 @@ def _apply_fan_shadow(match: Match) -> None:
                         "ntrp_level",
                     ]
                 )
-                print(
-                    f"[FAN_SHADOW] Player {p.pk} (doubles team2): rating {old_rating:.1f} -> {new_rating:.1f} (delta: {new_rating - old_rating:.1f}), Сила {old_ntrp} -> {new_ntrp}"
-                )
-                logger.info(
+                logger.debug(
                     "Player %s (doubles team2): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
                     p.pk,
                     old_rating,
@@ -621,10 +616,7 @@ def _apply_fan_shadow(match: Match) -> None:
         p2.save(
             update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
         )
-        print(
-            f"[FAN_SHADOW] Player {p2.pk} (singles): rating {old_rating_p2:.1f} -> {new_rating_b:.1f} (delta: {new_rating_b - old_rating_p2:.1f}), Сила {old_ntrp_p2} -> {new_ntrp_p2}"
-        )
-        logger.info(
+        logger.debug(
             "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
             p2.pk,
             old_rating_p2,

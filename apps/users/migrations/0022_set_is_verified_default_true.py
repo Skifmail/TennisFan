@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0021_change_total_points_to_float'),
+        ("users", "0021_change_total_points_to_float"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='player',
-            name='is_verified',
-            field=models.BooleanField(default=True, verbose_name='Подтверждён'),
+            model_name="player",
+            name="is_verified",
+            field=models.BooleanField(default=True, verbose_name="Подтверждён"),
         ),
     ]

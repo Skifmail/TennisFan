@@ -1,0 +1,561 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Управление: {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="container manage-page" style="padding-top: var(--spacing-2xl);">
+    <div class="manage-page-header mb-4 d-flex flex-wrap gap-2 align-items-center justify-content-between">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <a href="{% url 'tournament_list' %}" class="text-secondary">&larr; Турниры</a>
+            <span class="text-secondary">/</span>
+            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="text-secondary">{{ tournament.name }}</a>
+            <span class="text-secondary">/</span>
+            <span>Управление</span>
+        </div>
+        <span class="btn-manage-tournament-wrap">
+            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="btn-manage-tournament">Открыть публичную страницу</a>
+        </span>
+    </div>
+
+    <h1 class="page-title" style="text-align: left;">Управление турниром</h1>
+    <p class="text-secondary mb-4">
+        {{ tournament.name }} • {{ tournament.get_status_display }}
+        {% if tournament.start_date %} • {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}
+    </p>
+
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}" role="alert">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Секция 1: Статус и действия -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">Действия</h2>
+            <div class="d-flex flex-wrap gap-2">
+                {% if can_generate_groups %}
+                <form action="{% url 'tournament_manage_generate_groups' slug=tournament.slug %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">Сформировать группы</button>
+                </form>
+                {% endif %}
+                {% if can_generate_playoffs %}
+                <a href="{% url 'tournament_manage_intermediate_results' slug=tournament.slug %}" class="btn btn-outline-primary">Промежуточные результаты и создание плей-офф</a>
+                {% endif %}
+                {% if can_finalize %}
+                <form action="{% url 'tournament_manage_finalize' slug=tournament.slug %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">Завершить турнир</button>
+                </form>
+                {% endif %}
+                {% if not can_generate_groups and not can_generate_playoffs and not can_finalize %}
+                <p class="text-secondary mb-0">Нет доступных действий для текущего статуса.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Секция 2: Парный ТВД — команды и составление пар (до формирования групп) -->
+    {% if not tvd_groups and is_doubles_tvd %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">Команды ({{ teams|length }}) — полных: {{ full_teams_count }}</h2>
+            {% if teams %}
+            <ul class="list-unstyled mb-0 manage-list">
+                {% for t in teams %}
+                <li class="manage-list-item">
+                    <div class="manage-list-item-content">
+                        {% if t.player2_id %}
+                        {{ t.player1.user.last_name }} {{ t.player1.user.first_name }} <span class="text-secondary">(УС: {{ t.player1.ntrp_level|floatformat:1 }}, Р: {{ t.player1.total_points|floatformat:0 }})</span> / {{ t.player2.user.last_name }} {{ t.player2.user.first_name }} <span class="text-secondary">(УС: {{ t.player2.ntrp_level|floatformat:1 }}, Р: {{ t.player2.total_points|floatformat:0 }})</span>
+                        {% else %}
+                        {{ t.player1.user.last_name }} {{ t.player1.user.first_name }} <span class="text-secondary">(УС: {{ t.player1.ntrp_level|floatformat:1 }}, Р: {{ t.player1.total_points|floatformat:0 }})</span> <span class="text-secondary">— ожидает партнёра</span>
+                        {% endif %}
+                    </div>
+                    {% if not tournament.bracket_generated %}
+                    <div class="manage-list-item-action">
+                        <form action="{% url 'tournament_manage_remove_participant' slug=tournament.slug %}" method="post" class="d-inline" onsubmit="return confirm('Удалить команду из турнира?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="team_id" value="{{ t.pk }}">
+                            <button type="submit" class="btn btn-sm btn-outline btn-danger-text">Удалить команду</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-secondary mb-0">Нет заявок. Регистрация на публичной странице турнира (ожидание пары, присоединиться к команде, выбрать партнёра).</p>
+            {% endif %}
+            {% if players_for_pairs %}
+            <form action="{% url 'tournament_manage_compose_pair' slug=tournament.slug %}" method="post" class="mt-4 manage-block-bg" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                {% csrf_token %}
+                <h3 class="h6 mb-2">Составить пару вручную</h3>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <label class="mb-0">Игрок 1</label>
+                    <select name="player1_id" required class="form-select form-select-sm manage-player-select" style="width: auto; min-width: 18rem;">
+                        <option value="">—</option>
+                        {% for p in players_for_pairs %}
+                        <option value="{{ p.pk }}">{{ p.user.last_name }} {{ p.user.first_name }} (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</option>
+                        {% endfor %}
+                    </select>
+                    <label class="mb-0">Игрок 2</label>
+                    <select name="player2_id" required class="form-select form-select-sm manage-player-select" style="width: auto; min-width: 18rem;">
+                        <option value="">—</option>
+                        {% for p in players_for_pairs %}
+                        <option value="{{ p.pk }}">{{ p.user.last_name }} {{ p.user.first_name }} (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary">Составить пару</button>
+                </div>
+            </form>
+            {% elif teams %}
+            <p class="text-secondary small mt-2 mb-0">Чтобы составить пару, нужны заявки с публичной страницы (одиночные или полные команды).</p>
+            {% endif %}
+            {% if not tournament.bracket_generated %}
+            <form action="{% url 'tournament_manage_add_participant' slug=tournament.slug %}" method="post" class="mt-4 manage-block-bg participant-add-form" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                {% csrf_token %}
+                <h3 class="h6 mb-2">Добавить участника (одиночная заявка)</h3>
+                <div class="d-flex flex-wrap align-items-center gap-2 position-relative">
+                    <div class="participant-search-wrap position-relative" style="min-width: 20rem;">
+                        <input type="text" class="form-control form-control-sm participant-search-input" placeholder="Поиск по имени или телефону..." autocomplete="off" data-search-url="{% url 'tournament_manage_search_participants' slug=tournament.slug %}">
+                        <input type="hidden" name="player_id" class="participant-id-input" value="">
+                        <div class="participant-search-dropdown list-group position-absolute top-100 start-0 end-0 mt-1 shadow-sm rounded" style="max-height: 12rem; overflow-y: auto; z-index: 100; display: none;"></div>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary">Добавить</button>
+                </div>
+                <p class="text-secondary small mt-2 mb-0">Игрок будет добавлен в турнир как ожидающий партнёра.{% if tournament.entry_fee %} Или предложено оплатить взнос.{% endif %}</p>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Секция 2b: Одиночный ТВД — участники (до формирования групп) -->
+    {% if not tvd_groups and not is_doubles_tvd %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">Участники ({{ participants|length }})</h2>
+            {% if participants %}
+            <ul class="list-unstyled mb-0 manage-list">
+                {% for p in participants %}
+                <li class="manage-list-item">
+                    <div class="manage-list-item-content">
+                        <a href="{% url 'profile' pk=p.pk %}">{{ p.user.last_name }} {{ p.user.first_name }}</a>
+                        <span class="text-secondary"> (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</span>
+                    </div>
+                    {% if not tournament.bracket_generated %}
+                    <div class="manage-list-item-action">
+                        <form action="{% url 'tournament_manage_remove_participant' slug=tournament.slug %}" method="post" class="d-inline" onsubmit="return confirm('Удалить участника из турнира?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="player_id" value="{{ p.pk }}">
+                            <button type="submit" class="btn btn-sm btn-outline btn-danger-text">Удалить участника</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-secondary mb-0">Нет участников. Регистрация на публичной странице турнира.</p>
+            {% endif %}
+            {% if not tournament.bracket_generated %}
+            <form action="{% url 'tournament_manage_add_participant' slug=tournament.slug %}" method="post" class="mt-4 manage-block-bg participant-add-form" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                {% csrf_token %}
+                <h3 class="h6 mb-2">Добавить участника вручную</h3>
+                <div class="d-flex flex-wrap align-items-center gap-2 position-relative">
+                    <div class="participant-search-wrap position-relative" style="min-width: 20rem;">
+                        <input type="text" class="form-control form-control-sm participant-search-input" placeholder="Поиск по имени или телефону..." autocomplete="off" data-search-url="{% url 'tournament_manage_search_participants' slug=tournament.slug %}">
+                        <input type="hidden" name="player_id" class="participant-id-input" value="">
+                        <div class="participant-search-dropdown list-group position-absolute top-100 start-0 end-0 mt-1 shadow-sm rounded" style="max-height: 12rem; overflow-y: auto; z-index: 100; display: none;"></div>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary">Добавить</button>
+                </div>
+                {% if tournament.entry_fee %}<p class="text-secondary small mt-2 mb-0">При отсутствии оплаты взноса будет предложено добавить всё равно или отправить уведомление об оплате.</p>{% endif %}
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Секция 3: Группы и матчи групп -->
+    {% if tvd_groups %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">Группы</h2>
+            <div class="row g-4 tvd-groups-row">
+                {% for group in tvd_groups %}
+                <div class="col-12 col-lg-6 tvd-group-col">
+                    {% include 'includes/tvd_group_card.html' with group=group %}
+                    {% with matches=group.matches.all %}
+                    <div class="tvd-group-matches-row">
+                    {% for match in matches %}
+                    {% if match.status == 'scheduled' or match.status == 'postponed' %}
+                    {% include 'includes/manage_group_match_result.html' with match=match tournament=tournament %}
+                    {% endif %}
+                    {% endfor %}
+                    </div>
+                    {% endwith %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Секция 4: Плей-офф — визуальная турнирная сетка -->
+    {% if tvd_main_matches or tvd_consolation_matches %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">Плей-офф</h2>
+
+            {% if tvd_main_rounds %}
+            <h3 class="bracket-section-title">Основная сетка</h3>
+            <div class="bracket-container">
+                {% for round_name, round_matches in tvd_main_rounds %}
+                <div class="bracket-round-col">
+                    <div class="bracket-round-header">{{ round_name }}</div>
+                    <div class="bracket-round-body">
+                        {% for match in round_matches %}
+                        {% include 'includes/manage_bracket_match.html' with match=match tournament=tournament %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if tvd_consolation_rounds %}
+            <h3 class="bracket-section-title" style="margin-top: 2.5rem;">Утешительная сетка</h3>
+            <div class="bracket-container">
+                {% for round_name, round_matches in tvd_consolation_rounds %}
+                <div class="bracket-round-col">
+                    <div class="bracket-round-header">{{ round_name }}</div>
+                    <div class="bracket-round-body">
+                        {% for match in round_matches %}
+                        {% include 'includes/manage_bracket_match.html' with match=match tournament=tournament %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if tvd_main_rr_standings %}
+            <h3 class="bracket-section-title" style="margin-top: 2.5rem;">Основная сетка (круговой формат)</h3>
+            <h4 class="h5 mb-2">Матрица результатов</h4>
+            <div class="table-responsive mb-3">
+                <table class="round-robin-matrix">
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>{% if is_doubles_tvd %}Команда{% else %}Игрок{% endif %}</th>
+                            {% for p in tvd_main_rr_matrix_participants %}
+                            <th class="matrix-col">{{ forloop.counter }}</th>
+                            {% endfor %}
+                            <th>Очки</th>
+                            <th>Место</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in tvd_main_rr_matrix_rows %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td class="matrix-player-cell">
+                                {% if is_doubles_tvd %}
+                                <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                {% else %}
+                                <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                {% endif %}
+                            </td>
+                            {% for cell in row.cells %}
+                            {% if forloop.counter0 == forloop.parentloop.counter0 %}
+                            <td class="matrix-cell matrix-cell--diagonal">—</td>
+                            {% else %}
+                            <td class="matrix-cell">
+                                {% if cell.win is not None %}
+                                <div class="matrix-cell-win">{{ cell.win }}</div>
+                                <div class="matrix-cell-games">{{ cell.games|default:"—" }}</div>
+                                {% else %}—{% endif %}
+                            </td>
+                            {% endif %}
+                            {% endfor %}
+                            <td class="matrix-points">{{ row.points|default:"—" }}</td>
+                            <td class="matrix-place">{{ row.place|default:"—" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <h4 class="h5 mb-2">Таблица результатов</h4>
+            <div class="table-responsive mb-3">
+                <table class="round-robin-standings">
+                    <thead>
+                        <tr>
+                            <th>Место</th>
+                            <th>{% if is_doubles_tvd %}Команда{% else %}Игрок{% endif %}</th>
+                            <th>Игр</th>
+                            <th>В</th>
+                            <th>П</th>
+                            <th>Сеты</th>
+                            <th>Геймы</th>
+                            <th>Очки</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in tvd_main_rr_standings %}
+                        <tr>
+                            <td>{{ row.place|default:"—" }}</td>
+                            <td>
+                                {% if row.team %}
+                                <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                {% else %}
+                                <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                {% endif %}
+                            </td>
+                            <td>{{ row.matches }}</td>
+                            <td>{{ row.wins }}</td>
+                            <td>{{ row.losses }}</td>
+                            <td>{{ row.sets }}</td>
+                            <td>{{ row.games }}</td>
+                            <td>{{ row.points }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            {% if tvd_cons_rr_standings %}
+            <h3 class="bracket-section-title" style="margin-top: 2.5rem;">Утешительная сетка (круговой формат)</h3>
+            <h4 class="h5 mb-2">Матрица результатов</h4>
+            <div class="table-responsive mb-3">
+                <table class="round-robin-matrix">
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>{% if is_doubles_tvd %}Команда{% else %}Игрок{% endif %}</th>
+                            {% for p in tvd_cons_rr_matrix_participants %}
+                            <th class="matrix-col">{{ forloop.counter }}</th>
+                            {% endfor %}
+                            <th>Очки</th>
+                            <th>Место</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in tvd_cons_rr_matrix_rows %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td class="matrix-player-cell">
+                                {% if is_doubles_tvd %}
+                                <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                {% else %}
+                                <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                {% endif %}
+                            </td>
+                            {% for cell in row.cells %}
+                            {% if forloop.counter0 == forloop.parentloop.counter0 %}
+                            <td class="matrix-cell matrix-cell--diagonal">—</td>
+                            {% else %}
+                            <td class="matrix-cell">
+                                {% if cell.win is not None %}
+                                <div class="matrix-cell-win">{{ cell.win }}</div>
+                                <div class="matrix-cell-games">{{ cell.games|default:"—" }}</div>
+                                {% else %}—{% endif %}
+                            </td>
+                            {% endif %}
+                            {% endfor %}
+                            <td class="matrix-points">{{ row.points|default:"—" }}</td>
+                            <td class="matrix-place">{{ row.place|default:"—" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <h4 class="h5 mb-2">Таблица результатов</h4>
+            <div class="table-responsive mb-3">
+                <table class="round-robin-standings">
+                    <thead>
+                        <tr>
+                            <th>Место</th>
+                            <th>{% if is_doubles_tvd %}Команда{% else %}Игрок{% endif %}</th>
+                            <th>Игр</th>
+                            <th>В</th>
+                            <th>П</th>
+                            <th>Сеты</th>
+                            <th>Геймы</th>
+                            <th>Очки</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in tvd_cons_rr_standings %}
+                        <tr>
+                            <td>{{ row.place|default:"—" }}</td>
+                            <td>
+                                {% if row.team %}
+                                <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                {% else %}
+                                <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                {% endif %}
+                            </td>
+                            <td>{{ row.matches }}</td>
+                            <td>{{ row.wins }}</td>
+                            <td>{{ row.losses }}</td>
+                            <td>{{ row.sets }}</td>
+                            <td>{{ row.games }}</td>
+                            <td>{{ row.points }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Секция 5: Итоги -->
+    {% if tvd_standings %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">Итоги</h2>
+            <div class="table-responsive">
+                <table class="table table-sm manage-standings-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th class="text-center">Место</th>
+                            <th>Участник</th>
+                            <th class="text-center">Очки</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in tvd_standings %}
+                        <tr>
+                            <td class="text-center">{% if r.place == 1 %}🥇{% elif r.place == 2 %}🥈{% elif r.place == 3 %}🥉{% else %}{{ r.place }}{% endif %}</td>
+                            <td><a href="{% url 'profile' pk=r.player.pk %}">{{ r.player.user.last_name }} {{ r.player.user.first_name }}</a></td>
+                            <td class="text-center">{{ r.fan_points }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+<style>
+    .manage-match-result .form-control { text-align: center; }
+    .manage-match-result .manage-match-player { font-weight: 500; }
+    .manage-match-winner { display: inline-flex; align-items: center; gap: 0.5rem; }
+    a.tvd-group-match-link:hover { background: var(--color-bg-elevated); color: var(--color-primary); border-color: var(--color-primary); }
+    /* Выпадающий список поиска участников — каждый пункт с новой строки */
+    .participant-search-dropdown {
+        display: flex;
+        flex-direction: column;
+        background: var(--color-bg-primary, #fff);
+    }
+    .participant-search-dropdown a.participant-search-item {
+        display: block;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid var(--color-border-light, #dee2e6);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .participant-search-dropdown a.participant-search-item:last-child {
+        border-bottom: none;
+    }
+    .participant-search-dropdown a.participant-search-item:hover {
+        background: var(--color-bg-elevated, #f8f9fa);
+    }
+    /* Текст в выпадающих списках — чёрный */
+    .manage-player-select,
+    .manage-player-select option {
+        color: #000;
+    }
+    .participant-search-dropdown a.participant-search-item {
+        color: #000;
+    }
+</style>
+{% block extra_js %}
+<script>
+(function() {
+    var debounceMs = 250;
+    var timers = {};
+    document.querySelectorAll('.participant-search-input').forEach(function(input) {
+        var wrap = input.closest('.participant-search-wrap');
+        var dropdown = wrap ? wrap.querySelector('.participant-search-dropdown') : null;
+        var hiddenInput = wrap ? wrap.querySelector('.participant-id-input') : null;
+        var form = input.closest('form');
+        if (!wrap || !dropdown || !hiddenInput) return;
+
+        function esc(s) {
+            var t = document.createElement('div');
+            t.textContent = s == null ? '' : s;
+            return t.innerHTML;
+        }
+        function showDropdown(items) {
+            if (!items.length) {
+                dropdown.innerHTML = '<div class="list-group-item text-secondary small">Ничего не найдено. Введите имя или телефон.</div>';
+            } else {
+                dropdown.innerHTML = items.map(function(r) {
+                    return '<a href="#" class="list-group-item list-group-item-action participant-search-item" data-id="' + esc(String(r.id)) + '" data-display="' + esc(r.display || '') + '">' + esc(r.display || '') + '</a>';
+                }).join('');
+            }
+            dropdown.style.display = 'block';
+        }
+        function hideDropdown() {
+            dropdown.style.display = 'none';
+        }
+        function setSelected(id, display) {
+            hiddenInput.value = id || '';
+            input.value = display || '';
+            hideDropdown();
+        }
+
+        input.addEventListener('input', function() {
+            var q = (input.value || '').trim();
+            clearTimeout(timers[input.name]);
+            if (q.length < 2) {
+                hiddenInput.value = '';
+                hideDropdown();
+                return;
+            }
+            timers[input.name] = setTimeout(function() {
+                var url = input.getAttribute('data-search-url');
+                if (!url) return;
+                fetch(url + '?q=' + encodeURIComponent(q))
+                    .then(function(res) { return res.json(); })
+                    .then(function(data) {
+                        showDropdown(data.results || []);
+                    })
+                    .catch(function() { showDropdown([]); });
+            }, debounceMs);
+        });
+        dropdown.addEventListener('click', function(e) {
+            var item = e.target.closest('[data-id]');
+            if (item && item.dataset.id) {
+                e.preventDefault();
+                setSelected(item.dataset.id, item.dataset.display || item.textContent);
+            }
+        });
+        input.addEventListener('focus', function() {
+            if (dropdown.innerHTML && dropdown.querySelector('[data-id]')) dropdown.style.display = 'block';
+        });
+        document.addEventListener('click', function(e) {
+            if (!wrap.contains(e.target)) hideDropdown();
+        });
+        form.addEventListener('submit', function(e) {
+            if (!hiddenInput.value) {
+                e.preventDefault();
+                alert('Выберите участника из списка по результатам поиска.');
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}
+{% endblock %}

@@ -7,21 +7,52 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('subscriptions', '0004_add_cancelled_at'),
+        ("subscriptions", "0004_add_cancelled_at"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='RegionalTierPrice',
+            name="RegionalTierPrice",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('price', models.DecimalField(decimal_places=2, default=0, max_digits=10, verbose_name='Стоимость (руб)')),
-                ('name', models.CharField(default='Регионы', max_length=100, verbose_name='Название региона')),
-                ('tier', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='regional_prices', to='subscriptions.subscriptiontier', verbose_name='Тариф')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "price",
+                    models.DecimalField(
+                        decimal_places=2,
+                        default=0,
+                        max_digits=10,
+                        verbose_name="Стоимость (руб)",
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        default="Регионы",
+                        max_length=100,
+                        verbose_name="Название региона",
+                    ),
+                ),
+                (
+                    "tier",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="regional_prices",
+                        to="subscriptions.subscriptiontier",
+                        verbose_name="Тариф",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Региональная цена',
-                'verbose_name_plural': 'Региональные цены',
+                "verbose_name": "Региональная цена",
+                "verbose_name_plural": "Региональные цены",
             },
         ),
     ]

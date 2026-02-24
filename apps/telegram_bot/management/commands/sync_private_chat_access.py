@@ -38,10 +38,14 @@ class Command(BaseCommand):
         dry_run: bool = options.get("dry_run", False)
 
         if not bot_services.is_configured():
-            self.stdout.write(self.style.WARNING("Telegram user bot token не настроен."))
+            self.stdout.write(
+                self.style.WARNING("Telegram user bot token не настроен.")
+            )
             return
         if not bot_services.is_private_chat_configured():
-            self.stdout.write(self.style.WARNING("TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID не настроен."))
+            self.stdout.write(
+                self.style.WARNING("TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID не настроен.")
+            )
             return
 
         links_qs = (
@@ -118,4 +122,3 @@ class Command(BaseCommand):
             "sync_private_chat_access finished: "
             f"checked={checked}, to_remove={to_remove}, removed={removed}, failed={failed}, dry_run={dry_run}"
         )
-

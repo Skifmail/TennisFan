@@ -91,6 +91,96 @@ def _compute_result(proposal: MatchResultProposal):
     return winner, loser, walkover, winner_team, loser_team
 
 
+def notify_participants_match_result_confirmed(
+    match: Match, *, walkover: bool = False
+) -> None:
+    """
+    Отправить уведомления участникам матча о подтверждённом результате (ЛК + Telegram).
+    Вызывается из apply_proposal и из страницы управления турниром (админ ввёл результат).
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    winner = match.winner
+    winner_team = getattr(match, "winner_team", None)
+    url = reverse("match_detail", args=[match.pk])
+
+    from .utils import get_match_participants
+
+    participants = [
+        p
+        for p in get_match_participants(match)
+        if p and not getattr(p, "is_bye", False) and getattr(p, "user_id", None)
+    ]
+    is_friendly = match.is_friendly_sparring()
+
+    for p in participants:
+        try:
+            is_winner = (
+                p == winner
+                or (winner_team and p in (winner_team.player1, winner_team.player2))
+                or (
+                    match.is_doubles_sparring()
+                    and winner in (match.player1, match.partner1)
+                    and p in (match.player1, match.partner1)
+                )
+                or (
+                    match.is_doubles_sparring()
+                    and winner in (match.player2, match.partner2)
+                    and p in (match.player2, match.partner2)
+                )
+            )
+            if walkover:
+                msg = (
+                    "Результат матча подтверждён: тех. победа (соперник снялся)."
+                    if is_winner
+                    else "Результат матча подтверждён: тех. поражение."
+                )
+            else:
+                base = (
+                    "Результат матча подтверждён: вы выиграли."
+                    if is_winner
+                    else "Результат матча подтверждён: поражение."
+                )
+                if not is_friendly:
+                    p.refresh_from_db()
+                    changes = p.get_rating_changes()
+                    fan = changes.get("fan", {})
+                    delta = fan.get("delta") or 0
+                    if delta != 0:
+                        from apps.users.rating_utils import rating_to_ntrp_level
+
+                        d_str = f"+{int(delta)}" if delta > 0 else str(int(delta))
+                        base += (
+                            f" Вам начислено {d_str} очков рейтинга."
+                            if delta > 0
+                            else f" У вас вычтено {abs(int(delta))} очков рейтинга."
+                        )
+                        rating_before = float(p.total_points) - float(delta)
+                        ntrp_before = rating_to_ntrp_level(rating_before)
+                        ntrp_after = rating_to_ntrp_level(float(p.total_points))
+                        base += f" Сила: {ntrp_before:.1f} → {ntrp_after:.1f}."
+                msg = base
+            if len(msg) > 255:
+                msg = msg[:252] + "..."
+            Notification.objects.create(user=p.user, message=msg, url=url)
+        except Exception as e:
+            logger.warning(
+                "notify_participants_match_result_confirmed for player %s: %s",
+                getattr(p, "pk", None),
+                e,
+            )
+
+    try:
+        from apps.telegram_bot.notifications import (
+            notify_result_confirmed_to_participants,
+        )
+
+        notify_result_confirmed_to_participants(match)
+    except Exception as e:
+        logger.warning("notify_result_confirmed_to_participants failed: %s", e)
+
+
 def apply_proposal(proposal: MatchResultProposal) -> None:
     """
     Применить подтверждённую заявку к матчу.
@@ -152,86 +242,5 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     proposal.status = Match.ProposalStatus.ACCEPTED
     proposal.save(update_fields=["status"])
 
-    url = reverse("match_detail", args=[match.pk])
     match.refresh_from_db()
-
-    from .utils import get_match_participants
-
-    participants = [
-        p
-        for p in get_match_participants(match)
-        if p and not getattr(p, "is_bye", False) and getattr(p, "user_id", None)
-    ]
-    is_friendly = match.is_friendly_sparring()
-
-    for p in participants:
-        try:
-            is_winner = (
-                p == winner
-                or (winner_team and p in (winner_team.player1, winner_team.player2))
-                or (
-                    match.is_doubles_sparring()
-                    and winner in (match.player1, match.partner1)
-                    and p in (match.player1, match.partner1)
-                )
-                or (
-                    match.is_doubles_sparring()
-                    and winner in (match.player2, match.partner2)
-                    and p in (match.player2, match.partner2)
-                )
-            )
-            if is_walkover_retired:
-                msg = (
-                    "Результат матча подтверждён: тех. победа (соперник снялся)."
-                    if is_winner
-                    else "Результат матча подтверждён: тех. поражение."
-                )
-            else:
-                base = (
-                    "Результат матча подтверждён: вы выиграли."
-                    if is_winner
-                    else "Результат матча подтверждён: поражение."
-                )
-                if not is_friendly:
-                    p.refresh_from_db()
-                    changes = p.get_rating_changes()
-                    fan = changes.get("fan", {})
-                    delta = fan.get("delta") or 0
-                    if delta != 0:
-                        from apps.users.rating_utils import rating_to_ntrp_level
-
-                        d_str = f"+{int(delta)}" if delta > 0 else str(int(delta))
-                        base += (
-                            f" Вам начислено {d_str} очков рейтинга."
-                            if delta > 0
-                            else f" У вас вычтено {abs(int(delta))} очков рейтинга."
-                        )
-                        rating_before = float(p.total_points) - float(delta)
-                        ntrp_before = rating_to_ntrp_level(rating_before)
-                        ntrp_after = rating_to_ntrp_level(float(p.total_points))
-                        base += f" Сила: {ntrp_before:.1f} → {ntrp_after:.1f}."
-                msg = base
-            if len(msg) > 255:
-                msg = msg[:252] + "..."
-            Notification.objects.create(user=p.user, message=msg, url=url)
-        except Exception as e:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "apply_proposal Notification for player %s: %s",
-                getattr(p, "pk", None),
-                e,
-            )
-
-    try:
-        from apps.telegram_bot.notifications import (
-            notify_result_confirmed_to_participants,
-        )
-
-        notify_result_confirmed_to_participants(match)
-    except Exception as e:
-        import logging
-
-        logging.getLogger(__name__).warning(
-            "notify_result_confirmed_to_participants failed: %s", e
-        )
+    notify_participants_match_result_confirmed(match, walkover=is_walkover_retired)

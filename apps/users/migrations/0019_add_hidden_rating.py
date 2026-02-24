@@ -6,18 +6,26 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0018_update_ntrp_to_strength_level'),
+        ("users", "0018_update_ntrp_to_strength_level"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='player',
-            name='hidden_rating',
-            field=models.FloatField(default=0.0, help_text='Теневой рейтинг, пересчитывается хронологически после каждого матча.', verbose_name='Скрытый рейтинг'),
+            model_name="player",
+            name="hidden_rating",
+            field=models.FloatField(
+                default=0.0,
+                help_text="Теневой рейтинг, пересчитывается хронологически после каждого матча.",
+                verbose_name="Скрытый рейтинг",
+            ),
         ),
         migrations.AlterField(
-            model_name='player',
-            name='total_points',
-            field=models.IntegerField(default=0, help_text='Публичный рейтинг. Обновляется 1-го числа каждого месяца.', verbose_name='Рейтинг (отображаемый)'),
+            model_name="player",
+            name="total_points",
+            field=models.IntegerField(
+                default=0,
+                help_text="Публичный рейтинг. Обновляется 1-го числа каждого месяца.",
+                verbose_name="Рейтинг (отображаемый)",
+            ),
         ),
     ]

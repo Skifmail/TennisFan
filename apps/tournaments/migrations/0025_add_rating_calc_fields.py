@@ -6,23 +6,42 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tournaments', '0024_improve_points_fields_descriptions'),
+        ("tournaments", "0024_improve_points_fields_descriptions"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='match',
-            name='rating_delta_player1',
-            field=models.FloatField(default=0.0, help_text='Дельта рейтинга для игрока 1 / команды 1 после расчёта.', verbose_name='Изменение рейтинга П1'),
+            model_name="match",
+            name="rating_delta_player1",
+            field=models.FloatField(
+                default=0.0,
+                help_text="Дельта рейтинга для игрока 1 / команды 1 после расчёта.",
+                verbose_name="Изменение рейтинга П1",
+            ),
         ),
         migrations.AddField(
-            model_name='match',
-            name='rating_delta_player2',
-            field=models.FloatField(default=0.0, help_text='Дельта рейтинга для игрока 2 / команды 2 после расчёта.', verbose_name='Изменение рейтинга П2'),
+            model_name="match",
+            name="rating_delta_player2",
+            field=models.FloatField(
+                default=0.0,
+                help_text="Дельта рейтинга для игрока 2 / команды 2 после расчёта.",
+                verbose_name="Изменение рейтинга П2",
+            ),
         ),
         migrations.AddField(
-            model_name='match',
-            name='rating_status',
-            field=models.CharField(choices=[('na', 'Не применимо'), ('pending_calc', 'Ожидает расчёта'), ('calculated', 'Рассчитано')], db_index=True, default='na', help_text='pending_calc — матч ждёт ежемесячного пересчёта; calculated — рейтинг обновлён.', max_length=20, verbose_name='Статус рейтинга'),
+            model_name="match",
+            name="rating_status",
+            field=models.CharField(
+                choices=[
+                    ("na", "Не применимо"),
+                    ("pending_calc", "Ожидает расчёта"),
+                    ("calculated", "Рассчитано"),
+                ],
+                db_index=True,
+                default="na",
+                help_text="pending_calc — матч ждёт ежемесячного пересчёта; calculated — рейтинг обновлён.",
+                max_length=20,
+                verbose_name="Статус рейтинга",
+            ),
         ),
     ]

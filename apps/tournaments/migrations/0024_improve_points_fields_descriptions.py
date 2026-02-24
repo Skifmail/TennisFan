@@ -6,18 +6,26 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tournaments', '0023_update_points_fields_help_text'),
+        ("tournaments", "0023_update_points_fields_help_text"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='tournament',
-            name='points_loser',
-            field=models.IntegerField(default=-50, help_text='Используется для круговых и других форматов (не FAN/Олимпийская). Для кругового по умолчанию: 0 очков (можно настроить отрицательные, например -1). Для других форматов: -50 очков (очки отнимаются). FAN и Олимпийская система используют только положительные очки за раунды/места.', verbose_name='Очки за проигрыш'),
+            model_name="tournament",
+            name="points_loser",
+            field=models.IntegerField(
+                default=-50,
+                help_text="Используется для круговых и других форматов (не FAN/Олимпийская). Для кругового по умолчанию: 0 очков (можно настроить отрицательные, например -1). Для других форматов: -50 очков (очки отнимаются). FAN и Олимпийская система используют только положительные очки за раунды/места.",
+                verbose_name="Очки за проигрыш",
+            ),
         ),
         migrations.AlterField(
-            model_name='tournament',
-            name='points_winner',
-            field=models.IntegerField(default=100, help_text='Используется для круговых и других форматов (не FAN/Олимпийская). Для кругового по умолчанию: 1 очко. Для других форматов: 100 очков.', verbose_name='Очки за победу'),
+            model_name="tournament",
+            name="points_winner",
+            field=models.IntegerField(
+                default=100,
+                help_text="Используется для круговых и других форматов (не FAN/Олимпийская). Для кругового по умолчанию: 1 очко. Для других форматов: 100 очков.",
+                verbose_name="Очки за победу",
+            ),
         ),
     ]

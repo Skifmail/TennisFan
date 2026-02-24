@@ -6,22 +6,22 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tournaments', '0004_matchresultproposal'),
+        ("tournaments", "0004_matchresultproposal"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='tournament',
-            name='points_multiplier',
+            model_name="tournament",
+            name="points_multiplier",
         ),
         migrations.AddField(
-            model_name='tournament',
-            name='points_loser',
-            field=models.IntegerField(default=-50, verbose_name='Очки за проигрыш'),
+            model_name="tournament",
+            name="points_loser",
+            field=models.IntegerField(default=-50, verbose_name="Очки за проигрыш"),
         ),
         migrations.AddField(
-            model_name='tournament',
-            name='points_winner',
-            field=models.IntegerField(default=100, verbose_name='Очки за победу'),
+            model_name="tournament",
+            name="points_winner",
+            field=models.IntegerField(default=100, verbose_name="Очки за победу"),
         ),
     ]

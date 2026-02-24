@@ -6,13 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0010_alter_player_category'),
+        ("users", "0010_alter_player_category"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='player',
-            name='max_contact',
-            field=models.CharField(blank=True, help_text='Ссылка на профиль в мессенджере MAX (из раздела «Поделиться»)', max_length=500, verbose_name='MAX'),
+            model_name="player",
+            name="max_contact",
+            field=models.CharField(
+                blank=True,
+                help_text="Ссылка на профиль в мессенджере MAX (из раздела «Поделиться»)",
+                max_length=500,
+                verbose_name="MAX",
+            ),
         ),
     ]

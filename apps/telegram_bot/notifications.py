@@ -56,13 +56,35 @@ def notify_tournament_registered(user, tournament) -> None:
     deadline_str = (
         f"до {deadline.strftime('%d.%m.%Y')}" if deadline else "в ближайшее время"
     )
+    is_tvd = getattr(tournament, "format", None) == "weekend_day"
+    grid_word = "групп" if is_tvd else "сетки"
     text = (
         f"🎾 <b>Вы зарегистрированы на турнир</b>\n\n"
         f"«{tournament.name}» ({tournament.city})\n\n"
-        f"Ожидайте формирования сетки {deadline_str}. "
+        f"Ожидайте формирования {grid_word} {deadline_str}. "
         f"Мы пришлём уведомление о ваших матчах в этом турнире."
     )
     send_to_user_by_user(user, text)
+
+
+def notify_tournament_removed_refund(user, tournament, feedback_url: str) -> None:
+    """Уведомление о снятии с турнира и возврате взноса — ссылка на форму обратной связи."""
+    if not bot.is_configured():
+        return
+    text = (
+        f"⚠️ <b>Вы сняты с турнира</b> «{tournament.name}».\n\n"
+        "Взнос за участие был оплачен. Для возврата средств обратитесь к администратору через форму обратной связи по ссылке ниже."
+    )
+    reply_markup = (
+        {
+            "inline_keyboard": [
+                [{"text": "Обратная связь (возврат средств)", "url": feedback_url}]
+            ]
+        }
+        if feedback_url
+        else None
+    )
+    send_to_user_by_user(user, text, reply_markup=reply_markup)
 
 
 def _match_info_text(match) -> str:
@@ -79,6 +101,11 @@ def _match_info_text(match) -> str:
         round_info = "—"
     else:
         tournament_info = match.tournament.name if match.tournament else "—"
+        if (
+            match.tournament
+            and getattr(match.tournament, "format", None) == "weekend_day"
+        ):
+            tournament_info = f"{tournament_info} (ТВД)"
         round_info = match.round_name or "—"
 
     return (
@@ -91,16 +118,22 @@ def _match_info_text(match) -> str:
     )
 
 
-def notify_bracket_formed(tournament) -> None:
+def notify_bracket_formed(tournament, subtitle: str | None = None) -> None:
     """
     Уведомление всем участникам турнира о сформированной сетке (в бот и в ЛК).
-    Вызывать после формирования сетки (bracket_generated=True), один раз на турнир.
+    Вызывать после формирования сетки (bracket_generated=True).
+    subtitle: для ТВД можно передать "Группы сформированы" или "Плей-офф сформирован".
     """
     users = get_tournament_participant_users(tournament)
     from django.urls import reverse
 
     url = reverse("tournament_detail", args=[tournament.slug])
-    message_lk = f"Сетка турнира «{tournament.name}» сформирована. Проверьте матчи в «Мои матчи»."
+    if subtitle:
+        message_lk = (
+            f"{subtitle} турнира «{tournament.name}». Проверьте матчи в «Мои матчи»."
+        )
+    else:
+        message_lk = f"Сетка турнира «{tournament.name}» сформирована. Проверьте матчи в «Мои матчи»."
     if len(message_lk) > 255:
         message_lk = message_lk[:252] + "..."
 
@@ -114,11 +147,18 @@ def notify_bracket_formed(tournament) -> None:
 
     if not bot.is_configured():
         return
-    text = (
-        f"📋 <b>Сетка турнира сформирована</b>\n\n"
-        f"«{tournament.name}»\n\n"
-        "Ваши матчи уже в разделе «Мои матчи». Внесите результат до дедлайна."
-    )
+    if subtitle:
+        text = (
+            f"📋 <b>{subtitle}</b>\n\n"
+            f"«{tournament.name}»\n\n"
+            "Ваши матчи уже в разделе «Мои матчи». Внесите результат до дедлайна."
+        )
+    else:
+        text = (
+            f"📋 <b>Сетка турнира сформирована</b>\n\n"
+            f"«{tournament.name}»\n\n"
+            "Ваши матчи уже в разделе «Мои матчи». Внесите результат до дедлайна."
+        )
     reply_markup = {
         "inline_keyboard": [
             [{"text": "📅 Мои матчи", "callback_data": "menu_my_matches"}],
@@ -563,13 +603,18 @@ def notify_extension_approved(extension_request) -> None:
 
 def _format_new_tournament_message(tournament) -> str:
     """Формирует подробный текст уведомления о новом турнире (HTML для Telegram)."""
+    format_display = (
+        "ТВД"
+        if getattr(tournament, "format", None) == "weekend_day"
+        else tournament.get_format_display()
+    )
     parts = [
         "🆕 <b>Новый турнир</b>",
         "",
         f"<b>{html.escape(tournament.name)}</b>",
         f"📍 {html.escape(tournament.city)}",
         "",
-        f"Формат: {tournament.get_format_display()}",
+        f"Формат: {format_display}",
         f"Вариант: {tournament.get_variant_display()}",
         f"Категория: {tournament.get_gender_display()}",
         f"Продолжительность: {tournament.get_duration_display()}",

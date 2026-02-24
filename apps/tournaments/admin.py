@@ -18,12 +18,28 @@ from .models import (
     SeasonRating,
     Tournament,
     TournamentAllowedCategory,
+    TournamentEntryRefundRequest,
     TournamentPlayerResult,
     TournamentTeam,
+    TVDGroup,
+    TVDGroupMember,
+    TVDTournament,
 )
 from .olympic_consolation import generate_bracket as generate_olympic_bracket
 from .proposal_service import apply_proposal
 from .round_robin import generate_bracket as generate_round_robin_bracket
+from .tvd import (
+    _assign_tvd_places_5_onwards,
+)
+from .tvd import (
+    check_and_finalize as tvd_check_and_finalize,
+)
+from .tvd import (
+    generate_groups as tvd_generate_groups,
+)
+from .tvd import (
+    generate_playoffs as tvd_generate_playoffs,
+)
 
 
 @admin.action(description="Подтвердить результат матча")
@@ -72,6 +88,46 @@ def generate_round_robin_bracket_action(modeladmin, request, queryset):
             messages.success(request, f"{t.name}: {msg}")
         else:
             messages.warning(request, f"{t.name}: {msg}")
+
+
+@admin.action(description="Сформировать группы (ТВД)")
+def generate_tvd_groups_action(modeladmin, request, queryset):
+    for t in queryset:
+        ok, msg = tvd_generate_groups(t)
+        if ok:
+            messages.success(request, f"{t.name}: {msg}")
+        else:
+            messages.warning(request, f"{t.name}: {msg}")
+
+
+@admin.action(description="Сформировать плей-офф (ТВД)")
+def generate_tvd_playoffs_action(modeladmin, request, queryset):
+    for t in queryset:
+        ok, msg = tvd_generate_playoffs(t)
+        if ok:
+            messages.success(request, f"{t.name}: {msg}")
+        else:
+            messages.warning(request, f"{t.name}: {msg}")
+
+
+@admin.action(description="Завершить турнир (ТВД)")
+def finalize_tvd_action(modeladmin, request, queryset):
+    for t in queryset:
+        ok, msg = tvd_check_and_finalize(t)
+        if ok:
+            messages.success(request, f"{t.name}: {msg}")
+        else:
+            messages.warning(request, f"{t.name}: {msg}")
+
+
+@admin.action(description="Дозаполнить итоги ТВД (места 5+)")
+def backfill_tvd_standings_action(modeladmin, request, queryset):
+    """Для уже завершённых ТВД: присвоить места 5–8 и 9+ всем участникам без результата."""
+    from .models import TournamentStatus
+
+    for t in queryset.filter(status=TournamentStatus.COMPLETED):
+        _assign_tvd_places_5_onwards(t)
+        messages.success(request, f"{t.name}: итоги дозаполнены (места 5+).")
 
 
 class TournamentTeamInline(admin.TabularInline):
@@ -126,6 +182,17 @@ class TournamentAdminForm(forms.ModelForm):
         return cleaned_data
 
 
+@admin.register(TournamentEntryRefundRequest)
+class TournamentEntryRefundRequestAdmin(admin.ModelAdmin):
+    """Заявки на возврат взноса (участник удалён с турнира, взнос был оплачен)."""
+
+    list_display = ("refund_ref", "tournament", "user", "amount", "removed_at")
+    list_filter = ("tournament", "removed_at")
+    search_fields = ("refund_ref", "user__email", "user__last_name", "user__first_name")
+    readonly_fields = ("tournament", "user", "removed_at", "amount", "refund_ref")
+    date_hierarchy = "removed_at"
+
+
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
     form = TournamentAdminForm
@@ -142,7 +209,6 @@ class TournamentAdmin(admin.ModelAdmin):
         "city",
         "format",
         "variant",
-        "duration",
         "tournament_type",
         "status",
         "bracket_generated",
@@ -155,7 +221,6 @@ class TournamentAdmin(admin.ModelAdmin):
     list_filter = (
         "city",
         "gender",
-        "duration",
         "tournament_type",
         "format",
         "variant",
@@ -186,7 +251,6 @@ class TournamentAdmin(admin.ModelAdmin):
                     "city",
                     "gender",
                     "allowed_categories",
-                    "duration",
                     "tournament_type",
                     "status",
                     "start_date",
@@ -268,6 +332,113 @@ class TournamentAdmin(admin.ModelAdmin):
         js = ("js/admin_tournament.js",)
 
 
+class TVDGroupMemberInline(admin.TabularInline):
+    model = TVDGroupMember
+    extra = 0
+    raw_id_fields = ("player",)
+    ordering = ("final_place", "seed")
+
+
+class TVDGroupInline(admin.TabularInline):
+    model = TVDGroup
+    extra = 0
+    ordering = ("order",)
+    show_change_link = True
+
+
+class TVDTournamentAdminForm(TournamentAdminForm):
+    """Форма ТВД без поля format (выставляется автоматически)."""
+
+    class Meta(TournamentAdminForm.Meta):
+        exclude = ("format",)
+
+
+@admin.register(TVDTournament)
+class TVDTournamentAdmin(admin.ModelAdmin):
+    """Админка для турниров выходного дня (proxy над Tournament, format=weekend_day)."""
+
+    form = TVDTournamentAdminForm
+    inlines = [TVDGroupInline]
+
+    list_display = (
+        "name",
+        "city",
+        "variant",
+        "status",
+        "bracket_generated",
+        "start_date",
+        "max_participants",
+    )
+    list_filter = ("city", "status", "bracket_generated")
+    search_fields = ("name", "description")
+    list_editable = ("status",)
+    prepopulated_fields = {"slug": ("name",)}
+    filter_horizontal = ("participants",)
+    date_hierarchy = "start_date"
+    readonly_fields = ("insufficient_participants_notified_at",)
+    actions = [
+        generate_tvd_groups_action,
+        generate_tvd_playoffs_action,
+        finalize_tvd_action,
+        backfill_tvd_standings_action,
+    ]
+
+    fieldsets = (
+        ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
+        (
+            "ТВД (формат и участники)",
+            {
+                "fields": (
+                    "variant",
+                    "entry_fee",
+                    "is_one_day",
+                    "city",
+                    "gender",
+                    "allowed_categories",
+                    "tournament_type",
+                    "status",
+                    "start_date",
+                    "end_date",
+                    "registration_deadline",
+                    "min_participants",
+                    "max_participants",
+                    "insufficient_participants_notified_at",
+                    "bracket_generated",
+                    "match_days_per_round",
+                    "participants",
+                ),
+            },
+        ),
+        (
+            "Очки за места",
+            {
+                "fields": (
+                    "fan_points_r1",
+                    "fan_points_r2",
+                    "fan_points_sf",
+                    "fan_points_final",
+                    "fan_points_winner",
+                ),
+            },
+        ),
+        ("Формат матча в группах", {"fields": ("match_format",)}),
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(format="weekend_day")
+
+    def save_model(self, request, obj, form, change):
+        from .models import TournamentDuration, TournamentFormat
+
+        obj.format = TournamentFormat.WEEKEND_DAY
+        obj.duration = TournamentDuration.WEEKEND
+        super().save_model(request, obj, form, change)
+        selected = form.cleaned_data.get("allowed_categories") or []
+        obj.allowed_categories.all().delete()
+        for category in selected:
+            TournamentAllowedCategory.objects.create(tournament=obj, category=category)
+
+
 class MatchAdminForm(forms.ModelForm):
     """Форма матча с понятными подписями для счёта по сетам."""
 
@@ -336,6 +507,7 @@ class MatchAdmin(admin.ModelAdmin):
         "court",
         "next_match",
         "loser_next_match",
+        "tvd_group",
     )
     date_hierarchy = "scheduled_datetime"
 
@@ -350,6 +522,8 @@ class MatchAdmin(admin.ModelAdmin):
                     "round_index",
                     "round_order",
                     "is_consolation",
+                    "tvd_group",
+                    "tvd_stage",
                     "next_match",
                     "loser_next_match",
                     "placement_min",
@@ -471,6 +645,36 @@ class TournamentPlayerResultAdmin(admin.ModelAdmin):
         "fan_points",
         "is_consolation",
     )
+
+
+@admin.register(TVDGroup)
+class TVDGroupAdmin(admin.ModelAdmin):
+    """Группы ТВД. Участников можно редактировать во вкладке ниже."""
+
+    list_display = ("tournament", "name", "order", "is_completed")
+    list_filter = ("tournament", "is_completed")
+    ordering = ("tournament", "order")
+    inlines = [TVDGroupMemberInline]
+    raw_id_fields = ("tournament",)
+
+
+@admin.register(TVDGroupMember)
+class TVDGroupMemberAdmin(admin.ModelAdmin):
+    """Участник группы ТВД (ручное редактирование мест и статистики)."""
+
+    list_display = (
+        "group",
+        "player",
+        "seed",
+        "wins",
+        "losses",
+        "games_won",
+        "games_lost",
+        "final_place",
+    )
+    list_filter = ("group__tournament",)
+    search_fields = ("player__user__first_name", "player__user__last_name")
+    raw_id_fields = ("group", "player")
 
 
 @admin.register(SeasonPoints)

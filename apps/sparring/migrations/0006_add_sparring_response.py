@@ -7,25 +7,68 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sparring', '0005_alter_sparringrequest_desired_category'),
-        ('users', '0010_alter_player_category'),
+        ("sparring", "0005_alter_sparringrequest_desired_category"),
+        ("users", "0010_alter_player_category"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='SparringResponse',
+            name="SparringResponse",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('contact_method', models.CharField(choices=[('telegram', 'Telegram'), ('whatsapp', 'WhatsApp'), ('max', 'Max')], max_length=20, verbose_name='Способ связи')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Создано')),
-                ('respondent', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='sparring_responses', to='users.player', verbose_name='Кто откликнулся')),
-                ('sparring_request', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='responses', to='sparring.sparringrequest', verbose_name='Заявка')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "contact_method",
+                    models.CharField(
+                        choices=[
+                            ("telegram", "Telegram"),
+                            ("whatsapp", "WhatsApp"),
+                            ("max", "Max"),
+                        ],
+                        max_length=20,
+                        verbose_name="Способ связи",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Создано"),
+                ),
+                (
+                    "respondent",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="sparring_responses",
+                        to="users.player",
+                        verbose_name="Кто откликнулся",
+                    ),
+                ),
+                (
+                    "sparring_request",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="responses",
+                        to="sparring.sparringrequest",
+                        verbose_name="Заявка",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Отклик на спарринг',
-                'verbose_name_plural': 'Отклики на спарринг',
-                'ordering': ['-created_at'],
-                'constraints': [models.UniqueConstraint(fields=('sparring_request', 'respondent'), name='sparring_unique_response_per_user')],
+                "verbose_name": "Отклик на спарринг",
+                "verbose_name_plural": "Отклики на спарринг",
+                "ordering": ["-created_at"],
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("sparring_request", "respondent"),
+                        name="sparring_unique_response_per_user",
+                    )
+                ],
             },
         ),
     ]

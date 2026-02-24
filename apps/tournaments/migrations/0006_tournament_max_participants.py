@@ -6,13 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tournaments', '0005_remove_tournament_points_multiplier_and_more'),
+        ("tournaments", "0005_remove_tournament_points_multiplier_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='tournament',
-            name='max_participants',
-            field=models.PositiveIntegerField(blank=True, help_text='Оставьте пустым для неограниченного количества участников', null=True, verbose_name='Максимальное количество участников'),
+            model_name="tournament",
+            name="max_participants",
+            field=models.PositiveIntegerField(
+                blank=True,
+                help_text="Оставьте пустым для неограниченного количества участников",
+                null=True,
+                verbose_name="Максимальное количество участников",
+            ),
         ),
     ]

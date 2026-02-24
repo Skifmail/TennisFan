@@ -71,7 +71,13 @@ class NewsAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (None, {"fields": ("title", "slug", "excerpt", "content")}),
-        ("Медиа", {"fields": ("image",), "description": "Главное изображение. Дополнительные фото — в блоке «Фото новостей» ниже."}),
+        (
+            "Медиа",
+            {
+                "fields": ("image",),
+                "description": "Главное изображение. Дополнительные фото — в блоке «Фото новостей» ниже.",
+            },
+        ),
         ("Публикация", {"fields": ("is_published", "is_featured", "published_at")}),
     )
 
@@ -117,9 +123,7 @@ class AboutUsAdmin(admin.ModelAdmin):
         """Redirect to change view for singleton."""
         obj = AboutUs.objects.first()
         if obj and not request.path.endswith("/change/"):
-            return redirect(
-                reverse("admin:content_aboutus_change", args=[obj.pk])
-            )
+            return redirect(reverse("admin:content_aboutus_change", args=[obj.pk]))
         return super().changelist_view(request, extra_context)
 
 
@@ -333,11 +337,22 @@ class StringerPageAdmin(admin.ModelAdmin):
 class StringerCompanyAdmin(admin.ModelAdmin):
     """Админ для компаний стрингеров — отдельное редактирование с фото и контактами."""
 
-    list_display = ("name", "address", "is_active", "order", "rating_display", "created_at")
+    list_display = (
+        "name",
+        "address",
+        "is_active",
+        "order",
+        "rating_display",
+        "created_at",
+    )
     list_filter = ("is_active", "created_at", "stringer_page")
     search_fields = ("name", "address", "contact_items__value", "description")
     list_editable = ("is_active", "order")
-    inlines = [StringerCompanyContactInline, StringerCompanyPhotoInline, StringerCompanyRatingInline]
+    inlines = [
+        StringerCompanyContactInline,
+        StringerCompanyPhotoInline,
+        StringerCompanyRatingInline,
+    ]
 
     fieldsets = (
         (
@@ -378,8 +393,21 @@ class StringerCompanyRatingAdmin(admin.ModelAdmin):
 
     list_display = ("company", "user", "score", "comment_preview", "created_at")
     list_filter = ("score", "company", "created_at")
-    search_fields = ("comment", "user__email", "user__first_name", "user__last_name", "company__name")
-    readonly_fields = ("company", "user", "score", "comment", "created_at", "updated_at")
+    search_fields = (
+        "comment",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+        "company__name",
+    )
+    readonly_fields = (
+        "company",
+        "user",
+        "score",
+        "comment",
+        "created_at",
+        "updated_at",
+    )
     raw_id_fields = ("user",)
 
     def comment_preview(self, obj):

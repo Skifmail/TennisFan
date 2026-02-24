@@ -20,18 +20,25 @@ def noop(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0005_add_contact_page_and_max'),
+        ("content", "0005_add_contact_page_and_max"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='contactpage',
-            options={'verbose_name': 'Контакты', 'verbose_name_plural': 'Контакты'},
+            name="contactpage",
+            options={"verbose_name": "Контакты", "verbose_name_plural": "Контакты"},
         ),
         migrations.AddField(
-            model_name='contactitem',
-            name='contact_page',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='contact_items', to='content.contactpage', verbose_name='Страница контактов'),
+            model_name="contactitem",
+            name="contact_page",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="contact_items",
+                to="content.contactpage",
+                verbose_name="Страница контактов",
+            ),
         ),
         migrations.RunPython(assign_contact_items_to_page, noop),
     ]

@@ -7,26 +7,55 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Comment',
+            name="Comment",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('object_id', models.PositiveIntegerField()),
-                ('text', models.TextField(verbose_name='Текст комментария')),
-                ('rating_agreement', models.PositiveSmallIntegerField(blank=True, help_text='1-5', null=True, verbose_name='Договороспособность')),
-                ('rating_judging', models.PositiveSmallIntegerField(blank=True, help_text='1-5', null=True, verbose_name='Судейство')),
-                ('is_approved', models.BooleanField(default=True, verbose_name='Одобрен')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Создан')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Обновлён')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("object_id", models.PositiveIntegerField()),
+                ("text", models.TextField(verbose_name="Текст комментария")),
+                (
+                    "rating_agreement",
+                    models.PositiveSmallIntegerField(
+                        blank=True,
+                        help_text="1-5",
+                        null=True,
+                        verbose_name="Договороспособность",
+                    ),
+                ),
+                (
+                    "rating_judging",
+                    models.PositiveSmallIntegerField(
+                        blank=True, help_text="1-5", null=True, verbose_name="Судейство"
+                    ),
+                ),
+                (
+                    "is_approved",
+                    models.BooleanField(default=True, verbose_name="Одобрен"),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Создан"),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Обновлён"),
+                ),
             ],
             options={
-                'verbose_name': 'Комментарий',
-                'verbose_name_plural': 'Комментарии',
-                'ordering': ['-created_at'],
+                "verbose_name": "Комментарий",
+                "verbose_name_plural": "Комментарии",
+                "ordering": ["-created_at"],
             },
         ),
     ]

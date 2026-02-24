@@ -6,23 +6,40 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tournaments', '0022_add_deadline_extension_request'),
+        ("tournaments", "0022_add_deadline_extension_request"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='tournament',
-            name='gender',
-            field=models.CharField(choices=[('male', 'Мужчины'), ('female', 'Женщины'), ('mixed', 'Микст')], default='male', max_length=10, verbose_name='Категория по полу'),
+            model_name="tournament",
+            name="gender",
+            field=models.CharField(
+                choices=[
+                    ("male", "Мужчины"),
+                    ("female", "Женщины"),
+                    ("mixed", "Микст"),
+                ],
+                default="male",
+                max_length=10,
+                verbose_name="Категория по полу",
+            ),
         ),
         migrations.AlterField(
-            model_name='tournament',
-            name='points_loser',
-            field=models.IntegerField(default=-50, help_text='Используется для круговых и других форматов (не FAN/Олимпийская). Для кругового по умолчанию: 0 очков.', verbose_name='Очки за проигрыш'),
+            model_name="tournament",
+            name="points_loser",
+            field=models.IntegerField(
+                default=-50,
+                help_text="Используется для круговых и других форматов (не FAN/Олимпийская). Для кругового по умолчанию: 0 очков.",
+                verbose_name="Очки за проигрыш",
+            ),
         ),
         migrations.AlterField(
-            model_name='tournament',
-            name='points_winner',
-            field=models.IntegerField(default=100, help_text='Используется для круговых и других форматов (не FAN/Олимпийская). Для кругового по умолчанию: 1 очко.', verbose_name='Очки за победу'),
+            model_name="tournament",
+            name="points_winner",
+            field=models.IntegerField(
+                default=100,
+                help_text="Используется для круговых и других форматов (не FAN/Олимпийская). Для кругового по умолчанию: 1 очко.",
+                verbose_name="Очки за победу",
+            ),
         ),
     ]

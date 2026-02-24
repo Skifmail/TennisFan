@@ -14,7 +14,9 @@ def create_rules_sections(apps, schema_editor):
         ("site_usage_rules", "Правила пользования сайтом"),
     ]
     for slug, title in sections:
-        RulesSection.objects.get_or_create(slug=slug, defaults={"title": title, "body": ""})
+        RulesSection.objects.get_or_create(
+            slug=slug, defaults={"title": title, "body": ""}
+        )
 
 
 def noop(apps, schema_editor):

@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0020_init_hidden_rating_from_total_points'),
+        ("users", "0020_init_hidden_rating_from_total_points"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='player',
-            name='total_points',
-            field=models.FloatField(default=0.0, help_text='Публичный рейтинг. Обновляется после каждого матча.', verbose_name='Рейтинг (отображаемый)'),
+            model_name="player",
+            name="total_points",
+            field=models.FloatField(
+                default=0.0,
+                help_text="Публичный рейтинг. Обновляется после каждого матча.",
+                verbose_name="Рейтинг (отображаемый)",
+            ),
         ),
     ]

@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0014_registration_optional_fields_forehand_label'),
+        ("users", "0014_registration_optional_fields_forehand_label"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='player',
-            name='is_bye',
-            field=models.BooleanField(default=False, help_text='Служебный игрок для матчей «игрок — свободный круг» при нечётном числе участников.', verbose_name='Свободный круг (bye)'),
+            model_name="player",
+            name="is_bye",
+            field=models.BooleanField(
+                default=False,
+                help_text="Служебный игрок для матчей «игрок — свободный круг» при нечётном числе участников.",
+                verbose_name="Свободный круг (bye)",
+            ),
         ),
     ]

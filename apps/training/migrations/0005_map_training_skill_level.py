@@ -1,4 +1,5 @@
 """Map training skill levels to unified labels."""
+
 from __future__ import annotations
 
 from django.db import migrations

@@ -1,0 +1,88 @@
+{% if main_rounds or consolation_rounds %}
+<div class="bracket-grid">
+    {% if main_rounds %}
+    <section class="bracket-round">
+        <h3 class="bracket-section-title">Основная сетка</h3>
+        <div class="bracket-container">
+            {% for round_name, round_matches in main_rounds %}
+            <div class="bracket-round-col">
+                <div class="bracket-round-header">{{ round_name }}</div>
+                <div class="bracket-round-body">
+                    {% for match in round_matches %}
+                    <div class="bracket-match {% if match.status == 'completed' or match.status == 'walkover' %}bracket-match--done{% endif %}">
+                        <a href="{% url 'match_detail' pk=match.pk %}" class="bracket-match-link">
+                            <div class="bracket-match-players">
+                                <div class="bracket-match-player {% if match.player1 and match.winner == match.player1 %}bracket-match-player--winner{% endif %}">
+                                    {% if match.player1 %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" %}{% endif %}
+                                    <span class="bracket-player-name">{{ match.get_player1_display|default:"—" }}</span>
+                                    <span class="bracket-player-scores">
+                                        {% if match.player1_set1 is not None %}<span class="bracket-set">{{ match.player1_set1 }}</span>{% endif %}
+                                        {% if match.player1_set2 is not None %}<span class="bracket-set">{{ match.player1_set2 }}</span>{% endif %}
+                                        {% if match.player1_set3 is not None %}<span class="bracket-set">{{ match.player1_set3 }}</span>{% endif %}
+                                    </span>
+                                </div>
+                                <div class="bracket-match-player {% if match.player2 and match.winner == match.player2 %}bracket-match-player--winner{% endif %}">
+                                    {% if match.player2 %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" %}{% endif %}
+                                    <span class="bracket-player-name">{{ match.get_player2_display|default:"—" }}</span>
+                                    <span class="bracket-player-scores">
+                                        {% if match.player2_set1 is not None %}<span class="bracket-set">{{ match.player2_set1 }}</span>{% endif %}
+                                        {% if match.player2_set2 is not None %}<span class="bracket-set">{{ match.player2_set2 }}</span>{% endif %}
+                                        {% if match.player2_set3 is not None %}<span class="bracket-set">{{ match.player2_set3 }}</span>{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+    {% if consolation_rounds %}
+    <section class="bracket-round" style="margin-top: 2rem;">
+        <h3 class="bracket-section-title">Утешительная сетка</h3>
+        <div class="bracket-container">
+            {% for round_name, round_matches in consolation_rounds %}
+            <div class="bracket-round-col">
+                <div class="bracket-round-header">{{ round_name }}</div>
+                <div class="bracket-round-body">
+                    {% for match in round_matches %}
+                    <div class="bracket-match {% if match.status == 'completed' or match.status == 'walkover' %}bracket-match--done{% endif %}">
+                        <a href="{% url 'match_detail' pk=match.pk %}" class="bracket-match-link">
+                            <div class="bracket-match-players">
+                                <div class="bracket-match-player {% if match.player1 and match.winner == match.player1 %}bracket-match-player--winner{% endif %}">
+                                    {% if match.player1 %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" %}{% endif %}
+                                    <span class="bracket-player-name">{{ match.get_player1_display|default:"—" }}</span>
+                                    <span class="bracket-player-scores">
+                                        {% if match.player1_set1 is not None %}<span class="bracket-set">{{ match.player1_set1 }}</span>{% endif %}
+                                        {% if match.player1_set2 is not None %}<span class="bracket-set">{{ match.player1_set2 }}</span>{% endif %}
+                                    </span>
+                                </div>
+                                <div class="bracket-match-player {% if match.player2 and match.winner == match.player2 %}bracket-match-player--winner{% endif %}">
+                                    {% if match.player2 %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" %}{% endif %}
+                                    <span class="bracket-player-name">{{ match.get_player2_display|default:"—" }}</span>
+                                    <span class="bracket-player-scores">
+                                        {% if match.player2_set1 is not None %}<span class="bracket-set">{{ match.player2_set1 }}</span>{% endif %}
+                                        {% if match.player2_set2 is not None %}<span class="bracket-set">{{ match.player2_set2 }}</span>{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% else %}
+<div class="card mb-4">
+    <div class="card-body">
+        <p class="text-secondary mb-0">Плей-офф ещё не сформирован. Завершите групповой этап.</p>
+    </div>
+</div>
+{% endif %}

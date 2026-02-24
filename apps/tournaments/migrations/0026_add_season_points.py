@@ -7,25 +7,70 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tournaments', '0025_add_rating_calc_fields'),
-        ('users', '0022_set_is_verified_default_true'),
+        ("tournaments", "0025_add_rating_calc_fields"),
+        ("users", "0022_set_is_verified_default_true"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='SeasonPoints',
+            name="SeasonPoints",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('current_season_points', models.PositiveIntegerField(default=0, help_text='FAN очки, накопленные в текущем сезоне. Сбрасываются в конце сезона.', verbose_name='Очки текущего сезона')),
-                ('season_name', models.CharField(default='', help_text="Текущий сезон: 'Зима' или 'Лето'", max_length=20, verbose_name='Название сезона')),
-                ('season_year', models.IntegerField(default=0, help_text='Год текущего сезона', verbose_name='Год сезона')),
-                ('updated_at', models.DateTimeField(auto_now=True, help_text='Время последнего обновления сезонных очков', verbose_name='Обновлено')),
-                ('player', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='season_points', to='users.player', verbose_name='Игрок')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "current_season_points",
+                    models.PositiveIntegerField(
+                        default=0,
+                        help_text="FAN очки, накопленные в текущем сезоне. Сбрасываются в конце сезона.",
+                        verbose_name="Очки текущего сезона",
+                    ),
+                ),
+                (
+                    "season_name",
+                    models.CharField(
+                        default="",
+                        help_text="Текущий сезон: 'Зима' или 'Лето'",
+                        max_length=20,
+                        verbose_name="Название сезона",
+                    ),
+                ),
+                (
+                    "season_year",
+                    models.IntegerField(
+                        default=0,
+                        help_text="Год текущего сезона",
+                        verbose_name="Год сезона",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(
+                        auto_now=True,
+                        help_text="Время последнего обновления сезонных очков",
+                        verbose_name="Обновлено",
+                    ),
+                ),
+                (
+                    "player",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="season_points",
+                        to="users.player",
+                        verbose_name="Игрок",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Сезонные очки',
-                'verbose_name_plural': 'Сезонные очки',
-                'ordering': ['-current_season_points'],
+                "verbose_name": "Сезонные очки",
+                "verbose_name_plural": "Сезонные очки",
+                "ordering": ["-current_season_points"],
             },
         ),
     ]

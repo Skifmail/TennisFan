@@ -6,13 +6,25 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sparring', '0002_initial'),
+        ("sparring", "0002_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='sparringrequest',
-            name='desired_category',
-            field=models.CharField(blank=True, choices=[('futures', 'Фьючерс'), ('base', 'База'), ('tour', 'Тур'), ('hard', 'Хард'), ('challenger', 'Челленджер'), ('masters', 'Мастерс')], max_length=20, verbose_name='Желаемая категория партнёра'),
+            model_name="sparringrequest",
+            name="desired_category",
+            field=models.CharField(
+                blank=True,
+                choices=[
+                    ("futures", "Фьючерс"),
+                    ("base", "База"),
+                    ("tour", "Тур"),
+                    ("hard", "Хард"),
+                    ("challenger", "Челленджер"),
+                    ("masters", "Мастерс"),
+                ],
+                max_length=20,
+                verbose_name="Желаемая категория партнёра",
+            ),
         ),
     ]

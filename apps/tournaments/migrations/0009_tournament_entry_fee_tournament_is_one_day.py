@@ -6,18 +6,27 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tournaments', '0008_alter_tournament_city'),
+        ("tournaments", "0008_alter_tournament_city"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='tournament',
-            name='entry_fee',
-            field=models.DecimalField(decimal_places=2, default=0, max_digits=10, verbose_name='Вступительный взнос (руб)'),
+            model_name="tournament",
+            name="entry_fee",
+            field=models.DecimalField(
+                decimal_places=2,
+                default=0,
+                max_digits=10,
+                verbose_name="Вступительный взнос (руб)",
+            ),
         ),
         migrations.AddField(
-            model_name='tournament',
-            name='is_one_day',
-            field=models.BooleanField(default=False, help_text='Если отмечено, взнос платный для всех (с учетом скидок)', verbose_name='Однодневный турнир'),
+            model_name="tournament",
+            name="is_one_day",
+            field=models.BooleanField(
+                default=False,
+                help_text="Если отмечено, взнос платный для всех (с учетом скидок)",
+                verbose_name="Однодневный турнир",
+            ),
         ),
     ]

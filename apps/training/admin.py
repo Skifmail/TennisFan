@@ -22,7 +22,14 @@ logger = logging.getLogger(__name__)
 class CoachAdmin(admin.ModelAdmin):
     """Admin for Coach model."""
 
-    list_display = ("name", "user", "city", "experience_years", "specialization", "is_active")
+    list_display = (
+        "name",
+        "user",
+        "city",
+        "experience_years",
+        "specialization",
+        "is_active",
+    )
     list_filter = ("city", "is_active")
     search_fields = ("name", "bio", "specialization")
     list_editable = ("is_active",)
@@ -41,7 +48,9 @@ def approve_coach_applications(modeladmin, request, queryset):
             logger.exception("Ошибка одобрения заявки тренера %s: %s", app.pk, e)
             err += 1
     if ok:
-        messages.success(request, f"Одобрено заявок: {ok}. Тренеры добавлены в «Наши тренеры».")
+        messages.success(
+            request, f"Одобрено заявок: {ok}. Тренеры добавлены в «Наши тренеры»."
+        )
     if err:
         messages.error(request, f"Не удалось одобрить заявок: {err}. См. лог.")
 
@@ -70,14 +79,35 @@ class CoachApplicationAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("status", "city")
-    search_fields = ("name", "city", "applicant_name", "applicant_email", "specialization")
+    search_fields = (
+        "name",
+        "city",
+        "applicant_name",
+        "applicant_email",
+        "specialization",
+    )
     list_display_links = ("name",)
     actions = [approve_coach_applications, reject_coach_applications]
     readonly_fields = ("status", "coach", "created_at", "updated_at")
 
     fieldsets = (
-        ("Заявитель", {"fields": ("applicant_name", "applicant_email", "applicant_phone")}),
-        (None, {"fields": ("name", "photo", "bio", "experience_years", "specialization", "city")}),
+        (
+            "Заявитель",
+            {"fields": ("applicant_name", "applicant_email", "applicant_phone")},
+        ),
+        (
+            None,
+            {
+                "fields": (
+                    "name",
+                    "photo",
+                    "bio",
+                    "experience_years",
+                    "specialization",
+                    "city",
+                )
+            },
+        ),
         ("Контакты", {"fields": ("phone", "telegram", "whatsapp", "max_contact")}),
         ("Статус", {"fields": ("status", "coach", "created_at", "updated_at")}),
     )
@@ -134,7 +164,15 @@ class TrainingAdmin(admin.ModelAdmin):
 class TrainingEnrollmentAdmin(admin.ModelAdmin):
     """Admin for TrainingEnrollment model."""
 
-    list_display = ("training", "full_name", "email", "player", "desired_court", "status", "created_at")
+    list_display = (
+        "training",
+        "full_name",
+        "email",
+        "player",
+        "desired_court",
+        "status",
+        "created_at",
+    )
     list_filter = ("status", "training")
     search_fields = (
         "full_name",

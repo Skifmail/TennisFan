@@ -7,38 +7,126 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Court',
+            name="Court",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=200, verbose_name='Название')),
-                ('slug', models.SlugField(unique=True, verbose_name='URL')),
-                ('city', models.CharField(choices=[('moscow', 'Москва'), ('spb', 'Санкт-Петербург')], default='moscow', max_length=20, verbose_name='Город')),
-                ('address', models.CharField(max_length=255, verbose_name='Адрес')),
-                ('description', models.TextField(blank=True, verbose_name='Описание')),
-                ('surface', models.CharField(choices=[('hard', 'Хард'), ('clay', 'Грунт'), ('grass', 'Трава'), ('indoor', 'Закрытый хард')], default='hard', max_length=20, verbose_name='Покрытие')),
-                ('courts_count', models.PositiveSmallIntegerField(default=1, verbose_name='Количество кортов')),
-                ('has_lighting', models.BooleanField(default=True, verbose_name='Освещение')),
-                ('is_indoor', models.BooleanField(default=False, verbose_name='Крытый')),
-                ('phone', models.CharField(blank=True, max_length=20, verbose_name='Телефон')),
-                ('whatsapp', models.CharField(blank=True, max_length=20, verbose_name='WhatsApp')),
-                ('website', models.URLField(blank=True, verbose_name='Сайт')),
-                ('image', models.ImageField(blank=True, upload_to='courts/', verbose_name='Фото')),
-                ('latitude', models.DecimalField(blank=True, decimal_places=6, max_digits=9, null=True, verbose_name='Широта')),
-                ('longitude', models.DecimalField(blank=True, decimal_places=6, max_digits=9, null=True, verbose_name='Долгота')),
-                ('price_per_hour', models.DecimalField(blank=True, decimal_places=2, max_digits=8, null=True, verbose_name='Цена/час')),
-                ('is_active', models.BooleanField(default=True, verbose_name='Активен')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Создан')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Обновлён')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=200, verbose_name="Название")),
+                ("slug", models.SlugField(unique=True, verbose_name="URL")),
+                (
+                    "city",
+                    models.CharField(
+                        choices=[("moscow", "Москва"), ("spb", "Санкт-Петербург")],
+                        default="moscow",
+                        max_length=20,
+                        verbose_name="Город",
+                    ),
+                ),
+                ("address", models.CharField(max_length=255, verbose_name="Адрес")),
+                ("description", models.TextField(blank=True, verbose_name="Описание")),
+                (
+                    "surface",
+                    models.CharField(
+                        choices=[
+                            ("hard", "Хард"),
+                            ("clay", "Грунт"),
+                            ("grass", "Трава"),
+                            ("indoor", "Закрытый хард"),
+                        ],
+                        default="hard",
+                        max_length=20,
+                        verbose_name="Покрытие",
+                    ),
+                ),
+                (
+                    "courts_count",
+                    models.PositiveSmallIntegerField(
+                        default=1, verbose_name="Количество кортов"
+                    ),
+                ),
+                (
+                    "has_lighting",
+                    models.BooleanField(default=True, verbose_name="Освещение"),
+                ),
+                (
+                    "is_indoor",
+                    models.BooleanField(default=False, verbose_name="Крытый"),
+                ),
+                (
+                    "phone",
+                    models.CharField(blank=True, max_length=20, verbose_name="Телефон"),
+                ),
+                (
+                    "whatsapp",
+                    models.CharField(
+                        blank=True, max_length=20, verbose_name="WhatsApp"
+                    ),
+                ),
+                ("website", models.URLField(blank=True, verbose_name="Сайт")),
+                (
+                    "image",
+                    models.ImageField(
+                        blank=True, upload_to="courts/", verbose_name="Фото"
+                    ),
+                ),
+                (
+                    "latitude",
+                    models.DecimalField(
+                        blank=True,
+                        decimal_places=6,
+                        max_digits=9,
+                        null=True,
+                        verbose_name="Широта",
+                    ),
+                ),
+                (
+                    "longitude",
+                    models.DecimalField(
+                        blank=True,
+                        decimal_places=6,
+                        max_digits=9,
+                        null=True,
+                        verbose_name="Долгота",
+                    ),
+                ),
+                (
+                    "price_per_hour",
+                    models.DecimalField(
+                        blank=True,
+                        decimal_places=2,
+                        max_digits=8,
+                        null=True,
+                        verbose_name="Цена/час",
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(default=True, verbose_name="Активен"),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Создан"),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Обновлён"),
+                ),
             ],
             options={
-                'verbose_name': 'Корт',
-                'verbose_name_plural': 'Корты',
-                'ordering': ['name'],
+                "verbose_name": "Корт",
+                "verbose_name_plural": "Корты",
+                "ordering": ["name"],
             },
         ),
     ]

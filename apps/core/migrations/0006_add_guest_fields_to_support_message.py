@@ -8,37 +8,53 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0005_telegramtransferconsentlog'),
+        ("core", "0005_telegramtransferconsentlog"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='SupportConversation',
-            fields=[
-            ],
+            name="SupportConversation",
+            fields=[],
             options={
-                'verbose_name': 'диалог поддержки',
-                'verbose_name_plural': 'диалоги поддержки',
-                'proxy': True,
-                'indexes': [],
-                'constraints': [],
+                "verbose_name": "диалог поддержки",
+                "verbose_name_plural": "диалоги поддержки",
+                "proxy": True,
+                "indexes": [],
+                "constraints": [],
             },
-            bases=('core.supportmessage',),
+            bases=("core.supportmessage",),
         ),
         migrations.AddField(
-            model_name='supportmessage',
-            name='guest_contact',
-            field=models.CharField(blank=True, help_text='Email или телефон незарегистрированного пользователя', max_length=200, verbose_name='Контакт гостя'),
+            model_name="supportmessage",
+            name="guest_contact",
+            field=models.CharField(
+                blank=True,
+                help_text="Email или телефон незарегистрированного пользователя",
+                max_length=200,
+                verbose_name="Контакт гостя",
+            ),
         ),
         migrations.AddField(
-            model_name='supportmessage',
-            name='guest_name',
-            field=models.CharField(blank=True, help_text='Имя незарегистрированного пользователя', max_length=200, verbose_name='Имя гостя'),
+            model_name="supportmessage",
+            name="guest_name",
+            field=models.CharField(
+                blank=True,
+                help_text="Имя незарегистрированного пользователя",
+                max_length=200,
+                verbose_name="Имя гостя",
+            ),
         ),
         migrations.AlterField(
-            model_name='supportmessage',
-            name='user',
-            field=models.ForeignKey(blank=True, help_text='Зарегистрированный пользователь (null для гостей)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='support_messages', to=settings.AUTH_USER_MODEL),
+            model_name="supportmessage",
+            name="user",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="Зарегистрированный пользователь (null для гостей)",
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="support_messages",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
     ]

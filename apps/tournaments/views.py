@@ -9,9 +9,10 @@ from functools import wraps
 from itertools import groupby
 
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db import models
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -23,13 +24,49 @@ from .models import (
     Match,
     MatchResultProposal,
     Tournament,
+    TournamentEntryPayment,
+    TournamentEntryRefundRequest,
     TournamentPlayerResult,
+    TournamentStatus,
     TournamentTeam,
     TournamentType,
 )
 from .olympic_consolation import _is_olympic
 from .proposal_service import apply_proposal
-from .round_robin import _is_round_robin, compute_standings, get_match_matrix
+from .round_robin import (
+    _is_round_robin,
+    compute_standings,
+    compute_standings_for_entities,
+    get_match_matrix,
+    get_match_matrix_for_entities,
+)
+from .tvd import (
+    TVD_STAGE_CONSOLATION_RR,
+    TVD_STAGE_GROUP,
+    TVD_STAGE_MAIN_RR,
+    TVD_STAGE_MAIN_RR_1_3,
+    TVD_STAGE_MAIN_RR_4_6,
+    _is_tvd,
+    get_tvd_rr_entities_and_matches,
+)
+from .tvd import (
+    check_and_finalize as tvd_check_and_finalize,
+)
+from .tvd import (
+    generate_consolation_bracket as tvd_generate_consolation_bracket,
+)
+from .tvd import (
+    generate_groups as tvd_generate_groups,
+)
+from .tvd import (
+    generate_main_bracket as tvd_generate_main_bracket,
+)
+from .tvd import (
+    generate_playoffs as tvd_generate_playoffs,
+)
+from .tvd import (
+    is_group_stage_complete as tvd_is_group_stage_complete,
+)
 from .utils import get_match_opponent_users
 
 logger = logging.getLogger(__name__)
@@ -259,12 +296,17 @@ def tournament_detail(request, slug):
             "teams__player1__user",
             "teams__player2__user",
             "allowed_categories",
+            "tvd_groups__members__player__user",
+            "tvd_groups__matches__player1__user",
+            "tvd_groups__matches__player2__user",
+            "tvd_groups__matches__winner__user",
         ),
         slug=slug,
     )
     is_fan = _is_fan(tournament)
     is_olympic = _is_olympic(tournament)
     is_round_robin = _is_round_robin(tournament)
+    is_tvd = _is_tvd(tournament)
 
     if is_fan or is_olympic:
         matches = tournament.matches.order_by(
@@ -281,7 +323,12 @@ def tournament_detail(request, slug):
         matrix_data = None
         matrix_rows = None
         rr_standings = None
-        # Турнирная таблица для FAN и Олимпийской системы (на странице турнира)
+        tvd_groups = None
+        tvd_main_matches = None
+        tvd_consolation_matches = None
+        tvd_main_rounds = None
+        tvd_consolation_rounds = None
+        tvd_standings = None
         standings = _build_bracket_standings(tournament, is_fan, is_olympic)
     elif is_round_robin:
         matches = tournament.matches.filter(is_consolation=False).order_by(
@@ -325,6 +372,202 @@ def tournament_detail(request, slug):
                 }
             )
         standings = None
+        tvd_groups = None
+        tvd_main_matches = None
+        tvd_consolation_matches = None
+        tvd_main_rounds = None
+        tvd_consolation_rounds = None
+        tvd_standings = None
+    elif is_tvd:
+        matches = tournament.matches.order_by(
+            "is_consolation", "round_index", "round_order"
+        )
+        matches_by_round = []
+        for m in matches:
+            key = (m.round_name, m.is_consolation)
+            found = next((r for r in matches_by_round if (r[0], r[1]) == key), None)
+            if found:
+                found[2].append(m)
+            else:
+                matches_by_round.append((m.round_name, m.is_consolation, [m]))
+        matrix_participants = None
+        matrix_data = None
+        matrix_rows = None
+        rr_standings = None
+        standings = None
+        tvd_groups = list(
+            tournament.tvd_groups.prefetch_related(
+                "members__player__user",
+                "members__team__player1__user",
+                "members__team__player2__user",
+                "matches__player1__user",
+                "matches__player2__user",
+                "matches__winner__user",
+                "matches__team1__player1__user",
+                "matches__team1__player2__user",
+                "matches__team2__player1__user",
+                "matches__team2__player2__user",
+                "matches__winner_team__player1__user",
+                "matches__winner_team__player2__user",
+            ).order_by("order")
+        )
+        tvd_main_matches = list(
+            tournament.matches.filter(
+                is_consolation=False,
+                tvd_stage__in=(
+                    "main_qf",
+                    "main_sf",
+                    "main_final",
+                    "third_place",
+                    "main_round_robin",
+                    "main_rr_1_3",
+                    "main_rr_4_6",
+                ),
+            ).order_by("round_index", "round_order")
+        )
+        tvd_consolation_matches = list(
+            tournament.matches.filter(
+                is_consolation=True,
+                tvd_stage__in=(
+                    "consolation_sf",
+                    "consolation_final",
+                    "consolation_round_robin",
+                ),
+            ).order_by("round_index", "round_order")
+        )
+        tvd_main_rounds = _group_matches_by_round(tvd_main_matches)
+        tvd_consolation_rounds = _group_matches_by_round(tvd_consolation_matches)
+        tvd_standings = list(
+            tournament.fan_results.filter(place__isnull=False)
+            .select_related("player__user")
+            .order_by("place")
+        )
+        tvd_main_rr_standings = None
+        tvd_main_rr_matrix_rows = None
+        tvd_main_rr_matrix_participants = None
+        tvd_cons_rr_standings = None
+        tvd_cons_rr_matrix_rows = None
+        tvd_cons_rr_matrix_participants = None
+        tvd_rr_1_3_standings = None
+        tvd_rr_1_3_matrix_rows = None
+        tvd_rr_1_3_matrix_participants = None
+        tvd_rr_4_6_standings = None
+        tvd_rr_4_6_matrix_rows = None
+        tvd_rr_4_6_matrix_participants = None
+        main_rr_entities, main_rr_matches = get_tvd_rr_entities_and_matches(
+            tournament, TVD_STAGE_MAIN_RR
+        )
+        if main_rr_entities and main_rr_matches:
+            tvd_main_rr_standings = compute_standings_for_entities(
+                tournament, main_rr_entities, main_rr_matches
+            )
+            tvd_main_rr_matrix_participants, main_rr_matrix = (
+                get_match_matrix_for_entities(
+                    tournament, main_rr_entities, main_rr_matches
+                )
+            )
+            standings_by_entity = {
+                (row["team"] or row["player"]).id: row for row in tvd_main_rr_standings
+            }
+            tvd_main_rr_matrix_rows = []
+            for i, p in enumerate(tvd_main_rr_matrix_participants):
+                row_cells = main_rr_matrix[i] if i < len(main_rr_matrix) else []
+                st = standings_by_entity.get(p.id, {})
+                tvd_main_rr_matrix_rows.append(
+                    {
+                        "participant": p,
+                        "cells": row_cells,
+                        "place": st.get("place"),
+                        "points": st.get("points"),
+                    }
+                )
+        cons_rr_entities, cons_rr_matches = get_tvd_rr_entities_and_matches(
+            tournament, TVD_STAGE_CONSOLATION_RR
+        )
+        if cons_rr_entities and cons_rr_matches:
+            tvd_cons_rr_standings = compute_standings_for_entities(
+                tournament, cons_rr_entities, cons_rr_matches
+            )
+            tvd_cons_rr_matrix_participants, cons_rr_matrix = (
+                get_match_matrix_for_entities(
+                    tournament, cons_rr_entities, cons_rr_matches
+                )
+            )
+            standings_by_entity = {
+                (row["team"] or row["player"]).id: row for row in tvd_cons_rr_standings
+            }
+            tvd_cons_rr_matrix_rows = []
+            for i, p in enumerate(tvd_cons_rr_matrix_participants):
+                row_cells = cons_rr_matrix[i] if i < len(cons_rr_matrix) else []
+                st = standings_by_entity.get(p.id, {})
+                tvd_cons_rr_matrix_rows.append(
+                    {
+                        "participant": p,
+                        "cells": row_cells,
+                        "place": st.get("place"),
+                        "points": st.get("points"),
+                    }
+                )
+        tvd_rr_1_3_standings = None
+        tvd_rr_1_3_matrix_rows = None
+        tvd_rr_1_3_matrix_participants = None
+        tvd_rr_4_6_standings = None
+        tvd_rr_4_6_matrix_rows = None
+        tvd_rr_4_6_matrix_participants = None
+        rr_1_3_entities, rr_1_3_matches = get_tvd_rr_entities_and_matches(
+            tournament, TVD_STAGE_MAIN_RR_1_3
+        )
+        if rr_1_3_entities and rr_1_3_matches:
+            tvd_rr_1_3_standings = compute_standings_for_entities(
+                tournament, rr_1_3_entities, rr_1_3_matches
+            )
+            tvd_rr_1_3_matrix_participants, rr_1_3_matrix = (
+                get_match_matrix_for_entities(
+                    tournament, rr_1_3_entities, rr_1_3_matches
+                )
+            )
+            st_by_entity = {
+                (r["team"] or r["player"]).id: r for r in tvd_rr_1_3_standings
+            }
+            tvd_rr_1_3_matrix_rows = []
+            for i, p in enumerate(tvd_rr_1_3_matrix_participants):
+                cells = rr_1_3_matrix[i] if i < len(rr_1_3_matrix) else []
+                st = st_by_entity.get(p.id, {})
+                tvd_rr_1_3_matrix_rows.append(
+                    {
+                        "participant": p,
+                        "cells": cells,
+                        "place": st.get("place"),
+                        "points": st.get("points"),
+                    }
+                )
+        rr_4_6_entities, rr_4_6_matches = get_tvd_rr_entities_and_matches(
+            tournament, TVD_STAGE_MAIN_RR_4_6
+        )
+        if rr_4_6_entities and rr_4_6_matches:
+            tvd_rr_4_6_standings = compute_standings_for_entities(
+                tournament, rr_4_6_entities, rr_4_6_matches
+            )
+            tvd_rr_4_6_matrix_participants, rr_4_6_matrix = (
+                get_match_matrix_for_entities(
+                    tournament, rr_4_6_entities, rr_4_6_matches
+                )
+            )
+            st_by_entity = {
+                (r["team"] or r["player"]).id: r for r in tvd_rr_4_6_standings
+            }
+            tvd_rr_4_6_matrix_rows = []
+            for i, p in enumerate(tvd_rr_4_6_matrix_participants):
+                cells = rr_4_6_matrix[i] if i < len(rr_4_6_matrix) else []
+                st = st_by_entity.get(p.id, {})
+                tvd_rr_4_6_matrix_rows.append(
+                    {
+                        "participant": p,
+                        "cells": cells,
+                        "place": st.get("place"),
+                        "points": st.get("points"),
+                    }
+                )
     else:
         matches_by_round = None
         matches = tournament.matches.all().order_by("-scheduled_datetime")
@@ -333,8 +576,29 @@ def tournament_detail(request, slug):
         matrix_rows = None
         rr_standings = None
         standings = None
+        tvd_groups = None
+        tvd_main_matches = None
+        tvd_consolation_matches = None
+        tvd_main_rounds = None
+        tvd_consolation_rounds = None
+        tvd_standings = None
+        tvd_main_rr_standings = None
+        tvd_main_rr_matrix_rows = None
+        tvd_main_rr_matrix_participants = None
+        tvd_cons_rr_standings = None
+        tvd_cons_rr_matrix_rows = None
+        tvd_cons_rr_matrix_participants = None
+        tvd_rr_1_3_standings = None
+        tvd_rr_1_3_matrix_rows = None
+        tvd_rr_1_3_matrix_participants = None
+        tvd_rr_4_6_standings = None
+        tvd_rr_4_6_matrix_rows = None
+        tvd_rr_4_6_matrix_participants = None
 
     if tournament.is_doubles():
+        _ensure_doubles_participants_have_teams(tournament)
+        _remove_duplicate_doubles_teams(tournament)
+        _remove_solo_teams_for_teamed_players(tournament)
         participants_qs = []
         for team in tournament.teams.select_related(
             "player1__user", "player2__user"
@@ -362,7 +626,7 @@ def tournament_detail(request, slug):
         participants_qs = tournament.participants.all()
         solo_teams = []
         can_join_team = False
-        if is_fan or is_olympic:
+        if is_fan or is_olympic or is_tvd:
             participants_qs = participants_qs.order_by("-total_points")
         else:
             participants_qs = participants_qs.order_by(
@@ -407,6 +671,7 @@ def tournament_detail(request, slug):
         "is_fan": is_fan,
         "is_olympic": is_olympic,
         "is_round_robin": is_round_robin,
+        "is_tvd": is_tvd,
         "match_format_description": match_format_description,
         "participants": participants_qs,
         "solo_teams": solo_teams,
@@ -414,8 +679,1154 @@ def tournament_detail(request, slug):
         "user_is_registered": user_is_registered,
         "can_register": can_register,
         "registration_closed": registration_closed,
+        "tvd_groups": tvd_groups if is_tvd else None,
+        "tvd_main_matches": tvd_main_matches if is_tvd else None,
+        "tvd_consolation_matches": tvd_consolation_matches if is_tvd else None,
+        "tvd_main_rounds": tvd_main_rounds if is_tvd else None,
+        "tvd_consolation_rounds": tvd_consolation_rounds if is_tvd else None,
+        "tvd_standings": tvd_standings if is_tvd else None,
+        "tvd_main_rr_standings": tvd_main_rr_standings if is_tvd else None,
+        "tvd_main_rr_matrix_rows": tvd_main_rr_matrix_rows if is_tvd else None,
+        "tvd_main_rr_matrix_participants": (
+            tvd_main_rr_matrix_participants if is_tvd else None
+        ),
+        "tvd_cons_rr_standings": tvd_cons_rr_standings if is_tvd else None,
+        "tvd_cons_rr_matrix_rows": tvd_cons_rr_matrix_rows if is_tvd else None,
+        "tvd_cons_rr_matrix_participants": (
+            tvd_cons_rr_matrix_participants if is_tvd else None
+        ),
+        "tvd_rr_1_3_standings": tvd_rr_1_3_standings if is_tvd else None,
+        "tvd_rr_1_3_matrix_rows": tvd_rr_1_3_matrix_rows if is_tvd else None,
+        "tvd_rr_1_3_matrix_participants": (
+            tvd_rr_1_3_matrix_participants if is_tvd else None
+        ),
+        "tvd_rr_4_6_standings": tvd_rr_4_6_standings if is_tvd else None,
+        "tvd_rr_4_6_matrix_rows": tvd_rr_4_6_matrix_rows if is_tvd else None,
+        "tvd_rr_4_6_matrix_participants": (
+            tvd_rr_4_6_matrix_participants if is_tvd else None
+        ),
     }
+    if is_tvd:
+        return render(request, "tournaments/tvd_detail.html", context)
     return render(request, "tournaments/detail.html", context)
+
+
+def _group_matches_by_round(matches):
+    """Group matches into ordered list of (round_name, [matches]) tuples."""
+    from collections import OrderedDict
+
+    rounds: OrderedDict[str, list] = OrderedDict()
+    for m in matches:
+        key = m.round_name or m.tvd_stage
+        rounds.setdefault(key, []).append(m)
+    return list(rounds.items())
+
+
+@staff_member_required
+def tournament_manage(request, slug):
+    """Интерактивная страница управления ТВД-турниром (только для staff)."""
+    tournament = get_object_or_404(
+        Tournament.objects.prefetch_related(
+            "participants__user",
+            "teams__player1__user",
+            "teams__player2__user",
+            "matches__player1__user",
+            "matches__player2__user",
+            "matches__winner__user",
+            "matches__team1__player1__user",
+            "matches__team1__player2__user",
+            "matches__team2__player1__user",
+            "matches__team2__player2__user",
+            "matches__winner_team__player1__user",
+            "matches__winner_team__player2__user",
+            "fan_results__player__user",
+            "tvd_groups__members__player__user",
+            "tvd_groups__members__team__player1__user",
+            "tvd_groups__members__team__player2__user",
+            "tvd_groups__matches__player1__user",
+            "tvd_groups__matches__player2__user",
+            "tvd_groups__matches__winner__user",
+            "tvd_groups__matches__team1__player1__user",
+            "tvd_groups__matches__team2__player1__user",
+            "tvd_groups__matches__winner_team__player1__user",
+        ),
+        slug=slug,
+    )
+    if not _is_tvd(tournament):
+        messages.error(request, "Управление доступно только для турниров формата ТВД.")
+        return redirect("tournament_detail", slug=slug)
+
+    is_doubles = tournament.is_doubles()
+    teams = []
+    full_teams_count = 0
+    players_for_pairs = []
+    if is_doubles:
+        _ensure_doubles_participants_have_teams(tournament)
+        _remove_duplicate_doubles_teams(tournament)
+        _remove_solo_teams_for_teamed_players(tournament)
+        teams = list(
+            tournament.teams.select_related("player1__user", "player2__user").order_by(
+                "created_at"
+            )
+        )
+        full_teams_count = sum(1 for t in teams if t.player2_id is not None)
+        # Только игроки из одиночных заявок (ожидают партнёра); уже состоящие в паре не показываем
+        solo_player_ids = {
+            t.player1_id for t in teams if t.player1_id and t.player2_id is None
+        }
+        players_for_pairs = (
+            list(
+                Player.objects.filter(pk__in=solo_player_ids)
+                .select_related("user")
+                .order_by("user__last_name", "user__first_name")
+            )
+            if solo_player_ids
+            else []
+        )
+
+    tvd_groups = list(
+        tournament.tvd_groups.prefetch_related(
+            "members__player__user",
+            "members__team__player1__user",
+            "members__team__player2__user",
+            Prefetch(
+                "matches",
+                queryset=Match.objects.select_related(
+                    "player1__user",
+                    "player2__user",
+                    "winner__user",
+                    "team1__player1__user",
+                    "team1__player2__user",
+                    "team2__player1__user",
+                    "team2__player2__user",
+                    "winner_team__player1__user",
+                    "winner_team__player2__user",
+                ).order_by("round_order"),
+            ),
+        ).order_by("order")
+    )
+    group_matches = [list(g.matches.all()) for g in tvd_groups]
+    tvd_main_matches = list(
+        tournament.matches.filter(
+            is_consolation=False,
+            tvd_stage__in=(
+                "main_qf",
+                "main_sf",
+                "main_final",
+                "third_place",
+                "main_round_robin",
+                "main_rr_1_3",
+                "main_rr_4_6",
+            ),
+        ).order_by("round_index", "round_order")
+    )
+    tvd_consolation_matches = list(
+        tournament.matches.filter(
+            is_consolation=True,
+            tvd_stage__in=(
+                "consolation_sf",
+                "consolation_final",
+                "consolation_round_robin",
+            ),
+        ).order_by("round_index", "round_order")
+    )
+
+    tvd_main_rounds = _group_matches_by_round(tvd_main_matches)
+    tvd_consolation_rounds = _group_matches_by_round(tvd_consolation_matches)
+    tvd_standings = list(
+        tournament.fan_results.filter(place__isnull=False)
+        .select_related("player__user")
+        .order_by("place")
+    )
+    tvd_main_rr_standings = None
+    tvd_main_rr_matrix_rows = None
+    tvd_main_rr_matrix_participants = None
+    tvd_cons_rr_standings = None
+    tvd_cons_rr_matrix_rows = None
+    tvd_cons_rr_matrix_participants = None
+    main_rr_entities, main_rr_matches = get_tvd_rr_entities_and_matches(
+        tournament, TVD_STAGE_MAIN_RR
+    )
+    if main_rr_entities and main_rr_matches:
+        tvd_main_rr_standings = compute_standings_for_entities(
+            tournament, main_rr_entities, main_rr_matches
+        )
+        tvd_main_rr_matrix_participants, main_rr_matrix = get_match_matrix_for_entities(
+            tournament, main_rr_entities, main_rr_matches
+        )
+        standings_by_entity = {
+            (row["team"] or row["player"]).id: row for row in tvd_main_rr_standings
+        }
+        tvd_main_rr_matrix_rows = []
+        for i, p in enumerate(tvd_main_rr_matrix_participants):
+            row_cells = main_rr_matrix[i] if i < len(main_rr_matrix) else []
+            st = standings_by_entity.get(p.id, {})
+            tvd_main_rr_matrix_rows.append(
+                {
+                    "participant": p,
+                    "cells": row_cells,
+                    "place": st.get("place"),
+                    "points": st.get("points"),
+                }
+            )
+    cons_rr_entities, cons_rr_matches = get_tvd_rr_entities_and_matches(
+        tournament, TVD_STAGE_CONSOLATION_RR
+    )
+    if cons_rr_entities and cons_rr_matches:
+        tvd_cons_rr_standings = compute_standings_for_entities(
+            tournament, cons_rr_entities, cons_rr_matches
+        )
+        tvd_cons_rr_matrix_participants, cons_rr_matrix = get_match_matrix_for_entities(
+            tournament, cons_rr_entities, cons_rr_matches
+        )
+        standings_by_entity = {
+            (row["team"] or row["player"]).id: row for row in tvd_cons_rr_standings
+        }
+        tvd_cons_rr_matrix_rows = []
+        for i, p in enumerate(tvd_cons_rr_matrix_participants):
+            row_cells = cons_rr_matrix[i] if i < len(cons_rr_matrix) else []
+            st = standings_by_entity.get(p.id, {})
+            tvd_cons_rr_matrix_rows.append(
+                {
+                    "participant": p,
+                    "cells": row_cells,
+                    "place": st.get("place"),
+                    "points": st.get("points"),
+                }
+            )
+    participants = list(
+        tournament.participants.select_related("user").order_by(
+            "user__last_name", "user__first_name"
+        )
+    )
+
+    can_generate_groups = (
+        tournament.status in (TournamentStatus.UPCOMING, TournamentStatus.ACTIVE)
+        and not tvd_groups
+        and (
+            full_teams_count >= 4
+            if is_doubles
+            else tournament.participants.count() >= 4
+        )
+    )
+    groups_complete = tvd_is_group_stage_complete(tournament) if tvd_groups else False
+    can_generate_playoffs = (
+        tournament.status == TournamentStatus.GROUP_STAGE
+        and tvd_groups
+        and groups_complete
+    )
+    playoff_matches = tournament.matches.filter(
+        is_consolation=False,
+        tvd_stage__in=(
+            "main_qf",
+            "main_sf",
+            "main_final",
+            "third_place",
+            "main_round_robin",
+            "main_rr_1_3",
+            "main_rr_4_6",
+        ),
+    )
+    all_playoff_done = (
+        playoff_matches.exists()
+        and not playoff_matches.filter(status=Match.MatchStatus.SCHEDULED).exists()
+    )
+    can_finalize = tournament.status == TournamentStatus.PLAYOFFS and all_playoff_done
+
+    players_available_to_add = list(
+        _get_players_available_to_add_queryset(tournament)[:300]
+    )
+
+    context = {
+        "tournament": tournament,
+        "is_doubles_tvd": is_doubles,
+        "teams": teams,
+        "full_teams_count": full_teams_count,
+        "players_for_pairs": players_for_pairs,
+        "tvd_groups": tvd_groups,
+        "group_matches": group_matches,
+        "tvd_main_matches": tvd_main_matches,
+        "tvd_consolation_matches": tvd_consolation_matches,
+        "tvd_main_rounds": tvd_main_rounds,
+        "tvd_consolation_rounds": tvd_consolation_rounds,
+        "tvd_standings": tvd_standings,
+        "tvd_main_rr_standings": tvd_main_rr_standings,
+        "tvd_main_rr_matrix_rows": tvd_main_rr_matrix_rows,
+        "tvd_main_rr_matrix_participants": tvd_main_rr_matrix_participants,
+        "tvd_cons_rr_standings": tvd_cons_rr_standings,
+        "tvd_cons_rr_matrix_rows": tvd_cons_rr_matrix_rows,
+        "tvd_cons_rr_matrix_participants": tvd_cons_rr_matrix_participants,
+        "participants": participants,
+        "can_generate_groups": can_generate_groups,
+        "can_generate_playoffs": can_generate_playoffs,
+        "can_finalize": can_finalize,
+        "players_available_to_add": players_available_to_add,
+    }
+    return render(request, "tournaments/manage.html", context)
+
+
+def _tournament_manage_get_tournament(request, slug):
+    """Get TVD tournament by slug; redirect with error if not TVD."""
+    t = get_object_or_404(Tournament, slug=slug)
+    if not _is_tvd(t):
+        messages.error(request, "Управление доступно только для турниров формата ТВД.")
+        return None
+    return t
+
+
+def _player_in_full_team(tournament, player_id: int) -> bool:
+    """Игрок уже в полной команде (player2 заполнен) в этом турнире."""
+    return bool(
+        tournament.teams.filter(
+            models.Q(player1_id=player_id) | models.Q(player2_id=player_id),
+            player2__isnull=False,
+        ).exists()
+    )
+
+
+@staff_member_required
+def tournament_manage_compose_pair(request, slug):
+    """POST: составить пару (два игрока → одна команда) для парного ТВД."""
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None or not tournament.is_doubles():
+        messages.error(request, "Действие доступно только для парного ТВД.")
+        return redirect("tournament_manage", slug=slug)
+    if tournament.bracket_generated:
+        messages.warning(request, "Группы уже сформированы, менять команды нельзя.")
+        return redirect("tournament_manage", slug=slug)
+    player1_id = _parse_int_post(request, "player1_id")
+    player2_id = _parse_int_post(request, "player2_id")
+    if not player1_id or not player2_id:
+        messages.warning(request, "Выберите обоих игроков.")
+        return redirect("tournament_manage", slug=slug)
+    if player1_id == player2_id:
+        messages.warning(request, "Выберите двух разных игроков.")
+        return redirect("tournament_manage", slug=slug)
+    player1 = get_object_or_404(Player, pk=player1_id)
+    player2 = get_object_or_404(Player, pk=player2_id)
+
+    solo1 = tournament.teams.filter(player1_id=player1_id, player2__isnull=True).first()
+    solo2 = tournament.teams.filter(player1_id=player2_id, player2__isnull=True).first()
+
+    if solo1:
+        if _player_in_full_team(tournament, player2_id):
+            messages.error(
+                request,
+                f"{player2.user.last_name} {player2.user.first_name} уже в другой полной команде. Нельзя добавить в пару повторно.",
+            )
+            return redirect("tournament_manage", slug=slug)
+        solo1.player2 = player2
+        solo1.save(update_fields=["player2"])
+        if solo2 and solo2.pk != solo1.pk:
+            solo2.delete()
+        messages.success(request, f"Пара составлена: {solo1.get_display_name()}.")
+    elif solo2:
+        if _player_in_full_team(tournament, player1_id):
+            messages.error(
+                request,
+                f"{player1.user.last_name} {player1.user.first_name} уже в другой полной команде. Нельзя добавить в пару повторно.",
+            )
+            return redirect("tournament_manage", slug=slug)
+        solo2.player2 = player1
+        solo2.save(update_fields=["player2"])
+        if solo1 and solo1.pk != solo2.pk:
+            solo1.delete()
+        messages.success(request, f"Пара составлена: {solo2.get_display_name()}.")
+    else:
+        if _player_in_full_team(tournament, player1_id):
+            messages.error(
+                request,
+                f"{player1.user.last_name} {player1.user.first_name} уже в полной команде. Один игрок — одна команда в турнире.",
+            )
+            return redirect("tournament_manage", slug=slug)
+        if _player_in_full_team(tournament, player2_id):
+            messages.error(
+                request,
+                f"{player2.user.last_name} {player2.user.first_name} уже в полной команде. Один игрок — одна команда в турнире.",
+            )
+            return redirect("tournament_manage", slug=slug)
+        existing = tournament.teams.filter(
+            models.Q(player1_id=player1_id, player2_id=player2_id)
+            | models.Q(player1_id=player2_id, player2_id=player1_id),
+        ).first()
+        if existing:
+            messages.info(request, "Такая пара уже зарегистрирована.")
+        else:
+            TournamentTeam.objects.create(
+                tournament=tournament,
+                player1=player1,
+                player2=player2,
+            )
+            messages.success(
+                request,
+                f"Пара создана: {player1.user.last_name} {player1.user.first_name} / {player2.user.last_name} {player2.user.first_name}.",
+            )
+    return redirect("tournament_manage", slug=slug)
+
+
+@staff_member_required
+def tournament_manage_generate_groups(request, slug):
+    """POST: сформировать группы ТВД (HTMX)."""
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    ok, msg = tvd_generate_groups(tournament)
+    if ok:
+        messages.success(request, msg)
+    else:
+        messages.warning(request, msg)
+    return redirect("tournament_manage", slug=slug)
+
+
+@staff_member_required
+def tournament_manage_generate_playoffs(request, slug):
+    """POST: сформировать плей-офф ТВД (HTMX)."""
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    ok, msg = tvd_generate_playoffs(tournament)
+    if ok:
+        messages.success(request, msg)
+    else:
+        messages.warning(request, msg)
+    return redirect("tournament_manage", slug=slug)
+
+
+@staff_member_required
+def tournament_manage_finalize(request, slug):
+    """POST: завершить турнир ТВД (HTMX)."""
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    ok, msg = tvd_check_and_finalize(tournament)
+    if ok:
+        messages.success(request, msg)
+    else:
+        messages.warning(request, msg)
+    return redirect("tournament_manage", slug=slug)
+
+
+def _tvd_group_member_key(member, is_doubles):
+    """Ключ участника группы для сопоставления с матчами (player_id или team_id)."""
+    return member.team_id if is_doubles else member.player_id
+
+
+@staff_member_required
+def tournament_manage_intermediate_results(request, slug):
+    """GET: промежуточные результаты после группового этапа — кто в основную сетку, кто в утешительную."""
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    tvd_groups = list(
+        tournament.tvd_groups.prefetch_related(
+            "members__player__user",
+            "members__team__player1__user",
+            "members__team__player2__user",
+        ).order_by("order")
+    )
+    if not tvd_groups:
+        messages.warning(request, "Группы ещё не сформированы.")
+        return redirect("tournament_manage", slug=slug)
+    if not tvd_is_group_stage_complete(tournament):
+        messages.warning(
+            request, "Групповой этап ещё не завершён. Завершите все матчи групп."
+        )
+        return redirect("tournament_manage", slug=slug)
+    group_count = len(tvd_groups)
+    is_doubles = tournament.is_doubles()
+    group_tables = []
+    main_advancing = []
+    consolation_advancing = []
+    for group in tvd_groups:
+        group_matches = list(
+            Match.objects.filter(
+                tournament=tournament,
+                tvd_group=group,
+                tvd_stage=TVD_STAGE_GROUP,
+                status__in=(Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER),
+            )
+            .select_related("player1", "player2", "team1", "team2")
+            .prefetch_related("result_proposals")
+        )
+        member_has_rt = {}
+        member_rating_delta = {}
+        for m in group_matches:
+            if is_doubles:
+                e1, e2 = m.team1_id, m.team2_id
+            else:
+                e1, e2 = m.player1_id, m.player2_id
+            if e1 is None or e2 is None:
+                continue
+            member_rating_delta[e1] = member_rating_delta.get(e1, 0) + (
+                m.rating_delta_player1 or 0
+            )
+            member_rating_delta[e2] = member_rating_delta.get(e2, 0) + (
+                m.rating_delta_player2 or 0
+            )
+            if not m.winner_id and not m.winner_team_id:
+                continue
+            if m.is_walkover_loss():
+                winner_id = m.winner_team_id if is_doubles else m.winner_id
+                loser_id = e2 if winner_id == e1 else e1
+                member_has_rt[loser_id] = True
+        members = list(group.members.order_by("final_place", "seed"))
+        rows = []
+        for m in members:
+            key = _tvd_group_member_key(m, is_doubles)
+            place = m.final_place or 0
+            display_name = m.get_entity_display()
+            has_win = m.wins > 0
+            has_rt = member_has_rt.get(key, False)
+            rating_delta_sum = member_rating_delta.get(key, 0)
+            if place == 1 or place == 2:
+                dest = "main"
+                main_advancing.append(
+                    {
+                        "group_name": group.name,
+                        "place": place,
+                        "display_name": display_name,
+                        "has_win": has_win,
+                        "has_rt": has_rt,
+                        "rating_delta_sum": rating_delta_sum,
+                    }
+                )
+            elif place == 3 and group_count >= 3:
+                dest = "consolation"
+                consolation_advancing.append(
+                    {
+                        "group_name": group.name,
+                        "display_name": display_name,
+                        "has_win": has_win,
+                        "has_rt": has_rt,
+                        "rating_delta_sum": rating_delta_sum,
+                    }
+                )
+            else:
+                dest = None
+            rows.append(
+                {
+                    "place": place,
+                    "display_name": display_name,
+                    "wins": m.wins,
+                    "losses": m.losses,
+                    "games": f"{m.games_won}:{m.games_lost}",
+                    "games_won": m.games_won,
+                    "games_lost": m.games_lost,
+                    "destination": dest,
+                    "has_win": has_win,
+                    "has_rt": has_rt,
+                    "rating_delta_sum": rating_delta_sum,
+                }
+            )
+        group_tables.append({"group": group, "rows": rows})
+    can_create_main = tournament.status != TournamentStatus.PLAYOFFS
+    has_consolation_matches = Match.objects.filter(
+        tournament=tournament, is_consolation=True
+    ).exists()
+    can_create_consolation = (
+        group_count >= 3 and consolation_advancing and not has_consolation_matches
+    )
+    context = {
+        "tournament": tournament,
+        "group_tables": group_tables,
+        "main_advancing": main_advancing,
+        "consolation_advancing": consolation_advancing,
+        "group_count": group_count,
+        "has_consolation": group_count >= 3,
+        "not_playoffs_yet": can_create_main or can_create_consolation,
+        "can_create_main": can_create_main,
+        "can_create_consolation": can_create_consolation,
+    }
+    return render(request, "tournaments/manage_intermediate_results.html", context)
+
+
+@staff_member_required
+def tournament_manage_intermediate_generate_main(request, slug):
+    """POST: создать только основную сетку (формат olympic или circular)."""
+    if request.method != "POST":
+        return redirect("tournament_manage_intermediate_results", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    bracket_format = (request.POST.get("format") or "olympic").strip().lower()
+    if bracket_format not in ("olympic", "circular"):
+        bracket_format = "olympic"
+    ok, msg = tvd_generate_main_bracket(tournament, bracket_format=bracket_format)
+    if ok:
+        messages.success(request, msg)
+    else:
+        messages.warning(request, msg)
+    return redirect("tournament_manage_intermediate_results", slug=slug)
+
+
+@staff_member_required
+def tournament_manage_intermediate_generate_consolation(request, slug):
+    """POST: создать только утешительную сетку (формат olympic или circular)."""
+    if request.method != "POST":
+        return redirect("tournament_manage_intermediate_results", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    bracket_format = (request.POST.get("format") or "olympic").strip().lower()
+    if bracket_format not in ("olympic", "circular"):
+        bracket_format = "olympic"
+    ok, msg = tvd_generate_consolation_bracket(
+        tournament, bracket_format=bracket_format
+    )
+    if ok:
+        messages.success(request, msg)
+    else:
+        messages.warning(request, msg)
+    return redirect("tournament_manage_intermediate_results", slug=slug)
+
+
+def _get_players_available_to_add_queryset(tournament):
+    """QuerySet игроков, которых можно добавить в турнир (до формирования групп)."""
+    if getattr(tournament, "bracket_generated", False):
+        return Player.objects.none()
+    if tournament.is_doubles():
+        full_team_player_ids = set(
+            tournament.teams.filter(player2__isnull=False).values_list(
+                "player1_id", "player2_id"
+            )
+        )
+        flat = set()
+        for a, b in full_team_player_ids:
+            if a:
+                flat.add(a)
+            if b:
+                flat.add(b)
+        flat |= set(
+            tournament.teams.filter(player2__isnull=True).values_list(
+                "player1_id", flat=True
+            )
+        )
+        return (
+            Player.objects.filter(user__isnull=False)
+            .exclude(pk__in=flat)
+            .select_related("user")
+            .order_by("user__last_name", "user__first_name")
+        )
+    participants_ids = tournament.participants.values_list("pk", flat=True)
+    return (
+        Player.objects.filter(user__isnull=False)
+        .exclude(pk__in=participants_ids)
+        .select_related("user")
+        .order_by("user__last_name", "user__first_name")
+    )
+
+
+@staff_member_required
+def tournament_manage_search_participants(request, slug):
+    """GET ?q=... — поиск участников по имени или телефону для добавления в турнир. JSON."""
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        from django.http import JsonResponse
+
+        return JsonResponse({"results": []})
+    q = (request.GET.get("q") or "").strip()
+    if len(q) < 2:
+        from django.http import JsonResponse
+
+        return JsonResponse({"results": []})
+    # Фильтрация в Python: в SQLite LOWER() не переводит кириллицу в нижний регистр
+    q_lower = q.lower()
+    candidates = list(_get_players_available_to_add_queryset(tournament)[:500])
+    results = []
+    for p in candidates:
+        if len(results) >= 50:
+            break
+        last = (p.user.last_name or "").lower()
+        first = (p.user.first_name or "").lower()
+        phone = (p.user.phone or "").lower()
+        if q_lower in last or q_lower in first or q_lower in phone:
+            uc_str = f"{p.ntrp_level:.1f}" if p.ntrp_level is not None else "—"
+            rating_str = f"{p.total_points:.0f}" if p.total_points is not None else "—"
+            results.append(
+                {
+                    "id": p.pk,
+                    "display": f"{p.user.last_name} {p.user.first_name} (УС: {uc_str}, Р: {rating_str}) — {p.user.phone or '—'}",
+                }
+            )
+    from django.http import JsonResponse
+
+    return JsonResponse({"results": results})
+
+
+def _tournament_manage_player_already_in(tournament, player) -> tuple[bool, str | None]:
+    """Проверить, что игрок уже в турнире. Возвращает (already_in, error_message)."""
+    if tournament.is_doubles():
+        if tournament.teams.filter(
+            player1_id=player.pk, player2__isnull=False
+        ).exists():
+            return True, "Игрок уже в полной команде в этом турнире."
+        if tournament.teams.filter(player2_id=player.pk).exists():
+            return True, "Игрок уже в полной команде в этом турнире."
+        if tournament.teams.filter(player1_id=player.pk, player2__isnull=True).exists():
+            return True, "Игрок уже добавлен (ожидает партнёра)."
+        return False, None
+    else:
+        if tournament.participants.filter(pk=player.pk).exists():
+            return True, "Игрок уже в списке участников."
+        return False, None
+
+
+@staff_member_required
+def tournament_manage_add_participant(request, slug):
+    """POST: добавить участника по player_id. При отсутствии оплаты — редирект на страницу выбора."""
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    player_id = _parse_int_post(request, "player_id")
+    if not player_id:
+        messages.warning(request, "Выберите участника.")
+        return redirect("tournament_manage", slug=slug)
+    player = get_object_or_404(Player, pk=player_id)
+    already, err = _tournament_manage_player_already_in(tournament, player)
+    if already:
+        messages.warning(request, err)
+        return redirect("tournament_manage", slug=slug)
+    if _tournament_requires_entry_payment(tournament):
+        if not TournamentEntryPayment.objects.filter(
+            tournament=tournament, user_id=player.user_id
+        ).exists():
+            return redirect(
+                "tournament_manage_add_participant_confirm",
+                slug=slug,
+                player_id=player.pk,
+            )
+    _do_add_participant_to_tournament(tournament, player)
+    messages.success(
+        request, f"Участник добавлен: {player.user.last_name} {player.user.first_name}."
+    )
+    return redirect("tournament_manage", slug=slug)
+
+
+def _do_add_participant_to_tournament(tournament, player):
+    """Добавить участника в турнир (participants или solo-команда)."""
+    if tournament.is_doubles():
+        TournamentTeam.objects.create(
+            tournament=tournament, player1=player, player2=None
+        )
+    else:
+        tournament.participants.add(player)
+
+
+@staff_member_required
+def tournament_manage_add_participant_confirm(request, slug, player_id):
+    """Страница выбора: участник не оплатил — добавить всё равно или отправить уведомление об оплате."""
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    player = get_object_or_404(Player, pk=player_id)
+    if not _tournament_requires_entry_payment(tournament):
+        _do_add_participant_to_tournament(tournament, player)
+        messages.success(
+            request,
+            f"Участник добавлен: {player.user.last_name} {player.user.first_name}.",
+        )
+        return redirect("tournament_manage", slug=slug)
+    if tournament.is_doubles():
+        already = tournament.teams.filter(
+            models.Q(player1_id=player_id) | models.Q(player2_id=player_id)
+        ).exists()
+    else:
+        already = tournament.participants.filter(pk=player_id).exists()
+    if already:
+        messages.info(request, "Участник уже добавлен.")
+        return redirect("tournament_manage", slug=slug)
+    context = {
+        "tournament": tournament,
+        "player": player,
+    }
+    return render(request, "tournaments/manage_add_participant_confirm.html", context)
+
+
+@staff_member_required
+def tournament_manage_add_participant_force(request, slug):
+    """POST: добавить участника без проверки оплаты (player_id)."""
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    player_id = _parse_int_post(request, "player_id")
+    if not player_id:
+        messages.warning(request, "Выберите участника.")
+        return redirect("tournament_manage", slug=slug)
+    player = get_object_or_404(Player, pk=player_id)
+    if tournament.is_doubles():
+        if tournament.teams.filter(player1_id=player_id, player2__isnull=True).exists():
+            messages.info(request, "Игрок уже добавлен (ожидает партнёра).")
+            return redirect("tournament_manage", slug=slug)
+        if (
+            tournament.teams.filter(player1_id=player_id)
+            .filter(player2__isnull=False)
+            .exists()
+            or tournament.teams.filter(player2_id=player_id).exists()
+        ):
+            messages.warning(request, "Игрок уже в полной команде.")
+            return redirect("tournament_manage", slug=slug)
+    else:
+        if tournament.participants.filter(pk=player_id).exists():
+            messages.info(request, "Игрок уже в списке участников.")
+            return redirect("tournament_manage", slug=slug)
+    _do_add_participant_to_tournament(tournament, player)
+    messages.success(
+        request,
+        f"Участник добавлен без проверки оплаты: {player.user.last_name} {player.user.first_name}.",
+    )
+    return redirect("tournament_manage", slug=slug)
+
+
+@staff_member_required
+def tournament_manage_send_payment_notification(request, slug):
+    """POST: отправить участнику уведомление со ссылкой на оплату (player_id). После оплаты он будет добавлен автоматически."""
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    player_id = _parse_int_post(request, "player_id")
+    if not player_id:
+        messages.warning(request, "Выберите участника.")
+        return redirect("tournament_manage", slug=slug)
+    player = get_object_or_404(Player, pk=player_id)
+    payment_url = reverse("payment_preview") + f"?type=tournament&id={tournament.id}"
+    if tournament.is_doubles():
+        msg = (
+            f"Администратор приглашает вас оплатить участие в турнире «{tournament.name}». "
+            "После оплаты завершите регистрацию на странице турнира (выберите партнёра или создайте команду)."
+        )
+    else:
+        msg = (
+            f"Администратор приглашает вас оплатить участие в турнире «{tournament.name}». "
+            "После оплаты вы будете добавлены в турнир автоматически."
+        )
+    Notification.objects.create(
+        user=player.user,
+        message=msg,
+        url=payment_url,
+    )
+    if tournament.is_doubles():
+        messages.success(
+            request,
+            f"Уведомление об оплате отправлено {player.user.last_name} {player.user.first_name}. "
+            "После оплаты участник сможет завершить регистрацию на странице турнира.",
+        )
+    else:
+        messages.success(
+            request,
+            f"Уведомление об оплате отправлено {player.user.last_name} {player.user.first_name}. "
+            "После оплаты участник будет добавлен в турнир автоматически.",
+        )
+    return redirect("tournament_manage", slug=slug)
+
+
+def _build_refund_feedback_url(
+    refund: TournamentEntryRefundRequest, request=None
+) -> str:
+    """Ссылка на форму обратной связи с подставленной темой и текстом для возврата (путь или absolute_uri)."""
+    from urllib.parse import quote
+
+    subject = f"Возврат взноса — турнир «{refund.tournament.name}»"
+    user = refund.user
+    user_display = (
+        f"{user.last_name} {user.first_name}".strip() or user.email or f"ID {user.pk}"
+    )
+    removed_str = (
+        refund.removed_at.strftime("%d.%m.%Y %H:%M") if refund.removed_at else "—"
+    )
+    message = (
+        f"Заявка на возврат: {refund.refund_ref}\n"
+        f"Участник: {user_display}, User ID: {user.pk}\n"
+        f"Турнир: «{refund.tournament.name}», ID: {refund.tournament_id}\n"
+        f"Сумма к возврату: {refund.amount} руб.\n"
+        f"Дата удаления с турнира: {removed_str}\n\n"
+        "Прошу вернуть средства за участие в турнире."
+    )
+    path = (
+        reverse("support_feedback")
+        + f"?subject={quote(subject)}&message={quote(message)}"
+    )
+    if request:
+        return str(request.build_absolute_uri(path))
+    from django.conf import settings
+
+    base = getattr(settings, "SITE_URL", None) or ""
+    return str((base.rstrip("/") + path) if base else path)
+
+
+def _notify_removed_participant_refund(
+    request, user, tournament, refund: TournamentEntryRefundRequest
+):
+    """Уведомление в ЛК и в Telegram о снятии с турнира и возврате взноса."""
+    ref_url = _build_refund_feedback_url(refund, request)
+    msg_lk = (
+        f"Вы сняты с турнира «{tournament.name}». Взнос за участие был оплачен. "
+        "Для возврата средств обратитесь к администратору через форму обратной связи."
+    )
+    try:
+        Notification.objects.create(user=user, message=msg_lk, url=ref_url)
+    except Exception as e:
+        logger.exception(
+            "Notification create failed for removed participant refund (user=%s): %s",
+            user.pk,
+            e,
+        )
+    try:
+        from apps.telegram_bot import notifications as tg
+
+        tg.notify_tournament_removed_refund(user, tournament, ref_url)
+    except Exception as e:
+        logger.warning("notify_tournament_removed_refund telegram: %s", e)
+
+
+def _notify_removed_participant_no_refund(request, user, tournament):
+    """Уведомление в ЛК о снятии с турнира (без возврата — взнос не оплачивался)."""
+    tour_url = request.build_absolute_uri(
+        reverse("tournament_detail", args=[tournament.slug])
+    )
+    msg_lk = f"Вы сняты с турнира «{tournament.name}»."
+    try:
+        Notification.objects.create(user=user, message=msg_lk, url=tour_url)
+    except Exception as e:
+        logger.exception(
+            "Notification create failed for removed participant (user=%s): %s",
+            user.pk,
+            e,
+        )
+
+
+@staff_member_required
+def tournament_manage_remove_participant(request, slug):
+    """POST: удалить участника (player_id для одиночного, team_id для парного). При оплаченном взносе — заявка на возврат и уведомление."""
+    import secrets
+
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    if getattr(tournament, "bracket_generated", False):
+        messages.error(
+            request, "Нельзя удалять участников после формирования групп/сетки."
+        )
+        return redirect("tournament_manage", slug=slug)
+    team_id = _parse_int_post(request, "team_id")
+    player_id = _parse_int_post(request, "player_id")
+    entry_fee = (tournament.entry_fee or 0) if hasattr(tournament, "entry_fee") else 0
+    removed_users = []  # list of (user, had_paid)
+
+    if tournament.is_doubles() and team_id:
+        team = get_object_or_404(TournamentTeam, pk=team_id, tournament=tournament)
+        for p in [team.player1, team.player2]:
+            if p:
+                had_paid = TournamentEntryPayment.objects.filter(
+                    tournament=tournament, user_id=p.user_id
+                ).exists()
+                removed_users.append((p.user, had_paid))
+        team.delete()
+    elif not tournament.is_doubles() and player_id:
+        player = get_object_or_404(Player, pk=player_id)
+        if not tournament.participants.filter(pk=player_id).exists():
+            messages.warning(request, "Участник не найден в турнире.")
+            return redirect("tournament_manage", slug=slug)
+        had_paid = TournamentEntryPayment.objects.filter(
+            tournament=tournament, user_id=player.user_id
+        ).exists()
+        removed_users.append((player.user, had_paid))
+        tournament.participants.remove(player)
+    else:
+        messages.warning(request, "Укажите участника или команду для удаления.")
+        return redirect("tournament_manage", slug=slug)
+
+    for user, had_paid in removed_users:
+        if had_paid and entry_fee and float(entry_fee) > 0:
+            refund_ref = "REF-" + secrets.token_urlsafe(8).upper()[:10]
+            while TournamentEntryRefundRequest.objects.filter(
+                refund_ref=refund_ref
+            ).exists():
+                refund_ref = "REF-" + secrets.token_urlsafe(8).upper()[:10]
+            refund = TournamentEntryRefundRequest.objects.create(
+                tournament=tournament,
+                user=user,
+                amount=entry_fee,
+                refund_ref=refund_ref,
+            )
+            _notify_removed_participant_refund(request, user, tournament, refund)
+        else:
+            _notify_removed_participant_no_refund(request, user, tournament)
+
+    messages.success(request, "Участник(и) удалены из турнира.")
+    return redirect("tournament_manage", slug=slug)
+
+
+def _parse_int_post(request, key, default=None):
+    val = request.POST.get(key)
+    if val is None or str(val).strip() == "":
+        return default
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
+@staff_member_required
+def tournament_manage_match_result(request, slug, pk):
+    """POST: внести результат матча (score1/score2, winner_id/winner_team_id). Опционально walkover=1 — тех. результат (неявка/просрочка)."""
+    from django.utils import timezone
+
+    from .proposal_service import notify_participants_match_result_confirmed
+
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    match = get_object_or_404(Match, tournament=tournament, pk=pk)
+    is_walkover = request.POST.get("walkover") in ("1", "on", "true", "yes")
+    score1 = _parse_int_post(request, "score1")
+    score2 = _parse_int_post(request, "score2")
+    set2_p1 = _parse_int_post(request, "set2_p1")
+    set2_p2 = _parse_int_post(request, "set2_p2")
+    set3_p1 = _parse_int_post(request, "set3_p1")
+    set3_p2 = _parse_int_post(request, "set3_p2")
+    winner_id = _parse_int_post(request, "winner_id")
+    winner_team_id = _parse_int_post(request, "winner_team_id")
+    is_doubles_match = match.team1_id and match.team2_id
+    if is_doubles_match:
+        if not winner_team_id or winner_team_id not in (match.team1_id, match.team2_id):
+            messages.warning(request, "Укажите победившую команду.")
+            return redirect("tournament_manage", slug=slug)
+        winner_team = get_object_or_404(
+            TournamentTeam, pk=winner_team_id, tournament=tournament
+        )
+        match.winner_team = winner_team
+        match.winner = winner_team.player1
+    else:
+        if not winner_id and match.player1_id and match.player2_id:
+            messages.warning(request, "Укажите победителя.")
+            return redirect("tournament_manage", slug=slug)
+        winner = None
+        if winner_id:
+            winner = get_object_or_404(Player, pk=winner_id)
+            if winner.id != match.player1_id and winner.id != match.player2_id:
+                messages.warning(
+                    request, "Победитель должен быть одним из игроков матча."
+                )
+                return redirect("tournament_manage", slug=slug)
+        match.winner = winner
+    if is_walkover:
+        match.status = Match.MatchStatus.WALKOVER
+        match.completed_datetime = timezone.now()
+        match.rating_status = Match.RatingCalcStatus.PENDING
+        if match.winner_id == match.player1_id or (
+            is_doubles_match and match.winner_team_id == match.team1_id
+        ):
+            match.player1_set1 = 6
+            match.player2_set1 = 0
+            match.player1_set2 = 6
+            match.player2_set2 = 0
+        else:
+            match.player1_set1 = 0
+            match.player2_set1 = 6
+            match.player1_set2 = 0
+            match.player2_set2 = 6
+        match.save()
+        try:
+            notify_participants_match_result_confirmed(match, walkover=True)
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "notify_participants_match_result_confirmed after admin walkover: %s", e
+            )
+        messages.success(
+            request, "Технический результат (RT) сохранён. Таблица и сетка обновлены."
+        )
+    else:
+        if score1 is not None and score2 is not None:
+            match.player1_set1 = score1
+            match.player2_set1 = score2
+        if set2_p1 is not None and set2_p2 is not None:
+            match.player1_set2 = set2_p1
+            match.player2_set2 = set2_p2
+        if set3_p1 is not None and set3_p2 is not None:
+            match.player1_set3 = set3_p1
+            match.player2_set3 = set3_p2
+        # Проверка согласованности: победитель должен выиграть больше сетов по введённому счёту
+        winner_entity_id = (
+            match.winner_id
+            if not is_doubles_match
+            else (match.winner_team.player1_id if match.winner_team else None)
+        )
+        sets_p1 = sum(
+            1
+            for a, b in [
+                (match.player1_set1, match.player2_set1),
+                (match.player1_set2, match.player2_set2),
+                (match.player1_set3, match.player2_set3),
+            ]
+            if a is not None and b is not None and a > b
+        )
+        sets_p2 = sum(
+            1
+            for a, b in [
+                (match.player1_set1, match.player2_set1),
+                (match.player1_set2, match.player2_set2),
+                (match.player1_set3, match.player2_set3),
+            ]
+            if a is not None and b is not None and b > a
+        )
+        winner_won_more = (
+            (winner_entity_id == match.player1_id and sets_p1 > sets_p2)
+            or (winner_entity_id == match.player2_id and sets_p2 > sets_p1)
+            or (
+                is_doubles_match
+                and match.winner_team_id == match.team1_id
+                and sets_p1 > sets_p2
+            )
+            or (
+                is_doubles_match
+                and match.winner_team_id == match.team2_id
+                and sets_p2 > sets_p1
+            )
+        )
+        if (sets_p1 + sets_p2) >= 1 and not winner_won_more:
+            messages.error(
+                request,
+                "Счёт не соответствует выбранному победителю: по введённым геймам выигрывает другой участник. "
+                "Проверьте порядок полей: слева — первый игрок (сверху), справа — второй (снизу). "
+                "Если вы ввели счёт верно, но перепутали колонки — внесите снова, поменяв числа местами.",
+            )
+            return redirect("tournament_manage", slug=slug)
+        match.status = Match.MatchStatus.COMPLETED
+        match.completed_datetime = timezone.now()
+        match.rating_status = Match.RatingCalcStatus.PENDING
+        match.save()
+        try:
+            notify_participants_match_result_confirmed(match, walkover=False)
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "notify_participants_match_result_confirmed after admin result: %s", e
+            )
+        messages.success(
+            request, "Результат сохранён. Участникам отправлены уведомления."
+        )
+    return redirect("tournament_manage", slug=slug)
 
 
 def tournament_tables_list(request):
@@ -467,6 +1878,7 @@ def tournament_tables_detail(request, slug):
     )
     is_fan = _is_fan(tournament)
     is_olympic = _is_olympic(tournament)
+    is_tvd = _is_tvd(tournament)
     is_round_robin = _is_round_robin(tournament)
     if tournament.is_doubles():
         participants = []
@@ -548,6 +1960,24 @@ def tournament_tables_detail(request, slug):
                 }
                 for r in results_by_place
             ]
+    elif is_tvd:
+        # ТВД: таблица по итоговому месту (place из TournamentPlayerResult), как в итогах турнира
+        results_by_place = list(
+            tournament.fan_results.filter(place__isnull=False)
+            .select_related("player__user")
+            .order_by("place")
+        )
+        standings = [
+            {
+                "place": r.place,
+                "player": r.player,
+                "team": None,
+                "fan_result": r,
+                "fan_points": r.fan_points,
+                "round_eliminated": f"Место {r.place}",
+            }
+            for r in results_by_place
+        ]
     else:
         fan_results = {}
         if is_fan:
@@ -602,9 +2032,9 @@ def tournament_tables_detail(request, slug):
             chart_status_labels.append(status_display.get(status, status))
             chart_status_data.append(status_counts[status])
 
-    # Распределение очков FAN по раундам (для FAN)
+    # Распределение очков по раундам вылета (для FAN и ТВД)
     round_points = defaultdict(int)
-    if is_fan:
+    if is_fan or is_tvd:
         for r in tournament.fan_results.all():
             round_points[r.round_eliminated] += 1
     chart_round_labels = []
@@ -630,6 +2060,7 @@ def tournament_tables_detail(request, slug):
         "tournament": tournament,
         "is_fan": is_fan,
         "is_olympic": is_olympic,
+        "is_tvd": is_tvd,
         "is_round_robin": is_round_robin,
         "participants": participants,
         "standings": standings,
@@ -983,6 +2414,17 @@ def confirm_proposal(request, pk):
     return redirect("my_matches")
 
 
+def _tournament_requires_entry_payment(tournament) -> bool:
+    """Турнир с вступительным взносом: при регистрации требуется оплата (полная или со скидкой по подписке)."""
+    fee = getattr(tournament, "entry_fee", None) or 0
+    return bool(fee and float(fee) > 0)
+
+
+def _tournament_does_not_consume_subscription_limit(tournament) -> bool:
+    """Однодневные и платные турниры не уменьшают лимит регистраций по подписке."""
+    return bool(tournament.is_one_day or _tournament_requires_entry_payment(tournament))
+
+
 def _check_tournament_registration_eligibility(request, tournament, player):
     """Проверка подписки, категории и лимитов для регистрации. Возвращает (ok, error_message)."""
     user = getattr(request, "user", None)
@@ -999,7 +2441,6 @@ def _check_tournament_registration_eligibility(request, tournament, player):
     is_admin = user.is_superuser or user.is_staff
 
     # Проверка категорий применяется ко ВСЕМ, включая администраторов
-    # (чтобы не нарушать баланс турнира)
     allowed_categories = list(
         tournament.allowed_categories.values_list("category", flat=True)
     )
@@ -1024,8 +2465,9 @@ def _check_tournament_registration_eligibility(request, tournament, player):
     if is_admin:
         return True, None
 
-    if tournament.is_one_day:
-        return True, None  # Payment flow handles it
+    # Однодневные и турниры с взносом: подписка не обязательна, лимит не тратится (оплата отдельно)
+    if tournament.is_one_day or _tournament_requires_entry_payment(tournament):
+        return True, None
 
     if not sub or not sub.is_active:
         return False, "Для участия в многодневных турнирах требуется подписка."
@@ -1059,6 +2501,66 @@ def _check_user_can_register_for_tournament(user, tournament):
 def _is_player_registered_in_doubles(tournament, player):
     """Проверка: зарегистрирован ли игрок в парном турнире (в любой команде)."""
     return tournament.teams.filter(Q(player1=player) | Q(player2=player)).exists()
+
+
+def _ensure_doubles_participants_have_teams(tournament):
+    """
+    Для парного турнира: у каждого участника из M2M participants должна быть команда.
+    Участники, добавленные через админку в participants, получают solo-команду (player2=null),
+    чтобы отображаться в GUI и в форме «Составить пару».
+    """
+    if not tournament.is_doubles():
+        return
+    for player in tournament.participants.all():
+        if not tournament.teams.filter(Q(player1=player) | Q(player2=player)).exists():
+            TournamentTeam.objects.get_or_create(
+                tournament=tournament,
+                player1=player,
+                defaults={},
+            )
+
+
+def _remove_duplicate_doubles_teams(tournament):
+    """
+    Удалить дубликаты полных команд: одна пара игроков (A, B) — одна команда.
+    Оставляем команду с меньшим pk, остальные с той же парой удаляем.
+    """
+    if not tournament.is_doubles():
+        return
+    full_teams = list(
+        tournament.teams.filter(player2__isnull=False).values_list(
+            "pk", "player1_id", "player2_id"
+        )
+    )
+    seen_pairs = set()
+    for pk, p1, p2 in full_teams:
+        key = (min(p1, p2), max(p1, p2))
+        if key in seen_pairs:
+            TournamentTeam.objects.filter(pk=pk).delete()
+        else:
+            seen_pairs.add(key)
+
+
+def _remove_solo_teams_for_teamed_players(tournament):
+    """
+    Удалить solo-команды (ожидает партнёра) для игроков, которые уже в полной команде.
+    Один игрок не может одновременно быть в полной команде и «ожидать партнёра».
+    """
+    if not tournament.is_doubles():
+        return
+    players_in_full_teams = set(
+        tournament.teams.filter(player2__isnull=False).values_list(
+            "player1_id", flat=True
+        )
+    ) | set(
+        tournament.teams.filter(player2__isnull=False).values_list(
+            "player2_id", flat=True
+        )
+    )
+    tournament.teams.filter(
+        player2__isnull=True,
+        player1_id__in=players_in_full_teams,
+    ).delete()
 
 
 @login_required
@@ -1114,12 +2616,10 @@ def tournament_register(request, slug):
             return redirect("pricing")
         return redirect("tournament_detail", slug=tournament.slug)
 
-    # Администраторы обходят только проверку подписки (внутри функции),
-    # но проходят проверку категорий как обычные игроки
     is_admin = request.user.is_superuser or request.user.is_staff
 
-    if tournament.is_one_day:
-        # One-day tournament: Redirect to payment preview
+    # Турнир с вступительным взносом: все (с подпиской и без) переходят на страницу оплаты
+    if _tournament_requires_entry_payment(tournament):
         from urllib.parse import urlencode
 
         from django.urls import reverse
@@ -1129,23 +2629,26 @@ def tournament_register(request, slug):
         query_string = urlencode(params)
         return redirect(f"{base_url}?{query_string}")
     else:
-        # Multi-day tournament: subscription already checked in eligibility function
+        # Без взноса: регистрация сразу; лимит подписки не тратим для однодневных
         if is_admin:
             messages.success(
                 request, "Регистрация администратора (бесплатно/безлимитно)."
             )
         else:
-            try:
-                sub = request.user.subscription
-                if sub and sub.is_valid():
-                    sub.increment_usage()
-                    messages.success(
-                        request,
-                        f"Вы зарегистрированы! Осталось регистраций в этом месяце: {sub.get_remaining_slots()}",
-                    )
-                else:
+            if not _tournament_does_not_consume_subscription_limit(tournament):
+                try:
+                    sub = request.user.subscription
+                    if sub and sub.is_valid():
+                        sub.increment_usage()
+                        messages.success(
+                            request,
+                            f"Вы зарегистрированы! Осталось регистраций в этом месяце: {sub.get_remaining_slots()}",
+                        )
+                    else:
+                        messages.success(request, "Вы зарегистрированы!")
+                except Exception:
                     messages.success(request, "Вы зарегистрированы!")
-            except Exception:
+            else:
                 messages.success(request, "Вы зарегистрированы!")
 
         tournament.participants.add(player)
@@ -1192,13 +2695,31 @@ def tournament_register_doubles(request, slug):
         messages.info(request, "Вы уже зарегистрированы на этот турнир.")
         return redirect("tournament_detail", slug=slug)
 
-    # Проверка всех условий регистрации (включая категории)
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         messages.error(request, err)
         if err and "подписк" in err:
             return redirect("pricing")
         return redirect("tournament_detail", slug=slug)
+
+    # Турнир с взносом: без оплаты (по сессии) не показываем форму — редирект на страницу оплаты
+    if _tournament_requires_entry_payment(tournament):
+        paid_ids = request.session.get("tournament_entry_paid") or []
+        if tournament.id not in paid_ids:
+            from urllib.parse import urlencode
+
+            from django.urls import reverse
+
+            params = {
+                "type": "tournament",
+                "id": tournament.id,
+                "next": request.build_absolute_uri(
+                    reverse("tournament_register_doubles", kwargs={"slug": slug})
+                ),
+            }
+            base_url = reverse("payment_preview")
+            query_string = urlencode(params)
+            return redirect(f"{base_url}?{query_string}")
 
     solo_teams = list(
         tournament.teams.filter(player2__isnull=True).select_related("player1__user")
@@ -1283,12 +2804,18 @@ def tournament_register_doubles(request, slug):
 
         if action == "solo":
             TournamentTeam.objects.create(tournament=tournament, player1=player)
-            try:
-                sub = request.user.subscription
-                if sub and sub.is_valid():
-                    sub.increment_usage()
-            except Exception:
-                pass
+            if not _tournament_does_not_consume_subscription_limit(tournament):
+                try:
+                    sub = request.user.subscription
+                    if sub and sub.is_valid():
+                        sub.increment_usage()
+                except Exception:
+                    pass
+            paid_ids = request.session.get("tournament_entry_paid") or []
+            if tournament.id in paid_ids:
+                paid_ids = [i for i in paid_ids if i != tournament.id]
+                request.session["tournament_entry_paid"] = paid_ids
+                request.session.modified = True
             try:
                 from apps.telegram_bot import notifications as tg
 
@@ -1346,12 +2873,18 @@ def _do_join_team(request, tournament, player, team):
 
     team.player2 = player
     team.save()
-    try:
-        sub = request.user.subscription
-        if sub and sub.is_valid():
-            sub.increment_usage()
-    except Exception:
-        pass
+    if not _tournament_does_not_consume_subscription_limit(tournament):
+        try:
+            sub = request.user.subscription
+            if sub and sub.is_valid():
+                sub.increment_usage()
+        except Exception:
+            pass
+    paid_ids = request.session.get("tournament_entry_paid") or []
+    if tournament.id in paid_ids:
+        paid_ids = [i for i in paid_ids if i != tournament.id]
+        request.session["tournament_entry_paid"] = paid_ids
+        request.session.modified = True
     Notification.objects.create(
         user=team.player1.user,
         message=f"{player} присоединился к вашей команде в турнире {tournament.name}.",
@@ -1417,18 +2950,24 @@ def _do_add_partner(request, tournament, player, partner_id):
     TournamentTeam.objects.create(
         tournament=tournament, player1=player, player2=partner
     )
-    try:
-        sub = request.user.subscription
-        if sub and sub.is_valid():
-            sub.increment_usage()
-    except Exception:
-        pass
-    try:
-        psub = partner.user.subscription
-        if psub and psub.is_valid():
-            psub.increment_usage()
-    except Exception:
-        pass
+    if not _tournament_does_not_consume_subscription_limit(tournament):
+        try:
+            sub = request.user.subscription
+            if sub and sub.is_valid():
+                sub.increment_usage()
+        except Exception:
+            pass
+        try:
+            psub = partner.user.subscription
+            if psub and psub.is_valid():
+                psub.increment_usage()
+        except Exception:
+            pass
+    paid_ids = request.session.get("tournament_entry_paid") or []
+    if tournament.id in paid_ids:
+        paid_ids = [i for i in paid_ids if i != tournament.id]
+        request.session["tournament_entry_paid"] = paid_ids
+        request.session.modified = True
     Notification.objects.create(
         user=partner.user,
         message=f"{player} добавил вас в команду на турнир {tournament.name}.",

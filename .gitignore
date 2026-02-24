@@ -12,6 +12,7 @@ __pycache__/
 .Python
 venv/
 .venv/
+docs_venv/
 env/
 ENV/
 

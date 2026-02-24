@@ -1344,6 +1344,11 @@ def _handle_menu_callback_action(
                 p1 = m.get_player1_display()
                 p2 = m.get_player2_display()
                 tour_name = m.tournament.name if m.tournament else "Спарринг"
+                if (
+                    m.tournament
+                    and getattr(m.tournament, "format", None) == "weekend_day"
+                ):
+                    tour_name = f"{tour_name} (ТВД)"
                 lines.append("─────────────────")
                 lines.append(f"<b>{i}. {tour_name}</b> · {round_name}")
                 lines.append(f"   {p1}\n   vs\n   {p2}")
@@ -1360,6 +1365,11 @@ def _handle_menu_callback_action(
             keyboard = []
             for i, m in enumerate(scheduled_list[:10], 1):
                 tour_name = m.tournament.name if m.tournament else "Спарринг"
+                if (
+                    m.tournament
+                    and getattr(m.tournament, "format", None) == "weekend_day"
+                ):
+                    tour_name = f"{tour_name} (ТВД)"
                 label = f"{tour_name}, {m.round_name or 'раунд'}"
                 btn_text = f"📝 Матч {i}: {label}"
                 if len(btn_text) > 64:

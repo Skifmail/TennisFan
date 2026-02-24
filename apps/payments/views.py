@@ -108,6 +108,24 @@ def payment_preview(request):
     elif payment_type == "tournament":
         tournament_id = request.GET.get("id")
         tournament = get_object_or_404(Tournament, pk=tournament_id)
+        next_url = request.GET.get("next", "").strip()
+
+        # Админ не платит за турниры — сразу считаем участие подтверждённым
+        if request.user.is_authenticated and (
+            getattr(request.user, "is_staff", False)
+            or getattr(request.user, "is_superuser", False)
+        ):
+            from urllib.parse import urlencode
+
+            messages.success(
+                request,
+                "Регистрация без оплаты.",
+            )
+            params = {"type": "tournament", "id": tournament.id}
+            if next_url:
+                params["next"] = next_url
+            success_url = reverse("payment_success") + "?" + urlencode(params)
+            return redirect(success_url)
 
         # Calculate price (handle discount if user has subscription)
         entry_fee = tournament.entry_fee or 0
@@ -126,16 +144,18 @@ def payment_preview(request):
                 discount = entry_fee * (Decimal(discount_percent) / 100)
                 entry_fee = entry_fee - discount
 
+        discount_int = int(discount) if discount else 0
         context = {
             "title": f"Турнир: {tournament.name}",
             "description": f"Взнос за участие в турнире {tournament.get_city_display() if hasattr(tournament, 'get_city_display') else tournament.city}",
             "amount": entry_fee,
             "item_id": tournament.id,
+            "payment_next_url": next_url,
             "details": [
                 ("Турнир", tournament.name),
                 ("Дата", tournament.start_date),
                 ("Город", tournament.city),
-                ("Скидка", f"{discount} руб." if discount else "Нет"),
+                ("Скидка", f"{discount_int} ₽" if discount_int else "Нет"),
             ],
         }
 
@@ -196,3 +216,57 @@ def payment_process(request):
 
     # Пока платежный шлюз не подключен
     raise Http404("Payment gateway not connected")
+
+
+def payment_success(request):
+    """
+    Редирект после успешной оплаты (вызывается платёжным шлюзом).
+    GET: type=tournament, id=<tournament_id>, next=<url>.
+    Для турнира: записываем оплату в сессию (для парной регистрации),
+    для одиночного — добавляем участника и редирект на страницу турнира.
+    """
+    if not request.user.is_authenticated:
+        from django.conf import settings
+
+        messages.info(request, "Для просмотра необходимо войти.")
+        login_url = getattr(settings, "LOGIN_URL", "login")
+        return redirect(f"{reverse(login_url)}?next={request.get_full_path()}")
+
+    payment_type = request.GET.get("type")
+    item_id = request.GET.get("id")
+    next_url = request.GET.get("next", "").strip()
+
+    if payment_type == "tournament" and item_id:
+        try:
+            tid = int(item_id)
+        except (TypeError, ValueError):
+            tid = None
+        if tid is not None:
+            paid_ids = list(request.session.get("tournament_entry_paid") or [])
+            if tid not in paid_ids:
+                paid_ids.append(tid)
+                request.session["tournament_entry_paid"] = paid_ids
+                request.session.modified = True
+
+            tournament = Tournament.objects.filter(pk=tid).first()
+            if tournament and not tournament.is_doubles():
+                # Одиночный турнир: сразу добавляем участника (лимит подписки не тратим)
+                player = getattr(request.user, "player", None)
+                if player and not tournament.participants.filter(pk=player.pk).exists():
+                    tournament.participants.add(player)
+                    from apps.tournaments.models import TournamentEntryPayment
+
+                    TournamentEntryPayment.objects.get_or_create(
+                        tournament=tournament,
+                        user=request.user,
+                    )
+                    messages.success(
+                        request, "Оплата прошла успешно. Вы зарегистрированы на турнир."
+                    )
+                return redirect("tournament_detail", slug=tournament.slug)
+            if tournament and tournament.is_doubles() and next_url:
+                return redirect(next_url)
+
+    if next_url:
+        return redirect(next_url)
+    return redirect("tournament_list")

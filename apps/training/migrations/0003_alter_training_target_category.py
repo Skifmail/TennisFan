@@ -6,13 +6,25 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('training', '0002_initial'),
+        ("training", "0002_initial"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='training',
-            name='target_category',
-            field=models.CharField(blank=True, choices=[('futures', 'Фьючерс'), ('base', 'База'), ('tour', 'Тур'), ('hard', 'Хард'), ('challenger', 'Челленджер'), ('masters', 'Мастерс')], max_length=20, verbose_name='Целевая категория'),
+            model_name="training",
+            name="target_category",
+            field=models.CharField(
+                blank=True,
+                choices=[
+                    ("futures", "Фьючерс"),
+                    ("base", "База"),
+                    ("tour", "Тур"),
+                    ("hard", "Хард"),
+                    ("challenger", "Челленджер"),
+                    ("masters", "Мастерс"),
+                ],
+                max_length=20,
+                verbose_name="Целевая категория",
+            ),
         ),
     ]

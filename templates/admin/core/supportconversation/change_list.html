@@ -20,14 +20,18 @@
                 {% for conv in conversations %}
                 <tr class="{% cycle 'row1' 'row2' %}">
                     <td>
+                        {% if conv.user %}
                         <a href="{% url 'admin:core_supportconversation_detail' conv.user %}">
                             {{ conv.user__first_name }} {{ conv.user__last_name }}
                             {% if not conv.user__first_name and not conv.user__last_name %}
                                 (без имени)
                             {% endif %}
                         </a>
+                        {% else %}
+                        <span>Гость</span>
+                        {% endif %}
                     </td>
-                    <td>{{ conv.user__email }}</td>
+                    <td>{{ conv.user__email|default:"—" }}</td>
                     <td>{{ conv.message_count }}</td>
                     <td>{{ conv.last_message_at|date:"d.m.Y H:i" }}</td>
                 </tr>

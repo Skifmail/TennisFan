@@ -6,12 +6,16 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('courts', '0003_add_court_application'),
+        ("courts", "0003_add_court_application"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='courtapplication',
-            options={'ordering': ['-created_at'], 'verbose_name': 'Заявка на добавление корта', 'verbose_name_plural': 'Заявки'},
+            name="courtapplication",
+            options={
+                "ordering": ["-created_at"],
+                "verbose_name": "Заявка на добавление корта",
+                "verbose_name_plural": "Заявки",
+            },
         ),
     ]

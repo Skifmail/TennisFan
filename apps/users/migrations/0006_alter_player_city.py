@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0005_alter_player_category_alter_player_skill_level'),
+        ("users", "0005_alter_player_category_alter_player_skill_level"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='player',
-            name='city',
-            field=models.CharField(max_length=100, verbose_name='Город'),
+            model_name="player",
+            name="city",
+            field=models.CharField(max_length=100, verbose_name="Город"),
         ),
     ]

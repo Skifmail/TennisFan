@@ -35,4 +35,3 @@ def user_has_private_chat_access(user: Any) -> bool:
     """Короткий bool-хелпер для синхронизации доступа."""
     allowed, _ = get_private_chat_access_status(user)
     return allowed
-

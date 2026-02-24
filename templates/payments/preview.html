@@ -6,8 +6,8 @@
 {% block content %}
 <div class="container" style="max-width: 600px; padding-top: var(--spacing-2xl);">
     <div class="card">
-        <div class="card-header">
-            <h1 class="card-title">Подтверждение заказа</h1>
+        <div class="card-header" style="padding: var(--spacing-lg) var(--spacing-2xl);">
+            <h1 class="card-title" style="margin: 0;">Подтверждение заказа</h1>
         </div>
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <h2 class="mb-2" style="font-size: 1.25rem; margin-bottom: var(--spacing-md);">{{ title }}</h2>
@@ -23,7 +23,7 @@
                     {% endfor %}
                     <li style="display: flex; justify-content: space-between; margin-top: var(--spacing-lg); padding-top: var(--spacing-md); border-top: 2px solid var(--color-border); font-size: 1.1em; font-weight: bold;">
                         <span>Итого к оплате</span>
-                        <span style="color: var(--color-primary);">{{ amount|intcomma }} ₽</span>
+                        <span style="color: var(--color-primary);">{% if payment_type == 'tournament' %}{{ amount|floatformat:0 }}{% else %}{{ amount }}{% endif %} ₽</span>
                     </li>
                 </ul>
             </div>

@@ -47,8 +47,10 @@ def compress_image_to_max_bytes(file_like, max_bytes=MAX_IMAGE_SIZE_BYTES):
     """
     try:
         from PIL import Image
-    except ImportError:
-        raise ValueError("Pillow не установлен. Установите: pip install Pillow")
+    except ImportError as err:
+        raise ValueError(
+            "Pillow не установлен. Установите: pip install Pillow"
+        ) from err
 
     if hasattr(file_like, "read"):
         file_like.seek(0)
@@ -59,6 +61,7 @@ def compress_image_to_max_bytes(file_like, max_bytes=MAX_IMAGE_SIZE_BYTES):
     img = Image.open(io.BytesIO(data)).copy()
     try:
         from PIL import ImageOps
+
         img = ImageOps.exif_transpose(img)
     except Exception:
         pass
@@ -126,7 +129,9 @@ class CompressImageFieldsMixin:
             if file_obj.size <= MAX_IMAGE_SIZE_BYTES:
                 continue
             try:
-                compressed_bytes, ext = compress_image_to_max_bytes(file_obj, MAX_IMAGE_SIZE_BYTES)
+                compressed_bytes, ext = compress_image_to_max_bytes(
+                    file_obj, MAX_IMAGE_SIZE_BYTES
+                )
                 name = getattr(file_obj, "name", None) or f"image.{ext}"
                 if not name.lower().endswith((".jpg", ".jpeg", ".png")):
                     name = f"{name.rsplit('.', 1)[0] if '.' in name else name}.{ext}"
@@ -140,5 +145,10 @@ class CompressImageFieldsMixin:
                     len(compressed_bytes),
                 )
             except Exception as e:
-                logger.warning("Не удалось сжать изображение %s.%s: %s", self.__class__.__name__, field.name, e)
+                logger.warning(
+                    "Не удалось сжать изображение %s.%s: %s",
+                    self.__class__.__name__,
+                    field.name,
+                    e,
+                )
         super().save(*args, **kwargs)

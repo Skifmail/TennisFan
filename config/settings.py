@@ -137,6 +137,8 @@ TEMPLATES = [
                 "apps.users.context_processors.unread_notifications",
                 "apps.users.context_processors.user_is_coach",
                 "apps.navigation.context_processors.nav_menu_items",
+                "apps.core.context_processors.telegram_community_url",
+                "apps.core.context_processors.footer_social_links",
             ],
         },
     },
@@ -290,6 +292,11 @@ TELEGRAM_USER_BOT_WEBHOOK_SECRET = os.environ.get(
 )
 TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID = os.environ.get(
     "TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID", ""
+)
+# Публичная ссылка на открытое сообщество TennisFan в Telegram (при открытых группах)
+TELEGRAM_PUBLIC_COMMUNITY_URL = (
+    os.environ.get("TELEGRAM_PUBLIC_COMMUNITY_URL", "https://t.me/TennisFanu").strip()
+    or "https://t.me/TennisFanu"
 )
 TELEGRAM_BOT_SITE_BASE_URL = os.environ.get("TELEGRAM_BOT_SITE_BASE_URL", "")
 

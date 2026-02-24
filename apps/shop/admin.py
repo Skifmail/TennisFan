@@ -62,7 +62,10 @@ class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductPhotoInline]
 
     fieldsets = (
-        (None, {"fields": ("name", "size", "quantity", "description", "price", "order")}),
+        (
+            None,
+            {"fields": ("name", "size", "quantity", "description", "price", "order")},
+        ),
     )
 
 
@@ -70,7 +73,14 @@ class ProductAdmin(admin.ModelAdmin):
 class PurchaseRequestAdmin(admin.ModelAdmin):
     """Админ для заявок на покупку."""
 
-    list_display = ("product", "last_name", "first_name", "contact_phone", "status", "created_at")
+    list_display = (
+        "product",
+        "last_name",
+        "first_name",
+        "contact_phone",
+        "status",
+        "created_at",
+    )
     list_filter = ("status", "created_at")
     search_fields = ("first_name", "last_name", "contact_phone", "product__name")
     list_editable = ("status",)
@@ -80,7 +90,10 @@ class PurchaseRequestAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("Товар", {"fields": ("product",)}),
-        ("Заявитель", {"fields": ("user", "first_name", "last_name", "contact_phone", "comment")}),
+        (
+            "Заявитель",
+            {"fields": ("user", "first_name", "last_name", "contact_phone", "comment")},
+        ),
         ("Статус", {"fields": ("status",)}),
         ("Даты", {"fields": ("created_at", "updated_at")}),
     )

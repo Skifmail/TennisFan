@@ -6,13 +6,24 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0009_map_categories_to_skilllevel'),
+        ("users", "0009_map_categories_to_skilllevel"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='player',
-            name='category',
-            field=models.CharField(choices=[('novice', 'Новичок'), ('amateur', 'Любитель'), ('experienced', 'Опытный'), ('advanced', 'Продвинутый'), ('professional', 'Профессионал')], default='amateur', max_length=20, verbose_name='Категория'),
+            model_name="player",
+            name="category",
+            field=models.CharField(
+                choices=[
+                    ("novice", "Новичок"),
+                    ("amateur", "Любитель"),
+                    ("experienced", "Опытный"),
+                    ("advanced", "Продвинутый"),
+                    ("professional", "Профессионал"),
+                ],
+                default="amateur",
+                max_length=20,
+                verbose_name="Категория",
+            ),
         ),
     ]

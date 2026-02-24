@@ -32,8 +32,16 @@ class Command(BaseCommand):
             return
 
         if options["dry_run"]:
-            self.stdout.write(self.style.WARNING(f"Будет удалено привязок: {count}. Запустите без --dry-run для удаления."))
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Будет удалено привязок: {count}. Запустите без --dry-run для удаления."
+                )
+            )
             return
 
         qs.delete()
-        self.stdout.write(self.style.SUCCESS(f"Удалено привязок: {count}. Пользователи смогут привязать аккаунт заново при следующей отправке формы."))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Удалено привязок: {count}. Пользователи смогут привязать аккаунт заново при следующей отправке формы."
+            )
+        )

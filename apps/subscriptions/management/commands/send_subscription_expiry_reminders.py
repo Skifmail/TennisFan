@@ -43,7 +43,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options.get("dry_run", False)
         if not dry_run and not bot_services.is_configured():
-            self.stdout.write("Telegram user bot не настроен (TELEGRAM_USER_BOT_TOKEN).")
+            self.stdout.write(
+                "Telegram user bot не настроен (TELEGRAM_USER_BOT_TOKEN)."
+            )
             return
 
         now = timezone.now()
@@ -87,7 +89,9 @@ class Command(BaseCommand):
                 )
             else:
                 try:
-                    tg.notify_subscription_expiring(subscription.user, subscription, days_left=3)
+                    tg.notify_subscription_expiring(
+                        subscription.user, subscription, days_left=3
+                    )
                     sent_3 += 1
                 except Exception as e:
                     logger.exception(
@@ -104,7 +108,9 @@ class Command(BaseCommand):
                 )
             else:
                 try:
-                    tg.notify_subscription_expiring(subscription.user, subscription, days_left=1)
+                    tg.notify_subscription_expiring(
+                        subscription.user, subscription, days_left=1
+                    )
                     sent_1 += 1
                 except Exception as e:
                     logger.exception(

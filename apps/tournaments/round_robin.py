@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from apps.users.models import Notification, Player
 
-from .models import Match, Tournament, TournamentPlayerResult
+from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam
 
 logger = logging.getLogger(__name__)
 
@@ -316,7 +316,7 @@ def compute_standings(tournament: Tournament) -> list[dict]:
             if getattr(w, "is_bye", False) or getattr(los, "is_bye", False):
                 continue
         wid, lid = _entity_id(w), _entity_id(los)
-        if wid not in stats or lid not in stats:
+        if wid is None or lid is None or wid not in stats or lid not in stats:
             continue
         stats[wid]["matches"] += 1
         stats[lid]["matches"] += 1
@@ -355,10 +355,17 @@ def compute_standings(tournament: Tournament) -> list[dict]:
                         stats[lid]["games_won"] += s1
                         stats[lid]["games_lost"] += s2
                 else:
-                    stats[m.player1_id]["games_won"] += s1
-                    stats[m.player1_id]["games_lost"] += s2
-                    stats[m.player2_id]["games_won"] += s2
-                    stats[m.player2_id]["games_lost"] += s1
+                    p1_id, p2_id = m.player1_id, m.player2_id
+                    if (
+                        p1_id is not None
+                        and p2_id is not None
+                        and p1_id in stats
+                        and p2_id in stats
+                    ):
+                        stats[p1_id]["games_won"] += s1
+                        stats[p1_id]["games_lost"] += s2
+                        stats[p2_id]["games_won"] += s2
+                        stats[p2_id]["games_lost"] += s1
 
     rows = [v for v in stats.values()]
     if not rows:
@@ -374,16 +381,24 @@ def compute_standings(tournament: Tournament) -> list[dict]:
                     return 1 if m.winner_id == e1_id else -1
         return 0
 
-    def entity_id(row):
-        return row["team"].id if row["team"] else row["player"].id
+    def entity_id(row: dict) -> int | None:
+        t, p = row.get("team"), row.get("player")
+        if t is not None and t.id is not None:
+            return int(t.id)
+        if p is not None and p.id is not None:
+            return int(p.id)
+        return None
 
-    def sort_key(row):
+    def sort_key(row: dict) -> tuple[int, int, int, int, int, int]:
         eid = entity_id(row)
+        if eid is None:
+            return (0, 0, 0, 0, 0, 0)
         h2h_sum = 0
         for other in rows:
-            if entity_id(other) == eid:
+            oid = entity_id(other)
+            if oid is None or oid == eid:
                 continue
-            h2h_sum += head_to_head(eid, entity_id(other))
+            h2h_sum += head_to_head(eid, oid)
         return (
             -row["wins"],
             -h2h_sum,
@@ -487,6 +502,240 @@ def get_match_matrix(tournament: Tournament) -> tuple[list, list]:
             matrix[j][i] = cell_win
 
     return participants, matrix
+
+
+def compute_standings_for_entities(
+    tournament: Tournament,
+    entities: list[Player | TournamentTeam],
+    matches: list[Match],
+) -> list[dict]:
+    """
+    Таблица результатов круга по заданным участникам и списку матчей.
+    Подходит для ТВД круговой основной/утешительной сетки.
+    """
+    if not entities:
+        return []
+    is_doubles = isinstance(entities[0], TournamentTeam)
+    completed = [
+        m
+        for m in matches
+        if m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
+        and (m.winner_id or m.winner_team_id)
+    ]
+    stats: dict[int, Any] = {}
+    for e in entities:
+        if is_doubles:
+            if getattr(getattr(e, "player1", None), "is_bye", False):
+                continue
+            stats[e.id] = {
+                "team": e,
+                "player": None,
+                "matches": 0,
+                "wins": 0,
+                "losses": 0,
+                "sets_won": 0,
+                "sets_lost": 0,
+                "games_won": 0,
+                "games_lost": 0,
+            }
+        else:
+            if getattr(e, "is_bye", False):
+                continue
+            stats[e.id] = {
+                "player": e,
+                "team": None,
+                "matches": 0,
+                "wins": 0,
+                "losses": 0,
+                "sets_won": 0,
+                "sets_lost": 0,
+                "games_won": 0,
+                "games_lost": 0,
+            }
+
+    for m in completed:
+        w = _get_winner_entity(m, is_doubles)
+        los = _get_loser_entity(m, is_doubles)
+        if not w or not los:
+            continue
+        if is_doubles and (
+            getattr(w.player1, "is_bye", False) or getattr(los.player1, "is_bye", False)
+        ):
+            continue
+        if not is_doubles and (
+            getattr(w, "is_bye", False) or getattr(los, "is_bye", False)
+        ):
+            continue
+        wid, lid = _entity_id(w), _entity_id(los)
+        if wid is None or lid is None or wid not in stats or lid not in stats:
+            continue
+        w_id, l_id = cast(int, wid), cast(int, lid)
+        stats[w_id]["matches"] += 1
+        stats[l_id]["matches"] += 1
+        stats[w_id]["wins"] += 1
+        stats[l_id]["losses"] += 1
+        for i in range(1, 4):
+            s1 = getattr(m, f"player1_set{i}")
+            s2 = getattr(m, f"player2_set{i}")
+            if s1 is not None and s2 is not None:
+                side1_won_set = s1 > s2
+                if is_doubles:
+                    winner_side1 = m.winner_team_id == m.team1_id
+                    if winner_side1 == side1_won_set:
+                        stats[w_id]["sets_won"] += 1
+                        stats[l_id]["sets_lost"] += 1
+                    else:
+                        stats[l_id]["sets_won"] += 1
+                        stats[w_id]["sets_lost"] += 1
+                else:
+                    if (m.winner_id == m.player1_id) == side1_won_set:
+                        stats[w_id]["sets_won"] += 1
+                        stats[l_id]["sets_lost"] += 1
+                    else:
+                        stats[l_id]["sets_won"] += 1
+                        stats[w_id]["sets_lost"] += 1
+                if is_doubles:
+                    if w_id == m.team1_id:
+                        stats[w_id]["games_won"] += s1
+                        stats[w_id]["games_lost"] += s2
+                        stats[l_id]["games_won"] += s2
+                        stats[l_id]["games_lost"] += s1
+                    else:
+                        stats[w_id]["games_won"] += s2
+                        stats[w_id]["games_lost"] += s1
+                        stats[l_id]["games_won"] += s1
+                        stats[l_id]["games_lost"] += s2
+                else:
+                    p1_id, p2_id = m.player1_id, m.player2_id
+                    if (
+                        p1_id is not None
+                        and p2_id is not None
+                        and p1_id in stats
+                        and p2_id in stats
+                    ):
+                        stats[p1_id]["games_won"] += s1
+                        stats[p1_id]["games_lost"] += s2
+                        stats[p2_id]["games_won"] += s2
+                        stats[p2_id]["games_lost"] += s1
+
+    rows = [v for v in stats.values()]
+    if not rows:
+        return []
+
+    def head_to_head(e1_id: int, e2_id: int) -> int:
+        for m in completed:
+            if is_doubles:
+                if {m.team1_id, m.team2_id} == {e1_id, e2_id} and m.winner_team_id:
+                    return 1 if m.winner_team_id == e1_id else -1
+            else:
+                if {m.player1_id, m.player2_id} == {e1_id, e2_id} and m.winner_id:
+                    return 1 if m.winner_id == e1_id else -1
+        return 0
+
+    def entity_id(row: dict) -> int | None:
+        t, p = row.get("team"), row.get("player")
+        if t is not None and t.id is not None:
+            return int(t.id)
+        if p is not None and p.id is not None:
+            return int(p.id)
+        return None
+
+    def sort_key(row: dict) -> tuple[int, int, int, int, int, int]:
+        eid = entity_id(row)
+        if eid is None:
+            return (0, 0, 0, 0, 0, 0)
+        h2h_sum = 0
+        for other in rows:
+            oid = entity_id(other)
+            if oid is None or oid == eid:
+                continue
+            h2h_sum += head_to_head(eid, oid)
+        return (
+            -row["wins"],
+            -h2h_sum,
+            -(row["sets_won"] - row["sets_lost"]),
+            -(row["games_won"] - row["games_lost"]),
+            -row["games_won"],
+            eid,
+        )
+
+    rows.sort(key=sort_key)
+    has_completed_matches = any(r["matches"] > 0 for r in rows)
+    standings = []
+    for i, row in enumerate(rows, 1):
+        standings.append(
+            {
+                "place": i if has_completed_matches else None,
+                "player": row["player"],
+                "team": row["team"],
+                "matches": row["matches"],
+                "wins": row["wins"],
+                "losses": row["losses"],
+                "sets": f"{row['sets_won']}–{row['sets_lost']}",
+                "games": f"{row['games_won']}–{row['games_lost']}",
+                "points": row["wins"],
+            }
+        )
+    return standings
+
+
+def get_match_matrix_for_entities(
+    tournament: Tournament,
+    entities: list[Player | TournamentTeam],
+    matches: list[Match],
+) -> tuple[list, list]:
+    """
+    Матрица результатов по заданным участникам и списку матчей.
+    Возвращает (participants_list, matrix).
+    """
+    if not entities:
+        return [], []
+    is_doubles = isinstance(entities[0], TournamentTeam)
+    n = len(entities)
+    pid_to_idx = {e.id: i for i, e in enumerate(entities)}
+    matrix: list[list[dict[str, Any]]] = [
+        [{"win": None, "games": None} for _ in range(n)] for _ in range(n)
+    ]
+    completed = [
+        m
+        for m in matches
+        if m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
+        and (m.winner_id or m.winner_team_id)
+    ]
+    for m in completed:
+        if is_doubles:
+            if not m.team1_id or not m.team2_id:
+                continue
+            if getattr(m.team1.player1, "is_bye", False) or getattr(
+                m.team2.player1, "is_bye", False
+            ):
+                continue
+            i = pid_to_idx.get(m.team1_id)
+            j = pid_to_idx.get(m.team2_id)
+        else:
+            if getattr(m.player1, "is_bye", False) or getattr(
+                m.player2, "is_bye", False
+            ):
+                continue
+            i = pid_to_idx.get(m.player1_id)
+            j = pid_to_idx.get(m.player2_id)
+        if i is None or j is None:
+            continue
+        g1 = (m.player1_set1 or 0) + (m.player1_set2 or 0) + (m.player1_set3 or 0)
+        g2 = (m.player2_set1 or 0) + (m.player2_set2 or 0) + (m.player2_set3 or 0)
+        if is_doubles:
+            side1_won = m.winner_team_id == m.team1_id
+        else:
+            side1_won = m.winner_id == m.player1_id
+        cell_win = {"win": 1, "games": f"{g1}/{g2}"}
+        cell_loss = {"win": 0, "games": f"{g2}/{g1}"}
+        if side1_won:
+            matrix[i][j] = cell_win
+            matrix[j][i] = cell_loss
+        else:
+            matrix[i][j] = cell_loss
+            matrix[j][i] = cell_win
+    return list(entities), matrix
 
 
 def check_and_finalize_if_complete(tournament: Tournament) -> bool:

@@ -155,7 +155,7 @@
                 <form method="post" action="{% url 'tournament_join_team' slug=tournament.slug team_id=team.id %}" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline btn-sm">
-                        {{ team.player1.user.last_name }} {{ team.player1.user.first_name }} — присоединиться
+                        {{ team.player1.user.last_name }} {{ team.player1.user.first_name }} <span class="text-secondary">(УС: {{ team.player1.ntrp_level|floatformat:1 }}, Р: {{ team.player1.total_points|floatformat:0 }})</span> — присоединиться
                     </button>
                 </form>
                 {% endfor %}
@@ -172,9 +172,9 @@
                     {% include 'includes/avatar.html' with avatar=participant.player1.avatar class="player-avatar" size="48" %}
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px;">
-                            <a href="{% url 'profile' pk=participant.player1.pk %}">{{ participant.player1.user.last_name }} {{ participant.player1.user.first_name }}</a>
+                            <a href="{% url 'profile' pk=participant.player1.pk %}">{{ participant.player1.user.last_name }} {{ participant.player1.user.first_name }}</a> <span class="text-secondary small">(УС: {{ participant.player1.ntrp_level|floatformat:1 }}, Р: {{ participant.player1.total_points|floatformat:0 }})</span>
                             {% if participant.player2 %}
-                            / <a href="{% url 'profile' pk=participant.player2.pk %}">{{ participant.player2.user.last_name }} {{ participant.player2.user.first_name }}</a>
+                            / <a href="{% url 'profile' pk=participant.player2.pk %}">{{ participant.player2.user.last_name }} {{ participant.player2.user.first_name }}</a> <span class="text-secondary small">(УС: {{ participant.player2.ntrp_level|floatformat:1 }}, Р: {{ participant.player2.total_points|floatformat:0 }})</span>
                             {% else %}
                             <span class="text-muted">(ожидает партнёра)</span>
                             {% endif %}
@@ -189,7 +189,7 @@
                             {{ participant.user.first_name }} {{ participant.user.last_name }}
                         </div>
                         <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
-                            {{ participant.get_skill_level_display }} • {{ participant.total_points|floatformat:1 }} очков
+                            УС: {{ participant.ntrp_level|floatformat:1 }} • Р: {{ participant.total_points|floatformat:1 }}
                         </div>
                     </div>
                 </a>

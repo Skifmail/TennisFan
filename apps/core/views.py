@@ -485,7 +485,14 @@ def support_feedback(request):
     показать «Ваше сообщение принято. Ответ придёт в Telegram» и ссылку на привязку при необходимости.
     """
     if request.method == "GET":
-        form = FeedbackForm()
+        initial = {}
+        subject = (request.GET.get("subject") or "").strip()
+        message = (request.GET.get("message") or "").strip()
+        if subject:
+            initial["subject"] = subject[:200]
+        if message:
+            initial["message"] = message
+        form = FeedbackForm(initial=initial)
         return render(request, "core/support_feedback.html", {"form": form})
 
     form = FeedbackForm(request.POST)

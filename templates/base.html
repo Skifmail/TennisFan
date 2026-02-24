@@ -184,9 +184,17 @@
                 <div class="footer-social">
                     <h4 class="footer-social__title">Мы в соцсетях</h4>
                     <div class="social-links">
-                        <a href="{% url 'private_chat_access' %}" class="social-link" aria-label="Telegram">
-                            <img src="{% static 'images/Telegram_logo.svg' %}" alt="Telegram" width="20" height="20">
+                        {% for link in footer_social_links %}
+                        <a href="{{ link.url }}" class="social-link" aria-label="{{ link.name }}" target="_blank" rel="noopener noreferrer">
+                            {% if link.icon %}
+                            <img src="{{ link.icon.url }}" alt="{{ link.name }}" width="20" height="20">
+                            {% elif link.icon_path %}
+                            <img src="{% static link.icon_path %}" alt="{{ link.name }}" width="20" height="20">
+                            {% else %}
+                            <span>{{ link.name }}</span>
+                            {% endif %}
                         </a>
+                        {% endfor %}
                     </div>
                 </div>
             </div>

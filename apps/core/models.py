@@ -272,3 +272,48 @@ class FeedbackReply(models.Model):
 
     def __str__(self):
         return f"Ответ на #{self.feedback_id}: {self.text[:50]}..."
+
+
+# ---------------------------------------------------------------------------
+# Соцсети в футере (редактируются в админке)
+# ---------------------------------------------------------------------------
+
+
+class FooterSocialLink(models.Model):
+    """
+    Одна ссылка на соцсеть в футере: URL + иконка (загрузка SVG или путь в static).
+    """
+
+    name = models.CharField(
+        "Название",
+        max_length=100,
+        help_text="Например: Telegram, ВКонтакте. Используется в подсказке (aria-label).",
+    )
+    url = models.URLField("Ссылка", max_length=500)
+    icon = models.FileField(
+        "Иконка (SVG)",
+        upload_to="footer_social/",
+        blank=True,
+        help_text="Загрузите SVG-файл иконки. Либо укажите путь в поле «Путь к иконке».",
+    )
+    icon_path = models.CharField(
+        "Путь к иконке в static",
+        max_length=200,
+        blank=True,
+        help_text="Если иконка не загружена: путь относительно static, например images/VK.svg.",
+    )
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+
+    class Meta:
+        verbose_name = "ссылка на соцсеть"
+        verbose_name_plural = "Соцсети"
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"{self.name} ({self.url})"
+
+    def get_icon_url(self):
+        """URL иконки: загруженный файл или None (в шаблоне подставится static по icon_path)."""
+        if self.icon:
+            return self.icon.url
+        return None

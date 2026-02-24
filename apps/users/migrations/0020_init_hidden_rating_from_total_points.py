@@ -14,7 +14,7 @@ def init_hidden_rating(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0019_add_hidden_rating'),
+        ("users", "0019_add_hidden_rating"),
     ]
 
     operations = [

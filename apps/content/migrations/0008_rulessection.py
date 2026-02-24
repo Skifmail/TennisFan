@@ -13,9 +13,30 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="RulesSection",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("slug", models.SlugField(help_text="Уникальный код раздела", max_length=50, unique=True, verbose_name="Код раздела")),
-                ("title", models.CharField(max_length=200, verbose_name="Название (для админки)")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "slug",
+                    models.SlugField(
+                        help_text="Уникальный код раздела",
+                        max_length=50,
+                        unique=True,
+                        verbose_name="Код раздела",
+                    ),
+                ),
+                (
+                    "title",
+                    models.CharField(
+                        max_length=200, verbose_name="Название (для админки)"
+                    ),
+                ),
                 (
                     "body",
                     models.TextField(
@@ -24,7 +45,10 @@ class Migration(migrations.Migration):
                         verbose_name="Содержание (HTML)",
                     ),
                 ),
-                ("updated_at", models.DateTimeField(auto_now=True, verbose_name="Обновлено")),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Обновлено"),
+                ),
             ],
             options={
                 "verbose_name": "Раздел правил",

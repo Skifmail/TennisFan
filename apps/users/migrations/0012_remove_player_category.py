@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0011_add_player_max_contact'),
+        ("users", "0011_add_player_max_contact"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='player',
-            name='category',
+            model_name="player",
+            name="category",
         ),
     ]

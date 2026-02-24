@@ -9,14 +9,19 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('sparring', '0001_initial'),
-        ('users', '0001_initial'),
+        ("sparring", "0001_initial"),
+        ("users", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='sparringrequest',
-            name='player',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='sparring_requests', to='users.player', verbose_name='Игрок'),
+            model_name="sparringrequest",
+            name="player",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="sparring_requests",
+                to="users.player",
+                verbose_name="Игрок",
+            ),
         ),
     ]

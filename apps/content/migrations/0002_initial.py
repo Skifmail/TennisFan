@@ -9,19 +9,31 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('content', '0001_initial'),
-        ('tournaments', '0001_initial'),
+        ("content", "0001_initial"),
+        ("tournaments", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='gallery',
-            name='tournament',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='galleries', to='tournaments.tournament', verbose_name='Турнир'),
+            model_name="gallery",
+            name="tournament",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="galleries",
+                to="tournaments.tournament",
+                verbose_name="Турнир",
+            ),
         ),
         migrations.AddField(
-            model_name='photo',
-            name='gallery',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='photos', to='content.gallery', verbose_name='Галерея'),
+            model_name="photo",
+            name="gallery",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="photos",
+                to="content.gallery",
+                verbose_name="Галерея",
+            ),
         ),
     ]

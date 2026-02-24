@@ -15,6 +15,7 @@ repos:
     rev: v1.8.0
     hooks:
       - id: mypy
-        args: [--explicit-package-bases]
-        exclude: ^docs_venv/
+        args: [--explicit-package-bases, apps, config]
+        exclude: ^(docs_venv/|venv/|\.venv/)
+        pass_filenames: false  # проверяем только apps и config, без путей из venv
         additional_dependencies: [types-requests, types-python-dateutil, types-Pillow]

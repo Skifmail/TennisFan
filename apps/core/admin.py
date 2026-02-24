@@ -7,7 +7,12 @@ from django.db.models import Count, Max, Q
 from django.template.response import TemplateResponse
 from django.urls import path
 
-from .models import SupportConversation, SupportMessage, TelegramTransferConsentLog
+from .models import (
+    FooterSocialLink,
+    SupportConversation,
+    SupportMessage,
+    TelegramTransferConsentLog,
+)
 
 
 @admin.register(SupportConversation)
@@ -31,11 +36,10 @@ class SupportConversationAdmin(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         """Показываем список пользователей с диалогами."""
-        # Группируем сообщения по пользователям
+        # Группируем сообщения по пользователям (только зарегистрированные; гости — user=None)
         conversations = (
-            SupportMessage.objects.values(
-                "user", "user__email", "user__first_name", "user__last_name"
-            )
+            SupportMessage.objects.filter(user__isnull=False)
+            .values("user", "user__email", "user__first_name", "user__last_name")
             .annotate(
                 message_count=Count("id"),
                 last_message_at=Max("created_at"),
@@ -118,3 +122,13 @@ class TelegramTransferConsentLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(FooterSocialLink)
+class FooterSocialLinkAdmin(admin.ModelAdmin):
+    """Редактирование ссылок на соцсети в футере: URL и иконка (SVG)."""
+
+    list_display = ("name", "url", "order", "icon", "icon_path")
+    list_editable = ("order",)
+    list_display_links = ("name", "url")
+    search_fields = ("name", "url")

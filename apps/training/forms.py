@@ -63,7 +63,9 @@ class TrainingEnrollmentForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["desired_court"].queryset = Court.objects.filter(is_active=True).order_by("name")
+        self.fields["desired_court"].queryset = Court.objects.filter(
+            is_active=True
+        ).order_by("name")
         self.fields["desired_court"].required = False
         self.fields["desired_court"].empty_label = "—— Не выбрано ——"
         self.fields["message"].required = False
@@ -71,7 +73,9 @@ class TrainingEnrollmentForm(forms.ModelForm):
 
     def clean_agree_legal(self):
         if not self.cleaned_data.get("agree_legal"):
-            raise forms.ValidationError("Необходимо согласие на обработку персональных данных.")
+            raise forms.ValidationError(
+                "Необходимо согласие на обработку персональных данных."
+            )
         return True
 
 
@@ -189,11 +193,19 @@ class TrainingForm(forms.ModelForm):
             "target_category": forms.Select(attrs={"class": "form-control"}),
             "court": forms.Select(attrs={"class": "form-control"}),
             "city": forms.TextInput(attrs={"class": "form-control"}),
-            "duration_minutes": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
-            "max_participants": forms.NumberInput(attrs={"class": "form-control", "min": 1}),
-            "price": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": 0}),
+            "duration_minutes": forms.NumberInput(
+                attrs={"class": "form-control", "min": 1}
+            ),
+            "max_participants": forms.NumberInput(
+                attrs={"class": "form-control", "min": 1}
+            ),
+            "price": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01", "min": 0}
+            ),
             "schedule": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
-            "image": forms.FileInput(attrs={"class": "form-control", "accept": "image/*"}),
+            "image": forms.FileInput(
+                attrs={"class": "form-control", "accept": "image/*"}
+            ),
             "is_active": forms.CheckboxInput(attrs={"class": "form-checkbox"}),
         }
 
@@ -201,11 +213,15 @@ class TrainingForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         from apps.users.models import SkillLevel
 
-        self.fields["court"].queryset = Court.objects.filter(is_active=True).order_by("name")
+        self.fields["court"].queryset = Court.objects.filter(is_active=True).order_by(
+            "name"
+        )
         self.fields["court"].required = False
         self.fields["court"].empty_label = "—— Не выбрано ——"
         self.fields["target_category"].required = False
-        self.fields["target_category"].choices = [("", "———")] + list(SkillLevel.choices)
+        self.fields["target_category"].choices = [("", "———")] + list(
+            SkillLevel.choices
+        )
         self.fields["short_description"].required = False
         self.fields["schedule"].required = False
         self.fields["price"].required = False

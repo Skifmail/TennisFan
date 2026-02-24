@@ -46,7 +46,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options.get("dry_run", False)
         if not dry_run and not bot_services.is_configured():
-            self.stdout.write("Telegram user bot не настроен (TELEGRAM_USER_BOT_TOKEN).")
+            self.stdout.write(
+                "Telegram user bot не настроен (TELEGRAM_USER_BOT_TOKEN)."
+            )
             return
 
         now = timezone.now()
@@ -80,13 +82,19 @@ class Command(BaseCommand):
 
         for match in matches_2d:
             if dry_run:
-                self.stdout.write(f"  [2d] Матч #{match.pk} {match} дедлайн {match.deadline}")
+                self.stdout.write(
+                    f"  [2d] Матч #{match.pk} {match} дедлайн {match.deadline}"
+                )
             else:
                 try:
                     tg.notify_match_deadline_reminder(match, days_left=2)
                     sent_2 += 1
                     # Уведомление в ЛК (личный кабинет), сообщение до 255 символов
-                    deadline_str = match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else ""
+                    deadline_str = (
+                        match.deadline.strftime("%d.%m.%Y %H:%M")
+                        if match.deadline
+                        else ""
+                    )
                     msg = f"До дедлайна матча «{match.tournament.name}» 2 дня ({deadline_str}). Внесите результат: Мои матчи."
                     if len(msg) > 255:
                         msg = msg[:252] + "..."
@@ -95,19 +103,29 @@ class Command(BaseCommand):
                         try:
                             Notification.objects.create(user=user, message=msg, url=url)
                         except Exception as e:
-                            logger.warning("Notification deadline 2d user %s: %s", user.pk, e)
+                            logger.warning(
+                                "Notification deadline 2d user %s: %s", user.pk, e
+                            )
                 except Exception as e:
-                    logger.exception("send_deadline_reminder 2d match %s: %s", match.pk, e)
+                    logger.exception(
+                        "send_deadline_reminder 2d match %s: %s", match.pk, e
+                    )
 
         for match in matches_1d:
             if dry_run:
-                self.stdout.write(f"  [1d] Матч #{match.pk} {match} дедлайн {match.deadline}")
+                self.stdout.write(
+                    f"  [1d] Матч #{match.pk} {match} дедлайн {match.deadline}"
+                )
             else:
                 try:
                     tg.notify_match_deadline_reminder(match, days_left=1)
                     sent_1 += 1
                     # Уведомление в ЛК (личный кабинет), сообщение до 255 символов
-                    deadline_str = match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else ""
+                    deadline_str = (
+                        match.deadline.strftime("%d.%m.%Y %H:%M")
+                        if match.deadline
+                        else ""
+                    )
                     msg = f"До дедлайна матча «{match.tournament.name}» 1 день ({deadline_str}). Внесите результат: Мои матчи."
                     if len(msg) > 255:
                         msg = msg[:252] + "..."
@@ -116,11 +134,19 @@ class Command(BaseCommand):
                         try:
                             Notification.objects.create(user=user, message=msg, url=url)
                         except Exception as e:
-                            logger.warning("Notification deadline 1d user %s: %s", user.pk, e)
+                            logger.warning(
+                                "Notification deadline 1d user %s: %s", user.pk, e
+                            )
                 except Exception as e:
-                    logger.exception("send_deadline_reminder 1d match %s: %s", match.pk, e)
+                    logger.exception(
+                        "send_deadline_reminder 1d match %s: %s", match.pk, e
+                    )
 
         if dry_run:
-            self.stdout.write(f"Dry-run: матчей за 2 дня: {len(matches_2d)}, за 1 день: {len(matches_1d)}")
+            self.stdout.write(
+                f"Dry-run: матчей за 2 дня: {len(matches_2d)}, за 1 день: {len(matches_1d)}"
+            )
         else:
-            self.stdout.write(f"Напоминаний отправлено: за 2 дня — {sent_2}, за 1 день — {sent_1}.")
+            self.stdout.write(
+                f"Напоминаний отправлено: за 2 дня — {sent_2}, за 1 день — {sent_1}."
+            )

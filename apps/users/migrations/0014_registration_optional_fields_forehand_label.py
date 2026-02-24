@@ -6,33 +6,59 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0013_alter_player_skill_level'),
+        ("users", "0013_alter_player_skill_level"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='player',
-            name='birth_date',
-            field=models.DateField(blank=True, null=True, verbose_name='Дата рождения'),
+            model_name="player",
+            name="birth_date",
+            field=models.DateField(blank=True, null=True, verbose_name="Дата рождения"),
         ),
         migrations.AlterField(
-            model_name='player',
-            name='city',
-            field=models.CharField(blank=True, default='', max_length=100, verbose_name='Город'),
+            model_name="player",
+            name="city",
+            field=models.CharField(
+                blank=True, default="", max_length=100, verbose_name="Город"
+            ),
         ),
         migrations.AlterField(
-            model_name='player',
-            name='forehand',
-            field=models.CharField(blank=True, choices=[('right', 'Правша'), ('left', 'Левша')], default='', max_length=10, verbose_name='Ведущая рука'),
+            model_name="player",
+            name="forehand",
+            field=models.CharField(
+                blank=True,
+                choices=[("right", "Правша"), ("left", "Левша")],
+                default="",
+                max_length=10,
+                verbose_name="Ведущая рука",
+            ),
         ),
         migrations.AlterField(
-            model_name='player',
-            name='gender',
-            field=models.CharField(blank=True, choices=[('male', 'Мужской'), ('female', 'Женский')], default='', max_length=10, verbose_name='Пол'),
+            model_name="player",
+            name="gender",
+            field=models.CharField(
+                blank=True,
+                choices=[("male", "Мужской"), ("female", "Женский")],
+                default="",
+                max_length=10,
+                verbose_name="Пол",
+            ),
         ),
         migrations.AlterField(
-            model_name='player',
-            name='skill_level',
-            field=models.CharField(choices=[('novice', 'Новичок'), ('amateur', 'Любитель'), ('experienced', 'Опытный'), ('advanced', 'Продвинутый'), ('professional', 'Профессионал')], default='novice', help_text='Только из NTRP-теста или админка. Пользователь не редактирует вручную.', max_length=20, verbose_name='Уровень мастерства (NTRP)'),
+            model_name="player",
+            name="skill_level",
+            field=models.CharField(
+                choices=[
+                    ("novice", "Новичок"),
+                    ("amateur", "Любитель"),
+                    ("experienced", "Опытный"),
+                    ("advanced", "Продвинутый"),
+                    ("professional", "Профессионал"),
+                ],
+                default="novice",
+                help_text="Только из NTRP-теста или админка. Пользователь не редактирует вручную.",
+                max_length=20,
+                verbose_name="Уровень мастерства (NTRP)",
+            ),
         ),
     ]

@@ -6,18 +6,39 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tournaments', '0009_tournament_entry_fee_tournament_is_one_day'),
+        ("tournaments", "0009_tournament_entry_fee_tournament_is_one_day"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='seasonrating',
-            name='category',
-            field=models.CharField(choices=[('novice', 'Новичок'), ('amateur', 'Любитель'), ('experienced', 'Опытный'), ('advanced', 'Продвинутый'), ('professional', 'Профессионал')], max_length=20, verbose_name='Категория'),
+            model_name="seasonrating",
+            name="category",
+            field=models.CharField(
+                choices=[
+                    ("novice", "Новичок"),
+                    ("amateur", "Любитель"),
+                    ("experienced", "Опытный"),
+                    ("advanced", "Продвинутый"),
+                    ("professional", "Профессионал"),
+                ],
+                max_length=20,
+                verbose_name="Категория",
+            ),
         ),
         migrations.AlterField(
-            model_name='tournament',
-            name='category',
-            field=models.CharField(choices=[('novice', 'Новичок'), ('amateur', 'Любитель'), ('experienced', 'Опытный'), ('advanced', 'Продвинутый'), ('professional', 'Профессионал')], default='amateur', max_length=20, verbose_name='Категория'),
+            model_name="tournament",
+            name="category",
+            field=models.CharField(
+                choices=[
+                    ("novice", "Новичок"),
+                    ("amateur", "Любитель"),
+                    ("experienced", "Опытный"),
+                    ("advanced", "Продвинутый"),
+                    ("professional", "Профессионал"),
+                ],
+                default="amateur",
+                max_length=20,
+                verbose_name="Категория",
+            ),
         ),
     ]

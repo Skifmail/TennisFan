@@ -2,6 +2,7 @@
 Tournament models: Tournaments, Matches, Ratings.
 """
 
+from django.conf import settings
 from django.db import models
 
 from apps.users.models import Player, SkillLevel
@@ -22,6 +23,8 @@ class TournamentStatus(models.TextChoices):
 
     UPCOMING = "upcoming", "Предстоящий"
     ACTIVE = "active", "Активный"
+    GROUP_STAGE = "group_stage", "Групповой этап"
+    PLAYOFFS = "playoffs", "Плей-офф"
     COMPLETED = "completed", "Завершён"
     CANCELLED = "cancelled", "Отменён"
 
@@ -52,6 +55,7 @@ class TournamentFormat(models.TextChoices):
         "Олимпийская система (утешительная сетка)",
     )
     ROUND_ROBIN = "round_robin", "Круговой"
+    WEEKEND_DAY = "weekend_day", "Турнир выходного дня"
 
 
 class MatchFormat(models.TextChoices):
@@ -255,7 +259,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
 
     class Meta:
         verbose_name = "Турнир"
-        verbose_name_plural = "Турниры"
+        verbose_name_plural = "Многодневные Турниры"
         ordering = ["-start_date"]
 
     def __str__(self) -> str:
@@ -305,10 +309,87 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     def save(self, *args, **kwargs):
         from django.utils import timezone
 
+        self.duration = TournamentDuration.MULTI_DAY
         if self.registration_deadline and self.insufficient_participants_notified_at:
             if self.registration_deadline > timezone.now():
                 self.insufficient_participants_notified_at = None
         super().save(*args, **kwargs)
+
+
+class TournamentEntryPayment(models.Model):
+    """Факт оплаты вступительного взноса пользователем за турнир (для проверки при добавлении админом)."""
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="entry_payments",
+        verbose_name="Турнир",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tournament_entry_payments",
+        verbose_name="Пользователь",
+    )
+    paid_at = models.DateTimeField("Дата оплаты", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Оплата взноса за турнир"
+        verbose_name_plural = "Оплаты взносов за турниры"
+        unique_together = [("tournament", "user")]
+
+    def __str__(self) -> str:
+        return f"{self.tournament.name} — {self.user}"
+
+
+class TournamentEntryRefundRequest(models.Model):
+    """
+    Заявка на возврат взноса: участник удалён админом, взнос был оплачен.
+    Идентификатор refund_ref подставляется в форму обратной связи для админа.
+    """
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="entry_refund_requests",
+        verbose_name="Турнир",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tournament_entry_refund_requests",
+        verbose_name="Пользователь",
+    )
+    removed_at = models.DateTimeField("Дата удаления", auto_now_add=True)
+    amount = models.DecimalField(
+        "Сумма к возврату (руб)",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+    refund_ref = models.CharField(
+        "Идентификатор заявки (для админа)",
+        max_length=32,
+        unique=True,
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = "Заявка на возврат взноса"
+        verbose_name_plural = "Заявки на возврат взносов"
+        ordering = ["-removed_at"]
+
+    def __str__(self) -> str:
+        return f"{self.refund_ref}: {self.tournament.name} — {self.user}"
+
+
+class TVDTournament(Tournament):
+    """Прокси-модель для раздела «Турниры выходного дня» в админке."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "ТВД-турнир"
+        verbose_name_plural = "Турниры выходного дня"
 
 
 class TournamentTeam(models.Model):
@@ -356,6 +437,105 @@ class TournamentTeam(models.Model):
     def is_complete(self) -> bool:
         """Команда полная (оба игрока указаны)."""
         return self.player2_id is not None
+
+
+class TVDGroup(models.Model):
+    """Группа в турнире выходного дня (ТВД)."""
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="tvd_groups",
+        verbose_name="Турнир",
+    )
+    name = models.CharField("Название группы", max_length=10)  # A, B, C, ...
+    order = models.PositiveSmallIntegerField("Порядок", default=0)
+    is_completed = models.BooleanField("Группа завершена", default=False)
+
+    class Meta:
+        verbose_name = "Группа ТВД"
+        verbose_name_plural = "Группы ТВД"
+        unique_together = [("tournament", "name")]
+        ordering = ["tournament", "order", "name"]
+
+    def __str__(self) -> str:
+        return f"{self.tournament.name} — Группа {self.name}"
+
+
+class TVDGroupMember(models.Model):
+    """
+    Участник группы в ТВД-турнире.
+    Одиночный: group + player (team=null). Парный: group + team (player=null, для совместимости можно player=team.player1).
+    """
+
+    group = models.ForeignKey(
+        TVDGroup,
+        on_delete=models.CASCADE,
+        related_name="members",
+        verbose_name="Группа",
+    )
+    player = models.ForeignKey(
+        Player,
+        on_delete=models.CASCADE,
+        related_name="tvd_group_memberships",
+        verbose_name="Игрок",
+        null=True,
+        blank=True,
+        help_text="Для одиночного ТВД. Для парного — используйте team.",
+    )
+    team = models.ForeignKey(
+        "TournamentTeam",
+        on_delete=models.CASCADE,
+        related_name="tvd_group_memberships",
+        verbose_name="Команда",
+        null=True,
+        blank=True,
+        help_text="Для парного ТВД. Для одиночного — используйте player.",
+    )
+    seed = models.PositiveSmallIntegerField(
+        "Посев",
+        null=True,
+        blank=True,
+        help_text="Номер посева (1 = сильнейший в группе).",
+    )
+    wins = models.PositiveIntegerField("Победы", default=0)
+    losses = models.PositiveIntegerField("Поражения", default=0)
+    games_won = models.PositiveIntegerField("Геймов выиграно", default=0)
+    games_lost = models.PositiveIntegerField("Геймов проиграно", default=0)
+    final_place = models.PositiveSmallIntegerField(
+        "Место в группе",
+        null=True,
+        blank=True,
+        help_text="1, 2, 3 (или 4 для групп по 4 человека).",
+    )
+
+    class Meta:
+        verbose_name = "Участник группы ТВД"
+        verbose_name_plural = "Участники групп ТВД"
+        ordering = ["group", "final_place", "seed"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["group", "player"],
+                condition=models.Q(player__isnull=False),
+                name="tvdgroupmember_unique_group_player",
+            ),
+            models.UniqueConstraint(
+                fields=["group", "team"],
+                condition=models.Q(team__isnull=False),
+                name="tvdgroupmember_unique_group_team",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        if self.team_id:
+            return f"{self.team} в {self.group}"
+        return f"{self.player} в {self.group}"
+
+    def get_entity_display(self):
+        """Игрок или команда для отображения."""
+        if self.team_id:
+            return str(self.team)
+        return str(self.player) if self.player_id else "—"
 
 
 class Match(models.Model):
@@ -431,6 +611,21 @@ class Match(models.Model):
     is_consolation = models.BooleanField(
         "Подвал (матч вылетевших)",
         default=False,
+    )
+    tvd_group = models.ForeignKey(
+        TVDGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="matches",
+        verbose_name="Группа ТВД",
+        help_text="Для матчей группового этапа ТВД.",
+    )
+    tvd_stage = models.CharField(
+        "Этап ТВД",
+        max_length=30,
+        blank=True,
+        help_text="group, main_qf, main_sf, main_final, third_place, consolation_sf, consolation_final",
     )
     deadline = models.DateTimeField(
         "Дедлайн матча",

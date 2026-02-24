@@ -1,0 +1,60 @@
+<div class="manage-match-result bracket-match mt-3">
+    <form action="{% url 'tournament_manage_match_result' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-form">
+        {% csrf_token %}
+        <div class="bracket-match-players">
+            <div class="bracket-match-player bracket-match-player--input">
+                <span class="bracket-player-name">{{ match.get_player1_display|default:"TBD" }}</span>
+            </div>
+            <div class="bracket-match-player bracket-match-player--input">
+                <span class="bracket-player-name">{{ match.get_player2_display|default:"TBD" }}</span>
+            </div>
+        </div>
+        <div class="bracket-match-sets">
+            <div class="bracket-set-column-headers">
+                <span class="bracket-set-col-player" title="Геймы первого игрока (сверху)">{{ match.get_player1_display|default:"1-й" }}</span>
+                <span class="bracket-set-sep">:</span>
+                <span class="bracket-set-col-player" title="Геймы второго игрока (снизу)">{{ match.get_player2_display|default:"2-й" }}</span>
+            </div>
+            <div class="bracket-set-group">
+                <span class="bracket-set-label">Сет 1</span>
+                <div class="bracket-set-inputs">
+                    <input type="number" name="score1" min="0" max="20" class="bracket-set-input" placeholder="—" title="{{ match.get_player1_display|default:'1-й игрок' }}">
+                    <span class="bracket-set-sep">:</span>
+                    <input type="number" name="score2" min="0" max="20" class="bracket-set-input" placeholder="—" title="{{ match.get_player2_display|default:'2-й игрок' }}">
+                </div>
+            </div>
+            <div class="bracket-set-group">
+                <span class="bracket-set-label">Сет 2</span>
+                <div class="bracket-set-inputs">
+                    <input type="number" name="set2_p1" min="0" max="20" class="bracket-set-input" placeholder="—" title="{{ match.get_player1_display|default:'1-й игрок' }}">
+                    <span class="bracket-set-sep">:</span>
+                    <input type="number" name="set2_p2" min="0" max="20" class="bracket-set-input" placeholder="—" title="{{ match.get_player2_display|default:'2-й игрок' }}">
+                </div>
+            </div>
+            <div class="bracket-set-group">
+                <span class="bracket-set-label">Сет 3</span>
+                <div class="bracket-set-inputs">
+                    <input type="number" name="set3_p1" min="0" max="20" class="bracket-set-input" placeholder="—" title="{{ match.get_player1_display|default:'1-й игрок' }}">
+                    <span class="bracket-set-sep">:</span>
+                    <input type="number" name="set3_p2" min="0" max="20" class="bracket-set-input" placeholder="—" title="{{ match.get_player2_display|default:'2-й игрок' }}">
+                </div>
+            </div>
+        </div>
+        <div class="bracket-match-actions">
+            <div class="bracket-winner-row">
+                <span class="bracket-winner-label">Победитель:</span>
+                {% if match.team1_id and match.team2_id %}
+                <label class="bracket-radio"><input type="radio" name="winner_team_id" value="{{ match.team1_id }}" required> {{ match.get_player1_display }}</label>
+                <label class="bracket-radio"><input type="radio" name="winner_team_id" value="{{ match.team2_id }}" required> {{ match.get_player2_display }}</label>
+                {% else %}
+                {% if match.player1_id %}<label class="bracket-radio"><input type="radio" name="winner_id" value="{{ match.player1_id }}" required> {{ match.get_player1_display }}</label>{% endif %}
+                {% if match.player2_id %}<label class="bracket-radio"><input type="radio" name="winner_id" value="{{ match.player2_id }}" required> {{ match.get_player2_display }}</label>{% endif %}
+                {% endif %}
+            </div>
+            <div class="bracket-submit-row">
+                <label class="bracket-walkover"><input type="checkbox" name="walkover" value="1"> Тех. результат</label>
+                <button type="submit" class="btn btn-sm btn-primary bracket-submit-btn">Сохранить</button>
+            </div>
+        </div>
+    </form>
+</div>

@@ -6,27 +6,58 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0002_initial'),
+        ("content", "0002_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='AboutUs',
+            name="AboutUs",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('subtitle', models.CharField(blank=True, max_length=300, verbose_name='Подзаголовок')),
-                ('image', models.ImageField(blank=True, upload_to='about/', verbose_name='Фото')),
-                ('body', models.TextField(blank=True, help_text='Поддерживается Markdown (заголовки, списки, ссылки, жирный и т.п.).', verbose_name='Статья')),
-                ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Обновлено')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "subtitle",
+                    models.CharField(
+                        blank=True, max_length=300, verbose_name="Подзаголовок"
+                    ),
+                ),
+                (
+                    "image",
+                    models.ImageField(
+                        blank=True, upload_to="about/", verbose_name="Фото"
+                    ),
+                ),
+                (
+                    "body",
+                    models.TextField(
+                        blank=True,
+                        help_text="Поддерживается Markdown (заголовки, списки, ссылки, жирный и т.п.).",
+                        verbose_name="Статья",
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Обновлено"),
+                ),
             ],
             options={
-                'verbose_name': 'О нас',
-                'verbose_name_plural': 'О нас',
+                "verbose_name": "О нас",
+                "verbose_name_plural": "О нас",
             },
         ),
         migrations.AlterField(
-            model_name='page',
-            name='content',
-            field=models.TextField(help_text='Поддерживается Markdown (заголовки, списки, ссылки, жирный и т.п.).', verbose_name='Содержание'),
+            model_name="page",
+            name="content",
+            field=models.TextField(
+                help_text="Поддерживается Markdown (заголовки, списки, ссылки, жирный и т.п.).",
+                verbose_name="Содержание",
+            ),
         ),
     ]

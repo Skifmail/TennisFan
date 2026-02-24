@@ -13,11 +13,40 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="TelegramTransferConsentLog",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("consent_version", models.CharField(db_index=True, default="v1", max_length=32, verbose_name="Версия текста согласия")),
-                ("ip_address", models.GenericIPAddressField(blank=True, null=True, verbose_name="IP-адрес")),
-                ("user_agent", models.TextField(blank=True, default="", verbose_name="User-Agent")),
-                ("consented_at", models.DateTimeField(auto_now_add=True, verbose_name="Дата и время согласия")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "consent_version",
+                    models.CharField(
+                        db_index=True,
+                        default="v1",
+                        max_length=32,
+                        verbose_name="Версия текста согласия",
+                    ),
+                ),
+                (
+                    "ip_address",
+                    models.GenericIPAddressField(
+                        blank=True, null=True, verbose_name="IP-адрес"
+                    ),
+                ),
+                (
+                    "user_agent",
+                    models.TextField(blank=True, default="", verbose_name="User-Agent"),
+                ),
+                (
+                    "consented_at",
+                    models.DateTimeField(
+                        auto_now_add=True, verbose_name="Дата и время согласия"
+                    ),
+                ),
                 (
                     "user",
                     models.ForeignKey(

@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% block title %}Промежуточные результаты: {{ tournament.name }}{% endblock %}
+{% block content %}
+<div class="container manage-page" style="padding-top: var(--spacing-2xl);">
+    <div class="manage-page-header mb-4 d-flex flex-wrap gap-2 align-items-center">
+        <a href="{% url 'tournament_list' %}" class="text-secondary">&larr; Турниры</a>
+        <span class="text-secondary">/</span>
+        <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="text-secondary">{{ tournament.name }}</a>
+        <span class="text-secondary">/</span>
+        <a href="{% url 'tournament_manage' slug=tournament.slug %}" class="text-secondary">Управление</a>
+        <span class="text-secondary">/</span>
+        <span>Промежуточные результаты</span>
+    </div>
+
+    <h1 class="page-title" style="text-align: left;">Промежуточные результаты</h1>
+    <p class="text-secondary mb-4">После группового этапа. Кто выходит в основную сетку и в утешительную.</p>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">В основную сетку</h2>
+            <p class="text-secondary small mb-2">Занявшие 1-е и 2-е места в каждой группе выходят в плей-офф (1/4 или 1/2 финала).</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-intermediate">
+                    <thead>
+                        <tr>
+                            <th>Группа</th>
+                            <th class="text-center">Место</th>
+                            <th>Участник</th>
+                            <th class="text-center">WIN</th>
+                            <th class="text-center">RT</th>
+                            <th class="text-center">Очки силы</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in main_advancing %}
+                        <tr>
+                            <td><strong>Группа {{ item.group_name }}</strong></td>
+                            <td class="text-center">{% if item.place == 1 %}1-е{% else %}2-е{% endif %}</td>
+                            <td>{{ item.display_name }}</td>
+                            <td class="text-center">{% if item.has_win %}<span class="badge badge-success">WIN</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                            <td class="text-center">{% if item.has_rt %}<span class="badge badge-danger">RT</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                            <td class="text-center {% if item.rating_delta_sum > 0 %}delta-positive{% elif item.rating_delta_sum < 0 %}delta-negative{% endif %}">{% if item.rating_delta_sum != 0 %}{{ item.rating_delta_sum|floatformat:1 }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-secondary">Нет данных</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if has_consolation and consolation_advancing %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">В утешительную сетку</h2>
+            <p class="text-secondary small mb-2">Занявшие 3-е места в группах играют в утешительной сетке за места ниже основного плей-офф.</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-intermediate">
+                    <thead>
+                        <tr>
+                            <th>Группа</th>
+                            <th>Участник (3-е место)</th>
+                            <th class="text-center">WIN</th>
+                            <th class="text-center">RT</th>
+                            <th class="text-center">Очки силы</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in consolation_advancing %}
+                        <tr>
+                            <td><strong>Группа {{ item.group_name }}</strong></td>
+                            <td>{{ item.display_name }}</td>
+                            <td class="text-center">{% if item.has_win %}<span class="badge badge-success">WIN</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                            <td class="text-center">{% if item.has_rt %}<span class="badge badge-danger">RT</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                            <td class="text-center {% if item.rating_delta_sum > 0 %}delta-positive{% elif item.rating_delta_sum < 0 %}delta-negative{% endif %}">{% if item.rating_delta_sum != 0 %}{{ item.rating_delta_sum|floatformat:1 }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <h2 class="section-title mt-5 mb-4">Итоговые таблицы групп</h2>
+    <div class="row g-4 mb-5">
+        {% for gt in group_tables %}
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h3 class="h6 mb-3">Группа {{ gt.group.name }}</h3>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">Место</th>
+                                    <th>Участник</th>
+                                    <th class="text-center">WIN</th>
+                                    <th class="text-center">RT</th>
+                                    <th class="text-center">В</th>
+                                    <th class="text-center">П</th>
+                                    <th class="text-center">Геймы</th>
+                                    <th class="text-center">Очки силы</th>
+                                    <th>Куда проходит</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in gt.rows %}
+                                <tr>
+                                    <td class="text-center fw-bold">{{ row.place }}</td>
+                                    <td>{{ row.display_name }}</td>
+                                    <td class="text-center">{% if row.has_win %}<span class="badge badge-success">WIN</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                    <td class="text-center">{% if row.has_rt %}<span class="badge badge-danger">RT</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                    <td class="text-center">{{ row.wins }}</td>
+                                    <td class="text-center">{{ row.losses }}</td>
+                                    <td class="text-center"><span class="games-won">{{ row.games_won }}</span>:<span class="games-lost">{{ row.games_lost }}</span></td>
+                                    <td class="text-center {% if row.rating_delta_sum > 0 %}delta-positive{% elif row.rating_delta_sum < 0 %}delta-negative{% endif %}">{% if row.rating_delta_sum != 0 %}{{ row.rating_delta_sum|floatformat:1 }}{% else %}—{% endif %}</td>
+                                    <td class="small">
+                                        {% if row.destination == 'main' %}
+                                        <span class="text-success">→ Основная сетка</span>
+                                        {% elif row.destination == 'consolation' %}
+                                        <span class="text-warning">→ Утешительная</span>
+                                        {% else %}
+                                        <span class="text-secondary">—</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not_playoffs_yet %}
+    <div class="card mb-4 mt-5">
+        <div class="card-body">
+            <h2 class="section-title mb-4">Создание плей-офф и утешительной сетки</h2>
+            <p class="text-secondary small mb-4">Выберите формат и нажмите кнопку. Основную и утешительную сетку можно создавать по отдельности.</p>
+            <div class="row g-3">
+                {% if can_create_main %}
+                <div class="col-12 col-md-6">
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-2">Основная сетка</h3>
+                        <form action="{% url 'tournament_manage_intermediate_generate_main' slug=tournament.slug %}" method="post" class="d-flex flex-wrap gap-2 align-items-end">
+                            {% csrf_token %}
+                            <div class="flex-grow-1" style="min-width: 140px;">
+                                <label class="form-label small mb-1">Формат</label>
+                                <select name="format" class="form-select form-select-sm" style="min-width: 140px;">
+                                    <option value="olympic">Олимпийский (нокаут)</option>
+                                    <option value="circular">Круговой</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary flex-shrink-0" style="white-space: nowrap;">Создать основную сетку</button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+                {% if can_create_consolation %}
+                <div class="col-12 col-md-6">
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-2">Утешительная сетка</h3>
+                        <form action="{% url 'tournament_manage_intermediate_generate_consolation' slug=tournament.slug %}" method="post" class="d-flex flex-wrap gap-2 align-items-end">
+                            {% csrf_token %}
+                            <div class="flex-grow-1" style="min-width: 140px;">
+                                <label class="form-label small mb-1">Формат</label>
+                                <select name="format" class="form-select form-select-sm" style="min-width: 140px;">
+                                    <option value="olympic">Олимпийский (нокаут)</option>
+                                    <option value="circular">Круговой</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary flex-shrink-0" style="white-space: nowrap;">Создать утешительную сетку</button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'tournament_manage' slug=tournament.slug %}" class="btn btn-primary">Назад к управлению</a>
+    </div>
+</div>
+{% endblock %}

@@ -34,8 +34,8 @@ def reverse_add_stringers_menu_item(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('navigation', '0008_add_rules_menu_item'),
-        ('content', '0014_add_stringer_models'),
+        ("navigation", "0008_add_rules_menu_item"),
+        ("content", "0014_add_stringer_models"),
     ]
 
     operations = [

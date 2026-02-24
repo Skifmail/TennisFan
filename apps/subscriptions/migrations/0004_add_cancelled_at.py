@@ -6,18 +6,27 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('subscriptions', '0003_set_diamond_max_tournaments_to_100'),
+        ("subscriptions", "0003_set_diamond_max_tournaments_to_100"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='usersubscription',
-            name='cancelled_at',
-            field=models.DateTimeField(blank=True, help_text='Если заполнено — подписка отменена, но действует до end_date.', null=True, verbose_name='Дата отмены'),
+            model_name="usersubscription",
+            name="cancelled_at",
+            field=models.DateTimeField(
+                blank=True,
+                help_text="Если заполнено — подписка отменена, но действует до end_date.",
+                null=True,
+                verbose_name="Дата отмены",
+            ),
         ),
         migrations.AlterField(
-            model_name='subscriptiontier',
-            name='max_tournaments',
-            field=models.PositiveIntegerField(default=0, help_text='Количество турниров, на которые можно зарегистрироваться в месяц. 0 = регистрации запрещены.', verbose_name='Максимум турниров в месяц'),
+            model_name="subscriptiontier",
+            name="max_tournaments",
+            field=models.PositiveIntegerField(
+                default=0,
+                help_text="Количество турниров, на которые можно зарегистрироваться в месяц. 0 = регистрации запрещены.",
+                verbose_name="Максимум турниров в месяц",
+            ),
         ),
     ]

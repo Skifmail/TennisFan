@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sparring', '0003_alter_sparringrequest_desired_category'),
+        ("sparring", "0003_alter_sparringrequest_desired_category"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='sparringrequest',
-            name='city',
-            field=models.CharField(max_length=100, verbose_name='Город'),
+            model_name="sparringrequest",
+            name="city",
+            field=models.CharField(max_length=100, verbose_name="Город"),
         ),
     ]

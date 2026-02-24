@@ -21,10 +21,13 @@ class CourtRatingForm(forms.ModelForm):
 
 class CourtApplicationForm(forms.ModelForm):
     """Форма заявки на добавление корта. Поля совпадают с админкой ручного добавления."""
+
     agree_legal = forms.BooleanField(
         required=True,
         label="Согласие на обработку персональных данных",
-        error_messages={"required": "Необходимо согласиться с обработкой персональных данных."},
+        error_messages={
+            "required": "Необходимо согласиться с обработкой персональных данных."
+        },
     )
 
     class Meta:
@@ -51,7 +54,10 @@ class CourtApplicationForm(forms.ModelForm):
         )
         widgets = {
             "applicant_name": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "ФИО или название организации"}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "ФИО или название организации",
+                }
             ),
             "applicant_email": forms.EmailInput(
                 attrs={"class": "form-control", "placeholder": "email@example.com"}
@@ -60,7 +66,10 @@ class CourtApplicationForm(forms.ModelForm):
                 attrs={"class": "form-control", "placeholder": "+7XXXXXXXXXX"}
             ),
             "name": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Название корта или клуба"}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Название корта или клуба",
+                }
             ),
             "city": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Город"}
@@ -69,7 +78,11 @@ class CourtApplicationForm(forms.ModelForm):
                 attrs={"class": "form-control", "placeholder": "Улица, дом"}
             ),
             "description": forms.Textarea(
-                attrs={"class": "form-control", "rows": 3, "placeholder": "Краткое описание"}
+                attrs={
+                    "class": "form-control",
+                    "rows": 3,
+                    "placeholder": "Краткое описание",
+                }
             ),
             "surface": forms.Select(attrs={"class": "form-control"}),
             "courts_count": forms.NumberInput(
@@ -86,7 +99,9 @@ class CourtApplicationForm(forms.ModelForm):
             "website": forms.URLInput(
                 attrs={"class": "form-control", "placeholder": "https://..."}
             ),
-            "image": forms.FileInput(attrs={"class": "form-control", "accept": "image/*"}),
+            "image": forms.FileInput(
+                attrs={"class": "form-control", "accept": "image/*"}
+            ),
             "latitude": forms.NumberInput(
                 attrs={
                     "class": "form-control",
@@ -126,5 +141,7 @@ class CourtApplicationForm(forms.ModelForm):
     def clean_agree_legal(self) -> bool:
         """Проверка обязательного согласия на обработку персональных данных."""
         if not self.cleaned_data.get("agree_legal"):
-            raise ValidationError("Необходимо согласиться с обработкой персональных данных.")
+            raise ValidationError(
+                "Необходимо согласиться с обработкой персональных данных."
+            )
         return True

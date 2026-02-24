@@ -40,7 +40,9 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> str | None:
         dry_run: bool = options["dry_run"]
         players = Player.objects.filter(is_bye=False).only(
-            "pk", "total_points", "skill_level",
+            "pk",
+            "total_points",
+            "skill_level",
         )
 
         updated = 0
@@ -49,13 +51,13 @@ class Command(BaseCommand):
             # skill_level обновляется на основе текущего total_points
             # (который уже обновлён после каждого матча)
             new_skill_level = rating_to_skill_level(player.total_points)
-            
+
             if new_skill_level == player.skill_level:
                 skipped += 1
                 continue
 
             old_skill_level = player.skill_level
-            
+
             if dry_run:
                 self.stdout.write(
                     f"  [DRY-RUN] Player {player.pk}: "
@@ -67,9 +69,12 @@ class Command(BaseCommand):
                 player.save(update_fields=["skill_level"])
                 logger.info(
                     "Skill level updated: Player %s: %s → %s (rating: %.1f)",
-                    player.pk, old_skill_level, new_skill_level, player.total_points,
+                    player.pk,
+                    old_skill_level,
+                    new_skill_level,
+                    player.total_points,
                 )
-            
+
             updated += 1
 
         summary = (

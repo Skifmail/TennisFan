@@ -4,6 +4,7 @@ Webhook пользовательского Telegram-бота и редирект
 
 import json
 import logging
+import secrets
 from typing import Any, cast
 
 import requests
@@ -1791,7 +1792,7 @@ def user_bot_webhook(request):
             link = UserTelegramLink.objects.filter(binding_token=token).first()
             if link:
                 link.user_bot_chat_id = chat_id
-                link.binding_token = ""
+                link.binding_token = None
                 link.token_created_at = None
                 link.save(
                     update_fields=[
@@ -2077,7 +2078,11 @@ def connect_redirect(request):
 
     link, _ = UserTelegramLink.objects.get_or_create(
         user=request.user,
-        defaults={"telegram_chat_id": None, "user_bot_chat_id": None},
+        defaults={
+            "telegram_chat_id": None,
+            "user_bot_chat_id": None,
+            "binding_token": secrets.token_urlsafe(32),
+        },
     )
     token = link.get_or_create_binding_token()
     username = bot.get_bot_username()
@@ -2105,7 +2110,7 @@ def disconnect_user_bot(request):
         return redirect("profile", pk=request.user.player.pk)
 
     link.user_bot_chat_id = None
-    link.binding_token = ""
+    link.binding_token = None
     link.token_created_at = None
     link.save(update_fields=["user_bot_chat_id", "binding_token", "token_created_at"])
 

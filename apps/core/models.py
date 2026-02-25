@@ -44,8 +44,10 @@ class UserTelegramLink(models.Model):
         "Токен привязки (для t.me/bot?start=TOKEN)",
         max_length=64,
         blank=True,
+        null=True,
         unique=True,
         db_index=True,
+        help_text="Пусто/NULL = токен не выдан или уже использован. Уникален, чтобы один токен не привязал двух пользователей.",
     )
     token_created_at = models.DateTimeField("Когда создан токен", null=True, blank=True)
     created_at = models.DateTimeField("Создано", auto_now_add=True)

@@ -731,7 +731,7 @@ def telegram_support_webhook(request):
             link = UserTelegramLink.objects.filter(binding_token=token).first()
             if link:
                 link.telegram_chat_id = chat_id_int
-                link.binding_token = ""
+                link.binding_token = None
                 link.token_created_at = None
                 link.save(
                     update_fields=[

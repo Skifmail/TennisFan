@@ -88,7 +88,13 @@ class CourtApplicationForm(forms.ModelForm):
                     "placeholder": "Краткое описание",
                 }
             ),
-            "surface": forms.Select(attrs={"class": "form-control"}),
+            "surface": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Например: хард, грунт, трава",
+                    "maxlength": "100",
+                }
+            ),
             "courts_count": forms.NumberInput(
                 attrs={"class": "form-control", "min": 1, "max": 99}
             ),

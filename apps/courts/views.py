@@ -30,6 +30,13 @@ def court_list(request):
     if surface:
         courts = courts.filter(surface=surface)
 
+    surface_choices = list(
+        Court.objects.filter(is_active=True)
+        .values_list("surface", flat=True)
+        .distinct()
+        .order_by("surface")
+    )
+
     courts = list(courts)
     for c in courts:
         avg_rating = c.average_rating
@@ -42,6 +49,7 @@ def court_list(request):
         "courts": courts,
         "current_city": city,
         "current_surface": surface,
+        "surface_choices": surface_choices,
     }
     return render(request, "courts/list.html", context)
 

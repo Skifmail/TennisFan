@@ -247,8 +247,10 @@ def tournament_list(request):
     category = request.GET.get("category", "")
     status = request.GET.get("status", "")
 
-    tournaments = Tournament.objects.all().prefetch_related(
-        "participants__user", "allowed_categories"
+    tournaments = (
+        Tournament.objects.all()
+        .select_related("court")
+        .prefetch_related("participants__user", "allowed_categories")
     )
 
     if city:
@@ -283,7 +285,7 @@ def tournament_detail(request, slug):
     check_and_generate_past_deadline_brackets()
 
     tournament = get_object_or_404(
-        Tournament.objects.prefetch_related(
+        Tournament.objects.select_related("court").prefetch_related(
             "matches__player1__user",
             "matches__player2__user",
             "matches__winner__user",

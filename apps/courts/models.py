@@ -11,15 +11,6 @@ from django.utils.text import slugify
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
 
-class CourtSurface(models.TextChoices):
-    """Court surface types."""
-
-    HARD = "hard", "Хард"
-    CLAY = "clay", "Грунт"
-    GRASS = "grass", "Трава"
-    INDOOR = "indoor", "Закрытый хард"
-
-
 class Court(CompressImageFieldsMixin, models.Model):
     """Tennis court / club model."""
 
@@ -32,9 +23,8 @@ class Court(CompressImageFieldsMixin, models.Model):
 
     surface = models.CharField(
         "Покрытие",
-        max_length=20,
-        choices=CourtSurface.choices,
-        default=CourtSurface.HARD,
+        max_length=100,
+        help_text="Например: хард, грунт, трава. Заполняется заявителем при подаче заявки.",
     )
     courts_count = models.PositiveSmallIntegerField("Количество кортов", default=1)
     has_lighting = models.BooleanField("Освещение", default=True)
@@ -133,9 +123,8 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
 
     surface = models.CharField(
         "Покрытие",
-        max_length=20,
-        choices=CourtSurface.choices,
-        default=CourtSurface.HARD,
+        max_length=100,
+        help_text="Например: хард, грунт, трава. Укажите вручную.",
     )
     courts_count = models.PositiveSmallIntegerField("Количество кортов", default=1)
     has_lighting = models.BooleanField("Освещение", default=True)

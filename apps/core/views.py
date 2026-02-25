@@ -108,12 +108,17 @@ def _build_recent_matches(limit: int = 10, days: int = 5):
 
 def home(request):
     """Home page view. Формирование сеток по дедлайну выполняется по cron (generate_brackets_past_deadlines)."""
-    tournaments = Tournament.objects.filter(
-        status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE]
-    ).prefetch_related("participants__user", "allowed_categories")
+    tournaments = (
+        Tournament.objects.filter(
+            status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE]
+        )
+        .select_related("court")
+        .prefetch_related("participants__user", "allowed_categories")
+    )
 
     upcoming_tournaments = (
         Tournament.objects.filter(status=TournamentStatus.UPCOMING)
+        .select_related("court")
         .prefetch_related("allowed_categories")
         .order_by("start_date")[:6]
     )

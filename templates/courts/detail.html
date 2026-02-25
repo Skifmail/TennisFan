@@ -56,7 +56,7 @@
                 <dd>{% if court.is_indoor %}Закрытые{% else %}Открытые{% endif %}</dd>
 
                 <dt>Тип покрытия</dt>
-                <dd>{{ court.get_surface_display }}</dd>
+                <dd>{{ court.surface }}</dd>
 
                 {% if court.price_per_hour %}
                 <dt>Цена</dt>

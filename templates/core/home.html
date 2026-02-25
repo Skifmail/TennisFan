@@ -269,7 +269,7 @@
                     {% endfor %}
                     <h3 class="card-title">{{ tournament.name }}</h3>
                     <p class="card-text">
-                        {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
+                        {{ tournament.city }}{% if tournament.court %} • {{ tournament.court.name }}{% endif %} • {{ tournament.start_date|date:"d.m.Y" }}
                     </p>
                 </div>
             </a>

@@ -59,6 +59,17 @@
         {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
         {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
     </p>
+
+    {% if tournament.court %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h3 class="section-title mb-2">Место проведения</h3>
+            <p class="mb-1"><strong>{{ tournament.court.name }}</strong></p>
+            <p class="text-secondary mb-1">{{ tournament.court.address }}{% if tournament.court.surface %} • {{ tournament.court.surface }}{% endif %}</p>
+            <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="btn btn-outline btn-sm">Подробнее о корте</a>
+        </div>
+    </div>
+    {% endif %}
     
     {% if tournament.description %}
     <div class="card mb-4">

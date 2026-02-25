@@ -109,6 +109,15 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     slug = models.SlugField("URL", unique=True)
     description = models.TextField("Описание", blank=True)
     city = models.CharField("Город", max_length=100)
+    court = models.ForeignKey(
+        "courts.Court",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tournaments",
+        verbose_name="Корт",
+        help_text="Площадка проведения турнира (опционально).",
+    )
 
     # Subscription & Entry Fee fields
     entry_fee = models.DecimalField(

@@ -207,6 +207,7 @@ class TournamentAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "city",
+        "court",
         "format",
         "variant",
         "tournament_type",
@@ -249,6 +250,7 @@ class TournamentAdmin(admin.ModelAdmin):
                     "entry_fee",
                     "is_one_day",
                     "city",
+                    "court",
                     "gender",
                     "allowed_categories",
                     "tournament_type",
@@ -393,6 +395,7 @@ class TVDTournamentAdmin(admin.ModelAdmin):
                     "entry_fee",
                     "is_one_day",
                     "city",
+                    "court",
                     "gender",
                     "allowed_categories",
                     "tournament_type",

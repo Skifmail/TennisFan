@@ -179,6 +179,14 @@ class TournamentAdminForm(forms.ModelForm):
                 "Категория «Микст» доступна только для парных турниров. "
                 "Для одиночных используйте «Смешанный» (любой пол)."
             )
+        # Многодневный турнир: обязателен вступительный взнос (для регистрации по подписке или по оплате)
+        is_one_day = cleaned_data.get("is_one_day")
+        entry_fee = cleaned_data.get("entry_fee")
+        if is_one_day is False and (entry_fee is None or float(entry_fee or 0) <= 0):
+            raise ValidationError(
+                "Для многодневного турнира укажите сумму вступительного взноса (руб). "
+                "По подписке игроки регистрируются бесплатно в рамках лимита; без подписки или при исчерпанном лимите — оплата взноса."
+            )
         return cleaned_data
 
 
@@ -349,10 +357,34 @@ class TVDGroupInline(admin.TabularInline):
 
 
 class TVDTournamentAdminForm(TournamentAdminForm):
-    """Форма ТВД без поля format (выставляется автоматически)."""
+    """Форма ТВД: format и is_one_day выставляются автоматически, добавлено поле «Бесплатный»."""
+
+    is_free = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Бесплатный",
+        help_text="Если отмечено — взнос 0 ₽, регистрироваться могут все желающие (с учётом категорий). Иначе обязательно укажите сумму взноса.",
+    )
 
     class Meta(TournamentAdminForm.Meta):
-        exclude = ("format",)
+        exclude = ("format", "is_one_day")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and (self.instance.entry_fee or 0) == 0:
+            self.fields["is_free"].initial = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        is_free = cleaned_data.get("is_free")
+        entry_fee = cleaned_data.get("entry_fee")
+        if is_free:
+            cleaned_data["entry_fee"] = 0
+        elif entry_fee is None or (entry_fee is not None and float(entry_fee) <= 0):
+            raise ValidationError(
+                "Укажите сумму взноса (руб) или отметьте «Бесплатный»."
+            )
+        return cleaned_data
 
 
 @admin.register(TVDTournament)
@@ -392,8 +424,8 @@ class TVDTournamentAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "variant",
+                    "is_free",
                     "entry_fee",
-                    "is_one_day",
                     "city",
                     "court",
                     "gender",
@@ -434,7 +466,10 @@ class TVDTournamentAdmin(admin.ModelAdmin):
         from .models import TournamentDuration, TournamentFormat
 
         obj.format = TournamentFormat.WEEKEND_DAY
-        obj.duration = TournamentDuration.WEEKEND
+        obj.is_one_day = True  # ТВД всегда однодневный
+        obj.duration = TournamentDuration.SINGLE_DAY
+        if form.cleaned_data.get("is_free"):
+            obj.entry_fee = 0
         super().save_model(request, obj, form, change)
         selected = form.cleaned_data.get("allowed_categories") or []
         obj.allowed_categories.all().delete()

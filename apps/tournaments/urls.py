@@ -23,6 +23,11 @@ urlpatterns = [
         "<slug:slug>/register/", views.tournament_register, name="tournament_register"
     ),
     path(
+        "<slug:slug>/register/required/",
+        views.tournament_register_required,
+        name="tournament_register_required",
+    ),
+    path(
         "<slug:slug>/register/doubles/",
         views.tournament_register_doubles,
         name="tournament_register_doubles",

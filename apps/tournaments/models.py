@@ -49,10 +49,10 @@ class TournamentDuration(models.TextChoices):
 class TournamentFormat(models.TextChoices):
     """Формат проведения турнира."""
 
-    SINGLE_ELIMINATION = "single_elimination", "Одноэтапная сетка"
+    SINGLE_ELIMINATION = "single_elimination", "Олимпийский (до 1 поражения)"
     OLYMPIC_CONSOLATION = (
         "olympic_consolation",
-        "Олимпийская система (утешительная сетка)",
+        "Олимпийский (за все места)",
     )
     ROUND_ROBIN = "round_robin", "Круговой"
     WEEKEND_DAY = "weekend_day", "Турнир выходного дня"
@@ -318,7 +318,9 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     def save(self, *args, **kwargs):
         from django.utils import timezone
 
-        self.duration = TournamentDuration.MULTI_DAY
+        # ТВД (format=weekend_day) задаёт duration в админке; остальные — многодневные
+        if getattr(self, "format", None) != TournamentFormat.WEEKEND_DAY:
+            self.duration = TournamentDuration.MULTI_DAY
         if self.registration_deadline and self.insufficient_participants_notified_at:
             if self.registration_deadline > timezone.now():
                 self.insufficient_participants_notified_at = None

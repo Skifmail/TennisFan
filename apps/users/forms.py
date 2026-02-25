@@ -193,6 +193,35 @@ class PlayerProfileForm(forms.ModelForm):
                 if choices and choices[0][0] != "":
                     f.choices = [("", "———")] + choices
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        cleaned_data = super().clean()
+        if not self.user:
+            return cleaned_data
+        city = (cleaned_data.get("city") or "").strip()
+        if not city:
+            return cleaned_data
+        from apps.subscriptions.utils import normalize_city_for_pricing
+
+        new_city_norm = normalize_city_for_pricing(city)
+        if new_city_norm != "moscow":
+            return cleaned_data
+        try:
+            sub = self.user.subscription
+            if (
+                not sub.is_valid()
+                or not sub.purchase_city
+                or sub.purchase_city == "moscow"
+            ):
+                return cleaned_data
+        except Exception:
+            return cleaned_data
+        raise ValidationError(
+            "Нельзя сменить город на Москву: у вас активна подписка по региональному тарифу. "
+            "Дождитесь окончания подписки или отмените её в профиле, после этого можно будет сменить город."
+        )
+
     def save(self, commit=True):
         player = super().save(commit=False)
         if self.user:

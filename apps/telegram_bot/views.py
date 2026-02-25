@@ -111,7 +111,7 @@ def _get_client_ip(request) -> str | None:
 REPLY_BTN_MY_PROFILE = "👤 Мой профиль"
 REPLY_BTN_MY_MATCHES = "🎾 Мои матчи"
 REPLY_BTN_MY_SUBSCRIPTIONS = "📋 Мои подписки"
-REPLY_BTN_PRIVATE_CHAT = "💬 Закрытый чат"
+REPLY_BTN_PRIVATE_CHAT = "💬 Чат игроков"
 REPLY_BTN_GO_TO_SITE = "🌐 Перейти на сайт"
 REPLY_BTN_SPARRING = "🎾 Спарринг"
 REPLY_BTN_SPARRING_MY_REQUESTS = "📝 Мои заявки"
@@ -172,7 +172,7 @@ def _main_menu_keyboard(site_base_url: str):
             ],
             [
                 {"text": "📋 Моя подписка", "callback_data": "menu_my_subscription"},
-                {"text": "💬 Закрытый чат", "callback_data": "menu_private_chat"},
+                {"text": "💬 Чат игроков", "callback_data": "menu_private_chat"},
             ],
             [
                 {"text": "🌐 На сайт", "url": site_base_url.rstrip("/")},
@@ -1672,33 +1672,49 @@ def _handle_menu_callback_action(
                     ]
                 }
         else:
-            # Используем chat_id канала для создания одноразовой ссылки
-            from apps.telegram_bot.services import _get_private_chat_channel_id
-
-            channel_chat_id = _get_private_chat_channel_id()
-            invite_link = bot.create_private_chat_invite_link(
-                expire_seconds=1800, member_limit=1, chat_id=channel_chat_id
-            )
-            if invite_link:
+            # Та же ссылка на чат, что закреплена в футере сайта (TELEGRAM_PUBLIC_COMMUNITY_URL)
+            community_url = (
+                getattr(settings, "TELEGRAM_PUBLIC_COMMUNITY_URL", None) or ""
+            ).strip()
+            if community_url:
                 text = (
                     "💬 <b>Закрытый канал сообщества</b>\n\n"
                     "✅ Доступ подтверждён.\n"
-                    "Ниже ваша персональная ссылка для входа в канал @TennisFanru.\n\n"
-                    "⚠️ Ссылка одноразовая и действует 30 минут."
+                    "Перейдите по ссылке ниже"
                 )
                 reply_markup = {
                     "inline_keyboard": [
-                        [{"text": "➡️ Войти в закрытый канал", "url": invite_link}]
+                        [{"text": "➡️ Чат игроков", "url": community_url}]
                     ]
                 }
             else:
-                text = (
-                    "⚠️ <b>Не удалось создать приглашение в канал</b>\n\n"
-                    "Попробуйте ещё раз через минуту. Если ошибка повторяется, обратитесь в поддержку."
+                # Fallback: одноразовая ссылка через API, если URL не задан
+                from apps.telegram_bot.services import _get_private_chat_channel_id
+
+                channel_chat_id = _get_private_chat_channel_id()
+                invite_link = bot.create_private_chat_invite_link(
+                    expire_seconds=1800, member_limit=1, chat_id=channel_chat_id
                 )
+                if invite_link:
+                    text = (
+                        "💬 <b>Закрытый канал сообщества</b>\n\n"
+                        "✅ Доступ подтверждён.\n"
+                        "Ниже ваша персональная ссылка для входа в канал.\n\n"
+                        "⚠️ Ссылка одноразовая и действует 30 минут."
+                    )
+                    reply_markup = {
+                        "inline_keyboard": [
+                            [{"text": "➡️ Войти в закрытый канал", "url": invite_link}]
+                        ]
+                    }
+                else:
+                    text = (
+                        "⚠️ <b>Не удалось создать приглашение в канал</b>\n\n"
+                        "Попробуйте ещё раз через минуту. Если ошибка повторяется, обратитесь в поддержку."
+                    )
 
         ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
-        _answer("Закрытый канал" if ok else "Ошибка отправки")
+        _answer("Чат игроков" if ok else "Ошибка отправки")
         if not ok:
             logger.warning(
                 "menu_private_chat: send_message failed for chat_id=%s", chat_id

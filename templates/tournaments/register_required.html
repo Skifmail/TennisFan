@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Регистрация на {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 560px; padding-top: var(--spacing-2xl);">
+    <div class="mb-4">
+        <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="text-secondary">&larr; К турниру</a>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <h1 class="card-title" style="margin-bottom: var(--spacing-md);">Регистрация на многодневный турнир</h1>
+            <p class="text-secondary mb-4">
+                Для участия в турнире «{{ tournament.name }}» нужна действующая подписка с доступным лимитом регистраций
+                либо оплата вступительного взноса.
+            </p>
+            <p class="mb-4">
+                <strong>Вступительный взнос:</strong> {{ entry_fee|floatformat:0|intcomma }} ₽
+            </p>
+            <div class="d-flex flex-column gap-3">
+                <a href="{{ payment_url }}" class="btn btn-primary">
+                    Оплатить взнос {{ entry_fee|floatformat:0|intcomma }} ₽
+                </a>
+                <a href="{% url 'pricing' %}?next={% url 'tournament_register' slug=tournament.slug %}" class="btn btn-outline">
+                    Оформить подписку
+                </a>
+            </div>
+            <p class="text-muted mt-4 mb-0" style="font-size: var(--font-size-sm);">
+                По подписке регистрация на многодневные турниры входит в лимит (без доп. оплаты). После оформления подписки вернитесь на страницу турнира и нажмите «Записаться» снова.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

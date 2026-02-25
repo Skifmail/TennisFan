@@ -46,11 +46,12 @@ FILE_LOG_FORMAT = (
 # Уровень логирования из переменной окружения (по умолчанию INFO)
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
-# Добавляем обработчик для консоли (только в DEBUG режиме или если указано)
-if (
-    os.environ.get("DEBUG", "False") == "True"
-    or os.environ.get("LOG_TO_CONSOLE", "False") == "True"
-):
+# Вывод логов в терминал: при DEBUG или LOG_TO_CONSOLE=True
+_LOG_TO_CONSOLE = (
+    os.environ.get("DEBUG", "False").lower() == "true"
+    or os.environ.get("LOG_TO_CONSOLE", "False").lower() == "true"
+)
+if _LOG_TO_CONSOLE:
     logger.add(
         sys.stderr,
         format=LOG_FORMAT,

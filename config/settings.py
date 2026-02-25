@@ -361,6 +361,17 @@ LOGOUT_REDIRECT_URL = "home"
 # ------------------------------------------------------------------------------
 # LOGGING
 # ------------------------------------------------------------------------------
+# Вывод в терминал при DEBUG или LOG_TO_CONSOLE=True (для отладки NTRP и др.)
+_LOG_TO_CONSOLE = DEBUG or (os.environ.get("LOG_TO_CONSOLE", "False").lower() == "true")
+_ROOT_HANDLERS = ["file_info", "file_warnings", "file_errors"]
+_APPS_HANDLERS = ["file_info", "file_warnings", "file_errors"]
+if _LOG_TO_CONSOLE:
+    _ROOT_HANDLERS = _APPS_HANDLERS = [
+        "console",
+        "file_info",
+        "file_warnings",
+        "file_errors",
+    ]
 
 LOGGING = {
     "version": 1,
@@ -419,12 +430,12 @@ LOGGING = {
         },
     },
     "root": {
-        "handlers": ["file_info", "file_warnings", "file_errors"],
+        "handlers": _ROOT_HANDLERS,
         "level": "INFO",
     },
     "loggers": {
         "django": {
-            "handlers": ["file_info", "file_warnings", "file_errors"],
+            "handlers": _ROOT_HANDLERS,
             "level": "INFO",
             "propagate": False,
         },
@@ -439,22 +450,22 @@ LOGGING = {
             "propagate": False,
         },
         "apps.tournaments": {
-            "handlers": ["file_info", "file_warnings", "file_errors"],
+            "handlers": _APPS_HANDLERS,
             "level": "INFO",
             "propagate": False,
         },
         "apps.users": {
-            "handlers": ["file_info", "file_warnings", "file_errors"],
+            "handlers": _APPS_HANDLERS,
             "level": "INFO",
             "propagate": False,
         },
         "apps.sparring": {
-            "handlers": ["file_info", "file_warnings", "file_errors"],
+            "handlers": _APPS_HANDLERS,
             "level": "INFO",
             "propagate": False,
         },
         "apps.telegram_bot": {
-            "handlers": ["file_info", "file_warnings", "file_errors"],
+            "handlers": _APPS_HANDLERS,
             "level": "INFO",
             "propagate": False,
         },

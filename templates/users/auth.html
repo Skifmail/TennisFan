@@ -97,21 +97,30 @@
                         </div>
                     </div>
 
-                    <!-- Этап 2: Калькулятор уровня силы -->
+                    <!-- Этап 2: Уровень силы (ручной ввод или калькулятор) -->
                     <div class="register-step register-step-2 hidden" id="register-step-2">
-                        <h3 class="register-step-title">Шаг 2. Тест уровня силы</h3>
-                        <p class="text-secondary register-form-ntrp-note">Пройдите тест и нажмите «Рассчитать», затем
-                            нажмите «Зарегистрироваться».</p>
-                        {{ register_form.ntrp_level }}
-                        <div class="register-step-ntrp">
+                        <h3 class="register-step-title">Шаг 2. Уровень силы</h3>
+                        <p class="text-secondary register-form-ntrp-note">Укажите свой уровень или пройдите калькулятор, если не уверены.</p>
+                        <div class="form-group">
+                            <label class="form-label" for="id_ntrp_level">Как вы оцениваете свой уровень силы (NTRP):</label>
+                            {{ register_form.ntrp_level }}
+                            {% if register_form.ntrp_level.help_text %}
+                            <p class="form-help text-secondary">{{ register_form.ntrp_level.help_text }}</p>
+                            {% endif %}
+                            {% for err in register_form.ntrp_level.errors %}<p class="text-error form-error">{{ err }}</p>{% endfor %}
+                        </div>
+                        <div class="register-step-actions register-step-actions-two" style="margin-top: 1rem;">
+                            <button type="button" class="btn btn-outline" id="register-btn-back">← Назад</button>
+                            <button type="submit" class="btn btn-primary btn-lg register-form-submit">Зарегистрироваться</button>
+                        </div>
+                        <div class="register-ntrp-calc-toggle" style="margin-top: 1.5rem;">
+                            <p class="text-secondary mb-1">Не знаете свой уровень?</p>
+                            <button type="button" class="btn btn-outline btn-sm" id="register-btn-toggle-calc" aria-expanded="false">Открыть калькулятор уровня силы</button>
+                        </div>
+                        <div class="register-step-ntrp hidden" id="register-ntrp-quiz-wrap" aria-hidden="true">
                             {% include 'users/_ntrp_quiz.html' with can_save=False form_target='id_ntrp_level' %}
                         </div>
                         <div class="field-error" id="ntrp-error"></div>
-                        <div class="register-step-actions register-step-actions-two">
-                            <button type="button" class="btn btn-outline" id="register-btn-back">← Назад</button>
-                            <button type="submit"
-                                class="btn btn-primary btn-lg register-form-submit">Зарегистрироваться</button>
-                        </div>
                     </div>
                 </form>
             </div>
@@ -312,12 +321,28 @@
             });
         }
 
+        var quizWrap = document.getElementById('register-ntrp-quiz-wrap');
+        var btnToggleCalc = document.getElementById('register-btn-toggle-calc');
+        if (btnToggleCalc && quizWrap) {
+            btnToggleCalc.addEventListener('click', function () {
+                var isHidden = quizWrap.classList.contains('hidden');
+                quizWrap.classList.toggle('hidden', !isHidden);
+                quizWrap.setAttribute('aria-hidden', isHidden ? 'false' : 'true');
+                btnToggleCalc.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+                btnToggleCalc.textContent = isHidden ? 'Скрыть калькулятор' : 'Открыть калькулятор уровня силы';
+            });
+        }
+
         if (form) {
             form.addEventListener('submit', function (e) {
                 if (!step2 || !step2.classList.contains('hidden')) {
                     hideError(ntrpError);
-                    var nv = ntrpField ? (ntrpField.value || '').trim() : '';
-                    if (!nv || nv < 1 || nv > 7) { showError(ntrpError, 'Пройдите тест уровня силы и нажмите «Рассчитать».'); e.preventDefault(); }
+                    var nv = (ntrpField && ntrpField.value) ? ntrpField.value.trim() : '';
+                    var num = parseFloat(nv.replace(',', '.'));
+                    if (!nv || isNaN(num) || num < 1.5 || num > 7) {
+                        showError(ntrpError, 'Укажите уровень силы от 1.5 до 7.0 (например 3.7).');
+                        e.preventDefault();
+                    }
                 }
             });
         }

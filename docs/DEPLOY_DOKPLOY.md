@@ -125,7 +125,7 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 |------------|-------------------|
 | `SECRET_KEY` | Длинная случайная строка (Django). Если в строке есть символ `$`, в Dokploy замените его на `$$`, иначе Compose будет трактовать `$буквы` как переменную (например `$iu` → предупреждение и пустая подстановка). |
 | `ALLOWED_HOSTS` | `tennisfan.ru,www.tennisfan.ru` |
-| `CSRF_TRUSTED_ORIGINS` | `https://tennisfan.ru,https://www.tennisfan.ru` |
+| `CSRF_TRUSTED_ORIGINS` | Обязательно оба: `https://tennisfan.ru,https://www.tennisfan.ru` (иначе на мобильных возможна 403 при входе). |
 | `POSTGRES_DB` | `tennisfan` |
 | `POSTGRES_USER` | `tennisfan` |
 | `POSTGRES_PASSWORD` | Надёжный пароль БД |

@@ -63,7 +63,11 @@ class CourtApplicationForm(forms.ModelForm):
                 attrs={"class": "form-control", "placeholder": "email@example.com"}
             ),
             "applicant_phone": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "+7XXXXXXXXXX"}
+                attrs={
+                    "class": "form-control js-phone-input",
+                    "placeholder": "+7",
+                    "autocomplete": "tel",
+                }
             ),
             "name": forms.TextInput(
                 attrs={
@@ -91,10 +95,18 @@ class CourtApplicationForm(forms.ModelForm):
             "has_lighting": forms.CheckboxInput(attrs={"class": "form-checkbox"}),
             "is_indoor": forms.CheckboxInput(attrs={"class": "form-checkbox"}),
             "phone": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Телефон корта"}
+                attrs={
+                    "class": "form-control js-phone-input",
+                    "placeholder": "+7",
+                    "autocomplete": "tel",
+                }
             ),
             "whatsapp": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "+7XXXXXXXXXX"}
+                attrs={
+                    "class": "form-control js-phone-input",
+                    "placeholder": "+7",
+                    "autocomplete": "tel",
+                }
             ),
             "website": forms.URLInput(
                 attrs={"class": "form-control", "placeholder": "https://..."}

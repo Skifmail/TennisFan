@@ -107,7 +107,11 @@ class CoachApplicationForm(forms.ModelForm):
                 attrs={"class": "form-control", "placeholder": "email@example.com"}
             ),
             "applicant_phone": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "+7XXXXXXXXXX"}
+                attrs={
+                    "class": "form-control js-phone-input",
+                    "placeholder": "+7",
+                    "autocomplete": "tel",
+                }
             ),
             "name": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Как вас представлять"}
@@ -132,13 +136,21 @@ class CoachApplicationForm(forms.ModelForm):
                 }
             ),
             "phone": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Телефон для связи"}
+                attrs={
+                    "class": "form-control js-phone-input",
+                    "placeholder": "+7",
+                    "autocomplete": "tel",
+                }
             ),
             "telegram": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "@username"}
             ),
             "whatsapp": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "+7XXXXXXXXXX"}
+                attrs={
+                    "class": "form-control js-phone-input",
+                    "placeholder": "+7",
+                    "autocomplete": "tel",
+                }
             ),
             "max_contact": forms.TextInput(
                 attrs={

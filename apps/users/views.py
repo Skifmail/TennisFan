@@ -18,6 +18,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from apps.core.decorators import login_required_with_message
@@ -289,8 +290,11 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
     return result
 
 
+@never_cache
 def auth(request):
-    """Объединённая страница регистрации и входа с анимацией переключения."""
+    """Объединённая страница регистрации и входа с анимацией переключения.
+    never_cache предотвращает кэширование страницы (и устаревание CSRF-токена) — иначе на мобильных возможна 403 CSRF.
+    """
     # Определяем активный режим из GET параметра или по умолчанию register
     active_mode = request.GET.get("mode", "register")
     if active_mode not in ("register", "login"):
@@ -327,7 +331,11 @@ def auth(request):
                 from apps.core.telegram_notify import notify_new_registration
 
                 notify_new_registration(user, player)
-                login(request, user)
+                login(
+                    request,
+                    user,
+                    backend="django.contrib.auth.backends.ModelBackend",
+                )
                 messages.success(request, "Регистрация успешна! Добро пожаловать.")
                 return redirect("home")
         elif "username" in request.POST and "password" in request.POST:

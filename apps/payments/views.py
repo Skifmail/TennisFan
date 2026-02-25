@@ -288,16 +288,27 @@ def payment_success(request):
                 from apps.subscriptions.models import UserSubscription
                 from apps.subscriptions.views import _mark_user_paid_subscription
 
-                sub, _ = UserSubscription.objects.get_or_create(
+                sub, created = UserSubscription.objects.get_or_create(
                     user=request.user,
                     defaults={"tier": tier, "end_date": timezone.now()},
                 )
                 sub.tier = tier
-                sub.start_date = timezone.now()
-                sub.end_date = sub.start_date + relativedelta(months=1)
                 sub.is_active = True
                 sub.cancelled_at = None
-                sub.tournaments_registered_count = 0
+                now = timezone.now()
+                if created:
+                    sub.start_date = now
+                    sub.end_date = now + relativedelta(months=1)
+                    sub.tournaments_registered_count = 0
+                else:
+                    base = sub.end_date if sub.end_date and sub.end_date > now else now
+                    sub.end_date = base + relativedelta(months=1)
+                from apps.subscriptions.utils import normalize_city_for_pricing
+
+                city = getattr(request.user, "player", None) and getattr(
+                    request.user.player, "city", None
+                )
+                sub.purchase_city = normalize_city_for_pricing(city or "")
                 sub.save()
                 _mark_user_paid_subscription(request.user)
                 messages.success(

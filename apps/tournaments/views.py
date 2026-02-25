@@ -2417,9 +2417,15 @@ def confirm_proposal(request, pk):
 
 
 def _tournament_requires_entry_payment(tournament) -> bool:
-    """Турнир с вступительным взносом: при регистрации требуется оплата (полная или со скидкой по подписке)."""
+    """Турнир с вступительным взносом: при регистрации возможна оплата взноса (если нет подписки/лимита)."""
     fee = getattr(tournament, "entry_fee", None) or 0
     return bool(fee and float(fee) > 0)
+
+
+# Сообщение для редиректа на страницу «оплатить взнос или оформить подписку»
+REGISTER_PAY_OR_SUBSCRIBE_MSG = (
+    "Для регистрации оплатите вступительный взнос или оформите подписку."
+)
 
 
 def _tournament_does_not_consume_subscription_limit(tournament) -> bool:
@@ -2467,10 +2473,17 @@ def _check_tournament_registration_eligibility(request, tournament, player):
     if is_admin:
         return True, None
 
-    # Однодневные и турниры с взносом: подписка не обязательна, лимит не тратится (оплата отдельно)
-    if tournament.is_one_day or _tournament_requires_entry_payment(tournament):
+    # Однодневные: подписка не обязательна (взнос оплачивается отдельно)
+    if tournament.is_one_day:
         return True, None
 
+    # Многодневные с взносом: по подписке в рамках лимита — бесплатно; иначе — оплата взноса или оформление подписки
+    if _tournament_requires_entry_payment(tournament):
+        if sub and sub.is_valid() and sub.can_register_for_tournament():
+            return True, None
+        return False, REGISTER_PAY_OR_SUBSCRIBE_MSG
+
+    # Многодневные без взноса (не должно быть при валидации в админке): требуем подписку
     if not sub or not sub.is_active:
         return False, "Для участия в многодневных турнирах требуется подписка."
 
@@ -2614,14 +2627,16 @@ def tournament_register(request, slug):
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         messages.error(request, err)
+        if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
+            return redirect("tournament_register_required", slug=tournament.slug)
         if "подписк" in (err or ""):
             return redirect("pricing")
         return redirect("tournament_detail", slug=tournament.slug)
 
     is_admin = request.user.is_superuser or request.user.is_staff
 
-    # Турнир с вступительным взносом: все (с подпиской и без) переходят на страницу оплаты
-    if _tournament_requires_entry_payment(tournament):
+    # Однодневный с взносом: все переходят на страницу оплаты
+    if _tournament_requires_entry_payment(tournament) and tournament.is_one_day:
         from urllib.parse import urlencode
 
         from django.urls import reverse
@@ -2665,6 +2680,34 @@ def tournament_register(request, slug):
 
 @login_required
 @require_filled_profile
+def tournament_register_required(request, slug):
+    """Страница выбора: оплатить вступительный взнос или оформить подписку (для многодневного турнира)."""
+    tournament = get_object_or_404(Tournament, slug=slug)
+    if tournament.is_one_day:
+        return redirect("tournament_register", slug=slug)
+    fee = (tournament.entry_fee or 0) if hasattr(tournament, "entry_fee") else 0
+    from urllib.parse import urlencode
+
+    from django.urls import reverse
+
+    payment_url = (
+        reverse("payment_preview")
+        + "?"
+        + urlencode({"type": "tournament", "id": tournament.id})
+    )
+    return render(
+        request,
+        "tournaments/register_required.html",
+        {
+            "tournament": tournament,
+            "entry_fee": fee,
+            "payment_url": payment_url,
+        },
+    )
+
+
+@login_required
+@require_filled_profile
 def tournament_register_doubles(request, slug):
     """Регистрация на парный турнир: solo, с партнёром или присоединение к существующей паре."""
 
@@ -2700,12 +2743,14 @@ def tournament_register_doubles(request, slug):
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         messages.error(request, err)
+        if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
+            return redirect("tournament_register_required", slug=slug)
         if err and "подписк" in err:
             return redirect("pricing")
         return redirect("tournament_detail", slug=slug)
 
-    # Турнир с взносом: без оплаты (по сессии) не показываем форму — редирект на страницу оплаты
-    if _tournament_requires_entry_payment(tournament):
+    # Однодневный с взносом: без оплаты (по сессии) не показываем форму — редирект на оплату
+    if _tournament_requires_entry_payment(tournament) and tournament.is_one_day:
         paid_ids = request.session.get("tournament_entry_paid") or []
         if tournament.id not in paid_ids:
             from urllib.parse import urlencode
@@ -2856,6 +2901,8 @@ def _do_join_team(request, tournament, player, team):
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         messages.error(request, err)
+        if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
+            return redirect("tournament_register_required", slug=tournament.slug)
         return redirect("tournament_detail", slug=tournament.slug)
 
     # Проверка пола для микст-турниров
@@ -2940,6 +2987,8 @@ def _do_add_partner(request, tournament, player, partner_id):
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         messages.error(request, err)
+        if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
+            return redirect("tournament_register_required", slug=tournament.slug)
         return redirect("tournament_detail", slug=tournament.slug)
 
     partner_ok, partner_err = _check_user_can_register_for_tournament(

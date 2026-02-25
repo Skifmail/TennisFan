@@ -1,5 +1,6 @@
 import logging
 
+from dateutil.relativedelta import relativedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
@@ -9,6 +10,7 @@ from django.views.decorators.http import require_POST
 from apps.core.decorators import login_required_with_message, require_filled_profile
 
 from .models import SubscriptionTier, UserSubscription
+from .utils import normalize_city_for_pricing
 
 logger = logging.getLogger(__name__)
 
@@ -143,11 +145,21 @@ def buy_subscription(request, tier_id):
     )
 
     sub.tier = tier
-    sub.start_date = timezone.now()
-    sub.end_date = sub.start_date  # Will be updated by save() logic
     sub.is_active = True
-    sub.cancelled_at = None  # Сбрасываем отмену при покупке / возобновлении
-    sub.tournaments_registered_count = 0
+    sub.cancelled_at = None
+    now = timezone.now()
+    if created:
+        sub.start_date = now
+        sub.end_date = now + relativedelta(months=1)
+        sub.tournaments_registered_count = 0
+    else:
+        # Продление: прибавить месяц от даты окончания (или от сейчас, если истекла)
+        base = sub.end_date if sub.end_date and sub.end_date > now else now
+        sub.end_date = base + relativedelta(months=1)
+    city = getattr(request.user, "player", None) and getattr(
+        request.user.player, "city", None
+    )
+    sub.purchase_city = normalize_city_for_pricing(city or "")
     sub.save()
 
     _mark_user_paid_subscription(request.user)

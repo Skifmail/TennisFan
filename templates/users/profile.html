@@ -37,7 +37,7 @@
                     <p><strong>Дата рождения:</strong> {{ player.birth_date|date:"d.m.Y" }}</p>
                     {% if player.calculated_age %}<p><strong>Возраст:</strong> {{ player.calculated_age }} лет</p>{% endif %}
                     <p><strong>Пол:</strong> {{ player.get_gender_display }}</p>
-                    <p><strong>Forehand:</strong> {{ player.get_forehand_display }}</p>
+                    <p><strong>Ведущая рука:</strong> {{ player.get_forehand_display }}</p>
                 </div>
 
                 <!-- Статистика в виде таблицы (две строки: уровень/сила/FAN и очки сезона/матчей/побед) -->

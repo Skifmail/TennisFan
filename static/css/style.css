@@ -7812,15 +7812,15 @@ select.form-control {
     align-items: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--color-primary);
-    color: var(--color-bg);
+    background: transparent;
+    color: var(--color-primary);
     border: none;
     border-radius: var(--radius-xl);
     font-weight: 600;
     font-size: var(--font-size-sm);
     cursor: pointer;
-    box-shadow: var(--shadow-lg);
-    transition: transform var(--transition-fast);
+    box-shadow: none;
+    transition: transform var(--transition-fast), background-color 0.2s ease;
     animation: feedback-widget-pulse 2s ease-in-out infinite;
     will-change: transform;
 }
@@ -7830,7 +7830,7 @@ select.form-control {
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    box-shadow: 0 0 0 8px rgb(166 130 74 / 70%);
+    box-shadow: 0 0 0 8px rgb(166 130 74 / 25%);
     animation: feedback-widget-ring 2s ease-in-out infinite;
     pointer-events: none;
     will-change: transform, opacity;
@@ -7839,7 +7839,8 @@ select.form-control {
 .feedback-widget__btn:hover {
     animation: none;
     transform: scale(1.02);
-    box-shadow: var(--shadow-glow);
+    background: rgb(166 130 74 / 0.12);
+    box-shadow: none;
 }
 
 .feedback-widget__icon {
@@ -7854,9 +7855,8 @@ select.form-control {
     width: 24px;
     height: 24px;
     object-fit: contain;
-
-    /* убираем белый фон PNG: белое сливается с кнопкой, контур остаётся чёрным */
-    mix-blend-mode: multiply;
+    /* на прозрачной кнопке иконка видна без blend */
+    opacity: 0.9;
 }
 
 .feedback-widget__btn .feedback-widget__label {

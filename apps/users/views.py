@@ -3,6 +3,7 @@ Users views.
 """
 
 import json
+import logging
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -24,6 +25,8 @@ from apps.core.models import UserTelegramLink
 
 from .forms import PlayerProfileForm, UserRegistrationForm
 from .models import Notification, Player
+
+logger = logging.getLogger(__name__)
 
 
 def _map_ntrp_to_skill_level(level: Decimal) -> str:
@@ -703,6 +706,7 @@ def ntrp_test(request):
     """
     # Test can only be saved during registration (via auth view), not after
     can_save = False
+    logger.info("ntrp_test: page request, can_save=%s", can_save)
     return render(request, "users/ntrp_test.html", {"can_save": can_save})
 
 
@@ -720,15 +724,19 @@ def save_ntrp(request):
         return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
 
     raw_level = payload.get("ntrp_level")
+    logger.info("save_ntrp: payload raw_level=%s", raw_level)
     if raw_level is None:
+        logger.warning("save_ntrp: missing_level")
         return JsonResponse({"ok": False, "error": "missing_level"}, status=400)
 
     try:
         level = Decimal(str(raw_level))
-    except (InvalidOperation, ValueError):
+    except (InvalidOperation, ValueError) as e:
+        logger.warning("save_ntrp: invalid_level raw=%s err=%s", raw_level, e)
         return JsonResponse({"ok": False, "error": "invalid_level"}, status=400)
 
     if level < Decimal("1.5") or level > Decimal("7.0"):
+        logger.warning("save_ntrp: out_of_range level=%s", level)
         return JsonResponse({"ok": False, "error": "out_of_range"}, status=400)
 
     try:
@@ -759,4 +767,5 @@ def save_ntrp(request):
     player.save(
         update_fields=["ntrp_level", "skill_level", "total_points", "hidden_rating"]
     )
+    logger.info("save_ntrp: ok level=%s", level)
     return JsonResponse({"ok": True, "ntrp_level": f"{level:.1f}"})

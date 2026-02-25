@@ -165,13 +165,16 @@
 
     /**
      * Линейное преобразование суммы баллов (70–430) в уровень силы (1.5–7.0).
-     * Каждые 60 баллов = 1.5 уровня.
+     * Уровень ограничен 7.0, иначе при всех макс. ответах (430) получалось бы 7.5 и тест не завершался.
      */
     const getNtrpLevelFromScore = (score) => {
         const minScore = 70;
         const maxScore = 430;
+        const minLevel = 1.5;
+        const maxLevel = 7.0;
         const clampedScore = Math.min(Math.max(score, minScore), maxScore);
-        const ntrp = 1.5 + ((clampedScore - minScore) / (maxScore - minScore)) * 6.0;
+        let ntrp = minLevel + ((clampedScore - minScore) / (maxScore - minScore)) * (maxLevel - minLevel);
+        ntrp = Math.min(ntrp, maxLevel);
         return Math.round(ntrp * 10) / 10;
     };
 
@@ -294,8 +297,13 @@
 
     calcBtn.addEventListener('click', () => {
         const totalScore = answers.reduce((sum, value) => sum + (value || 0), 0);
+        const level = getNtrpLevelFromScore(totalScore);
         const result = getNtrpResult(totalScore);
+        if (typeof console !== 'undefined' && console.log) {
+            console.log('[NTRP] Рассчитать: баллы=%s, уровень=%.1f, result=%o', totalScore, level, result);
+        }
         if (!result) {
+            console.warn('[NTRP] Группа не найдена для уровня', level, '- проверьте ntrpLevelGroups');
             return;
         }
         levelValueEl.textContent = `${result.label} (${result.level.toFixed(1)})`;

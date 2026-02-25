@@ -2,6 +2,8 @@
 User forms.
 """
 
+from decimal import Decimal
+
 from django import forms
 from django.contrib.auth import get_user_model
 
@@ -26,12 +28,22 @@ class UserRegistrationForm(forms.ModelForm):
         ),
     )
     ntrp_level = forms.DecimalField(
-        label="Уровень силы",
+        label="Уровень силы (NTRP)",
         required=True,
-        min_value=1,
-        max_value=7,
+        min_value=Decimal("1.5"),
+        max_value=Decimal("7.0"),
         decimal_places=1,
-        widget=forms.HiddenInput(attrs={"id": "id_ntrp_level"}),
+        widget=forms.NumberInput(
+            attrs={
+                "id": "id_ntrp_level",
+                "class": "form-control",
+                "min": "1.5",
+                "max": "7",
+                "step": "0.1",
+                "placeholder": "например 3.7",
+            }
+        ),
+        help_text="Число от 1.5 до 7.0.",
     )
     password = forms.CharField(
         label="Пароль *",
@@ -65,23 +77,23 @@ class UserRegistrationForm(forms.ModelForm):
         return city
 
     def clean_ntrp_level(self):
-        from decimal import Decimal, InvalidOperation
+        from decimal import InvalidOperation
 
         val = self.cleaned_data.get("ntrp_level")
         if val is None or val == "":
             raise forms.ValidationError(
-                "Пройдите тест уровня силы и нажмите «Рассчитать» перед регистрацией."
+                "Укажите уровень силы от 1.5 до 7.0 (например 3.7) или пройдите калькулятор ниже."
             )
         try:
             v = Decimal(str(val))
             if v < Decimal("1.5") or v > Decimal("7.0"):
                 raise forms.ValidationError(
-                    "Некорректный результат теста. Пройдите тест заново."
+                    "Уровень должен быть от 1.5 до 7.0 (один знак после запятой)."
                 )
             return v
         except (TypeError, ValueError, InvalidOperation) as err:
             raise forms.ValidationError(
-                "Пройдите тест уровня силы и нажмите «Рассчитать» перед регистрацией."
+                "Укажите уровень силы от 1.5 до 7.0 (например 3.7)."
             ) from err
 
     def clean_password_confirm(self):
@@ -114,7 +126,11 @@ class PlayerProfileForm(forms.ModelForm):
         label="Телефон",
         required=False,
         widget=forms.TextInput(
-            attrs={"class": "form-control", "placeholder": "+7XXXXXXXXXX"}
+            attrs={
+                "class": "form-control js-phone-input",
+                "placeholder": "+7",
+                "autocomplete": "tel",
+            }
         ),
     )
 

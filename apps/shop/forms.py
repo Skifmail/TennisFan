@@ -30,7 +30,11 @@ class PurchaseRequestForm(forms.ModelForm):
                 attrs={"class": "form-control", "placeholder": "Фамилия"}
             ),
             "contact_phone": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Номер для связи"}
+                attrs={
+                    "class": "form-control js-phone-input",
+                    "placeholder": "+7",
+                    "autocomplete": "tel",
+                }
             ),
             "comment": forms.Textarea(
                 attrs={

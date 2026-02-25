@@ -197,9 +197,13 @@ class Player(CompressImageFieldsMixin, models.Model):
 
     @property
     def paid_subscription_tier(self):
-        """Return subscription tier if player has an active paid subscription (Silver/Gold/Diamond), else None."""
+        """Возвращает тариф подписки для отображения «особого статуса» (значка) только если у тарифа включён has_badge.
+        Если в админке у тарифа снята галочка «Особый значок», возвращается None — значок нигде не показывается.
+        """
         tier = self.active_subscription_tier
         if tier is None or tier.name == "free":
+            return None
+        if not tier.has_badge:
             return None
         return tier
 

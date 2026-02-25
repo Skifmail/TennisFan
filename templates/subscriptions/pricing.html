@@ -23,21 +23,39 @@
         <div
             class="pricing-card {% if tier.name == 'free' %}pricing-card-free{% endif %} {% if tier.name == 'diamond' %}pricing-card-diamond{% endif %} {% if current_tier_id == tier.id %}pricing-card-current{% endif %}">
             {% if tier.name == 'diamond' %}
-            <div class="pricing-card__badge">Популярный</div>
+            <div class="pricing-card__badge {% if tier.show_promo_price %}pricing-card__badge--left{% endif %}">Популярный</div>
+            {% endif %}
+            {% if tier.show_promo_price %}
+            <div class="pricing-card__badge pricing-card__badge--promo">Акция</div>
             {% endif %}
 
             <h3 class="pricing-card__title">{{ tier.get_name_display }}</h3>
 
-            <div class="pricing-card__price">
+            <div class="pricing-card__price {% if tier.show_promo_price %}pricing-card__price--promo{% endif %}">
                 {% if tier.effective_price == 0 %}
                 <span class="price-amount">Бесплатно</span>
                 {% else %}
+                {% if tier.show_first_one_ruble %}
+                <span class="price-amount price-amount--current">1 ₽</span>
+                <span class="price-period">первый раз</span>
+                <span class="price-then">далее {{ tier.effective_price|intcomma|cut:".00" }} ₽/мес</span>
+                {% elif tier.show_promo_price %}
+                <span class="price-amount price-amount--old" aria-hidden="true">{{ tier.effective_original_price|intcomma|cut:".00" }} ₽</span>
+                <span class="price-amount price-amount--current">{{ tier.effective_price|intcomma|cut:".00" }} ₽</span>
+                {% if tier.effective_original_price_ends_at %}
+                <span class="price-promo-ends">До {{ tier.effective_original_price_ends_at|date:"d.m.Y" }} {{ tier.effective_original_price_ends_at|time:"H:i" }}</span>
+                {% endif %}
+                {% else %}
                 <span class="price-amount">{{ tier.effective_price|intcomma|cut:".00" }} ₽</span>
+                {% endif %}
+                {% if not tier.show_first_one_ruble %}
                 <span class="price-period">/ месяц</span>
+                {% endif %}
+                {% if tier.first_subscription_one_ruble %}
+                <div class="price-first-ruble-note">Первая подписка за 1 ₽</div>
+                {% endif %}
                 {% if tier.is_regional_price %}
-                <div style="font-size: 0.8rem; color: var(--color-success); margin-top: 5px;">
-                    Ваш регион: {{ user_city|capfirst }}
-                </div>
+                <div class="price-region-note">Ваш регион: {{ user_city|capfirst }}</div>
                 {% endif %}
                 {% endif %}
             </div>

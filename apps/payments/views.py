@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.subscriptions.models import SubscriptionTier
 from apps.tournaments.models import Tournament
@@ -94,15 +95,53 @@ def payment_preview(request):
     if payment_type == "subscription":
         tier_id = request.GET.get("id")
         tier = get_object_or_404(SubscriptionTier, pk=tier_id)
+        # Эффективная цена: региональная при наличии, иначе из тарифа
+        from decimal import Decimal
+
+        effective_price = tier.price
+        user_city = "moscow"
+        if request.user.is_authenticated:
+            try:
+                player = getattr(request.user, "player", None)
+                if player and player.city:
+                    city_val = player.city.lower().strip()
+                    user_city = (
+                        "moscow"
+                        if city_val in ("moscow", "moskva", "москва")
+                        else city_val
+                    )
+            except Exception:
+                pass
+        if user_city != "moscow":
+            from apps.subscriptions.models import RegionalTierPrice
+
+            rp = RegionalTierPrice.objects.filter(tier=tier).first()
+            if rp:
+                effective_price = rp.price
+        # Первая подписка за 1 ₽ (если тариф участвует и игрок ещё ни разу не покупал)
+        first_time_one_ruble = False
+        if tier.first_subscription_one_ruble and request.user.is_authenticated:
+            try:
+                if (
+                    getattr(request.user, "player", None)
+                    and not request.user.player.has_ever_paid_subscription
+                ):
+                    first_time_one_ruble = True
+            except Exception:
+                pass
+        amount = Decimal("1") if first_time_one_ruble else effective_price
+        details = [
+            ("Тариф", tier.get_name_display()),
+            ("Срок действия", "1 месяц"),
+        ]
+        if first_time_one_ruble:
+            details.append(("Акция", "Первая подписка за 1 ₽"))
         context = {
             "title": f"Подписка: {tier.get_name_display()}",
             "description": "Ежемесячная подписка на сервис TennisFan",
-            "amount": tier.price,
+            "amount": amount,
             "item_id": tier.id,
-            "details": [
-                ("Тариф", tier.get_name_display()),
-                ("Срок действия", "1 месяц"),
-            ],
+            "details": details,
         }
 
     elif payment_type == "tournament":
@@ -235,6 +274,39 @@ def payment_success(request):
     payment_type = request.GET.get("type")
     item_id = request.GET.get("id")
     next_url = request.GET.get("next", "").strip()
+
+    if payment_type == "subscription" and item_id:
+        try:
+            tier_id = int(item_id)
+        except (TypeError, ValueError):
+            tier_id = None
+        if tier_id is not None:
+            from dateutil.relativedelta import relativedelta
+
+            tier = SubscriptionTier.objects.filter(pk=tier_id).first()
+            if tier:
+                from apps.subscriptions.models import UserSubscription
+                from apps.subscriptions.views import _mark_user_paid_subscription
+
+                sub, _ = UserSubscription.objects.get_or_create(
+                    user=request.user,
+                    defaults={"tier": tier, "end_date": timezone.now()},
+                )
+                sub.tier = tier
+                sub.start_date = timezone.now()
+                sub.end_date = sub.start_date + relativedelta(months=1)
+                sub.is_active = True
+                sub.cancelled_at = None
+                sub.tournaments_registered_count = 0
+                sub.save()
+                _mark_user_paid_subscription(request.user)
+                messages.success(
+                    request, f"Подписка «{tier.get_name_display()}» успешно оформлена."
+                )
+                try:
+                    return redirect("profile", pk=request.user.player.pk)
+                except Exception:
+                    return redirect("pricing")
 
     if payment_type == "tournament" and item_id:
         try:

@@ -6,6 +6,7 @@ from .models import RegionalTierPrice, SubscriptionTier, UserSubscription
 class RegionalTierPriceInline(admin.TabularInline):
     model = RegionalTierPrice
     extra = 1
+    fields = ("name", "price", "original_price", "original_price_ends_at")
 
 
 @admin.register(SubscriptionTier)
@@ -13,6 +14,9 @@ class SubscriptionTierAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "price",
+        "original_price",
+        "original_price_ends_at",
+        "first_subscription_one_ruble",
         "max_tournaments",
         "is_unlimited",
         "one_day_tournament_discount",
@@ -20,6 +24,9 @@ class SubscriptionTierAdmin(admin.ModelAdmin):
     )
     list_editable = (
         "price",
+        "original_price",
+        "original_price_ends_at",
+        "first_subscription_one_ruble",
         "max_tournaments",
         "is_unlimited",
         "one_day_tournament_discount",

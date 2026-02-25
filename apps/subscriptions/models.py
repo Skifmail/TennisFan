@@ -19,6 +19,20 @@ class SubscriptionTier(models.Model):
     price = models.DecimalField(
         "Стоимость (руб)", max_digits=10, decimal_places=2, default=0
     )
+    original_price = models.DecimalField(
+        "Цена до скидки (руб)",
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Если указана — на странице тарифов показывается перечёркнутой, рядом актуальная цена (акция).",
+    )
+    original_price_ends_at = models.DateTimeField(
+        "Акционная цена действует до",
+        null=True,
+        blank=True,
+        help_text="Дата и время, после которых перечёркнутая цена не показывается. Пусто — акция без срока.",
+    )
 
     # Registration limits
     max_tournaments = models.PositiveIntegerField(
@@ -44,6 +58,12 @@ class SubscriptionTier(models.Model):
     has_sparring = models.BooleanField("Доступ к спаррингам", default=False)
     has_admin_support = models.BooleanField("Поддержка администратора", default=False)
     has_badge = models.BooleanField("Особый значок", default=False)
+
+    first_subscription_one_ruble = models.BooleanField(
+        "Первая подписка за 1 ₽",
+        default=False,
+        help_text="Если включено: игрок, который ни разу не покупал подписку, может купить этот тариф за 1 ₽. Все последующие покупки — по обычной цене.",
+    )
 
     class Meta:
         verbose_name = "Тариф"
@@ -176,6 +196,20 @@ class RegionalTierPrice(models.Model):
     )
     price = models.DecimalField(
         "Стоимость (руб)", max_digits=10, decimal_places=2, default=0
+    )
+    original_price = models.DecimalField(
+        "Цена до скидки (руб)",
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Перечёркнутая цена для этого региона. Пусто — использовать из тарифа.",
+    )
+    original_price_ends_at = models.DateTimeField(
+        "Акция действует до",
+        null=True,
+        blank=True,
+        help_text="Пусто — использовать срок из тарифа.",
     )
     name = models.CharField("Название региона", max_length=100, default="Регионы")
 

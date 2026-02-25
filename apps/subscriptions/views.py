@@ -13,6 +13,17 @@ from .models import SubscriptionTier, UserSubscription
 logger = logging.getLogger(__name__)
 
 
+def _mark_user_paid_subscription(user):
+    """Отметить, что пользователь хотя бы раз оплатил подписку (для акции «первая за 1 ₽»)."""
+    try:
+        player = user.player
+        if not player.has_ever_paid_subscription:
+            player.has_ever_paid_subscription = True
+            player.save(update_fields=["has_ever_paid_subscription"])
+    except Exception:
+        pass
+
+
 @login_required_with_message(
     "Информация о тарифах доступна только для зарегистрированных пользователей."
 )
@@ -55,22 +66,59 @@ def pricing_page(request):
     if user_city != "moscow":
         from .models import RegionalTierPrice
 
-        # Fetch all regional prices
-        regional_prices = {
-            rp.tier_id: rp.price for rp in RegionalTierPrice.objects.all()
+        regional_by_tier = {
+            rp.tier_id: rp for rp in RegionalTierPrice.objects.select_related("tier")
         }
 
         for tier in tiers:
-            if tier.id in regional_prices:
-                tier.effective_price = regional_prices[tier.id]
+            rp = regional_by_tier.get(tier.id)
+            if rp:
+                tier.effective_price = rp.price
                 tier.is_regional_price = True
+                tier.effective_original_price = (
+                    rp.original_price
+                    if rp.original_price is not None
+                    else tier.original_price
+                )
+                tier.effective_original_price_ends_at = (
+                    rp.original_price_ends_at
+                    if rp.original_price_ends_at is not None
+                    else tier.original_price_ends_at
+                )
             else:
                 tier.effective_price = tier.price
                 tier.is_regional_price = False
+                tier.effective_original_price = tier.original_price
+                tier.effective_original_price_ends_at = tier.original_price_ends_at
     else:
         for tier in tiers:
             tier.effective_price = tier.price
             tier.is_regional_price = False
+            tier.effective_original_price = tier.original_price
+            tier.effective_original_price_ends_at = tier.original_price_ends_at
+
+    now = timezone.now()
+    user_has_ever_paid_subscription = False
+    if request.user.is_authenticated:
+        try:
+            if getattr(request.user, "player", None):
+                user_has_ever_paid_subscription = (
+                    request.user.player.has_ever_paid_subscription
+                )
+        except Exception:
+            pass
+
+    for tier in tiers:
+        orig = tier.effective_original_price
+        ends_at = tier.effective_original_price_ends_at
+        tier.show_promo_price = (
+            orig is not None
+            and orig > tier.effective_price
+            and (ends_at is None or ends_at > now)
+        )
+        tier.show_first_one_ruble = (
+            tier.first_subscription_one_ruble and not user_has_ever_paid_subscription
+        )
 
     return render(
         request,
@@ -101,6 +149,8 @@ def buy_subscription(request, tier_id):
     sub.cancelled_at = None  # Сбрасываем отмену при покупке / возобновлении
     sub.tournaments_registered_count = 0
     sub.save()
+
+    _mark_user_paid_subscription(request.user)
 
     from apps.core.telegram_notify import notify_subscription_purchase
 

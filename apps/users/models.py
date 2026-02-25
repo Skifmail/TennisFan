@@ -164,6 +164,11 @@ class Player(CompressImageFieldsMixin, models.Model):
 
     is_verified = models.BooleanField("Подтверждён", default=True)
     is_legend = models.BooleanField("Легенда", default=False)
+    has_ever_paid_subscription = models.BooleanField(
+        "Уже покупал подписку",
+        default=False,
+        help_text="Становится True после первой оплаты любой подписки (для акции «первая за 1 ₽»).",
+    )
     is_bye = models.BooleanField(
         "Свободный круг (bye)",
         default=False,

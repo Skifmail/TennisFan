@@ -50,8 +50,8 @@
 
         <div class="live-results" id="live-results" data-avatar-placeholder="{% static 'images/avatar_placeholder.jpg' %}">
             <div class="live-results__header">
-                <span class="live-results__title">🎾 Результаты матчей</span>
-                <span class="live-results__subtitle">За последние 5 дней</span>
+                <span class="live-results__title">Результаты матчей</span>
+                <span class="live-results__subtitle">Сыгранные матчи</span>
             </div>
             <div class="live-results__list" id="live-results-list">
                 {% for m in recent_matches %}
@@ -80,7 +80,7 @@
                 </a>
                 </div>
                 {% empty %}
-                <div class="live-results__empty">Нет завершённых матчей за последние 5 дней</div>
+                <div class="live-results__empty">Нет сыгранных матчей</div>
                 {% endfor %}
             </div>
         </div>
@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     function renderAll(animateFirst) {
         if (matches.length === 0) {
-            listEl.innerHTML = '<div class="live-results__empty">Нет завершённых матчей за последние 5 дней</div>';
+            listEl.innerHTML = '<div class="live-results__empty">Нет сыгранных матчей</div>';
             return;
         }
         listEl.innerHTML = matches.map(function(m, i) { return renderRow(m, animateFirst && i === 0); }).join('');

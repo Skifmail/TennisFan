@@ -21,6 +21,8 @@
                     <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">Олимпийская</span>
                     {% elif t.format == 'round_robin' %}
                     <span class="player-category" style="background: rgba(100, 149, 237, 0.2); color: #6495ed;">Круговой</span>
+                    {% elif t.format == 'weekend_day' %}
+                    <span class="player-category" style="background: rgba(72, 61, 139, 0.25); color: #483d8b;" title="{{ t.get_format_display }}">OneDay</span>
                     {% endif %}
                     {% for ac in t.allowed_categories.all %}
                     <span class="player-category">{{ ac.get_category_display }}</span>

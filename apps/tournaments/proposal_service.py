@@ -180,6 +180,13 @@ def notify_participants_match_result_confirmed(
     except Exception as e:
         logger.warning("notify_result_confirmed_to_participants failed: %s", e)
 
+    try:
+        from apps.player_ratings.notifications import notify_players_to_rate_match
+
+        notify_players_to_rate_match(match)
+    except Exception as e:
+        logger.warning("notify_players_to_rate_match failed: %s", e)
+
 
 def apply_proposal(proposal: MatchResultProposal) -> None:
     """

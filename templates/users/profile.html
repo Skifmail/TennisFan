@@ -100,6 +100,8 @@
                 </div>
                 {% endif %}
 
+                {% include 'includes/player_skills_block.html' with player_skills_data=player_skills_data is_owner=is_profile_owner only %}
+
                 {% if player.bio %}
                 <p class="profile-info__bio text-secondary">{{ player.bio }}</p>
                 {% endif %}

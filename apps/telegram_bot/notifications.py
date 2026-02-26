@@ -105,7 +105,7 @@ def _match_info_text(match) -> str:
             match.tournament
             and getattr(match.tournament, "format", None) == "weekend_day"
         ):
-            tournament_info = f"{tournament_info} (ТВД)"
+            tournament_info = f"{tournament_info} (OneDay)"
         round_info = match.round_name or "—"
 
     return (
@@ -604,7 +604,7 @@ def notify_extension_approved(extension_request) -> None:
 def _format_new_tournament_message(tournament) -> str:
     """Формирует подробный текст уведомления о новом турнире (HTML для Telegram)."""
     format_display = (
-        "ТВД"
+        "OneDay"
         if getattr(tournament, "format", None) == "weekend_day"
         else tournament.get_format_display()
     )

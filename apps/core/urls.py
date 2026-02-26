@@ -9,6 +9,9 @@ from . import views
 urlpatterns = [
     path("", views.home, name="home"),
     path("api/recent-matches/", views.api_recent_matches, name="api_recent_matches"),
+    path(
+        "api/upcoming-matches/", views.api_upcoming_matches, name="api_upcoming_matches"
+    ),
     path("rating/", views.rating, name="rating"),
     path("hall-of-fame/", views.hall_of_fame, name="hall_of_fame"),
     path("results/", views.results, name="results"),

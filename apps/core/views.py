@@ -7,6 +7,7 @@ import logging
 import re
 import secrets
 from datetime import timedelta
+from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -106,6 +107,62 @@ def _build_recent_matches(limit: int = 10, days: int = 5):
     return result
 
 
+def _build_upcoming_matches(limit: int = 10, days: int = 5):
+    """Предстоящие матчи на ближайшие N дней для виджета на главной."""
+    now = timezone.now()
+    until = now + timedelta(days=days)
+    matches = (
+        Match.objects.filter(
+            status__in=[Match.MatchStatus.SCHEDULED, Match.MatchStatus.IN_PROGRESS],
+            scheduled_datetime__gte=now,
+            scheduled_datetime__lte=until,
+        )
+        .select_related(
+            "player1__user",
+            "player2__user",
+            "team1__player1__user",
+            "team2__player1__user",
+        )
+        .order_by("scheduled_datetime", "pk")[:limit]
+    )
+    result: list[dict[str, Any]] = []
+    for m in matches:
+        p1 = m.get_side1_player()
+        p2 = m.get_side2_player()
+        if not p1 or not p2:
+            continue
+        if getattr(p1, "is_bye", False) or getattr(p2, "is_bye", False):
+            continue
+        avatar1 = p1.avatar.url if (hasattr(p1, "avatar") and p1.avatar) else None
+        avatar2 = p2.avatar.url if (hasattr(p2, "avatar") and p2.avatar) else None
+        result.append(
+            {
+                "id": m.pk,
+                "player1": m.get_player1_display(),
+                "player2": m.get_player2_display(),
+                "p1_avatar": avatar1,
+                "p2_avatar": avatar2,
+                "score": "—",
+                "score_column": "—",
+                "p1_ntrp": float(p1.ntrp_level or 0),
+                "p1_ntrp_delta": 0.0,
+                "p1_rating": float(p1.total_points),
+                "p1_rating_delta": 0.0,
+                "p2_ntrp": float(p2.ntrp_level or 0),
+                "p2_ntrp_delta": 0.0,
+                "p2_rating": float(p2.total_points),
+                "p2_rating_delta": 0.0,
+                "date": (
+                    m.scheduled_datetime.strftime("%d.%m.%Y %H:%M")
+                    if m.scheduled_datetime
+                    else ""
+                ),
+                "match_url": f"/tournaments/match/{m.pk}/",
+            }
+        )
+    return result
+
+
 def home(request):
     """Home page view. Формирование сеток по дедлайну выполняется по cron (generate_brackets_past_deadlines)."""
     tournaments = (
@@ -167,6 +224,7 @@ def home(request):
     )
 
     recent_matches = _build_recent_matches(limit=10, days=5)
+    upcoming_matches = _build_upcoming_matches(limit=10, days=5)
 
     # Метрики для Hero-блока
     def format_number(num):
@@ -200,6 +258,7 @@ def home(request):
         "top_players": top_players,
         "recent_matches": recent_matches,
         "recent_matches_json": json.dumps(recent_matches, default=str),
+        "upcoming_matches_json": json.dumps(upcoming_matches, default=str),
         "latest_news": News.objects.filter(is_published=True)[:4],
         "hero_stats": hero_stats,
         "current_filters": {
@@ -219,6 +278,13 @@ def home(request):
 def api_recent_matches(request):
     """API: последние матчи за 5 дней для live-тикера."""
     matches = _build_recent_matches(limit=10, days=5)
+    return JsonResponse({"matches": matches})
+
+
+@require_safe
+def api_upcoming_matches(request):
+    """API: предстоящие матчи на ближайшие 5 дней для live-тикера."""
+    matches = _build_upcoming_matches(limit=10, days=5)
     return JsonResponse({"matches": matches})
 
 

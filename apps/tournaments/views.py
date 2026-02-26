@@ -2205,6 +2205,17 @@ def my_matches(request):
         m.pending_proposals = pending_by_match.get(m.id, [])
         m.has_pending = len(m.pending_proposals) > 0
 
+    # Статус возможности оценки соперника (кнопка «Оценить соперника» в карточке матча)
+    try:
+        from apps.player_ratings.services import get_match_rating_status
+    except Exception:
+        get_match_rating_status = None
+
+    if get_match_rating_status is not None and request.user.is_authenticated:
+        for m in matches:
+            # rating_status: { can_rate, already_rated, can_edit, reason, rate_url }
+            m.rating_status = get_match_rating_status(m, player)
+
     return render(
         request,
         "tournaments/my_matches.html",

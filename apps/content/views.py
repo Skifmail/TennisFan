@@ -12,6 +12,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.comments.models import Comment
+from apps.subscriptions.models import RegionalTierPrice, SubscriptionTier
+from apps.tournaments.models import Tournament
 from apps.users.models import Player
 
 from .forms import AboutUsCommentForm, NewsCommentForm
@@ -188,10 +190,43 @@ def contacts(request):
     contact_page = ContactPage.get_singleton()
     intro_html = markdown.markdown(contact_page.intro_text or "", extensions=["extra"])
     items = contact_page.contact_items.order_by("order", "id")
+
+    # Цены на подписки (Москва и регионы)
+    tiers = list(SubscriptionTier.objects.all().order_by("price"))
+    regional_by_tier = {
+        rp.tier_id: rp for rp in RegionalTierPrice.objects.select_related("tier")
+    }
+    moscow_pricing = []
+    regional_pricing = []
+    for tier in tiers:
+        moscow_pricing.append(
+            {
+                "name": tier.get_name_display(),
+                "price": tier.price,
+            }
+        )
+        rp = regional_by_tier.get(tier.id)
+        if rp:
+            regional_pricing.append(
+                {
+                    "name": f"{tier.get_name_display()} ({rp.name})",
+                    "price": rp.price,
+                }
+            )
+
+    # Минимальный взнос для однодневных турниров (из админки)
+    one_day_qs = Tournament.objects.filter(is_one_day=True, entry_fee__gt=0)
+    one_day_min_fee = (
+        one_day_qs.order_by("entry_fee").values_list("entry_fee", flat=True).first()
+    )
+
     context = {
         "contact_page": contact_page,
         "intro_html": intro_html,
         "contact_items": items,
+        "moscow_pricing": moscow_pricing,
+        "regional_pricing": regional_pricing,
+        "one_day_min_fee": one_day_min_fee,
     }
     return render(request, "content/contacts.html", context)
 

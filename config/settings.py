@@ -305,6 +305,22 @@ TELEGRAM_PUBLIC_COMMUNITY_URL = (
 TELEGRAM_BOT_SITE_BASE_URL = os.environ.get("TELEGRAM_BOT_SITE_BASE_URL", "")
 
 # ------------------------------------------------------------------------------
+# YANDEX MAPS / GEOCODER
+# ------------------------------------------------------------------------------
+
+# Эти настройки читаются в courts.admin/_get_geocoder_api_key и courts.geocoder.
+# В продакшене ключи передаются через переменные окружения:
+#   YANDEX_MAPS_API_KEY
+#   YANDEX_GEOCODER_API_KEY
+#   YANDEX_GEOCODER_REFERER
+#
+# Здесь мы просто прокидываем их в Django settings, чтобы getattr(settings, ...)
+# возвращал корректные значения.
+YANDEX_MAPS_API_KEY = os.environ.get("YANDEX_MAPS_API_KEY", "")
+YANDEX_GEOCODER_API_KEY = os.environ.get("YANDEX_GEOCODER_API_KEY", "")
+YANDEX_GEOCODER_REFERER = os.environ.get("YANDEX_GEOCODER_REFERER", "")
+
+# ------------------------------------------------------------------------------
 # CRON
 # ------------------------------------------------------------------------------
 

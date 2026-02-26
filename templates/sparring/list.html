@@ -57,10 +57,13 @@
             {% if has_sparring_access %}
             <a href="{% url 'sparring_create' %}?type={{ sparring_type }}" class="btn btn-primary">Создать заявку</a>
             {% else %}
-            <a href="{% url 'pricing' %}" class="btn btn-outline">Подписка для доступа</a>
+            <a href="{% url 'pricing' %}" class="btn btn-primary">Оформить подписку</a>
             {% endif %}
         </div>
     </div>
+    {% if not has_sparring_access %}
+    <p class="text-muted mb-3" style="font-size: var(--font-size-sm);">Чтобы создавать заявки и откликаться на заявки других игроков — оформите подписку.</p>
+    {% endif %}
 
     {% if sparring_type == 'singles' %}
     <div class="grid grid-2">
@@ -87,6 +90,8 @@
                         </div>
                         <div class="d-flex gap-1 mt-1 mb-2 flex-wrap">
                             <span class="player-category">{{ req.player.get_skill_level_display }}</span>
+                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);" title="Уровень силы (NTRP)">Сила {{ req.player.ntrp_level }}</span>
+                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);" title="Рейтинг FAN">Рейтинг {{ req.player.total_points|floatformat:0 }}</span>
                             {% if req.desired_category %}
                             <span class="sparring-desired-category">Партнёр: {{ req.get_desired_category_display }}</span>
                             {% endif %}
@@ -126,6 +131,8 @@
                     <button type="button" class="btn btn-primary sparring-respond-btn" data-id="{{ req.pk }}">
                         Откликнуться
                     </button>
+                    {% else %}
+                    <a href="{% url 'pricing' %}" class="btn btn-outline sparring-btn--locked" title="Оформите подписку, чтобы откликаться на заявки">Для отклика нужна подписка</a>
                     {% endif %}
                 </div>
             </div>
@@ -158,6 +165,8 @@
                         </div>
                         <div class="d-flex gap-1 mt-1 mb-2 flex-wrap">
                             <span class="player-category">{{ req.created_by.get_skill_level_display }}</span>
+                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);" title="Уровень силы (NTRP)">Сила {{ req.created_by.ntrp_level }}</span>
+                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);" title="Рейтинг FAN">Рейтинг {{ req.created_by.total_points|floatformat:0 }}</span>
                             {% if req.desired_level %}
                             <span class="sparring-desired-category">Партнёры: {{ req.get_desired_level_display }}</span>
                             {% endif %}

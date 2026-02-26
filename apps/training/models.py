@@ -222,13 +222,12 @@ class Training(CompressImageFieldsMixin, models.Model):
         related_name="trainings",
         verbose_name="Тренер",
     )
-    court = models.ForeignKey(
+    courts = models.ManyToManyField(
         "courts.Court",
-        on_delete=models.SET_NULL,
-        null=True,
         blank=True,
         related_name="trainings",
-        verbose_name="Корт",
+        verbose_name="Корты",
+        help_text="Один тренер может проводить тренировки на разных площадках.",
     )
     city = models.CharField("Город", max_length=100)
 

@@ -63,10 +63,12 @@
                     </div>
                     {% endif %}
 
-                    {% if training.court %}
+                    {% if training.courts.exists %}
                     <div class="mb-3">
-                        <div class="text-muted" style="font-size: var(--font-size-xs);">Корт</div>
-                        <a href="{% url 'court_detail' slug=training.court.slug %}">{{ training.court.name }}</a>
+                        <div class="text-muted" style="font-size: var(--font-size-xs);">Корты</div>
+                        {% for court in training.courts.all %}
+                        <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
                     </div>
                     {% endif %}
 

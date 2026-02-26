@@ -29,6 +29,17 @@ class Court(CompressImageFieldsMixin, models.Model):
     courts_count = models.PositiveSmallIntegerField("Количество кортов", default=1)
     has_lighting = models.BooleanField("Освещение", default=True)
     is_indoor = models.BooleanField("Крытый", default=False)
+    is_outdoor = models.BooleanField(
+        "Открытый",
+        default=False,
+        help_text="У одного корта могут быть и крытые, и открытые поля.",
+    )
+
+    racket_rental = models.BooleanField("Аренда ракеток", default=False)
+    parking_on_site = models.BooleanField("Парковка на территории", default=False)
+    parking_nearby = models.BooleanField("Парковка рядом", default=False)
+    racket_stringing = models.BooleanField("Перетяжка ракеток", default=False)
+    has_training = models.BooleanField("Тренировки", default=False)
 
     phone = models.CharField("Телефон", max_length=50, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
@@ -51,6 +62,20 @@ class Court(CompressImageFieldsMixin, models.Model):
 
     price_per_hour = models.DecimalField(
         "Цена/час", max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    rental_price_min = models.DecimalField(
+        "Цена аренды от (₽/час)",
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    rental_price_max = models.DecimalField(
+        "Цена аренды до (₽/час)",
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
     )
     is_active = models.BooleanField("Активен", default=True)
 

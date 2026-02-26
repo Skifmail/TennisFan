@@ -60,5 +60,92 @@
     {% else %}
     <p class="text-muted text-center mt-4">Контакты пока не добавлены. Добавьте их в админ-панели.</p>
     {% endif %}
+
+    <div class="card mt-4">
+        <div class="card-body legal-doc__body">
+            <h2 style="font-size: var(--font-size-lg); margin-bottom: var(--spacing-md);">Реквизиты и платёжная информация</h2>
+
+            <div style="display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--spacing-xl); align-items: flex-start;">
+                <div>
+                    <h3 style="font-size: var(--font-size-md); margin-bottom: var(--spacing-sm);">Организация</h3>
+                    <p style="margin-bottom: var(--spacing-xs);"><strong>ИП Ермолаев Леонид</strong></p>
+                    <p style="margin-bottom: var(--spacing-xs);">Регистрация: г. Раменское</p>
+                    <p style="margin-bottom: var(--spacing-xs);"><strong>ИНН:</strong> 561417897115</p>
+                    <p style="margin-bottom: var(--spacing-xs);"><strong>ОГРНИП:</strong> 325508100579372</p>
+                    <p style="margin-bottom: var(--spacing-xs);"><strong>Телефон:</strong> <a href="tel:+79123451166" style="color: var(--color-primary); text-decoration: none;">+7&nbsp;912&nbsp;345‑11‑66</a></p>
+                    <p style="margin-bottom: var(--spacing-md);"><strong>E‑mail:</strong> <a href="mailto:tennis@tennisfan.ru" style="color: var(--color-primary); text-decoration: none;">tennis@tennisfan.ru</a></p>
+
+                    <h3 style="font-size: var(--font-size-md); margin: var(--spacing-md) 0 var(--spacing-sm);">Цены на подписки</h3>
+                    <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-xs);">
+                        Актуальные цены.
+                    </p>
+                    {% if moscow_pricing %}
+                    <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">
+                        <div style="grid-column: 1 / -1; font-weight: 600; margin-bottom: 4px;">Москва</div>
+                        {% for tier in moscow_pricing %}
+                        <div>{{ tier.name }}</div>
+                        <div style="text-align: right; white-space: nowrap;">{{ tier.price|floatformat:0 }} ₽</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% if regional_pricing %}
+                    <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">
+                        <div style="grid-column: 1 / -1; font-weight: 600; margin-bottom: 4px;">Регионы</div>
+                        {% for tier in regional_pricing %}
+                        <div>{{ tier.name }}</div>
+                        <div style="text-align: right; white-space: nowrap;">{{ tier.price|floatformat:0 }} ₽</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <p class="text-secondary" style="font-size: var(--font-size-xs); margin-bottom: var(--spacing-md);">
+                        * Цены на подписки могут изменяться. Фактическая стоимость всегда отображается на странице оформления подписки.
+                    </p>
+
+                    <h3 style="font-size: var(--font-size-md); margin: var(--spacing-md) 0 var(--spacing-sm);">Однодневные турниры OneDay</h3>
+                    <p style="margin-bottom: var(--spacing-xs); font-size: var(--font-size-sm);">
+                        Стартовый взнос за участие в однодневном турнире OneDay:
+                        <strong>
+                            {% if one_day_min_fee %}
+                                {{ one_day_min_fee|floatformat:0 }} ₽
+                            {% else %}
+                                1&nbsp;000 ₽
+                            {% endif %}
+                        </strong>
+                    </p>
+                    <p class="text-secondary" style="font-size: var(--font-size-xs); margin-bottom: 0;">
+                        * Конкретная стоимость участия в каждом турнире может отличаться и указывается в карточке турнира.
+                    </p>
+                </div>
+
+                <div>
+                    <h3 style="font-size: var(--font-size-md); margin-bottom: var(--spacing-sm);">Виды экономической деятельности (ОКВЭД)</h3>
+                    <p class="text-secondary" style="font-size: var(--font-size-xs); margin-bottom: var(--spacing-sm);">
+                        Перечень основных и дополнительных видов деятельности в соответствии с ЕГРИП:
+                    </p>
+                    <ul style="padding-left: 1.2em; margin: 0; font-size: var(--font-size-sm); line-height: 1.5;">
+                        <li><strong>93.19</strong> — Деятельность в области спорта прочая (основной вид деятельности)</li>
+                        <li><strong>62.01</strong> — Разработка компьютерного программного обеспечения</li>
+                        <li><strong>73.11</strong> — Деятельность рекламных агентств</li>
+                        <li><strong>77.21</strong> — Прокат и аренда товаров для отдыха и спортивных товаров</li>
+                        <li><strong>47.64</strong> — Торговля розничная спортивным оборудованием и спортивными товарами в специализированных магазинах</li>
+                        <li><strong>47.91</strong> — Торговля розничная по почте или по информационно‑коммуникационной сети Интернет</li>
+                        <li><strong>46.90</strong> — Торговля оптовая неспециализированная</li>
+                        <li><strong>85.41.1</strong> — Образование в области спорта и отдыха</li>
+                        <li><strong>93.12</strong> — Деятельность спортивных клубов</li>
+                        <li><strong>47.19</strong> — Торговля розничная прочая в неспециализированных магазинах</li>
+                    </ul>
+
+                    <p class="text-secondary" style="font-size: var(--font-size-xs); margin-top: var(--spacing-sm);">
+                        Подробная информация о регистрации индивидуального предпринимателя доступна в
+                        <a href="https://www.rusprofile.ru/ip/325508100579372" target="_blank" rel="noopener noreferrer" style="color: var(--color-primary); text-decoration: none;">
+                            реестре Rusprofile
+                        </a>.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

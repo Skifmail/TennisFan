@@ -1349,7 +1349,7 @@ def _handle_menu_callback_action(
                     m.tournament
                     and getattr(m.tournament, "format", None) == "weekend_day"
                 ):
-                    tour_name = f"{tour_name} (ТВД)"
+                    tour_name = f"{tour_name} (OneDay)"
                 lines.append("─────────────────")
                 lines.append(f"<b>{i}. {tour_name}</b> · {round_name}")
                 lines.append(f"   {p1}\n   vs\n   {p2}")
@@ -1370,7 +1370,7 @@ def _handle_menu_callback_action(
                     m.tournament
                     and getattr(m.tournament, "format", None) == "weekend_day"
                 ):
-                    tour_name = f"{tour_name} (ТВД)"
+                    tour_name = f"{tour_name} (OneDay)"
                 label = f"{tour_name}, {m.round_name or 'раунд'}"
                 btn_text = f"📝 Матч {i}: {label}"
                 if len(btn_text) > 64:

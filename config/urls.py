@@ -11,6 +11,7 @@ urlpatterns = [
     path(f"{settings.ADMIN_URL}/", admin.site.urls),
     path("", include("apps.core.urls")),
     path("users/", include("apps.users.urls")),
+    path("ratings/", include("apps.player_ratings.urls")),
     path("tournaments/", include("apps.tournaments.urls")),
     path("courts/", include("apps.courts.urls")),
     path("sparring/", include("apps.sparring.urls")),

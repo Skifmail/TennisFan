@@ -147,6 +147,9 @@
                 {% endif %}
                 {% else %}
                 <div class="text-secondary" style="font-size: var(--font-size-sm);">Матч завершён, изменение счёта недоступно.</div>
+                {% if match.rating_status and match.rating_status.can_rate and not match.rating_status.already_rated %}
+                <a href="{{ match.rating_status.rate_url }}" class="btn btn-ghost match-card-item__btn" style="margin-top: var(--spacing-sm); width: 100%;">Оценить соперника</a>
+                {% endif %}
                 {% endif %}
             </div>
         </div>

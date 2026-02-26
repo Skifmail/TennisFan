@@ -51,7 +51,14 @@
         <div class="live-results" id="live-results" data-avatar-placeholder="{% static 'images/avatar_placeholder.jpg' %}">
             <div class="live-results__header">
                 <span class="live-results__title">Результаты матчей</span>
-                <span class="live-results__subtitle">Сыгранные матчи</span>
+                <div class="live-results__tabs" role="tablist">
+                    <button type="button" class="live-results__tab live-results__tab--active" data-tab="played">
+                        Сыгранные матчи
+                    </button>
+                    <button type="button" class="live-results__tab" data-tab="upcoming">
+                        Предстоящие матчи
+                    </button>
+                </div>
             </div>
             <div class="live-results__list" id="live-results-list">
                 {% for m in recent_matches %}
@@ -310,16 +317,25 @@
 {% endif %}
 
 <script id="live-results-data" type="application/json">{{ recent_matches_json|safe }}</script>
+<script id="live-upcoming-data" type="application/json">{{ upcoming_matches_json|safe }}</script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     var listEl = document.getElementById('live-results-list');
     if (!listEl) return;
 
     var dataEl = document.getElementById('live-results-data');
+    var dataUpcomingEl = document.getElementById('live-upcoming-data');
+    var matchesPlayed = [];
+    var matchesUpcoming = [];
     var matches = [];
+    var currentTab = 'played';
     try {
         if (dataEl && dataEl.textContent) {
-            matches = JSON.parse(dataEl.textContent);
+            matchesPlayed = JSON.parse(dataEl.textContent);
+            matches = matchesPlayed.slice();
+        }
+        if (dataUpcomingEl && dataUpcomingEl.textContent) {
+            matchesUpcoming = JSON.parse(dataUpcomingEl.textContent);
         }
     } catch (e) {}
 
@@ -349,7 +365,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     function renderAll(animateFirst) {
         if (matches.length === 0) {
-            listEl.innerHTML = '<div class="live-results__empty">Нет сыгранных матчей</div>';
+            var emptyText = currentTab === 'upcoming'
+                ? 'Нет предстоящих матчей'
+                : 'Нет сыгранных матчей';
+            listEl.innerHTML = '<div class="live-results__empty">' + emptyText + '</div>';
             return;
         }
         listEl.innerHTML = matches.map(function(m, i) { return renderRow(m, animateFirst && i === 0); }).join('');
@@ -383,11 +402,53 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('{% url "api_recent_matches" %}').then(function(r) { return r.json(); }).then(function(data) {
         var ms = data.matches || [];
         if (ms.length > 0) {
-            matches = ms;
+            matchesPlayed = ms;
+            if (currentTab === 'played') {
+                matches = matchesPlayed.slice();
+            }
             renderAll();
             startRotation();
         }
     }).catch(function(){});
+
+    fetch('{% url "api_upcoming_matches" %}').then(function(r) { return r.json(); }).then(function(data) {
+        var ms = data.matches || [];
+        if (ms.length > 0) {
+            matchesUpcoming = ms;
+            if (currentTab === 'upcoming') {
+                matches = matchesUpcoming.slice();
+                renderAll(false);
+            }
+        }
+    }).catch(function(){});
+
+    function setTab(tab) {
+        if (tab === currentTab) return;
+        currentTab = tab;
+        var tabs = document.querySelectorAll('.live-results__tab');
+        tabs.forEach(function(btn) {
+            if (btn.getAttribute('data-tab') === tab) {
+                btn.classList.add('live-results__tab--active');
+            } else {
+                btn.classList.remove('live-results__tab--active');
+            }
+        });
+        if (tab === 'played') {
+            matches = matchesPlayed.slice();
+            renderAll(false);
+            startRotation();
+        } else {
+            matches = matchesUpcoming.slice();
+            renderAll(false);
+        }
+    }
+
+    document.querySelectorAll('.live-results__tab').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var tab = this.getAttribute('data-tab') || 'played';
+            setTab(tab);
+        });
+    });
 });
 </script>
 {% endblock %}

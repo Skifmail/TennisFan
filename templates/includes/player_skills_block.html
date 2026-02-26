@@ -1,0 +1,38 @@
+{% comment %}
+  player_skills_data: { metrics: [ { name, label, display_value, votes_count, insufficient_data } ], recommend_to_improve: [ ... ] }
+  is_owner: для блока "Рекомендовано улучшить"
+{% endcomment %}
+{% if player_skills_data %}
+<div class="player-skills-block profile-info__section">
+    <h3 class="player-skills-block__title">Сильные стороны</h3>
+    <div class="player-skills-block__grid">
+        {% for m in player_skills_data.metrics %}
+        <div class="player-skills-block__item">
+            <span class="player-skills-block__label">{{ m.label }}</span>
+            <div class="player-skills-block__right">
+                {% if m.insufficient_data %}
+                <span class="player-skills-block__value player-skills-block__value--muted">Недостаточно данных</span>
+                {% else %}
+                <span class="player-skills-block__stars" title="Оценка {{ m.display_value }} из 10 (оценок: {{ m.votes_count }})" aria-label="{{ m.display_value }} из 10">
+                    {% for i in "1234567890" %}
+                    <span class="player-skills-block__star {% if forloop.counter <= m.stars_filled %}player-skills-block__star--filled{% endif %}">★</span>
+                    {% endfor %}
+                </span>
+                <span class="player-skills-block__votes">({{ m.votes_count }})</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% if is_owner and player_skills_data.recommend_to_improve %}
+    <div class="player-skills-block__improve">
+        <h4 class="player-skills-block__improve-title">Рекомендовано улучшить</h4>
+        <ul class="player-skills-block__improve-list">
+            {% for r in player_skills_data.recommend_to_improve %}
+            <li>{{ r.label }} — <strong>{{ r.average_weighted|floatformat:1 }}</strong> (оценок: {{ r.votes_count }})</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endif %}

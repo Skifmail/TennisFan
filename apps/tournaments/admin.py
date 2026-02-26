@@ -389,7 +389,7 @@ class TVDTournamentAdminForm(TournamentAdminForm):
 
 @admin.register(TVDTournament)
 class TVDTournamentAdmin(admin.ModelAdmin):
-    """Админка для турниров выходного дня (proxy над Tournament, format=weekend_day)."""
+    """Админка для однодневных турниров (proxy над Tournament, format=weekend_day)."""
 
     form = TVDTournamentAdminForm
     inlines = [TVDGroupInline]

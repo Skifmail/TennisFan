@@ -55,7 +55,7 @@ class TournamentFormat(models.TextChoices):
         "Олимпийский (за все места)",
     )
     ROUND_ROBIN = "round_robin", "Круговой"
-    WEEKEND_DAY = "weekend_day", "Турнир выходного дня"
+    WEEKEND_DAY = "weekend_day", "Однодневный турнир"
 
 
 class MatchFormat(models.TextChoices):
@@ -395,12 +395,12 @@ class TournamentEntryRefundRequest(models.Model):
 
 
 class TVDTournament(Tournament):
-    """Прокси-модель для раздела «Турниры выходного дня» в админке."""
+    """Прокси-модель для раздела однодневных турниров в админке."""
 
     class Meta:
         proxy = True
-        verbose_name = "ТВД-турнир"
-        verbose_name_plural = "Турниры выходного дня"
+        verbose_name = "Однодневный турнир"
+        verbose_name_plural = "Однодневные турниры"
 
 
 class TournamentTeam(models.Model):

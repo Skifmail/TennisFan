@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Оценить соперника{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl); max-width: 560px;">
+    <h1 class="page-title mb-3">Оценка соперника</h1>
+    <p class="text-secondary mb-4">Матч: {{ match }}. Оценки анонимны, редактирование возможно 24 часа.</p>
+
+    {% if not rating_status.can_rate and not rating_status.can_edit %}
+    <p class="text-secondary">{{ rating_status.reason }}</p>
+    <a href="{% url 'match_detail' match.pk %}" class="btn btn-outline">К матчу</a>
+    {% else %}
+    <form id="rate-form" class="rate-form">
+        {% csrf_token %}
+        {% for m in metrics %}
+        <div class="mb-3">
+            <label for="id_{{ m.name }}" class="form-label">{{ m.label }} (1–10, необязательно)</label>
+            <input type="number" name="{{ m.name }}" id="id_{{ m.name }}" class="form-control" min="1" max="10" step="1" placeholder="—">
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">Отправить оценку</button>
+        <a href="{% url 'match_detail' match.pk %}" class="btn btn-outline ms-2">Отмена</a>
+    </form>
+    <p id="rate-message" class="mt-3 small text-secondary" style="display:none;"></p>
+    {% endif %}
+</div>
+
+<script>
+(function() {
+    const form = document.getElementById('rate-form');
+    if (!form) return;
+    const msgEl = document.getElementById('rate-message');
+    const rateApiUrl = '{{ rate_api_url|escapejs }}';
+    const myMatchesUrl = '{{ my_matches_url|escapejs }}';
+    const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const payload = {};
+        form.querySelectorAll('input[type=number]').forEach(function(inp) {
+            const v = inp.value.trim();
+            payload[inp.name] = v === '' ? null : parseInt(v, 10);
+        });
+        msgEl.style.display = 'none';
+        fetch(rateApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) {
+            return r.json().then(function(data) {
+                if (r.ok && data.success) {
+                    msgEl.textContent = 'Оценка сохранена. Спасибо! Сейчас вернёмся к списку матчей.';
+                    msgEl.style.color = 'var(--color-success, green)';
+                    msgEl.style.display = 'block';
+                    // Блокируем форму и уходим в «Мои матчи»
+                    form.querySelectorAll('input, button').forEach(function(el) {
+                        el.disabled = true;
+                    });
+                    const redirectTarget = data.redirect_url || myMatchesUrl || null;
+                    if (redirectTarget) {
+                        setTimeout(function() {
+                            window.location.href = redirectTarget;
+                        }, 800);
+                    }
+                } else {
+                    msgEl.textContent = data.error || 'Ошибка отправки';
+                    msgEl.style.color = 'var(--color-danger, red)';
+                    msgEl.style.display = 'block';
+                }
+            });
+        })
+        .catch(function() {
+            msgEl.textContent = 'Ошибка сети';
+            msgEl.style.color = 'var(--color-danger, red)';
+            msgEl.style.display = 'block';
+        });
+    });
+})();
+</script>
+{% endblock %}

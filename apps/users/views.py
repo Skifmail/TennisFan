@@ -649,6 +649,16 @@ def profile(request, pk):
             except Exception:
                 pass
 
+    player_skills_data = None
+    try:
+        from apps.player_ratings.services import get_player_skills
+
+        player_skills_data = get_player_skills(
+            player, request.user, include_lowest_three=True
+        )
+    except Exception:
+        pass
+
     context = {
         "player": player,
         "recent_matches": recent_matches,
@@ -666,6 +676,8 @@ def profile(request, pk):
         "current_season_display": current_season_display,
         "season_points_data": season_points_data,
         "season_championships": season_championships,
+        "player_skills_data": player_skills_data,
+        "is_profile_owner": request.user == player.user,
     }
     return render(request, "users/profile.html", context)
 

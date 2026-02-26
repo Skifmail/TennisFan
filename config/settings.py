@@ -101,6 +101,7 @@ INSTALLED_APPS = [
     "apps.navigation",
     "apps.shop",
     "apps.telegram_bot",
+    "apps.player_ratings",
 ]
 
 # ------------------------------------------------------------------------------

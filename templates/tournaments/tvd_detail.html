@@ -11,7 +11,7 @@
 
     <div class="d-flex gap-2 mb-2 flex-wrap">
         <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_variant_display }}</span>
-        <span class="player-category" style="background: rgba(72, 61, 139, 0.25); color: #483d8b;">ТВД</span>
+        <span class="player-category" style="background: rgba(72, 61, 139, 0.25); color: #483d8b;">OneDay</span>
         {% for ac in tournament.allowed_categories.all %}
         <span class="player-category">{{ ac.get_category_display }}</span>
         {% endfor %}

@@ -7581,6 +7581,19 @@ select.form-control {
     align-items: center;
 }
 
+/* Кнопка «Для отклика нужна подписка» — визуально неактивная, но ведёт на страницу тарифов */
+.sparring-btn--locked {
+    opacity: 0.85;
+    color: var(--color-text-muted);
+    border-color: var(--color-text-muted);
+}
+.sparring-btn--locked:hover {
+    background: transparent;
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    opacity: 1;
+}
+
 .sparring-card--closed .sparring-card__desc {
     opacity: 0.85;
 }

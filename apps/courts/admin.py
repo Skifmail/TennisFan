@@ -58,10 +58,20 @@ class CourtAdmin(admin.ModelAdmin):
         "surface",
         "courts_count",
         "is_indoor",
+        "is_outdoor",
         "price_per_hour",
         "is_active",
     )
-    list_filter = ("city", "surface", "is_indoor", "has_lighting", "is_active")
+    list_filter = (
+        "city",
+        "surface",
+        "is_indoor",
+        "is_outdoor",
+        "has_lighting",
+        "racket_rental",
+        "has_training",
+        "is_active",
+    )
     search_fields = ("name", "address")
     list_editable = ("is_active",)
     prepopulated_fields = {"slug": ("name",)}
@@ -84,11 +94,30 @@ class CourtAdmin(admin.ModelAdmin):
         ),
         (
             "Характеристики",
-            {"fields": ("surface", "courts_count", "has_lighting", "is_indoor")},
+            {
+                "fields": (
+                    "surface",
+                    "courts_count",
+                    "has_lighting",
+                    "is_indoor",
+                    "is_outdoor",
+                )
+            },
         ),
         (
             "Особенности",
-            {"fields": ("sells_balls", "sells_water", "multiple_payment_methods")},
+            {
+                "fields": (
+                    "sells_balls",
+                    "sells_water",
+                    "multiple_payment_methods",
+                    "racket_rental",
+                    "parking_on_site",
+                    "parking_nearby",
+                    "racket_stringing",
+                    "has_training",
+                )
+            },
         ),
         ("Контакты", {"fields": ("phone", "whatsapp", "website")}),
         (
@@ -98,7 +127,17 @@ class CourtAdmin(admin.ModelAdmin):
                 "description": "Координаты подставляются по адресу при сохранении (Yandex Geocoder). Либо укажите вручную или действие «Получить координаты по адресу» в списке кортов.",
             },
         ),
-        ("Цена и фото", {"fields": ("price_per_hour", "image")}),
+        (
+            "Цена и фото",
+            {
+                "fields": (
+                    "price_per_hour",
+                    "rental_price_min",
+                    "rental_price_max",
+                    "image",
+                )
+            },
+        ),
         ("Статус", {"fields": ("is_active",)}),
     )
 

@@ -55,7 +55,9 @@ def training_list(request):
 def training_detail(request, slug):
     """Training detail page. Только для авторизованных пользователей."""
     training = get_object_or_404(
-        Training.objects.select_related("coach", "court"), slug=slug, is_active=True
+        Training.objects.select_related("coach").prefetch_related("courts"),
+        slug=slug,
+        is_active=True,
     )
     return render(request, "training/detail.html", {"training": training})
 

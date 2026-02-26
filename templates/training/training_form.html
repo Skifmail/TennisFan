@@ -57,9 +57,10 @@
                         {% for err in form.city.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                     <div class="form-group" style="flex: 1; min-width: 180px;">
-                        <label class="form-label" for="id_court">{{ form.court.label }}</label>
-                        {{ form.court }}
-                        {% for err in form.court.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                        <label class="form-label" for="id_courts">{{ form.courts.label }}</label>
+                        {{ form.courts }}
+                        <span class="form-hint text-muted" style="font-size: var(--font-size-xs);">Можно выбрать несколько — один тренер может проводить тренировки на разных площадках.</span>
+                        {% for err in form.courts.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                 </div>
 

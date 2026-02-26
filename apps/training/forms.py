@@ -187,7 +187,7 @@ class TrainingForm(forms.ModelForm):
             "training_type",
             "skill_level",
             "target_category",
-            "court",
+            "courts",
             "city",
             "duration_minutes",
             "max_participants",
@@ -203,7 +203,7 @@ class TrainingForm(forms.ModelForm):
             "training_type": forms.Select(attrs={"class": "form-control"}),
             "skill_level": forms.Select(attrs={"class": "form-control"}),
             "target_category": forms.Select(attrs={"class": "form-control"}),
-            "court": forms.Select(attrs={"class": "form-control"}),
+            "courts": forms.SelectMultiple(attrs={"class": "form-control", "size": 8}),
             "city": forms.TextInput(attrs={"class": "form-control"}),
             "duration_minutes": forms.NumberInput(
                 attrs={"class": "form-control", "min": 1}
@@ -225,11 +225,10 @@ class TrainingForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         from apps.users.models import SkillLevel
 
-        self.fields["court"].queryset = Court.objects.filter(is_active=True).order_by(
+        self.fields["courts"].queryset = Court.objects.filter(is_active=True).order_by(
             "name"
         )
-        self.fields["court"].required = False
-        self.fields["court"].empty_label = "—— Не выбрано ——"
+        self.fields["courts"].required = False
         self.fields["target_category"].required = False
         self.fields["target_category"].choices = [("", "———")] + list(
             SkillLevel.choices

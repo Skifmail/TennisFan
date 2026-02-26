@@ -148,6 +148,7 @@ class TrainingAdmin(admin.ModelAdmin):
         "training_type",
         "skill_level",
         "coach",
+        "courts_display",
         "city",
         "price",
         "is_active",
@@ -157,7 +158,16 @@ class TrainingAdmin(admin.ModelAdmin):
     search_fields = ("title", "description")
     list_editable = ("is_active", "is_featured")
     prepopulated_fields = {"slug": ("title",)}
-    raw_id_fields = ("coach", "court")
+    raw_id_fields = ("coach",)
+    filter_horizontal = ("courts",)
+
+    def courts_display(self, obj):
+        names = list(obj.courts.values_list("name", flat=True)[:6])
+        if not names:
+            return "—"
+        return ", ".join(names[:5]) + (" …" if len(names) > 5 else "")
+
+    courts_display.short_description = "Корты"
 
 
 @admin.register(TrainingEnrollment)

@@ -33,15 +33,23 @@
             <div class="card-body">
                 <h3 class="card-title">{{ court.name }}</h3>
                 <p class="card-text">{{ court.address }}</p>
-                <div class="d-flex gap-1 mt-2">
+                <div class="d-flex gap-1 mt-2 flex-wrap">
                     <span class="player-category">{{ court.surface }}</span>
                     {% if court.is_indoor %}
                     <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">Крытый</span>
                     {% endif %}
+                    {% if court.is_outdoor %}
+                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">Открытый</span>
+                    {% endif %}
                 </div>
                 <div class="court-card__footer mt-2 d-flex justify-content-between align-items-center flex-wrap gap-1">
-                    {% if court.price_per_hour %}
-                    <span class="text-primary" style="font-weight: 600;">{{ court.price_per_hour }} ₽/час</span>
+                    {% if court.rental_price_min or court.rental_price_max or court.price_per_hour %}
+                    <span class="text-primary" style="font-weight: 600;">
+                        {% if court.rental_price_min and court.rental_price_max %}от {{ court.rental_price_min }} до {{ court.rental_price_max }} ₽/час
+                        {% elif court.rental_price_min %}от {{ court.rental_price_min }} ₽/час
+                        {% elif court.rental_price_max %}до {{ court.rental_price_max }} ₽/час
+                        {% else %}{{ court.price_per_hour }} ₽/час{% endif %}
+                    </span>
                     {% else %}
                     <span></span>
                     {% endif %}

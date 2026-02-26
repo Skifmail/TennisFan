@@ -39,12 +39,17 @@
                 {% endif %}
             </dl>
 
-            {% if court.sells_balls or court.sells_water or court.multiple_payment_methods %}
+            {% if court.sells_balls or court.sells_water or court.multiple_payment_methods or court.racket_rental or court.parking_on_site or court.parking_nearby or court.racket_stringing or court.has_training %}
             <h3 class="court-detail__section-title">Особенности</h3>
             <ul class="court-detail__features">
                 {% if court.sells_balls %}<li><span class="court-detail__check">✓</span> Теннисные мячи в продаже</li>{% endif %}
                 {% if court.sells_water %}<li><span class="court-detail__check">✓</span> Вода в продаже</li>{% endif %}
                 {% if court.multiple_payment_methods %}<li><span class="court-detail__check">✓</span> Возможность оплаты корта разными способами</li>{% endif %}
+                {% if court.racket_rental %}<li><span class="court-detail__check">✓</span> Аренда ракеток</li>{% endif %}
+                {% if court.parking_on_site %}<li><span class="court-detail__check">✓</span> Парковка на территории</li>{% endif %}
+                {% if court.parking_nearby %}<li><span class="court-detail__check">✓</span> Парковка рядом</li>{% endif %}
+                {% if court.racket_stringing %}<li><span class="court-detail__check">✓</span> Перетяжка ракеток</li>{% endif %}
+                {% if court.has_training %}<li><span class="court-detail__check">✓</span> Тренировки</li>{% endif %}
             </ul>
             {% endif %}
 
@@ -53,14 +58,29 @@
                 <dd>{{ court.courts_count }}</dd>
 
                 <dt>Типы кортов</dt>
-                <dd>{% if court.is_indoor %}Закрытые{% else %}Открытые{% endif %}</dd>
+                <dd>
+                    {% if court.is_indoor and court.is_outdoor %}Закрытые и открытые
+                    {% elif court.is_indoor %}Закрытые
+                    {% elif court.is_outdoor %}Открытые
+                    {% else %}—{% endif %}
+                </dd>
 
                 <dt>Тип покрытия</dt>
                 <dd>{{ court.surface }}</dd>
 
-                {% if court.price_per_hour %}
-                <dt>Цена</dt>
-                <dd class="text-primary" style="font-weight: 600;">{{ court.price_per_hour }} ₽/час</dd>
+                {% if court.rental_price_min or court.rental_price_max or court.price_per_hour %}
+                <dt>Цена аренды</dt>
+                <dd class="text-primary" style="font-weight: 600;">
+                    {% if court.rental_price_min and court.rental_price_max %}
+                        от {{ court.rental_price_min }} до {{ court.rental_price_max }} ₽/час
+                    {% elif court.rental_price_min %}
+                        от {{ court.rental_price_min }} ₽/час
+                    {% elif court.rental_price_max %}
+                        до {{ court.rental_price_max }} ₽/час
+                    {% else %}
+                        {{ court.price_per_hour }} ₽/час
+                    {% endif %}
+                </dd>
                 {% endif %}
             </dl>
 

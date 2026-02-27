@@ -21,7 +21,7 @@ from .constants import (
     RATING_MIN,
 )
 from .enums import SkillMetric
-from .models import PlayerSkillAggregate, PlayerSkillRating
+from .models import PlayerSkillAggregate, PlayerSkillRating, SkillMetricConfig
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,77 @@ def validate_metric_values(payload: dict[str, Any]) -> dict[str, int | None]:
         except (TypeError, ValueError):
             result[name] = None
     return result
+
+
+def ensure_metric_configs_exist() -> None:
+    """Гарантирует наличие записей конфигурации для всех метрик.
+
+    Краткое описание:
+        Создаёт недостающие записи SkillMetricConfig для всех метрик SkillMetric
+        с базовыми названиями и включённым отображением.
+
+    Args:
+        None: Функция не принимает аргументов.
+
+    Returns:
+        None: Ничего не возвращает.
+
+    Raises:
+        None: Явных исключений не генерирует, возможны стандартные ошибки БД.
+    """
+    for name, label in SkillMetric.choices:
+        SkillMetricConfig.objects.get_or_create(
+            metric_name=name,
+            defaults={"label": label, "display_on_page": True},
+        )
+
+
+def get_metric_labels() -> dict[str, str]:
+    """Возвращает карту системных имён метрик в отображаемые названия.
+
+    Краткое описание:
+        Строит словарь базовых названий метрик с учётом переопределений в БД.
+
+    Args:
+        None: Функция не принимает аргументов.
+
+    Returns:
+        dict[str, str]: Словарь {metric_name: отображаемое_название}.
+
+    Raises:
+        None: Явных исключений не генерирует, возможны стандартные ошибки БД.
+    """
+    ensure_metric_configs_exist()
+    base_labels: dict[str, str] = dict(SkillMetric.choices)
+    overrides: dict[str, str] = {
+        cfg.metric_name: cfg.label for cfg in SkillMetricConfig.objects.all()
+    }
+    base_labels.update(overrides)
+    return base_labels
+
+
+def get_visible_metric_names() -> list[str]:
+    """Возвращает список метрик, отмеченных для отображения.
+
+    Краткое описание:
+        Отбирает системные имена метрик, для которых в SkillMetricConfig
+        установлен флаг display_on_page, и сортирует их в базовом порядке.
+
+    Args:
+        None: Функция не принимает аргументов.
+
+    Returns:
+        list[str]: Список имён метрик в порядке SkillMetric.all_metric_names().
+
+    Raises:
+        None: Явных исключений не генерирует, возможны стандартные ошибки БД.
+    """
+    ensure_metric_configs_exist()
+    visible = {
+        cfg.metric_name
+        for cfg in SkillMetricConfig.objects.filter(display_on_page=True)
+    }
+    return [name for name in SkillMetric.all_metric_names() if name in visible]
 
 
 # --- Сохранение и пересчёт ----------------------------------------------------
@@ -252,7 +323,7 @@ def get_player_skills(
         and request_user.player.pk == player.pk
     )
 
-    aggregates = {
+    aggregates: dict[str, dict[str, Any]] = {
         a.metric_name: {
             "average_raw": round(a.average_raw, 2),
             "average_weighted": round(a.average_weighted, 2),
@@ -267,12 +338,14 @@ def get_player_skills(
         for a in PlayerSkillAggregate.objects.filter(player=player)
     }
 
-    # Все 12 метрик в едином порядке
+    # Метрики в едином порядке, с учётом настроек отображения
     result: dict[str, Any] = {
         "metrics": [],
         "recommend_to_improve": [],
     }
-    for name in SkillMetric.all_metric_names():
+    metric_labels = get_metric_labels()
+    visible_metric_names = get_visible_metric_names()
+    for name in visible_metric_names:
         data = aggregates.get(name)
         if not data:
             data = {
@@ -292,7 +365,7 @@ def get_player_skills(
         result["metrics"].append(
             {
                 "name": name,
-                "label": dict(SkillMetric.choices).get(name, name),
+                "label": metric_labels.get(name, name),
                 "stars_filled": stars_filled,
                 **data,
             }
@@ -300,7 +373,7 @@ def get_player_skills(
 
     if is_owner and include_lowest_three:
         with_votes: list[tuple[str, dict[str, Any]]] = []
-        for name in SkillMetric.all_metric_names():
+        for name in visible_metric_names:
             agg = aggregates.get(name)
             if agg and agg.get("votes_count", 0) >= MIN_VOTES_TO_DISPLAY:
                 with_votes.append((name, agg))
@@ -309,7 +382,7 @@ def get_player_skills(
         result["recommend_to_improve"] = [
             {
                 "name": name,
-                "label": dict(SkillMetric.choices).get(name, name),
+                "label": metric_labels.get(name, name),
                 "average_weighted": data["average_weighted"],
                 "votes_count": data["votes_count"],
             }

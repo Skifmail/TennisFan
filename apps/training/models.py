@@ -63,17 +63,45 @@ class Coach(models.Model):
         return str(self.name)
 
     @property
-    def telegram_url(self) -> str | None:
-        if not self.telegram:
+    def player_profile(self):
+        """Связанный профиль игрока (если есть)."""
+        from apps.users.models import Player  # локальный импорт, чтобы избежать циклов
+
+        if not self.user_id:
             return None
-        u = self.telegram.strip().lstrip("@")
+        try:
+            return self.user.player
+        except (AttributeError, Player.DoesNotExist):
+            return None
+
+    @property
+    def photo_or_avatar(self):
+        """Фото тренера: собственное фото или аватар игрока, если фото не загружено."""
+        if self.photo:
+            return self.photo
+        player = self.player_profile
+        if player and player.avatar:
+            return player.avatar
+        return None
+
+    @property
+    def telegram_url(self) -> str | None:
+        handle = self.telegram or (
+            self.player_profile.telegram if self.player_profile else ""
+        )
+        if not handle:
+            return None
+        u = handle.strip().lstrip("@")
         return str(f"https://t.me/{u}") if u else None
 
     @property
     def whatsapp_url(self) -> str | None:
-        if not self.whatsapp:
+        number = self.whatsapp or (
+            self.player_profile.whatsapp if self.player_profile else ""
+        )
+        if not number:
             return None
-        phone = "".join(c for c in self.whatsapp if c.isdigit())
+        phone = "".join(c for c in number if c.isdigit())
         if phone.startswith("8") and len(phone) == 11:
             phone = "7" + phone[1:]
         elif phone.startswith("7") and len(phone) == 11:

@@ -15,10 +15,11 @@ from django.views.decorators.http import require_GET, require_http_methods
 from apps.tournaments.models import Match
 from apps.users.models import Player
 
-from .enums import SkillMetric
 from .services import (
     get_match_rating_status,
+    get_metric_labels,
     get_player_skills,
+    get_visible_metric_names,
     submit_rating,
 )
 
@@ -55,8 +56,11 @@ def rate_match(request, match_id: int):
         status = get_match_rating_status(match, player)
         if request.headers.get("Accept", "").find("application/json") >= 0:
             return JsonResponse({"success": True, "rating_status": status})
+        metric_labels = get_metric_labels()
+        visible_metric_names = get_visible_metric_names()
         metrics = [
-            {"name": name, "label": label} for name, label in SkillMetric.choices
+            {"name": name, "label": metric_labels.get(name, name)}
+            for name in visible_metric_names
         ]
         return render(
             request,

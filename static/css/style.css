@@ -3758,6 +3758,30 @@ select.form-control {
     grid-template-columns: repeat(4, 1fr);
 }
 
+/* Coach detail layout */
+.coach-detail-grid {
+    grid-template-columns: 300px 1fr;
+    gap: var(--spacing-xl);
+}
+
+.coach-detail-sidebar {
+    height: fit-content;
+}
+
+@media (width <= 900px) {
+    .coach-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .coach-detail-sidebar {
+        order: 1;
+    }
+
+    .coach-detail-main {
+        order: 2;
+    }
+}
+
 /* Training detail layout */
 .training-detail-grid {
     grid-template-columns: 1fr 400px;

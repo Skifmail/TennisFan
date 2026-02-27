@@ -13,6 +13,7 @@
                 {% if m.insufficient_data %}
                 <span class="player-skills-block__value player-skills-block__value--muted">Недостаточно данных</span>
                 {% else %}
+                <span class="player-skills-block__numeric">{{ m.display_value|floatformat:1 }}</span>
                 <span class="player-skills-block__stars" title="Оценка {{ m.display_value }} из 10 (оценок: {{ m.votes_count }})" aria-label="{{ m.display_value }} из 10">
                     {% for i in "1234567890" %}
                     <span class="player-skills-block__star {% if forloop.counter <= m.stars_filled %}player-skills-block__star--filled{% endif %}">★</span>

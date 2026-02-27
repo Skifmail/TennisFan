@@ -9,11 +9,11 @@
         <a href="{% url 'coach_list' %}" class="text-secondary">&larr; Все тренеры</a>
     </div>
 
-    <div class="grid" style="grid-template-columns: 300px 1fr; gap: var(--spacing-xl);">
-        <div class="card" style="height: fit-content;">
+    <div class="grid coach-detail-grid">
+        <div class="card coach-detail-sidebar">
             <div class="card-body text-center">
-                {% if coach.photo %}
-                <img src="{{ coach.photo.url }}" alt="" class="player-avatar"
+                {% if coach.photo_or_avatar %}
+                <img src="{{ coach.photo_or_avatar.url }}" alt="" class="player-avatar"
                     style="width: 150px; height: 150px; margin: 0 auto var(--spacing-lg);">
                 {% else %}
                 <div class="player-avatar" style="width: 150px; height: 150px; margin: 0 auto var(--spacing-lg);"></div>
@@ -34,7 +34,7 @@
             </div>
         </div>
 
-        <div>
+        <div class="coach-detail-main">
             {% if coach.bio %}
             <div class="card mb-4">
                 <div class="card-body">

@@ -8,8 +8,8 @@
         <a href="{% url 'training_list' %}" class="text-secondary">&larr; Все тренировки</a>
     </div>
 
-    <div class="grid" style="grid-template-columns: 1fr 400px; gap: var(--spacing-xl);">
-        <div>
+    <div class="grid training-detail-grid">
+        <div class="training-detail-main">
             {% if training.image %}
             <img src="{{ training.image.url }}" alt=""
                 style="width: 100%; border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl);">
@@ -39,8 +39,8 @@
             {% endif %}
         </div>
 
-        <div>
-            <div class="card" style="position: sticky; top: 100px;">
+        <div class="training-detail-sidebar">
+            <div class="card training-detail-sidebar-card">
                 <div class="card-body">
                     {% if training.price %}
                     <div class="text-primary mb-3" style="font-size: var(--font-size-2xl); font-weight: 800;">{{ training.price }} ₽</div>

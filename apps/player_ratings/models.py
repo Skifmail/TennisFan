@@ -86,6 +86,38 @@ class PlayerSkillRating(models.Model):
             setattr(self, metric_name, value)
 
 
+class SkillMetricConfig(models.Model):
+    """Настраиваемое отображаемое название метрики навыков игрока."""
+
+    metric_name = models.CharField(
+        max_length=30,
+        choices=SkillMetric.choices,
+        unique=True,
+        db_index=True,
+        verbose_name="Системное имя метрики",
+    )
+    label = models.CharField(
+        max_length=100,
+        verbose_name="Название для отображения",
+        help_text="Будет показано в профиле игрока и в форме оценки соперника.",
+    )
+    display_on_page = models.BooleanField(
+        default=True,
+        verbose_name="Отображать на странице",
+        help_text=(
+            "Если включено, метрика будет показана в профиле игрока и в форме оценки соперника."
+        ),
+    )
+
+    class Meta:
+        verbose_name = "Название метрики навыков"
+        verbose_name_plural = "Названия метрик навыков"
+        db_table = "player_ratings_skillmetricconfig"
+
+    def __str__(self) -> str:
+        return f"{self.metric_name} → {self.label}"
+
+
 class PlayerSkillAggregate(models.Model):
     """
     Агрегат по игроку и метрике: среднее, байесовское среднее, число оценок.

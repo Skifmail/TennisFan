@@ -3758,6 +3758,52 @@ select.form-control {
     grid-template-columns: repeat(4, 1fr);
 }
 
+/* Coach detail layout */
+.coach-detail-grid {
+    grid-template-columns: 300px 1fr;
+    gap: var(--spacing-xl);
+}
+
+.coach-detail-sidebar {
+    height: fit-content;
+}
+
+@media (width <= 900px) {
+    .coach-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .coach-detail-sidebar {
+        order: 1;
+    }
+
+    .coach-detail-main {
+        order: 2;
+    }
+}
+
+/* Training detail layout */
+.training-detail-grid {
+    grid-template-columns: 1fr 400px;
+    gap: var(--spacing-xl);
+}
+
+.training-detail-sidebar-card {
+    position: sticky;
+    top: 100px;
+}
+
+@media (width <= 900px) {
+    .training-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .training-detail-sidebar-card {
+        position: static;
+        margin-top: var(--spacing-lg);
+    }
+}
+
 /* ==========================================================================
    Hero Section
    ========================================================================== */
@@ -4196,7 +4242,9 @@ select.form-control {
     border: none;
     font-weight: 600;
     text-decoration: none;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .footer-donate:hover,
@@ -4205,6 +4253,14 @@ select.form-control {
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
     color: #0f3f40 !important;
     background: #caa94f !important;
+}
+
+@media (width <= 480px) {
+    .footer-donate,
+    .footer-brand .btn-donate {
+        padding: 8px 14px;
+        font-size: var(--font-size-xs);
+    }
 }
 
 .footer-bottom {
@@ -7739,6 +7795,10 @@ select.form-control {
     flex-shrink: 0;
     vertical-align: middle;
     object-fit: contain;
+    width: 24px;
+    height: 24px;
+    max-width: 24px;
+    max-height: 24px;
 }
 
 .form-group-messenger {

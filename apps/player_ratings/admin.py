@@ -1,6 +1,7 @@
 from django.contrib import admin
 
-from .models import PlayerSkillAggregate, PlayerSkillRating
+from .models import PlayerSkillAggregate, PlayerSkillRating, SkillMetricConfig
+from .services import ensure_metric_configs_exist
 
 
 @admin.register(PlayerSkillRating)
@@ -26,3 +27,15 @@ class PlayerSkillAggregateAdmin(admin.ModelAdmin):
     search_fields = ("player__user__email",)
     raw_id_fields = ("player",)
     readonly_fields = ("updated_at",)
+
+
+@admin.register(SkillMetricConfig)
+class SkillMetricConfigAdmin(admin.ModelAdmin):
+    list_display = ("metric_name", "label", "display_on_page")
+    list_editable = ("label", "display_on_page")
+    search_fields = ("metric_name", "label")
+
+    def get_queryset(self, request):
+        """Возвращает QuerySet конфигураций, гарантируя наличие записей для всех метрик."""
+        ensure_metric_configs_exist()
+        return super().get_queryset(request)

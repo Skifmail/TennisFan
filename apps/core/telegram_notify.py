@@ -23,26 +23,35 @@ NOTIFY_STARTUP_GREETING = (
 )
 
 
+def _is_shared_cache() -> bool:
+    """Проверка, что кэш общий между процессами (Redis и т.п.), а не локальная память."""
+    backend = getattr(settings, "CACHES", {}).get("default", {}).get("BACKEND", "")
+    return (
+        "redis" in backend.lower()
+        or "memcached" in backend.lower()
+        or "database" in backend.lower()
+    )
+
+
 def send_startup_greeting_to_admins() -> None:
     """
     Отправить приветственное сообщение всем админам один раз после старта.
-    Используется кэш, чтобы не слать при каждом рестарте воркера (повтор не чаще чем раз в 7 дней).
+    Работает только при общем кэше (Redis/Memcached): иначе каждый воркер шлёт отдельно.
+    Используется cache.add() (атомарно «установить, если нет»), повтор не чаще чем раз в 7 дней.
     """
-    try:
-        if cache.get(CACHE_KEY_NOTIFY_GREETING_SENT):
-            return
-    except Exception:
-        pass
-    if not send_admin_message(NOTIFY_STARTUP_GREETING):
+    if not _is_shared_cache():
         return
     try:
-        cache.set(
+        added = cache.add(
             CACHE_KEY_NOTIFY_GREETING_SENT,
             True,
             timeout=CACHE_GREETING_TIMEOUT,
         )
+        if not added:
+            return
     except Exception:
-        pass
+        return
+    send_admin_message(NOTIFY_STARTUP_GREETING)
 
 
 def send_admin_message(text: str, parse_mode: str = "HTML") -> bool:

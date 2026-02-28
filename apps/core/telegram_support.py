@@ -16,19 +16,29 @@ def _get_bot_token() -> str:
     return (getattr(settings, "TELEGRAM_SUPPORT_BOT_TOKEN", None) or "").strip()
 
 
-def _get_admin_chat_id() -> str:
-    return (getattr(settings, "TELEGRAM_ADMIN_CHAT_ID", None) or "").strip()
+def _get_admin_chat_ids() -> list[str]:
+    """Список chat_id администраторов (из TELEGRAM_ADMIN_CHAT_IDS или одного TELEGRAM_ADMIN_CHAT_ID)."""
+    ids = getattr(settings, "TELEGRAM_ADMIN_CHAT_IDS", None)
+    if ids:
+        return [str(cid).strip() for cid in ids if str(cid).strip()]
+    single = (getattr(settings, "TELEGRAM_ADMIN_CHAT_ID", None) or "").strip()
+    return [single] if single else []
 
 
 def is_telegram_configured() -> bool:
-    """Проверка, что бот и админский chat_id заданы."""
-    return bool(_get_bot_token() and _get_admin_chat_id())
+    """Проверка, что бот и хотя бы один админский chat_id заданы."""
+    return bool(_get_bot_token() and _get_admin_chat_ids())
 
 
 def get_admin_chat_id_value() -> str | None:
-    """Значение TELEGRAM_ADMIN_CHAT_ID для whitelist."""
-    v = _get_admin_chat_id()
-    return v if v else None
+    """Первый TELEGRAM_ADMIN_CHAT_ID для обратной совместимости (например whitelist)."""
+    ids = _get_admin_chat_ids()
+    return ids[0] if ids else None
+
+
+def get_admin_chat_ids() -> list[str]:
+    """Список всех chat_id, которым шлём уведомления и сообщения поддержки."""
+    return _get_admin_chat_ids()
 
 
 def send_message(
@@ -65,11 +75,18 @@ def send_message(
 
 
 def send_to_admin(text: str) -> tuple[int | None, bool]:
-    """Отправить сообщение администратору. Возвращает (message_id, success)."""
-    chat_id = _get_admin_chat_id()
-    if not chat_id:
+    """Отправить сообщение всем администраторам. Возвращает (message_id последней отправки, True если хотя бы одна успешна)."""
+    chat_ids = _get_admin_chat_ids()
+    if not chat_ids:
         return None, False
-    return send_message(chat_id, text)
+    last_msg_id = None
+    any_ok = False
+    for chat_id in chat_ids:
+        msg_id, ok = send_message(chat_id, text)
+        if ok:
+            last_msg_id = msg_id
+            any_ok = True
+    return last_msg_id, any_ok
 
 
 def edit_message(

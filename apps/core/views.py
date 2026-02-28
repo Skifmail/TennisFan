@@ -685,8 +685,8 @@ def telegram_support_webhook(request):
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({"ok": True})
 
-    admin_chat_id = tg_support.get_admin_chat_id_value()
-    if not admin_chat_id:
+    admin_chat_ids = tg_support.get_admin_chat_ids()
+    if not admin_chat_ids:
         return JsonResponse({"ok": True})
 
     message = data.get("message") or {}
@@ -695,7 +695,7 @@ def telegram_support_webhook(request):
     reply_to = message.get("reply_to_message") or {}
 
     # ----- Ответ администратора (reply на наше сообщение админу) -----
-    if reply_to and chat_id == admin_chat_id and text:
+    if reply_to and chat_id in admin_chat_ids and text:
         original_message_id = reply_to.get("message_id")
         if not original_message_id:
             return JsonResponse({"ok": True})
@@ -770,11 +770,11 @@ def telegram_support_webhook(request):
                     )
             else:
                 new_text = support_msg.admin_telegram_text + "\n\n✅ Ответ отправлен"
-            tg_support.edit_message(admin_chat_id, original_message_id, new_text)
+            tg_support.edit_message(chat_id, original_message_id, new_text)
         return JsonResponse({"ok": True})
 
     # Админ написал сообщение без Reply — подсказка
-    if chat_id == admin_chat_id and text and not reply_to:
+    if chat_id in admin_chat_ids and text and not reply_to:
         tg_support.send_to_admin(
             "⚠️ Чтобы ответить пользователю, выберите его сообщение (Reply) и введите ответ."
         )

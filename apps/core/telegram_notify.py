@@ -23,34 +23,44 @@ def send_admin_message(text: str, parse_mode: str = "HTML") -> bool:
 
 def _send_admin_message_raw(text: str, parse_mode: str = "HTML"):
     """
-    Отправить сообщение в Telegram админу.
-    Возвращает (message_id или None, success: bool).
+    Отправить сообщение в Telegram всем админам (список TELEGRAM_ADMIN_CHAT_IDS).
+    Возвращает (message_id последней отправки или None, success: bool — хотя бы одна успешна).
     """
-    token = getattr(settings, "TELEGRAM_BOT_TOKEN", None) or ""
-    chat_id = getattr(settings, "TELEGRAM_ADMIN_CHAT_ID", None) or ""
-    if not token.strip() or not chat_id.strip():
-        logger.debug(
-            "Telegram notify skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID not set"
-        )
-        return None, False
+    token = (getattr(settings, "TELEGRAM_BOT_TOKEN", None) or "").strip()
+    chat_ids = getattr(settings, "TELEGRAM_ADMIN_CHAT_IDS", None) or []
+    if not token or not chat_ids:
+        single = (getattr(settings, "TELEGRAM_ADMIN_CHAT_ID", None) or "").strip()
+        if single:
+            chat_ids = [single]
+        else:
+            logger.debug(
+                "Telegram notify skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID(s) not set"
+            )
+            return None, False
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        "chat_id": chat_id.strip(),
-        "text": text,
-        "parse_mode": parse_mode,
-        "disable_web_page_preview": True,
-    }
-    try:
-        r = requests.post(url, json=payload, timeout=10)
-        r.raise_for_status()
-        data = r.json()
-        result = data.get("result", {})
-        msg_id = result.get("message_id")
-        return msg_id, True
-    except Exception as e:
-        logger.warning("Telegram notify failed: %s", e)
-        return None, False
+    last_msg_id = None
+    any_ok = False
+    for chat_id in chat_ids:
+        cid = str(chat_id).strip()
+        if not cid:
+            continue
+        payload = {
+            "chat_id": cid,
+            "text": text,
+            "parse_mode": parse_mode,
+            "disable_web_page_preview": True,
+        }
+        try:
+            r = requests.post(url, json=payload, timeout=10)
+            r.raise_for_status()
+            data = r.json()
+            result = data.get("result", {})
+            last_msg_id = result.get("message_id")
+            any_ok = True
+        except Exception as e:
+            logger.warning("Telegram notify failed for chat_id=%s: %s", cid, e)
+    return last_msg_id, any_ok
 
 
 def _escape(s: str) -> str:

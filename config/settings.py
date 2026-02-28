@@ -287,7 +287,12 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 # ------------------------------------------------------------------------------
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
+_telegram_admin_raw = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
+TELEGRAM_ADMIN_CHAT_ID = _telegram_admin_raw.strip()
+# Список chat_id для рассылки уведомлений и поддержки (через запятую в .env)
+TELEGRAM_ADMIN_CHAT_IDS = [
+    cid.strip() for cid in _telegram_admin_raw.split(",") if cid.strip()
+]
 TELEGRAM_SUPPORT_BOT_TOKEN = os.environ.get("TELEGRAM_SUPPORT_BOT_TOKEN", "")
 TELEGRAM_SUPPORT_WEBHOOK_SECRET = os.environ.get("TELEGRAM_SUPPORT_WEBHOOK_SECRET", "")
 TELEGRAM_USER_BOT_TOKEN = os.environ.get("TELEGRAM_USER_BOT_TOKEN", "")

@@ -8,8 +8,41 @@ from typing import cast
 
 import requests
 from django.conf import settings
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
+
+# Ключ кэша: приветствие при старте отправлено (не слать при каждом рестарте воркера)
+CACHE_KEY_NOTIFY_GREETING_SENT = "telegram_notify_startup_greeting_sent"
+CACHE_GREETING_TIMEOUT = 60 * 60 * 24 * 7  # 7 дней
+
+# Первое приветствие админам при старте бота уведомлений
+NOTIFY_STARTUP_GREETING = (
+    "👋 <b>Бот уведомлений TennisFan</b>\n\n"
+    "Запущен. Вы будете получать сюда уведомления с сайта (регистрации, заявки, обратная связь и др.)."
+)
+
+
+def send_startup_greeting_to_admins() -> None:
+    """
+    Отправить приветственное сообщение всем админам один раз после старта.
+    Используется кэш, чтобы не слать при каждом рестарте воркера (повтор не чаще чем раз в 7 дней).
+    """
+    try:
+        if cache.get(CACHE_KEY_NOTIFY_GREETING_SENT):
+            return
+    except Exception:
+        pass
+    if not send_admin_message(NOTIFY_STARTUP_GREETING):
+        return
+    try:
+        cache.set(
+            CACHE_KEY_NOTIFY_GREETING_SENT,
+            True,
+            timeout=CACHE_GREETING_TIMEOUT,
+        )
+    except Exception:
+        pass
 
 
 def send_admin_message(text: str, parse_mode: str = "HTML") -> bool:

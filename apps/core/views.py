@@ -773,10 +773,14 @@ def telegram_support_webhook(request):
             tg_support.edit_message(chat_id, original_message_id, new_text)
         return JsonResponse({"ok": True})
 
-    # Админ написал сообщение без Reply — подсказка
+    # Админ написал /start — первое приветствие (проверка, что бот работает)
     if chat_id in admin_chat_ids and text and not reply_to:
-        tg_support.send_to_admin(
-            "⚠️ Чтобы ответить пользователю, выберите его сообщение (Reply) и введите ответ."
+        if text.strip() == "/start":
+            tg_support.send_message(chat_id, tg_support.ADMIN_GREETING_SUPPORT)
+            return JsonResponse({"ok": True})
+        tg_support.send_message(
+            chat_id,
+            "⚠️ Чтобы ответить пользователю, выберите его сообщение (Reply) и введите ответ.",
         )
         return JsonResponse({"ok": True})
 
@@ -861,7 +865,7 @@ def telegram_support_webhook(request):
                 else:
                     tg_support.send_message(
                         chat_id_int,
-                        "Отправьте форму обратной связи на сайте и перейдите по ссылке из уведомления, чтобы привязать аккаунт и получать ответы здесь.",
+                        tg_support.USER_GREETING_SUPPORT,
                     )
         return JsonResponse({"ok": True})
 
@@ -876,7 +880,7 @@ def telegram_support_webhook(request):
         if not link:
             tg_support.send_message(
                 chat_id_int,
-                "Сначала отправьте форму на сайте и перейдите по ссылке из уведомления, чтобы привязать аккаунт.",
+                tg_support.USER_GREETING_SUPPORT,
             )
             return JsonResponse({"ok": True})
 

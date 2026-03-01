@@ -1,5 +1,8 @@
+import logging
+from decimal import Decimal
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -10,6 +13,9 @@ from apps.subscriptions.models import SubscriptionTier
 from apps.tournaments.models import Tournament
 
 from .forms import DonateForm
+from .yookassa_client import create_payment, get_payment_status
+
+logger = logging.getLogger(__name__)
 
 
 def _is_offer_accepted(request) -> bool:
@@ -96,8 +102,6 @@ def payment_preview(request):
         tier_id = request.GET.get("id")
         tier = get_object_or_404(SubscriptionTier, pk=tier_id)
         # Эффективная цена: региональная при наличии, иначе из тарифа
-        from decimal import Decimal
-
         effective_price = tier.price
         user_city = "moscow"
         if request.user.is_authenticated:
@@ -140,6 +144,7 @@ def payment_preview(request):
             "title": f"Подписка: {tier.get_name_display()}",
             "description": "Ежемесячная подписка на сервис TennisFan",
             "amount": amount,
+            "amount_value": f"{amount:.2f}",
             "item_id": tier.id,
             "details": details,
         }
@@ -178,8 +183,6 @@ def payment_preview(request):
                 request.user.subscription.tier.one_day_tournament_discount
             )
             if discount_percent > 0:
-                from decimal import Decimal
-
                 discount = entry_fee * (Decimal(discount_percent) / 100)
                 entry_fee = entry_fee - discount
 
@@ -188,6 +191,7 @@ def payment_preview(request):
             "title": f"Турнир: {tournament.name}",
             "description": f"Взнос за участие в турнире {tournament.get_city_display() if hasattr(tournament, 'get_city_display') else tournament.city}",
             "amount": entry_fee,
+            "amount_value": f"{entry_fee:.2f}",
             "item_id": tournament.id,
             "payment_next_url": next_url,
             "details": [
@@ -203,7 +207,16 @@ def payment_preview(request):
         comment = request.GET.get("comment", "")
         name_or_email = request.GET.get("name_or_email", "")
 
-        details = [("Тип", "Донат")]
+        try:
+            amount_decimal = Decimal(str(amount or "0").replace(",", "."))
+        except Exception:
+            amount_decimal = Decimal("0")
+        if amount_decimal <= 0:
+            messages.warning(request, "Укажите сумму для доната.")
+            return redirect(reverse("donate"))
+
+        amount_value = f"{amount_decimal:.2f}"
+        details = [("Тип", "Донат"), ("Сумма", f"{amount_decimal} ₽")]
         if name_or_email:
             details.append(("Имя/Email", name_or_email))
         if comment:
@@ -214,7 +227,8 @@ def payment_preview(request):
         context = {
             "title": "Поддержка проекта (Донат)",
             "description": "Добровольный взнос на развитие проекта",
-            "amount": amount,
+            "amount": amount_decimal,
+            "amount_value": amount_value,
             "comment": comment,
             "name_or_email": name_or_email,
             "details": details,
@@ -238,8 +252,6 @@ def payment_process(request):
         payment_type in ("subscription", "tournament")
         and not request.user.is_authenticated
     ):
-        from django.conf import settings
-
         messages.info(request, "Для оплаты необходимо зарегистрироваться.")
         login_url = getattr(settings, "LOGIN_URL", "login")
         next_url = request.get_full_path()
@@ -253,8 +265,155 @@ def payment_process(request):
         )
         return _build_preview_redirect(request, payment_type)
 
-    # Пока платежный шлюз не подключен
-    raise Http404("Payment gateway not connected")
+    if request.method != "POST":
+        return _build_preview_redirect(request, payment_type)
+
+    # Сумма и описание для ЮKassa (нормализуем запятую в точку — форма может отдать "100,00" в русской локали)
+    amount_raw = (request.POST.get("amount") or "").strip().replace(",", ".")
+    try:
+        amount_decimal = Decimal(amount_raw or "0")
+    except Exception:
+        amount_decimal = Decimal("0")
+    if amount_decimal <= 0:
+        messages.error(request, "Укажите корректную сумму оплаты.")
+        return _build_preview_redirect(request, payment_type)
+
+    amount_str = f"{amount_decimal:.2f}"
+    item_id = request.POST.get("id", "").strip()
+    next_url = request.POST.get("next", "").strip()
+
+    if payment_type == "donation":
+        description = "Поддержка проекта TennisFan (донат)"
+    elif payment_type == "subscription":
+        description = "Подписка TennisFan"
+    elif payment_type == "tournament":
+        description = "Взнос за участие в турнире TennisFan"
+    else:
+        description = "Оплата на TennisFan"
+
+    if (
+        not getattr(settings, "YOOKASSA_SHOP_ID", "").strip()
+        or not getattr(settings, "YOOKASSA_SECRET_KEY", "").strip()
+    ):
+        messages.error(
+            request,
+            "Платёжный шлюз временно недоступен. Попробуйте позже или свяжитесь с нами.",
+        )
+        return _build_preview_redirect(request, payment_type)
+
+    return_url_absolute = request.build_absolute_uri(reverse("payment_return"))
+    metadata = {
+        "payment_type": payment_type,
+        "item_id": item_id or "",
+        "next": next_url or "",
+    }
+    if request.user.is_authenticated:
+        metadata["user_id"] = str(request.user.pk)
+
+    try:
+        payment_id, confirmation_url = create_payment(
+            amount=amount_str,
+            return_url=return_url_absolute,
+            description=description[:128],
+            metadata=metadata,
+        )
+    except (ValueError, RuntimeError) as e:
+        logger.warning("YooKassa create_payment failed: %s", e)
+        messages.error(
+            request,
+            "Не удалось создать платёж. Проверьте сумму и попробуйте снова.",
+        )
+        return _build_preview_redirect(request, payment_type)
+
+    pending_data = {
+        "payment_id": payment_id,
+        "payment_type": payment_type,
+        "item_id": item_id,
+        "next": next_url,
+    }
+    if payment_type == "donation":
+        pending_data["amount"] = amount_str
+        pending_data["name_or_email"] = request.POST.get("name_or_email", "").strip()
+        pending_data["comment"] = request.POST.get("comment", "").strip()
+    else:
+        # Подписка и турнир: сохраняем фактическую сумму (региональная цена, акция 1 ₽ и т.д.)
+        pending_data["amount"] = amount_str
+    request.session["yookassa_pending"] = pending_data
+    request.session.modified = True
+    return redirect(confirmation_url)
+
+
+def payment_return(request):
+    """
+    Страница возврата после оплаты в ЮKassa.
+    ЮKassa перенаправляет сюда пользователя по return_url. Проверяем статус платежа
+    и редиректим на payment_success при успехе.
+    """
+    pending = request.session.get("yookassa_pending")
+    if not pending:
+        messages.warning(
+            request,
+            "Сессия истекла или вы уже обработали этот платёж. Проверьте результат в личном кабинете.",
+        )
+        return redirect("donate")
+
+    payment_id = pending.get("payment_id")
+    payment_type = pending.get("payment_type", "")
+    item_id = pending.get("item_id", "")
+    next_url = pending.get("next", "")
+
+    status = get_payment_status(payment_id) if payment_id else None
+    if status != "succeeded":
+        messages.error(
+            request,
+            "Оплата не была завершена или отменена. Попробуйте снова или выберите другой способ.",
+        )
+        del request.session["yookassa_pending"]
+        request.session.modified = True
+        params = {}
+        if payment_type:
+            params["type"] = payment_type
+        if item_id:
+            params["id"] = item_id
+        if params:
+            return redirect(reverse("payment_preview") + "?" + urlencode(params))
+        return redirect("donate")
+
+    # Уведомление админу о донате до очистки сессии
+    if payment_type == "donation":
+        try:
+            from apps.core.telegram_notify import notify_donation
+
+            notify_donation(
+                amount=pending.get("amount", ""),
+                name_or_email=pending.get("name_or_email", ""),
+                comment=pending.get("comment", ""),
+            )
+        except Exception as e:
+            logger.warning("Telegram notify_donation failed: %s", e)
+
+    del request.session["yookassa_pending"]
+    request.session.modified = True
+
+    # Донат от гостя — просто благодарим и редирект на главную
+    if payment_type == "donation" and not request.user.is_authenticated:
+        messages.success(request, "Спасибо за поддержку проекта!")
+        return redirect("home")
+
+    success_url = reverse("payment_success")
+    params = []
+    if payment_type:
+        params.append(("type", payment_type))
+    if item_id:
+        params.append(("id", item_id))
+    if next_url:
+        params.append(("next", next_url))
+    amount_paid = pending.get("amount", "").strip()
+    if amount_paid:
+        params.append(("amount", amount_paid))
+    if params:
+        success_url += "?" + urlencode(params)
+    return redirect(success_url)
 
 
 def payment_success(request):
@@ -274,6 +433,10 @@ def payment_success(request):
     payment_type = request.GET.get("type")
     item_id = request.GET.get("id")
     next_url = request.GET.get("next", "").strip()
+
+    if payment_type == "donation":
+        messages.success(request, "Спасибо за поддержку проекта!")
+        return redirect("home")
 
     if payment_type == "subscription" and item_id:
         try:
@@ -311,6 +474,18 @@ def payment_success(request):
                 sub.purchase_city = normalize_city_for_pricing(city or "")
                 sub.save()
                 _mark_user_paid_subscription(request.user)
+                try:
+                    from apps.core.telegram_notify import notify_subscription_purchase
+
+                    notify_subscription_purchase(
+                        request.user,
+                        tier,
+                        amount_paid=request.GET.get("amount"),
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Telegram notify_subscription_purchase failed: %s", e
+                    )
                 messages.success(
                     request, f"Подписка «{tier.get_name_display()}» успешно оформлена."
                 )
@@ -332,6 +507,22 @@ def payment_success(request):
                 request.session.modified = True
 
             tournament = Tournament.objects.filter(pk=tid).first()
+            if tournament:
+                try:
+                    from apps.core.telegram_notify import (
+                        notify_tournament_entry_payment,
+                    )
+
+                    notify_tournament_entry_payment(
+                        tournament,
+                        request.user,
+                        amount=request.GET.get("amount"),
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Telegram notify_tournament_entry_payment failed: %s",
+                        e,
+                    )
             if tournament and not tournament.is_doubles():
                 # Одиночный турнир: сразу добавляем участника (лимит подписки не тратим)
                 player = getattr(request.user, "player", None)
@@ -343,12 +534,19 @@ def payment_success(request):
                         tournament=tournament,
                         user=request.user,
                     )
-                    messages.success(
-                        request, "Оплата прошла успешно. Вы зарегистрированы на турнир."
-                    )
+                messages.success(
+                    request,
+                    "Оплата вступительного взноса прошла успешно. Вы зарегистрированы на турнир.",
+                )
                 return redirect("tournament_detail", slug=tournament.slug)
-            if tournament and tournament.is_doubles() and next_url:
-                return redirect(next_url)
+            if tournament and tournament.is_doubles():
+                messages.success(
+                    request,
+                    "Оплата вступительного взноса прошла успешно. Завершите регистрацию на странице турнира: выберите партнёра или создайте команду.",
+                )
+                if next_url:
+                    return redirect(next_url)
+                return redirect("tournament_detail", slug=tournament.slug)
 
     if next_url:
         return redirect(next_url)

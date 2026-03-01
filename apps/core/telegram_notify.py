@@ -266,29 +266,6 @@ def notify_court_comment(comment, court, score: int | None = None) -> bool:
     return send_admin_message(msg)
 
 
-def notify_about_us_comment(comment) -> bool:
-    """Уведомление админу о новом комментарии на странице «О нас»."""
-    author = getattr(comment, "author", None)
-    author_name = _escape(str(author) if author else "—")
-    author_email = "—"
-    if author:
-        try:
-            author_email = _escape(getattr(author.user, "email", None) or "—")
-        except Exception:
-            pass
-    text_preview = _escape((comment.text or "")[:300])
-    if (comment.text or "") and len(comment.text or "") > 300:
-        text_preview += "…"
-
-    msg = (
-        "💬 <b>Новый комментарий на странице «О нас»</b>\n\n"
-        f"Автор: {author_name}\n"
-        f"Email: {author_email}\n\n"
-        f"Текст:\n{text_preview}"
-    )
-    return send_admin_message(msg)
-
-
 def notify_news_comment(comment, news) -> bool:
     """Уведомление админу о новом комментарии к новости."""
     author = getattr(comment, "author", None)
@@ -372,13 +349,47 @@ def notify_tournament_insufficient_participants(tournament) -> bool:
     return send_admin_message(msg)
 
 
-def notify_subscription_purchase(user, tier) -> bool:
-    """Уведомление о покупке подписки."""
+def notify_donation(amount: str, name_or_email: str = "", comment: str = "") -> bool:
+    """Уведомление админу о донате (после успешной оплаты)."""
+    amount_s = _escape(str(amount))
+    name_s = _escape((name_or_email or "").strip() or "—")
+    comment_s = _escape((comment or "").strip() or "—")
+    text = (
+        "🎁 <b>Донат</b>\n\n"
+        f"Сумма: {amount_s} ₽\n"
+        f"От: {name_s}\n"
+        f"Комментарий: {comment_s}"
+    )
+    return send_admin_message(text)
+
+
+def notify_tournament_entry_payment(
+    tournament, user, amount: str | None = None
+) -> bool:
+    """Уведомление админу об оплате взноса за регистрацию на турнир."""
+    name = _escape(user.get_full_name() or user.email or "—")
+    email = _escape(user.email or "—")
+    tournament_name = _escape(getattr(tournament, "name", "") or "—")
+    amount_s = amount or str(getattr(tournament, "entry_fee", "") or "—")
+    text = (
+        "🎾 <b>Оплата взноса за турнир</b>\n\n"
+        f"Турнир: {tournament_name}\n"
+        f"Участник: {name}\n"
+        f"Email: {email}\n"
+        f"Сумма: {amount_s} ₽"
+    )
+    return send_admin_message(text)
+
+
+def notify_subscription_purchase(user, tier, amount_paid: str | None = None) -> bool:
+    """Уведомление о покупке подписки. amount_paid — фактически уплаченная сумма (регион, акция 1 ₽)."""
     name = _escape(user.get_full_name() or user.email or "—")
     email = _escape(user.email or "—")
     phone = _escape(getattr(user, "phone", None) or "—")
     tier_name = _escape(tier.get_name_display())
-    price = tier.price
+    amount_s = (amount_paid or "").strip() if amount_paid else None
+    if amount_s is None:
+        amount_s = str(tier.price)
 
     text = (
         "💳 <b>Покупка подписки</b>\n\n"
@@ -386,7 +397,7 @@ def notify_subscription_purchase(user, tier) -> bool:
         f"Email: {email}\n"
         f"Телефон: {phone}\n\n"
         f"Тариф: {tier_name}\n"
-        f"Сумма: {price} ₽"
+        f"Сумма: {amount_s} ₽"
     )
     return send_admin_message(text)
 

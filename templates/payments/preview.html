@@ -31,11 +31,14 @@
             <form action="{{ process_url }}" method="post">
                 {% csrf_token %}
                 <input type="hidden" name="type" value="{{ payment_type }}">
+                <input type="hidden" name="amount" value="{{ amount_value|default:amount }}">
                 {% if item_id %}
                     <input type="hidden" name="id" value="{{ item_id }}">
                 {% endif %}
+                {% if payment_next_url %}
+                    <input type="hidden" name="next" value="{{ payment_next_url }}">
+                {% endif %}
                 {% if payment_type == 'donation' %}
-                    <input type="hidden" name="amount" value="{{ amount }}">
                     {% if comment %}
                     <input type="hidden" name="comment" value="{{ comment }}">
                     {% endif %}

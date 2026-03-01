@@ -16,7 +16,7 @@ from apps.subscriptions.models import RegionalTierPrice, SubscriptionTier
 from apps.tournaments.models import Tournament
 from apps.users.models import Player
 
-from .forms import AboutUsCommentForm, NewsCommentForm
+from .forms import NewsCommentForm
 from .models import (
     AboutUs,
     ContactPage,
@@ -125,62 +125,14 @@ def page_detail(request, slug):
 
 def about_us(request):
     """
-    "О нас" page with editable content and comments.
-    Заголовок "О НАС" фиксирован в шаблоне.
+    Страница «О нас» с редактируемым контентом.
+    Заголовок «О НАС» фиксирован в шаблоне.
     """
     about = AboutUs.get_singleton()
     body_html = markdown.markdown(about.body or "", extensions=["extra"])
-
-    # Comments
-    ct = ContentType.objects.get_for_model(AboutUs)
-    comments = (
-        Comment.objects.filter(
-            content_type=ct,
-            object_id=about.pk,
-        )
-        .select_related("author__user")
-        .order_by("-created_at")
-    )
-
-    # Comment form
-    form = AboutUsCommentForm()
-    if request.method == "POST":
-        form = AboutUsCommentForm(request.POST)
-        if form.is_valid():
-            if not request.user.is_authenticated:
-                messages.error(request, "Войдите, чтобы оставить комментарий.")
-                return redirect("login")
-            player = Player.objects.filter(user=request.user).first()
-            if player is None:
-                messages.error(
-                    request,
-                    "Создайте профиль игрока, чтобы оставлять комментарии.",
-                )
-                return redirect("profile_edit")
-            comment = Comment.objects.create(
-                content_type=ct,
-                object_id=about.pk,
-                author=player,
-                text=form.cleaned_data["text"].strip(),
-                is_approved=True,
-            )
-            try:
-                from apps.core.telegram_notify import notify_about_us_comment
-
-                notify_about_us_comment(comment)
-            except Exception as e:
-                logger.warning("Telegram notify for About Us comment failed: %s", e)
-            messages.success(
-                request,
-                "Комментарий отправлен на модерацию. Он появится после одобрения.",
-            )
-            return redirect("about_us")
-
     context = {
         "about": about,
         "body_html": body_html,
-        "comments": comments,
-        "comment_form": form,
     }
     return render(request, "content/about_us.html", context)
 

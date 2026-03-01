@@ -310,6 +310,14 @@ TELEGRAM_PUBLIC_COMMUNITY_URL = (
 TELEGRAM_BOT_SITE_BASE_URL = os.environ.get("TELEGRAM_BOT_SITE_BASE_URL", "")
 
 # ------------------------------------------------------------------------------
+# ЮKassa (YooKassa)
+# ------------------------------------------------------------------------------
+# Идентификатор магазина и секретный ключ из личного кабинета ЮKassa.
+# Документация: https://yookassa.ru/developers/payment-acceptance/getting-started/quick-start
+YOOKASSA_SHOP_ID = os.environ.get("YOOKASSA_SHOP_ID", "")
+YOOKASSA_SECRET_KEY = os.environ.get("YOOKASSA_SECRET_KEY", "")
+
+# ------------------------------------------------------------------------------
 # YANDEX MAPS / GEOCODER
 # ------------------------------------------------------------------------------
 

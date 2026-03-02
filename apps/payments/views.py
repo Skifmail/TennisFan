@@ -286,6 +286,13 @@ def payment_process(request):
         description = "Поддержка проекта TennisFan (донат)"
     elif payment_type == "subscription":
         description = "Подписка TennisFan"
+        if item_id:
+            try:
+                tier = SubscriptionTier.objects.filter(pk=int(item_id)).first()
+                if tier:
+                    description = f"Подписка TennisFan: {tier.get_name_display()}"
+            except (ValueError, TypeError):
+                pass
     elif payment_type == "tournament":
         description = "Взнос за участие в турнире TennisFan"
     else:

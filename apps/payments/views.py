@@ -295,6 +295,10 @@ def payment_process(request):
         not getattr(settings, "YOOKASSA_SHOP_ID", "").strip()
         or not getattr(settings, "YOOKASSA_SECRET_KEY", "").strip()
     ):
+        logger.warning(
+            "YooKassa: ключи не заданы (YOOKASSA_SHOP_ID или YOOKASSA_SECRET_KEY пусты). "
+            "Проверьте .env и перезапуск приложения."
+        )
         messages.error(
             request,
             "Платёжный шлюз временно недоступен. Попробуйте позже или свяжитесь с нами.",
@@ -318,7 +322,7 @@ def payment_process(request):
             metadata=metadata,
         )
     except (ValueError, RuntimeError) as e:
-        logger.warning("YooKassa create_payment failed: %s", e)
+        logger.exception("YooKassa create_payment failed: %s", e)
         messages.error(
             request,
             "Не удалось создать платёж. Проверьте сумму и попробуйте снова.",

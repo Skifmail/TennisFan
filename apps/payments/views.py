@@ -291,13 +291,14 @@ def payment_process(request):
     else:
         description = "Оплата на TennisFan"
 
-    if (
-        not getattr(settings, "YOOKASSA_SHOP_ID", "").strip()
-        or not getattr(settings, "YOOKASSA_SECRET_KEY", "").strip()
-    ):
+    shop_id = (getattr(settings, "YOOKASSA_SHOP_ID", None) or "").strip()
+    secret_key = (getattr(settings, "YOOKASSA_SECRET_KEY", None) or "").strip()
+    if not shop_id or not secret_key:
         logger.warning(
-            "YooKassa: ключи не заданы (YOOKASSA_SHOP_ID или YOOKASSA_SECRET_KEY пусты). "
-            "Проверьте .env и перезапуск приложения."
+            "YooKassa: ключи не заданы. SHOP_ID=%s, SECRET_KEY=%s. "
+            "В Environment не должно быть комментариев (#) и пустых строк; задайте переменные отдельными строками.",
+            "пусто" if not shop_id else "задан",
+            "пусто" if not secret_key else "задан",
         )
         messages.error(
             request,

@@ -11,7 +11,9 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
-load_dotenv(BASE_DIR / ".env.local", override=True)  # локальная разработка
+# .env.local с override только в разработке, чтобы не затирать переменные из Dokploy/systemd на сервере
+if os.environ.get("DEBUG", "False").strip().lower() == "true":
+    load_dotenv(BASE_DIR / ".env.local", override=True)
 
 # ------------------------------------------------------------------------------
 # CORE

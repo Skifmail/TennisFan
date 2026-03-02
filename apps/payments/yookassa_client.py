@@ -21,6 +21,7 @@ def create_payment(
     description: str,
     *,
     metadata: dict | None = None,
+    customer_email: str | None = None,
 ) -> tuple[str, str]:
     """
     Создать платёж в ЮKassa и получить URL для редиректа пользователя.
@@ -30,6 +31,7 @@ def create_payment(
         return_url: URL, на который пользователь вернётся после оплаты.
         description: Описание платежа (до 128 символов), видно в ЛК и при оплате.
         metadata: Произвольный словарь (type, item_id, next и т.д.) для восстановления контекста после возврата.
+        customer_email: Email покупателя для чека 54-ФЗ (обязателен, если в ЛК ЮKassa включена передача чеков).
 
     Returns:
         Кортеж (payment_id, confirmation_url). Редирект пользователя на confirmation_url.
@@ -56,6 +58,24 @@ def create_payment(
             str(k): str(v)
             for k, v in metadata.items()
             if v is not None and str(v).strip()
+        }
+
+    # Чек по 54-ФЗ: обязателен, если в настройках магазина ЮKassa включена передача данных для чека
+    email = (customer_email or "").strip()
+    if email and "@" in email:
+        payload["receipt"] = {
+            "customer": {"email": email[:64]},
+            "items": [
+                {
+                    "description": (description or "Оплата")[:128],
+                    "quantity": 1.0,
+                    "amount": {"value": amount, "currency": "RUB"},
+                    "vat_code": 1,
+                    "payment_mode": "full_payment",
+                    "payment_subject": "service",
+                }
+            ],
+            "internet": "true",
         }
 
     idempotence_key = str(uuid.uuid4())

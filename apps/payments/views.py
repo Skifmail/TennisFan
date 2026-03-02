@@ -315,12 +315,26 @@ def payment_process(request):
     if request.user.is_authenticated:
         metadata["user_id"] = str(request.user.pk)
 
+    # Email для чека 54-ФЗ (обязателен при включённой передаче чеков в ЛК ЮKassa)
+    receipt_email = ""
+    if request.user.is_authenticated and getattr(request.user, "email", None):
+        receipt_email = (request.user.email or "").strip()
+    if not receipt_email or "@" not in receipt_email:
+        name_or_email = (request.POST.get("name_or_email") or "").strip()
+        if "@" in name_or_email:
+            receipt_email = name_or_email
+    if not receipt_email or "@" not in receipt_email:
+        receipt_email = (
+            getattr(settings, "DEFAULT_FROM_EMAIL", "") or "info@tennisfan.ru"
+        )
+
     try:
         payment_id, confirmation_url = create_payment(
             amount=amount_str,
             return_url=return_url_absolute,
             description=description[:128],
             metadata=metadata,
+            customer_email=receipt_email,
         )
     except (ValueError, RuntimeError) as e:
         logger.exception("YooKassa create_payment failed: %s", e)

@@ -25,6 +25,7 @@ ENV/
 # Local files
 .env
 .env.local
+.env.example
 *.sqlite3
 db.sqlite3
 media/

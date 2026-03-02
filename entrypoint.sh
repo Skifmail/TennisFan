@@ -1,6 +1,14 @@
 #!/bin/bash
 set -e
 
+# Dokploy и др. могут писать переменные в .env без передачи в процесс — подгружаем в окружение
+if [ -f /app/.env ]; then
+  set -a
+  # shellcheck source=/dev/null
+  source /app/.env
+  set +a
+fi
+
 echo "Waiting for database..."
 while ! python -c "
 import os

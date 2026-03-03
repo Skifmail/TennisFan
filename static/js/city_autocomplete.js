@@ -74,9 +74,11 @@
      */
     function positionDropdown(input, dropdown) {
         var rect = input.getBoundingClientRect();
-        dropdown.style.position = "fixed";
-        dropdown.style.left = rect.left + "px";
-        dropdown.style.top = rect.bottom + "px";
+        var scrollX = window.pageXOffset || document.documentElement.scrollLeft || 0;
+        var scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+        dropdown.style.position = "absolute";
+        dropdown.style.left = (rect.left + scrollX) + "px";
+        dropdown.style.top = (rect.bottom + scrollY) + "px";
         dropdown.style.width = Math.max(rect.width, 200) + "px";
         dropdown.style.zIndex = "9999";
     }
@@ -101,11 +103,15 @@
             item.style.background = "#fff";
             item.style.color = "#000";
 
-            item.addEventListener("click", function (event) {
+            // Используем mousedown, чтобы успеть выбрать до blur/focus смены (особенно в админке)
+            function handleSelect(event) {
                 event.preventDefault();
                 event.stopPropagation();
                 onSelect(name);
-            });
+            }
+
+            item.addEventListener("mousedown", handleSelect);
+            item.addEventListener("click", handleSelect);
             item.addEventListener("mouseenter", function () {
                 setHighlight(dropdown, index);
             });

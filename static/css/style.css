@@ -5854,6 +5854,50 @@ select.form-control {
     text-align: left;
 }
 
+
+.nav-user-avatar-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0.25rem;
+}
+
+.nav-user-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.nav-user-avatar--fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(166 130 74 / 60%);
+    color: #000;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+@media (width <= 1024px) {
+    .nav-dropdown {
+        min-width: 0;
+        max-width: 160px;
+    }
+
+    .nav-dropdown-toggle {
+        padding-left: 0.5rem;
+    }
+
+    .nav-user-avatar-wrap {
+        margin-right: 0.35rem;
+    }
+
+    .user-name-text {
+        font-size: 0.8rem;
+    }
+}
 .nav-dropdown-toggle:hover {
     background: rgb(166 130 74 / 30%);
     border-color: var(--color-primary);

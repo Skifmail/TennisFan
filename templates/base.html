@@ -63,9 +63,20 @@
                     <div class="nav-dropdown">
                         <button type="button" class="nav-dropdown-toggle" id="user-menu-toggle">
                             {% if user.player %}
-                            <span class="user-name-text">{{ user.player }}</span>
+                            <span class="nav-user-avatar-wrap">
+                                {% if user.player.avatar %}
+                                <img src="{{ user.player.avatar.url }}" alt="{{ user.player }}" class="nav-user-avatar">
+                                {% else %}
+                                <span class="nav-user-avatar nav-user-avatar--fallback">{{ user.first_name|default:'?'|slice:':1'|upper }}</span>
+                                {% endif %}
+                            </span>
+                            {% with fn=user.first_name ln=user.last_name %}
+                            <span class="user-name-text">
+                                {% if fn %}{{ fn|upper }}{% else %}{{ user.player|stringformat:'s'|upper }}{% endif %}{% if ln %} {{ ln|slice:':1'|upper }}.{% endif %}
+                            </span>
+                            {% endwith %}
                             {% else %}
-                            <span class="user-name-text">{{ user.email|truncatechars:15 }}</span>
+                            <span class="user-name-text">{{ user.email|truncatechars:10 }}</span>
                             {% endif %}
                             <span class="nav-dropdown-arrow">▼</span>
                         </button>

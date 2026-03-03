@@ -8,6 +8,12 @@
     <title>{% block title %}TennisFan{% endblock %} - Всероссийская теннисная платформа для игроков всех уровней</title>
     <meta name="description"
         content="{% block meta_description %}TennisFan - платформа любительских теннисных турниров по всей России. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
+    {% if google_site_verification %}
+    <meta name="google-site-verification" content="{{ google_site_verification }}">
+    {% endif %}
+    {% if yandex_verification %}
+    <meta name="yandex-verification" content="{{ yandex_verification }}">
+    {% endif %}
 
     <link rel="icon" type="image/png" sizes="64x64" href="{% static 'images/favicon.png' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon.png' %}">

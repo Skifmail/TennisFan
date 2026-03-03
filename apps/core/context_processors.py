@@ -20,3 +20,18 @@ def footer_social_links(request):
     """
     links = list(FooterSocialLink.objects.all())
     return {"footer_social_links": links}
+
+
+def search_engine_verification(request):
+    """
+    Коды верификации для Google Search Console и Yandex Webmaster.
+    Подставляются в <meta> в base.html при наличии в настройках.
+    """
+    return {
+        "google_site_verification": getattr(
+            settings, "GOOGLE_SITE_VERIFICATION", ""
+        ).strip()
+        or None,
+        "yandex_verification": getattr(settings, "YANDEX_VERIFICATION", "").strip()
+        or None,
+    }

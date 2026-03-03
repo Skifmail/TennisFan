@@ -12,8 +12,9 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import linebreaks
 from django.views.decorators.csrf import csrf_exempt
@@ -38,6 +39,27 @@ from .forms import FeedbackForm
 from .models import SupportMessage, UserTelegramLink
 
 logger = logging.getLogger(__name__)
+
+
+@require_safe
+def robots_txt(request: Any) -> HttpResponse:
+    """
+    Отдача robots.txt для поисковых систем.
+    Разрешает индексацию, запрещает админку и платёжные переходы, указывает sitemap.
+    """
+    sitemap_url = request.build_absolute_uri(reverse("sitemap"))
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /admin/",
+        "Disallow: /payments/process/",
+        "Disallow: /payments/return/",
+        "Disallow: /payments/success/",
+        "Disallow: /telegram/",
+        "",
+        f"Sitemap: {sitemap_url}",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
 
 
 def _build_recent_matches(limit: int = 10, days: int = 5):

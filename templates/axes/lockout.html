@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Учетная запись заблокирована{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Учетная запись заблокирована</h1>
+    <p class="page-subtitle">Слишком много неудачных попыток входа.</p>
+</div>
+
+<div class="container" style="max-width: 640px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl); text-align: center;">
+            <p style="font-size: var(--font-size-lg); margin-bottom: var(--spacing-lg);">
+                Учетная запись заблокирована: слишком много попыток входа. Повторите попытку позже.
+            </p>
+            <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-md);">
+                В целях безопасности мы временно ограничили вход с этого устройства.
+            </p>
+            <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-xl);">
+                До следующей попытки входа осталось: <span id="lockout-timer" data-minutes="5">05:00</span>.
+            </p>
+            <a href="{% url 'home' %}" class="btn btn-outline btn-lg" style="margin-bottom: var(--spacing-md);">На главную</a>
+            <p class="text-secondary" style="font-size: var(--font-size-xs);">
+                Если вы забыли пароль, воспользуйтесь восстановлением через форму входа.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var el = document.getElementById('lockout-timer');
+        if (!el) return;
+        var minutes = parseInt(el.getAttribute('data-minutes') || '5', 10);
+        var total = minutes * 60;
+
+        function format(sec) {
+            var m = Math.floor(sec / 60);
+            var s = sec % 60;
+            return (m < 10 ? '0' + m : '' + m) + ':' + (s < 10 ? '0' + s : '' + s);
+        }
+
+        function tick() {
+            if (total <= 0) {
+                el.textContent = '00:00';
+                return;
+            }
+            el.textContent = format(total);
+            total -= 1;
+            window.setTimeout(tick, 1000);
+        }
+
+        tick();
+    })();
+</script>
+{% endblock %}

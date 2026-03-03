@@ -4,6 +4,7 @@ Production-ready configuration.
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -65,8 +66,8 @@ SESSION_SAVE_EVERY_REQUEST = True
 
 # Защита от перебора паролей (админка и вход на сайт)
 AXES_FAILURE_LIMIT = 5
-AXES_COOLOFF_TIME = 1  # часы блокировки по IP после превышения попыток
-AXES_LOCKOUT_TEMPLATE = None
+AXES_COOLOFF_TIME = timedelta(minutes=5)  # время блокировки после превышения попыток
+AXES_LOCKOUT_TEMPLATE = "axes/lockout.html"
 AXES_LOCKOUT_URL = None
 
 # Опционально: свой путь к админке (в .env задать, напр. ADMIN_URL=manage-secret-xyz)

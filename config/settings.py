@@ -83,6 +83,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.sites",
+    "django.contrib.sitemaps",
     "django.contrib.humanize",
     "django_crontab",
     "django_extensions",
@@ -145,6 +147,7 @@ TEMPLATES = [
                 "apps.navigation.context_processors.nav_menu_items",
                 "apps.core.context_processors.telegram_community_url",
                 "apps.core.context_processors.footer_social_links",
+                "apps.core.context_processors.search_engine_verification",
             ],
         },
     },
@@ -318,6 +321,21 @@ TELEGRAM_BOT_SITE_BASE_URL = os.environ.get("TELEGRAM_BOT_SITE_BASE_URL", "")
 # Документация: https://yookassa.ru/developers/payment-acceptance/getting-started/quick-start
 YOOKASSA_SHOP_ID = os.environ.get("YOOKASSA_SHOP_ID", "")
 YOOKASSA_SECRET_KEY = os.environ.get("YOOKASSA_SECRET_KEY", "")
+
+# ------------------------------------------------------------------------------
+# SITES (для sitemap.xml — домен берётся из модели Site, id=1)
+# ------------------------------------------------------------------------------
+SITE_ID = 1
+# Домен для sitemap (по умолчанию первый из ALLOWED_HOSTS или tennisfan.ru)
+SITE_DOMAIN = os.environ.get("SITE_DOMAIN", "").strip() or "tennisfan.ru"
+
+# ------------------------------------------------------------------------------
+# Верификация в поисковиках (Google Search Console, Yandex Webmaster)
+# ------------------------------------------------------------------------------
+# Коды из интерфейсов верификации — подставляются в <meta> в base.html.
+# Не заданы — теги не выводятся.
+GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip()
+YANDEX_VERIFICATION = os.environ.get("YANDEX_VERIFICATION", "").strip()
 
 # ------------------------------------------------------------------------------
 # YANDEX MAPS / GEOCODER

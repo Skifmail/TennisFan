@@ -5,10 +5,21 @@ Main URL configuration for TennisFan project.
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.sitemaps import views as sitemap_views
 from django.urls import include, path
+
+from apps.core.views import robots_txt
+from config.sitemaps import StaticViewSitemap
 
 urlpatterns = [
     path(f"{settings.ADMIN_URL}/", admin.site.urls),
+    path(
+        "sitemap.xml",
+        sitemap_views.sitemap,
+        {"sitemaps": {"static": StaticViewSitemap}},
+        name="sitemap",
+    ),
+    path("robots.txt", robots_txt, name="robots_txt"),
     path("", include("apps.core.urls")),
     path("users/", include("apps.users.urls")),
     path("ratings/", include("apps.player_ratings.urls")),

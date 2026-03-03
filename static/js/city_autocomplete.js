@@ -149,6 +149,12 @@
         if (input.dataset.cityAutocomplete === "attached") return;
         input.dataset.cityAutocomplete = "attached";
 
+        // Отключаем нативный autocomplete браузера, чтобы не мешал нашему списку
+        input.setAttribute("autocomplete", "off");
+        input.setAttribute("autocapitalize", "off");
+        input.setAttribute("autocorrect", "off");
+        input.setAttribute("spellcheck", "false");
+
         var dropdown = createDropdown();
         document.body.appendChild(dropdown);
 

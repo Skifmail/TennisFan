@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 class CoachAdmin(admin.ModelAdmin):
     """Admin for Coach model."""
 
+    class Media:
+        js = ("js/city_autocomplete.js",)
+
     list_display = (
         "name",
         "user",
@@ -68,6 +71,9 @@ def reject_coach_applications(modeladmin, request, queryset):
 @admin.register(CoachApplication)
 class CoachApplicationAdmin(admin.ModelAdmin):
     """Заявки «Стать тренером». После одобрения создаётся Coach."""
+
+    class Media:
+        js = ("js/city_autocomplete.js",)
 
     list_display = (
         "name",
@@ -143,6 +149,9 @@ class CoachApplicationAdmin(admin.ModelAdmin):
 @admin.register(Training)
 class TrainingAdmin(admin.ModelAdmin):
     """Admin for Training model."""
+
+    class Media:
+        js = ("js/city_autocomplete.js",)
 
     form = AdminTrainingForm
     list_display = (

@@ -58,6 +58,14 @@
         wrap.setAttribute("role", "listbox");
         wrap.setAttribute("aria-hidden", "true");
         wrap.style.display = "none";
+        // Базовые стили по умолчанию (на случай, если CSS не подключен, как в админке)
+        wrap.style.background = "#fff";
+        wrap.style.border = "1px solid #ccc";
+        wrap.style.borderRadius = "4px";
+        wrap.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+        wrap.style.maxHeight = "240px";
+        wrap.style.overflowY = "auto";
+        wrap.style.padding = "2px 0";
         return wrap;
     }
 
@@ -87,7 +95,15 @@
             item.setAttribute("role", "option");
             item.setAttribute("data-index", index);
             item.textContent = name;
-            item.addEventListener("click", function () {
+            // Базовые стили по умолчанию для элемента
+            item.style.padding = "4px 10px";
+            item.style.cursor = "pointer";
+            item.style.background = "#fff";
+            item.style.color = "#000";
+
+            item.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
                 onSelect(name);
             });
             item.addEventListener("mouseenter", function () {
@@ -102,7 +118,15 @@
     function setHighlight(dropdown, index) {
         var items = dropdown.querySelectorAll(".city-autocomplete__item");
         items.forEach(function (el, i) {
-            el.classList.toggle("city-autocomplete__item--active", i === index);
+            var active = i === index;
+            el.classList.toggle("city-autocomplete__item--active", active);
+            if (active) {
+                el.style.background = "#1e90ff";
+                el.style.color = "#fff";
+            } else {
+                el.style.background = "#fff";
+                el.style.color = "#000";
+            }
         });
     }
 

@@ -52,6 +52,9 @@ def _geocode_court(court: Court) -> bool:
 class CourtAdmin(admin.ModelAdmin):
     """Admin for Court model."""
 
+    class Media:
+        js = ("js/city_autocomplete.js",)
+
     list_display = (
         "name",
         "city",

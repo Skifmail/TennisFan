@@ -339,7 +339,7 @@ class TournamentAdmin(admin.ModelAdmin):
 
     class Media:
         css = {"all": ("css/admin_tournament.css",)}
-        js = ("js/admin_tournament.js",)
+        js = ("js/admin_tournament.js", "js/city_autocomplete.js")
 
 
 class TVDGroupMemberInline(admin.TabularInline):

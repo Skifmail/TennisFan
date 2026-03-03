@@ -36,9 +36,36 @@ from apps.users.rating_utils import rating_to_ntrp_level
 
 from . import telegram_support as tg_support
 from .forms import FeedbackForm
-from .models import SupportMessage, UserTelegramLink
+from .models import City, SupportMessage, UserTelegramLink
 
 logger = logging.getLogger(__name__)
+
+
+@require_safe
+def api_cities(request: Any) -> JsonResponse:
+    """
+    API автодополнения городов: GET /api/cities/?q=<query>.
+    Возвращает JSON-список названий городов (макс. 10).
+    Для PostgreSQL используется TrigramSimilarity; иначе — поиск по вхождению.
+    """
+    q = (request.GET.get("q") or "").strip()
+    if len(q) < 2:
+        return JsonResponse([], safe=True)
+
+    from django.db import connection
+
+    if connection.vendor == "postgresql":
+        from django.contrib.postgres.search import TrigramSimilarity
+
+        cities = (
+            City.objects.annotate(similarity=TrigramSimilarity("name", q))
+            .filter(similarity__gt=0.2)
+            .order_by("-similarity")[:10]
+        )
+    else:
+        cities = City.objects.filter(name__icontains=q).order_by("name")[:10]
+
+    return JsonResponse([c.name for c in cities], safe=False)
 
 
 @require_safe

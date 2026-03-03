@@ -7,6 +7,7 @@ import logging
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
+from .forms import AdminTrainingForm
 from .models import (
     Coach,
     CoachApplication,
@@ -66,7 +67,7 @@ def reject_coach_applications(modeladmin, request, queryset):
 
 @admin.register(CoachApplication)
 class CoachApplicationAdmin(admin.ModelAdmin):
-    """Заявки «Стать тренером». Одобренные превращаются в Coach."""
+    """Заявки «Стать тренером». После одобрения создаётся Coach."""
 
     list_display = (
         "name",
@@ -143,23 +144,62 @@ class CoachApplicationAdmin(admin.ModelAdmin):
 class TrainingAdmin(admin.ModelAdmin):
     """Admin for Training model."""
 
+    form = AdminTrainingForm
     list_display = (
         "title",
-        "training_type",
-        "skill_level",
+        "types_display",
+        "levels_display",
         "coach",
         "courts_display",
         "city",
-        "price",
+        "price_range_display",
+        "court_price_range_display",
         "is_active",
         "is_featured",
     )
-    list_filter = ("training_type", "skill_level", "city", "is_active", "is_featured")
+    list_filter = ("city", "is_active", "is_featured")
     search_fields = ("title", "description")
     list_editable = ("is_active", "is_featured")
     prepopulated_fields = {"slug": ("title",)}
     raw_id_fields = ("coach",)
     filter_horizontal = ("courts",)
+
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "title",
+                    "slug",
+                    "short_description",
+                    "description",
+                    "image",
+                )
+            },
+        ),
+        (
+            "Типы тренировки и цены",
+            {"fields": ("type_prices",)},
+        ),
+        (
+            "Уровни",
+            {"fields": ("skill_levels", "target_levels")},
+        ),
+        ("Тренер и место", {"fields": ("coach", "courts", "city")}),
+        ("Параметры", {"fields": ("duration_minutes", "max_participants", "schedule")}),
+        ("Стоимость корта", {"fields": ("court_price_min", "court_price_max")}),
+        ("Настройки", {"fields": ("is_active", "is_featured")}),
+    )
+
+    def types_display(self, obj):
+        return ", ".join(obj.training_types_display) or "—"
+
+    types_display.short_description = "Типы"
+
+    def levels_display(self, obj):
+        return ", ".join(obj.skill_levels_display) or "—"
+
+    levels_display.short_description = "Уровни"
 
     def courts_display(self, obj):
         names = list(obj.courts.values_list("name", flat=True)[:6])
@@ -168,6 +208,16 @@ class TrainingAdmin(admin.ModelAdmin):
         return ", ".join(names[:5]) + (" …" if len(names) > 5 else "")
 
     courts_display.short_description = "Корты"
+
+    def price_range_display(self, obj):
+        return obj.price_display or "—"
+
+    price_range_display.short_description = "Цена"
+
+    def court_price_range_display(self, obj):
+        return obj.court_price_display or "—"
+
+    court_price_range_display.short_description = "Корт"
 
 
 @admin.register(TrainingEnrollment)

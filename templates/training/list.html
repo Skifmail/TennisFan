@@ -16,14 +16,16 @@
             <option value="individual" {% if current_type == 'individual' %}selected{% endif %}>Индивидуальные</option>
             <option value="group" {% if current_type == 'group' %}selected{% endif %}>Групповые</option>
             <option value="mini_group" {% if current_type == 'mini_group' %}selected{% endif %}>Мини-группы</option>
+            <option value="sparring" {% if current_type == 'sparring' %}selected{% endif %}>Спарринг</option>
+            <option value="split" {% if current_type == 'split' %}selected{% endif %}>Сплит</option>
         </select>
         <select name="level" class="form-control" onchange="this.form.submit()">
             <option value="">Все уровни</option>
-            <option value="novice" {% if current_level == 'novice' %}selected{% endif %}>Новичок</option>
-            <option value="amateur" {% if current_level == 'amateur' %}selected{% endif %}>Любитель</option>
-            <option value="experienced" {% if current_level == 'experienced' %}selected{% endif %}>Опытный</option>
-            <option value="advanced" {% if current_level == 'advanced' %}selected{% endif %}>Мастерс</option>
-            <option value="professional" {% if current_level == 'professional' %}selected{% endif %}>Профессионал</option>
+            <option value="novice" {% if current_level == 'novice' %}selected{% endif %}>Новичок (1.5–2.5)</option>
+            <option value="amateur" {% if current_level == 'amateur' %}selected{% endif %}>Любитель (2.6–3.5)</option>
+            <option value="experienced" {% if current_level == 'experienced' %}selected{% endif %}>Опытный (3.6–4.5)</option>
+            <option value="advanced" {% if current_level == 'advanced' %}selected{% endif %}>Мастерс (4.6–5.5)</option>
+            <option value="professional" {% if current_level == 'professional' %}selected{% endif %}>Профессионал (5.6–7.0)</option>
         </select>
     </form>
 
@@ -32,26 +34,34 @@
         {% if not user_is_coach %}<a href="{% url 'coach_application_create' %}" class="btn btn-primary btn--filter-size">Стать тренером</a>{% endif %}
     </div>
 
-    <div class="grid grid-3">
+    <div class="grid grid-3 training-grid">
         {% for training in trainings %}
-        <a href="{% url 'training_detail' slug=training.slug %}" class="card">
+        <a href="{% url 'training_detail' slug=training.slug %}" class="card training-card">
             {% if training.image %}
             <img src="{{ training.image.url }}" alt="" class="card-image">
             {% else %}
             <div class="card-image" style="background: linear-gradient(135deg, var(--color-primary-transparent), var(--color-bg-elevated));"></div>
             {% endif %}
             <div class="card-body">
-                <div class="d-flex gap-1 mb-2">
-                    <span class="player-category">{{ training.get_training_type_display }}</span>
-                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ training.get_skill_level_display }}</span>
+                <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">
+                    {% for tt in training.training_types_display %}
+                    <span class="player-category">{{ tt }}</span>
+                    {% endfor %}
+                    {% for sl in training.skill_levels_display %}
+                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ sl }}</span>
+                    {% endfor %}
                 </div>
                 <h3 class="card-title">{{ training.title }}</h3>
                 <p class="card-text">{{ training.short_description|default:training.description|truncatewords:15 }}</p>
                 {% if training.coach %}
                 <p class="text-secondary mt-2" style="font-size: var(--font-size-sm);">Тренер: {{ training.coach.name }}</p>
                 {% endif %}
-                {% if training.price %}
-                <p class="text-primary mt-2" style="font-weight: 600;">{{ training.price }} ₽</p>
+                {% if training.price_display %}
+                <p class="text-primary mt-2" style="font-weight: 600;">{{ training.price_display }}
+                    {% if training.court_price_display %}
+                    <span class="text-secondary" style="font-weight: 400; font-size: var(--font-size-sm);">{{ training.court_price_display }}</span>
+                    {% endif %}
+                </p>
                 {% endif %}
             </div>
         </a>

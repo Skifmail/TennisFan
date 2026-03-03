@@ -49,10 +49,18 @@
                 {% for training in trainings %}
                 <a href="{% url 'training_detail' slug=training.slug %}" class="card">
                     <div class="card-body">
-                        <span class="player-category mb-2">{{ training.get_training_type_display }}</span>
+                        <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">
+                            {% for tt in training.training_types_display %}
+                            <span class="player-category">{{ tt }}</span>
+                            {% endfor %}
+                        </div>
                         <h3 class="card-title">{{ training.title }}</h3>
-                        {% if training.price %}
-                        <p class="text-primary mt-2" style="font-weight: 600;">{{ training.price }} ₽</p>
+                        {% if training.price_display %}
+                        <p class="text-primary mt-2" style="font-weight: 600;">{{ training.price_display }}
+                            {% if training.court_price_display %}
+                            <span class="text-secondary" style="font-weight: 400; font-size: var(--font-size-sm);">{{ training.court_price_display }}</span>
+                            {% endif %}
+                        </p>
                         {% endif %}
                     </div>
                 </a>

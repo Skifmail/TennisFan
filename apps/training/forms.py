@@ -2,11 +2,15 @@
 Training forms.
 """
 
+from decimal import Decimal
+
 from django import forms
 
 from apps.courts.models import Court
+from apps.users.models import SkillLevel
 
 from .models import CoachApplication, Training, TrainingEnrollment
+from .widgets import MultiCheckboxWidget, TypePricesWidget
 
 
 class TrainingEnrollmentForm(forms.ModelForm):
@@ -176,7 +180,25 @@ class CoachApplicationForm(forms.ModelForm):
 
 
 class TrainingForm(forms.ModelForm):
-    """Форма создания/редактирования тренировки тренером."""
+    """Форма создания/редактирования тренировки тренером (через сайт)."""
+
+    type_prices = forms.JSONField(
+        label="Типы тренировки и цены",
+        required=True,
+        widget=TypePricesWidget(),
+    )
+    skill_levels = forms.MultipleChoiceField(
+        label="Уровни (игроков с этим уровнем беру на тренировку)",
+        choices=SkillLevel.choices,
+        widget=MultiCheckboxWidget(choices=SkillLevel.choices, show_ntrp=True),
+        required=True,
+    )
+    target_levels = forms.MultipleChoiceField(
+        label="Целевой уровень силы",
+        choices=SkillLevel.choices,
+        widget=MultiCheckboxWidget(choices=SkillLevel.choices, show_ntrp=True),
+        required=False,
+    )
 
     class Meta:
         model = Training
@@ -184,14 +206,15 @@ class TrainingForm(forms.ModelForm):
             "title",
             "short_description",
             "description",
-            "training_type",
-            "skill_level",
-            "target_category",
+            "type_prices",
+            "skill_levels",
+            "target_levels",
             "courts",
             "city",
             "duration_minutes",
             "max_participants",
-            "price",
+            "court_price_min",
+            "court_price_max",
             "schedule",
             "image",
             "is_active",
@@ -200,9 +223,6 @@ class TrainingForm(forms.ModelForm):
             "title": forms.TextInput(attrs={"class": "form-control"}),
             "short_description": forms.TextInput(attrs={"class": "form-control"}),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
-            "training_type": forms.Select(attrs={"class": "form-control"}),
-            "skill_level": forms.Select(attrs={"class": "form-control"}),
-            "target_category": forms.Select(attrs={"class": "form-control"}),
             "courts": forms.SelectMultiple(attrs={"class": "form-control", "size": 8}),
             "city": forms.TextInput(attrs={"class": "form-control"}),
             "duration_minutes": forms.NumberInput(
@@ -211,8 +231,21 @@ class TrainingForm(forms.ModelForm):
             "max_participants": forms.NumberInput(
                 attrs={"class": "form-control", "min": 1}
             ),
-            "price": forms.NumberInput(
-                attrs={"class": "form-control", "step": "0.01", "min": 0}
+            "court_price_min": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "step": "1",
+                    "min": 0,
+                    "placeholder": "от",
+                }
+            ),
+            "court_price_max": forms.NumberInput(
+                attrs={
+                    "class": "form-control",
+                    "step": "1",
+                    "min": 0,
+                    "placeholder": "до",
+                }
             ),
             "schedule": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
             "image": forms.FileInput(
@@ -223,17 +256,149 @@ class TrainingForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from apps.users.models import SkillLevel
+        self.fields["courts"].queryset = Court.objects.filter(is_active=True).order_by(
+            "name"
+        )
+        # На сайте корты выбираем чекбоксами
+        self.fields["courts"].widget = forms.CheckboxSelectMultiple(
+            attrs={"class": "checkbox-list courts-checkbox-list"}
+        )
+        # Важно: явно прокидываем choices в виджет, иначе он рендерит пустой список
+        self.fields["courts"].widget.choices = self.fields["courts"].choices
+        self.fields["courts"].required = False
+        self.fields["short_description"].required = False
+        self.fields["schedule"].required = False
+        self.fields["court_price_min"].required = False
+        self.fields["court_price_max"].required = False
+        self.fields["image"].required = False
 
+        if self.instance and self.instance.pk:
+            self.initial["type_prices"] = self.instance.type_prices or {}
+            self.initial["skill_levels"] = self.instance.skill_levels or []
+            self.initial["target_levels"] = self.instance.target_levels or []
+
+    def clean_type_prices(self):
+        value = self.cleaned_data.get("type_prices")
+        if not value:
+            raise forms.ValidationError("Выберите хотя бы один тип тренировки.")
+        return value
+
+    def _apply_price_range(self, training: Training) -> None:
+        """Устанавливает общий диапазон цен по выбранным типам."""
+        type_prices = self.cleaned_data.get("type_prices") or {}
+        prices: list[Decimal] = []
+        for raw in type_prices.values():
+            if raw in (None, ""):
+                continue
+            try:
+                prices.append(Decimal(str(raw)))
+            except Exception:
+                continue
+        if prices:
+            training.price_min = min(prices)
+            training.price_max = max(prices)
+        else:
+            training.price_min = None
+            training.price_max = None
+
+    def save(self, commit: bool = True) -> Training:
+        training: Training = super().save(commit=False)
+        self._apply_price_range(training)
+        if commit:
+            training.save()
+            self.save_m2m()
+        return training
+
+
+class AdminTrainingForm(forms.ModelForm):
+    """Форма тренировки для админки: чекбоксы + цены по типам в одном блоке."""
+
+    type_prices = forms.JSONField(
+        label="Типы тренировки и цены",
+        required=True,
+        widget=TypePricesWidget(),
+    )
+    skill_levels = forms.MultipleChoiceField(
+        label="Уровни (игроков с этим уровнем беру на тренировку)",
+        choices=SkillLevel.choices,
+        widget=MultiCheckboxWidget(choices=SkillLevel.choices, show_ntrp=True),
+        required=True,
+    )
+    target_levels = forms.MultipleChoiceField(
+        label="Целевой уровень силы",
+        choices=SkillLevel.choices,
+        widget=MultiCheckboxWidget(choices=SkillLevel.choices, show_ntrp=True),
+        required=False,
+    )
+
+    class Meta:
+        model = Training
+        fields = (
+            "title",
+            "slug",
+            "short_description",
+            "description",
+            "type_prices",
+            "skill_levels",
+            "target_levels",
+            "coach",
+            "courts",
+            "city",
+            "duration_minutes",
+            "max_participants",
+            "court_price_min",
+            "court_price_max",
+            "schedule",
+            "image",
+            "is_active",
+            "is_featured",
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.fields["courts"].queryset = Court.objects.filter(is_active=True).order_by(
             "name"
         )
         self.fields["courts"].required = False
-        self.fields["target_category"].required = False
-        self.fields["target_category"].choices = [("", "———")] + list(
-            SkillLevel.choices
-        )
         self.fields["short_description"].required = False
         self.fields["schedule"].required = False
-        self.fields["price"].required = False
+        self.fields["court_price_min"].required = False
+        self.fields["court_price_max"].required = False
         self.fields["image"].required = False
+
+        if self.instance and self.instance.pk:
+            self.initial["type_prices"] = self.instance.type_prices or {}
+            self.initial["skill_levels"] = self.instance.skill_levels or []
+            self.initial["target_levels"] = self.instance.target_levels or []
+
+    def clean_type_prices(self):
+        value = self.cleaned_data.get("type_prices")
+        if not value:
+            raise forms.ValidationError("Выберите хотя бы один тип тренировки.")
+        return value
+
+    def _apply_price_range(self, training: Training) -> None:
+        """Устанавливает общий диапазон цен по выбранным типам."""
+        type_prices = self.cleaned_data.get("type_prices") or {}
+        prices: list[Decimal] = []
+        for raw in type_prices.values():
+            if raw in (None, ""):
+                continue
+            try:
+                prices.append(Decimal(str(raw)))
+            except Exception:
+                continue
+        if prices:
+            training.price_min = min(prices)
+            training.price_max = max(prices)
+        else:
+            training.price_min = None
+            training.price_max = None
+
+    def save(self, commit: bool = True) -> Training:
+        training: Training = super().save(commit=False)
+        self._apply_price_range(training)
+        if commit:
+            training.save()
+            self.save_m2m()
+        return training

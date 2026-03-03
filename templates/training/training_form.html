@@ -7,7 +7,7 @@
     <h1 class="page-title">{% if training %}Редактировать тренировку{% else %}Добавить тренировку{% endif %}</h1>
 </div>
 
-<div class="container" style="max-width: 640px;">
+<div class="container" style="max-width: 720px;">
     <div class="card">
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <form method="post" enctype="multipart/form-data">
@@ -32,21 +32,23 @@
                     {% for err in form.description.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
 
-                <div class="d-flex gap-2" style="flex-wrap: wrap;">
-                    <div class="form-group" style="flex: 1; min-width: 140px;">
-                        <label class="form-label" for="id_training_type">{{ form.training_type.label }} *</label>
-                        {{ form.training_type }}
-                        {% for err in form.training_type.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                <h3 style="font-size: var(--font-size-lg); margin-top: var(--spacing-xl); margin-bottom: var(--spacing-md);">Типы тренировки и цены *</h3>
+                <p class="text-muted" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-md);">Выберите типы и укажите цену за каждый.</p>
+                <div class="form-group">
+                    {{ form.type_prices }}
+                    {% for err in form.type_prices.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+
+                <div class="d-flex gap-2" style="flex-wrap: wrap; margin-top: var(--spacing-xl);">
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label class="form-label">{{ form.skill_levels.label }} *</label>
+                        {{ form.skill_levels }}
+                        {% for err in form.skill_levels.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
-                    <div class="form-group" style="flex: 1; min-width: 140px;">
-                        <label class="form-label" for="id_skill_level">{{ form.skill_level.label }} *</label>
-                        {{ form.skill_level }}
-                        {% for err in form.skill_level.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                    </div>
-                    <div class="form-group" style="flex: 1; min-width: 140px;">
-                        <label class="form-label" for="id_target_category">{{ form.target_category.label }}</label>
-                        {{ form.target_category }}
-                        {% for err in form.target_category.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label class="form-label">{{ form.target_levels.label }}</label>
+                        {{ form.target_levels }}
+                        {% for err in form.target_levels.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                 </div>
 
@@ -58,8 +60,14 @@
                     </div>
                     <div class="form-group" style="flex: 1; min-width: 180px;">
                         <label class="form-label" for="id_courts">{{ form.courts.label }}</label>
-                        {{ form.courts }}
-                        <span class="form-hint text-muted" style="font-size: var(--font-size-xs);">Можно выбрать несколько — один тренер может проводить тренировки на разных площадках.</span>
+                        <input type="text"
+                               id="court-search"
+                               class="form-control"
+                               placeholder="Поиск корта по названию или городу">
+                        <div id="courts-checkbox-container" style="margin-top: var(--spacing-xs); max-height: 260px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-xs) var(--spacing-sm);">
+                            {{ form.courts }}
+                        </div>
+                        <span class="form-hint text-muted" style="font-size: var(--font-size-xs);">Можно выбрать несколько кортов — просто ставьте галочки в списке.</span>
                         {% for err in form.courts.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                 </div>
@@ -75,10 +83,18 @@
                         {{ form.max_participants }}
                         {% for err in form.max_participants.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
+                </div>
+
+                <div class="d-flex gap-2" style="flex-wrap: wrap;">
                     <div class="form-group" style="flex: 1; min-width: 120px;">
-                        <label class="form-label" for="id_price">{{ form.price.label }}</label>
-                        {{ form.price }}
-                        {% for err in form.price.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                        <label class="form-label" for="id_court_price_min">Корт от (₽)</label>
+                        {{ form.court_price_min }}
+                        {% for err in form.court_price_min.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 120px;">
+                        <label class="form-label" for="id_court_price_max">Корт до (₽)</label>
+                        {{ form.court_price_max }}
+                        {% for err in form.court_price_max.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                 </div>
 
@@ -108,4 +124,52 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        function initCourtSearch() {
+            var searchInput = document.getElementById('court-search');
+            var container = document.getElementById('courts-checkbox-container');
+            if (!searchInput || !container) return;
+
+            // Корневой элемент виджета (Django рендерит id="id_courts")
+            var widgetRoot = container.querySelector('#id_courts') || container.firstElementChild;
+            if (!widgetRoot) return;
+
+            // Одна строка на опцию: прямой потомок виджета (div или li), а не контейнера
+            var checkboxes = container.querySelectorAll('input[type="checkbox"]');
+            var rows = [];
+            for (var i = 0; i < checkboxes.length; i++) {
+                var cb = checkboxes[i];
+                var el = cb;
+                while (el.parentElement && el.parentElement !== widgetRoot) {
+                    el = el.parentElement;
+                }
+                if (el && el !== widgetRoot) {
+                    rows.push({ row: el, checkbox: cb });
+                }
+            }
+
+            function filterCourts() {
+                var query = (searchInput.value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+                rows.forEach(function (item) {
+                    var text = (item.row.textContent || '').toLowerCase().replace(/\s+/g, ' ');
+                    var show = !query || text.indexOf(query) !== -1 || item.checkbox.checked;
+                    item.row.style.display = show ? '' : 'none';
+                });
+            }
+
+            searchInput.addEventListener('input', filterCourts);
+            searchInput.addEventListener('keyup', filterCourts);
+            rows.forEach(function (item) { item.checkbox.addEventListener('change', filterCourts); });
+            filterCourts(); // начальное состояние (пустой поиск — всё видно)
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initCourtSearch);
+        } else {
+            initCourtSearch();
+        }
+    })();
+</script>
 {% endblock %}

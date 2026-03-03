@@ -26,7 +26,12 @@
                     <a href="{% url 'training_edit' pk=t.pk %}" class="btn btn-ghost btn--filter-size">Изменить</a>
                     <a href="{% url 'training_detail' slug=t.slug %}" class="btn btn-outline btn--filter-size">На сайт</a>
                 </div>
-                <p class="text-secondary mb-0">{{ t.get_training_type_display }}, {{ t.city }}{% if t.price %} · {{ t.price }} ₽{% endif %}</p>
+                <p class="text-secondary mb-0">
+                    {% for tt in t.training_types_display %}{{ tt }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                    · {{ t.city }}
+                    {% if t.price_display %} · {{ t.price_display }}{% endif %}
+                    {% if t.court_price_display %} <span style="font-size: var(--font-size-sm);">{{ t.court_price_display }}</span>{% endif %}
+                </p>
 
                 <h4 class="mt-4 mb-2" style="font-size: var(--font-size-base);">Заявки ({{ t.enrollments.count }})</h4>
                 {% for e in t.enrollments.all %}
@@ -72,7 +77,10 @@
             <div class="card">
                 <div class="card-body">
                     <h3 class="card-title">{{ e.training.title }}</h3>
-                    <p class="text-secondary mb-2" style="font-size: var(--font-size-sm);">{{ e.training.get_training_type_display }}, {{ e.training.city }}</p>
+                    <p class="text-secondary mb-2" style="font-size: var(--font-size-sm);">
+                        {% for tt in e.training.training_types_display %}{{ tt }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        · {{ e.training.city }}
+                    </p>
                     <p class="mb-3"><span class="player-category">{{ e.get_status_display }}</span></p>
                     <div class="d-flex gap-2">
                         <a href="{% url 'training_detail' slug=e.training.slug %}" class="btn btn-outline btn--filter-size">Подробнее</a>

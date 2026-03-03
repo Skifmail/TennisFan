@@ -8,6 +8,7 @@ from django.template.response import TemplateResponse
 from django.urls import path
 
 from .models import (
+    City,
     FooterSocialLink,
     SupportConversation,
     SupportMessage,
@@ -132,3 +133,12 @@ class FooterSocialLinkAdmin(admin.ModelAdmin):
     list_editable = ("order",)
     list_display_links = ("name", "url")
     search_fields = ("name", "url")
+
+
+@admin.register(City)
+class CityAdmin(admin.ModelAdmin):
+    """Справочник городов для автодополнения на сайте."""
+
+    list_display = ("name",)
+    search_fields = ("name",)
+    ordering = ("name",)

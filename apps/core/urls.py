@@ -8,6 +8,7 @@ from . import views
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("api/cities/", views.api_cities, name="api_cities"),
     path("api/recent-matches/", views.api_recent_matches, name="api_recent_matches"),
     path(
         "api/upcoming-matches/", views.api_upcoming_matches, name="api_upcoming_matches"

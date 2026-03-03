@@ -15,11 +15,24 @@
                 style="width: 100%; border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl);">
             {% endif %}
 
-            <div class="d-flex gap-1 mb-2">
-                <span class="player-category">{{ training.get_training_type_display }}</span>
+            <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">
+                {% for tt in training.training_types_display %}
+                <span class="player-category">{{ tt }}</span>
+                {% endfor %}
+                {% for sl in training.skill_levels_display %}
                 <span class="player-category"
-                    style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ training.get_skill_level_display }}</span>
+                    style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ sl }}</span>
+                {% endfor %}
             </div>
+
+            {% if training.target_levels_display %}
+            <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">
+                <span class="text-muted" style="font-size: var(--font-size-xs); align-self: center;">Целевой уровень:</span>
+                {% for tl in training.target_levels_display %}
+                <span class="player-category" style="background: var(--color-success-transparent, rgba(92, 184, 92, 0.15)); color: var(--color-text-secondary);">{{ tl }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
 
             <h1 style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);">{{ training.title }}</h1>
 
@@ -42,8 +55,23 @@
         <div class="training-detail-sidebar">
             <div class="card training-detail-sidebar-card">
                 <div class="card-body">
-                    {% if training.price %}
-                    <div class="text-primary mb-3" style="font-size: var(--font-size-2xl); font-weight: 800;">{{ training.price }} ₽</div>
+                    {% if training.price_display %}
+                    <div class="text-primary mb-1" style="font-size: var(--font-size-2xl); font-weight: 800;">{{ training.price_display }}</div>
+                    {% endif %}
+                    {% if training.court_price_display %}
+                    <div class="text-secondary mb-3" style="font-size: var(--font-size-base);">{{ training.court_price_display }}</div>
+                    {% endif %}
+
+                    {% if training.type_prices_display %}
+                    <div class="mb-3">
+                        <div class="text-muted mb-1" style="font-size: var(--font-size-xs);">Стоимость по типам</div>
+                        {% for tp_name, tp_price in training.type_prices_display %}
+                        <div class="d-flex" style="justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-border-light, rgba(0,0,0,0.06));">
+                            <span>{{ tp_name }}</span>
+                            <span style="font-weight: 600;">{{ tp_price }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
                     {% endif %}
 
                     <div class="mb-3">

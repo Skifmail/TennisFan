@@ -1,0 +1,33 @@
+<table style="border-collapse: collapse; width: 100%; max-width: 500px;">
+    <thead>
+        <tr>
+            <th style="text-align: left; padding: 4px 8px; border-bottom: 1px solid #ccc;"></th>
+            <th style="text-align: left; padding: 4px 8px; border-bottom: 1px solid #ccc;">Тип тренировки</th>
+            <th style="text-align: left; padding: 4px 8px; border-bottom: 1px solid #ccc;">Цена (₽)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in widget.choices %}
+        <tr>
+            <td style="padding: 4px 8px;">
+                <input type="checkbox"
+                       name="{{ widget.name }}_checked_{{ item.code }}"
+                       id="id_{{ widget.name }}_checked_{{ item.code }}"
+                       {% if item.checked %}checked{% endif %}>
+            </td>
+            <td style="padding: 4px 8px;">
+                <label for="id_{{ widget.name }}_checked_{{ item.code }}">{{ item.label }}</label>
+            </td>
+            <td style="padding: 4px 8px;">
+                <input type="number"
+                       name="{{ widget.name }}_price_{{ item.code }}"
+                       id="id_{{ widget.name }}_price_{{ item.code }}"
+                       value="{{ item.price|default:'' }}"
+                       step="1"
+                       min="0"
+                       style="width: 120px;">
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

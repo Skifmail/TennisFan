@@ -12,7 +12,11 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.decorators import login_required_with_message
 
-from .forms import CoachApplicationForm, TrainingEnrollmentForm, TrainingForm
+from .forms import (
+    CoachApplicationForm,
+    TrainingEnrollmentForm,
+    TrainingForm,
+)
 from .models import (
     Coach,
     Training,
@@ -26,7 +30,7 @@ logger = logging.getLogger(__name__)
     "Раздел тренировок доступен только для зарегистрированных пользователей."
 )
 def training_list(request):
-    """List of trainings. Только для авторизованных пользователей."""
+    """Список тренировок. Только для авторизованных пользователей."""
     skill_level = request.GET.get("level", "")
     training_type = request.GET.get("type", "")
     city = request.GET.get("city", "")
@@ -34,9 +38,10 @@ def training_list(request):
     trainings = Training.objects.filter(is_active=True).select_related("coach")
 
     if skill_level:
-        trainings = trainings.filter(skill_level=skill_level)
+        trainings = trainings.filter(skill_levels__contains=[skill_level])
     if training_type:
-        trainings = trainings.filter(training_type=training_type)
+        # type_prices — словарь {type: price}, фильтруем по наличию ключа
+        trainings = trainings.filter(type_prices__has_key=training_type)
     if city:
         trainings = trainings.filter(city__icontains=city)
 
@@ -53,7 +58,7 @@ def training_list(request):
     "Детали тренировки доступны только для зарегистрированных пользователей."
 )
 def training_detail(request, slug):
-    """Training detail page. Только для авторизованных пользователей."""
+    """Страница тренировки. Только для авторизованных пользователей."""
     training = get_object_or_404(
         Training.objects.select_related("coach").prefetch_related("courts"),
         slug=slug,
@@ -237,13 +242,16 @@ def training_add(request):
                 slug = f"{base}-{n}"
             t.slug = slug
             t.save()
+            form.save_m2m()
             messages.success(request, f"Тренировка «{t.title}» создана.")
             return redirect("my_trainings")
     else:
         form = TrainingForm(initial={"city": coach.city} if coach.city else {})
 
     return render(
-        request, "training/training_form.html", {"form": form, "training": None}
+        request,
+        "training/training_form.html",
+        {"form": form, "training": None},
     )
 
 
@@ -271,7 +279,9 @@ def training_edit(request, pk):
         form = TrainingForm(instance=training)
 
     return render(
-        request, "training/training_form.html", {"form": form, "training": training}
+        request,
+        "training/training_form.html",
+        {"form": form, "training": training},
     )
 
 

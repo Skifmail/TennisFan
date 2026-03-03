@@ -10,13 +10,24 @@ from django.utils.text import slugify
 from apps.users.models import SkillLevel
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
+# Соответствие уровней NTRP (строковые ключи совпадают с SkillLevel)
+SKILL_LEVEL_NTRP: dict[str, str] = {
+    "novice": "1.5–2.5",
+    "amateur": "2.6–3.5",
+    "experienced": "3.6–4.5",
+    "advanced": "4.6–5.5",
+    "professional": "5.6–7.0",
+}
+
 
 class TrainingType(models.TextChoices):
-    """Training types."""
+    """Типы тренировок."""
 
     INDIVIDUAL = "individual", "Индивидуальная"
     GROUP = "group", "Групповая"
     MINI_GROUP = "mini_group", "Мини-группа (2-4 чел.)"
+    SPARRING = "sparring", "Спарринг тренировка"
+    SPLIT = "split", "Сплит"
 
 
 class Coach(models.Model):
@@ -222,24 +233,30 @@ class CoachApplication(CompressImageFieldsMixin, models.Model):
 
 
 class Training(CompressImageFieldsMixin, models.Model):
-    """Adult training program model."""
+    """Модель тренировки для взрослых."""
 
     title = models.CharField("Название", max_length=200)
     slug = models.SlugField("URL", unique=True)
     description = models.TextField("Описание")
     short_description = models.CharField("Краткое описание", max_length=300, blank=True)
 
-    training_type = models.CharField(
-        "Тип тренировки",
-        max_length=20,
-        choices=TrainingType.choices,
-        default=TrainingType.INDIVIDUAL,
+    type_prices = models.JSONField(
+        "Типы и цены",
+        default=dict,
+        blank=True,
+        help_text="Словарь {тип_тренировки: цена}. Пример: {'individual': 3000, 'group': 1500}.",
     )
-    skill_level = models.CharField(
-        "Уровень", max_length=20, choices=SkillLevel.choices, default=SkillLevel.AMATEUR
+    skill_levels = models.JSONField(
+        "Уровни",
+        default=list,
+        blank=True,
+        help_text="Список выбранных уровней (novice, amateur, experienced, advanced, professional).",
     )
-    target_category = models.CharField(
-        "Целевой уровень силы", max_length=20, choices=SkillLevel.choices, blank=True
+    target_levels = models.JSONField(
+        "Целевые уровни силы",
+        default=list,
+        blank=True,
+        help_text="Список целевых уровней силы.",
     )
 
     coach = models.ForeignKey(
@@ -263,8 +280,19 @@ class Training(CompressImageFieldsMixin, models.Model):
         "Длительность (мин)", default=60
     )
     max_participants = models.PositiveSmallIntegerField("Макс. участников", default=1)
-    price = models.DecimalField(
-        "Цена", max_digits=10, decimal_places=2, null=True, blank=True
+
+    price_min = models.DecimalField(
+        "Цена от", max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    price_max = models.DecimalField(
+        "Цена до", max_digits=10, decimal_places=2, null=True, blank=True
+    )
+
+    court_price_min = models.DecimalField(
+        "Цена за корт от", max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    court_price_max = models.DecimalField(
+        "Цена за корт до", max_digits=10, decimal_places=2, null=True, blank=True
     )
 
     schedule = models.TextField(
@@ -290,6 +318,75 @@ class Training(CompressImageFieldsMixin, models.Model):
 
     def __str__(self) -> str:
         return str(self.title)
+
+    @property
+    def training_types(self) -> list[str]:
+        """Список выбранных типов тренировки (ключи из type_prices)."""
+        return list((self.type_prices or {}).keys())
+
+    @property
+    def training_types_display(self) -> list[str]:
+        """Человекочитаемые названия выбранных типов тренировки."""
+        mapping = dict(TrainingType.choices)
+        return [mapping.get(t, t) for t in self.training_types]
+
+    @property
+    def type_prices_display(self) -> list[tuple[str, str]]:
+        """Список (название типа, цена) для отображения."""
+        mapping = dict(TrainingType.choices)
+        result: list[tuple[str, str]] = []
+        for t, price in (self.type_prices or {}).items():
+            label = mapping.get(t, t)
+            result.append((label, f"{price:,.0f} ₽" if price else "—"))
+        return result
+
+    @property
+    def skill_levels_display(self) -> list[str]:
+        """Человекочитаемые названия выбранных уровней с числовым диапазоном."""
+        mapping = dict(SkillLevel.choices)
+        result: list[str] = []
+        for lvl in self.skill_levels or []:
+            label = mapping.get(lvl, lvl)
+            ntrp = SKILL_LEVEL_NTRP.get(lvl, "")
+            result.append(f"{label} ({ntrp})" if ntrp else label)
+        return result
+
+    @property
+    def target_levels_display(self) -> list[str]:
+        """Человекочитаемые названия выбранных целевых уровней с числовым диапазоном."""
+        mapping = dict(SkillLevel.choices)
+        result: list[str] = []
+        for lvl in self.target_levels or []:
+            label = mapping.get(lvl, lvl)
+            ntrp = SKILL_LEVEL_NTRP.get(lvl, "")
+            result.append(f"{label} ({ntrp})" if ntrp else label)
+        return result
+
+    @property
+    def price_display(self) -> str:
+        """Строковое представление диапазона цены."""
+        if self.price_min and self.price_max:
+            if self.price_min == self.price_max:
+                return f"{self.price_min:,.0f} ₽"
+            return f"{self.price_min:,.0f} – {self.price_max:,.0f} ₽"
+        if self.price_min:
+            return f"от {self.price_min:,.0f} ₽"
+        if self.price_max:
+            return f"до {self.price_max:,.0f} ₽"
+        return ""
+
+    @property
+    def court_price_display(self) -> str:
+        """Строковое представление диапазона цены за корт."""
+        if self.court_price_min and self.court_price_max:
+            if self.court_price_min == self.court_price_max:
+                return f"+ корт {self.court_price_min:,.0f} ₽"
+            return f"+ корт {self.court_price_min:,.0f} – {self.court_price_max:,.0f} ₽"
+        if self.court_price_min:
+            return f"+ корт от {self.court_price_min:,.0f} ₽"
+        if self.court_price_max:
+            return f"+ корт до {self.court_price_max:,.0f} ₽"
+        return ""
 
 
 class TrainingEnrollment(models.Model):

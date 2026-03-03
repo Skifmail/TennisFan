@@ -173,7 +173,9 @@
                         showSuggestions(dropdown, data, input, function (name) {
                             input.value = name;
                             hideDropdown(dropdown);
-                            input.focus();
+                            // Явно триггерим событие change, но не открываем подсказки заново
+                            var evt = new Event('change', { bubbles: true });
+                            input.dispatchEvent(evt);
                         });
                     } else {
                         hideDropdown(dropdown);
@@ -235,6 +237,14 @@
         input.addEventListener("input", onInput);
         input.addEventListener("focus", onInput);
         input.addEventListener("keydown", onKeydown);
+        input.addEventListener("blur", function () {
+            // На мобильных даём возможность обработать клик по подсказке, затем скрываем список, если фокус ушёл
+            window.setTimeout(function () {
+                if (!dropdown.contains(document.activeElement)) {
+                    hideDropdown(dropdown);
+                }
+            }, 150);
+        });
         document.addEventListener("click", closeOnClickOutside);
     }
 

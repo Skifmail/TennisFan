@@ -33,7 +33,8 @@
 
             <div class="pricing-card__price {% if tier.show_promo_price %}pricing-card__price--promo{% endif %}">
                 {% if tier.effective_price == 0 %}
-                <span class="price-amount">Бесплатно</span>
+                <span class="price-amount">0 ₽</span>
+                <span class="price-period">/ месяц</span>
                 {% else %}
                 {% if tier.show_first_one_ruble %}
                 <span class="price-amount price-amount--current">1 ₽</span>
@@ -179,7 +180,7 @@
                 {% if current_tier_id == tier.id %}
                 <button disabled class="btn btn-outline pricing-card__btn">Текущий план</button>
                 {% elif tier.price == 0 %}
-                <button disabled class="btn btn-outline pricing-card__btn">Бесплатный тариф</button>
+                {# Для бесплатного тарифа отдельная кнопка не нужна #}
                 {% else %}
                 <a href="{% url 'payment_preview' %}?type=subscription&id={{ tier.id }}"
                     class="btn {% if tier.name == 'diamond' %}btn-primary{% else %}btn-outline{% endif %} pricing-card__btn">Купить

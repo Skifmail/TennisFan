@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Технические работы — tennisfan.ru</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:  #2d6a4f;
+      --lime:   #74c69d;
+      --yellow: #f4d03f;
+      --dark:   #1a2e22;
+      --light:  #f0faf4;
+      --text:   #d8f3dc;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Outfit', sans-serif;
+      background: var(--dark);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .bg {
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at 60% 40%, #2d6a4f 0%, #1a2e22 70%);
+      z-index: 0;
+    }
+    .bg::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+      opacity: .4;
+      pointer-events: none;
+    }
+
+    /* ── Ball ── */
+    #ball {
+      position: fixed;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      z-index: 3;
+      pointer-events: none;
+      background: radial-gradient(circle at 38% 32%, #b7e4c7, #52b788 48%, #2d6a4f);
+      box-shadow:
+        inset -5px -5px 12px rgba(0,0,0,.35),
+        inset 3px 3px 7px rgba(255,255,255,.18),
+        0 0 22px rgba(82,183,136,.45);
+    }
+    #ball::before, #ball::after {
+      content: '';
+      position: absolute;
+      border: 1.8px solid rgba(255,255,255,.28);
+      border-radius: 50%;
+      top: 50%; left: 50%;
+    }
+    #ball::before {
+      width: 52px; height: 22px;
+      transform: translate(-50%,-50%) rotate(-35deg);
+      border-left-color: transparent; border-right-color: transparent;
+    }
+    #ball::after {
+      width: 22px; height: 52px;
+      transform: translate(-50%,-50%) rotate(-35deg);
+      border-top-color: transparent; border-bottom-color: transparent;
+    }
+
+    /* ── Card ── */
+    .card {
+      position: relative; z-index: 2;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+      animation: fadeUp .8s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(2.5rem, 8vw, 5rem);
+      letter-spacing: .12em;
+      color: var(--yellow);
+      text-shadow: 0 0 40px #f4d03f55;
+      line-height: 1;
+      animation: fadeUp .8s .1s ease both;
+    }
+    .logo span { color: var(--lime); }
+
+    .divider {
+      width: 120px; height: 3px;
+      background: linear-gradient(90deg, transparent, var(--yellow), transparent);
+      margin: 1.2rem auto;
+      border-radius: 2px;
+      animation: fadeUp .8s .2s ease both;
+    }
+
+    .headline {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(1.6rem, 5vw, 3rem);
+      letter-spacing: .08em;
+      color: var(--light);
+      animation: fadeUp .8s .3s ease both;
+    }
+
+    .sub {
+      margin-top: 1rem;
+      font-size: clamp(.95rem, 2vw, 1.1rem);
+      font-weight: 300;
+      color: var(--lime);
+      line-height: 1.7;
+      max-width: 480px;
+      animation: fadeUp .8s .4s ease both;
+    }
+
+    /* ── Progress ── */
+    .progress-wrap {
+      margin-top: 2.5rem;
+      width: min(360px, 90vw);
+      animation: fadeUp .8s .5s ease both;
+    }
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: .8rem;
+      color: #74c69d99;
+      margin-bottom: .5rem;
+      letter-spacing: .04em;
+    }
+    .progress-track {
+      height: 6px;
+      background: #ffffff18;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--lime), var(--yellow));
+      border-radius: 99px;
+      width: 100%;
+      transition: width 1s linear;
+    }
+
+    /* ── Timer ── */
+    .timer {
+      margin-top: 2.5rem;
+      display: flex;
+      gap: 1.5rem;
+      align-items: flex-start;
+      animation: fadeUp .8s .6s ease both;
+    }
+    .time-block { display: flex; flex-direction: column; align-items: center; gap: .2rem; }
+    .time-value {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.6rem;
+      color: var(--yellow);
+      line-height: 1;
+      min-width: 3ch;
+      text-align: center;
+    }
+    .time-label { font-size: .7rem; letter-spacing: .1em; color: #74c69d99; text-transform: uppercase; }
+    .time-sep {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.2rem;
+      color: var(--lime);
+      opacity: .5;
+      padding-top: .15rem;
+      animation: blink 1s step-start infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Racquet ── */
+    .racquet-wrap {
+      margin-top: 2rem;
+      opacity: .5;
+      animation: fadeUp .8s .7s ease both;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg"></div>
+  <div id="ball"></div>
+
+  <main class="card">
+    <div class="logo">Tennis<span>Fan</span>.ru</div>
+    <div class="divider"></div>
+    <h1 class="headline">Технические работы</h1>
+    <p class="sub">
+      Мы обновляем сайт. Ракетка уже в руке —<br>
+      через несколько минут всё будет готово!
+    </p>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Обновление сайта</span>
+        <span id="pct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="fill"></div>
+      </div>
+    </div>
+
+    <div class="timer">
+      <div class="time-block">
+        <span class="time-value" id="mm">03</span>
+        <span class="time-label">минут</span>
+      </div>
+      <div class="time-sep">:</div>
+      <div class="time-block">
+        <span class="time-value" id="ss">00</span>
+        <span class="time-label">секунд</span>
+      </div>
+    </div>
+
+    <!-- Realistic racquet -->
+    <div class="racquet-wrap">
+      <svg width="68" height="148" viewBox="0 0 68 148" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer frame -->
+        <ellipse cx="34" cy="40" rx="26" ry="34" stroke="#74c69d" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+        <!-- Inner frame shadow -->
+        <ellipse cx="34" cy="40" rx="20.5" ry="28.5" stroke="#52b788" stroke-width="1" fill="none" opacity=".4"/>
+
+        <!-- Strings horizontal -->
+        <clipPath id="head"><ellipse cx="34" cy="40" rx="20" ry="28"/></clipPath>
+        <g clip-path="url(#head)" stroke="#74c69d" stroke-width="1" opacity=".55">
+          <line x1="14" y1="16" x2="54" y2="16"/>
+          <line x1="14" y1="22" x2="54" y2="22"/>
+          <line x1="14" y1="28" x2="54" y2="28"/>
+          <line x1="14" y1="34" x2="54" y2="34"/>
+          <line x1="14" y1="40" x2="54" y2="40"/>
+          <line x1="14" y1="46" x2="54" y2="46"/>
+          <line x1="14" y1="52" x2="54" y2="52"/>
+          <line x1="14" y1="58" x2="54" y2="58"/>
+          <line x1="14" y1="64" x2="54" y2="64"/>
+          <!-- Strings vertical -->
+          <line x1="18" y1="12" x2="18" y2="68"/>
+          <line x1="22" y1="12" x2="22" y2="68"/>
+          <line x1="26" y1="12" x2="26" y2="68"/>
+          <line x1="30" y1="12" x2="30" y2="68"/>
+          <line x1="34" y1="12" x2="34" y2="68"/>
+          <line x1="38" y1="12" x2="38" y2="68"/>
+          <line x1="42" y1="12" x2="42" y2="68"/>
+          <line x1="46" y1="12" x2="46" y2="68"/>
+          <line x1="50" y1="12" x2="50" y2="68"/>
+        </g>
+
+        <!-- Throat wedge -->
+        <path d="M14 72 L20 90 L48 90 L54 72" stroke="#74c69d" stroke-width="4.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+        <!-- Throat fill -->
+        <path d="M20 90 L48 90 L44 74 L24 74 Z" fill="#2d6a4f" opacity=".6"/>
+
+        <!-- Handle shaft -->
+        <rect x="27.5" y="89" width="13" height="30" rx="2.5" fill="#3a7d5c"/>
+        <!-- Shaft highlight -->
+        <rect x="29" y="89" width="4" height="30" rx="1.5" fill="#52b788" opacity=".25"/>
+
+        <!-- Grip wrap -->
+        <rect x="27" y="118" width="14" height="24" rx="3" fill="#1d4731"/>
+        <line x1="27" y1="122" x2="41" y2="122" stroke="#0f2a1e" stroke-width="1.5" opacity=".6"/>
+        <line x1="27" y1="127" x2="41" y2="127" stroke="#0f2a1e" stroke-width="1.5" opacity=".6"/>
+        <line x1="27" y1="132" x2="41" y2="132" stroke="#0f2a1e" stroke-width="1.5" opacity=".6"/>
+        <line x1="27" y1="137" x2="41" y2="137" stroke="#0f2a1e" stroke-width="1.5" opacity=".6"/>
+
+        <!-- Butt cap -->
+        <rect x="25" y="141" width="18" height="7" rx="3.5" fill="#52b788" opacity=".75"/>
+      </svg>
+    </div>
+  </main>
+
+  <script>
+    // ── Timer + progress bar (synced to time) ──
+    const TOTAL = 3 * 60; // 3 minutes
+    let remaining = TOTAL;
+
+    const mmEl  = document.getElementById('mm');
+    const ssEl  = document.getElementById('ss');
+    const pctEl = document.getElementById('pct');
+    const fill  = document.getElementById('fill');
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    // init bar to 0% visually, then let transition run
+    fill.style.width = '0%';
+
+    const tick = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) { clearInterval(tick); location.reload(); return; }
+
+      mmEl.textContent = pad(Math.floor(remaining / 60));
+      ssEl.textContent = pad(remaining % 60);
+
+      // bar fills up as time passes: 0% at start → 100% at end
+      const elapsed = TOTAL - remaining;
+      const pct = Math.round((elapsed / TOTAL) * 100);
+      fill.style.width = pct + '%';
+      pctEl.textContent = pct + '%';
+    }, 1000);
+
+    // ── Bouncing ball ──
+    const ball = document.getElementById('ball');
+    const R = 22;
+
+    let x = window.innerWidth  / 2;
+    let y = window.innerHeight / 2;
+
+    const baseSpeed = 220;
+    const angle = Math.random() * Math.PI * 2;
+    let vx = Math.cos(angle) * baseSpeed;
+    let vy = Math.sin(angle) * baseSpeed;
+
+    let last = null;
+    let spinAngle = 0;
+
+    function frame(ts) {
+      if (!last) last = ts;
+      const dt = Math.min((ts - last) / 1000, 0.05);
+      last = ts;
+
+      x += vx * dt;
+      y += vy * dt;
+
+      const maxX = window.innerWidth  - R;
+      const maxY = window.innerHeight - R;
+
+      let bounced = false;
+      if (x <= R)    { x = R;    vx =  Math.abs(vx); bounced = true; }
+      if (x >= maxX) { x = maxX; vx = -Math.abs(vx); bounced = true; }
+      if (y <= R)    { y = R;    vy =  Math.abs(vy); bounced = true; }
+      if (y >= maxY) { y = maxY; vy = -Math.abs(vy); bounced = true; }
+
+      if (bounced) {
+        // random angle nudge ±15° for chaotic trajectory
+        const nudge = (Math.random() - 0.5) * 0.52;
+        const spd   = Math.hypot(vx, vy);
+        const cur   = Math.atan2(vy, vx) + nudge;
+        vx = Math.cos(cur) * spd;
+        vy = Math.sin(cur) * spd;
+
+        // keep speed bounded
+        const s = Math.hypot(vx, vy);
+        if (s < 160) { vx *= 160/s; vy *= 160/s; }
+        if (s > 320) { vx *= 320/s; vy *= 320/s; }
+      }
+
+      // Spin the ball slightly for realism
+      spinAngle += 2;
+      ball.style.transform = `translate(${x - R}px, ${y - R}px) rotate(${spinAngle}deg)`;
+
+      requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+
+    window.addEventListener('resize', () => {
+      x = Math.min(x, window.innerWidth  - R);
+      y = Math.min(y, window.innerHeight - R);
+    });
+  </script>
+</body>
+</html>

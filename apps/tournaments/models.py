@@ -315,6 +315,20 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             return 0
         return int(max(0, self.max_participants - self.participants.count()))
 
+    def save(self, *args, **kwargs) -> None:
+        """Custom save to normalize duration and reset notification flag when дедлайн сдвинут."""
+        from django.utils import timezone
+
+        # ТВД (format=weekend_day) задаёт duration в админке; остальные — многодневные.
+        if self.format != TournamentFormat.WEEKEND_DAY:
+            self.duration = TournamentDuration.MULTI_DAY
+        # Если дедлайн регистрации перенесли вперёд после отправки уведомления,
+        # сбрасываем отметку, чтобы при следующей проверке уведомление могло уйти снова.
+        if self.registration_deadline and self.insufficient_participants_notified_at:
+            if self.registration_deadline > timezone.now():
+                self.insufficient_participants_notified_at = None
+        super().save(*args, **kwargs)
+
 
 class TournamentPhoto(models.Model):
     """Дополнительное фото турнира для галереи (до 5 штук на турнир)."""
@@ -344,17 +358,6 @@ class TournamentPhoto(models.Model):
 
     def __str__(self) -> str:
         return f"Фото турнира {self.tournament.name}"
-
-    def save(self, *args, **kwargs):
-        from django.utils import timezone
-
-        # ТВД (format=weekend_day) задаёт duration в админке; остальные — многодневные
-        if getattr(self, "format", None) != TournamentFormat.WEEKEND_DAY:
-            self.duration = TournamentDuration.MULTI_DAY
-        if self.registration_deadline and self.insufficient_participants_notified_at:
-            if self.registration_deadline > timezone.now():
-                self.insufficient_participants_notified_at = None
-        super().save(*args, **kwargs)
 
 
 class TournamentEntryPayment(models.Model):

@@ -211,41 +211,25 @@
     .logo-coin__face {
       position: absolute;
       inset: 0;
-      border-radius: 50%;
-      background: radial-gradient(circle at 30% 20%, #ffffff, #f4d03f, #c38f1f);
-      box-shadow:
-        0 0 35px rgba(244, 208, 63, 0.5),
-        inset 0 0 18px rgba(0, 0, 0, 0.45);
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
       display: flex;
       align-items: center;
       justify-content: center;
       backface-visibility: hidden;
     }
     .logo-coin__face img {
-      width: 70%;
-      height: 70%;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
-      filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.45));
+      filter: none;
     }
     .logo-coin__face--back {
       transform: rotateY(180deg);
     }
     .logo-coin__edge {
-      position: absolute;
-      inset: 6px;
-      border-radius: 50%;
-      background: conic-gradient(
-        from 90deg,
-        #b8860b 0deg,
-        #f4d03f 60deg,
-        #b8860b 120deg,
-        #f4d03f 180deg,
-        #b8860b 240deg,
-        #f4d03f 300deg,
-        #b8860b 360deg
-      );
-      transform: translateZ(-6px);
-      opacity: 0.85;
+      display: none;
     }
   </style>
 </head>

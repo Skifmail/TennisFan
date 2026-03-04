@@ -80,7 +80,7 @@ services:
       - "traefik.http.routers.tennisfan.rule=Host(`tennisfan.ru`) || Host(`www.tennisfan.ru`)"
       - "traefik.http.routers.tennisfan.entrypoints=websecure"
       - "traefik.http.routers.tennisfan.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.tennisfan.priority=100"
+      - "traefik.http.routers.tennisfan.priority=1000"
 
       # Привязываем router к backend‑service на порту 8000
       - "traefik.http.routers.tennisfan.service=tennisfan"

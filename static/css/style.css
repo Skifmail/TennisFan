@@ -6214,18 +6214,17 @@ select.form-control {
 
     .tournament-card-photos {
         width: 100%;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--spacing-xs);
     }
 
     .tournament-card-photos .tournament-img {
-        height: 120px;
-    }
-
-    .tournament-img {
-        width: 120px;
-        height: 120px;
-        align-self: flex-start;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1 / 1;
         border-radius: var(--radius-sm);
+        object-fit: cover;
     }
 
     .tournament-content-wrapper {

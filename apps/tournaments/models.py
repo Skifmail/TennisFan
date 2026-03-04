@@ -315,6 +315,36 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             return 0
         return int(max(0, self.max_participants - self.participants.count()))
 
+
+class TournamentPhoto(models.Model):
+    """Дополнительное фото турнира для галереи (до 5 штук на турнир)."""
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="photos",
+        verbose_name="Турнир",
+    )
+    image = models.ImageField(
+        "Фото",
+        upload_to="tournaments/gallery/",
+        validators=[validate_image_max_2mb],
+    )
+    order = models.PositiveSmallIntegerField(
+        "Порядок",
+        default=0,
+        help_text="Меньшее число — раньше в галерее.",
+    )
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Фото турнира"
+        verbose_name_plural = "Фото турниров"
+        ordering = ["order", "id"]
+
+    def __str__(self) -> str:
+        return f"Фото турнира {self.tournament.name}"
+
     def save(self, *args, **kwargs):
         from django.utils import timezone
 

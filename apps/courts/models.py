@@ -106,6 +106,36 @@ class Court(CompressImageFieldsMixin, models.Model):
         return f"https://wa.me/{phone}"
 
 
+class CourtPhoto(models.Model):
+    """Дополнительное фото корта для галереи (до 5 штук на корт)."""
+
+    court = models.ForeignKey(
+        Court,
+        on_delete=models.CASCADE,
+        related_name="photos",
+        verbose_name="Корт",
+    )
+    image = models.ImageField(
+        "Фото",
+        upload_to="courts/gallery/",
+        validators=[validate_image_max_2mb],
+    )
+    order = models.PositiveSmallIntegerField(
+        "Порядок",
+        default=0,
+        help_text="Меньшее число — раньше в галерее.",
+    )
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Фото корта"
+        verbose_name_plural = "Фото кортов"
+        ordering = ["order", "id"]
+
+    def __str__(self) -> str:
+        return f"Фото {self.court.name}"
+
+
 class CourtApplicationStatus(models.TextChoices):
     """Статус заявки на добавление корта."""
 

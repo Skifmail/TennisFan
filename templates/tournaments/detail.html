@@ -4,6 +4,26 @@
 
 {% block title %}{{ tournament.name }}{% endblock %}
 
+{% block meta_description %}
+{{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}. {{ tournament.description|striptags|truncatechars:150 }}
+{% endblock %}
+
+{% block meta_og %}
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ tournament.name }} — TennisFan">
+    <meta property="og:description" content="{{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+    {% if tournament.image %}
+    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ tournament.image.url }}">
+    {% elif tournament.photos.all %}
+    {% with first_photo=tournament.photos.all.0 %}
+    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ first_photo.image.url }}">
+    {% endwith %}
+    {% else %}
+    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/logo-og-default.png' %}">
+    {% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="container" style="padding-top: var(--spacing-2xl);">
     <div class="mb-4">

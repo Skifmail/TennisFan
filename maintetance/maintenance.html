@@ -9,25 +9,30 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green:  #2d6a4f;
-      --lime:   #74c69d;
-      --yellow: #f4d03f;
-      --dark:   #1a2e22;
-      --light:  #f0faf4;
-      --text:   #d8f3dc;
+      /* Цвета, близкие к основному сайту */
+      --bg-main:      #012b1c;
+      --bg-card:      #001f14;
+      --primary:      #a6824a;
+      --primary-dark: #03110d;
+      --accent:       #83530c;
+      --text-main:    silver;
+      --text-soft:    #c0b59f;
     }
 
     html, body {
       height: 100%;
-      font-family: 'Outfit', sans-serif;
-      background: var(--dark);
-      color: var(--text);
+      font-family: 'Open Sans', -apple-system, blinkmacsystemfont, 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at top, #013524 0%, var(--bg-main) 40%, #000f0a 100%);
+      color: var(--text-main);
       overflow: hidden;
     }
 
     .bg {
       position: fixed; inset: 0;
-      background: radial-gradient(ellipse at 60% 40%, #2d6a4f 0%, #1a2e22 70%);
+      background:
+        radial-gradient(circle at 10% 10%, rgba(163,133,96,0.25) 0, transparent 45%),
+        radial-gradient(circle at 80% 20%, rgba(0,0,0,0.6) 0, transparent 55%),
+        radial-gradient(ellipse at 60% 40%, #013524 0%, var(--bg-main) 60%, #000b07 100%);
       z-index: 0;
     }
     .bg::after {
@@ -88,15 +93,15 @@
     }
 
     .logo {
-      font-family: 'Bebas Neue', sans-serif;
+      font-family: 'Roboto', sans-serif;
       font-size: clamp(2.5rem, 8vw, 5rem);
       letter-spacing: .12em;
-      color: var(--yellow);
-      text-shadow: 0 0 40px #f4d03f55;
+      color: var(--primary);
+      text-shadow: 0 0 40px rgba(166,130,74,0.45);
       line-height: 1;
       animation: fadeUp .8s .1s ease both;
     }
-    .logo span { color: var(--lime); }
+    .logo span { color: var(--accent); }
 
     .divider {
       width: 120px; height: 3px;
@@ -110,7 +115,7 @@
       font-family: 'Bebas Neue', sans-serif;
       font-size: clamp(1.6rem, 5vw, 3rem);
       letter-spacing: .08em;
-      color: var(--light);
+      color: var(--text-main);
       animation: fadeUp .8s .3s ease both;
     }
 
@@ -118,7 +123,7 @@
       margin-top: 1rem;
       font-size: clamp(.95rem, 2vw, 1.1rem);
       font-weight: 300;
-      color: var(--lime);
+      color: var(--text-soft);
       line-height: 1.7;
       max-width: 480px;
       animation: fadeUp .8s .4s ease both;

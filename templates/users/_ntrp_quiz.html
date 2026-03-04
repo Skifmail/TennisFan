@@ -65,7 +65,7 @@
             options: [
                 { label: 'Избегаю удара слева, всегда забегаю под право.', score: 10 },
                 { label: 'Просто перекидываю мяч через сетку, удар слабый и только защитный.', score: 20 },
-                { label: 'Могу держать перестрелку слева на средней скорости, иногда ошибаюсь по длине.', score: 30 },
+                { label: 'Могу держать мяч слева на средней скорости, иногда ошибаюсь по длине.', score: 30 },
                 { label: 'Стабильно бью слева с вращением или резаным ударом, могу атаковать с этой стороны.', score: 40 },
                 { label: 'Удар слева такой же сильный и опасный, как и удар справа.', score: 50 },
             ],
@@ -219,6 +219,11 @@
         stepEl.textContent = `Вопрос ${currentIndex + 1} из ${ntrpQuestions.length}`;
         const totalScore = answers.reduce((sum, value) => sum + (value || 0), 0);
         scoreEl.textContent = `Баллы: ${totalScore}`;
+        if (currentIndex === ntrpQuestions.length - 1) {
+            nextBtn.classList.add('hidden');
+        } else {
+            nextBtn.classList.remove('hidden');
+        }
         questionEl.textContent = question.text;
         questionHintEl.textContent = question.hint || '';
         optionsEl.innerHTML = '';

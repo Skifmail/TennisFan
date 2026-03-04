@@ -72,6 +72,10 @@ services:
       - "8000"
     volumes:
       - static_data:/app/staticfiles
+    labels:
+      - "traefik.http.middlewares.maintenance-errors.errors.status=502,503"
+      - "traefik.http.middlewares.maintenance-errors.errors.service=maintenance@docker"
+      - "traefik.http.middlewares.maintenance-errors.errors.query=/"
     depends_on:
       db:
         condition: service_healthy

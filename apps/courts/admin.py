@@ -9,7 +9,13 @@ from django.contrib import admin, messages
 from django.utils.html import format_html
 
 from .geocoder import _normalize_address_for_geocode, geocode_address
-from .models import Court, CourtApplication, CourtApplicationStatus, CourtRating
+from .models import (
+    Court,
+    CourtApplication,
+    CourtApplicationStatus,
+    CourtPhoto,
+    CourtRating,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,12 +54,22 @@ def _geocode_court(court: Court) -> bool:
     return True
 
 
+class CourtPhotoInline(admin.TabularInline):
+    """Дополнительные фото корта (до 4 штук, вместе с основным фото — до 5)."""
+
+    model = CourtPhoto
+    extra = 0
+    max_num = 4
+
+
 @admin.register(Court)
 class CourtAdmin(admin.ModelAdmin):
     """Admin for Court model."""
 
     class Media:
         js = ("js/city_autocomplete.js",)
+
+    inlines = [CourtPhotoInline]
 
     list_display = (
         "name",

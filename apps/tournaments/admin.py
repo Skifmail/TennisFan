@@ -19,6 +19,7 @@ from .models import (
     Tournament,
     TournamentAllowedCategory,
     TournamentEntryRefundRequest,
+    TournamentPhoto,
     TournamentPlayerResult,
     TournamentTeam,
     TVDGroup,
@@ -139,6 +140,14 @@ class TournamentTeamInline(admin.TabularInline):
     classes = ("variant-doubles-only",)  # для JS: скрывать при варианте «Одиночный»
 
 
+class TournamentPhotoInline(admin.TabularInline):
+    """Дополнительные фото турнира (до 4 штук, вместе с обложкой — до 5)."""
+
+    model = TournamentPhoto
+    extra = 0
+    max_num = 4
+
+
 class TournamentAdminForm(forms.ModelForm):
     """Форма турнира с полем «Допустимые категории» в виде чекбоксов (1–5)."""
 
@@ -204,7 +213,7 @@ class TournamentEntryRefundRequestAdmin(admin.ModelAdmin):
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
     form = TournamentAdminForm
-    inlines = [TournamentTeamInline]
+    inlines = [TournamentTeamInline, TournamentPhotoInline]
 
     """Admin for Tournament model.
 

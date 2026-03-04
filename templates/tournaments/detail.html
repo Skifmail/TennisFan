@@ -9,7 +9,24 @@
     <div class="mb-4">
         <a href="{% url 'tournament_list' %}" class="text-secondary">&larr; Все турниры</a>
     </div>
-    
+
+    {% if tournament.image or tournament.photos.all %}
+    <div class="tournament-gallery">
+        <div class="tournament-gallery__grid">
+            {% if tournament.image %}
+            <div class="tournament-gallery__item tournament-gallery__item--main">
+                <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}">
+            </div>
+            {% endif %}
+            {% for photo in tournament.photos.all|slice:":4" %}
+            <div class="tournament-gallery__item">
+                <img src="{{ photo.image.url }}" alt="{{ tournament.name }}">
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
         <div class="d-flex gap-2 mb-2 flex-wrap">
         <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_variant_display }}</span>
         {% if tournament.format == 'single_elimination' %}
@@ -489,4 +506,41 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+.tournament-gallery {
+    margin-bottom: var(--spacing-xl);
+}
+.tournament-gallery__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: var(--spacing-sm);
+}
+.tournament-gallery__item {
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+}
+.tournament-gallery__item img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-height: 400px;
+    object-fit: cover;
+}
+.tournament-gallery__item--main {
+    grid-row: span 2;
+}
+@media (max-width: 768px) {
+    .tournament-gallery__grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .tournament-gallery__item--main {
+        grid-column: 1 / -1;
+        grid-row: auto;
+    }
+}
+</style>
 {% endblock %}

@@ -180,11 +180,67 @@
     }
     @keyframes blink { 50% { opacity: 0; } }
 
-    /* ── Racquet ── */
-    .racquet-wrap {
-      margin-top: 2rem;
-      opacity: .5;
+    /* ── Spinning logo coin (как на форме входа) ── */
+    .logo-coin-wrap {
+      margin-top: 2.5rem;
       animation: fadeUp .8s .7s ease both;
+    }
+    .logo-coin {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin: 0 auto;
+      perspective: 900px;
+    }
+    .logo-coin__inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      animation: coin-spin 5s linear infinite;
+    }
+    @keyframes coin-spin {
+      from { transform: rotateY(0deg); }
+      to   { transform: rotateY(360deg); }
+    }
+    .logo-coin__face {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 20%, #ffffff, #f4d03f, #c38f1f);
+      box-shadow:
+        0 0 35px rgba(244, 208, 63, 0.5),
+        inset 0 0 18px rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backface-visibility: hidden;
+    }
+    .logo-coin__face img {
+      width: 70%;
+      height: 70%;
+      object-fit: contain;
+      filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.45));
+    }
+    .logo-coin__face--back {
+      transform: rotateY(180deg);
+    }
+    .logo-coin__edge {
+      position: absolute;
+      inset: 6px;
+      border-radius: 50%;
+      background: conic-gradient(
+        from 90deg,
+        #b8860b 0deg,
+        #f4d03f 60deg,
+        #b8860b 120deg,
+        #f4d03f 180deg,
+        #b8860b 240deg,
+        #f4d03f 300deg,
+        #b8860b 360deg
+      );
+      transform: translateZ(-6px);
+      opacity: 0.85;
     }
   </style>
 </head>
@@ -199,7 +255,8 @@
     <h1 class="headline">Технические работы</h1>
     <p class="sub">
       Мы обновляем сайт. Ракетка уже в руке —<br>
-      через несколько минут всё будет готово!
+      через несколько минут всё будет готово!<br>
+      Так же вы можете попробовать обновить страницу.
     </p>
 
     <div class="progress-wrap">
@@ -224,59 +281,20 @@
       </div>
     </div>
 
-    <!-- Realistic racquet -->
-    <div class="racquet-wrap">
-      <svg width="68" height="148" viewBox="0 0 68 148" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- Outer frame -->
-        <ellipse cx="34" cy="40" rx="26" ry="34" stroke="#74c69d" stroke-width="5.5" fill="none" stroke-linecap="round"/>
-        <!-- Inner frame shadow -->
-        <ellipse cx="34" cy="40" rx="20.5" ry="28.5" stroke="#52b788" stroke-width="1" fill="none" opacity=".4"/>
-
-        <!-- Strings horizontal -->
-        <clipPath id="head"><ellipse cx="34" cy="40" rx="20" ry="28"/></clipPath>
-        <g clip-path="url(#head)" stroke="#74c69d" stroke-width="1" opacity=".55">
-          <line x1="14" y1="16" x2="54" y2="16"/>
-          <line x1="14" y1="22" x2="54" y2="22"/>
-          <line x1="14" y1="28" x2="54" y2="28"/>
-          <line x1="14" y1="34" x2="54" y2="34"/>
-          <line x1="14" y1="40" x2="54" y2="40"/>
-          <line x1="14" y1="46" x2="54" y2="46"/>
-          <line x1="14" y1="52" x2="54" y2="52"/>
-          <line x1="14" y1="58" x2="54" y2="58"/>
-          <line x1="14" y1="64" x2="54" y2="64"/>
-          <!-- Strings vertical -->
-          <line x1="18" y1="12" x2="18" y2="68"/>
-          <line x1="22" y1="12" x2="22" y2="68"/>
-          <line x1="26" y1="12" x2="26" y2="68"/>
-          <line x1="30" y1="12" x2="30" y2="68"/>
-          <line x1="34" y1="12" x2="34" y2="68"/>
-          <line x1="38" y1="12" x2="38" y2="68"/>
-          <line x1="42" y1="12" x2="42" y2="68"/>
-          <line x1="46" y1="12" x2="46" y2="68"/>
-          <line x1="50" y1="12" x2="50" y2="68"/>
-        </g>
-
-        <!-- Throat wedge -->
-        <path d="M14 72 L20 90 L48 90 L54 72" stroke="#74c69d" stroke-width="4.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
-        <!-- Throat fill -->
-        <path d="M20 90 L48 90 L44 74 L24 74 Z" fill="#2d6a4f" opacity=".6"/>
-
-        <!-- Handle shaft -->
-        <rect x="27.5" y="89" width="13" height="30" rx="2.5" fill="#3a7d5c"/>
-        <!-- Shaft highlight -->
-        <rect x="29" y="89" width="4" height="30" rx="1.5" fill="#52b788" opacity=".25"/>
-
-        <!-- Grip wrap -->
-        <rect x="27" y="118" width="14" height="24" rx="3" fill="#1d4731"/>
-        <line x1="27" y1="122" x2="41" y2="122" stroke="#0f2a1e" stroke-width="1.5" opacity=".6"/>
-        <line x1="27" y1="127" x2="41" y2="127" stroke="#0f2a1e" stroke-width="1.5" opacity=".6"/>
-        <line x1="27" y1="132" x2="41" y2="132" stroke="#0f2a1e" stroke-width="1.5" opacity=".6"/>
-        <line x1="27" y1="137" x2="41" y2="137" stroke="#0f2a1e" stroke-width="1.5" opacity=".6"/>
-
-        <!-- Butt cap -->
-        <rect x="25" y="141" width="18" height="7" rx="3.5" fill="#52b788" opacity=".75"/>
-      </svg>
-    </div>
+    <!-- Spinning logo coin -->
+    <div class="logo-coin-wrap">
+      <div class="logo-coin">
+        <div class="logo-coin__inner">
+          <div class="logo-coin__face logo-coin__face--front">
+            <img src="/static/images/logo.svg" alt="TennisFan логотип">
+          </div>
+          <div class="logo-coin__face logo-coin__face--back">
+            <img src="/static/images/logo.svg" alt="TennisFan логотип">
+          </div>
+          <div class="logo-coin__edge"></div>
+        </div>
+      </div>
+     </div>
   </main>
 
   <script>

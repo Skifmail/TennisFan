@@ -10,17 +10,26 @@
     </div>
 
     {% if court.image or court.photos.all %}
-    <div class="court-gallery">
-        <div class="court-gallery__grid">
+    <div class="court-gallery" data-court-gallery>
+        <div class="court-gallery__main">
+            <img src="" alt="{{ court.name }}" data-court-gallery-main>
+        </div>
+        <div class="court-gallery__thumbs">
             {% if court.image %}
-            <div class="court-gallery__item court-gallery__item--main">
+            <button type="button"
+                    class="court-gallery__thumb court-gallery__thumb--active"
+                    data-court-gallery-thumb
+                    data-full-url="{{ court.image.url }}">
                 <img src="{{ court.image.url }}" alt="{{ court.name }}">
-            </div>
+            </button>
             {% endif %}
-            {% for photo in court.photos.all|slice:":4" %}
-            <div class="court-gallery__item">
+            {% for photo in court.photos.all %}
+            <button type="button"
+                    class="court-gallery__thumb{% if not court.image and forloop.first %} court-gallery__thumb--active{% endif %}"
+                    data-court-gallery-thumb
+                    data-full-url="{{ photo.image.url }}">
                 <img src="{{ photo.image.url }}" alt="{{ court.name }}">
-            </div>
+            </button>
             {% endfor %}
         </div>
     </div>
@@ -288,32 +297,52 @@
 .court-gallery {
     margin-bottom: var(--spacing-xl);
 }
-.court-gallery__grid {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    gap: var(--spacing-sm);
-}
-.court-gallery__item {
+.court-gallery__main {
+    position: relative;
     overflow: hidden;
     border-radius: var(--radius-lg);
 }
-.court-gallery__item img {
+.court-gallery__main img {
     display: block;
     width: 100%;
-    height: 100%;
-    max-height: 400px;
-    object-fit: cover;
+    height: auto;
+    object-fit: contain;
 }
-.court-gallery__item--main {
-    grid-row: span 2;
+.court-gallery__thumbs {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+.court-gallery__thumb {
+    border: none;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    flex: 0 0 96px;
+}
+.court-gallery__thumb img {
+    display: block;
+    width: 100%;
+    height: 72px;
+    object-fit: cover;
+    opacity: 0.8;
+    transition: opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.court-gallery__thumb:hover img {
+    opacity: 1;
+    transform: scale(1.03);
+}
+.court-gallery__thumb--active img {
+    opacity: 1;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
 }
 @media (max-width: 768px) {
-    .court-gallery__grid {
-        grid-template-columns: 1fr 1fr;
-    }
-    .court-gallery__item--main {
-        grid-column: 1 / -1;
-        grid-row: auto;
+    .court-gallery__thumbs .court-gallery__thumb:nth-child(n+4) {
+        display: none;
     }
 }
 .court-detail__title { font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg); }
@@ -336,6 +365,45 @@
 .court-rate-stars__input:checked ~ .court-rate-stars__star { color: var(--color-primary); }
 .court-rate-stars__label:has(.court-rate-stars__input:checked) .court-rate-stars__star { color: var(--color-primary); }
 </style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var gallery = document.querySelector('[data-court-gallery]');
+    if (!gallery) {
+        return;
+    }
+
+    var mainImage = gallery.querySelector('[data-court-gallery-main]');
+    var thumbButtons = gallery.querySelectorAll('[data-court-gallery-thumb]');
+
+    if (!mainImage || !thumbButtons.length) {
+        return;
+    }
+
+    var activeThumb = gallery.querySelector('.court-gallery__thumb--active') || thumbButtons[0];
+    if (activeThumb) {
+        var initialUrl = activeThumb.getAttribute('data-full-url');
+        if (initialUrl) {
+            mainImage.src = initialUrl;
+        }
+    }
+
+    thumbButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            var imageUrl = button.getAttribute('data-full-url');
+            if (!imageUrl) {
+                return;
+            }
+
+            mainImage.src = imageUrl;
+
+            thumbButtons.forEach(function (btn) {
+                btn.classList.remove('court-gallery__thumb--active');
+            });
+            button.classList.add('court-gallery__thumb--active');
+        });
+    });
+});
+</script>
 {% if court_has_coords and yandex_maps_api_key %}
 <script src="https://api-maps.yandex.ru/2.1?apikey={{ yandex_maps_api_key }}&lang=ru_RU" type="text/javascript"></script>
 <script>

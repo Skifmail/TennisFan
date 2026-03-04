@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load skill_tags %}
 
 {% block title %}Матч: {{ match.get_player1_display }} vs {{ match.get_player2_display }}{% endblock %}
 
@@ -18,7 +19,7 @@
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <div class="text-center mb-4">
                 {% if match.tournament %}
-                    <span class="player-category">{% for ac in match.tournament.allowed_categories.all %}{{ ac.get_category_display }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if match.round_name %} · {{ match.round_name }}{% endif %}</span>
+                    <span class="player-category">{% for ac in match.tournament.allowed_categories.all %}{{ ac.category|skill_with_ntrp }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if match.round_name %} · {{ match.round_name }}{% endif %}</span>
                 {% elif match.is_sparring %}
                     <span class="player-category">Спарринг{% if match.is_doubles_sparring %} · Парный{% endif %}{% if match.is_friendly_sparring %} · Дружеский матч{% endif %}{% if match.round_name %} · {{ match.round_name }}{% endif %}</span>
                 {% else %}
@@ -187,7 +188,7 @@
                                 <div class="match-details-label">🏅 Допустимые категории</div>
                                 <div class="match-details-value">
                                     {% for ac in match.tournament.allowed_categories.all %}
-                                        <span class="category-tag">{{ ac.get_category_display }}</span>
+                                        <span class="category-tag">{{ ac.category|skill_with_ntrp }}</span>
                                     {% empty %}
                                         <span class="text-muted">—</span>
                                     {% endfor %}

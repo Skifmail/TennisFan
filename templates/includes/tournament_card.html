@@ -1,3 +1,5 @@
+{% load humanize %}
+{% load skill_tags %}
 <div class="card tournament-card" data-url="{% url 'tournament_detail' slug=tournament.slug %}" onclick="window.location.href=this.dataset.url;">
     <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}"></span>
     <div class="card-body tournament-card-body">
@@ -28,7 +30,7 @@
                     <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="badge" style="text-decoration: none;" onclick="event.stopPropagation();" title="{{ tournament.court.address }}">{{ tournament.court.name }}</a>
                     {% endif %}
                     {% for ac in tournament.allowed_categories.all %}
-                    <span class="badge">{{ ac.get_category_display }}</span>
+                    <span class="badge">{{ ac.category|skill_with_ntrp }}</span>
                     {% endfor %}
                     <span class="badge">{{ tournament.get_gender_display }}</span>
                     <span class="badge">{{ tournament.get_duration_display }}</span>
@@ -49,8 +51,13 @@
 
                 <h3 class="card-title">{{ tournament.name }}</h3>
                 <p class="card-text text-secondary">{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}</p>
-                <div class="d-flex gap-2 flex-wrap">
+                <div class="d-flex gap-2 flex-wrap align-items-center">
                     <span class="player-category">{{ tournament.get_tournament_type_display }}</span>
+                    {% if tournament.duration == 'multi' and tournament.entry_fee and tournament.entry_fee > 0 %}
+                        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-success);">
+                            Взнос: {{ tournament.entry_fee|floatformat:0|intcomma }} ₽
+                        </span>
+                    {% endif %}
                 </div>
 
                 {% if tournament.variant == 'doubles' %}

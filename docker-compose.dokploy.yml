@@ -73,10 +73,26 @@ services:
     volumes:
       - static_data:/app/staticfiles
     labels:
-      # Показываем страницу техработ при 404 и ошибках бекенда
+      # Включаем Traefik для этого сервиса
+      - "traefik.enable=true"
+
+      # Явно описываем HTTP‑router для боевого сайта
+      - "traefik.http.routers.tennisfan.rule=Host(`tennisfan.ru`) || Host(`www.tennisfan.ru`)"
+      - "traefik.http.routers.tennisfan.entrypoints=websecure"
+      - "traefik.http.routers.tennisfan.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.tennisfan.priority=100"
+
+      # Привязываем router к backend‑service на порту 8000
+      - "traefik.http.routers.tennisfan.service=tennisfan"
+      - "traefik.http.services.tennisfan.loadbalancer.server.port=8000"
+
+      # Описываем middleware с кастомной страницей техработ
       - "traefik.http.middlewares.maintenance-errors.errors.status=404,500-599"
       - "traefik.http.middlewares.maintenance-errors.errors.service=maintenance@docker"
       - "traefik.http.middlewares.maintenance-errors.errors.query=/"
+
+      # Подключаем middleware к нашему роутеру
+      - "traefik.http.routers.tennisfan.middlewares=maintenance-errors"
     depends_on:
       db:
         condition: service_healthy

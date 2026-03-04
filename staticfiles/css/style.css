@@ -6087,21 +6087,7 @@ select.form-control {
 .tournament-card-photos {
     display: flex;
     gap: var(--spacing-sm);
-    align-items: stretch;
-}
-
-.tournament-card-photos__extra {
-    display: none;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-}
-
-.tournament-img-thumb {
-    width: 100%;
-    height: 72px;
-    object-fit: cover;
-    border-radius: var(--radius-sm);
-    flex-shrink: 0;
+    align-items: flex-start;
 }
 
 .tournament-img {
@@ -6217,16 +6203,13 @@ select.form-control {
 
     .tournament-card-photos {
         width: 100%;
-        display: grid;
-        grid-template-columns: 1.4fr 1fr;
+        justify-content: space-between;
     }
 
-    .tournament-card-photos__extra {
-        display: flex;
-    }
-
-    .tournament-card-photos__extra .tournament-img-thumb {
-        height: calc((120px - var(--spacing-sm)) / 2);
+    .tournament-card-photos .tournament-img {
+        flex: 1 1 0;
+        width: auto;
+        height: 120px;
     }
 
     .tournament-img {

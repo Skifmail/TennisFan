@@ -6,13 +6,9 @@
         {% if tournament.image %}
         <div class="tournament-card-photos">
             <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img">
-            {% if tournament.photos.all %}
-            <div class="tournament-card-photos__extra">
-                {% for photo in tournament.photos.all|slice:":2" %}
-                <img src="{{ photo.image.url }}" alt="{{ tournament.name }}" class="tournament-img-thumb">
-                {% endfor %}
-            </div>
-            {% endif %}
+            {% for photo in tournament.photos.all|slice:":2" %}
+            <img src="{{ photo.image.url }}" alt="{{ tournament.name }}" class="tournament-img">
+            {% endfor %}
         </div>
         {% else %}
         <div class="tournament-img tournament-img-placeholder"></div>

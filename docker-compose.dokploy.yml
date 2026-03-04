@@ -73,7 +73,8 @@ services:
     volumes:
       - static_data:/app/staticfiles
     labels:
-      - "traefik.http.middlewares.maintenance-errors.errors.status=502,503"
+      # Показываем страницу техработ при 404 и ошибках бекенда
+      - "traefik.http.middlewares.maintenance-errors.errors.status=404,500-599"
       - "traefik.http.middlewares.maintenance-errors.errors.service=maintenance@docker"
       - "traefik.http.middlewares.maintenance-errors.errors.query=/"
     depends_on:

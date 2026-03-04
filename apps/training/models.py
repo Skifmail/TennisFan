@@ -8,16 +8,8 @@ from django.db import models
 from django.utils.text import slugify
 
 from apps.users.models import SkillLevel
+from apps.users.skill_levels import SKILL_LEVEL_NTRP
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
-
-# Соответствие уровней NTRP (строковые ключи совпадают с SkillLevel)
-SKILL_LEVEL_NTRP: dict[str, str] = {
-    "novice": "1.5–2.5",
-    "amateur": "2.6–3.5",
-    "experienced": "3.6–4.5",
-    "advanced": "4.6–5.5",
-    "professional": "5.6–7.0",
-}
 
 
 class TrainingType(models.TextChoices):

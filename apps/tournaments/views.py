@@ -274,11 +274,8 @@ def tournament_list(request):
     return render(request, "tournaments/list.html", context)
 
 
-@login_required_with_message(
-    "Детали турнира доступны только для зарегистрированных пользователей."
-)
 def tournament_detail(request, slug):
-    """Tournament detail page. Только для авторизованных пользователей."""
+    """Tournament detail page. Доступна всем пользователям, в том числе незарегистрированным."""
     # Проверяем и формируем сетки для турниров с истёкшим дедлайном регистрации
     from apps.tournaments.fan import check_and_generate_past_deadline_brackets
 

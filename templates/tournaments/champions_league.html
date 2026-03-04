@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load skill_tags %}
 
 {% block title %}Лига Чемпионов{% endblock %}
 
@@ -22,7 +23,7 @@
             {% endif %}
             <div class="card-body">
                 {% for ac in tournament.allowed_categories.all %}
-                <span class="player-category mb-2">{{ ac.get_category_display }}</span>
+                <span class="player-category mb-2">{{ ac.category|skill_with_ntrp }}</span>
                 {% endfor %}
                 <h3 class="card-title">{{ tournament.name }}</h3>
                 <p class="card-text">

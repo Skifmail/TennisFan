@@ -1,0 +1,14 @@
+   services:
+     maintenance:
+       image: nginx:alpine
+       volumes:
+         - ./maintenance.html:/usr/share/nginx/html/index.html:ro
+       networks:
+         - dokploy-network
+       labels:
+         - "traefik.enable=true"
+         - "traefik.http.services.maintenance.loadbalancer.server.port=80"
+
+   networks:
+     dokploy-network:
+       external: true

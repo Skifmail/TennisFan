@@ -24,13 +24,13 @@
 
     <div class="grid grid-3">
         {% for court in courts %}
-        <a href="{% url 'court_detail' slug=court.slug %}" class="card">
+        <a href="{% url 'court_detail' slug=court.slug %}" class="card court-card">
             {% if court.image %}
             <img src="{{ court.image.url }}" alt="" class="card-image">
             {% else %}
             <div class="card-image" style="background: var(--color-bg-elevated);"></div>
             {% endif %}
-            <div class="card-body">
+            <div class="card-body court-card__body">
                 <h3 class="card-title">{{ court.name }}</h3>
                 <p class="card-text">{{ court.address }}</p>
                 <div class="d-flex gap-1 mt-2 flex-wrap">

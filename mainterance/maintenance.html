@@ -17,6 +17,9 @@
       --accent:       #83530c;
       --text-main:    silver;
       --text-soft:    #c0b59f;
+      /* Общие переменные (нужны для таймера и прогресс-бара) */
+      --yellow:       #f4d03f;
+      --lime:         #74c69d;
     }
 
     html, body {
@@ -50,15 +53,19 @@
       height: 64px;
       z-index: 3;
       pointer-events: none;
-      background-image: url("/images/icons8-теннисный-мяч-96.png");
+      /* CSS fallback на случай если картинка не загрузится */
+      background-color: #52b788;
+      background-image: url("/images/icons8-tennis-ball-96.png"), url("/images/icons8-теннисный-мяч-96.png");
       background-repeat: no-repeat;
       background-position: center;
       background-size: contain;
+      border-radius: 50%;
+      box-shadow:
+        inset -5px -5px 12px rgba(0,0,0,.3),
+        inset 3px 3px 7px rgba(255,255,255,.15),
+        0 0 18px rgba(82,183,136,.4);
     }
-    #ball::before,
-    #ball::after {
-      display: none;
-    }
+    #ball::before, #ball::after { display: none; }
 
     /* ── Card ── */
     .card {
@@ -303,7 +310,7 @@
 
     // ── Bouncing ball ──
     const ball = document.getElementById('ball');
-    const R = 22;
+    const R = 32; // половина от 64px
 
     let x = window.innerWidth  / 2;
     let y = window.innerHeight / 2;

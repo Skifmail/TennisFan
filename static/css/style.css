@@ -856,6 +856,18 @@ button {
     padding: var(--spacing-lg);
 }
 
+.tournament-preview-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.tournament-preview-card .card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
 .court-card {
     display: flex;
     flex-direction: column;

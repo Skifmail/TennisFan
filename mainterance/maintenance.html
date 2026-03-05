@@ -46,32 +46,18 @@
     /* ── Ball ── */
     #ball {
       position: fixed;
-      width: 44px; height: 44px;
-      border-radius: 50%;
+      width: 64px;
+      height: 64px;
       z-index: 3;
       pointer-events: none;
-      background: radial-gradient(circle at 38% 32%, #b7e4c7, #52b788 48%, #2d6a4f);
-      box-shadow:
-        inset -5px -5px 12px rgba(0,0,0,.35),
-        inset 3px 3px 7px rgba(255,255,255,.18),
-        0 0 22px rgba(82,183,136,.45);
+      background-image: url("/images/icons8-теннисный-мяч-96.png");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: contain;
     }
-    #ball::before, #ball::after {
-      content: '';
-      position: absolute;
-      border: 1.8px solid rgba(255,255,255,.28);
-      border-radius: 50%;
-      top: 50%; left: 50%;
-    }
-    #ball::before {
-      width: 52px; height: 22px;
-      transform: translate(-50%,-50%) rotate(-35deg);
-      border-left-color: transparent; border-right-color: transparent;
-    }
+    #ball::before,
     #ball::after {
-      width: 22px; height: 52px;
-      transform: translate(-50%,-50%) rotate(-35deg);
-      border-top-color: transparent; border-bottom-color: transparent;
+      display: none;
     }
 
     /* ── Card ── */

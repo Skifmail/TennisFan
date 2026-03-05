@@ -132,17 +132,23 @@ class NtrpTestResultInline(admin.TabularInline):
 
         table_html = """
 <style>
+  .ntrp-answers-wrapper {
+    max-width: 100%;
+    overflow-x: auto;
+  }
   .ntrp-answers-table {
     width: 100%;
     border-collapse: collapse;
     margin: 0.5rem 0;
     font-size: 13px;
+    min-width: 320px;
   }
   .ntrp-answers-table th,
   .ntrp-answers-table td {
     border: 1px solid #ddd;
     padding: 4px 6px;
     vertical-align: top;
+    white-space: normal;
   }
   .ntrp-answers-table th {
     background: #f5f5f5;
@@ -156,52 +162,21 @@ class NtrpTestResultInline(admin.TabularInline):
   .ntrp-answer-text {
     font-weight: 400;
   }
-  @media (max-width: 768px) {
-    .ntrp-answers-table thead {
-      display: none;
-    }
-    .ntrp-answers-table,
-    .ntrp-answers-table tbody,
-    .ntrp-answers-table tr,
-    .ntrp-answers-table td {
-      display: block;
-      width: 100%;
-    }
-    .ntrp-answers-table tr {
-      margin-bottom: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .ntrp-answers-table td {
-      border: none;
-      border-bottom: 1px solid #eee;
-    }
-    .ntrp-answers-table td:last-child {
-      border-bottom: none;
-    }
-    .ntrp-cell-index::before {
-      content: "№ вопроса: ";
-      font-weight: 600;
-    }
-    .ntrp-cell-score::before {
-      content: "Баллы: ";
-      font-weight: 600;
-    }
-  }
 </style>
-<table class="ntrp-answers-table">
-  <thead>
-    <tr>
-      <th>№</th>
-      <th>Баллы</th>
-      <th>Ответ</th>
-    </tr>
-  </thead>
-  <tbody>
-    __ROWS_PLACEHOLDER__
-  </tbody>
-</table>
+<div class="ntrp-answers-wrapper">
+  <table class="ntrp-answers-table">
+    <thead>
+      <tr>
+        <th>№</th>
+        <th>Баллы</th>
+        <th>Ответ</th>
+      </tr>
+    </thead>
+    <tbody>
+      __ROWS_PLACEHOLDER__
+    </tbody>
+  </table>
+</div>
 """
 
         table_html = table_html.replace("__ROWS_PLACEHOLDER__", "".join(rows))

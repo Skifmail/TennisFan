@@ -6119,16 +6119,15 @@ select.form-control {
 }
 
 .tournament-img {
-    width: 200px;
-    height: 150px;
+    width: 140px;
+    height: 140px;
     object-fit: cover;
     border-radius: var(--radius-md);
     flex-shrink: 0;
 }
 
 .tournament-card-photos .tournament-img {
-    flex: 1 1 0;
-    width: auto;
+    flex: 0 0 auto;
 }
 
 @media (min-width: 769px) {

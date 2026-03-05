@@ -25,7 +25,7 @@ from apps.core.decorators import login_required_with_message
 from apps.core.models import UserTelegramLink
 
 from .forms import PlayerProfileForm, UserRegistrationForm
-from .models import Notification, Player
+from .models import Notification, NtrpTestResult, Player
 
 logger = logging.getLogger(__name__)
 
@@ -328,6 +328,24 @@ def auth(request):
                     hidden_rating=float(starting_pts),
                     is_verified=True,  # Новые пользователи автоматически верифицированы
                 )
+
+                quiz_raw = register_form.cleaned_data.get("ntrp_quiz_payload") or ""
+                if quiz_raw:
+                    try:
+                        quiz_data = json.loads(quiz_raw)
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        quiz_data = None
+                    if isinstance(quiz_data, dict):
+                        NtrpTestResult.objects.create(
+                            player=player,
+                            source=NtrpTestResult.Source.REGISTRATION,
+                            total_score=quiz_data.get("total_score") or None,
+                            level=level_decimal,
+                            starting_points=float(starting_pts),
+                            applied_to_rating=True,
+                            answers=quiz_data.get("answers") or [],
+                        )
+
                 from apps.core.telegram_notify import notify_new_registration
 
                 notify_new_registration(user, player)

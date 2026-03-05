@@ -55,6 +55,11 @@ class UserRegistrationForm(forms.ModelForm):
         label="Подтвердите пароль *",
         widget=forms.PasswordInput(attrs={"class": "form-control"}),
     )
+    ntrp_quiz_payload = forms.CharField(
+        label="",
+        required=False,
+        widget=forms.HiddenInput(),
+    )
     agree_legal = forms.BooleanField(
         required=True,
         label="",

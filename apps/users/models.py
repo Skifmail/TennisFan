@@ -367,6 +367,94 @@ class Player(CompressImageFieldsMixin, models.Model):
         return result
 
 
+class NtrpTestResult(models.Model):
+    """Результат теста уровня силы (NTRP) для игрока."""
+
+    class Source(models.TextChoices):
+        """Источник прохождения теста."""
+
+        REGISTRATION = "registration", "Регистрация"
+        MANUAL_TEST = "manual_test", "Тест без изменения рейтинга"
+
+    player = models.ForeignKey(
+        Player,
+        on_delete=models.CASCADE,
+        related_name="ntrp_tests",
+        verbose_name="Игрок",
+    )
+    created_at = models.DateTimeField("Дата прохождения", auto_now_add=True)
+    source = models.CharField(
+        "Источник",
+        max_length=32,
+        choices=Source.choices,
+        default=Source.REGISTRATION,
+    )
+    total_score = models.PositiveIntegerField(
+        "Суммарные баллы по тесту", null=True, blank=True
+    )
+    level = models.DecimalField(
+        "Рассчитанный уровень силы (NTRP)",
+        max_digits=3,
+        decimal_places=1,
+        null=True,
+        blank=True,
+    )
+    starting_points = models.FloatField(
+        "Стартовый рейтинг FAN",
+        null=True,
+        blank=True,
+        help_text="Значение рейтинга FAN, установленное на основании этого теста (если применимо).",
+    )
+    applied_to_rating = models.BooleanField(
+        "Применён к рейтингу игрока",
+        default=False,
+        help_text="Показывает, использовался ли этот тест для установки стартового рейтинга игрока.",
+    )
+    answers = models.JSONField(
+        "Ответы по вопросам",
+        default=list,
+        blank=True,
+        help_text=(
+            "Структура: список словарей с вопросом, выбранным вариантом и баллами. "
+            "Например: [{'index': 0, 'question': 'Опыт игры', 'option_index': 2, "
+            "'option_label': '...', 'option_score': 30}, ...]."
+        ),
+    )
+
+    class Meta:
+        verbose_name = "Результат теста NTRP"
+        verbose_name_plural = "Результаты теста NTRP"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"NTRP тест для {self.player} от {self.created_at:%Y-%m-%d %H:%M}"
+
+    def get_answers_display(self) -> str:
+        """Сформировать краткое текстовое представление ответов для админки.
+
+        Returns:
+            str: Человекочитаемая строка с перечислением вопросов и выбранных ответов.
+        """
+        if not self.answers:
+            return "Ответы отсутствуют."
+
+        parts: list[str] = []
+        for item in self.answers:
+            index = item.get("index")
+            question = item.get("question") or ""
+            option_label = item.get("option_label") or ""
+            option_score = item.get("option_score")
+            num = f"{int(index) + 1}" if isinstance(index, int) else "?"
+            if option_score is not None:
+                parts.append(
+                    f"{num}) {question} — {option_label} (баллы: {option_score})"
+                )
+            else:
+                parts.append(f"{num}) {question} — {option_label}")
+
+        return " | ".join(parts)
+
+
 class Notification(models.Model):
     """Simple notification for user actions."""
 

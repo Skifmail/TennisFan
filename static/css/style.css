@@ -856,6 +856,22 @@ button {
     padding: var(--spacing-lg);
 }
 
+.court-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.court-card__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.court-card__footer {
+    margin-top: auto;
+}
+
 /* Появление карточек снизу вверх при прокрутке, по очереди слева направо */
 .main .card,
 .main .match-card {

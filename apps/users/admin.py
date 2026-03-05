@@ -6,7 +6,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import Notification, Player, SkillLevel, User
+from .models import Notification, NtrpTestResult, Player, SkillLevel, User
 from .skill_levels import skill_with_ntrp
 
 
@@ -74,11 +74,46 @@ class PlayerAdminForm(forms.ModelForm):
         fields = "__all__"
 
 
+class NtrpTestResultInline(admin.TabularInline):
+    """Inline-отображение результатов теста NTRP в карточке игрока."""
+
+    model = NtrpTestResult
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        "created_at",
+        "source",
+        "total_score",
+        "level",
+        "starting_points",
+        "applied_to_rating",
+        "answers_display",
+    )
+    fields = readonly_fields
+
+    def has_add_permission(self, request, obj=None) -> bool:
+        """Запретить ручное добавление результатов теста из админки."""
+        return False
+
+    @admin.display(description="Ответы по вопросам")
+    def answers_display(self, obj: NtrpTestResult) -> str:
+        """Отформатированные ответы на вопросы теста для отображения в админке.
+
+        Args:
+            obj (NtrpTestResult): Экземпляр результата теста.
+
+        Returns:
+            str: Подготовленная строка с ответами.
+        """
+        return obj.get_answers_display()
+
+
 @admin.register(Player)
 class PlayerAdmin(admin.ModelAdmin):
     """Admin configuration for Player model."""
 
     form = PlayerAdminForm
+    inlines = (NtrpTestResultInline,)
 
     list_display = (
         "user",

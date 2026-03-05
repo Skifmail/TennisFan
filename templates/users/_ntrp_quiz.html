@@ -249,7 +249,32 @@
         updateButtons();
     };
 
-    const saveNtrpIfAllowed = async (level) => {
+    const buildAnswersPayload = (totalScore, level, resultMeta) => {
+        const items = ntrpQuestions.map((q, qIndex) => {
+            const selectedScore = answers[qIndex];
+            const optionIndex = q.options.findIndex((opt) => opt.score === selectedScore);
+            const option = optionIndex >= 0 ? q.options[optionIndex] : null;
+            return {
+                index: qIndex,
+                question: q.text,
+                hint: q.hint || '',
+                option_index: optionIndex >= 0 ? optionIndex : null,
+                option_label: option ? option.label : null,
+                option_score: option ? option.score : null,
+            };
+        });
+
+        return {
+            version: 1,
+            total_score: totalScore,
+            level,
+            level_group_label: resultMeta && resultMeta.label ? resultMeta.label : null,
+            level_group_text: resultMeta && resultMeta.text ? resultMeta.text : null,
+            answers: items,
+        };
+    };
+
+    const saveNtrpIfAllowed = async (level, payload) => {
         if (!quizEl || quizEl.dataset.canSave !== 'true') {
             return;
         }
@@ -273,7 +298,10 @@
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrftoken || '',
                 },
-                body: JSON.stringify({ ntrp_level: level }),
+                body: JSON.stringify({
+                    ntrp_level: level,
+                    quiz_payload: payload || null,
+                }),
             });
         } catch (error) {
             // silently ignore
@@ -304,6 +332,7 @@
         const totalScore = answers.reduce((sum, value) => sum + (value || 0), 0);
         const level = getNtrpLevelFromScore(totalScore);
         const result = getNtrpResult(totalScore);
+        const payload = buildAnswersPayload(totalScore, level, result);
         if (typeof console !== 'undefined' && console.log) {
             console.log('[NTRP] Рассчитать: баллы=%s, уровень=%.1f, result=%o', totalScore, level, result);
         }
@@ -321,6 +350,18 @@
             if (input) {
                 input.value = result.level.toFixed(1);
                 input.dispatchEvent(new Event('input', { bubbles: true }));
+
+                const form = input.form;
+                if (form) {
+                    let hidden = form.querySelector('input[name="ntrp_quiz_payload"]');
+                    if (!hidden) {
+                        hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = 'ntrp_quiz_payload';
+                        form.appendChild(hidden);
+                    }
+                    hidden.value = JSON.stringify(payload);
+                }
             }
             if (resultLink) resultLink.classList.add('hidden');
             if (resultFormMsg) resultFormMsg.classList.remove('hidden');
@@ -332,7 +373,7 @@
             } else if (infoMsgEl) {
                 infoMsgEl.classList.add('hidden');
             }
-            saveNtrpIfAllowed(result.level);
+            saveNtrpIfAllowed(result.level, payload);
         }
     });
 

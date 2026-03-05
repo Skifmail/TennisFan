@@ -29,6 +29,7 @@
                 <form method="post" id="register-form" class="register-form-layout register-form-steps">
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="register">
+                    {{ register_form.ntrp_quiz_payload }}
 
                     <!-- Этап 1: персональные данные -->
                     <div class="register-step register-step-1" id="register-step-1">

@@ -11,10 +11,27 @@
 
     {% if court.image or court.photos.all %}
     <div class="court-gallery" data-court-gallery>
-        <div class="court-gallery__main">
-            <img src="" alt="{{ court.name }}" data-court-gallery-main>
+        <div class="court-gallery__main" data-court-gallery-main-view>
+            <div class="court-gallery__bg-blur" data-court-gallery-bg></div>
+            <img class="court-gallery__main-img"
+                 src=""
+                 alt="{{ court.name }}"
+                 data-court-gallery-main>
+            <span class="court-gallery__counter" data-court-gallery-counter></span>
+            <button type="button"
+                    class="court-gallery__arrow court-gallery__arrow--prev"
+                    data-court-gallery-prev
+                    aria-label="Предыдущее фото">
+                &#8249;
+            </button>
+            <button type="button"
+                    class="court-gallery__arrow court-gallery__arrow--next"
+                    data-court-gallery-next
+                    aria-label="Следующее фото">
+                &#8250;
+            </button>
         </div>
-        <div class="court-gallery__thumbs">
+        <div class="court-gallery__strip" data-court-gallery-strip>
             {% if court.image %}
             <button type="button"
                     class="court-gallery__thumb court-gallery__thumb--active"
@@ -32,6 +49,10 @@
             </button>
             {% endfor %}
         </div>
+    </div>
+    <div class="court-lightbox" data-court-lightbox>
+        <button type="button" class="court-lightbox__close" data-court-lightbox-close>&times;</button>
+        <img src="" alt="{{ court.name }}" data-court-lightbox-img>
     </div>
     {% endif %}
 
@@ -299,50 +320,168 @@
 }
 .court-gallery__main {
     position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
     overflow: hidden;
     border-radius: var(--radius-lg);
+    background: #000;
 }
-.court-gallery__main img {
-    display: block;
+.court-gallery__bg-blur {
+    position: absolute;
+    inset: -12%;
+    background-size: cover;
+    background-position: center;
+    filter: blur(22px) brightness(0.45) saturate(1.4);
+    transform: scale(1.08);
+    transition: background-image var(--transition-base);
+}
+.court-gallery__main-img {
+    position: absolute;
+    inset: 0;
     width: 100%;
-    height: auto;
+    height: 100%;
     object-fit: contain;
+    transition: transform 0.4s ease, opacity 0.25s ease;
 }
-.court-gallery__thumbs {
+.court-gallery__main-img.is-fading {
+    opacity: 0;
+    transform: scale(0.98);
+}
+.court-gallery__main:hover .court-gallery__main-img {
+    transform: scale(1.01);
+}
+.court-gallery__counter {
+    position: absolute;
+    right: 16px;
+    bottom: 14px;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    pointer-events: none;
+}
+.court-gallery__arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(6px);
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    cursor: pointer;
     display: flex;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-sm);
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    z-index: 2;
+}
+.court-gallery__arrow--prev {
+    left: 12px;
+}
+.court-gallery__arrow--next {
+    right: 12px;
+}
+.court-gallery:hover .court-gallery__arrow {
+    opacity: 1;
+}
+.court-gallery__arrow:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+.court-gallery__strip {
+    display: flex;
+    gap: 4px;
+    background: var(--color-bg-elevated);
+    padding: 4px;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     overflow-x: auto;
-    padding-bottom: 4px;
+    scrollbar-width: none;
+    margin-top: 2px;
+}
+.court-gallery__strip::-webkit-scrollbar {
+    display: none;
 }
 .court-gallery__thumb {
-    border: none;
+    flex: 0 0 auto;
+    width: 80px;
+    min-width: 72px;
+    aspect-ratio: 1 / 1;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s ease, opacity 0.2s ease, transform 0.15s ease;
+    opacity: 0.65;
     padding: 0;
     background: transparent;
-    cursor: pointer;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    flex: 0 0 96px;
+}
+.court-gallery__thumb--active img {
+    opacity: 1;
+}
+.court-gallery__thumb--active {
+    border-color: var(--color-primary);
+    opacity: 1;
+}
+.court-gallery__thumb:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
 }
 .court-gallery__thumb img {
     display: block;
     width: 100%;
-    height: 72px;
+    height: 100%;
     object-fit: cover;
-    opacity: 0.8;
-    transition: opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+    transition: transform 0.25s ease, opacity 0.25s ease;
 }
 .court-gallery__thumb:hover img {
-    opacity: 1;
-    transform: scale(1.03);
+    transform: scale(1.06);
 }
-.court-gallery__thumb--active img {
+.court-lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 1100;
+    align-items: center;
+    justify-content: center;
+}
+.court-lightbox--open {
+    display: flex;
+}
+.court-lightbox img {
+    max-width: 92vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 0 80px rgba(0, 0, 0, 0.8);
+}
+.court-lightbox__close {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    color: #fff;
+    font-size: 32px;
+    cursor: pointer;
+    opacity: 0.8;
+    background: none;
+    border: none;
+    line-height: 1;
+}
+.court-lightbox__close:hover {
     opacity: 1;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
 }
 @media (max-width: 768px) {
-    .court-gallery__thumbs .court-gallery__thumb:nth-child(n+4) {
-        display: none;
+    .court-gallery__arrow {
+        width: 32px;
+        height: 32px;
     }
 }
 .court-detail__title { font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg); }
@@ -372,36 +511,134 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    var mainView = gallery.querySelector('[data-court-gallery-main-view]');
     var mainImage = gallery.querySelector('[data-court-gallery-main]');
+    var bgBlur = gallery.querySelector('[data-court-gallery-bg]');
+    var counter = gallery.querySelector('[data-court-gallery-counter]');
+    var strip = gallery.querySelector('[data-court-gallery-strip]');
     var thumbButtons = gallery.querySelectorAll('[data-court-gallery-thumb]');
+    var prevBtn = gallery.querySelector('[data-court-gallery-prev]');
+    var nextBtn = gallery.querySelector('[data-court-gallery-next]');
 
-    if (!mainImage || !thumbButtons.length) {
+    if (!mainView || !mainImage || !bgBlur || !counter || !strip || !thumbButtons.length) {
         return;
     }
 
-    var activeThumb = gallery.querySelector('.court-gallery__thumb--active') || thumbButtons[0];
-    if (activeThumb) {
-        var initialUrl = activeThumb.getAttribute('data-full-url');
-        if (initialUrl) {
-            mainImage.src = initialUrl;
+    var photos = Array.prototype.map.call(thumbButtons, function (btn) {
+        return btn.getAttribute('data-full-url');
+    }).filter(function (url) { return !!url; });
+
+    if (!photos.length) {
+        return;
+    }
+
+    var currentIndex = 0;
+
+    function applyPhoto(idx, withAnimation) {
+        var url = photos[idx];
+        if (!url) {
+            return;
+        }
+        if (withAnimation) {
+            mainImage.classList.add('is-fading');
+            setTimeout(function () {
+                mainImage.src = url;
+                bgBlur.style.backgroundImage = 'url(' + url + ')';
+                counter.textContent = (idx + 1) + ' / ' + photos.length;
+                thumbButtons.forEach(function (btn, i) {
+                    btn.classList.toggle('court-gallery__thumb--active', i === idx);
+                });
+                mainImage.classList.remove('is-fading');
+            }, 200);
+        } else {
+            mainImage.src = url;
+            bgBlur.style.backgroundImage = 'url(' + url + ')';
+            counter.textContent = (idx + 1) + ' / ' + photos.length;
+            thumbButtons.forEach(function (btn, i) {
+                btn.classList.toggle('court-gallery__thumb--active', i === idx);
+            });
+        }
+
+        var activeThumb = thumbButtons[idx];
+        if (activeThumb && typeof activeThumb.scrollIntoView === 'function') {
+            activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
     }
 
-    thumbButtons.forEach(function (button) {
+    function goTo(offset) {
+        var nextIndex = (currentIndex + offset + photos.length) % photos.length;
+        currentIndex = nextIndex;
+        applyPhoto(currentIndex, true);
+    }
+
+    thumbButtons.forEach(function (button, index) {
         button.addEventListener('click', function () {
-            var imageUrl = button.getAttribute('data-full-url');
-            if (!imageUrl) {
-                return;
-            }
-
-            mainImage.src = imageUrl;
-
-            thumbButtons.forEach(function (btn) {
-                btn.classList.remove('court-gallery__thumb--active');
-            });
-            button.classList.add('court-gallery__thumb--active');
+            currentIndex = index;
+            applyPhoto(currentIndex, true);
         });
     });
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', function (event) {
+            event.stopPropagation();
+            goTo(-1);
+        });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', function (event) {
+            event.stopPropagation();
+            goTo(1);
+        });
+    }
+
+    var lightbox = document.querySelector('[data-court-lightbox]');
+    var lightboxImg = lightbox ? lightbox.querySelector('[data-court-lightbox-img]') : null;
+    var lightboxClose = lightbox ? lightbox.querySelector('[data-court-lightbox-close]') : null;
+
+    if (lightbox && lightboxImg) {
+        mainView.addEventListener('click', function (event) {
+            if (event.target.closest('[data-court-gallery-prev]') || event.target.closest('[data-court-gallery-next]')) {
+                return;
+            }
+            lightboxImg.src = photos[currentIndex];
+            lightbox.classList.add('court-lightbox--open');
+        });
+
+        function closeLightbox(event) {
+            if (!lightbox.classList.contains('court-lightbox--open')) {
+                return;
+            }
+            if (!event || event.target === lightbox || (event.target && event.target.hasAttribute('data-court-lightbox-close'))) {
+                lightbox.classList.remove('court-lightbox--open');
+            }
+        }
+
+        if (lightboxClose) {
+            lightboxClose.addEventListener('click', function (event) {
+                event.stopPropagation();
+                closeLightbox(event);
+            });
+        }
+
+        lightbox.addEventListener('click', closeLightbox);
+
+        document.addEventListener('keydown', function (event) {
+            if (!lightbox.classList.contains('court-lightbox--open')) {
+                return;
+            }
+            if (event.key === 'Escape') {
+                lightbox.classList.remove('court-lightbox--open');
+            } else if (event.key === 'ArrowLeft') {
+                goTo(-1);
+                lightboxImg.src = photos[currentIndex];
+            } else if (event.key === 'ArrowRight') {
+                goTo(1);
+                lightboxImg.src = photos[currentIndex];
+            }
+        });
+    }
+
+    applyPhoto(currentIndex, false);
 });
 </script>
 {% if court_has_coords and yandex_maps_api_key %}

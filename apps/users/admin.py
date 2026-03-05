@@ -132,16 +132,11 @@ class NtrpTestResultInline(admin.TabularInline):
 
         table_html = """
 <style>
-  .ntrp-answers-wrapper {
-    max-width: 100%;
-    overflow-x: auto;
-  }
   .ntrp-answers-table {
     width: 100%;
     border-collapse: collapse;
     margin: 0.5rem 0;
     font-size: 13px;
-    min-width: 320px;
   }
   .ntrp-answers-table th,
   .ntrp-answers-table td {
@@ -163,20 +158,18 @@ class NtrpTestResultInline(admin.TabularInline):
     font-weight: 400;
   }
 </style>
-<div class="ntrp-answers-wrapper">
-  <table class="ntrp-answers-table">
-    <thead>
-      <tr>
-        <th>№</th>
-        <th>Баллы</th>
-        <th>Ответ</th>
-      </tr>
-    </thead>
-    <tbody>
-      __ROWS_PLACEHOLDER__
-    </tbody>
-  </table>
-</div>
+<table class="ntrp-answers-table">
+  <thead>
+    <tr>
+      <th>№</th>
+      <th>Баллы</th>
+      <th>Ответ</th>
+    </tr>
+  </thead>
+  <tbody>
+    __ROWS_PLACEHOLDER__
+  </tbody>
+</table>
 """
 
         table_html = table_html.replace("__ROWS_PLACEHOLDER__", "".join(rows))

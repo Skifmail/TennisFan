@@ -2,10 +2,12 @@
 Users admin configuration.
 """
 
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import Notification, Player, User
+from .models import Notification, Player, SkillLevel, User
+from .skill_levels import skill_with_ntrp
 
 
 @admin.register(User)
@@ -58,15 +60,31 @@ class UserAdmin(BaseUserAdmin):
     )
 
 
+class PlayerAdminForm(forms.ModelForm):
+    """Форма редактирования игрока с числовым отображением уровней силы в селекте."""
+
+    skill_level = forms.ChoiceField(
+        choices=[(code, skill_with_ntrp(code)) for code, _ in SkillLevel.choices],
+        label="Уровень силы",
+        required=True,
+    )
+
+    class Meta:
+        model = Player
+        fields = "__all__"
+
+
 @admin.register(Player)
 class PlayerAdmin(admin.ModelAdmin):
     """Admin configuration for Player model."""
+
+    form = PlayerAdminForm
 
     list_display = (
         "user",
         "is_bye",
         "city",
-        "skill_level",
+        "skill_level_with_ntrp",
         "gender",
         "ntrp_level",
         "total_points",
@@ -75,6 +93,12 @@ class PlayerAdmin(admin.ModelAdmin):
         "is_verified",
         "is_legend",
     )
+
+    @admin.display(description="Уровень силы")
+    def skill_level_with_ntrp(self, obj: Player) -> str:
+        """Возвращает уровень силы с числовым диапазоном NTRP."""
+        return skill_with_ntrp(obj.skill_level) if obj.skill_level else ""
+
     list_filter = (
         "city",
         "skill_level",

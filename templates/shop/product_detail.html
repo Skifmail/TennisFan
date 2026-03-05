@@ -36,7 +36,9 @@
                     {% endif %}
                     {% else %}
                     <div class="shop-detail__main-photo shop-detail__placeholder">
-                        <span>Нет фото</span>
+                        <video class="shop-detail__video-placeholder" autoplay muted loop playsinline preload="metadata">
+                            <source src="{% static 'video/logotip.MP4' %}" type="video/mp4">
+                        </video>
                     </div>
                     {% endif %}
                 </div>

@@ -21,7 +21,8 @@
     <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ first_photo.image.url }}">
     {% endwith %}
     {% else %}
-    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/logo-og-default.png' %}">
+    {# Фолбэк: используем существующий placeholder-аватар, чтобы не было ошибок манифеста staticfiles #}
+    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/avatar_placeholder.png' %}">
     {% endif %}
 {% endblock %}
 

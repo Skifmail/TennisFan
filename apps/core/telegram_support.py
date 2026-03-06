@@ -82,23 +82,43 @@ def send_message(
         msg_id = result.get("message_id")
         return msg_id, True
     except Exception as e:
-        logger.warning("Telegram send_message failed: %s", e)
+        logger.warning(
+            "Telegram support send_message failed chat_id=%s: %s", chat_id, e
+        )
         return None, False
 
 
 def send_to_admin(text: str) -> tuple[int | None, bool]:
     """Отправить сообщение всем администраторам. Возвращает (message_id последней отправки, True если хотя бы одна успешна)."""
+    deliveries = send_to_admin_with_deliveries(text)
+    if not deliveries:
+        return None, False
+    return deliveries[-1][1], True
+
+
+def send_to_admin_with_deliveries(
+    text: str,
+) -> list[tuple[str, int]]:
+    """
+    Отправить сообщение всем администраторам.
+    Возвращает список пар (admin_chat_id, message_id) для успешных отправок.
+    Нужен для сохранения доставок в SupportMessageAdminDelivery (ответ любого админа найдёт обращение).
+    """
     chat_ids = _get_admin_chat_ids()
     if not chat_ids:
-        return None, False
-    last_msg_id = None
-    any_ok = False
+        logger.warning("Telegram support send_to_admin: TELEGRAM_ADMIN_CHAT_IDS пуст")
+        return []
+    result: list[tuple[str, int]] = []
     for chat_id in chat_ids:
         msg_id, ok = send_message(chat_id, text)
-        if ok:
-            last_msg_id = msg_id
-            any_ok = True
-    return last_msg_id, any_ok
+        if ok and msg_id is not None:
+            result.append((str(chat_id).strip(), msg_id))
+        else:
+            logger.warning(
+                "Telegram support: сообщение не доставлено админу chat_id=%s",
+                chat_id,
+            )
+    return result
 
 
 def edit_message(

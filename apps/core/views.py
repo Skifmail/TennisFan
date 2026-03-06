@@ -36,7 +36,7 @@ from apps.users.rating_utils import rating_to_ntrp_level
 
 from . import telegram_support as tg_support
 from .forms import FeedbackForm
-from .models import City, SupportMessage, UserTelegramLink
+from .models import City, SupportMessage, SupportMessageAdminDelivery, UserTelegramLink
 
 logger = logging.getLogger(__name__)
 
@@ -557,13 +557,19 @@ def _create_support_message_and_send_to_admin(
         guest_contact=guest_contact_val,
         guest_telegram_username=guest_telegram_val,
     )
-    msg_id, ok = tg_support.send_to_admin(text_for_admin)
-    if ok and msg_id is not None:
-        support_msg.admin_telegram_message_id = msg_id
+    deliveries = tg_support.send_to_admin_with_deliveries(text_for_admin)
+    if deliveries:
         support_msg.admin_telegram_text = text_for_admin
+        support_msg.admin_telegram_message_id = deliveries[0][1]
         support_msg.save(
             update_fields=["admin_telegram_message_id", "admin_telegram_text"]
         )
+        for admin_chat_id, admin_msg_id in deliveries:
+            SupportMessageAdminDelivery.objects.create(
+                support_message=support_msg,
+                admin_chat_id=admin_chat_id,
+                admin_telegram_message_id=admin_msg_id,
+            )
 
     binding_url = None
     if request.user.is_authenticated and tg_support.is_telegram_configured():
@@ -749,16 +755,29 @@ def telegram_support_webhook(request):
         if not original_message_id:
             return JsonResponse({"ok": True})
 
-        support_msg = (
-            SupportMessage.objects.filter(
+        delivery = (
+            SupportMessageAdminDelivery.objects.filter(
+                admin_chat_id=chat_id,
                 admin_telegram_message_id=original_message_id,
             )
-            .select_related("user")
+            .select_related("support_message", "support_message__user")
             .first()
         )
+        if delivery:
+            support_msg = delivery.support_message
+        else:
+            support_msg = (
+                SupportMessage.objects.filter(
+                    admin_telegram_message_id=original_message_id,
+                )
+                .select_related("user")
+                .first()
+            )
         if not support_msg:
             logger.debug(
-                "Webhook: no SupportMessage for message_id=%s", original_message_id
+                "Webhook: no SupportMessage for chat_id=%s message_id=%s",
+                chat_id,
+                original_message_id,
             )
             return JsonResponse({"ok": True})
 
@@ -949,13 +968,19 @@ def telegram_support_webhook(request):
             text=text,
             source="Telegram",
         )
-        msg_id, ok = tg_support.send_to_admin(text_for_admin)
-        if ok and msg_id is not None:
-            support_msg.admin_telegram_message_id = msg_id
+        deliveries = tg_support.send_to_admin_with_deliveries(text_for_admin)
+        if deliveries:
             support_msg.admin_telegram_text = text_for_admin
+            support_msg.admin_telegram_message_id = deliveries[0][1]
             support_msg.save(
                 update_fields=["admin_telegram_message_id", "admin_telegram_text"]
             )
+            for admin_chat_id, admin_msg_id in deliveries:
+                SupportMessageAdminDelivery.objects.create(
+                    support_message=support_msg,
+                    admin_chat_id=admin_chat_id,
+                    admin_telegram_message_id=admin_msg_id,
+                )
 
         return JsonResponse({"ok": True})
 

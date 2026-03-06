@@ -525,6 +525,11 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "apps.core": {
+            "handlers": _APPS_HANDLERS,
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 

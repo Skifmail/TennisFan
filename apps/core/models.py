@@ -190,12 +190,13 @@ class SupportMessage(models.Model):
     is_from_admin = models.BooleanField("От администратора", default=False)
     created_at = models.DateTimeField("Создано", auto_now_add=True)
     # ID сообщения в Telegram (наше сообщение админу), чтобы связать reply админа с этим сообщением
+    # Храним только для обратной совместимости; реальные привязки — в SupportMessageAdminDelivery.
     admin_telegram_message_id = models.BigIntegerField(
         "ID сообщения в Telegram (админу)",
         null=True,
         blank=True,
-        unique=True,
         db_index=True,
+        help_text="Сохраняем первый успешный message_id для совместимости; у каждого админа свой message_id.",
     )
     # Текст, который мы отправили админу (для редактирования сообщения после ответа — пометка «Ответ отправлен»)
     admin_telegram_text = models.TextField("Текст сообщения админу", blank=True)
@@ -208,8 +209,38 @@ class SupportMessage(models.Model):
     def __str__(self):
         if self.user:
             return f"#{self.pk} {'(админ)' if self.is_from_admin else ''} {self.user}"
-        else:
-            return f"#{self.pk} {'(админ)' if self.is_from_admin else ''} Гость: {self.guest_name or 'Без имени'}"
+        return f"#{self.pk} {'(админ)' if self.is_from_admin else ''} Гость: {self.guest_name or 'Без имени'}"
+
+
+class SupportMessageAdminDelivery(models.Model):
+    """
+    Доставка сообщения поддержки конкретному админу в Telegram.
+    У каждого админа своя копия сообщения со своим message_id в его чате.
+    По (admin_chat_id, admin_telegram_message_id) находим SupportMessage при ответе админа.
+    """
+
+    support_message = models.ForeignKey(
+        SupportMessage,
+        on_delete=models.CASCADE,
+        related_name="admin_deliveries",
+    )
+    admin_chat_id = models.CharField(
+        "Chat ID админа в Telegram",
+        max_length=32,
+        db_index=True,
+    )
+    admin_telegram_message_id = models.BigIntegerField(
+        "ID сообщения в чате админа",
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = "доставка сообщения админу"
+        verbose_name_plural = "доставки сообщений админам"
+        unique_together = [("admin_chat_id", "admin_telegram_message_id")]
+
+    def __str__(self):
+        return f"#{self.support_message_id} → chat {self.admin_chat_id} msg {self.admin_telegram_message_id}"
 
 
 class SupportConversation(SupportMessage):

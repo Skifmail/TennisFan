@@ -12,7 +12,85 @@ from apps.tournaments.models import Match, Tournament, TournamentStatus
 from apps.tournaments.olympic_consolation import (
     generate_bracket as olympic_generate_bracket,
 )
+from apps.tournaments.utils import generate_unique_tournament_slug
 from apps.users.models import Player, User
+
+
+class GenerateUniqueTournamentSlugTestCase(TestCase):
+    """Тесты автогенерации уникального slug для турниров."""
+
+    def test_first_tournament_gets_base_slug(self) -> None:
+        """Первый турнир с названием получает slug без суффикса."""
+        slug = generate_unique_tournament_slug(name="Кубок Москвы")
+        self.assertEqual(slug, "кубок-москвы")
+
+    def test_duplicate_name_gets_suffix(self) -> None:
+        """Второй турнир с тем же названием получает slug с суффиксом -2."""
+        Tournament.objects.create(
+            name="Кубок Москвы",
+            slug="кубок-москвы",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+        )
+        slug = generate_unique_tournament_slug(name="Кубок Москвы")
+        self.assertEqual(slug, "кубок-москвы-2")
+
+    def test_third_tournament_gets_suffix_3(self) -> None:
+        """Третий турнир с тем же названием получает slug с суффиксом -3."""
+        Tournament.objects.create(
+            name="Кубок Москвы",
+            slug="кубок-москвы",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+        )
+        Tournament.objects.create(
+            name="Кубок Москвы",
+            slug="кубок-москвы-2",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+        )
+        slug = generate_unique_tournament_slug(name="Кубок Москвы")
+        self.assertEqual(slug, "кубок-москвы-3")
+
+    def test_long_name_truncated_with_suffix(self) -> None:
+        """Длинное название обрезается, оставляя место для суффикса."""
+        long_name = "Любительский Северо-Восточный кубок Москвы по теннису (Москва)"
+        slug = generate_unique_tournament_slug(name=long_name)
+        self.assertLessEqual(len(slug), 50)
+        self.assertTrue(slug.replace("-", "").isalnum() or slug.endswith("-2"))
+
+    def test_editing_existing_keeps_slug(self) -> None:
+        """При редактировании турнира его slug сохраняется, если уникален."""
+        t = Tournament.objects.create(
+            name="Мой турнир",
+            slug="moy-turnir",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+        )
+        slug = generate_unique_tournament_slug(
+            name="Мой турнир", slug="moy-turnir", instance=t
+        )
+        self.assertEqual(slug, "moy-turnir")
+
+    def test_prepopulated_latin_slug_gets_suffix_on_duplicate(self) -> None:
+        """При prepopulated Latin slug (как в админке) дубликат получает суффикс -2."""
+        base_slug = "kubok-moskvy-2025"
+        Tournament.objects.create(
+            name="Кубок Москвы 2025",
+            slug=base_slug,
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+        )
+        slug = generate_unique_tournament_slug(
+            name="Кубок Москвы 2025",
+            slug=base_slug,
+        )
+        self.assertEqual(slug, "kubok-moskvy-2025-2")
 
 
 class FanAdvanceWinnerTestCase(TestCase):

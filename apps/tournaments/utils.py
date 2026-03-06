@@ -3,7 +3,53 @@
 Используются в views и в telegram_bot без циклических импортов.
 """
 
+from typing import cast
+
+from django.utils.text import slugify
+
 from .models import Match, Tournament
+
+SLUG_MAX_LENGTH = 50
+SUFFIX_RESERVED = 4
+
+
+def generate_unique_tournament_slug(
+    name: str,
+    slug: str | None = None,
+    instance: Tournament | None = None,
+) -> str:
+    """
+    Генерирует уникальный slug для турнира.
+
+    Если slug уже занят другим турниром или пустой — создаётся уникальный вариант
+    путём добавления суффикса -2, -3 и т.д. Базовый slug обрезается до 46 символов,
+    чтобы оставить место для суффикса (лимит SlugField — 50 символов).
+
+    Args:
+        name: Название турнира (используется, если slug пустой).
+        slug: Текущее значение slug (может быть из prepopulated или ввода пользователя).
+        instance: Редактируемый экземпляр турнира (исключается из проверки уникальности).
+
+    Returns:
+        Уникальный slug, подходящий под ограничение max_length.
+    """
+    raw_slug = (slug or "").strip()
+    base = raw_slug or cast(str, slugify(name, allow_unicode=True))
+    if not base:
+        base = "tournament"
+    base = base[: SLUG_MAX_LENGTH - SUFFIX_RESERVED].rstrip("-")
+    candidate = base
+    n = 1
+    queryset = Tournament.objects.all()
+    if instance and instance.pk:
+        queryset = queryset.exclude(pk=instance.pk)
+    while queryset.filter(slug=candidate).exists():
+        n += 1
+        suffix = f"-{n}"
+        if len(base) + len(suffix) > SLUG_MAX_LENGTH:
+            base = base[: SLUG_MAX_LENGTH - len(suffix)].rstrip("-") or "tournament"
+        candidate = base + suffix
+    return candidate
 
 
 def get_tournament_participant_users(tournament: Tournament) -> list:

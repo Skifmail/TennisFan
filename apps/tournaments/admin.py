@@ -7,6 +7,7 @@ from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 
 from apps.users.models import SkillLevel
+from apps.users.skill_levels import skill_with_ntrp
 
 from .fan import generate_bracket
 from .models import (
@@ -41,6 +42,7 @@ from .tvd import (
 from .tvd import (
     generate_playoffs as tvd_generate_playoffs,
 )
+from .utils import generate_unique_tournament_slug
 
 
 @admin.action(description="Подтвердить результат матча")
@@ -169,6 +171,10 @@ class TournamentAdminForm(forms.ModelForm):
             self.fields["allowed_categories"].initial = list(
                 self.instance.allowed_categories.values_list("category", flat=True)
             )
+        self.fields["slug"].help_text = (
+            "Можно оставить пустым или ввести вручную. При совпадении с существующим "
+            "турниром автоматически добавится суффикс -2, -3 и т.д."
+        )
 
     def clean_allowed_categories(self):
         value = self.cleaned_data.get("allowed_categories") or []
@@ -196,6 +202,14 @@ class TournamentAdminForm(forms.ModelForm):
                 "Для многодневного турнира укажите сумму вступительного взноса (руб). "
                 "По подписке игроки регистрируются бесплатно в рамках лимита; без подписки или при исчерпанном лимите — оплата взноса."
             )
+        # Автогенерация уникального slug: при одинаковых названиях добавляется суффикс -2, -3 и т.д.
+        name = cleaned_data.get("name") or ""
+        slug = cleaned_data.get("slug") or ""
+        cleaned_data["slug"] = generate_unique_tournament_slug(
+            name=name,
+            slug=slug or None,
+            instance=self.instance,
+        )
         return cleaned_data
 
 
@@ -224,13 +238,14 @@ class TournamentAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "city",
-        "court",
+        "allowed_skill_levels",
         "format",
         "variant",
         "tournament_type",
         "status",
         "bracket_generated",
         "start_date",
+        "court",
         "min_participants",
         "max_participants",
         "min_teams",
@@ -256,6 +271,22 @@ class TournamentAdmin(admin.ModelAdmin):
         generate_olympic_bracket_action,
         generate_round_robin_bracket_action,
     ]
+
+    def allowed_skill_levels(self, obj) -> str:
+        """Отображение допущенных уровней участников с их числовыми диапазонами."""
+        # Здесь важно показать и название уровня, и его числовой диапазон (NTRP),
+        # чтобы администратору было сразу понятно, кого пускает турнир.
+        codes = list(
+            obj.allowed_categories.values_list("category", flat=True).order_by(
+                "category"
+            )
+        )
+        if not codes:
+            return "—"
+        parts = [skill_with_ntrp(code) for code in codes]
+        return ", ".join(parts)
+
+    allowed_skill_levels.short_description = "Уровень участников"
 
     fieldsets = (
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),

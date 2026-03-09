@@ -49,6 +49,13 @@ CACHE_RESULT_ENTRY_TIMEOUT = 300  # 5 min
 TELEGRAM_TRANSFER_CONSENT_VERSION = "v1-2026-02-10"
 
 
+def _get_redirect_url_after_bot_settings_change(request) -> str:
+    next_url = str(request.POST.get("next", "")).strip()
+    if next_url.startswith("/") and not next_url.startswith("//"):
+        return next_url
+    return cast(str, reverse("profile", kwargs={"pk": request.user.player.pk}))
+
+
 def _parse_score_input(text: str):
     """
     Парсит счёт вида "6:4 6:3" или "6:4 3:6 10:7".
@@ -2063,7 +2070,7 @@ def connect_redirect(request):
             request,
             "Для подключения Telegram-бота необходимо подтвердить согласие на передачу данных в Telegram.",
         )
-        return redirect("profile", pk=request.user.player.pk)
+        return redirect(_get_redirect_url_after_bot_settings_change(request))
 
     # Фиксируем юридически значимое согласие на передачу данных в Telegram
     try:
@@ -2085,10 +2092,7 @@ def connect_redirect(request):
             request,
             "Telegram-бот временно недоступен. Проверьте TELEGRAM_USER_BOT_TOKEN в .env и перезапустите сервер.",
         )
-        try:
-            return redirect("profile", pk=request.user.player.pk)
-        except Exception:
-            return redirect("profile_edit")
+        return redirect(_get_redirect_url_after_bot_settings_change(request))
 
     link, _ = UserTelegramLink.objects.get_or_create(
         user=request.user,
@@ -2102,10 +2106,7 @@ def connect_redirect(request):
     username = bot.get_bot_username()
     if not username:
         messages.error(request, "Не удалось получить ссылку на бота.")
-        try:
-            return redirect("profile", pk=request.user.player.pk)
-        except Exception:
-            return redirect("profile_edit")
+        return redirect(_get_redirect_url_after_bot_settings_change(request))
     url = f"https://t.me/{username}?start={token}"
     return redirect(url)
 
@@ -2121,7 +2122,7 @@ def disconnect_user_bot(request):
     link = UserTelegramLink.objects.filter(user=request.user).first()
     if not link or not link.user_bot_chat_id:
         messages.info(request, "Telegram-бот уже отключён.")
-        return redirect("profile", pk=request.user.player.pk)
+        return redirect(_get_redirect_url_after_bot_settings_change(request))
 
     link.user_bot_chat_id = None
     link.binding_token = None
@@ -2132,4 +2133,4 @@ def disconnect_user_bot(request):
         request,
         "Telegram-бот отключён. Уведомления в Telegram больше не будут приходить.",
     )
-    return redirect("profile", pk=request.user.player.pk)
+    return redirect(_get_redirect_url_after_bot_settings_change(request))

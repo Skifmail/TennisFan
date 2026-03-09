@@ -719,9 +719,40 @@ def profile(request, pk):
     return render(request, "users/profile.html", context)
 
 
+def _get_telegram_bot_connection_context(user) -> dict[str, str | bool]:
+    telegram_user_bot_connected = False
+    telegram_bot_username = ""
+
+    try:
+        link = user.telegram_link
+        telegram_user_bot_connected = link.user_bot_chat_id is not None
+    except UserTelegramLink.DoesNotExist:
+        pass
+
+    if telegram_user_bot_connected:
+        try:
+            from apps.telegram_bot import services as bot_services
+
+            telegram_bot_username = bot_services.get_bot_username() or ""
+        except Exception:
+            pass
+
+    return {
+        "telegram_user_bot_connected": telegram_user_bot_connected,
+        "telegram_bot_username": telegram_bot_username,
+    }
+
+
 @login_required
 def profile_edit(request):
-    """Edit profile view."""
+    """Отобразить и сохранить настройки профиля пользователя.
+
+    Args:
+        request (HttpRequest): HTTP-запрос текущего пользователя.
+
+    Returns:
+        HttpResponse: Страница редактирования профиля или редирект после сохранения.
+    """
     try:
         player = request.user.player
     except Player.DoesNotExist:
@@ -741,7 +772,10 @@ def profile_edit(request):
     return render(
         request,
         "users/profile_edit.html",
-        {"form": form},
+        {
+            "form": form,
+            **_get_telegram_bot_connection_context(request.user),
+        },
     )
 
 

@@ -102,6 +102,54 @@
                     </div>
                 </div>
 
+                <div class="profile-info__telegram">
+                    <h3 class="profile-info__telegram-title">Telegram-бот</h3>
+                    <p class="text-secondary profile-info__telegram-text">
+                        Уведомления о регистрациях на турниры, матчах и дедлайнах, напоминания за 2 и 1 день,
+                        запросы на подтверждение результата. В боте: «Мои матчи», «Мой профиль», «Моя подписка».
+                    </p>
+                    <p class="text-secondary profile-info__telegram-text">
+                        <strong>Важно:</strong> нажмите кнопку ниже, откройте чат с ботом и нажмите <strong>«Запустить»</strong> (или отправьте /start). Без этого бот не сможет присылать вам сообщения.
+                    </p>
+                    <p class="text-secondary profile-info__telegram-text">
+                        Подключая Telegram-бота, вы соглашаетесь с передачей необходимых данных в сервис Telegram для работы уведомлений.
+                        Подробнее:
+                        <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политика конфиденциальности</a>
+                        и
+                        <a href="{% url 'legal_personal_data' %}" target="_blank" rel="noopener">Согласие на обработку персональных данных</a>.
+                    </p>
+                    {% if telegram_user_bot_connected %}
+                    <p class="text-success profile-info__telegram-status">✓ Бот подключён — уведомления будут приходить в Telegram</p>
+                    <div class="profile-info__telegram-actions">
+                        {% if telegram_bot_username %}
+                        <a href="https://t.me/{{ telegram_bot_username }}" target="_blank" rel="noopener" class="btn btn-telegram btn-telegram--outline">
+                            <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="btn-telegram__icon" width="20" height="20"> Открыть бота
+                        </a>
+                        {% endif %}
+                        <form method="post" action="{% url 'telegram_disconnect' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{% url 'profile_edit' %}">
+                            <button type="submit" class="btn btn-outline btn-danger-text">Отключить бота</button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <form method="post" action="{% url 'telegram_connect' %}" class="profile-info__telegram-consent-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'profile_edit' %}">
+                        <label class="consent-label profile-info__telegram-consent">
+                            <input type="checkbox" name="telegram_transfer_consent" required>
+                            <span class="consent-text">
+                                Я подтверждаю согласие на передачу необходимых данных в сервис Telegram
+                                для работы уведомлений бота.
+                            </span>
+                        </label>
+                        <button type="submit" class="btn btn-telegram">
+                            <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="btn-telegram__icon" width="20" height="20"> Подключить Telegram-бот
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+
                 <hr style="margin: var(--spacing-xl) 0; border: none; border-top: 1px solid var(--color-border);">
 
                 <h3 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Безопасность</h3>

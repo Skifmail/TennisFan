@@ -27,13 +27,11 @@
             {% endif %}
             <h3 class="pricing-card__title">{{ tier.get_name_display }}</h3>
 
-            {% if tier.is_popular %}
             <div class="pricing-card__badges">
                 {% if tier.is_popular %}
                 <div class="pricing-card__badge pricing-card__badge--popular">Популярный</div>
                 {% endif %}
             </div>
-            {% endif %}
 
             <div class="pricing-card__price {% if tier.show_promo_price %}pricing-card__price--promo{% endif %}">
                 {% if tier.effective_price == 0 %}

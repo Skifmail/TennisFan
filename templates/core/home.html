@@ -266,7 +266,7 @@
 
         <div class="grid grid-3">
             {% for tournament in upcoming_tournaments %}
-            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card tournament-preview-card">
+            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card tournament-preview-card{% if not tournament.image %} tournament-preview-card--no-image{% endif %}">
                 <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}">
                     {% if tournament.status == 'upcoming' %}Идет набор{% elif tournament.status == 'active' %}В ИГРЕ{% elif tournament.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
                 </span>

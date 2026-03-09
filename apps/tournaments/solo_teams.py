@@ -36,7 +36,7 @@ def remove_solo_teams_from_doubles_tournament(tournament: Tournament) -> int:
         player = team.player1
         try:
             sub = player.user.subscription
-            if sub and sub.is_valid() and not sub.tier.is_unlimited:
+            if sub and not sub.has_unlimited_tournament_access():
                 sub.decrement_usage()
         except Exception:
             pass

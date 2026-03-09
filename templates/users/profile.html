@@ -123,11 +123,11 @@
                         <span>{{ player.user.subscription.end_date|date:"d.m.Y" }}</span>
                     </div>
                     {% endif %}
-                    {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.is_valid %}
+                    {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.tier.max_tournaments > 0 %}
                     <div class="subscription-info__limit">
                         <div class="subscription-info__row">
-                            <span class="subscription-info__label">Лимит:</span>
-                            <span>{{ player.user.subscription.tournaments_registered_count }} / {{ player.user.subscription.tier.max_tournaments }}</span>
+                            <span class="subscription-info__label">Остаток регистраций:</span>
+                            <span>{{ player.user.subscription.get_remaining_slots }}</span>
                         </div>
                         <div class="subscription-info__bar">
                             <div class="subscription-info__bar-fill" data-width-pct="{{ subscription_usage_percent }}"></div>
@@ -941,6 +941,114 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         };
     }
 
+    function setFanChartWrapState(fanMatchData) {
+        var fanWrap = document.getElementById('fanChartInnerWrap');
+        if (!fanWrap) {
+            return;
+        }
+        fanWrap.style.minWidth = fanMatchData.length <= 2
+            ? '220px'
+            : Math.max(fanMatchData.length * 18, 180) + 'px';
+        fanWrap.style.cursor = fanMatchData.some(function(d) { return d.match_id; }) ? 'pointer' : 'default';
+    }
+
+    function buildFanChartTooltipCallbacks(fanMatchData) {
+        return {
+            title: function(items) {
+                if (items.length && items[0].label) return formatDateLabel(items[0].label);
+                return '';
+            },
+            label: function(context) {
+                var index = context.dataIndex;
+                var d = fanMatchData[index];
+                if (!d) {
+                    return '';
+                }
+                var ntrpDelta = (d.ntrp_after || 0) - (d.ntrp_before || 0);
+                var fanDelta = d.fan_delta || 0;
+                var ntrpSign = ntrpDelta >= 0 ? '+' : '';
+                var fanSign = fanDelta >= 0 ? '+' : '';
+                var lines = [
+                    'Сила ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' +
+                    (d.points || 0).toFixed(1) + ' (' + fanSign + fanDelta.toFixed(1) + ')'
+                ];
+                if (d.match_opponent) lines.push('Матч: vs ' + d.match_opponent + ' — ' + (d.match_score || ''));
+                if (d.match_id) lines.push('Клик — подробнее');
+                return lines;
+            }
+        };
+    }
+
+    function buildFanChartOptions(fanMatchData) {
+        var fanBarVisualConfig = getFanBarVisualConfig(fanMatchData.length);
+        var chartOpts = buildChartOptions('Рейтинг', '');
+        chartOpts.datasets = chartOpts.datasets || {};
+        chartOpts.datasets.bar = {
+            barPercentage: fanBarVisualConfig.barPercentage,
+            categoryPercentage: fanBarVisualConfig.categoryPercentage,
+            maxBarThickness: fanBarVisualConfig.maxBarThickness
+        };
+        chartOpts.plugins.tooltip = {
+            displayColors: false,
+            backgroundColor: 'rgba(3, 17, 13, 0.96)',
+            titleColor: '#fff0c2',
+            bodyColor: 'rgba(244, 232, 207, 0.94)',
+            borderColor: 'rgba(250, 204, 21, 0.3)',
+            borderWidth: 1,
+            padding: 14,
+            cornerRadius: 14,
+            callbacks: buildFanChartTooltipCallbacks(fanMatchData)
+        };
+        chartOpts.onClick = function(ev, elements) {
+            if (elements.length && fanMatchData[elements[0].index] && fanMatchData[elements[0].index].match_id) {
+                window.location.href = '/tournaments/match/' + fanMatchData[elements[0].index].match_id + '/';
+            }
+        };
+        return {
+            options: chartOpts,
+            visual: fanBarVisualConfig
+        };
+    }
+
+    function renderFanChart(fanMatchData) {
+        var canvas = document.getElementById('chartProfilePoints');
+        if (!canvas) {
+            return;
+        }
+
+        var labels = fanMatchData.map(function(d) { return d.date; });
+        var points = fanMatchData.map(function(d) { return d.points; });
+        var barColors = buildFanBarColors(fanMatchData);
+        var barBorders = buildFanBarBorders(fanMatchData);
+        var chartConfig = buildFanChartOptions(fanMatchData);
+
+        setFanChartWrapState(fanMatchData);
+
+        if (charts.points) {
+            charts.points.destroy();
+        }
+
+        charts.points = new Chart(canvas, {
+            type: 'bar',
+            options: chartConfig.options,
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: points,
+                    backgroundColor: barColors,
+                    borderColor: barBorders,
+                    borderWidth: 1,
+                    borderRadius: chartConfig.visual.borderRadius,
+                    borderSkipped: false,
+                    barPercentage: chartConfig.visual.barPercentage,
+                    categoryPercentage: chartConfig.visual.categoryPercentage,
+                    maxBarThickness: chartConfig.visual.maxBarThickness
+                }]
+            }
+        });
+        charts.points.$fanMatchData = fanMatchData;
+    }
+
     var chartPalettes = {
         matches: {
             lineStart: 'rgba(87, 225, 255, 1)',
@@ -1103,60 +1211,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         var fanMatchData = data.filter(function(d) {
             return (d.matches || 0) > 0 && (d.won === true || d.won === false);
         });
-        var fanLabels = fanMatchData.map(function(d) { return d.date; });
-        var fanPointsData = fanMatchData.map(function(d) { return d.points; });
-        var barColors = buildFanBarColors(fanMatchData);
-        var barBorders = buildFanBarBorders(fanMatchData);
-        var fanBarVisualConfig = getFanBarVisualConfig(fanMatchData.length);
-
-        if (charts.points && document.getElementById('chartProfilePoints')) {
-            charts.points.$fanMatchData = fanMatchData;
-            charts.points.data.labels = fanLabels;
-            charts.points.data.datasets[0].data = fanPointsData;
-            charts.points.data.datasets[0].backgroundColor = barColors;
-            charts.points.data.datasets[0].borderColor = barBorders;
-            charts.points.data.datasets[0].barPercentage = fanBarVisualConfig.barPercentage;
-            charts.points.data.datasets[0].categoryPercentage = fanBarVisualConfig.categoryPercentage;
-            charts.points.data.datasets[0].maxBarThickness = fanBarVisualConfig.maxBarThickness;
-            charts.points.data.datasets[0].borderRadius = fanBarVisualConfig.borderRadius;
-            // Ширина контейнера для прокрутки: узкие столбцы
-            var fanWrap = document.getElementById('fanChartInnerWrap');
-            if (fanWrap) {
-                fanWrap.style.minWidth = fanMatchData.length <= 2
-                    ? '220px'
-                    : Math.max(fanMatchData.length * 18, 180) + 'px';
-                fanWrap.style.cursor = fanMatchData.some(function(d) { return d.match_id; }) ? 'pointer' : 'default';
-                charts.points.resize();
-            }
-
-            charts.points.options.plugins.tooltip.callbacks = charts.points.options.plugins.tooltip.callbacks || {};
-            charts.points.options.plugins.tooltip.callbacks.title = function(items) {
-                if (items.length && items[0].label) return formatDateLabel(items[0].label);
-                return '';
-            };
-            charts.points.options.plugins.tooltip.callbacks.label = function(context) {
-                var index = context.dataIndex;
-                var d = fanMatchData[index];
-                var ntrpDelta = (d.ntrp_after || 0) - (d.ntrp_before || 0);
-                var fanDelta = d.fan_delta || 0;
-                var ntrpSign = ntrpDelta >= 0 ? '+' : '';
-                var fanSign = fanDelta >= 0 ? '+' : '';
-                var lines = [
-                    'Сила ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' +
-                    (d.points || 0).toFixed(1) + ' (' + fanSign + fanDelta.toFixed(1) + ')'
-                ];
-                if (d.match_opponent) lines.push('Матч: vs ' + d.match_opponent + ' — ' + (d.match_score || ''));
-                if (d.match_id) lines.push('Клик — подробнее');
-                return lines;
-            };
-            charts.points.options.onClick = function(ev, elements) {
-                if (elements.length && fanMatchData[elements[0].index] && fanMatchData[elements[0].index].match_id) {
-                    window.location.href = '/tournaments/match/' + fanMatchData[elements[0].index].match_id + '/';
-                }
-            };
-
-            charts.points.update('none');
-        }
+        renderFanChart(fanMatchData);
         if (charts.matches && document.getElementById('chartProfileMatches')) {
             charts.matches.data.labels = labels;
             charts.matches.data.datasets[0].data = matchesData;
@@ -1207,83 +1262,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         var fanMatchData0 = progressData.filter(function(d) {
             return (d.matches || 0) > 0 && (d.won === true || d.won === false);
         });
-        var labels0 = fanMatchData0.map(function(d) { return d.date; });
-        var pts0 = fanMatchData0.map(function(d) { return d.points; });
-        var barColors0 = buildFanBarColors(fanMatchData0);
-        var barBorders0 = buildFanBarBorders(fanMatchData0);
-        var fanBarVisualConfig0 = getFanBarVisualConfig(fanMatchData0.length);
-
-        var chartOpts = buildChartOptions('Рейтинг', '');
-        chartOpts.datasets = chartOpts.datasets || {};
-        chartOpts.datasets.bar = {
-            barPercentage: fanBarVisualConfig0.barPercentage,
-            categoryPercentage: fanBarVisualConfig0.categoryPercentage,
-            maxBarThickness: fanBarVisualConfig0.maxBarThickness
-        };
-        chartOpts.plugins.tooltip = {
-            displayColors: false,
-            backgroundColor: 'rgba(3, 17, 13, 0.96)',
-            titleColor: '#fff0c2',
-            bodyColor: 'rgba(244, 232, 207, 0.94)',
-            borderColor: 'rgba(250, 204, 21, 0.3)',
-            borderWidth: 1,
-            padding: 14,
-            cornerRadius: 14,
-            callbacks: {
-                title: function(items) {
-                    if (items.length && items[0].label) return formatDateLabel(items[0].label);
-                    return '';
-                },
-                label: function(context) {
-                    var index = context.dataIndex;
-                    var d = fanMatchData0[index];
-                    var ntrpDelta = (d.ntrp_after || 0) - (d.ntrp_before || 0);
-                    var fanDelta = d.fan_delta || 0;
-                    var ntrpSign = ntrpDelta >= 0 ? '+' : '';
-                    var fanSign = fanDelta >= 0 ? '+' : '';
-                    var lines = [
-                        'Сила ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' +
-                        (d.points || 0).toFixed(1) + ' (' + fanSign + fanDelta.toFixed(1) + ')'
-                    ];
-                    if (d.match_opponent) lines.push('Матч: vs ' + d.match_opponent + ' — ' + (d.match_score || ''));
-                    if (d.match_id) lines.push('Клик — подробнее');
-                    return lines;
-                }
-            }
-        };
-        chartOpts.onClick = function(ev, elements) {
-            if (elements.length && fanMatchData0[elements[0].index] && fanMatchData0[elements[0].index].match_id) {
-                window.location.href = '/tournaments/match/' + fanMatchData0[elements[0].index].match_id + '/';
-            }
-        };
-
-        var fanWrap0 = document.getElementById('fanChartInnerWrap');
-        if (fanWrap0) {
-            fanWrap0.style.minWidth = fanMatchData0.length <= 2
-                ? '220px'
-                : Math.max(fanMatchData0.length * 18, 180) + 'px';
-            fanWrap0.style.cursor = fanMatchData0.some(function(d) { return d.match_id; }) ? 'pointer' : 'default';
-        }
-
-        charts.points = new Chart(document.getElementById('chartProfilePoints'), {
-            type: 'bar',
-            options: chartOpts,
-            data: {
-                labels: labels0,
-                datasets: [{
-                    data: pts0,
-                    backgroundColor: barColors0,
-                    borderColor: barBorders0,
-                    borderWidth: 1,
-                    borderRadius: fanBarVisualConfig0.borderRadius,
-                    borderSkipped: false,
-                    barPercentage: fanBarVisualConfig0.barPercentage,
-                    categoryPercentage: fanBarVisualConfig0.categoryPercentage,
-                    maxBarThickness: fanBarVisualConfig0.maxBarThickness
-                }]
-            }
-        });
-        charts.points.$fanMatchData = fanMatchData0;
+        renderFanChart(fanMatchData0);
     }
     if (document.getElementById('chartProfileMatches')) {
         var labels0 = progressData.map(function(d) { return d.date; });

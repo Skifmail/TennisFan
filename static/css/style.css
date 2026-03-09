@@ -7124,14 +7124,21 @@ select.form-control {
     margin-right: auto;
 }
 
+.pricing-card--has-promo .pricing-card__title {
+    padding-right: 124px;
+}
+
 .pricing-card__badge--promo {
-    margin-left: auto;
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 3;
     padding: 6px 14px;
     font-size: var(--font-size-sm);
     border-radius: 14px;
-    background: linear-gradient(135deg, #e85d04 0%, #dc2f02 100%);
+    background: linear-gradient(135deg, #b62821 0%, #9f1d17 100%);
     color: #fff;
-    box-shadow: 0 2px 8px rgb(220 47 2 / 40%);
+    box-shadow: 0 4px 12px rgb(159 29 23 / 35%);
 }
 
 .pricing-card__price--promo {
@@ -7174,7 +7181,13 @@ select.form-control {
         font-size: 11px;
     }
 
+    .pricing-card--has-promo .pricing-card__title {
+        padding-right: 98px;
+    }
+
     .pricing-card__badge--promo {
+        top: 10px;
+        right: 10px;
         padding: 5px 12px;
         font-size: 12px;
     }

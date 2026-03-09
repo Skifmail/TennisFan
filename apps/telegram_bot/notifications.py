@@ -828,7 +828,7 @@ def notify_subscription_expiring(user, subscription, days_left: int) -> None:
             features_lost.append("• Регистрация на турниры (безлимит)")
         else:
             features_lost.append(
-                f"• Регистрация на турниры ({tier.max_tournaments} в месяц)"
+                f"• Регистрация на турниры ({tier.max_tournaments} за покупку)"
             )
     if tier.one_day_tournament_discount > 0:
         features_lost.append(

@@ -2902,7 +2902,7 @@ button {
     }
 
     .profile-charts {
-        margin-top: 0;
+        margin-top: 0 !important;
 
         /* Убираем отступ на мобильных, так как колонки вертикальные */
     }

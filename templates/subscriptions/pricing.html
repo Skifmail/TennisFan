@@ -21,16 +21,16 @@
     <div class="pricing-grid">
         {% for tier in tiers %}
         <div
-            class="pricing-card {% if tier.card_theme != 'none' %}pricing-card--{{ tier.card_theme }}{% endif %} {% if tier.is_free_tier %}pricing-card-free{% endif %} {% if current_tier_id == tier.id %}pricing-card-current{% endif %}">
+            class="pricing-card {% if tier.card_theme != 'none' %}pricing-card--{{ tier.card_theme }}{% endif %} {% if tier.is_free_tier %}pricing-card-free{% endif %} {% if current_tier_id == tier.id %}pricing-card-current{% endif %} {% if tier.show_promo_price %}pricing-card--has-promo{% endif %}">
+            {% if tier.show_promo_price %}
+            <div class="pricing-card__badge pricing-card__badge--promo">Акция</div>
+            {% endif %}
             <h3 class="pricing-card__title">{{ tier.get_name_display }}</h3>
 
-            {% if tier.is_popular or tier.show_promo_price %}
+            {% if tier.is_popular %}
             <div class="pricing-card__badges">
                 {% if tier.is_popular %}
                 <div class="pricing-card__badge pricing-card__badge--popular">Популярный</div>
-                {% endif %}
-                {% if tier.show_promo_price %}
-                <div class="pricing-card__badge pricing-card__badge--promo">Акция</div>
                 {% endif %}
             </div>
             {% endif %}
@@ -79,7 +79,7 @@
                         {% elif tier.max_tournaments == 0 %}
                         <span class="pricing-feature__value pricing-feature__value--disabled">Недоступно</span>
                         {% else %}
-                        <span class="pricing-feature__value">{{ tier.max_tournaments }} в месяц</span>
+                        <span class="pricing-feature__value">{{ tier.max_tournaments }} за покупку</span>
                         {% endif %}
                     </div>
                 </div>
@@ -202,21 +202,24 @@
                 <h3 class="pricing-faq__question">Как работает подписка?</h3>
                 <p class="pricing-faq__answer">
                     Подписка действует в течение срока, указанного в выбранном тарифе. После окончания срока действия
-                    подписка автоматически продлевается только после новой оплаты.
+                    подписка автоматически продлевается только после новой оплаты. Если в тарифе были включены
+                    регистрации на турниры и вы использовали не все, неиспользованный остаток сохраняется за вами
+                    даже после окончания подписки.
                 </p>
             </div>
             <div class="pricing-faq__item">
                 <h3 class="pricing-faq__question">Можно ли отменить подписку?</h3>
                 <p class="pricing-faq__answer">
                     Да, вы можете отменить подписку в любой момент в своём профиле — в блоке «Подписка» нажмите кнопку
-                    «Отменить подписку». Доступ ко всем функциям тарифа сохранится до конца оплаченного периода.
+                    «Отменить подписку». Доступ ко всем функциям тарифа сохранится до конца оплаченного периода, а
+                    неиспользованный остаток регистраций на турниры не сгорит и останется доступен до его исчерпания.
                 </p>
             </div>
             <div class="pricing-faq__item">
                 <h3 class="pricing-faq__question">Что происходит с регистрациями при смене тарифа?</h3>
                 <p class="pricing-faq__answer">
-                    При переходе на более высокий тариф лимит регистраций увеличивается. При переходе на более низкий
-                    тариф текущие регистрации сохраняются, но новые будут ограничены новым лимитом.
+                    При покупке или продлении подписки вам начисляется новый пакет регистраций по выбранному тарифу.
+                    Неиспользованный остаток сохраняется и суммируется с новыми начислениями.
                 </p>
             </div>
         </div>

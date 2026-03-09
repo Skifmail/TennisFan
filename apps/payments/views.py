@@ -486,7 +486,6 @@ def payment_success(request):
                 if created:
                     sub.start_date = now
                     sub.end_date = tier.apply_duration(now)
-                    sub.tournaments_registered_count = 0
                 else:
                     base = sub.end_date if sub.end_date and sub.end_date > now else now
                     sub.end_date = tier.apply_duration(base)
@@ -497,6 +496,8 @@ def payment_success(request):
                 )
                 sub.purchase_city = normalize_city_for_pricing(city or "")
                 sub.save()
+                if not tier.is_unlimited and tier.max_tournaments > 0:
+                    sub.add_tournament_registration_slots(tier.max_tournaments)
                 _mark_user_paid_subscription(request.user)
                 try:
                     from apps.core.telegram_notify import notify_subscription_purchase

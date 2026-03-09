@@ -96,14 +96,18 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
         "tier",
         "purchase_city",
         "status_display",
-        "tournaments_registered_count",
+        "tournament_registration_balance",
         "registrations_limit_display",
         "end_date",
         "cancelled_at",
     )
     list_filter = ("tier", "is_active", "end_date")
     search_fields = ("user__username", "user__email", "user__last_name")
-    readonly_fields = ("tournaments_registered_count", "cancelled_at", "purchase_city")
+    readonly_fields = (
+        "tournament_registration_balance",
+        "cancelled_at",
+        "purchase_city",
+    )
     autocomplete_fields = ("user",)
 
     def registrations_limit_display(self, obj: UserSubscription) -> str:

@@ -2452,8 +2452,6 @@ def _check_tournament_registration_eligibility(request, tournament, player):
 
     try:
         sub = user.subscription
-        if not sub.is_valid():
-            sub = None
     except Exception:
         sub = None
 
@@ -2490,18 +2488,15 @@ def _check_tournament_registration_eligibility(request, tournament, player):
 
     # Многодневные с взносом: по подписке в рамках лимита — бесплатно; иначе — оплата взноса или оформление подписки
     if _tournament_requires_entry_payment(tournament):
-        if sub and sub.is_valid() and sub.can_register_for_tournament():
+        if sub and sub.can_register_for_tournament():
             return True, None
         return False, REGISTER_PAY_OR_SUBSCRIBE_MSG
 
-    # Многодневные без взноса (не должно быть при валидации в админке): требуем подписку
-    if not sub or not sub.is_active:
-        return False, "Для участия в многодневных турнирах требуется подписка."
-
-    if not sub.can_register_for_tournament():
+    # Многодневные без взноса: нужен активный безлимит или несгораемый остаток регистраций.
+    if not sub or not sub.can_register_for_tournament():
         return (
             False,
-            "Вы исчерпали лимит регистрации на турниры в этом месяце. Обновите подписку.",
+            "Для участия в многодневных турнирах нужна активная подписка или доступный остаток регистраций.",
         )
 
     return True, None
@@ -2629,8 +2624,6 @@ def tournament_register(request, slug):
     # SUBSCRIPTION CHECK
     try:
         sub = request.user.subscription
-        if not sub.is_valid():
-            sub = None
     except Exception:
         sub = None
 
@@ -2666,11 +2659,11 @@ def tournament_register(request, slug):
             if not _tournament_does_not_consume_subscription_limit(tournament):
                 try:
                     sub = request.user.subscription
-                    if sub and sub.is_valid():
+                    if sub and sub.can_register_for_tournament():
                         sub.increment_usage()
                         messages.success(
                             request,
-                            f"Вы зарегистрированы! Осталось регистраций в этом месяце: {sub.get_remaining_slots()}",
+                            f"Вы зарегистрированы! Осталось регистраций: {sub.get_remaining_slots()}",
                         )
                     else:
                         messages.success(request, "Вы зарегистрированы!")
@@ -2865,7 +2858,7 @@ def tournament_register_doubles(request, slug):
             if not _tournament_does_not_consume_subscription_limit(tournament):
                 try:
                     sub = request.user.subscription
-                    if sub and sub.is_valid():
+                    if sub and sub.can_register_for_tournament():
                         sub.increment_usage()
                 except Exception:
                     pass
@@ -2936,7 +2929,7 @@ def _do_join_team(request, tournament, player, team):
     if not _tournament_does_not_consume_subscription_limit(tournament):
         try:
             sub = request.user.subscription
-            if sub and sub.is_valid():
+            if sub and sub.can_register_for_tournament():
                 sub.increment_usage()
         except Exception:
             pass
@@ -3015,13 +3008,13 @@ def _do_add_partner(request, tournament, player, partner_id):
     if not _tournament_does_not_consume_subscription_limit(tournament):
         try:
             sub = request.user.subscription
-            if sub and sub.is_valid():
+            if sub and sub.can_register_for_tournament():
                 sub.increment_usage()
         except Exception:
             pass
         try:
             psub = partner.user.subscription
-            if psub and psub.is_valid():
+            if psub and psub.can_register_for_tournament():
                 psub.increment_usage()
         except Exception:
             pass

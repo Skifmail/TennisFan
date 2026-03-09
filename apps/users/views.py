@@ -665,7 +665,7 @@ def profile(request, pk):
         if max_t and max_t > 0:
             subscription_usage_percent = min(
                 100,
-                int(100 * sub.tournaments_registered_count / max_t),
+                int(100 * min(sub.get_remaining_slots(), max_t) / max_t),
             )
 
     telegram_user_bot_connected = False

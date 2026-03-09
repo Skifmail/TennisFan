@@ -154,7 +154,6 @@ def buy_subscription(request, tier_id):
     if created:
         sub.start_date = now
         sub.end_date = tier.apply_duration(now)
-        sub.tournaments_registered_count = 0
     else:
         # Продление: прибавляем срок выбранного тарифа от даты окончания
         # (или от текущего момента, если подписка уже истекла).
@@ -165,6 +164,8 @@ def buy_subscription(request, tier_id):
     )
     sub.purchase_city = normalize_city_for_pricing(city or "")
     sub.save()
+    if not tier.is_unlimited and tier.max_tournaments > 0:
+        sub.add_tournament_registration_slots(tier.max_tournaments)
 
     _mark_user_paid_subscription(request.user)
 

@@ -107,8 +107,8 @@ class SubscriptionTier(models.Model):
 
     # Registration limits
     max_tournaments = models.PositiveIntegerField(
-        "Максимум турниров в месяц",
-        help_text="Количество турниров, на которые можно зарегистрироваться в месяц. 0 = регистрации запрещены.",
+        "Количество регистраций за покупку",
+        help_text="Сколько регистраций на турниры начисляется при покупке или продлении этого тарифа. 0 = регистрации запрещены.",
         default=0,
     )
     is_unlimited = models.BooleanField("Неограниченные регистрации", default=False)
@@ -451,10 +451,14 @@ class UserSubscription(models.Model):
         help_text="Если заполнено — подписка отменена, но действует до end_date.",
     )
 
-    # Registration tracking for the current period
-    tournaments_registered_count = models.PositiveIntegerField(
-        "Использовано регистраций в этом месяце",
+    # Несгораемый баланс регистраций на турниры
+    tournament_registration_balance = models.PositiveIntegerField(
+        "Остаток регистраций на турниры",
         default=0,
+        help_text=(
+            "Баланс регистраций, который пополняется при покупке подписки и "
+            "расходуется при записи на многодневные турниры."
+        ),
     )
     # Город при покупке (для защиты от смены города на Москву после покупки по региональному тарифу)
     purchase_city = models.CharField(
@@ -535,30 +539,85 @@ class UserSubscription(models.Model):
         Returns:
             bool: ``True``, если регистрация на турнир доступна.
         """
-        if self.tier.is_unlimited:
+        if self.has_unlimited_tournament_access():
             return True
-        if self.tier.max_tournaments == 0:
-            return False
-        return bool(self.tournaments_registered_count < self.tier.max_tournaments)
+        return bool(self.tournament_registration_balance > 0)
+
+    def has_unlimited_tournament_access(self) -> bool:
+        """Проверить, есть ли у подписки безлимитная регистрация на турниры.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            bool: ``True``, если подписка активна и тариф даёт безлимит.
+        """
+        return bool(self.is_valid() and self.tier.is_unlimited)
+
+    def add_tournament_registration_slots(self, slots: int) -> None:
+        """Пополнить баланс регистраций на турниры.
+
+        Args:
+            slots (int): Количество слотов для добавления в баланс.
+
+        Returns:
+            None: Метод обновляет баланс регистраций в базе данных.
+
+        Raises:
+            ValueError: Если передано отрицательное количество слотов.
+        """
+        if slots < 0:
+            raise ValueError(
+                "Нельзя пополнить баланс отрицательным количеством слотов."
+            )
+        if slots == 0:
+            return
+        self.tournament_registration_balance += slots
+        self.save(update_fields=["tournament_registration_balance"])
 
     def increment_usage(self) -> None:
-        self.tournaments_registered_count += 1
-        self.save(update_fields=["tournaments_registered_count"])
+        """Списать одну регистрацию из несгораемого баланса.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            None: Метод обновляет баланс регистраций в базе данных.
+        """
+        if self.has_unlimited_tournament_access():
+            return
+        if self.tournament_registration_balance <= 0:
+            return
+        self.tournament_registration_balance -= 1
+        self.save(update_fields=["tournament_registration_balance"])
 
     def decrement_usage(self) -> None:
-        """Восстановить одну регистрацию (например, при удалении из турнира)."""
-        if self.tournaments_registered_count > 0:
-            self.tournaments_registered_count -= 1
-            self.save(update_fields=["tournaments_registered_count"])
+        """Вернуть одну регистрацию в баланс пользователя.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            None: Метод обновляет баланс регистраций в базе данных.
+        """
+        if self.has_unlimited_tournament_access():
+            return
+        self.tournament_registration_balance += 1
+        self.save(update_fields=["tournament_registration_balance"])
 
     def get_remaining_slots(self) -> int:
-        if self.tier.is_unlimited:
+        """Вернуть количество доступных регистраций на турниры.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            int: Остаток слотов регистрации. Для активного безлимита возвращается
+                ``999`` как технический маркер.
+        """
+        if self.has_unlimited_tournament_access():
             return 999
-        if self.tier.max_tournaments == 0:
-            return 0
-        return int(
-            max(0, self.tier.max_tournaments - self.tournaments_registered_count)
-        )
+        return int(max(0, self.tournament_registration_balance))
 
 
 class RegionalTierPrice(models.Model):

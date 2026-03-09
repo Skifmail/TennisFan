@@ -15,7 +15,7 @@ def _decrement_subscription_for_user(user) -> None:
     """Восстановить один слот регистрации пользователю, если подписка есть и не безлимитная."""
     try:
         sub = getattr(user, "subscription", None)
-        if sub and sub.is_valid() and not getattr(sub.tier, "is_unlimited", True):
+        if sub and not sub.has_unlimited_tournament_access():
             sub.decrement_usage()
     except Exception as e:
         logger.warning(

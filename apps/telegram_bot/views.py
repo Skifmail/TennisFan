@@ -1560,15 +1560,13 @@ def _handle_menu_callback_action(
                     end_str = f"{end_str} (через {days_left} дн.)"
 
             # Регистрации на турниры
-            if tier.is_unlimited:
+            if sub.has_unlimited_tournament_access():
                 reg_text = "♾️ Безлимит"
-            elif tier.max_tournaments == 0:
+            elif tier.max_tournaments == 0 and sub.get_remaining_slots() == 0:
                 reg_text = "🚫 Недоступно"
             else:
-                used = sub.tournaments_registered_count
-                total = tier.max_tournaments
                 remaining = sub.get_remaining_slots()
-                reg_text = f"{used}/{total} (осталось: {remaining})"
+                reg_text = f"🎟️ Осталось: {remaining}"
 
             # Список возможностей тарифа
             features = []

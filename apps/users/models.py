@@ -206,7 +206,7 @@ class Player(CompressImageFieldsMixin, models.Model):
         Если в админке у тарифа снята галочка «Особый значок», возвращается None — значок нигде не показывается.
         """
         tier = self.active_subscription_tier
-        if tier is None or tier.name == "free":
+        if tier is None or tier.is_free_tier:
             return None
         if not tier.has_badge:
             return None

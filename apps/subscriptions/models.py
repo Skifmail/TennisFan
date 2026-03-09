@@ -1,11 +1,22 @@
-from dateutil.relativedelta import relativedelta
+from datetime import datetime, timedelta
+from typing import Any, ClassVar, cast
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from django.utils.text import slugify
 
 
 class SubscriptionTier(models.Model):
-    """Subscription tier levels."""
+    """Модель тарифа подписки.
+
+    Args:
+        models.Model: Базовый класс Django-модели.
+
+    Returns:
+        None: Экземпляр модели используется Django ORM.
+    """
 
     class Level(models.TextChoices):
         FREE = "free", "Free"
@@ -13,8 +24,68 @@ class SubscriptionTier(models.Model):
         GOLD = "gold", "Gold"
         DIAMOND = "diamond", "Diamond"
 
-    name = models.CharField(
-        "Название тарифа", max_length=50, choices=Level.choices, unique=True
+    SYSTEM_NAME_LABELS: ClassVar[dict[str, str]] = {
+        "free": "Free",
+        "silver": "Silver",
+        "gold": "Gold",
+        "diamond": "Diamond",
+    }
+    SYSTEM_TIER_CODES: ClassVar[set[str]] = set(SYSTEM_NAME_LABELS.keys())
+    SLUG_TRANSLITERATION_MAP: ClassVar[dict[str, str]] = {
+        "а": "a",
+        "б": "b",
+        "в": "v",
+        "г": "g",
+        "д": "d",
+        "е": "e",
+        "ё": "e",
+        "ж": "zh",
+        "з": "z",
+        "и": "i",
+        "й": "y",
+        "к": "k",
+        "л": "l",
+        "м": "m",
+        "н": "n",
+        "о": "o",
+        "п": "p",
+        "р": "r",
+        "с": "s",
+        "т": "t",
+        "у": "u",
+        "ф": "f",
+        "х": "h",
+        "ц": "ts",
+        "ч": "ch",
+        "ш": "sh",
+        "щ": "sch",
+        "ъ": "",
+        "ы": "y",
+        "ь": "",
+        "э": "e",
+        "ю": "yu",
+        "я": "ya",
+    }
+
+    name = models.SlugField(
+        "Код тарифа",
+        max_length=50,
+        unique=True,
+        blank=True,
+        help_text=(
+            "Внутренний код тарифа. Для новых тарифов можно оставить пустым — "
+            "он сгенерируется из названия. Для системных тарифов используйте "
+            "free, silver, gold или diamond."
+        ),
+    )
+    display_name = models.CharField(
+        "Название тарифа на сайте",
+        max_length=100,
+        blank=True,
+        help_text=(
+            "Отображаемое название тарифа в интерфейсе. "
+            "Если оставить пустым, будет использовано системное название или код."
+        ),
     )
     price = models.DecimalField(
         "Стоимость (руб)", max_digits=10, decimal_places=2, default=0
@@ -64,18 +135,300 @@ class SubscriptionTier(models.Model):
         default=False,
         help_text="Если включено: игрок, который ни разу не покупал подписку, может купить этот тариф за 1 ₽. Все последующие покупки — по обычной цене.",
     )
+    is_popular = models.BooleanField(
+        "Популярный тариф",
+        default=False,
+        help_text="Если включено, на карточке тарифа будет показан бейдж «Популярный».",
+    )
+
+    class CardTheme(models.TextChoices):
+        NONE = "none", "Без темы"
+        BRONZE = "bronze", "Бронза"
+        SILVER = "silver_theme", "Серебро"
+        GOLD = "gold_theme", "Золото"
+        PLATINUM = "platinum_theme", "Платина"
+        DIAMOND_THEME = "diamond_theme", "Бриллиант"
+
+    card_theme = models.CharField(
+        "Тема оформления карточки",
+        max_length=20,
+        choices=CardTheme.choices,
+        default=CardTheme.NONE,
+        help_text="Металлический стиль карточки тарифа на странице подписок.",
+    )
+    duration_days = models.PositiveIntegerField(
+        "Срок действия (дней)",
+        default=30,
+        help_text="На сколько дней активируется или продлевается подписка по этому тарифу.",
+    )
+    is_visible = models.BooleanField("Показывать тариф на сайте", default=True)
+    sort_order = models.PositiveIntegerField("Порядок отображения", default=0)
 
     class Meta:
         verbose_name = "Тариф"
         verbose_name_plural = "Тарифы"
-        ordering = ["price"]
+        ordering = ["sort_order", "price", "id"]
 
-    def __str__(self):
+    @property
+    def is_system_tier(self) -> bool:
+        """Проверить, является ли тариф системным.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            bool: ``True``, если тариф относится к системным кодам.
+        """
+        return self.name in self.SYSTEM_TIER_CODES
+
+    @property
+    def is_free_tier(self) -> bool:
+        """Проверить, является ли тариф бесплатным системным тарифом.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            bool: ``True``, если код тарифа равен ``free``.
+        """
+        return str(self.name) == "free"
+
+    @property
+    def is_diamond_tier(self) -> bool:
+        """Проверить, является ли тариф системным Diamond.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            bool: ``True``, если код тарифа равен ``diamond``.
+        """
+        return str(self.name) == "diamond"
+
+    @property
+    def badge_variant(self) -> str:
+        """Вернуть вариант бейджа для отображения.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            str: Код варианта бейджа. Для тарифа с платиновой темой возвращается
+                ``platinum``. Для остальных кастомных тарифов возвращается ``custom``.
+        """
+        tier_name = str(self.name)
+        if tier_name in self.SYSTEM_TIER_CODES:
+            return tier_name
+        if str(self.card_theme) == str(self.CardTheme.PLATINUM):
+            return "platinum"
+        return "custom"
+
+    @property
+    def duration_label(self) -> str:
+        """Вернуть человекочитаемый срок действия тарифа.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            str: Срок действия в виде текста, например ``30 дней``.
+        """
+        days = self.duration_days
+        remainder_10 = days % 10
+        remainder_100 = days % 100
+        if remainder_10 == 1 and remainder_100 != 11:
+            suffix = "день"
+        elif remainder_10 in (2, 3, 4) and remainder_100 not in (12, 13, 14):
+            suffix = "дня"
+        else:
+            suffix = "дней"
+        return f"{days} {suffix}"
+
+    def get_duration_delta(self) -> timedelta:
+        """Вернуть временной интервал действия тарифа.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            timedelta: Интервал, на который активируется подписка.
+        """
+        return timedelta(days=self.duration_days)
+
+    def apply_duration(self, base_datetime: datetime) -> datetime:
+        """Рассчитать дату окончания тарифа от базовой даты.
+
+        Args:
+            base_datetime (datetime): Базовая дата и время начала отсчёта.
+
+        Returns:
+            datetime: Дата окончания с учётом срока действия тарифа.
+        """
+        return base_datetime + self.get_duration_delta()
+
+    @classmethod
+    def build_code_from_display_name(cls, value: str) -> str:
+        """Сгенерировать безопасный код тарифа из названия.
+
+        Args:
+            value (str): Название тарифа, введённое администратором.
+
+        Returns:
+            str: Нормализованный slug-код тарифа.
+        """
+        normalized_value = value.strip().lower()
+        transliterated = "".join(
+            cls.SLUG_TRANSLITERATION_MAP.get(char, char) for char in normalized_value
+        )
+        generated_slug = str(slugify(transliterated))
+        return generated_slug[:50]
+
+    @classmethod
+    def generate_unique_code_from_display_name(
+        cls, value: str, instance_pk: int | None = None
+    ) -> str:
+        """Сгенерировать уникальный код тарифа из названия.
+
+        Args:
+            value (str): Название тарифа, введённое администратором.
+            instance_pk (int | None): Идентификатор текущего тарифа при редактировании.
+
+        Returns:
+            str: Уникальный slug-код тарифа.
+        """
+        base_slug = cls.build_code_from_display_name(value)
+        if not base_slug:
+            return ""
+
+        slug_candidate = base_slug
+        suffix = 2
+        queryset = cls.objects.all()
+        if instance_pk is not None:
+            queryset = queryset.exclude(pk=instance_pk)
+
+        while queryset.filter(name=slug_candidate).exists():
+            suffix_text = f"-{suffix}"
+            slug_candidate = f"{base_slug[: 50 - len(suffix_text)]}{suffix_text}"
+            suffix += 1
+
+        return slug_candidate
+
+    def clean(self) -> None:
+        """Провалидировать безопасные изменения тарифа.
+
+        Args:
+            None: Метод использует состояние текущего экземпляра.
+
+        Returns:
+            None: Метод ничего не возвращает.
+
+        Raises:
+            ValidationError: Если попытаться переименовать системный тариф
+                или сохранить тариф без срока/кода.
+        """
+        super().clean()
+        if not self.name:
+            generated_name = self.generate_unique_code_from_display_name(
+                self.display_name, self.pk
+            )
+            if not generated_name:
+                raise ValidationError(
+                    {
+                        "name": (
+                            "Укажите «Название тарифа на сайте», чтобы код тарифа "
+                            "сгенерировался автоматически, или заполните код вручную."
+                        )
+                    }
+                )
+            self.name = generated_name
+
+        if self.duration_days <= 0:
+            raise ValidationError(
+                {"duration_days": "Срок действия тарифа должен быть больше нуля."}
+            )
+
+        if not self.pk:
+            return
+
+        original = type(self).objects.filter(pk=self.pk).only("name").first()
+        if original is None:
+            return
+
+        # Системные коды участвуют в ключевой бизнес-логике и не должны
+        # изменяться после создания, иначе можно сломать отображение и проверки.
+        if original.name in self.SYSTEM_TIER_CODES and self.name != original.name:
+            raise ValidationError(
+                {
+                    "name": (
+                        "Нельзя изменять код системного тарифа. "
+                        "Меняйте только «Название тарифа на сайте»."
+                    )
+                }
+            )
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Сохранить тариф с полной валидацией.
+
+        Args:
+            *args: Позиционные аргументы Django ORM.
+            **kwargs: Именованные аргументы Django ORM.
+
+        Returns:
+            None: Метод сохраняет объект в базе данных.
+
+        Raises:
+            ValidationError: Если данные тарифа нарушают правила безопасности.
+        """
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        """Удалить тариф, если это разрешено правилами безопасности.
+
+        Args:
+            *args: Позиционные аргументы Django ORM.
+            **kwargs: Именованные аргументы Django ORM.
+
+        Returns:
+            None: Метод удаляет объект из базы данных.
+
+        Raises:
+            ValidationError: Если попытаться удалить системный тариф.
+        """
+        if self.is_system_tier:
+            raise ValidationError(
+                "Нельзя удалять системные тарифы free, silver, gold и diamond."
+            )
+        return cast(tuple[int, dict[str, int]], super().delete(*args, **kwargs))
+
+    def get_name_display(self) -> str:
+        """Вернуть отображаемое название тарифа.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            str: Название тарифа для интерфейса и уведомлений.
+        """
+        display_name = str(self.display_name)
+        if display_name:
+            return display_name
+        tier_name = str(self.name)
+        return self.SYSTEM_NAME_LABELS.get(tier_name, tier_name)
+
+    def __str__(self) -> str:
         return self.get_name_display()
 
 
 class UserSubscription(models.Model):
-    """User's active subscription."""
+    """Модель активной подписки пользователя.
+
+    Args:
+        models.Model: Базовый класс Django-модели.
+
+    Returns:
+        None: Экземпляр модели используется Django ORM.
+    """
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -144,9 +497,18 @@ class UserSubscription(models.Model):
     # Persistence
     # ------------------------------------------------------------------
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Сохранить подписку пользователя.
+
+        Args:
+            *args: Позиционные аргументы Django ORM.
+            **kwargs: Именованные аргументы Django ORM.
+
+        Returns:
+            None: Метод сохраняет объект в базе данных.
+        """
         if not self.end_date:
-            self.end_date = self.start_date + relativedelta(months=1)
+            self.end_date = self.tier.apply_duration(self.start_date)
         super().save(*args, **kwargs)
 
     # ------------------------------------------------------------------
@@ -165,7 +527,14 @@ class UserSubscription(models.Model):
         return bool(self.is_active and self.end_date > timezone.now())
 
     def can_register_for_tournament(self) -> bool:
-        """Check if user has registration slots left."""
+        """Проверить, остались ли у пользователя слоты регистрации.
+
+        Args:
+            None: Метод использует поля текущего экземпляра.
+
+        Returns:
+            bool: ``True``, если регистрация на турнир доступна.
+        """
         if self.tier.is_unlimited:
             return True
         if self.tier.max_tournaments == 0:
@@ -193,7 +562,14 @@ class UserSubscription(models.Model):
 
 
 class RegionalTierPrice(models.Model):
-    """Regional price override for a subscription tier."""
+    """Региональная цена для тарифа подписки.
+
+    Args:
+        models.Model: Базовый класс Django-модели.
+
+    Returns:
+        None: Экземпляр модели используется Django ORM.
+    """
 
     tier = models.ForeignKey(
         SubscriptionTier,
@@ -224,5 +600,5 @@ class RegionalTierPrice(models.Model):
         verbose_name = "Региональная цена"
         verbose_name_plural = "Региональные цены"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.tier} - {self.name}: {self.price}"

@@ -1,6 +1,5 @@
 import logging
 
-from dateutil.relativedelta import relativedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
@@ -59,8 +58,12 @@ def pricing_page(request):
         except Exception:
             pass
 
-    # Fetch all tiers
-    tiers = list(SubscriptionTier.objects.all().order_by("price"))
+    # Показываем на странице только тарифы, отмеченные для публикации.
+    tiers = list(
+        SubscriptionTier.objects.filter(is_visible=True).order_by(
+            "sort_order", "price", "id"
+        )
+    )
 
     # If user is NOT from Moscow, try to find regional prices
     # We assume 'moscow' is the default price (stored in SubscriptionTier.price)
@@ -150,12 +153,13 @@ def buy_subscription(request, tier_id):
     now = timezone.now()
     if created:
         sub.start_date = now
-        sub.end_date = now + relativedelta(months=1)
+        sub.end_date = tier.apply_duration(now)
         sub.tournaments_registered_count = 0
     else:
-        # Продление: прибавить месяц от даты окончания (или от сейчас, если истекла)
+        # Продление: прибавляем срок выбранного тарифа от даты окончания
+        # (или от текущего момента, если подписка уже истекла).
         base = sub.end_date if sub.end_date and sub.end_date > now else now
-        sub.end_date = base + relativedelta(months=1)
+        sub.end_date = tier.apply_duration(base)
     city = getattr(request.user, "player", None) and getattr(
         request.user.player, "city", None
     )

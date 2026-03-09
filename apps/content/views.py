@@ -144,7 +144,11 @@ def contacts(request):
     items = contact_page.contact_items.order_by("order", "id")
 
     # Цены на подписки (Москва и регионы)
-    tiers = list(SubscriptionTier.objects.all().order_by("price"))
+    tiers = list(
+        SubscriptionTier.objects.filter(is_visible=True).order_by(
+            "sort_order", "price", "id"
+        )
+    )
     regional_by_tier = {
         rp.tier_id: rp for rp in RegionalTierPrice.objects.select_related("tier")
     }

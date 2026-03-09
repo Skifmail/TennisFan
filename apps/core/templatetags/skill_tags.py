@@ -17,6 +17,6 @@ def skill_with_ntrp_filter(code: str) -> str:
         code (str): Код уровня силы (значение из ``SkillLevel``).
 
     Returns:
-        str: Строка вида ``\"Новичок (1.5–2.5)\"`` или исходное название уровня.
+        str: Строка вида ``\"Новичок (1.5–2.4)\"`` или исходное название уровня.
     """
     return skill_with_ntrp(code)

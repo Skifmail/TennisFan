@@ -136,13 +136,13 @@ def payment_preview(request):
         amount = Decimal("1") if first_time_one_ruble else effective_price
         details = [
             ("Тариф", tier.get_name_display()),
-            ("Срок действия", "1 месяц"),
+            ("Срок действия", tier.duration_label),
         ]
         if first_time_one_ruble:
             details.append(("Акция", "Первая подписка за 1 ₽"))
         context = {
             "title": f"Подписка: {tier.get_name_display()}",
-            "description": "Ежемесячная подписка на сервис TennisFan",
+            "description": "Подписка на сервис TennisFan",
             "amount": amount,
             "amount_value": f"{amount:.2f}",
             "item_id": tier.id,
@@ -470,8 +470,6 @@ def payment_success(request):
         except (TypeError, ValueError):
             tier_id = None
         if tier_id is not None:
-            from dateutil.relativedelta import relativedelta
-
             tier = SubscriptionTier.objects.filter(pk=tier_id).first()
             if tier:
                 from apps.subscriptions.models import UserSubscription
@@ -487,11 +485,11 @@ def payment_success(request):
                 now = timezone.now()
                 if created:
                     sub.start_date = now
-                    sub.end_date = now + relativedelta(months=1)
+                    sub.end_date = tier.apply_duration(now)
                     sub.tournaments_registered_count = 0
                 else:
                     base = sub.end_date if sub.end_date and sub.end_date > now else now
-                    sub.end_date = base + relativedelta(months=1)
+                    sub.end_date = tier.apply_duration(base)
                 from apps.subscriptions.utils import normalize_city_for_pricing
 
                 city = getattr(request.user, "player", None) and getattr(

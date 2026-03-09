@@ -21,25 +21,29 @@
     <div class="pricing-grid">
         {% for tier in tiers %}
         <div
-            class="pricing-card {% if tier.name == 'free' %}pricing-card-free{% endif %} {% if tier.name == 'diamond' %}pricing-card-diamond{% endif %} {% if current_tier_id == tier.id %}pricing-card-current{% endif %}">
-            {% if tier.name == 'diamond' %}
-            <div class="pricing-card__badge {% if tier.show_promo_price %}pricing-card__badge--left{% endif %}">Популярный</div>
-            {% endif %}
-            {% if tier.show_promo_price %}
-            <div class="pricing-card__badge pricing-card__badge--promo">Акция</div>
-            {% endif %}
-
+            class="pricing-card {% if tier.card_theme != 'none' %}pricing-card--{{ tier.card_theme }}{% endif %} {% if tier.is_free_tier %}pricing-card-free{% endif %} {% if current_tier_id == tier.id %}pricing-card-current{% endif %}">
             <h3 class="pricing-card__title">{{ tier.get_name_display }}</h3>
+
+            {% if tier.is_popular or tier.show_promo_price %}
+            <div class="pricing-card__badges">
+                {% if tier.is_popular %}
+                <div class="pricing-card__badge pricing-card__badge--popular">Популярный</div>
+                {% endif %}
+                {% if tier.show_promo_price %}
+                <div class="pricing-card__badge pricing-card__badge--promo">Акция</div>
+                {% endif %}
+            </div>
+            {% endif %}
 
             <div class="pricing-card__price {% if tier.show_promo_price %}pricing-card__price--promo{% endif %}">
                 {% if tier.effective_price == 0 %}
                 <span class="price-amount">0 ₽</span>
-                <span class="price-period">/ месяц</span>
+                <span class="price-period">на {{ tier.duration_label }}</span>
                 {% else %}
                 {% if tier.show_first_one_ruble %}
                 <span class="price-amount price-amount--current">1 ₽</span>
                 <span class="price-period">первый раз</span>
-                <span class="price-then">далее {{ tier.effective_price|intcomma|cut:".00" }} ₽/мес</span>
+                <span class="price-then">далее {{ tier.effective_price|intcomma|cut:".00" }} ₽ на {{ tier.duration_label }}</span>
                 {% elif tier.show_promo_price %}
                 <span class="price-amount price-amount--old" aria-hidden="true">{{ tier.effective_original_price|intcomma|cut:".00" }} ₽</span>
                 <span class="price-amount price-amount--current">{{ tier.effective_price|intcomma|cut:".00" }} ₽</span>
@@ -50,7 +54,7 @@
                 <span class="price-amount">{{ tier.effective_price|intcomma|cut:".00" }} ₽</span>
                 {% endif %}
                 {% if not tier.show_first_one_ruble %}
-                <span class="price-period">/ месяц</span>
+                <span class="price-period">на {{ tier.duration_label }}</span>
                 {% endif %}
                 {% if tier.first_subscription_one_ruble %}
                 <div class="price-first-ruble-note">Первая подписка за 1 ₽</div>
@@ -183,7 +187,7 @@
                 {# Для бесплатного тарифа отдельная кнопка не нужна #}
                 {% else %}
                 <a href="{% url 'payment_preview' %}?type=subscription&id={{ tier.id }}"
-                    class="btn {% if tier.name == 'diamond' %}btn-primary{% else %}btn-outline{% endif %} pricing-card__btn">Купить
+                    class="btn {% if tier.card_theme != 'none' %}btn-primary{% else %}btn-outline{% endif %} pricing-card__btn">Купить
                     подписку</a>
                 {% endif %}
             </div>
@@ -197,8 +201,8 @@
             <div class="pricing-faq__item">
                 <h3 class="pricing-faq__question">Как работает подписка?</h3>
                 <p class="pricing-faq__answer">
-                    Подписка действует в течение месяца с момента покупки. После окончания срока действия подписка
-                    автоматически продлевается, если у вас есть активная оплата.
+                    Подписка действует в течение срока, указанного в выбранном тарифе. После окончания срока действия
+                    подписка автоматически продлевается только после новой оплаты.
                 </p>
             </div>
             <div class="pricing-faq__item">

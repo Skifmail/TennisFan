@@ -6151,6 +6151,20 @@ select.form-control {
     gap: var(--spacing-sm);
 }
 
+.tournament-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    align-items: flex-start;
+}
+
+.tournament-card-badge-slot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    min-width: 0;
+}
+
 .tournament-action {
     align-self: flex-start;
     margin-top: auto;
@@ -6263,6 +6277,82 @@ select.form-control {
         width: 100%;
     }
 
+    .tournament-card-badges {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-areas:
+            "variant format city"
+            "level gender duration"
+            "capacity capacity capacity";
+        gap: 6px;
+        align-items: stretch;
+    }
+
+    .tournament-card-badges--with-court {
+        grid-template-areas:
+            "variant format city"
+            "level gender duration"
+            "court court capacity";
+    }
+
+    .tournament-card-badge-slot {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .tournament-card-badge-slot--variant {
+        grid-area: variant;
+    }
+
+    .tournament-card-badge-slot--format {
+        grid-area: format;
+    }
+
+    .tournament-card-badge-slot--city {
+        grid-area: city;
+    }
+
+    .tournament-card-badge-slot--court {
+        grid-area: court;
+    }
+
+    .tournament-card-badge-slot--level {
+        grid-area: level;
+        flex-direction: column;
+    }
+
+    .tournament-card-badge-slot--gender {
+        grid-area: gender;
+    }
+
+    .tournament-card-badge-slot--duration {
+        grid-area: duration;
+    }
+
+    .tournament-card-badge-slot--capacity {
+        grid-area: capacity;
+    }
+
+    .tournament-card-badge-slot .badge {
+        width: 100%;
+        min-width: 0;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.2;
+        padding: 6px 8px;
+        font-size: 11px;
+    }
+
+    .tournament-card-badge-slot--court .badge,
+    .tournament-card-badge-slot--capacity .badge,
+    .tournament-card-badge-slot--level .badge {
+        justify-content: flex-start;
+        text-align: left;
+    }
+
     .tournament-action {
         width: 100%;
         margin-top: var(--spacing-sm);
@@ -6282,6 +6372,24 @@ select.form-control {
     .tournament-img {
         width: 100px;
         height: 100px;
+    }
+
+    .tournament-card-badges {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-areas:
+            "variant format"
+            "city level"
+            "gender duration"
+            "capacity capacity";
+    }
+
+    .tournament-card-badges--with-court {
+        grid-template-areas:
+            "variant format"
+            "city level"
+            "gender duration"
+            "court court"
+            "capacity capacity";
     }
 
     .tournament-participants-grid {

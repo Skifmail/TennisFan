@@ -6346,13 +6346,6 @@ select.form-control {
         font-size: 11px;
     }
 
-    .tournament-card-badge-slot--court .badge,
-    .tournament-card-badge-slot--capacity .badge,
-    .tournament-card-badge-slot--level .badge {
-        justify-content: flex-start;
-        text-align: left;
-    }
-
     .tournament-action {
         width: 100%;
         margin-top: var(--spacing-sm);

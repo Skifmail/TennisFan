@@ -2,7 +2,9 @@
 {% load skill_tags %}
 {% load static %}
 <div class="card tournament-card" data-url="{% url 'tournament_detail' slug=tournament.slug %}" onclick="window.location.href=this.dataset.url;">
-    <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}"></span>
+    <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}">
+        {% if tournament.status == 'upcoming' %}Идет набор{% elif tournament.status == 'active' %}В ИГРЕ{% elif tournament.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
+    </span>
     <div class="card-body tournament-card-body">
         {% if tournament.image %}
         <div class="tournament-card-photos">

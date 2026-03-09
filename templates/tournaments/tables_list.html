@@ -28,7 +28,9 @@
                     {% for ac in t.allowed_categories.all %}
                     <span class="player-category">{{ ac.category|skill_with_ntrp }}</span>
                     {% endfor %}
-                    <span class="tournament-status-badge tournament-status-badge--{{ t.status }} tournament-table-badges__status" title="{{ t.get_status_display }}"></span>
+                    <span class="tournament-status-badge tournament-status-badge--{{ t.status }} tournament-table-badges__status" title="{{ t.get_status_display }}">
+                        {% if t.status == 'upcoming' %}Идет набор{% elif t.status == 'active' %}В ИГРЕ{% elif t.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
+                    </span>
                 </div>
                 <h2 class="tournament-table-title">{{ t.name }}</h2>
                 <p class="text-secondary mb-3">{{ t.city }} • {{ t.start_date|date:"d.m.Y" }}{% if t.end_date %} — {{ t.end_date|date:"d.m.Y" }}{% endif %}</p>

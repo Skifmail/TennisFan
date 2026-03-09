@@ -13,7 +13,9 @@
     <div class="grid grid-3">
         {% for tournament in tournaments %}
         <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card tournament-preview-card">
-            <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}"></span>
+            <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}">
+                {% if tournament.status == 'upcoming' %}Идет набор{% elif tournament.status == 'active' %}В ИГРЕ{% elif tournament.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
+            </span>
             {% if tournament.image %}
             <img src="{{ tournament.image.url }}" alt="" class="card-image">
             {% else %}

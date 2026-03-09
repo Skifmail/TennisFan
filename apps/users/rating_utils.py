@@ -44,11 +44,11 @@ def map_ntrp_to_skill_level(level: Decimal) -> str:
     """Map strength decimal level to SkillLevel category.
 
     Ranges:
-        1.5–2.5 → Новичок
-        2.6–3.5 → Любитель
-        3.6–4.5 → Опытный
-        4.6–5.5 → Мастерс
-        5.6–7.0 → Профессионал
+        1.5–2.4 → Новичок
+        2.5–3.4 → Любитель
+        3.5–4.4 → Опытный
+        4.5–5.4 → Мастерс
+        5.5–7.0 → Профессионал
     """
 
     def _choice_value(x) -> str:
@@ -57,13 +57,13 @@ def map_ntrp_to_skill_level(level: Decimal) -> str:
     # Clamp level to valid range [1.5, 7.0]
     level = max(Decimal("1.5"), min(Decimal("7.0"), level))
 
-    if level <= Decimal("2.5"):
+    if level <= Decimal("2.4"):
         return _choice_value(SkillLevel.NOVICE)
-    if level <= Decimal("3.5"):
+    if level <= Decimal("3.4"):
         return _choice_value(SkillLevel.AMATEUR)
-    if level <= Decimal("4.5"):
+    if level <= Decimal("4.4"):
         return _choice_value(SkillLevel.EXPERIENCED)
-    if level <= Decimal("5.5"):
+    if level <= Decimal("5.4"):
         return _choice_value(SkillLevel.ADVANCED)
     return _choice_value(SkillLevel.PROFESSIONAL)
 

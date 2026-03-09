@@ -903,6 +903,39 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         });
     }
 
+    function getFanBarVisualConfig(matchCount) {
+        if (matchCount <= 1) {
+            return {
+                barPercentage: 0.9,
+                categoryPercentage: 0.42,
+                maxBarThickness: 60,
+                borderRadius: 22
+            };
+        }
+        if (matchCount === 2) {
+            return {
+                barPercentage: 0.82,
+                categoryPercentage: 0.5,
+                maxBarThickness: 52,
+                borderRadius: 20
+            };
+        }
+        if (matchCount <= 4) {
+            return {
+                barPercentage: 0.76,
+                categoryPercentage: 0.66,
+                maxBarThickness: 38,
+                borderRadius: 18
+            };
+        }
+        return {
+            barPercentage: 0.72,
+            categoryPercentage: 0.8,
+            maxBarThickness: 26,
+            borderRadius: 999
+        };
+    }
+
     var chartPalettes = {
         matches: {
             lineStart: 'rgba(87, 225, 255, 1)',
@@ -1069,6 +1102,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         var fanPointsData = fanMatchData.map(function(d) { return d.points; });
         var barColors = buildFanBarColors(fanMatchData);
         var barBorders = buildFanBarBorders(fanMatchData);
+        var fanBarVisualConfig = getFanBarVisualConfig(fanMatchData.length);
 
         if (charts.points && document.getElementById('chartProfilePoints')) {
             charts.points.$fanMatchData = fanMatchData;
@@ -1076,10 +1110,16 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
             charts.points.data.datasets[0].data = fanPointsData;
             charts.points.data.datasets[0].backgroundColor = barColors;
             charts.points.data.datasets[0].borderColor = barBorders;
+            charts.points.data.datasets[0].barPercentage = fanBarVisualConfig.barPercentage;
+            charts.points.data.datasets[0].categoryPercentage = fanBarVisualConfig.categoryPercentage;
+            charts.points.data.datasets[0].maxBarThickness = fanBarVisualConfig.maxBarThickness;
+            charts.points.data.datasets[0].borderRadius = fanBarVisualConfig.borderRadius;
             // Ширина контейнера для прокрутки: узкие столбцы
             var fanWrap = document.getElementById('fanChartInnerWrap');
             if (fanWrap) {
-                fanWrap.style.minWidth = Math.max(fanMatchData.length * 18, 180) + 'px';
+                fanWrap.style.minWidth = fanMatchData.length <= 2
+                    ? '220px'
+                    : Math.max(fanMatchData.length * 18, 180) + 'px';
                 fanWrap.style.cursor = fanMatchData.some(function(d) { return d.match_id; }) ? 'pointer' : 'default';
                 charts.points.resize();
             }
@@ -1166,10 +1206,15 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         var pts0 = fanMatchData0.map(function(d) { return d.points; });
         var barColors0 = buildFanBarColors(fanMatchData0);
         var barBorders0 = buildFanBarBorders(fanMatchData0);
+        var fanBarVisualConfig0 = getFanBarVisualConfig(fanMatchData0.length);
 
         var chartOpts = buildChartOptions('Рейтинг', '');
         chartOpts.datasets = chartOpts.datasets || {};
-        chartOpts.datasets.bar = { barPercentage: 0.72, categoryPercentage: 0.8 };
+        chartOpts.datasets.bar = {
+            barPercentage: fanBarVisualConfig0.barPercentage,
+            categoryPercentage: fanBarVisualConfig0.categoryPercentage,
+            maxBarThickness: fanBarVisualConfig0.maxBarThickness
+        };
         chartOpts.plugins.tooltip = {
             displayColors: false,
             backgroundColor: 'rgba(3, 17, 13, 0.96)',
@@ -1209,7 +1254,9 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
 
         var fanWrap0 = document.getElementById('fanChartInnerWrap');
         if (fanWrap0) {
-            fanWrap0.style.minWidth = Math.max(fanMatchData0.length * 18, 180) + 'px';
+            fanWrap0.style.minWidth = fanMatchData0.length <= 2
+                ? '220px'
+                : Math.max(fanMatchData0.length * 18, 180) + 'px';
             fanWrap0.style.cursor = fanMatchData0.some(function(d) { return d.match_id; }) ? 'pointer' : 'default';
         }
 
@@ -1223,10 +1270,11 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                     backgroundColor: barColors0,
                     borderColor: barBorders0,
                     borderWidth: 1,
-                    borderRadius: 999,
+                    borderRadius: fanBarVisualConfig0.borderRadius,
                     borderSkipped: false,
-                    barPercentage: 0.72,
-                    categoryPercentage: 0.8
+                    barPercentage: fanBarVisualConfig0.barPercentage,
+                    categoryPercentage: fanBarVisualConfig0.categoryPercentage,
+                    maxBarThickness: fanBarVisualConfig0.maxBarThickness
                 }]
             }
         });

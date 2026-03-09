@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static skill_tags %}
 
 {% block title %}Мои заявки на спарринг{% endblock %}
 
@@ -67,11 +67,11 @@
                             <p>
                                 👤 Возраст партнёра:
                                 {% if req.desired_partner_age_min and req.desired_partner_age_max %}
-                                    {{ req.desired_partner_age_min }}-{{ req.desired_partner_age_max }} лет
+                                    {{ req.desired_partner_age_min }}-{{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
                                 {% elif req.desired_partner_age_min %}
-                                    от {{ req.desired_partner_age_min }} лет
+                                    от {{ req.desired_partner_age_min }} {{ req.desired_partner_age_min|years_suffix }}
                                 {% elif req.desired_partner_age_max %}
-                                    до {{ req.desired_partner_age_max }} лет
+                                    до {{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
                                 {% endif %}
                             </p>
                             {% endif %}

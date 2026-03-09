@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static skill_tags %}
 
 {% block title %}{{ player }} - Профиль{% endblock %}
 
@@ -35,7 +35,7 @@
                     {% endif %}
                     <p><strong>Город:</strong> {{ player.city }}</p>
                     <p><strong>Дата рождения:</strong> {{ player.birth_date|date:"d.m.Y" }}</p>
-                    {% if player.calculated_age %}<p><strong>Возраст:</strong> {{ player.calculated_age }} лет</p>{% endif %}
+                    {% if player.calculated_age %}<p><strong>Возраст:</strong> {{ player.calculated_age }} {{ player.calculated_age|years_suffix }}</p>{% endif %}
                     <p><strong>Пол:</strong> {{ player.get_gender_display }}</p>
                     <p><strong>Ведущая рука:</strong> {{ player.get_forehand_display }}</p>
                 </div>
@@ -100,20 +100,6 @@
                 </div>
                 {% endif %}
 
-                {% include 'includes/player_skills_block.html' with player_skills_data=player_skills_data is_owner=is_profile_owner only %}
-
-                {% if player.bio %}
-                <p class="profile-info__bio text-secondary">{{ player.bio }}</p>
-                {% endif %}
-
-                {% if request.user != player.user %}
-                    {% if player.telegram_url or player.whatsapp_url or player.max_url %}
-                    <div class="profile-info__messengers">
-                        {% include 'includes/messenger_links.html' with obj=player %}
-                    </div>
-                    {% endif %}
-                {% endif %}
-
                 {% if request.user == player.user %}
                 {% if player.user.subscription %}
                 <div class="subscription-info profile-info__subscription">
@@ -162,12 +148,38 @@
                     </div>
                 </div>
 
-
                 {% else %}
                 <div class="alert alert-warning profile-info__subscription-alert">
                     У вас нет активной платной подписки. <a href="{% url 'pricing' %}">Купить</a>
                 </div>
                 {% endif %}
+                {% endif %}
+
+                {% if can_view_profile_stats %}
+                {% include 'includes/player_skills_block.html' with player_skills_data=player_skills_data is_owner=is_profile_owner only %}
+                {% elif is_profile_owner %}
+                <div class="profile-stats-placeholder profile-stats-placeholder--inline">
+                    <h3 class="profile-stats-placeholder__title">Статистика скрыта</h3>
+                    <p class="profile-stats-placeholder__text">
+                        Графики, сильные стороны и рекомендации доступны только при активной подписке.
+                    </p>
+                    <a href="{% url 'pricing' %}" class="profile-stats-placeholder__link">Выбрать тариф</a>
+                </div>
+                {% endif %}
+
+                {% if player.bio %}
+                <p class="profile-info__bio text-secondary">{{ player.bio }}</p>
+                {% endif %}
+
+                {% if request.user != player.user %}
+                    {% if player.telegram_url or player.whatsapp_url or player.max_url %}
+                    <div class="profile-info__messengers">
+                        {% include 'includes/messenger_links.html' with obj=player %}
+                    </div>
+                    {% endif %}
+                {% endif %}
+
+                {% if request.user == player.user %}
                 <div class="profile-info__telegram">
                     <h4 class="profile-info__telegram-title">Telegram-бот</h4>
                     <p class="text-secondary profile-info__telegram-text">
@@ -219,35 +231,64 @@
             </div>
 
             <!-- Right: progress charts -->
+            {% if can_view_profile_stats %}
             <div class="profile-charts">
                 <div class="profile-charts__header">
-                    <h3 class="profile-charts__title">Прогресс</h3>
-                    <div class="profile-charts__filters">
-                        <select id="profileProgressYear" class="profile-charts__filter-select" aria-label="Год">
-                            <option value="">Все годы</option>
-                        </select>
-                        <select id="profileProgressMonth" class="profile-charts__filter-select" aria-label="Месяц">
-                            <option value="">Все месяцы</option>
-                            <option value="1">Январь</option>
-                            <option value="2">Февраль</option>
-                            <option value="3">Март</option>
-                            <option value="4">Апрель</option>
-                            <option value="5">Май</option>
-                            <option value="6">Июнь</option>
-                            <option value="7">Июль</option>
-                            <option value="8">Август</option>
-                            <option value="9">Сентябрь</option>
-                            <option value="10">Октябрь</option>
-                            <option value="11">Ноябрь</option>
-                            <option value="12">Декабрь</option>
-                        </select>
-                        <select id="profileProgressSeason" class="profile-charts__filter-select" aria-label="Сезон">
-                            <option value="">Все сезоны</option>
-                        </select>
+                    <div class="profile-charts__title-wrap">
+                        <h3 class="profile-charts__title">Прогресс</h3>
+                        <p class="profile-charts__subtitle">Живая аналитика формы, стабильности и темпа вашего сезона.</p>
+                    </div>
+                    <div class="profile-charts__controls">
+                        <div class="profile-charts__pill-groups">
+                            <div class="profile-charts__pill-group">
+                                <span class="profile-charts__pill-label">Год</span>
+                                <div class="profile-charts__pill-track" id="profileProgressYearPills"></div>
+                            </div>
+                            <div class="profile-charts__pill-group">
+                                <span class="profile-charts__pill-label">Месяц</span>
+                                <div class="profile-charts__pill-track" id="profileProgressMonthPills"></div>
+                            </div>
+                            <div class="profile-charts__pill-group">
+                                <span class="profile-charts__pill-label">Сезон</span>
+                                <div class="profile-charts__pill-track" id="profileProgressSeasonPills"></div>
+                            </div>
+                        </div>
+                        <div class="profile-charts__filters profile-charts__selects">
+                            <select id="profileProgressYear" class="profile-charts__filter-select" aria-label="Год">
+                                <option value="">Все годы</option>
+                            </select>
+                            <select id="profileProgressMonth" class="profile-charts__filter-select" aria-label="Месяц">
+                                <option value="">Все месяцы</option>
+                                <option value="1">Январь</option>
+                                <option value="2">Февраль</option>
+                                <option value="3">Март</option>
+                                <option value="4">Апрель</option>
+                                <option value="5">Май</option>
+                                <option value="6">Июнь</option>
+                                <option value="7">Июль</option>
+                                <option value="8">Август</option>
+                                <option value="9">Сентябрь</option>
+                                <option value="10">Октябрь</option>
+                                <option value="11">Ноябрь</option>
+                                <option value="12">Декабрь</option>
+                            </select>
+                            <select id="profileProgressSeason" class="profile-charts__filter-select" aria-label="Сезон">
+                                <option value="">Все сезоны</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="profile-chart profile-chart--points">
-                    <div class="profile-chart__label">Рейтинг</div>
+                    <div class="profile-chart__head">
+                        <div class="profile-chart__title-wrap">
+                            <span class="profile-chart__eyebrow">Пульс рейтинга</span>
+                            <div class="profile-chart__label">FAN-рейтинг</div>
+                        </div>
+                        <div class="profile-chart__metric">
+                            <span class="profile-chart__metric-value" id="chartProfilePointsValue">--</span>
+                            <span class="profile-chart__metric-trend" id="chartProfilePointsTrend">Нет данных</span>
+                        </div>
+                    </div>
                     <div class="profile-chart__canvas-scroll" id="fanChartScrollWrap">
                         <div class="profile-chart__canvas-wrap profile-chart__canvas-wrap--fan" id="fanChartInnerWrap">
                             <canvas id="chartProfilePoints" aria-label="График рейтинга"></canvas>
@@ -255,24 +296,62 @@
                     </div>
                 </div>
                 <div class="profile-chart profile-chart--matches">
-                    <div class="profile-chart__label">Матчей</div>
+                    <div class="profile-chart__head">
+                        <div class="profile-chart__title-wrap">
+                            <span class="profile-chart__eyebrow">Игровая активность</span>
+                            <div class="profile-chart__label">Матчей</div>
+                        </div>
+                        <div class="profile-chart__metric">
+                            <span class="profile-chart__metric-value" id="chartProfileMatchesValue">--</span>
+                            <span class="profile-chart__metric-trend" id="chartProfileMatchesTrend">Нет данных</span>
+                        </div>
+                    </div>
                     <div class="profile-chart__canvas-wrap">
                         <canvas id="chartProfileMatches" aria-label="График матчей"></canvas>
                     </div>
                 </div>
                 <div class="profile-chart profile-chart--winrate">
-                    <div class="profile-chart__label">% побед</div>
+                    <div class="profile-chart__head">
+                        <div class="profile-chart__title-wrap">
+                            <span class="profile-chart__eyebrow">Стабильность</span>
+                            <div class="profile-chart__label">% побед</div>
+                        </div>
+                        <div class="profile-chart__metric">
+                            <span class="profile-chart__metric-value" id="chartProfileWinRateValue">--</span>
+                            <span class="profile-chart__metric-trend" id="chartProfileWinRateTrend">Нет данных</span>
+                        </div>
+                    </div>
                     <div class="profile-chart__canvas-wrap">
                         <canvas id="chartProfileWinRate" aria-label="График процента побед"></canvas>
                     </div>
                 </div>
                 <div class="profile-chart profile-chart--season">
-                    <div class="profile-chart__label">Очки сезона ({{ current_season_display }})</div>
+                    <div class="profile-chart__head">
+                        <div class="profile-chart__title-wrap">
+                            <span class="profile-chart__eyebrow">Сезонная гонка</span>
+                            <div class="profile-chart__label">Очки сезона ({{ current_season_display }})</div>
+                        </div>
+                        <div class="profile-chart__metric">
+                            <span class="profile-chart__metric-value" id="chartProfileSeasonValue">--</span>
+                            <span class="profile-chart__metric-trend" id="chartProfileSeasonTrend">Нет данных</span>
+                        </div>
+                    </div>
                     <div class="profile-chart__canvas-wrap">
                         <canvas id="chartProfileSeasonPoints" aria-label="График сезонных очков"></canvas>
                     </div>
                 </div>
             </div>
+            {% elif is_profile_owner %}
+            <div class="profile-charts">
+                <div class="profile-stats-placeholder profile-stats-placeholder--charts">
+                    <h3 class="profile-stats-placeholder__title">Прогресс недоступен</h3>
+                    <p class="profile-stats-placeholder__text">
+                        Для просмотра графиков прогресса нужна активная подписка.
+                    </p>
+                    <a href="{% url 'pricing' %}" class="profile-stats-placeholder__link">Открыть тарифы</a>
+                </div>
+            </div>
+            {% endif %}
         </div>
         </div>
     </div>
@@ -418,14 +497,14 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
     var statsTable = document.querySelector('.profile-stats-table');
     var charts = document.querySelector('.profile-charts');
     var profileInfo = document.querySelector('.profile-info');
-    
+
     if (statsTable && charts && profileInfo) {
         function alignCharts() {
             // Получаем позицию таблицы статистики относительно .profile-info
             var profileInfoTop = profileInfo.getBoundingClientRect().top;
             var statsTop = statsTable.getBoundingClientRect().top;
             var offset = statsTop - profileInfoTop;
-            
+
             // Устанавливаем отступ для диаграмм
             if (offset > 0) {
                 charts.style.marginTop = offset + 'px';
@@ -433,23 +512,24 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                 charts.style.marginTop = '0';
             }
         }
-        
+
         // Выравниваем при загрузке
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', alignCharts);
         } else {
             alignCharts();
         }
-        
+
         // Выравниваем при изменении размера окна
         window.addEventListener('resize', alignCharts);
-        
+
         // Выравниваем после небольшой задержки (на случай асинхронной загрузки контента)
         setTimeout(alignCharts, 100);
         setTimeout(alignCharts, 500);
     }
 })();
 </script>
+{% if can_view_profile_stats %}
 {{ profile_progress_data|json_script:"profile-progress-data" }}
 {{ season_points_data|json_script:"season-points-data" }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -459,12 +539,28 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
     if (!el || !el.textContent) return;
     var progressData = JSON.parse(el.textContent);
     if (!progressData.length) return;
+    var chartsRoot = document.querySelector('.profile-charts');
 
     function formatDateLabel(iso) {
         var parts = iso.split('-');
         if (parts.length === 3) return parts[2] + '.' + parts[1] + '.' + parts[0];
         return iso;
     }
+
+    var monthNames = {
+        1: 'Январь',
+        2: 'Февраль',
+        3: 'Март',
+        4: 'Апрель',
+        5: 'Май',
+        6: 'Июнь',
+        7: 'Июль',
+        8: 'Август',
+        9: 'Сентябрь',
+        10: 'Октябрь',
+        11: 'Ноябрь',
+        12: 'Декабрь'
+    };
 
     // Получаем список годов
     var years = [];
@@ -477,6 +573,21 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
     if (yearSelect) {
         years.forEach(function(y) { yearSelect.appendChild(new Option(y, y)); });
     }
+
+    var availableMonthsMap = {};
+    progressData.forEach(function(d) {
+        if (!d.date) {
+            return;
+        }
+        var parts = d.date.split('-');
+        if (parts.length !== 3) {
+            return;
+        }
+        var monthNumber = parseInt(parts[1], 10);
+        if (monthNumber >= 1 && monthNumber <= 12) {
+            availableMonthsMap[String(monthNumber)] = monthNames[monthNumber];
+        }
+    });
 
     // Получаем список сезонов из данных
     function getSeasonFromDate(dateStr) {
@@ -501,7 +612,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
             seasonsMap[season.key] = season;
         }
     });
-    
+
     // Добавляем сезоны из сезонных очков
     var seasonPointsEl = document.getElementById('season-points-data');
     var seasonPointsData = [];
@@ -512,6 +623,17 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                 var season = getSeasonFromDate(d.date);
                 if (season && !seasonsMap[season.key]) {
                     seasonsMap[season.key] = season;
+                }
+                if (!d.date) {
+                    return;
+                }
+                var parts = d.date.split('-');
+                if (parts.length !== 3) {
+                    return;
+                }
+                var monthNumber = parseInt(parts[1], 10);
+                if (monthNumber >= 1 && monthNumber <= 12) {
+                    availableMonthsMap[String(monthNumber)] = monthNames[monthNumber];
                 }
             });
         } catch (e) {
@@ -530,6 +652,71 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
             var label = s.name + ' ' + s.year;
             seasonSelect.appendChild(new Option(label, s.key));
         });
+    }
+
+    var monthSelect = document.getElementById('profileProgressMonth');
+    if (monthSelect) {
+        monthSelect.innerHTML = '';
+        monthSelect.appendChild(new Option('Все месяцы', ''));
+        Object.keys(availableMonthsMap)
+            .sort(function(a, b) { return parseInt(a, 10) - parseInt(b, 10); })
+            .forEach(function(monthValue) {
+                monthSelect.appendChild(new Option(availableMonthsMap[monthValue], monthValue));
+            });
+    }
+
+    function buildFilterPills(selectId, trackId) {
+        var select = document.getElementById(selectId);
+        var track = document.getElementById(trackId);
+        if (!select || !track) {
+            return;
+        }
+
+        track.innerHTML = '';
+        Array.from(select.options).forEach(function(option) {
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'profile-charts__pill';
+            button.textContent = option.textContent || '';
+            button.dataset.value = option.value;
+            button.setAttribute('aria-pressed', option.selected ? 'true' : 'false');
+            if (option.selected) {
+                button.classList.add('is-active');
+            }
+            button.addEventListener('click', function() {
+                if (select.value === option.value) {
+                    return;
+                }
+                select.value = option.value;
+                syncFilterPills();
+                onFilterChange();
+            });
+            track.appendChild(button);
+        });
+    }
+
+    function syncFilterPills() {
+        ['profileProgressYear', 'profileProgressMonth', 'profileProgressSeason'].forEach(function(selectId) {
+            var select = document.getElementById(selectId);
+            var pillsId = selectId + 'Pills';
+            var track = document.getElementById(pillsId);
+            if (!select || !track) {
+                return;
+            }
+            Array.from(track.querySelectorAll('.profile-charts__pill')).forEach(function(button) {
+                var isActive = button.dataset.value === select.value;
+                button.classList.toggle('is-active', isActive);
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+        });
+    }
+
+    buildFilterPills('profileProgressYear', 'profileProgressYearPills');
+    buildFilterPills('profileProgressMonth', 'profileProgressMonthPills');
+    buildFilterPills('profileProgressSeason', 'profileProgressSeasonPills');
+    syncFilterPills();
+    if (chartsRoot) {
+        chartsRoot.classList.add('profile-charts--enhanced');
     }
 
     function filterByYear(data, year) {
@@ -553,7 +740,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         if (parts.length !== 2) return data;
         var seasonName = parts[0] === 'winter' ? 'Зима' : 'Лето';
         var seasonYear = parseInt(parts[1], 10);
-        
+
         return data.filter(function(d) {
             if (!d.date) return false;
             var season = getSeasonFromDate(d.date);
@@ -565,9 +752,40 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         return {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            animation: {
+                duration: 900,
+                easing: 'easeOutQuart',
+                delay: function(context) {
+                    if (context.type !== 'data' || context.mode !== 'default') {
+                        return 0;
+                    }
+                    return context.dataIndex * 28;
+                }
+            },
+            layout: {
+                padding: {
+                    top: 8,
+                    right: 10,
+                    bottom: 2,
+                    left: 4
+                }
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    displayColors: false,
+                    backgroundColor: 'rgba(3, 17, 13, 0.94)',
+                    titleColor: '#f8ecd1',
+                    bodyColor: 'rgba(244, 232, 207, 0.92)',
+                    borderColor: 'rgba(166, 130, 74, 0.34)',
+                    borderWidth: 1,
+                    padding: 14,
+                    cornerRadius: 14,
+                    caretPadding: 10,
                     callbacks: {
                         title: function(items) {
                             if (items.length && items[0].label) return formatDateLabel(items[0].label);
@@ -581,24 +799,252 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                 }
             },
             scales: {
-                x: { display: true, ticks: { maxTicksLimit: 8, maxRotation: 45 } },
-                y: { display: true, beginAtZero: true }
+                x: {
+                    display: true,
+                    border: { display: false },
+                    grid: {
+                        display: false,
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: 'rgba(224, 215, 193, 0.62)',
+                        maxTicksLimit: 8,
+                        maxRotation: 0,
+                        autoSkipPadding: 18,
+                        padding: 10
+                    }
+                },
+                y: {
+                    display: true,
+                    beginAtZero: true,
+                    border: { display: false },
+                    grid: {
+                        color: 'rgba(166, 130, 74, 0.10)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: 'rgba(224, 215, 193, 0.68)',
+                        padding: 10
+                    }
+                }
             }
         };
     }
 
-    var lineDataset = {
-        borderColor: 'var(--color-primary, #2563eb)',
-        backgroundColor: 'rgba(37, 99, 235, 0.1)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3,
-        pointHoverRadius: 6
+    function createLineGradient(chart, startColor, endColor) {
+        if (!chart.chartArea) {
+            return startColor;
+        }
+        var gradient = chart.ctx.createLinearGradient(
+            chart.chartArea.left,
+            chart.chartArea.top,
+            chart.chartArea.right,
+            chart.chartArea.bottom
+        );
+        gradient.addColorStop(0, startColor);
+        gradient.addColorStop(1, endColor);
+        return gradient;
+    }
+
+    function createFillGradient(chart, topColor, bottomColor) {
+        if (!chart.chartArea) {
+            return topColor;
+        }
+        var gradient = chart.ctx.createLinearGradient(0, chart.chartArea.top, 0, chart.chartArea.bottom);
+        gradient.addColorStop(0, topColor);
+        gradient.addColorStop(1, bottomColor);
+        return gradient;
+    }
+
+    function createBarGradient(chart, topColor, bottomColor) {
+        if (!chart.chartArea) {
+            return topColor;
+        }
+        var gradient = chart.ctx.createLinearGradient(0, chart.chartArea.top, 0, chart.chartArea.bottom);
+        gradient.addColorStop(0, topColor);
+        gradient.addColorStop(1, bottomColor);
+        return gradient;
+    }
+
+    function getFanBarPalette(delta) {
+        if (delta > 0) {
+            return {
+                top: 'rgba(14, 203, 129, 0.96)',
+                bottom: 'rgba(14, 203, 129, 0.68)',
+                border: 'rgb(14, 203, 129)'
+            };
+        }
+        if (delta < 0) {
+            return {
+                top: 'rgba(230, 67, 90, 0.96)',
+                bottom: 'rgba(230, 67, 90, 0.68)',
+                border: 'rgb(230, 67, 90)'
+            };
+        }
+        return {
+            top: 'rgba(226, 232, 240, 0.88)',
+            bottom: 'rgba(148, 163, 184, 0.58)',
+            border: 'rgba(203, 213, 225, 0.92)'
+        };
+    }
+
+    function buildFanBarColors(data) {
+        return data.map(function(d) {
+            var palette = getFanBarPalette(d.fan_delta || 0);
+            return function(context) {
+                return createBarGradient(context.chart, palette.top, palette.bottom);
+            };
+        });
+    }
+
+    function buildFanBarBorders(data) {
+        return data.map(function(d) {
+            return getFanBarPalette(d.fan_delta || 0).border;
+        });
+    }
+
+    var chartPalettes = {
+        matches: {
+            lineStart: 'rgba(87, 225, 255, 1)',
+            lineEnd: 'rgba(58, 160, 255, 1)',
+            fillStart: 'rgba(87, 225, 255, 0.28)',
+            fillEnd: 'rgba(87, 225, 255, 0.02)',
+            point: 'rgba(155, 242, 255, 1)',
+            down: 'rgba(255, 124, 171, 0.88)',
+            up: 'rgba(87, 225, 255, 1)'
+        },
+        winrate: {
+            lineStart: 'rgba(74, 222, 128, 1)',
+            lineEnd: 'rgba(163, 230, 53, 0.94)',
+            fillStart: 'rgba(74, 222, 128, 0.25)',
+            fillEnd: 'rgba(74, 222, 128, 0.02)',
+            point: 'rgba(187, 247, 208, 1)',
+            down: 'rgba(248, 113, 113, 0.92)',
+            up: 'rgba(74, 222, 128, 1)'
+        },
+        season: {
+            lineStart: 'rgba(250, 204, 21, 1)',
+            lineEnd: 'rgba(251, 146, 60, 0.94)',
+            fillStart: 'rgba(250, 204, 21, 0.24)',
+            fillEnd: 'rgba(250, 204, 21, 0.03)',
+            point: 'rgba(254, 240, 138, 1)',
+            down: 'rgba(248, 113, 113, 0.92)',
+            up: 'rgba(250, 204, 21, 1)'
+        }
     };
+
+    function createLineDataset(data, palette) {
+        return {
+            data: data,
+            borderColor: function(context) {
+                return createLineGradient(context.chart, palette.lineStart, palette.lineEnd);
+            },
+            backgroundColor: function(context) {
+                return createFillGradient(context.chart, palette.fillStart, palette.fillEnd);
+            },
+            fill: true,
+            tension: 0.38,
+            borderWidth: 3,
+            pointRadius: function(context) {
+                var points = context.dataset.data || [];
+                return context.dataIndex === points.length - 1 ? 4 : 0;
+            },
+            pointHoverRadius: 6,
+            pointHitRadius: 18,
+            pointBorderWidth: 2,
+            pointBackgroundColor: '#03110d',
+            pointBorderColor: palette.point,
+            segment: {
+                borderColor: function(context) {
+                    return context.p0.parsed.y > context.p1.parsed.y ? palette.down : palette.up;
+                }
+            }
+        };
+    }
+
+    function getTrendState(delta) {
+        if (delta > 0) return 'positive';
+        if (delta < 0) return 'negative';
+        return 'neutral';
+    }
+
+    function formatNumber(value, digits) {
+        return Number(value).toLocaleString('ru-RU', {
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits
+        });
+    }
+
+    function formatMetricValue(value, suffix, digits) {
+        if (value === null || value === undefined || Number.isNaN(Number(value))) {
+            return '--';
+        }
+        return formatNumber(value, digits || 0) + (suffix || '');
+    }
+
+    function formatTrend(value, suffix, digits) {
+        if (value === null || value === undefined || Number.isNaN(Number(value))) {
+            return 'Нет данных';
+        }
+        var sign = value > 0 ? '+' : '';
+        return sign + formatNumber(value, digits || 0) + (suffix || '') + ' за период';
+    }
+
+    function setMetric(baseId, value, trend, trendState) {
+        var valueEl = document.getElementById(baseId + 'Value');
+        var trendEl = document.getElementById(baseId + 'Trend');
+        if (valueEl) {
+            valueEl.textContent = value;
+        }
+        if (trendEl) {
+            trendEl.textContent = trend;
+            trendEl.setAttribute('data-trend', trendState);
+        }
+    }
+
+    function updateMetricCards(data, fanMatchData, seasonData) {
+        var latestPoint = fanMatchData.length ? fanMatchData[fanMatchData.length - 1].points : null;
+        var pointDelta = fanMatchData.length > 1 ? latestPoint - fanMatchData[0].points : null;
+        setMetric(
+            'chartProfilePoints',
+            formatMetricValue(latestPoint, ' FAN', 1),
+            formatTrend(pointDelta, ' FAN', 1),
+            getTrendState(pointDelta || 0)
+        );
+
+        var latestMatches = data.length ? data[data.length - 1].matches : null;
+        var matchesDelta = data.length > 1 ? latestMatches - data[0].matches : null;
+        setMetric(
+            'chartProfileMatches',
+            formatMetricValue(latestMatches, '', 0),
+            formatTrend(matchesDelta, '', 0),
+            getTrendState(matchesDelta || 0)
+        );
+
+        var latestWinrate = data.length ? data[data.length - 1].win_rate : null;
+        var winrateDelta = data.length > 1 ? latestWinrate - data[0].win_rate : null;
+        setMetric(
+            'chartProfileWinRate',
+            formatMetricValue(latestWinrate, '%', 0),
+            formatTrend(winrateDelta, ' п.п.', 0),
+            getTrendState(winrateDelta || 0)
+        );
+
+        var latestSeason = seasonData.length ? seasonData[seasonData.length - 1].season_points : null;
+        var seasonDelta = seasonData.length > 1 ? latestSeason - seasonData[0].season_points : null;
+        setMetric(
+            'chartProfileSeason',
+            formatMetricValue(latestSeason, '', 0),
+            formatTrend(seasonDelta, '', 0),
+            getTrendState(seasonDelta || 0)
+        );
+    }
 
     var charts = { points: null, matches: null, winrate: null, season: null };
 
     function updateCharts(selectedYear, selectedMonth, selectedSeason) {
+        var hasActiveFilter = Boolean(selectedYear || selectedMonth || selectedSeason);
+
         // Фильтруем основные данные (FAN, матчи, % побед)
         var data = progressData;
         if (selectedYear) {
@@ -610,43 +1056,34 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         if (selectedSeason) {
             data = filterBySeason(data, selectedSeason);
         }
-        if (!data.length) data = progressData;
-        
+
         var labels = data.map(function(d) { return d.date; });
-        var pointsData = data.map(function(d) { return d.points; });
         var matchesData = data.map(function(d) { return d.matches; });
         var winRateData = data.map(function(d) { return d.win_rate; });
-        
+
         // Для FAN-диаграммы: только свершившиеся матчи (1 столбец = 1 матч), без синтетических записей
         var fanMatchData = data.filter(function(d) {
             return (d.matches || 0) > 0 && (d.won === true || d.won === false);
         });
         var fanLabels = fanMatchData.map(function(d) { return d.date; });
         var fanPointsData = fanMatchData.map(function(d) { return d.points; });
-        var barColors = fanMatchData.map(function(d) {
-            var delta = d.fan_delta || 0;
-            if (delta > 0) return 'rgb(14, 203, 129)';   // Зелёный — прирост рейтинга
-            if (delta < 0) return 'rgb(230, 67, 90)';     // Красный — потеря рейтинга
-            return 'rgba(128, 128, 128, 0.6)';            // Серый — без изменения
-        });
-
-        var chartOpts = buildChartOptions('Рейтинг', '');
-        var winRateOpts = buildChartOptions('% побед', '%');
-        winRateOpts.scales = { x: chartOpts.scales.x, y: { display: true, beginAtZero: true, max: 100 } };
+        var barColors = buildFanBarColors(fanMatchData);
+        var barBorders = buildFanBarBorders(fanMatchData);
 
         if (charts.points && document.getElementById('chartProfilePoints')) {
+            charts.points.$fanMatchData = fanMatchData;
             charts.points.data.labels = fanLabels;
             charts.points.data.datasets[0].data = fanPointsData;
             charts.points.data.datasets[0].backgroundColor = barColors;
-            charts.points.data.datasets[0].borderColor = barColors;
+            charts.points.data.datasets[0].borderColor = barBorders;
             // Ширина контейнера для прокрутки: узкие столбцы
             var fanWrap = document.getElementById('fanChartInnerWrap');
             if (fanWrap) {
-                fanWrap.style.minWidth = Math.max(fanMatchData.length * 10, 150) + 'px';
+                fanWrap.style.minWidth = Math.max(fanMatchData.length * 18, 180) + 'px';
                 fanWrap.style.cursor = fanMatchData.some(function(d) { return d.match_id; }) ? 'pointer' : 'default';
                 charts.points.resize();
             }
-            
+
             charts.points.options.plugins.tooltip.callbacks = charts.points.options.plugins.tooltip.callbacks || {};
             charts.points.options.plugins.tooltip.callbacks.title = function(items) {
                 if (items.length && items[0].label) return formatDateLabel(items[0].label);
@@ -660,7 +1097,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                 var ntrpSign = ntrpDelta >= 0 ? '+' : '';
                 var fanSign = fanDelta >= 0 ? '+' : '';
                 var lines = [
-                    'Сила ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' + 
+                    'Сила ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' +
                     (d.points || 0).toFixed(1) + ' (' + fanSign + fanDelta.toFixed(1) + ')'
                 ];
                 if (d.match_opponent) lines.push('Матч: vs ' + d.match_opponent + ' — ' + (d.match_score || ''));
@@ -672,7 +1109,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                     window.location.href = '/tournaments/match/' + fanMatchData[elements[0].index].match_id + '/';
                 }
             };
-            
+
             charts.points.update('none');
         }
         if (charts.matches && document.getElementById('chartProfileMatches')) {
@@ -697,9 +1134,11 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         if (selectedSeason) {
             seasonData = filterBySeason(seasonData, selectedSeason);
         }
-        if (!seasonData.length && seasonPointsData.length) {
+        if (!seasonData.length && !hasActiveFilter && seasonPointsData.length) {
             seasonData = seasonPointsData;
         }
+
+        updateMetricCards(data, fanMatchData, seasonData);
 
         if (charts.season && document.getElementById('chartProfileSeasonPoints')) {
             var seasonLabels = seasonData.map(function(d) { return d.date; });
@@ -714,6 +1153,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         var year = yearSelect ? yearSelect.value : '';
         var month = document.getElementById('profileProgressMonth') ? document.getElementById('profileProgressMonth').value : '';
         var season = seasonSelect ? seasonSelect.value : '';
+        syncFilterPills();
         updateCharts(year || null, month || null, season || null);
     }
 
@@ -724,17 +1164,21 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         });
         var labels0 = fanMatchData0.map(function(d) { return d.date; });
         var pts0 = fanMatchData0.map(function(d) { return d.points; });
-        var barColors0 = fanMatchData0.map(function(d) {
-            var delta = d.fan_delta || 0;
-            if (delta > 0) return 'rgb(14, 203, 129)';
-            if (delta < 0) return 'rgb(230, 67, 90)';
-            return 'rgba(128, 128, 128, 0.6)';
-        });
-        
+        var barColors0 = buildFanBarColors(fanMatchData0);
+        var barBorders0 = buildFanBarBorders(fanMatchData0);
+
         var chartOpts = buildChartOptions('Рейтинг', '');
         chartOpts.datasets = chartOpts.datasets || {};
-        chartOpts.datasets.bar = { barPercentage: 0.6, categoryPercentage: 0.7 };
+        chartOpts.datasets.bar = { barPercentage: 0.72, categoryPercentage: 0.8 };
         chartOpts.plugins.tooltip = {
+            displayColors: false,
+            backgroundColor: 'rgba(3, 17, 13, 0.96)',
+            titleColor: '#fff0c2',
+            bodyColor: 'rgba(244, 232, 207, 0.94)',
+            borderColor: 'rgba(250, 204, 21, 0.3)',
+            borderWidth: 1,
+            padding: 14,
+            cornerRadius: 14,
             callbacks: {
                 title: function(items) {
                     if (items.length && items[0].label) return formatDateLabel(items[0].label);
@@ -748,7 +1192,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                     var ntrpSign = ntrpDelta >= 0 ? '+' : '';
                     var fanSign = fanDelta >= 0 ? '+' : '';
                     var lines = [
-                        'Сила ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' + 
+                        'Сила ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' +
                         (d.points || 0).toFixed(1) + ' (' + fanSign + fanDelta.toFixed(1) + ')'
                     ];
                     if (d.match_opponent) lines.push('Матч: vs ' + d.match_opponent + ' — ' + (d.match_score || ''));
@@ -762,27 +1206,31 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                 window.location.href = '/tournaments/match/' + fanMatchData0[elements[0].index].match_id + '/';
             }
         };
-        
+
         var fanWrap0 = document.getElementById('fanChartInnerWrap');
         if (fanWrap0) {
-            fanWrap0.style.minWidth = Math.max(fanMatchData0.length * 10, 150) + 'px';
+            fanWrap0.style.minWidth = Math.max(fanMatchData0.length * 18, 180) + 'px';
             fanWrap0.style.cursor = fanMatchData0.some(function(d) { return d.match_id; }) ? 'pointer' : 'default';
         }
-        
+
         charts.points = new Chart(document.getElementById('chartProfilePoints'), {
             type: 'bar',
             options: chartOpts,
-            data: { 
-                labels: labels0, 
-                datasets: [{ 
+            data: {
+                labels: labels0,
+                datasets: [{
                     data: pts0,
                     backgroundColor: barColors0,
-                    borderColor: barColors0,
-                    borderWidth: 0,
-                    borderRadius: 2
-                }] 
+                    borderColor: barBorders0,
+                    borderWidth: 1,
+                    borderRadius: 999,
+                    borderSkipped: false,
+                    barPercentage: 0.72,
+                    categoryPercentage: 0.8
+                }]
             }
         });
+        charts.points.$fanMatchData = fanMatchData0;
     }
     if (document.getElementById('chartProfileMatches')) {
         var labels0 = progressData.map(function(d) { return d.date; });
@@ -790,20 +1238,39 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         charts.matches = new Chart(document.getElementById('chartProfileMatches'), {
             type: 'line',
             options: buildChartOptions('Матчей', ''),
-            data: { labels: labels0, datasets: [{ ...lineDataset, data: m0 }] }
+            data: { labels: labels0, datasets: [createLineDataset(m0, chartPalettes.matches)] }
         });
     }
     if (document.getElementById('chartProfileWinRate')) {
         var labels0 = progressData.map(function(d) { return d.date; });
         var wr0 = progressData.map(function(d) { return d.win_rate; });
         var winRateOpts = buildChartOptions('% побед', '%');
-        winRateOpts.scales = { x: winRateOpts.scales.x, y: { display: true, beginAtZero: true, max: 100 } };
+        winRateOpts.scales = {
+            x: winRateOpts.scales.x,
+            y: {
+                display: true,
+                beginAtZero: true,
+                max: 100,
+                border: { display: false },
+                grid: {
+                    color: 'rgba(166, 130, 74, 0.10)',
+                    drawBorder: false
+                },
+                ticks: {
+                    color: 'rgba(224, 215, 193, 0.68)',
+                    padding: 10,
+                    callback: function(value) {
+                        return value + '%';
+                    }
+                }
+            }
+        };
         charts.winrate = new Chart(document.getElementById('chartProfileWinRate'), {
             type: 'line',
             options: winRateOpts,
             data: {
                 labels: labels0,
-                datasets: [{ ...lineDataset, borderColor: 'var(--color-success, #16a34a)', backgroundColor: 'rgba(22, 163, 74, 0.1)', data: wr0 }]
+                datasets: [createLineDataset(wr0, chartPalettes.winrate)]
             }
         });
     }
@@ -817,26 +1284,26 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
             options: buildChartOptions('Очков сезона', ''),
             data: {
                 labels: seasonLabels,
-                datasets: [{
-                    ...lineDataset,
-                    borderColor: 'var(--color-warning, #f59e0b)',
-                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                    data: seasonPts
-                }]
+                datasets: [createLineDataset(seasonPts, chartPalettes.season)]
             }
         });
     }
+
+    updateMetricCards(progressData, fanMatchData0, seasonPointsData);
 
     // Добавляем обработчики событий для всех фильтров
     if (yearSelect) {
         yearSelect.addEventListener('change', onFilterChange);
     }
-    var monthSelect = document.getElementById('profileProgressMonth');
     if (monthSelect) {
         monthSelect.addEventListener('change', onFilterChange);
     }
     if (seasonSelect) {
         seasonSelect.addEventListener('change', onFilterChange);
+    }
+
+    if (chartsRoot) {
+        chartsRoot.classList.add('profile-charts--ready');
     }
 
     // Обработка модального окна отмены подписки
@@ -848,7 +1315,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                 cancelSubModal.style.display = 'none';
             }
         });
-        
+
         // Закрытие по Escape
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && cancelSubModal.style.display === 'flex') {
@@ -858,6 +1325,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
     }
 })();
 </script>
+{% endif %}
 
 {# --- Модальное окно подтверждения отмены подписки (в конце страницы для правильного z-index) --- #}
 {% if user.is_authenticated and player.user.subscription.is_valid and not player.user.subscription.is_cancelled %}

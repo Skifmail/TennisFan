@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 
 from apps.comments.models import Comment
 from apps.subscriptions.models import RegionalTierPrice, SubscriptionTier
+from apps.subscriptions.utils import user_can_read_comments, user_can_write_comments
 from apps.tournaments.models import Tournament
 from apps.users.models import Player
 
@@ -52,6 +53,8 @@ def news_detail(request, slug):
 
     # Comments
     ct = ContentType.objects.get_for_model(News)
+    can_read_comments = user_can_read_comments(request.user)
+    can_write_comments = user_can_write_comments(request.user)
     comments = (
         Comment.objects.filter(
             content_type=ct,
@@ -59,15 +62,20 @@ def news_detail(request, slug):
         )
         .select_related("author__user")
         .order_by("-created_at")
+        if can_read_comments
+        else Comment.objects.none()
     )
 
     form = NewsCommentForm()
     if request.method == "POST" and request.POST.get("action") == "comment":
+        if not can_write_comments:
+            messages.error(
+                request,
+                "Комментарии доступны только при активной подписке с разрешением на написание комментариев.",
+            )
+            return redirect("news_detail", slug=news.slug)
         form = NewsCommentForm(request.POST)
         if form.is_valid():
-            if not request.user.is_authenticated:
-                messages.error(request, "Войдите, чтобы оставить комментарий.")
-                return redirect("login")
             player = Player.objects.filter(user=request.user).first()
             if player is None:
                 messages.error(
@@ -94,7 +102,13 @@ def news_detail(request, slug):
     return render(
         request,
         "content/news_detail.html",
-        {"news": news, "comments": comments, "comment_form": form},
+        {
+            "news": news,
+            "comments": comments,
+            "comment_form": form,
+            "can_read_comments": can_read_comments,
+            "can_write_comments": can_write_comments,
+        },
     )
 
 

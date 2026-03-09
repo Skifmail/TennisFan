@@ -183,7 +183,7 @@
 
     <section class="court-detail__comments mt-4" id="court-comment-form">
         <h2 class="section-title mb-3">Комментарии</h2>
-        {% if can_comment %}
+        {% if can_write_comments %}
         <form method="post" action="{% url 'court_detail' slug=court.slug %}" class="card mb-4">
             <div class="card-body">
                 {% csrf_token %}
@@ -202,10 +202,13 @@
                 <button type="submit" class="btn btn-primary">Отправить</button>
             </div>
         </form>
+        {% elif user.is_authenticated %}
+        <p class="text-muted">Написание комментариев и оценок доступно только при активной подписке с включённым правом «Писать комментарии».</p>
         {% else %}
-        <p class="text-muted"><a href="{% url 'login' %}?next={{ request.path }}">Войдите</a>, чтобы оставить комментарий и оценку.</p>
+        <p class="text-muted"><a href="{% url 'login' %}?next={{ request.path }}">Войдите</a> и оформите подписку, чтобы оставлять комментарии и оценки.</p>
         {% endif %}
 
+        {% if can_read_comments %}
         <div class="court-comments-list">
             {% for comment in comments %}
             <div class="card mb-2">
@@ -235,6 +238,11 @@
             <p class="text-secondary">Пока нет комментариев.</p>
             {% endfor %}
         </div>
+        {% elif user.is_authenticated %}
+        <p class="text-secondary">Чтение комментариев доступно только при активной подписке с включённым правом «Читать комментарии».</p>
+        {% else %}
+        <p class="text-secondary">Комментарии доступны только пользователям с активной подпиской.</p>
+        {% endif %}
     </section>
 
     <section class="mt-4">

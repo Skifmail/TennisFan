@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static skill_tags %}
 
 {% block title %}{{ coach.name }}{% endblock %}
 
@@ -21,7 +21,7 @@
 
                 <h1 style="font-size: var(--font-size-xl);">{{ coach.name }}</h1>
                 <p class="text-secondary">{{ coach.specialization }}</p>
-                <p class="text-muted mt-2">Опыт: {{ coach.experience_years }} лет</p>
+                <p class="text-muted mt-2">Опыт: {{ coach.experience_years }} {{ coach.experience_years|years_suffix }}</p>
 
                 {% if coach.phone or coach.telegram_url or coach.whatsapp_url or coach.max_url %}
                 <div class="d-flex gap-2 mt-3 flex-wrap" style="justify-content: center;">

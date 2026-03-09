@@ -9,6 +9,7 @@ from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.comments.models import Comment
+from apps.subscriptions.utils import user_can_read_comments, user_can_write_comments
 from apps.users.models import Player
 
 from .forms import CourtApplicationForm
@@ -57,6 +58,8 @@ def court_list(request):
 def court_detail(request, slug):
     """Court detail page with rating, comments, expanded info."""
     court = get_object_or_404(Court, slug=slug, is_active=True)
+    can_read_comments = user_can_read_comments(request.user)
+    can_write_comments = user_can_write_comments(request.user)
 
     # Rating: average and count; current user's rating if any
     rating_agg = court.ratings.aggregate(
@@ -77,13 +80,17 @@ def court_detail(request, slug):
 
     # Comments (generic Comment model for Court) + оценка автора по court.ratings
     ct = ContentType.objects.get_for_model(Court)
-    comments = list(
-        Comment.objects.filter(
-            content_type=ct,
-            object_id=court.pk,
+    comments = (
+        list(
+            Comment.objects.filter(
+                content_type=ct,
+                object_id=court.pk,
+            )
+            .select_related("author__user")
+            .order_by("-created_at")
         )
-        .select_related("author__user")
-        .order_by("-created_at")
+        if can_read_comments
+        else []
     )
     ratings_by_user = dict(court.ratings.values_list("user_id", "score"))
     for c in comments:
@@ -91,11 +98,13 @@ def court_detail(request, slug):
         c.author_rating_percent = (c.author_score or 0) * 20
 
     # POST: submit comment + rating (оценка ставится только вместе с комментарием)
-    if (
-        request.method == "POST"
-        and request.POST.get("action") == "comment"
-        and request.user.is_authenticated
-    ):
+    if request.method == "POST" and request.POST.get("action") == "comment":
+        if not can_write_comments:
+            messages.error(
+                request,
+                "Комментарии доступны только при активной подписке с разрешением на написание комментариев.",
+            )
+            return redirect("court_detail", slug=court.slug)
         text = (request.POST.get("text") or "").strip()
         score_raw = request.POST.get("score")
         try:
@@ -143,7 +152,8 @@ def court_detail(request, slug):
         "court": court,
         "recent_matches": recent_matches,
         "comments": comments,
-        "can_comment": request.user.is_authenticated,
+        "can_read_comments": can_read_comments,
+        "can_write_comments": can_write_comments,
         "yandex_maps_api_key": getattr(settings, "YANDEX_MAPS_API_KEY", "") or "",
         "court_has_coords": court.latitude is not None and court.longitude is not None,
     }

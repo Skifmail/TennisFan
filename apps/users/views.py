@@ -30,6 +30,19 @@ from .models import Notification, NtrpTestResult, Player
 logger = logging.getLogger(__name__)
 
 
+def _can_view_profile_stats(request_user: Any, player: Player) -> bool:
+    """Проверить доступ владельца профиля к статистике и графикам."""
+    if request_user != player.user:
+        return True
+
+    subscription = getattr(player.user, "subscription", None)
+    if subscription is None or not subscription.is_valid():
+        return False
+
+    tier = getattr(subscription, "tier", None)
+    return bool(tier is not None and tier.can_see_stats)
+
+
 def _map_ntrp_to_skill_level(level: Decimal) -> str:
     """Map strength level (1.0-7.0) to SkillLevel category (delegates to rating_utils)."""
     from .rating_utils import map_ntrp_to_skill_level
@@ -406,6 +419,8 @@ def profile(request, pk):
         ),
         pk=pk,
     )
+    is_profile_owner = request.user == player.user
+    can_view_profile_stats = _can_view_profile_stats(request.user, player)
 
     from apps.tournaments.models import Match
 
@@ -503,7 +518,7 @@ def profile(request, pk):
         (12, "Декабрь"),
     ]
 
-    progress_data = _get_profile_progress_data(player)
+    progress_data = _get_profile_progress_data(player) if can_view_profile_stats else []
 
     # Собираем данные о сезонных очках по датам
     def _get_season_points_data(player: Player) -> list[dict[str, Any]]:
@@ -602,7 +617,9 @@ def profile(request, pk):
 
         return result
 
-    season_points_data = _get_season_points_data(player)
+    season_points_data = (
+        _get_season_points_data(player) if can_view_profile_stats else []
+    )
 
     # Получаем сезонные очки
     from apps.tournaments.models import SeasonArchive, SeasonPoints
@@ -653,7 +670,7 @@ def profile(request, pk):
 
     telegram_user_bot_connected = False
     telegram_bot_username = ""
-    if request.user.is_authenticated and request.user == player.user:
+    if request.user.is_authenticated and is_profile_owner:
         try:
             link = request.user.telegram_link
             telegram_user_bot_connected = link.user_bot_chat_id is not None
@@ -668,14 +685,15 @@ def profile(request, pk):
                 pass
 
     player_skills_data = None
-    try:
-        from apps.player_ratings.services import get_player_skills
+    if can_view_profile_stats:
+        try:
+            from apps.player_ratings.services import get_player_skills
 
-        player_skills_data = get_player_skills(
-            player, request.user, include_lowest_three=True
-        )
-    except Exception:
-        pass
+            player_skills_data = get_player_skills(
+                player, request.user, include_lowest_three=True
+            )
+        except Exception:
+            pass
 
     context = {
         "player": player,
@@ -695,7 +713,8 @@ def profile(request, pk):
         "season_points_data": season_points_data,
         "season_championships": season_championships,
         "player_skills_data": player_skills_data,
-        "is_profile_owner": request.user == player.user,
+        "is_profile_owner": is_profile_owner,
+        "can_view_profile_stats": can_view_profile_stats,
     }
     return render(request, "users/profile.html", context)
 

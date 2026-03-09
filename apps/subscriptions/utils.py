@@ -1,5 +1,7 @@
 """Вспомогательные функции для подписок и тарифов."""
 
+from typing import Any
+
 
 def normalize_city_for_pricing(city_str: str) -> str:
     """
@@ -10,3 +12,57 @@ def normalize_city_for_pricing(city_str: str) -> str:
     if city in ("moscow", "moskva", "москва"):
         return "moscow"
     return city or "moscow"
+
+
+def _get_valid_subscription_tier(user: Any) -> Any | None:
+    """Вернуть тариф активной подписки пользователя."""
+    if not getattr(user, "is_authenticated", False):
+        return None
+
+    subscription = getattr(user, "subscription", None)
+    if subscription is None or not subscription.is_valid():
+        return None
+
+    return getattr(subscription, "tier", None)
+
+
+def user_can_read_comments(user: Any) -> bool:
+    """Проверить доступ пользователя к чтению комментариев.
+
+    Args:
+        user (Any): Пользователь Django, для которого проверяется доступ.
+
+    Returns:
+        bool: ``True``, если у пользователя есть активная подписка и тариф
+        разрешает чтение комментариев.
+    """
+    tier = _get_valid_subscription_tier(user)
+    return bool(tier is not None and getattr(tier, "can_read_comments", False))
+
+
+def user_can_write_comments(user: Any) -> bool:
+    """Проверить доступ пользователя к написанию комментариев.
+
+    Args:
+        user (Any): Пользователь Django, для которого проверяется доступ.
+
+    Returns:
+        bool: ``True``, если у пользователя есть активная подписка и тариф
+        разрешает написание комментариев.
+    """
+    tier = _get_valid_subscription_tier(user)
+    return bool(tier is not None and getattr(tier, "can_write_comments", False))
+
+
+def user_can_rate_opponents(user: Any) -> bool:
+    """Проверить доступ пользователя к оценке соперников.
+
+    Args:
+        user (Any): Пользователь Django, для которого проверяется доступ.
+
+    Returns:
+        bool: ``True``, если у пользователя есть активная подписка и тариф
+        разрешает оценку соперников после матчей.
+    """
+    tier = _get_valid_subscription_tier(user)
+    return bool(tier is not None and getattr(tier, "can_rate_opponents", False))

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load skill_tags %}
 
 {% block title %}Тренеры{% endblock %}
 
@@ -27,7 +28,7 @@
                 <h3 class="card-title">{{ coach.name }}</h3>
                 <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ coach.specialization }}</p>
                 <p class="text-muted mt-2" style="font-size: var(--font-size-sm);">Опыт: {{ coach.experience_years }}
-                    лет</p>
+                    {{ coach.experience_years|years_suffix }}</p>
             </div>
         </a>
         {% empty %}

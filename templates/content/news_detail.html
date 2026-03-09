@@ -50,7 +50,7 @@
     <section class="comments-section" id="comments">
         <h2 class="mb-4" style="font-size: var(--font-size-2xl);">Комментарии</h2>
 
-        {% if user.is_authenticated %}
+        {% if can_write_comments %}
         <div class="card mb-4">
             <div class="card-body">
                 <form method="post" action="{% url 'news_detail' slug=news.slug %}#comments">
@@ -64,13 +64,18 @@
                 </form>
             </div>
         </div>
+        {% elif user.is_authenticated %}
+        <p class="text-muted mb-4">
+            Написание комментариев доступно только при активной подписке с включённым тарифным правом
+            «Писать комментарии».
+        </p>
         {% else %}
         <p class="text-muted mb-4">
-            <a href="{% url 'login' %}">Войдите</a>, чтобы оставить комментарий.
+            <a href="{% url 'login' %}">Войдите</a> и оформите подписку, чтобы оставлять комментарии.
         </p>
         {% endif %}
 
-        {% if comments %}
+        {% if can_read_comments and comments %}
         <div class="comments-list">
             {% for comment in comments %}
             <div class="card mb-3">
@@ -84,8 +89,12 @@
             </div>
             {% endfor %}
         </div>
-        {% else %}
+        {% elif can_read_comments %}
         <p class="text-muted">Пока нет комментариев. Будьте первым!</p>
+        {% elif user.is_authenticated %}
+        <p class="text-muted">Чтение комментариев доступно только при активной подписке с включённым правом «Читать комментарии».</p>
+        {% else %}
+        <p class="text-muted">Комментарии доступны только пользователям с активной подпиской.</p>
         {% endif %}
     </section>
 </div>

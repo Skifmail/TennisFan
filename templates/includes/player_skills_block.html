@@ -4,33 +4,59 @@
 {% endcomment %}
 {% if player_skills_data %}
 <div class="player-skills-block profile-info__section">
-    <h3 class="player-skills-block__title">Сильные стороны</h3>
+    <div class="player-skills-block__head">
+        <div>
+            <span class="player-skills-block__eyebrow">Игровой профиль</span>
+            <h3 class="player-skills-block__title">Сильные стороны</h3>
+            <p class="player-skills-block__subtitle">Оценка того, как соперники воспринимают ваши игровые качества на корте.</p>
+        </div>
+    </div>
     <div class="player-skills-block__grid">
         {% for m in player_skills_data.metrics %}
         <div class="player-skills-block__item">
-            <span class="player-skills-block__label">{{ m.label }}</span>
-            <div class="player-skills-block__right">
+            <div class="player-skills-block__row">
+                <span class="player-skills-block__label">{{ m.label }}</span>
                 {% if m.insufficient_data %}
                 <span class="player-skills-block__value player-skills-block__value--muted">Недостаточно данных</span>
                 {% else %}
-                <span class="player-skills-block__numeric">{{ m.display_value|floatformat:1 }}</span>
+                {% widthratio m.display_value 10 100 as metric_fill %}
+                <div class="player-skills-block__score" title="Оценка {{ m.display_value }} из 10">
+                    <span class="player-skills-block__numeric">{{ m.display_value|floatformat:1 }}</span>
+                    <span class="player-skills-block__score-max">/10</span>
+                </div>
+                {% endif %}
+            </div>
+            {% if m.insufficient_data %}
+            <div class="player-skills-block__empty-state">Нужно больше оценок, чтобы уверенно показать этот навык.</div>
+            {% else %}
+            <div class="player-skills-block__bar" aria-hidden="true">
+                <div class="player-skills-block__bar-fill" style="width: {{ metric_fill }}%;"></div>
+            </div>
+            <div class="player-skills-block__meta">
                 <span class="player-skills-block__stars" title="Оценка {{ m.display_value }} из 10 (оценок: {{ m.votes_count }})" aria-label="{{ m.display_value }} из 10">
                     {% for i in "1234567890" %}
                     <span class="player-skills-block__star {% if forloop.counter <= m.stars_filled %}player-skills-block__star--filled{% endif %}">★</span>
                     {% endfor %}
                 </span>
-                <span class="player-skills-block__votes">({{ m.votes_count }})</span>
-                {% endif %}
+                <span class="player-skills-block__votes">Оценок: {{ m.votes_count }}</span>
             </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
     {% if is_owner and player_skills_data.recommend_to_improve %}
     <div class="player-skills-block__improve">
-        <h4 class="player-skills-block__improve-title">Рекомендовано улучшить</h4>
+        <div class="player-skills-block__improve-head">
+            <span class="player-skills-block__improve-icon" aria-hidden="true">↗</span>
+            <h4 class="player-skills-block__improve-title">Рекомендовано улучшить</h4>
+        </div>
         <ul class="player-skills-block__improve-list">
             {% for r in player_skills_data.recommend_to_improve %}
-            <li>{{ r.label }} — <strong>{{ r.average_weighted|floatformat:1 }}</strong> (оценок: {{ r.votes_count }})</li>
+            <li class="player-skills-block__improve-item">
+                <span class="player-skills-block__improve-name">{{ r.label }}</span>
+                <span class="player-skills-block__improve-score">{{ r.average_weighted|floatformat:1 }}</span>
+                <span class="player-skills-block__improve-votes">Оценок: {{ r.votes_count }}</span>
+            </li>
             {% endfor %}
         </ul>
     </div>

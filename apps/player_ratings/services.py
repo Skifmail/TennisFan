@@ -9,6 +9,7 @@ from typing import Any, cast
 from django.db import transaction
 from django.utils import timezone
 
+from apps.subscriptions.utils import user_can_rate_opponents
 from apps.tournaments.models import Match
 from apps.tournaments.utils import get_match_participants
 from apps.users.models import Player
@@ -34,6 +35,11 @@ def can_rate_match(match: Match, player: Player) -> tuple[bool, str]:
     Оценивать можно только: матч завершён, пользователь участвовал, не оценивал ранее.
     Возвращает (ok, reason).
     """
+    if not user_can_rate_opponents(player.user):
+        return (
+            False,
+            "Оценка соперников доступна только при активной подписке с включённым правом «Оценивать соперников».",
+        )
     if match.status not in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
         return False, "Матч не завершён"
     participants = get_match_participants(match)

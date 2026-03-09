@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load skill_tags %}
 
 {% block title %}Парный матч 2×2 · Заявка #{{ doubles_request.pk }}{% endblock %}
 
@@ -50,11 +51,11 @@
                 <p class="mb-1">
                     👤 Возраст партнёров:
                     {% if doubles_request.desired_age_min and doubles_request.desired_age_max %}
-                        {{ doubles_request.desired_age_min }}-{{ doubles_request.desired_age_max }} лет
+                        {{ doubles_request.desired_age_min }}-{{ doubles_request.desired_age_max }} {{ doubles_request.desired_age_max|years_suffix }}
                     {% elif doubles_request.desired_age_min %}
-                        от {{ doubles_request.desired_age_min }} лет
+                        от {{ doubles_request.desired_age_min }} {{ doubles_request.desired_age_min|years_suffix }}
                     {% elif doubles_request.desired_age_max %}
-                        до {{ doubles_request.desired_age_max }} лет
+                        до {{ doubles_request.desired_age_max }} {{ doubles_request.desired_age_max|years_suffix }}
                     {% endif %}
                 </p>
                 {% endif %}

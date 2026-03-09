@@ -26,6 +26,19 @@ from .services import (
 logger = logging.getLogger(__name__)
 
 
+def _can_view_own_skills(request_user: object, player: Player) -> bool:
+    """Проверить доступ владельца профиля к своим навыкам."""
+    if request_user != player.user:
+        return True
+
+    subscription = getattr(player.user, "subscription", None)
+    if subscription is None or not subscription.is_valid():
+        return False
+
+    tier = getattr(subscription, "tier", None)
+    return bool(tier is not None and tier.can_see_stats)
+
+
 def _get_current_player(request):
     if not request.user.is_authenticated:
         return None
@@ -138,6 +151,14 @@ def player_skills(request, player_id: int):
         return JsonResponse(
             {"success": False, "error": "Игрок не найден"},
             status=404,
+        )
+    if not _can_view_own_skills(request.user, player):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Статистика и навыки доступны только при активной подписке с доступом к статистике.",
+            },
+            status=403,
         )
     data = get_player_skills(
         player,

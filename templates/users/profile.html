@@ -500,6 +500,11 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
 
     if (statsTable && charts && profileInfo) {
         function alignCharts() {
+            if (window.innerWidth <= 900) {
+                charts.style.marginTop = '0';
+                return;
+            }
+
             // Получаем позицию таблицы статистики относительно .profile-info
             var profileInfoTop = profileInfo.getBoundingClientRect().top;
             var statsTop = statsTable.getBoundingClientRect().top;

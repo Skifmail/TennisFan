@@ -121,71 +121,65 @@
 
             <hr class="my-4">
 
-            <h3 class="h5 mb-4" style="display: flex; align-items: center; gap: var(--spacing-sm);">
-                <span>📊</span>
-                <span>Подробная информация</span>
-            </h3>
+            <h3 class="h5 mb-4">Подробная информация</h3>
             <div class="match-details-grid">
                 {% if match.tournament %}
                 <section class="match-details-section card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
                     <div class="card-body">
-                        <h4 class="match-details-title" style="display: flex; align-items: center; gap: var(--spacing-xs); margin-bottom: var(--spacing-md);">
-                            <span>🏆</span>
-                            <span>Турнир</span>
-                        </h4>
+                        <h4 class="match-details-title" style="margin-bottom: var(--spacing-md);">Турнир</h4>
                         <div class="match-details-table">
                             <div class="match-details-row">
-                                <div class="match-details-label">📝 Название</div>
+                                <div class="match-details-label">Название</div>
                                 <div class="match-details-value"><a href="{% url 'tournament_detail' slug=match.tournament.slug %}">{{ match.tournament.name }}</a></div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">📍 Город</div>
+                                <div class="match-details-label">Город</div>
                                 <div class="match-details-value">{{ match.tournament.city }}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">🎯 Тип</div>
+                                <div class="match-details-label">Тип</div>
                                 <div class="match-details-value">{{ match.tournament.get_tournament_type_display }}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">📋 Формат</div>
+                                <div class="match-details-label">Формат</div>
                                 <div class="match-details-value">{{ match.tournament.get_format_display }}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">👥 Вариант</div>
+                                <div class="match-details-label">Вариант</div>
                                 <div class="match-details-value">{{ match.tournament.get_variant_display }}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">⚧️ Категория по полу</div>
+                                <div class="match-details-label">Категория по полу</div>
                                 <div class="match-details-value">{{ match.tournament.get_gender_display }}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">⏱️ Продолжительность</div>
+                                <div class="match-details-label">Продолжительность</div>
                                 <div class="match-details-value">{{ match.tournament.get_duration_display }}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">📊 Статус турнира</div>
+                                <div class="match-details-label">Статус турнира</div>
                                 <div class="match-details-value">
                                     <span class="status-badge status-badge--{{ match.tournament.status }}">{{ match.tournament.get_status_display }}</span>
                                 </div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">📅 Дата начала</div>
+                                <div class="match-details-label">Дата начала</div>
                                 <div class="match-details-value">{{ match.tournament.start_date|date:"d.m.Y" }}</div>
                             </div>
                             {% if match.tournament.end_date %}
                             <div class="match-details-row">
-                                <div class="match-details-label">📅 Дата окончания</div>
+                                <div class="match-details-label">Дата окончания</div>
                                 <div class="match-details-value">{{ match.tournament.end_date|date:"d.m.Y" }}</div>
                             </div>
                             {% endif %}
                             {% if match.tournament.registration_deadline %}
                             <div class="match-details-row">
-                                <div class="match-details-label">⏰ Дедлайн регистрации</div>
+                                <div class="match-details-label">Дедлайн регистрации</div>
                                 <div class="match-details-value">{{ match.tournament.registration_deadline|date:"d.m.Y H:i" }}</div>
                             </div>
                             {% endif %}
                             <div class="match-details-row">
-                                <div class="match-details-label">🏅 Допустимые категории</div>
+                                <div class="match-details-label">Допустимые категории</div>
                                 <div class="match-details-value">
                                     {% for ac in match.tournament.allowed_categories.all %}
                                         <span class="category-tag">{{ ac.category|skill_with_ntrp }}</span>
@@ -196,7 +190,7 @@
                             </div>
                             {% if match.tournament.match_format %}
                             <div class="match-details-row">
-                                <div class="match-details-label">🎾 Формат матча</div>
+                                <div class="match-details-label">Формат матча</div>
                                 <div class="match-details-value">{{ match.tournament.get_match_format_display }}</div>
                             </div>
                             {% endif %}
@@ -206,17 +200,14 @@
                 {% elif match.is_sparring %}
                 <section class="match-details-section card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
                     <div class="card-body">
-                        <h4 class="match-details-title" style="display: flex; align-items: center; gap: var(--spacing-xs); margin-bottom: var(--spacing-md);">
-                            <span>🤝</span>
-                            <span>Спарринг</span>
-                        </h4>
+                        <h4 class="match-details-title" style="margin-bottom: var(--spacing-md);">Спарринг</h4>
                         <div class="match-details-table">
                             <div class="match-details-row">
-                                <div class="match-details-label">🎯 Тип матча</div>
+                                <div class="match-details-label">Тип матча</div>
                                 <div class="match-details-value">Спарринг (личная встреча)</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">ℹ️ Описание</div>
+                                <div class="match-details-label">Описание</div>
                                 <div class="match-details-value">
                                     {% if match.is_friendly_sparring %}
                                         <span class="text-muted">Дружеский матч — результат не влияет на рейтинг и силу</span>
@@ -231,13 +222,10 @@
                 {% endif %}
                 <section class="match-details-section card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
                     <div class="card-body">
-                        <h4 class="match-details-title" style="display: flex; align-items: center; gap: var(--spacing-xs); margin-bottom: var(--spacing-md);">
-                            <span>🎾</span>
-                            <span>Матч</span>
-                        </h4>
+                        <h4 class="match-details-title" style="margin-bottom: var(--spacing-md);">Матч</h4>
                         <div class="match-details-table">
                             <div class="match-details-row">
-                                <div class="match-details-label">🔄 Раунд</div>
+                                <div class="match-details-label">Раунд</div>
                                 <div class="match-details-value">{% if match.round_name %}{{ match.round_name }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
                             </div>
                             <div class="match-details-row">
@@ -245,12 +233,12 @@
                                 <div class="match-details-value">{{ match.round_index }}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">🔢 Порядок в раунде</div>
+                                <div class="match-details-label">Порядок в раунде</div>
                                 <div class="match-details-value">{{ match.round_order }}</div>
                             </div>
                             {% if match.is_consolation %}
                             <div class="match-details-row">
-                                <div class="match-details-label">🔄 Утешительная сетка</div>
+                                <div class="match-details-label">Утешительная сетка</div>
                                 <div class="match-details-value">
                                     <span class="status-badge status-badge--info">Да</span>
                                 </div>
@@ -258,45 +246,45 @@
                             {% endif %}
                             {% if match.placement_min is not None and match.placement_max is not None %}
                             <div class="match-details-row">
-                                <div class="match-details-label">🏆 Места</div>
+                                <div class="match-details-label">Места</div>
                                 <div class="match-details-value">за {{ match.placement_min }}–{{ match.placement_max }} место</div>
                             </div>
                             {% endif %}
                             <div class="match-details-row">
-                                <div class="match-details-label">⏰ Дедлайн матча</div>
+                                <div class="match-details-label">Дедлайн матча</div>
                                 <div class="match-details-value">{% if match.deadline %}{{ match.deadline|date:"d.m.Y H:i" }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">📅 Дата и время</div>
+                                <div class="match-details-label">Дата и время</div>
                                 <div class="match-details-value">{% if match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">✅ Завершён</div>
+                                <div class="match-details-label">Завершён</div>
                                 <div class="match-details-value">{% if match.completed_datetime %}{{ match.completed_datetime|date:"d.m.Y H:i" }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">🏟️ Корт</div>
+                                <div class="match-details-label">Корт</div>
                                 <div class="match-details-value">{% if match.court %}{{ match.court.name }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">📊 Статус</div>
+                                <div class="match-details-label">Статус</div>
                                 <div class="match-details-value">
                                     <span class="status-badge status-badge--{{ match.status }}">{{ match.get_status_display }}</span>
                                 </div>
                             </div>
                             <div class="match-details-row">
-                                <div class="match-details-label">📈 Счёт</div>
+                                <div class="match-details-label">Счёт</div>
                                 <div class="match-details-value" style="font-weight: 600; font-size: var(--font-size-base);">{{ match.score_display }}</div>
                             </div>
                             {% if match.status == 'completed' or match.status == 'walkover' %}
                             {% if match.is_friendly_sparring %}
                             <div class="match-details-row">
-                                <div class="match-details-label">📊 Рейтинг</div>
+                                <div class="match-details-label">Рейтинг</div>
                                 <div class="match-details-value"><span class="text-muted">Дружеский матч — результат не влияет на рейтинг и силу</span></div>
                             </div>
                             {% else %}
                             <div class="match-details-row match-details-row--highlight">
-                                <div class="match-details-label">📈 Изменение рейтинга</div>
+                                <div class="match-details-label">Изменение рейтинга</div>
                                 <div class="match-details-value">
                                     <div class="rating-change">
                                         <div class="rating-change-item">
@@ -316,7 +304,7 @@
                             </div>
                             {% if season_points_player1 is not None or season_points_player2 is not None %}
                             <div class="match-details-row match-details-row--highlight">
-                                <div class="match-details-label">🏅 Сезонные очки</div>
+                                <div class="match-details-label">Сезонные очки</div>
                                 <div class="match-details-value">
                                     <div class="season-points">
                                         <div class="season-points-item">

@@ -866,6 +866,29 @@ button {
     display: flex;
     flex-direction: column;
     flex: 1;
+    min-width: 0;
+    padding-right: clamp(1rem, 2vw, 1.4rem);
+}
+
+.tournament-preview-card--no-image .card-body {
+    padding-top: calc(var(--spacing-lg) + 2.25rem);
+}
+
+.tournament-preview-card .card-title {
+    min-width: 0;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.tournament-preview-card .card-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.tournament-preview-card .player-category {
+    max-width: calc(100% - 130px);
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .court-card {

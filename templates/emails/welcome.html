@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Добро пожаловать в TennisFan!</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f4f4;
+        }
+        .wrapper {
+            width: 100%;
+            background-color: #f4f4f4;
+            padding: 40px 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #1a3a2a 0%, #0f2318 100%);
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            color: #a6824a;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .header p {
+            margin: 10px 0 0;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 16px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a3a2a;
+            margin-bottom: 20px;
+        }
+        .intro {
+            margin-bottom: 30px;
+            color: #555555;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a3a2a;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #a6824a;
+        }
+        .steps {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .steps li {
+            padding: 12px 0;
+            padding-left: 35px;
+            position: relative;
+            border-bottom: 1px solid #eeeeee;
+        }
+        .steps li:last-child {
+            border-bottom: none;
+        }
+        .steps li::before {
+            content: attr(data-step);
+            position: absolute;
+            left: 0;
+            top: 12px;
+            width: 24px;
+            height: 24px;
+            background-color: #a6824a;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .steps li a {
+            color: #a6824a;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .steps li a:hover {
+            text-decoration: underline;
+        }
+        .cta-section {
+            text-align: center;
+            padding: 30px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+        .cta-section p {
+            margin: 0 0 20px;
+            color: #555555;
+        }
+        .btn {
+            display: inline-block;
+            padding: 14px 30px;
+            background: linear-gradient(135deg, #a6824a 0%, #8b6a3d 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(166, 130, 74, 0.3);
+        }
+        .btn:hover {
+            background: linear-gradient(135deg, #b8935a 0%, #9a7744 100%);
+        }
+        .features {
+            display: table;
+            width: 100%;
+            margin: 20px 0;
+        }
+        .feature {
+            display: table-row;
+        }
+        .feature-icon {
+            display: table-cell;
+            width: 40px;
+            padding: 10px 0;
+            vertical-align: top;
+            font-size: 24px;
+        }
+        .feature-text {
+            display: table-cell;
+            padding: 10px 0 10px 10px;
+            vertical-align: top;
+            color: #555555;
+        }
+        .feature-text strong {
+            color: #1a3a2a;
+        }
+        .footer {
+            background-color: #1a3a2a;
+            padding: 30px;
+            text-align: center;
+        }
+        .footer p {
+            margin: 0 0 10px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+        }
+        .footer a {
+            color: #a6824a;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        .social-links {
+            margin-top: 15px;
+        }
+        .social-links a {
+            display: inline-block;
+            margin: 0 8px;
+            color: #a6824a;
+            font-size: 14px;
+        }
+        @media only screen and (max-width: 620px) {
+            .container {
+                margin: 0 10px;
+                border-radius: 8px;
+            }
+            .header, .content, .footer {
+                padding: 25px 20px;
+            }
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <div class="header">
+                <h1>TennisFan</h1>
+                <p>Теннисное сообщество</p>
+            </div>
+
+            <div class="content">
+                <p class="greeting">Привет, {{ user_name }}!</p>
+
+                <p class="intro">
+                    Добро пожаловать в TennisFan — сообщество любителей тенниса. Здесь вы найдёте турниры,
+                    спарринг-партнёров, рейтинги и много полезного для вашей игры.
+                </p>
+
+                <div class="section">
+                    <h2 class="section-title">С чего начать?</h2>
+                    <ol class="steps">
+                        <li data-step="1">
+                            <strong>Заполните профиль</strong> — добавьте фото, укажите город и уровень игры.
+                            <br><a href="{{ profile_url }}">Перейти в профиль →</a>
+                        </li>
+                        <li data-step="2">
+                            <strong>Подключите Telegram</strong> — получайте уведомления о матчах и турнирах прямо в мессенджер.
+                            <br><a href="{{ telegram_bot_url }}">Присоединиться к сообществу →</a>
+                        </li>
+                        <li data-step="3">
+                            <strong>Посмотрите ближайшие турниры</strong> — выберите подходящий и зарегистрируйтесь.
+                            <br><a href="{{ tournaments_url }}">Список турниров →</a>
+                        </li>
+                        <li data-step="4">
+                            <strong>Изучите тарифы</strong> — подписка открывает доступ к спаррингам, статистике и многому другому.
+                            <br><a href="{{ pricing_url }}">Посмотреть тарифы →</a>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="section">
+                    <h2 class="section-title">Что вас ждёт</h2>
+                    <div class="features">
+                        <div class="feature">
+                            <div class="feature-icon">🏆</div>
+                            <div class="feature-text">
+                                <strong>Турниры</strong> — регулярные соревнования для игроков разного уровня
+                            </div>
+                        </div>
+                        <div class="feature">
+                            <div class="feature-icon">📊</div>
+                            <div class="feature-text">
+                                <strong>Рейтинг</strong> — следите за своим прогрессом и сравнивайте результаты
+                            </div>
+                        </div>
+                        <div class="feature">
+                            <div class="feature-icon">🎾</div>
+                            <div class="feature-text">
+                                <strong>Спарринги</strong> — находите партнёров для игры в удобное время
+                            </div>
+                        </div>
+                        <div class="feature">
+                            <div class="feature-icon">💬</div>
+                            <div class="feature-text">
+                                <strong>Сообщество</strong> — общайтесь с единомышленниками в Telegram
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cta-section">
+                    <p>Готовы начать? Перейдите в личный кабинет и заполните профиль!</p>
+                    <a href="{{ profile_url }}" class="btn">Перейти в профиль</a>
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>Если у вас есть вопросы, напишите нам: <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+                <p>Или свяжитесь через <a href="{{ telegram_bot_url }}">Telegram</a></p>
+                <div class="social-links">
+                    <a href="{{ base_url }}">tennisfan.ru</a>
+                </div>
+                <p style="margin-top: 20px; font-size: 12px; color: rgba(255,255,255,0.5);">
+                    Вы получили это письмо, потому что зарегистрировались на TennisFan.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

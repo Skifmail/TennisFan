@@ -57,7 +57,7 @@
         el = document.createElement("div");
         el.id = PAGE_SPINNER_ID;
         el.className = "page-transition-spinner";
-        var spinner = createSpinner("spinner-md", true);
+        var spinner = createSpinner("spinner-lg", true);
         el.appendChild(spinner);
         document.body.appendChild(el);
         return el;

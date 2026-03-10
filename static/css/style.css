@@ -2239,9 +2239,9 @@ button {
 .profile-info__name {
     font-size: var(--font-size-xl);
     margin: 0 0 var(--spacing-xs) 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .profile-info__badges {

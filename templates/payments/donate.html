@@ -11,7 +11,7 @@
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <p class="text-secondary" style="margin-bottom: var(--spacing-xl);">Ваша поддержка помогает нам развивать TennisFan и проводить больше турниров.</p>
             
-            <form method="post" action="">
+            <form method="post" action="" data-loader-overlay>
                 {% csrf_token %}
                 
                 <div class="form-group" style="margin-bottom: var(--spacing-xl);">
@@ -44,7 +44,7 @@
                 <div style="margin-bottom: var(--spacing-xl);">
                     {% include 'includes/offer_consent.html' %}
                 </div>
-                <button type="submit" class="btn btn-primary btn-pay w-100">Перейти к оплате</button>
+                <button type="submit" class="btn btn-primary btn-pay w-100" data-loading-text="Переход к оплате...">Перейти к оплате</button>
             </form>
         </div>
     </div>

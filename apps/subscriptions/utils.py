@@ -1,6 +1,28 @@
 """Вспомогательные функции для подписок и тарифов."""
 
-from typing import Any
+from decimal import Decimal
+from typing import Any, cast
+
+from .models import RegionalTierPrice, UserSubscription
+
+
+def get_subscription_renew_amount(subscription: UserSubscription) -> Decimal:
+    """Рассчитать стоимость продления подписки с учётом города покупки.
+
+    Args:
+        subscription: Подписка пользователя.
+
+    Returns:
+        Сумма к списанию в рублях.
+    """
+    tier = subscription.tier
+    purchase_city = normalize_city_for_pricing(subscription.purchase_city or "")
+    amount: Decimal = cast(Decimal, tier.price)
+    if purchase_city and purchase_city != "moscow":
+        regional = RegionalTierPrice.objects.filter(tier=tier).first()
+        if regional is not None:
+            amount = cast(Decimal, regional.price)
+    return amount
 
 
 def normalize_city_for_pricing(city_str: str) -> str:

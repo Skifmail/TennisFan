@@ -99,3 +99,68 @@ def send_welcome_email(user: User) -> bool:
     except Exception as exc:
         logger.exception("send_welcome_email: failed to send to %s: %s", email, exc)
         return False
+
+
+def send_subscription_pre_debit_notification(
+    user: User,
+    *,
+    amount_rub: str,
+    tier_name: str,
+    end_date_str: str,
+    profile_url: str,
+) -> bool:
+    """Уведомление за 24ч до автосписания (требование ФЗ 376-ФЗ).
+
+    Args:
+        user: Пользователь.
+        amount_rub: Сумма списания в рублях.
+        tier_name: Название тарифа.
+        end_date_str: Дата окончания подписки.
+        profile_url: Ссылка на профиль для отключения автосписания.
+
+    Returns:
+        True, если письмо отправлено успешно.
+    """
+    email = (getattr(user, "email", "") or "").strip()
+    if not email or "@" not in email:
+        logger.warning(
+            "send_subscription_pre_debit_notification: user %s has no valid email",
+            user.pk,
+        )
+        return False
+
+    subject = "TennisFan: завтра автосписание подписки"
+
+    body = (
+        f"Здравствуйте!\n\n"
+        f"Ваша подписка «{tier_name}» истекает {end_date_str}.\n\n"
+        f"Завтра с привязанной карты будет автоматически списано {amount_rub} ₽ "
+        f"для продления подписки.\n\n"
+        f"Чтобы отключить автосписание и отвязать карту, перейдите в профиль:\n"
+        f"{profile_url}\n\n"
+        f"С уважением,\nКоманда TennisFan"
+    )
+
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru")
+
+    try:
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=body,
+            from_email=from_email,
+            to=[email],
+        )
+        msg.send(fail_silently=False)
+        logger.info(
+            "send_subscription_pre_debit_notification: sent to %s (user %s)",
+            email,
+            user.pk,
+        )
+        return True
+    except Exception as exc:
+        logger.exception(
+            "send_subscription_pre_debit_notification: failed to send to %s: %s",
+            email,
+            exc,
+        )
+        return False

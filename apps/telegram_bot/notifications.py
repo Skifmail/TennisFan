@@ -797,14 +797,26 @@ def notify_new_tournament_by_pk(tournament_pk: int) -> None:
     thread.start()
 
 
-def notify_subscription_expiring(user, subscription, days_left: int) -> None:
+def notify_subscription_expiring(
+    user,
+    subscription,
+    days_left: int,
+    *,
+    has_autopay: bool = False,
+    renew_amount: str | None = None,
+) -> None:
     """
     Уведомление пользователю об истечении подписки за N дней.
+
+    Для пользователей с автосписанием при days_left=1 добавляется сумма
+    и ссылка на отключение (требование ФЗ 376-ФЗ).
 
     Args:
         user: User объект
         subscription: UserSubscription объект
         days_left: количество дней до истечения (3 или 1)
+        has_autopay: включено ли автосписание
+        renew_amount: сумма предстоящего списания в рублях (строка)
     """
     if not bot.is_configured():
         return
@@ -856,8 +868,15 @@ def notify_subscription_expiring(user, subscription, days_left: int) -> None:
         f"Истекает: {end_date_str}\n\n"
         f"<b>Что вы потеряете:</b>\n"
         f"{features_text}\n\n"
-        f"💡 <b>Продлите подписку сейчас</b> и сохраните доступ ко всем функциям!\n"
-        f"Не упустите возможность участвовать в турнирах и общаться с сообществом."
+    )
+    if days_left == 1 and has_autopay and renew_amount:
+        text += (
+            f"💳 <b>Автосписание:</b> завтра будет списано <b>{renew_amount} ₽</b> "
+            f"с привязанной карты. Отключить автосписание можно в профиле на сайте.\n\n"
+        )
+    text += (
+        "💡 <b>Продлите подписку сейчас</b> и сохраните доступ ко всем функциям!\n"
+        "Не упустите возможность участвовать в турнирах и общаться с сообществом."
     )
 
     site_base_url = _get_site_base_url()
@@ -869,6 +888,19 @@ def notify_subscription_expiring(user, subscription, days_left: int) -> None:
             [{"text": "📋 Моя подписка", "callback_data": "menu_my_subscription"}],
         ],
     }
+    if days_left == 1 and has_autopay:
+        from django.urls import reverse
+
+        try:
+            player = getattr(user, "player", None)
+            if player is not None:
+                profile_url = reverse("profile", kwargs={"pk": player.pk})
+                profile_full_url = f"{site_base_url.rstrip('/')}{profile_url}"
+                reply_markup["inline_keyboard"].append(
+                    [{"text": "🚫 Отключить автосписание", "url": profile_full_url}]
+                )
+        except Exception:
+            pass
 
     ok = send_to_user_by_user(user, text, reply_markup=reply_markup)
     logger.info(

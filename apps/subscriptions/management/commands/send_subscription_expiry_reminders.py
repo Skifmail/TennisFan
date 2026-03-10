@@ -14,10 +14,15 @@
 import logging
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.email_service import send_subscription_pre_debit_notification
+from apps.payments.models import SavedPaymentMethod
 from apps.subscriptions.models import UserSubscription
+from apps.subscriptions.utils import get_subscription_renew_amount
 from apps.telegram_bot import notifications as tg
 from apps.telegram_bot import services as bot_services
 
@@ -108,9 +113,46 @@ class Command(BaseCommand):
                 )
             else:
                 try:
-                    tg.notify_subscription_expiring(
-                        subscription.user, subscription, days_left=1
+                    has_autopay = SavedPaymentMethod.objects.filter(
+                        user=subscription.user,
+                        is_active=True,
+                        is_default_for_subscriptions=True,
+                    ).exists()
+                    renew_amount = (
+                        str(int(get_subscription_renew_amount(subscription)))
+                        if has_autopay
+                        else None
                     )
+                    tg.notify_subscription_expiring(
+                        subscription.user,
+                        subscription,
+                        days_left=1,
+                        has_autopay=has_autopay,
+                        renew_amount=renew_amount,
+                    )
+                    if has_autopay and renew_amount:
+                        site_base = (
+                            getattr(
+                                settings,
+                                "TELEGRAM_BOT_SITE_BASE_URL",
+                                "",
+                            ).strip()
+                            or "https://tennisfan.ru"
+                        )
+                        site_base = site_base.rstrip("/")
+                        player = getattr(subscription.user, "player", None)
+                        profile_url = (
+                            f"{site_base}{reverse('profile', kwargs={'pk': player.pk})}"
+                            if player
+                            else f"{site_base}/"
+                        )
+                        send_subscription_pre_debit_notification(
+                            subscription.user,
+                            amount_rub=renew_amount,
+                            tier_name=subscription.tier.get_name_display(),
+                            end_date_str=subscription.end_date.strftime("%d.%m.%Y"),
+                            profile_url=profile_url,
+                        )
                     sent_1 += 1
                 except Exception as e:
                     logger.exception(

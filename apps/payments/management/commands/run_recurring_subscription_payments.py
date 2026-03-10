@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from decimal import Decimal
-from typing import Any, cast
+from typing import Any
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -11,32 +10,10 @@ from django.utils import timezone
 from apps.core.telegram_notify import notify_subscription_purchase
 from apps.payments.models import SavedPaymentMethod
 from apps.payments.yookassa_client import create_recurring_payment
-from apps.subscriptions.models import RegionalTierPrice, UserSubscription
-from apps.subscriptions.utils import normalize_city_for_pricing
+from apps.subscriptions.models import UserSubscription
+from apps.subscriptions.utils import get_subscription_renew_amount
 
 logger = logging.getLogger(__name__)
-
-
-def _get_subscription_renew_price(subscription: UserSubscription) -> Decimal:
-    """Рассчитать стоимость продления подписки с учётом города покупки.
-
-    Args:
-        subscription (UserSubscription): Подписка пользователя.
-
-    Returns:
-        Decimal: Сумма к списанию в рублях.
-    """
-    tier = subscription.tier
-    purchase_city = normalize_city_for_pricing(subscription.purchase_city or "")
-
-    amount: Decimal = cast(Decimal, tier.price)
-
-    if purchase_city and purchase_city != "moscow":
-        regional_price = RegionalTierPrice.objects.filter(tier=tier).first()
-        if regional_price is not None:
-            amount = cast(Decimal, regional_price.price)
-
-    return amount
 
 
 class Command(BaseCommand):
@@ -115,7 +92,7 @@ class Command(BaseCommand):
                 )
                 continue
 
-            amount = _get_subscription_renew_price(sub)
+            amount = get_subscription_renew_amount(sub)
             amount_str = f"{amount:.2f}"
             description = (
                 f"Автопродление подписки TennisFan: {sub.tier.get_name_display()}"

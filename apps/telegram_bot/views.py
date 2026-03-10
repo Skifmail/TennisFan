@@ -1288,13 +1288,18 @@ def _handle_menu_callback(callback_query: dict, base_url: str = "") -> bool:
     Отправляет контент прямо в чат бота (матчи, профиль, подписка, ссылка на сайт).
     """
     callback_data = (callback_query.get("callback_data") or "").strip()
-    if callback_data not in (
-        "menu_my_matches",
-        "menu_my_profile",
-        "menu_my_subscription",
-        "menu_private_chat",
-        "menu_go_to_site",
-        "menu_sparring",
+    if not (
+        callback_data
+        in {
+            "menu_my_matches",
+            "menu_my_profile",
+            "menu_my_subscription",
+            "menu_private_chat",
+            "menu_go_to_site",
+            "menu_sparring",
+        }
+        or callback_data.startswith("my_matches_tour_")
+        or callback_data == "my_matches_sparring"
     ):
         return False
 
@@ -1400,72 +1405,171 @@ def _handle_menu_callback_action(
                 | Q(team2__player2=player),
                 status=Match.MatchStatus.SCHEDULED,
             )
-            # Если по матчу уже отправлен результат и он ждёт подтверждения — не показываем
-            # его в списке «куда можно внести результат».
             .exclude(result_proposals__status=Match.ProposalStatus.PENDING)
             .distinct()
             .select_related("tournament", "player1", "player2", "team1", "team2")
-            .order_by("deadline", "scheduled_datetime")[:20]
+            .order_by("deadline", "scheduled_datetime")[:50]
         )
         scheduled_list = list(scheduled)
 
+        tournaments: dict[int, dict] = {}
+        sparring_matches: list[Match] = []
+        for m in scheduled_list:
+            if m.tournament_id:
+                group = tournaments.setdefault(
+                    m.tournament_id,
+                    {
+                        "tournament": m.tournament,
+                        "matches": [],
+                        "nearest_deadline": m.deadline,
+                    },
+                )
+                group["matches"].append(m)
+                if m.deadline and (
+                    group["nearest_deadline"] is None
+                    or m.deadline < group["nearest_deadline"]
+                ):
+                    group["nearest_deadline"] = m.deadline
+            elif m.match_type == Match.MatchType.SPARRING:
+                sparring_matches.append(m)
+
         lines = [
             "🎾 <b>Мои матчи</b>",
-            "<i>Только предстоящие. По сыгранным — смотрите на сайте.</i>",
+            "<i>Сначала выберите турнир или спарринг. По сыгранным матчам — смотрите раздел «Мои матчи» на сайте.</i>",
             "",
         ]
-        if not scheduled_list:
+        keyboard: list[list[dict]] = []
+
+        if not tournaments and not sparring_matches:
             lines.append("Нет предстоящих матчей.")
         else:
-            for i, m in enumerate(scheduled_list, 1):
+            idx = 1
+            for t_id, info in tournaments.items():
+                t = info["tournament"]
+                match_count = len(info["matches"])
+                deadline_str = (
+                    info["nearest_deadline"].strftime("%d.%m.%Y %H:%M")
+                    if info["nearest_deadline"]
+                    else "—"
+                )
+                lines.append(
+                    f"<b>{idx}. Турнир:</b> {t.name} · матчей: {match_count} · ближайший дедлайн: {deadline_str}"
+                )
+                keyboard.append(
+                    [
+                        {
+                            "text": f"🏆 Турнир {idx}: {t.name[:40]}",
+                            "callback_data": f"my_matches_tour_{t_id}",
+                        }
+                    ]
+                )
+                idx += 1
+            if sparring_matches:
+                lines.append("")
+                lines.append(
+                    f"<b>{idx}. Спарринги:</b> личные встречи, предстоящих матчей: {len(sparring_matches)}"
+                )
+                keyboard.append(
+                    [
+                        {
+                            "text": f"🎾 Спарринги ({len(sparring_matches)})",
+                            "callback_data": "my_matches_sparring",
+                        }
+                    ]
+                )
+
+        text = "\n".join(lines)
+        reply_markup = {"inline_keyboard": keyboard} if keyboard else None
+
+        ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer("Список турниров" if ok else "Сообщение не отправлено")
+        if not ok:
+            logger.warning(
+                "menu_my_matches: send_message failed for chat_id=%s", chat_id
+            )
+
+    elif (
+        callback_data.startswith("my_matches_tour_")
+        or callback_data == "my_matches_sparring"
+    ):
+        # Показать матчи выбранного турнира или все спарринги
+        from apps.tournaments.models import (
+            Tournament,
+        )
+
+        try:
+            selected_tournament_id: int | None
+            is_sparring = callback_data == "my_matches_sparring"
+            if is_sparring:
+                selected_tournament_id = None
+            else:
+                selected_tournament_id = int(callback_data[len("my_matches_tour_") :])
+        except (ValueError, TypeError):
+            _answer("Неверные данные")
+            return
+
+        matches_qs = Match.objects.filter(
+            Q(player1=player)
+            | Q(player2=player)
+            | Q(team1__player1=player)
+            | Q(team1__player2=player)
+            | Q(team2__player1=player)
+            | Q(team2__player2=player),
+            status=Match.MatchStatus.SCHEDULED,
+        ).exclude(result_proposals__status=Match.ProposalStatus.PENDING)
+
+        if is_sparring:
+            matches_qs = matches_qs.filter(match_type=Match.MatchType.SPARRING)
+            header = "🎾 <b>Мои спарринги</b>"
+        else:
+            matches_qs = matches_qs.filter(
+                match_type=Match.MatchType.TOURNAMENT,
+                tournament_id=selected_tournament_id,
+            )
+            t_obj = Tournament.objects.filter(pk=selected_tournament_id).first()
+            t_name = t_obj.name if t_obj else "Турнир"
+            header = f"🏆 <b>{t_name}</b>"
+
+        matches = list(
+            matches_qs.select_related(
+                "tournament", "player1", "player2", "team1", "team2"
+            ).order_by("deadline", "scheduled_datetime")[:20]
+        )
+
+        lines = [header, "", "<i>Выберите матч, чтобы внести результат.</i>", ""]
+        sub_keyboard: list[list[dict]] = []
+
+        if not matches:
+            lines.append("Нет предстоящих матчей для этого выбора.")
+        else:
+            for i, m in enumerate(matches, 1):
                 deadline_str = (
                     m.deadline.strftime("%d.%m.%Y %H:%M") if m.deadline else "—"
                 )
                 round_name = m.round_name or "—"
                 p1 = m.get_player1_display()
                 p2 = m.get_player2_display()
-                tour_name = m.tournament.name if m.tournament else "Спарринг"
-                if (
-                    m.tournament
-                    and getattr(m.tournament, "format", None) == "weekend_day"
-                ):
-                    tour_name = f"{tour_name} (OneDay)"
                 lines.append("─────────────────")
-                lines.append(f"<b>{i}. {tour_name}</b> · {round_name}")
+                lines.append(f"<b>{i}.</b> {round_name}")
                 lines.append(f"   {p1}\n   vs\n   {p2}")
                 lines.append(f"   📅 Дедлайн: {deadline_str}")
-                lines.append("")
-            lines.append("─────────────────")
-            lines.append("")
-            lines.append("<b>Внести результат</b> — выберите матч кнопкой ниже:")
+                btn_label = f"📝 Матч {i}: {round_name}"
+                if len(btn_label) > 64:
+                    btn_label = (btn_label[:61]).rstrip() + "…"
+                sub_keyboard.append(
+                    [
+                        {
+                            "text": btn_label,
+                            "callback_data": f"result_enter_{m.pk}",
+                        }
+                    ]
+                )
 
         text = "\n".join(lines)
-
-        reply_markup = None
-        if scheduled_list:
-            keyboard = []
-            for i, m in enumerate(scheduled_list[:10], 1):
-                tour_name = m.tournament.name if m.tournament else "Спарринг"
-                if (
-                    m.tournament
-                    and getattr(m.tournament, "format", None) == "weekend_day"
-                ):
-                    tour_name = f"{tour_name} (OneDay)"
-                label = f"{tour_name}, {m.round_name or 'раунд'}"
-                btn_text = f"📝 Матч {i}: {label}"
-                if len(btn_text) > 64:
-                    btn_text = (f"📝 Матч {i}: {label}"[:61]).rstrip() + "…"
-                keyboard.append(
-                    [{"text": btn_text, "callback_data": f"result_enter_{m.pk}"}]
-                )
-            reply_markup = {"inline_keyboard": keyboard}
-
+        reply_markup = {"inline_keyboard": sub_keyboard} if sub_keyboard else None
         ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
-        _answer("Список матчей" if ok else "Сообщение не отправлено")
-        if not ok:
-            logger.warning(
-                "menu_my_matches: send_message failed for chat_id=%s", chat_id
-            )
+        _answer("Матчи" if ok else "Сообщение не отправлено")
+        return
 
     elif callback_data == "menu_my_profile":
         try:

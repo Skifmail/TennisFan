@@ -3,9 +3,93 @@
 {% block content %}
 <div class="page-header">
     <h1 class="page-title">Мои матчи</h1>
+    {% if current_tournament %}
+    <p class="page-subtitle">
+        Матчи турнира «{{ current_tournament.name }}»{% if current_tournament.city %} · {{ current_tournament.city }}{% endif %}.
+        <a href="{% url 'my_matches' %}" class="text-primary">Вернуться к списку турниров и спаррингов</a>
+    </p>
+    {% elif is_sparring_group %}
+    <p class="page-subtitle">
+        Личные встречи (все спарринговые матчи с вашим участием).
+        <a href="{% url 'my_matches' %}" class="text-primary">Вернуться к списку турниров и спаррингов</a>
+    </p>
+    {% else %}
+    <p class="page-subtitle">
+        Выберите турнир или спарринг, чтобы посмотреть свои матчи и внести результат.
+    </p>
+    {% endif %}
 </div>
 <div class="container">
-    {% if matches %}
+    {% if not current_tournament and not is_sparring_group %}
+    <form method="get" class="d-flex flex-wrap gap-2 mb-4 my-matches-filters">
+        <div class="form-group" style="flex: 1 1 240px;">
+            <input type="text"
+                   name="q"
+                   class="form-control"
+                   placeholder="Название турнира или город"
+                   value="{{ search_query }}">
+        </div>
+        <div class="form-group" style="flex: 0 0 220px;">
+            <select name="kind" class="form-control">
+                <option value="" {% if not kind_filter %}selected{% endif %}>Турниры и спарринги</option>
+                <option value="tournaments" {% if kind_filter == 'tournaments' %}selected{% endif %}>Только турниры</option>
+                <option value="sparring" {% if kind_filter == 'sparring' %}selected{% endif %}>Только спарринги</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-outline">Найти</button>
+    </form>
+
+    <div class="my-matches-grid">
+        {% for t in tournaments %}
+        <div class="card match-card-item">
+            <div class="card-body match-card-item__body">
+                <div class="match-meta">
+                    <div class="text-secondary" style="font-size: var(--font-size-sm);">
+                        Турнир · {{ t.name }}{% if t.city %} · {{ t.city }}{% endif %}
+                    </div>
+                    <div style="font-size: var(--font-size-sm);">
+                        {% if t.start_date %}
+                            {{ t.start_date|date:"d.m.Y" }}{% if t.end_date %} – {{ t.end_date|date:"d.m.Y" }}{% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--spacing-sm);">
+                    Матчей с вашим участием: {{ t.match_count }}
+                    {% if t.nearest_deadline %}
+                        · ближайший дедлайн: {{ t.nearest_deadline|date:"d.m.Y" }}
+                    {% endif %}
+                </div>
+                <div class="match-card-item__actions" style="margin-top: var(--spacing-md);">
+                    <a href="{% url 'my_matches' %}?tournament={{ t.slug }}" class="btn btn-primary match-card-item__btn">Открыть матчи турнира</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-secondary" style="grid-column: 1 / -1;">
+            Турниров с вашими матчами не найдено.
+        </p>
+        {% endfor %}
+
+        {% if show_sparring_group and sparring_match_count %}
+        <div class="card match-card-item">
+            <div class="card-body match-card-item__body">
+                <div class="match-meta">
+                    <div class="text-secondary" style="font-size: var(--font-size-sm);">
+                        Спарринги · Личные встречи
+                    </div>
+                </div>
+                <div class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--spacing-sm);">
+                    Матчей спарринга с вашим участием: {{ sparring_match_count }}
+                </div>
+                <div class="match-card-item__actions" style="margin-top: var(--spacing-md);">
+                    <a href="{% url 'my_matches' %}?sparring=1" class="btn btn-outline match-card-item__btn">Показать спарринги</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% elif matches %}
     <div class="my-matches-grid">
         {% for match in matches %}
         <div class="card match-card-item">

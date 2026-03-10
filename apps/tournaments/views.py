@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db import models
-from django.db.models import Prefetch, Q
+from django.db.models import Count, Min, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -2162,22 +2162,29 @@ def match_detail(request, pk):
 
 @login_required
 def my_matches(request):
-    """List matches for current player."""
+    """Страница «Мои матчи»: сначала список турниров/спаррингов, затем матчи выбранной группы."""
 
     player = getattr(request.user, "player", None)
     if player is None:
         player = Player.objects.create(user=request.user)
 
-    matches = (
-        Match.objects.filter(
-            models.Q(player1=player)
-            | models.Q(player2=player)
-            | models.Q(team1__player1=player)
-            | models.Q(team1__player2=player)
-            | models.Q(team2__player1=player)
-            | models.Q(team2__player2=player)
-        )
-        .select_related(
+    tournament_slug = (request.GET.get("tournament") or "").strip()
+    is_sparring_group = request.GET.get("sparring") == "1"
+    search_query = (request.GET.get("q") or "").strip()
+    kind_filter = (request.GET.get("kind") or "").strip()
+
+    base_q = (
+        models.Q(player1=player)
+        | models.Q(player2=player)
+        | models.Q(team1__player1=player)
+        | models.Q(team1__player2=player)
+        | models.Q(team2__player1=player)
+        | models.Q(team2__player2=player)
+    )
+
+    # Детальный режим: показываем матчи конкретного турнира или все спарринги
+    if tournament_slug or is_sparring_group:
+        matches_qs = Match.objects.filter(base_q).select_related(
             "player1__user",
             "player2__user",
             "tournament",
@@ -2187,41 +2194,103 @@ def my_matches(request):
             "team2__player2__user",
             "sparring_response__sparring_request",
         )
-        .order_by("deadline")
-    )
+        current_tournament: Tournament | None = None
+        if tournament_slug:
+            matches_qs = matches_qs.filter(
+                tournament__slug=tournament_slug,
+                match_type=Match.MatchType.TOURNAMENT,
+            )
+            current_tournament = Tournament.objects.filter(slug=tournament_slug).first()
+        else:
+            matches_qs = matches_qs.filter(match_type=Match.MatchType.SPARRING)
 
-    proposals = MatchResultProposal.objects.filter(match__in=matches).select_related(
-        "proposer", "match"
-    )
-    # Group all pending proposals by match_id
-    pending_by_match = {}
-    for p in proposals:
-        if p.status == Match.ProposalStatus.PENDING:
-            if p.match_id not in pending_by_match:
-                pending_by_match[p.match_id] = []
-            pending_by_match[p.match_id].append(p)
+        matches = list(matches_qs.order_by("deadline", "scheduled_datetime", "pk"))
 
-    for m in matches:
-        m.pending_proposals = pending_by_match.get(m.id, [])
-        m.has_pending = len(m.pending_proposals) > 0
+        proposals = MatchResultProposal.objects.filter(
+            match__in=matches
+        ).select_related("proposer", "match")
+        pending_by_match: dict[int, list[MatchResultProposal]] = {}
+        for p in proposals:
+            if p.status == Match.ProposalStatus.PENDING:
+                pending_by_match.setdefault(p.match_id, []).append(p)
 
-    # Статус возможности оценки соперника (кнопка «Оценить соперника» в карточке матча)
-    try:
-        from apps.player_ratings.services import get_match_rating_status
-    except Exception:
-        get_match_rating_status = None
-
-    if get_match_rating_status is not None and request.user.is_authenticated:
         for m in matches:
-            # rating_status: { can_rate, already_rated, can_edit, reason, rate_url }
-            m.rating_status = get_match_rating_status(m, player)
+            m.pending_proposals = pending_by_match.get(m.id, [])
+            m.has_pending = bool(m.pending_proposals)
+
+        try:
+            from apps.player_ratings.services import get_match_rating_status
+        except Exception:
+            get_match_rating_status = None
+
+        if get_match_rating_status is not None and request.user.is_authenticated:
+            for m in matches:
+                m.rating_status = get_match_rating_status(m, player)
+
+        return render(
+            request,
+            "tournaments/my_matches.html",
+            {
+                "matches": matches,
+                "player": player,
+                "current_tournament": current_tournament,
+                "is_sparring_group": is_sparring_group,
+                "search_query": search_query,
+                "kind_filter": kind_filter,
+            },
+        )
+
+    # Режим списка турниров/спаррингов
+    participant_matches = Match.objects.filter(base_q).select_related(
+        "tournament",
+    )
+
+    tournament_matches = participant_matches.filter(
+        match_type=Match.MatchType.TOURNAMENT, tournament__isnull=False
+    )
+
+    tournaments_qs = (
+        Tournament.objects.filter(matches__in=tournament_matches)
+        .distinct()
+        .annotate(
+            match_count=Count(
+                "matches", filter=models.Q(matches__in=tournament_matches)
+            ),
+            nearest_deadline=Min("matches__deadline"),
+        )
+        .order_by("-start_date")
+    )
+    if search_query:
+        tournaments_qs = tournaments_qs.filter(
+            Q(name__icontains=search_query) | Q(city__icontains=search_query)
+        )
+
+    tournaments = list(tournaments_qs)
+    sparring_count = (
+        participant_matches.filter(match_type=Match.MatchType.SPARRING)
+        .distinct()
+        .count()
+    )
+
+    if kind_filter == "tournaments":
+        show_sparring_group = False
+    elif kind_filter == "sparring":
+        tournaments = []
+        show_sparring_group = sparring_count > 0
+    else:
+        show_sparring_group = sparring_count > 0
 
     return render(
         request,
         "tournaments/my_matches.html",
         {
-            "matches": matches,
+            "matches": [],
             "player": player,
+            "tournaments": tournaments,
+            "sparring_match_count": sparring_count,
+            "show_sparring_group": show_sparring_group,
+            "search_query": search_query,
+            "kind_filter": kind_filter,
         },
     )
 

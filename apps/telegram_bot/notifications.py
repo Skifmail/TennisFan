@@ -1025,3 +1025,47 @@ def notify_doubles_join_accepted(join_request) -> None:
         "notify_doubles_join_accepted: join_request=%s",
         join_request.pk,
     )
+
+
+def notify_team_sparring_ready(match_request) -> None:
+    """
+    Уведомление автору командного спарринга:
+    команды сформированы (4 участника), можно сформировать матчи.
+    """
+    if not bot.is_configured():
+        return
+    author_user = getattr(match_request.created_by, "user", None)
+    if not author_user:
+        return
+
+    text = (
+        "🎾 <b>Командный спарринг готов</b>\n\n"
+        "Вы одобрили все отклики, обе команды сформированы (4 участника).\n\n"
+        "Нажмите кнопку ниже, чтобы создать серию матчей:\n"
+        "• 4 одиночных матча (каждый против каждого из другой команды)\n"
+        "• 1 парный матч 2×2\n\n"
+        "После создания матчи появятся в разделе «Мои матчи»."
+    )
+    reply_markup = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "✅ Сформировать матчи",
+                    "callback_data": f"team_sparring_generate_{match_request.pk}",
+                }
+            ],
+            [
+                {
+                    "text": "📅 Мои матчи",
+                    "callback_data": "menu_my_matches",
+                }
+            ],
+        ],
+    }
+    ok = send_to_user_by_user(author_user, text, reply_markup=reply_markup)
+    logger.info(
+        "notify_team_sparring_ready: request=%s, user=%s, sent=%s",
+        match_request.pk,
+        getattr(author_user, "pk", None),
+        ok,
+    )

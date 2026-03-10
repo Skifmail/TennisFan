@@ -763,8 +763,18 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
     - sparring_del_req_<id>, sparring_cancel_resp_<id>
     - sparring_req_<id>, sparring_cand_<id>, sparring_profile_<id>
     - contact_{response_id}, confirm_match_{response_id}
+    - team_sparring_generate_{request_id}
     """
-    from apps.sparring.models import SparringRequest, SparringResponse
+    from apps.sparring.doubles_services import (
+        DoublesMatchKind,
+        DoublesMatchRequestStatus,
+        confirm_team_sparring_series,
+    )
+    from apps.sparring.models import (
+        DoublesMatchRequest,
+        SparringRequest,
+        SparringResponse,
+    )
 
     callback_data = (callback_query.get("callback_data") or "").strip()
     cq_id = callback_query.get("id")
@@ -776,6 +786,7 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
         callback_data.startswith("contact_")
         or callback_data.startswith("confirm_match_")
         or callback_data.startswith("sparring_")
+        or callback_data.startswith("team_sparring_generate_")
     )
     if not is_sparring:
         return False
@@ -795,6 +806,68 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
     player = getattr(user, "player", None)
     if not player:
         _answer_callback(cq_id, "Создайте профиль игрока на сайте.", show_alert=True)
+        return True
+
+    # ——— Командный спарринг: сформировать матчи ———
+    if callback_data.startswith("team_sparring_generate_"):
+        try:
+            req_id = int(callback_data[len("team_sparring_generate_") :])
+        except (ValueError, TypeError):
+            _answer_callback(cq_id, "Неверные данные.", show_alert=True)
+            return True
+
+        req = (
+            DoublesMatchRequest.objects.select_related("created_by")
+            .prefetch_related("teams__members")
+            .filter(pk=req_id)
+            .first()
+        )
+        if not req:
+            _answer_callback(cq_id, "Заявка не найдена.", show_alert=True)
+            return True
+        if req.created_by_id != player.id:
+            _answer_callback(
+                cq_id,
+                "Только автор заявки может формировать матчи.",
+                show_alert=True,
+            )
+            return True
+        if req.kind != DoublesMatchKind.TEAM:
+            _answer_callback(
+                cq_id, "Эта заявка не является командным спаррингом.", show_alert=True
+            )
+            return True
+        if req.status != DoublesMatchRequestStatus.READY:
+            _answer_callback(
+                cq_id,
+                "Команды ещё не полные. Нужны 2 игрока в каждой команде.",
+                show_alert=True,
+            )
+            return True
+
+        try:
+            matches = confirm_team_sparring_series(
+                match_request_id=req_id, confirmed_by=player
+            )
+        except Exception as exc:
+            logger.exception("team_sparring_generate failed: %s", exc)
+            _answer_callback(
+                cq_id,
+                "Ошибка при создании матчей. Попробуйте позже.",
+                show_alert=True,
+            )
+            return True
+
+        total = len(matches)
+        singles_count = max(0, total - 1)
+        _answer_callback(cq_id, "Матчи созданы!")
+        bot.send_to_user(
+            chat_id,
+            "✅ <b>Матчи командного спарринга созданы</b>\n\n"
+            f"Создано одиночных матчей: <b>{singles_count}</b>\n"
+            f"Создано парных матчей 2×2: <b>1</b>\n\n"
+            "Проверьте раздел «Мои матчи» на сайте или в боте.",
+        )
         return True
 
     # ——— A. Мои заявки ———

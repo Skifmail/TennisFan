@@ -1,21 +1,28 @@
 {% extends 'base.html' %}
 {% load skill_tags %}
 
-{% block title %}Парный матч 2×2 · Заявка #{{ doubles_request.pk }}{% endblock %}
+{% block title %}
+    {% if is_team_sparring %}Командный спарринг · Заявка #{{ doubles_request.pk }}{% else %}Парный матч 2×2 · Заявка #{{ doubles_request.pk }}{% endif %}
+{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="mb-4">
-        <a href="{% url 'sparring_list' %}?type=doubles" class="text-secondary">← Все заявки 2×2</a>
+        <a href="{% url 'sparring_list' %}?type={% if is_team_sparring %}team{% else %}doubles{% endif %}" class="text-secondary">
+            ← {% if is_team_sparring %}Все командные спарринги{% else %}Все заявки 2×2{% endif %}
+        </a>
         {% if is_author %}
-        · <a href="{% url 'sparring_my_requests' %}?type=doubles" class="text-secondary">Мои заявки</a>
+        · <a href="{% url 'sparring_my_requests' %}?type={% if is_team_sparring %}team{% else %}doubles{% endif %}" class="text-secondary">Мои заявки</a>
         {% endif %}
     </div>
 
     <div class="card" style="max-width: 700px;">
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <div class="sparring-card__flags mb-3">
-                <span class="sparring-flag sparring-flag--type">{{ doubles_request.get_status_display }}</span>
+                <span class="sparring-flag sparring-flag--type">
+                    {% if is_team_sparring %}Командный спарринг{% else %}Парный 2×2{% endif %}
+                </span>
+                <span class="sparring-flag sparring-flag--gender">{{ doubles_request.get_status_display }}</span>
                 {% if doubles_request.is_friendly %}
                 <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
                 {% endif %}
@@ -57,6 +64,12 @@
                     {% elif doubles_request.desired_age_max %}
                         до {{ doubles_request.desired_age_max }} {{ doubles_request.desired_age_max|years_suffix }}
                     {% endif %}
+                </p>
+                {% endif %}
+                {% if is_team_sparring %}
+                <p class="mb-1">
+                    В командном спарринге система создаст 4 одиночных матча (каждый против каждого из другой команды)
+                    и один парный матч 2×2.
                 </p>
                 {% endif %}
             </div>
@@ -152,7 +165,9 @@
                 {% if can_confirm %}
                 <form method="post" action="{% url 'doubles_confirm' pk=doubles_request.pk %}">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-primary" onclick="return confirm('Подтвердить состав и создать матч?');">Подтвердить матч</button>
+                    <button type="submit" class="btn btn-primary" onclick="return confirm('{% if is_team_sparring %}Сформировать серию матчей для этого командного спарринга?{% else %}Подтвердить состав и создать матч?{% endif %}');">
+                        {% if is_team_sparring %}Сформировать матчи{% else %}Подтвердить матч{% endif %}
+                    </button>
                 </form>
                 {% endif %}
 

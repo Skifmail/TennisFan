@@ -1,5 +1,6 @@
 import logging
 from decimal import Decimal
+from typing import cast
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -11,11 +12,13 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from apps.core.models import LegalAcceptanceLog
+from apps.legal.utils import get_legal_document_version
 from apps.subscriptions.models import SubscriptionTier
 from apps.tournaments.models import Tournament
 
 from .forms import DonateForm
-from .models import SavedPaymentMethod
+from .models import PaymentRecord, SavedPaymentMethod
 from .yookassa_client import (
     create_payment,
     get_payment_details,
@@ -23,6 +26,92 @@ from .yookassa_client import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _get_request_ip(request: HttpRequest) -> str | None:
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip() or None
+    remote_addr = request.META.get("REMOTE_ADDR", "").strip()
+    return remote_addr or None
+
+
+def _get_item_label(payment_type: str, item_id: str) -> str:
+    if payment_type == "subscription":
+        try:
+            tier = SubscriptionTier.objects.filter(pk=int(item_id)).first()
+        except (TypeError, ValueError):
+            tier = None
+        if tier is None:
+            return "Подписка"
+        return cast(str, tier.get_name_display())
+
+    if payment_type == "tournament":
+        try:
+            tournament = Tournament.objects.filter(pk=int(item_id)).first()
+        except (TypeError, ValueError):
+            tournament = None
+        if tournament is None:
+            return "Турнир"
+        return cast(str, tournament.title)
+
+    if payment_type == "donation":
+        return "Поддержка проекта"
+
+    return "Оплата"
+
+
+def _log_offer_acceptance(
+    request: HttpRequest,
+    *,
+    user,
+    payment_type: str,
+    item_id: str,
+    payment_id: str,
+) -> None:
+    LegalAcceptanceLog.objects.create(
+        user=user,
+        document_slug="offer",
+        document_version=get_legal_document_version("offer"),
+        source="payment",
+        ip_address=_get_request_ip(request),
+        user_agent=request.META.get("HTTP_USER_AGENT", "").strip(),
+        metadata={
+            "payment_type": payment_type,
+            "item_id": item_id,
+            "payment_id": payment_id,
+        },
+    )
+
+
+def _create_payment_record(
+    *,
+    user,
+    payment_type: str,
+    item_id: str,
+    amount_str: str,
+    payment_id: str,
+    autopay_enabled: bool,
+) -> None:
+    try:
+        amount = Decimal(amount_str)
+    except Exception:
+        amount = Decimal("0")
+
+    PaymentRecord.objects.update_or_create(
+        user=user,
+        yookassa_payment_id=payment_id,
+        defaults={
+            "payment_type": payment_type or PaymentRecord.PaymentType.DONATION,
+            "item_id": item_id,
+            "item_label": _get_item_label(payment_type, item_id),
+            "amount": amount,
+            "status": "succeeded",
+            "is_recurring": False,
+            "autopay_enabled": autopay_enabled,
+            "metadata": {},
+        },
+    )
 
 
 def _is_offer_accepted(request: HttpRequest) -> bool:
@@ -531,6 +620,23 @@ def payment_return(request: HttpRequest) -> HttpResponse:
                         "is_default_for_subscriptions": True,
                     },
                 )
+
+    if request.user.is_authenticated and payment_id:
+        _log_offer_acceptance(
+            request,
+            user=request.user,
+            payment_type=payment_type,
+            item_id=item_id,
+            payment_id=payment_id,
+        )
+        _create_payment_record(
+            user=request.user,
+            payment_type=payment_type,
+            item_id=item_id,
+            amount_str=str(pending.get("amount", "")),
+            payment_id=payment_id,
+            autopay_enabled=enable_autopay,
+        )
 
     del request.session["yookassa_pending"]
     request.session.modified = True

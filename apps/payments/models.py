@@ -120,3 +120,101 @@ class SavedPaymentMethod(models.Model):
         self.save(
             update_fields=["is_active", "is_default_for_subscriptions", "updated_at"]
         )
+
+
+class PaymentRecord(models.Model):
+    """Журнал успешных оплат пользователя.
+
+    Модель хранит краткую историю оплат, связанных с сайтом: подписки,
+    турнирные взносы и донаты. Запись создаётся после подтверждения успеха
+    платежа или после успешного рекуррентного списания.
+    """
+
+    class PaymentType(models.TextChoices):
+        """Типы оплат, фиксируемые в журнале."""
+
+        SUBSCRIPTION = "subscription", "Подписка"
+        TOURNAMENT = "tournament", "Турнир"
+        DONATION = "donation", "Донат"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="payment_records",
+        verbose_name="Пользователь",
+    )
+    payment_type = models.CharField(
+        "Тип оплаты",
+        max_length=32,
+        choices=PaymentType.choices,
+        db_index=True,
+    )
+    item_id = models.CharField(
+        "ID объекта",
+        max_length=64,
+        blank=True,
+        help_text="ID тарифа, турнира или другого объекта оплаты.",
+    )
+    item_label = models.CharField(
+        "Наименование",
+        max_length=255,
+        blank=True,
+    )
+    amount = models.DecimalField(
+        "Сумма",
+        max_digits=10,
+        decimal_places=2,
+    )
+    currency = models.CharField(
+        "Валюта",
+        max_length=8,
+        default="RUB",
+    )
+    status = models.CharField(
+        "Статус",
+        max_length=32,
+        default="succeeded",
+        db_index=True,
+    )
+    yookassa_payment_id = models.CharField(
+        "ID платежа в ЮKassa",
+        max_length=128,
+        blank=True,
+        db_index=True,
+    )
+    is_recurring = models.BooleanField(
+        "Рекуррентный платёж",
+        default=False,
+    )
+    autopay_enabled = models.BooleanField(
+        "С автосписанием",
+        default=False,
+        help_text="Показывает, включал ли пользователь автопродление при оплате.",
+    )
+    metadata = models.JSONField(
+        "Дополнительные данные",
+        default=dict,
+        blank=True,
+    )
+    paid_at = models.DateTimeField(
+        "Дата оплаты",
+        default=timezone.now,
+        db_index=True,
+    )
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "запись об оплате"
+        verbose_name_plural = "записи об оплатах"
+        ordering = ["-paid_at", "-id"]
+
+    def __str__(self) -> str:
+        """Вернуть краткое описание платежа.
+
+        Returns:
+            str: Тип, сумма и пользователь.
+        """
+        return (
+            f"{self.get_payment_type_display()} {self.amount} {self.currency} / "
+            f"{self.user}"
+        )

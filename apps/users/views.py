@@ -22,12 +22,35 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from apps.core.decorators import login_required_with_message
-from apps.core.models import UserTelegramLink
+from apps.core.models import LegalAcceptanceLog, UserTelegramLink
+from apps.legal.utils import get_legal_document_version
 
 from .forms import PlayerProfileForm, UserRegistrationForm
 from .models import Notification, NtrpTestResult, Player
 
 logger = logging.getLogger(__name__)
+
+
+def _get_request_ip(request) -> str | None:
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip() or None
+    remote_addr = request.META.get("REMOTE_ADDR", "").strip()
+    return remote_addr or None
+
+
+def _log_registration_legal_acceptances(request, user) -> None:
+    ip_address = _get_request_ip(request)
+    user_agent = request.META.get("HTTP_USER_AGENT", "").strip()
+    for document_slug in ("personal-data", "privacy"):
+        LegalAcceptanceLog.objects.create(
+            user=user,
+            document_slug=document_slug,
+            document_version=get_legal_document_version(document_slug),
+            source="registration",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
 
 
 def _can_view_profile_stats(request_user: Any, player: Player) -> bool:
@@ -368,6 +391,7 @@ def auth(request):
                 from apps.core.email_service import send_welcome_email
 
                 send_welcome_email(user)
+                _log_registration_legal_acceptances(request, user)
 
                 login(
                     request,

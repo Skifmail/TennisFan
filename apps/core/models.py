@@ -137,6 +137,76 @@ class TelegramTransferConsentLog(models.Model):
         )
 
 
+class LegalAcceptanceLog(models.Model):
+    """Журнал фиксации согласий и акцептов юридических документов.
+
+    Модель хранит подтверждение того, что пользователь принял конкретный
+    юридический документ: согласие на обработку ПДн, политику
+    конфиденциальности, публичную оферту и т.д.
+    """
+
+    class DocumentSlug(models.TextChoices):
+        """Поддерживаемые типы юридических документов."""
+
+        PERSONAL_DATA = "personal-data", "Согласие на обработку ПДн"
+        PRIVACY = "privacy", "Политика конфиденциальности"
+        OFFER = "offer", "Публичная оферта"
+        TERMS = "terms", "Пользовательское соглашение"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="legal_acceptances",
+        verbose_name="Пользователь",
+    )
+    document_slug = models.CharField(
+        "Документ",
+        max_length=32,
+        choices=DocumentSlug.choices,
+        db_index=True,
+    )
+    document_version = models.CharField(
+        "Версия документа",
+        max_length=64,
+        default="unknown",
+        db_index=True,
+    )
+    source = models.CharField(
+        "Источник акцепта",
+        max_length=64,
+        default="site",
+        help_text="Например: registration, payment, profile.",
+    )
+    ip_address = models.GenericIPAddressField(
+        "IP-адрес",
+        null=True,
+        blank=True,
+    )
+    user_agent = models.TextField("User-Agent", blank=True, default="")
+    metadata = models.JSONField(
+        "Дополнительные данные",
+        default=dict,
+        blank=True,
+    )
+    accepted_at = models.DateTimeField("Дата и время фиксации", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-accepted_at"]
+        verbose_name = "фиксация согласия с документом"
+        verbose_name_plural = "фиксации согласий с документами"
+
+    def __str__(self) -> str:
+        """Вернуть краткое представление записи журнала.
+
+        Returns:
+            str: Пользователь, документ и время фиксации.
+        """
+        return (
+            f"{self.user} / {self.get_document_slug_display()} / "
+            f"{self.accepted_at:%d.%m.%Y %H:%M}"
+        )
+
+
 class SupportMessage(models.Model):
     """
     Сообщение в системе поддержки: от пользователя (с сайта или из Telegram)

@@ -41,7 +41,7 @@
                     {% endif %}
 
                     <!-- Этап 1: персональные данные -->
-                    <div class="register-step register-step-1" id="register-step-1">
+                    <div class="register-step register-step-1 {% if show_register_step2 %}hidden{% endif %}" id="register-step-1">
                         <h3 class="register-step-title">Шаг 1. Персональные данные</h3>
                         <div class="register-step-fields">
                             <div class="form-group">
@@ -140,7 +140,7 @@
                     </div>
 
                     <!-- Этап 2: Уровень силы (ручной ввод или калькулятор) -->
-                    <div class="register-step register-step-2 hidden" id="register-step-2">
+                    <div class="register-step register-step-2 {% if not show_register_step2 %}hidden{% endif %}" id="register-step-2">
                         <h3 class="register-step-title">Шаг 2. Уровень силы</h3>
                         <p class="text-secondary register-form-ntrp-note">Укажите свой уровень или пройдите калькулятор, если не уверены.</p>
                         <div class="form-group">

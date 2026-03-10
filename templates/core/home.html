@@ -26,23 +26,31 @@
                 <div class="hero-metric-divider"></div>
                 <div class="hero-metric">
                     <span class="hero-metric__value">{{ hero_stats.tournaments_count|default:"0" }}</span>
-                    <span class="hero-metric__label">активных турниров</span>
+                    <span class="hero-metric__label">
+                        {{ hero_stats.tournaments_count|default:"0"|ru_pluralize:"активный турнир,активных турнира,активных турниров" }}
+                    </span>
                 </div>
                 <div class="hero-metric-divider"></div>
                 <div class="hero-metric">
                     <span class="hero-metric__value">{{ hero_stats.matches_count|default:"0" }}</span>
-                    <span class="hero-metric__label">сыгранных матчей</span>
+                    <span class="hero-metric__label">
+                        {{ hero_stats.matches_count|default:"0"|ru_pluralize:"сыгранный матч,сыгранных матча,сыгранных матчей" }}
+                    </span>
                 </div>
             </div>
             <div class="hero-metrics hero-metrics--premium">
                 <div class="hero-metric">
                     <span class="hero-metric__value">{{ hero_stats.courts_count|default:"0" }}</span>
-                    <span class="hero-metric__label">кортов</span>
+                    <span class="hero-metric__label">
+                        {{ hero_stats.courts_count|default:"0"|ru_pluralize:"корт,корта,кортов" }}
+                    </span>
                 </div>
                 <div class="hero-metric-divider"></div>
                 <div class="hero-metric">
                     <span class="hero-metric__value">{{ hero_stats.cities_count|default:"0" }}</span>
-                    <span class="hero-metric__label">городов</span>
+                    <span class="hero-metric__label">
+                        {{ hero_stats.cities_count|default:"0"|ru_pluralize:"город,города,городов" }}
+                    </span>
                 </div>
                 <div class="hero-metric-divider"></div>
                 <div class="hero-metric">

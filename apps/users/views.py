@@ -362,6 +362,11 @@ def auth(request):
                 from apps.core.telegram_notify import notify_new_registration
 
                 notify_new_registration(user, player)
+
+                from apps.core.email_service import send_welcome_email
+
+                send_welcome_email(user)
+
                 login(
                     request,
                     user,

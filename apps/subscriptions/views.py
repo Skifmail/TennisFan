@@ -169,6 +169,24 @@ def buy_subscription(request, tier_id):
 
     _mark_user_paid_subscription(request.user)
 
+    try:
+        from apps.payments.models import PaymentRecord
+        from apps.subscriptions.utils import get_subscription_renew_amount
+
+        PaymentRecord.objects.create(
+            user=request.user,
+            payment_type=PaymentRecord.PaymentType.SUBSCRIPTION,
+            item_id=str(tier.pk),
+            item_label=tier.get_name_display(),
+            amount=get_subscription_renew_amount(sub),
+            status="manual_success",
+            is_recurring=False,
+            autopay_enabled=False,
+            metadata={"source": "legacy_buy_subscription"},
+        )
+    except Exception as exc:
+        logger.warning("PaymentRecord create failed in buy_subscription: %s", exc)
+
     from apps.core.telegram_notify import notify_subscription_purchase
 
     notify_subscription_purchase(request.user, tier)

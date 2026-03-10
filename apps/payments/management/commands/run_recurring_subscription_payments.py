@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.core.telegram_notify import notify_subscription_purchase
-from apps.payments.models import SavedPaymentMethod
+from apps.payments.models import PaymentRecord, SavedPaymentMethod
 from apps.payments.yookassa_client import create_recurring_payment
 from apps.subscriptions.models import UserSubscription
 from apps.subscriptions.utils import get_subscription_renew_amount
@@ -128,6 +128,23 @@ class Command(BaseCommand):
                 )
 
                 if status == "succeeded":
+                    PaymentRecord.objects.update_or_create(
+                        user=user,
+                        yookassa_payment_id=payment_id,
+                        defaults={
+                            "payment_type": PaymentRecord.PaymentType.SUBSCRIPTION,
+                            "item_id": str(sub.tier_id),
+                            "item_label": sub.tier.get_name_display(),
+                            "amount": amount,
+                            "status": status,
+                            "is_recurring": True,
+                            "autopay_enabled": True,
+                            "metadata": {
+                                "subscription_id": sub.pk,
+                                "payment_method_id": payment_method.payment_method_id,
+                            },
+                        },
+                    )
                     # Продлеваем подписку по тем же правилам, что и при ручной оплате.
                     now_local = timezone.now()
                     base = (

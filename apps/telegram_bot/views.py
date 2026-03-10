@@ -1300,6 +1300,7 @@ def _handle_menu_callback(callback_query: dict, base_url: str = "") -> bool:
         }
         or callback_data.startswith("my_matches_tour_")
         or callback_data == "my_matches_sparring"
+        or callback_data.startswith("subscription_tier_")
     ):
         return False
 
@@ -1571,6 +1572,119 @@ def _handle_menu_callback_action(
         _answer("Матчи" if ok else "Сообщение не отправлено")
         return
 
+    elif callback_data.startswith("subscription_tier_"):
+        # Детальная карточка тарифа + кнопка оплаты
+        if not base_url:
+            _answer("Ссылка на оплату недоступна")
+            return
+
+        base = base_url.rstrip("/")
+        try:
+            tier_id = int(callback_data[len("subscription_tier_") :])
+        except (ValueError, TypeError):
+            _answer("Неверные данные тарифа")
+            return
+
+        tier_obj = SubscriptionTier.objects.filter(is_visible=True, id=tier_id).first()
+        if not tier_obj:
+            _answer("Тариф недоступен")
+            return
+
+        # Красивая карточка тарифа
+        name = tier_obj.display_name or tier_obj.get_name_display()
+        price_str = f"{tier_obj.price} ₽"
+
+        # Акционная цена
+        now = timezone.now()
+        show_original = (
+            tier_obj.original_price is not None
+            and tier_obj.original_price > tier_obj.price
+            and (
+                tier_obj.original_price_ends_at is None
+                or tier_obj.original_price_ends_at > now
+            )
+        )
+        if show_original:
+            price_block = (
+                f"💰 <b>Стоимость:</b> <s>{tier_obj.original_price} ₽</s> → {price_str}"
+            )
+        else:
+            price_block = f"💰 <b>Стоимость:</b> {price_str}"
+
+        # Особые бейджи
+        badges: list[str] = []
+        if tier_obj.is_popular:
+            badges.append("🔥 Популярный выбор")
+        if tier_obj.first_subscription_one_ruble:
+            badges.append("✨ Первая подписка за 1 ₽")
+
+        # Особенности тарифа
+        features: list[str] = []
+        if tier_obj.can_see_stats:
+            features.append("• Доступ к статистике и рейтингам")
+        if tier_obj.can_read_comments:
+            features.append("• Чтение комментариев и отзывов")
+        if tier_obj.can_write_comments:
+            features.append("• Возможность оставлять комментарии")
+        if tier_obj.can_rate_opponents:
+            features.append("• Оценка соперников после матчей")
+        if tier_obj.has_private_chat:
+            features.append("• Доступ в чат игроков")
+        if tier_obj.has_sparring:
+            features.append("• Организация и участие в спаррингах")
+        if tier_obj.one_day_tournament_discount > 0:
+            features.append(
+                f"• Скидка {tier_obj.one_day_tournament_discount}% на однодневные турниры"
+            )
+        if tier_obj.has_admin_support:
+            features.append("• Приоритетная поддержка администратора")
+        if tier_obj.has_badge:
+            features.append("• Особый статус в профиле")
+
+        features_text = (
+            "\n".join(features) if features else "• Базовые функции платформы"
+        )
+
+        lines = [
+            "💎 <b>Тариф подписки</b>",
+            "",
+            f"🔹 <b>{name}</b>",
+            f"⏱ <b>Срок действия:</b> {tier_obj.duration_label}",
+            price_block,
+        ]
+        if badges:
+            lines.append("")
+            lines.append("🏷 <b>Особенности тарифа:</b>")
+            lines.append("\n".join(f"• {b}" for b in badges))
+
+        lines.append("")
+        lines.append("🚀 <b>Что даёт этот тариф:</b>")
+        lines.append(features_text)
+        lines.append("")
+        lines.append(
+            "После оплаты подписка привяжется к вашему аккаунту, "
+            "а доступ к возможностям откроется автоматически."
+        )
+
+        text = "\n".join(lines)
+
+        pay_url = f"{base}/payments/preview/?type=subscription&id={tier_obj.id}"
+        reply_markup = {
+            "inline_keyboard": [
+                [{"text": "✅ Оплатить подписку", "url": pay_url}],
+                [
+                    {
+                        "text": "⬅️ Назад к тарифам",
+                        "callback_data": "menu_my_subscription",
+                    }
+                ],
+            ]
+        }
+
+        ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+        _answer("Тариф" if ok else "Сообщение не отправлено")
+        return
+
     elif callback_data == "menu_my_profile":
         try:
             # Получаем сезонные очки
@@ -1802,7 +1916,7 @@ def _handle_menu_callback_action(
 
             text = "\n".join(lines)
 
-        # Кнопки с тарифами и оплатой прямо из бота (через веб-страницу оплаты)
+        # Кнопки с тарифами: сначала показываем карточку тарифа, затем отдельная кнопка «Оплатить»
         if base_url:
             tiers = list(
                 SubscriptionTier.objects.filter(is_visible=True).order_by(
@@ -1810,26 +1924,13 @@ def _handle_menu_callback_action(
                 )
             )
             buttons: list[list[dict]] = []
-            base = base_url.rstrip("/")
             for tier_obj in tiers:
-                pay_url = f"{base}/payments/preview/?type=subscription&id={tier_obj.id}"
-                label = f"{tier_obj.get_name_display()} · {tier_obj.duration_label}"
+                label = f"{tier_obj.display_name or tier_obj.get_name_display()} · {tier_obj.duration_label}"
                 buttons.append(
                     [
                         {
                             "text": f"💳 {label}",
-                            "url": pay_url,
-                        }
-                    ]
-                )
-            if sub is not None:
-                # Дополнительная кнопка на страницу с тарифами
-                pricing_url = f"{base}/subscriptions/pricing/"
-                buttons.append(
-                    [
-                        {
-                            "text": "🔄 Подробнее о тарифах на сайте",
-                            "url": pricing_url,
+                            "callback_data": f"subscription_tier_{tier_obj.id}",
                         }
                     ]
                 )

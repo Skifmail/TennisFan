@@ -1618,32 +1618,40 @@ def _handle_menu_callback_action(
         if tier_obj.first_subscription_one_ruble:
             badges.append("✨ Первая подписка за 1 ₽")
 
-        # Особенности тарифа
-        features: list[str] = []
-        if tier_obj.can_see_stats:
-            features.append("• Доступ к статистике и рейтингам")
-        if tier_obj.can_read_comments:
-            features.append("• Чтение комментариев и отзывов")
-        if tier_obj.can_write_comments:
-            features.append("• Возможность оставлять комментарии")
-        if tier_obj.can_rate_opponents:
-            features.append("• Оценка соперников после матчей")
-        if tier_obj.has_private_chat:
-            features.append("• Доступ в чат игроков")
-        if tier_obj.has_sparring:
-            features.append("• Организация и участие в спаррингах")
-        if tier_obj.one_day_tournament_discount > 0:
-            features.append(
-                f"• Скидка {tier_obj.one_day_tournament_discount}% на однодневные турниры"
+        # Регистрации на турниры
+        if tier_obj.is_unlimited:
+            registrations_text = "♾️ Неограниченные регистрации на турниры"
+        elif tier_obj.max_tournaments > 0:
+            registrations_text = (
+                f"🎟 <b>{tier_obj.max_tournaments}</b> регистраций на турниры за период"
             )
-        if tier_obj.has_admin_support:
-            features.append("• Приоритетная поддержка администратора")
-        if tier_obj.has_badge:
-            features.append("• Особый статус в профиле")
+        else:
+            registrations_text = "🚫 Регистрации на турниры не включены"
 
-        features_text = (
-            "\n".join(features) if features else "• Базовые функции платформы"
-        )
+        # Особенности тарифа (чек‑лист как на сайте)
+        feature_rows: list[tuple[bool, str]] = [
+            (tier_obj.can_see_stats, "Статистика и рейтинги"),
+            (tier_obj.can_read_comments, "Чтение комментариев и отзывов"),
+            (tier_obj.can_write_comments, "Возможность оставлять комментарии"),
+            (tier_obj.can_rate_opponents, "Оценка соперников после матчей"),
+            (tier_obj.has_private_chat, "Доступ в чат игроков"),
+            (tier_obj.has_sparring, "Организация и участие в спаррингах"),
+            (
+                tier_obj.one_day_tournament_discount > 0,
+                (
+                    f"Скидка {tier_obj.one_day_tournament_discount}% на однодневные турниры"
+                ),
+            ),
+            (tier_obj.has_admin_support, "Приоритетная поддержка администратора"),
+            (tier_obj.has_badge, "Особый статус в профиле"),
+        ]
+
+        features_lines: list[str] = []
+        for enabled, label in feature_rows:
+            icon = "✅" if enabled else "❌"
+            features_lines.append(f"{icon} {label}")
+
+        features_text = "\n".join(features_lines)
 
         lines = [
             "💎 <b>Тариф подписки</b>",
@@ -1651,6 +1659,7 @@ def _handle_menu_callback_action(
             f"🔹 <b>{name}</b>",
             f"⏱ <b>Срок действия:</b> {tier_obj.duration_label}",
             price_block,
+            f"🎯 <b>Регистрации на турниры:</b>\n{registrations_text}",
         ]
         if badges:
             lines.append("")

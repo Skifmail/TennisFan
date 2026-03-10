@@ -492,7 +492,7 @@ button {
 @media (width <= 1024px) {
     .nav {
         display: grid;
-        grid-template-columns: 44px 1fr 1fr;
+        grid-template-columns: 32px 1fr 1fr;
         align-items: center;
         gap: 0;
         position: relative;
@@ -502,8 +502,8 @@ button {
         display: flex;
         justify-content: center;
         align-items: center;
-        width: 44px;
-        height: 44px;
+        width: 32px;
+        height: 32px;
         flex-shrink: 0;
         grid-column: 1;
     }
@@ -548,8 +548,8 @@ button {
     /* Узкий блок: кнопка и меню по контенту, без пустого места справа */
     .nav-dropdown {
         width: max-content;
-        min-width: 150px;
-        max-width: 168px;
+        min-width: 140px;
+        max-width: 150px;
     }
 
     .nav-dropdown-toggle {
@@ -558,7 +558,7 @@ button {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        padding: 0.4rem 1.75rem 0.4rem 0.65rem;
+        padding: 0.3rem 1.3rem 0.3rem 0.5rem;
         position: relative;
     }
 

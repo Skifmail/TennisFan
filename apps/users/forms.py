@@ -15,6 +15,35 @@ User = get_user_model()
 class UserRegistrationForm(forms.ModelForm):
     """Упрощённая форма регистрации: имя, фамилия, телефон, email, дата рождения, тест уровня силы."""
 
+    first_name = forms.CharField(
+        label="Имя *",
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Ваше имя"}
+        ),
+    )
+    last_name = forms.CharField(
+        label="Фамилия *",
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Ваша фамилия"}
+        ),
+    )
+    phone = forms.CharField(
+        label="Телефон *",
+        required=True,
+        max_length=20,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control js-phone-input",
+                "placeholder": "+7",
+                "autocomplete": "tel",
+            }
+        ),
+        help_text="Укажите номер в формате +7XXXXXXXXXX.",
+    )
     email = forms.EmailField(
         label="Email *",
         widget=forms.EmailInput(attrs={"class": "form-control"}),
@@ -68,7 +97,7 @@ class UserRegistrationForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ("email",)
+        fields = ("email", "first_name", "last_name", "phone")
         widgets: dict = {}
         labels: dict = {}
 
@@ -80,6 +109,25 @@ class UserRegistrationForm(forms.ModelForm):
         if not city:
             raise forms.ValidationError("Укажите город.")
         return city
+
+    def clean_phone(self):
+        phone_raw = (self.cleaned_data.get("phone") or "").strip()
+        if not phone_raw:
+            raise forms.ValidationError("Укажите телефон.")
+
+        digits = "".join(ch for ch in phone_raw if ch.isdigit())
+        # Допускаем ввод с 8 или 7 или +7, нормализуем к 11 цифрам
+        if digits.startswith("8") and len(digits) == 11:
+            digits = "7" + digits[1:]
+        elif digits.startswith("7") and len(digits) == 11:
+            pass
+        elif len(digits) == 10:
+            digits = "7" + digits
+        if len(digits) != 11 or not digits.isdigit():
+            raise forms.ValidationError(
+                "Введите телефон в формате +7XXXXXXXXXX (11 цифр)."
+            )
+        return f"+{digits}"
 
     def clean_ntrp_level(self):
         from decimal import InvalidOperation
@@ -111,6 +159,9 @@ class UserRegistrationForm(forms.ModelForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.set_password(self.cleaned_data["password"])
+        user.first_name = self.cleaned_data.get("first_name", "").strip()
+        user.last_name = self.cleaned_data.get("last_name", "").strip()
+        user.phone = self.cleaned_data.get("phone", "").strip()
         if commit:
             user.save()
         return user

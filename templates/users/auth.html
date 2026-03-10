@@ -36,6 +36,22 @@
                         <h3 class="register-step-title">Шаг 1. Персональные данные</h3>
                         <div class="register-step-fields">
                             <div class="form-group">
+                                <label class="form-label" for="id_first_name">{{ register_form.first_name.label }}</label>
+                                {{ register_form.first_name }}
+                                <div class="field-error" id="first_name-error"></div>
+                                {% for error in register_form.first_name.errors %}
+                                    <p class="text-error form-error">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_last_name">{{ register_form.last_name.label }}</label>
+                                {{ register_form.last_name }}
+                                <div class="field-error" id="last_name-error"></div>
+                                {% for error in register_form.last_name.errors %}
+                                    <p class="text-error form-error">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                            <div class="form-group">
                                 <label class="form-label" for="id_email">{{ register_form.email.label }}</label>
                                 {{ register_form.email }}
                                 <div class="field-error" id="email-error"></div>
@@ -48,6 +64,17 @@
                                 <div class="field-error" id="city-error"></div>
                                 {% for error in register_form.city.errors %}<p class="text-error form-error">{{ error }}
                                 </p>{% endfor %}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="id_phone">{{ register_form.phone.label }}</label>
+                                {{ register_form.phone }}
+                                <div class="field-error" id="phone-error"></div>
+                                {% if register_form.phone.help_text %}
+                                    <p class="form-help text-secondary">{{ register_form.phone.help_text }}</p>
+                                {% endif %}
+                                {% for error in register_form.phone.errors %}
+                                    <p class="text-error form-error">{{ error }}</p>
+                                {% endfor %}
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="id_password">{{ register_form.password.label }}</label>
@@ -232,16 +259,22 @@
         const form = document.getElementById('register-form');
         if (!form) return;
 
+        const firstNameField = document.getElementById('id_first_name');
+        const lastNameField = document.getElementById('id_last_name');
         const emailField = document.getElementById('id_email');
         const passwordField = document.getElementById('id_password');
         const passwordConfirmField = document.getElementById('id_password_confirm');
         const cityField = document.getElementById('id_city');
         const ntrpField = document.getElementById('id_ntrp_level');
+        const phoneField = document.getElementById('id_phone');
         const emailError = document.getElementById('email-error');
         const passwordError = document.getElementById('password-error');
         const passwordConfirmError = document.getElementById('password_confirm-error');
         const cityError = document.getElementById('city-error');
         const ntrpError = document.getElementById('ntrp-error');
+        const firstNameError = document.getElementById('first_name-error');
+        const lastNameError = document.getElementById('last_name-error');
+        const phoneError = document.getElementById('phone-error');
         const consentError = document.getElementById('consent-error');
 
         function validateEmail(email) {
@@ -258,7 +291,7 @@
             el.style.display = 'none';
         }
 
-        [emailField, passwordField, passwordConfirmField, cityField].forEach(function (f) {
+        [firstNameField, lastNameField, emailField, passwordField, passwordConfirmField, cityField, phoneField].forEach(function (f) {
             if (!f) return;
             f.addEventListener('input', function () {
                 var g = this.closest('.form-group');
@@ -282,8 +315,19 @@
             });
         }
 
+        function validatePhone(phone) {
+            const digits = (phone || '').replace(/\\D/g, '');
+            // На клиенте допускаем любую маску, если цифр как минимум 10.
+            // Строгая проверка и нормализация выполняются на сервере.
+            return digits.length >= 10;
+        }
+
         function validateStep1() {
             var has = false;
+            if (!firstNameField || !firstNameField.value.trim()) { showError(firstNameError, 'Укажите имя.'); has = true; }
+            else hideError(firstNameError);
+            if (!lastNameField || !lastNameField.value.trim()) { showError(lastNameError, 'Укажите фамилию.'); has = true; }
+            else hideError(lastNameError);
             if (!emailField || !emailField.value.trim()) { showError(emailError, 'Email обязателен.'); has = true; }
             else if (!validateEmail(emailField.value.trim())) { showError(emailError, 'Введите корректный email.'); has = true; }
             else hideError(emailError);
@@ -293,6 +337,9 @@
             else hideError(passwordConfirmError);
             if (!cityField || !cityField.value.trim()) { showError(cityError, 'Укажите город.'); has = true; }
             else hideError(cityError);
+            if (!phoneField || !phoneField.value.trim()) { showError(phoneError, 'Укажите телефон.'); has = true; }
+            else if (!validatePhone(phoneField.value.trim())) { showError(phoneError, 'Введите корректный номер телефона.'); has = true; }
+            else hideError(phoneError);
             var consent = form.querySelector('input[name="agree_legal"]');
             if (consent && !consent.checked) {
                 showError(consentError, 'Необходимо дать согласие на обработку персональных данных.');

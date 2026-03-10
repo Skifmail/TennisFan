@@ -104,6 +104,17 @@ class UserRegistrationForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        if not email:
+            raise forms.ValidationError("Укажите email.")
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError(
+                "Пользователь с таким email уже зарегистрирован. "
+                "Войдите в аккаунт или воспользуйтесь восстановлением пароля."
+            )
+        return email
+
     def clean_city(self):
         city = (self.cleaned_data.get("city") or "").strip()
         if not city:
@@ -127,7 +138,15 @@ class UserRegistrationForm(forms.ModelForm):
             raise forms.ValidationError(
                 "Введите телефон в формате +7XXXXXXXXXX (11 цифр)."
             )
-        return f"+{digits}"
+        normalized = f"+{digits}"
+
+        if User.objects.filter(phone=normalized).exists():
+            raise forms.ValidationError(
+                "Пользователь с таким телефоном уже зарегистрирован. "
+                "Войдите в аккаунт или воспользуйтесь восстановлением пароля."
+            )
+
+        return normalized
 
     def clean_ntrp_level(self):
         from decimal import InvalidOperation

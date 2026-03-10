@@ -196,7 +196,10 @@ class TrainingAdmin(admin.ModelAdmin):
         ),
         ("Тренер и место", {"fields": ("coach", "courts", "city")}),
         ("Параметры", {"fields": ("duration_minutes", "max_participants", "schedule")}),
-        ("Стоимость корта", {"fields": ("court_price_min", "court_price_max")}),
+        (
+            "Стоимость корта",
+            {"fields": ("court_has_extra_fee", "court_price_min", "court_price_max")},
+        ),
         ("Настройки", {"fields": ("is_active", "is_featured")}),
     )
 

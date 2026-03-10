@@ -15,10 +15,13 @@
                 <a href="{% url 'tournament_list' %}" class="btn btn-primary btn-lg hero-btn-primary">Найти турнир</a>
                 <a href="{% url 'sparring_list' %}" class="btn btn-outline btn-lg hero-btn-outline">Найти соперника</a>
             </div>
+            {% load skill_tags %}
             <div class="hero-metrics hero-metrics--premium">
                 <div class="hero-metric">
                     <span class="hero-metric__value">{{ hero_stats.players_count|default:"0" }}</span>
-                    <span class="hero-metric__label">игрока</span>
+                    <span class="hero-metric__label">
+                        {{ hero_stats.players_count|default:"0"|ru_pluralize:"игрок,игрока,игроков" }}
+                    </span>
                 </div>
                 <div class="hero-metric-divider"></div>
                 <div class="hero-metric">
@@ -44,7 +47,9 @@
                 <div class="hero-metric-divider"></div>
                 <div class="hero-metric">
                     <span class="hero-metric__value">{{ hero_stats.coaches_count|default:"0" }}</span>
-                    <span class="hero-metric__label">тренеров</span>
+                    <span class="hero-metric__label">
+                        {{ hero_stats.coaches_count|default:"0"|ru_pluralize:"тренер,тренера,тренеров" }}
+                    </span>
                 </div>
             </div>
         </div>

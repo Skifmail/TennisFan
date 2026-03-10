@@ -22,6 +22,7 @@ from django.views.decorators.http import require_http_methods
 
 from apps.core import telegram_notify as admin_notify
 from apps.core.models import TelegramTransferConsentLog, UserTelegramLink
+from apps.subscriptions.models import SubscriptionTier
 from apps.tournaments.models import DeadlineExtensionRequest, Match, MatchResultProposal
 from apps.tournaments.proposal_service import apply_proposal
 from apps.tournaments.utils import get_match_opponent_users, get_match_participants
@@ -29,7 +30,6 @@ from apps.users.models import Notification, Player
 
 from . import notifications as tg_notify
 from . import services as bot
-from .private_chat import get_private_chat_access_status
 
 
 def _get_site_base_url() -> str:
@@ -1704,16 +1704,8 @@ def _handle_menu_callback_action(
             text = (
                 "📋 <b>Моя подписка</b>\n\n"
                 "❌ <b>Нет активной подписки</b>\n\n"
-                "Для участия в турнирах и доступа ко всем функциям платформы оформите подписку.\n\n"
-                "💡 Выберите тариф, который подходит именно вам!"
+                "Выберите тариф ниже, чтобы оформить доступ к полному функционалу TennisFan."
             )
-            if base_url:
-                pricing_url = f"{base_url.rstrip('/')}/subscriptions/pricing/"
-                reply_markup = {
-                    "inline_keyboard": [
-                        [{"text": "💳 Выбрать тариф", "url": pricing_url}],
-                    ],
-                }
         else:
             tier = sub.tier
             tier_name = tier.get_name_display()
@@ -1810,18 +1802,39 @@ def _handle_menu_callback_action(
 
             text = "\n".join(lines)
 
-            # Кнопки действий
-            if base_url:
-                pricing_url = f"{base_url.rstrip('/')}/subscriptions/pricing/"
-                keyboard = []
-                if not is_valid or (days_left is not None and days_left <= 3):
-                    keyboard.append(
-                        [{"text": "💳 Продлить подписку", "url": pricing_url}]
-                    )
-                if is_valid and not is_cancelled:
-                    keyboard.append([{"text": "🔄 Сменить тариф", "url": pricing_url}])
-                if keyboard:
-                    reply_markup = {"inline_keyboard": keyboard}
+        # Кнопки с тарифами и оплатой прямо из бота (через веб-страницу оплаты)
+        if base_url:
+            tiers = list(
+                SubscriptionTier.objects.filter(is_visible=True).order_by(
+                    "sort_order", "price", "id"
+                )
+            )
+            buttons: list[list[dict]] = []
+            base = base_url.rstrip("/")
+            for tier_obj in tiers:
+                pay_url = f"{base}/payments/preview/?type=subscription&id={tier_obj.id}"
+                label = f"{tier_obj.get_name_display()} · {tier_obj.duration_label}"
+                buttons.append(
+                    [
+                        {
+                            "text": f"💳 {label}",
+                            "url": pay_url,
+                        }
+                    ]
+                )
+            if sub is not None:
+                # Дополнительная кнопка на страницу с тарифами
+                pricing_url = f"{base}/subscriptions/pricing/"
+                buttons.append(
+                    [
+                        {
+                            "text": "🔄 Подробнее о тарифах на сайте",
+                            "url": pricing_url,
+                        }
+                    ]
+                )
+            if buttons:
+                reply_markup = {"inline_keyboard": buttons}
 
         ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
         _answer("Подписка" if ok else "Ошибка отправки")
@@ -1831,28 +1844,15 @@ def _handle_menu_callback_action(
             )
 
     elif callback_data == "menu_private_chat":
-        has_access, reason = get_private_chat_access_status(user)
+        # Чат игроков сейчас открытый: не ограничиваем доступ подпиской,
+        # просто отдаём ссылку из настроек или создаём инвайт.
         reply_markup = None
 
         if not bot.is_private_chat_configured():
             text = (
-                "⚙️ <b>Закрытый канал сообщества</b>\n\n"
-                "Канал пока настраивается администратором. Попробуйте немного позже."
+                "💬 <b>Чат игроков</b>\n\n"
+                "Ссылка на чат временно недоступна. Попробуйте чуть позже."
             )
-        elif not has_access:
-            text = (
-                "💬 <b>Закрытый канал сообщества</b>\n\n"
-                "🔒 Доступ сейчас недоступен.\n"
-                f"Причина: {reason}\n\n"
-                "Оформите/продлите подписку с доступом к сообществу, и бот сразу даст ссылку."
-            )
-            if base_url:
-                pricing_url = f"{base_url.rstrip('/')}/subscriptions/pricing/"
-                reply_markup = {
-                    "inline_keyboard": [
-                        [{"text": "💳 Выбрать тариф", "url": pricing_url}]
-                    ]
-                }
         else:
             # Та же ссылка на чат, что закреплена в футере сайта (TELEGRAM_PUBLIC_COMMUNITY_URL)
             community_url = (

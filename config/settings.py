@@ -399,6 +399,16 @@ CRONJOBS = [
         ["sync_private_chat_access"],
     ),
     ("0 3 1 * *", "django.core.management.call_command", ["monthly_rating_publish"]),
+    (
+        "0 4 * * *",
+        "django.core.management.call_command",
+        ["run_recurring_subscription_payments"],
+    ),
+    (
+        "0 10 * * *",
+        "django.core.management.call_command",
+        ["send_subscription_expiry_reminders"],
+    ),
 ]
 
 # ------------------------------------------------------------------------------

@@ -38,6 +38,18 @@
                 {% if payment_next_url %}
                     <input type="hidden" name="next" value="{{ payment_next_url }}">
                 {% endif %}
+                {% if payment_type == 'subscription' and request.user.is_authenticated %}
+                <div class="form-group" style="margin-bottom: var(--spacing-lg);">
+                    <label class="offer-consent__label">
+                        <input type="checkbox" name="enable_autopay" class="offer-consent__checkbox">
+                        <span class="offer-consent__text">
+                            Сохранить карту и включить автоматическое продление подписки.
+                            Вы сможете отключить автосписания и отвязать карту в любой момент
+                            в&nbsp;личном кабинете.
+                        </span>
+                    </label>
+                </div>
+                {% endif %}
                 {% if payment_type == 'donation' %}
                     {% if comment %}
                     <input type="hidden" name="comment" value="{{ comment }}">

@@ -146,6 +146,53 @@
                             <a href="{% url 'pricing' %}" class="btn btn-sm btn-outline" style="width: 100%;">Продлить</a>
                         {% endif %}
                     </div>
+
+                    {% if is_profile_owner %}
+                    <div class="subscription-autopay">
+                        <div class="subscription-autopay__header">
+                            <span class="subscription-autopay__eyebrow">Автосписание за подписку</span>
+                            <span class="subscription-autopay__status {% if not subscription_autopay_card %}subscription-autopay__status--off{% endif %}">
+                                {% if subscription_autopay_card %}Подключено{% else %}Отключено{% endif %}
+                            </span>
+                        </div>
+
+                        {% if subscription_autopay_card %}
+                        <div class="subscription-autopay__card">
+                            <div class="subscription-autopay__card-main">
+                                <span class="subscription-autopay__card-brand">
+                                    {{ subscription_autopay_card.card_network|default:"Банковская карта" }}
+                                </span>
+                                <span class="subscription-autopay__card-pan">**** {{ subscription_autopay_card.card_last4 }}</span>
+                            </div>
+                            {% if subscription_autopay_card.card_exp_month and subscription_autopay_card.card_exp_year %}
+                            <div class="subscription-autopay__card-expiry">
+                                Действует до {{ subscription_autopay_card.card_exp_month }}/{{ subscription_autopay_card.card_exp_year }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <div class="subscription-autopay__footer">
+                            {% if subscription_autopay_card %}
+                            <p class="subscription-autopay__hint">
+                                Средства будут списываться автоматически в день продления подписки.
+                                Вы можете в любой момент отключить автосписания и отвязать карту.
+                            </p>
+                            <form method="post" action="{% url 'disable_subscription_autopay' %}" class="subscription-autopay__form">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger subscription-autopay__disable-btn">
+                                    Отключить автосписания и отвязать карту
+                                </button>
+                            </form>
+                            {% else %}
+                            <p class="subscription-autopay__hint">
+                                Автосписание сейчас <strong>отключено</strong>. Подписка не будет продлена автоматически.
+                                Вы сможете подключить автосписание при следующей оплате, отметив опцию «Сохранить карту и включить автоматическое продление».
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
                 {% else %}

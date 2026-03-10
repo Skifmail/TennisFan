@@ -8,4 +8,9 @@ urlpatterns = [
     path("process/", views.payment_process, name="payment_process"),
     path("return/", views.payment_return, name="payment_return"),
     path("success/", views.payment_success, name="payment_success"),
+    path(
+        "autopay/disable/",
+        views.disable_subscription_autopay,
+        name="disable_subscription_autopay",
+    ),
 ]

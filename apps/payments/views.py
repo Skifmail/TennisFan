@@ -4,28 +4,50 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import messages
-from django.http import Http404
+from django.contrib.auth.decorators import login_required
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from apps.subscriptions.models import SubscriptionTier
 from apps.tournaments.models import Tournament
 
 from .forms import DonateForm
-from .yookassa_client import create_payment, get_payment_status
+from .models import SavedPaymentMethod
+from .yookassa_client import (
+    create_payment,
+    get_payment_details,
+    get_payment_status,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def _is_offer_accepted(request) -> bool:
-    """Проверяет, подтверждена ли оферта в POST-форме оплаты."""
+def _is_offer_accepted(request: HttpRequest) -> bool:
+    """Проверяет, подтверждена ли оферта в POST-форме оплаты.
+
+    Args:
+        request (HttpRequest): Текущий HTTP-запрос.
+
+    Returns:
+        bool: ``True``, если чекбокс акцепта оферты установлен.
+    """
     raw = str(request.POST.get("offer_accepted", "")).strip().lower()
     return raw in {"1", "true", "on", "yes"}
 
 
-def _build_preview_redirect(request, payment_type: str | None):
-    """Возвращает redirect на страницу предпросмотра с восстановлением параметров платежа."""
+def _build_preview_redirect(request: HttpRequest, payment_type: str | None):
+    """Вернуть redirect на страницу предпросмотра с восстановлением параметров платежа.
+
+    Args:
+        request (HttpRequest): Текущий HTTP-запрос.
+        payment_type (str | None): Тип платежа (subscription, tournament, donation).
+
+    Returns:
+        HttpResponse: Перенаправление на страницу предпросмотра платежа.
+    """
     params: dict[str, str] = {}
     if payment_type:
         params["type"] = payment_type
@@ -51,8 +73,15 @@ def _build_preview_redirect(request, payment_type: str | None):
     return redirect(f"{base_url}?{query_string}" if query_string else base_url)
 
 
-def donate_view(request):
-    """Страница доната — доступна всем пользователям."""
+def donate_view(request: HttpRequest) -> HttpResponse:
+    """Страница доната — доступна всем пользователям.
+
+    Args:
+        request (HttpRequest): Текущий HTTP-запрос.
+
+    Returns:
+        HttpResponse: HTML-страница с формой доната.
+    """
     if request.method == "POST":
         form = DonateForm(request.POST, user=request.user)
         if form.is_valid():
@@ -80,8 +109,18 @@ def donate_view(request):
     return render(request, "payments/donate.html", {"form": form})
 
 
-def payment_preview(request):
-    """Предпросмотр платежа. Для доната доступно всем, для остальных типов требуется авторизация."""
+def payment_preview(request: HttpRequest) -> HttpResponse:
+    """Предпросмотр платежа перед переходом на форму ЮKassa.
+
+    Для доната страница доступна всем пользователям, для подписок и турниров
+    требуется авторизация.
+
+    Args:
+        request (HttpRequest): Текущий HTTP-запрос.
+
+    Returns:
+        HttpResponse: HTML-страница с деталями платежа и кнопкой перехода к оплате.
+    """
     payment_type = request.GET.get("type")
 
     # Для подписок и турниров требуется авторизация
@@ -172,8 +211,8 @@ def payment_preview(request):
             return redirect(success_url)
 
         # Calculate price (handle discount if user has subscription)
-        entry_fee = tournament.entry_fee or 0
-        discount = 0
+        entry_fee: Decimal = tournament.entry_fee or Decimal("0")
+        discount: Decimal = Decimal("0")
         if (
             request.user.is_authenticated
             and hasattr(request.user, "subscription")
@@ -243,8 +282,19 @@ def payment_preview(request):
     return render(request, "payments/preview.html", context)
 
 
-def payment_process(request):
-    """Обработка платежа. Для доната доступно всем, для остальных типов требуется авторизация."""
+def payment_process(request: HttpRequest) -> HttpResponse:
+    """Создание платежа в ЮKassa и редирект на страницу оплаты.
+
+    Для доната доступно всем пользователям, для подписок и турниров требуется
+    авторизация. Здесь же обрабатывается акцепт оферты и, для подписок,
+    выбор опции сохранения карты для автопродления.
+
+    Args:
+        request (HttpRequest): Текущий HTTP-запрос.
+
+    Returns:
+        HttpResponse: Редирект либо обратно на предпросмотр, либо на форму оплаты.
+    """
     payment_type = request.POST.get("type") or request.GET.get("type")
 
     # Для подписок и турниров требуется авторизация
@@ -281,6 +331,12 @@ def payment_process(request):
     amount_str = f"{amount_decimal:.2f}"
     item_id = request.POST.get("id", "").strip()
     next_url = request.POST.get("next", "").strip()
+
+    # Для подписки пользователь может включить автопродление и сохранение карты.
+    enable_autopay = False
+    if payment_type == "subscription" and request.user.is_authenticated:
+        raw_autopay = str(request.POST.get("enable_autopay", "")).strip().lower()
+        enable_autopay = raw_autopay in {"1", "true", "on", "yes"}
 
     if payment_type == "donation":
         description = "Поддержка проекта TennisFan (донат)"
@@ -321,6 +377,10 @@ def payment_process(request):
     }
     if request.user.is_authenticated:
         metadata["user_id"] = str(request.user.pk)
+    if payment_type == "subscription" and enable_autopay:
+        # Маркер в metadata — в логах и ЛК ЮKassa будет видно, что платёж
+        # используется для включения автопродления подписки.
+        metadata["enable_autopay"] = "1"
 
     # Email для чека 54-ФЗ (обязателен при включённой передаче чеков в ЛК ЮKassa)
     receipt_email = ""
@@ -342,6 +402,9 @@ def payment_process(request):
             description=description[:128],
             metadata=metadata,
             customer_email=receipt_email,
+            save_payment_method=(
+                enable_autopay if payment_type == "subscription" else None
+            ),
         )
     except (ValueError, RuntimeError) as e:
         logger.exception("YooKassa create_payment failed: %s", e)
@@ -356,6 +419,9 @@ def payment_process(request):
         "payment_type": payment_type,
         "item_id": item_id,
         "next": next_url,
+        "enable_autopay": (
+            "1" if payment_type == "subscription" and enable_autopay else ""
+        ),
     }
     if payment_type == "donation":
         pending_data["amount"] = amount_str
@@ -369,11 +435,18 @@ def payment_process(request):
     return redirect(confirmation_url)
 
 
-def payment_return(request):
-    """
-    Страница возврата после оплаты в ЮKassa.
-    ЮKassa перенаправляет сюда пользователя по return_url. Проверяем статус платежа
-    и редиректим на payment_success при успехе.
+def payment_return(request: HttpRequest) -> HttpResponse:
+    """Обработка возврата пользователя с формы ЮKassa.
+
+    ЮKassa перенаправляет браузер на ``return_url``. На этой странице мы
+    проверяем статус платежа и перенаправляем пользователя далее на
+    ``payment_success`` при успешной оплате.
+
+    Args:
+        request (HttpRequest): Текущий HTTP-запрос.
+
+    Returns:
+        HttpResponse: Редирект на страницу успеха или обратно к оформлению.
     """
     pending = request.session.get("yookassa_pending")
     if not pending:
@@ -387,6 +460,7 @@ def payment_return(request):
     payment_type = pending.get("payment_type", "")
     item_id = pending.get("item_id", "")
     next_url = pending.get("next", "")
+    enable_autopay = str(pending.get("enable_autopay", "")).strip() == "1"
 
     status = get_payment_status(payment_id) if payment_id else None
     if status != "succeeded":
@@ -396,13 +470,15 @@ def payment_return(request):
         )
         del request.session["yookassa_pending"]
         request.session.modified = True
-        params = {}
+        preview_params: dict[str, str] = {}
         if payment_type:
-            params["type"] = payment_type
+            preview_params["type"] = payment_type
         if item_id:
-            params["id"] = item_id
-        if params:
-            return redirect(reverse("payment_preview") + "?" + urlencode(params))
+            preview_params["id"] = item_id
+        if preview_params:
+            return redirect(
+                reverse("payment_preview") + "?" + urlencode(preview_params)
+            )
         return redirect("donate")
 
     # Уведомление админу о донате до очистки сессии
@@ -418,6 +494,44 @@ def payment_return(request):
         except Exception as e:
             logger.warning("Telegram notify_donation failed: %s", e)
 
+    # Для подписки и включённого автопродления пробуем сохранить способ оплаты.
+    if (
+        payment_type == "subscription"
+        and enable_autopay
+        and request.user.is_authenticated
+        and payment_id
+    ):
+        details = get_payment_details(payment_id)
+        if isinstance(details, dict):
+            pm = details.get("payment_method") or {}
+            pm_id = pm.get("id")
+            if isinstance(pm_id, str) and pm_id:
+                card = pm.get("card") or {}
+                card_last4 = str(card.get("last4") or "")[-4:]
+                exp_month = str(card.get("expiry_month") or "")[:2]
+                exp_year = str(card.get("expiry_year") or "")[:4]
+                network = str(card.get("card_type") or card.get("brand") or "").strip()
+
+                # Старые способы оплаты пользователя перестают быть дефолтными
+                # для автопродления, чтобы не дублировать списания.
+                SavedPaymentMethod.objects.filter(
+                    user=request.user,
+                    is_default_for_subscriptions=True,
+                ).update(is_default_for_subscriptions=False)
+
+                SavedPaymentMethod.objects.update_or_create(
+                    payment_method_id=pm_id,
+                    defaults={
+                        "user": request.user,
+                        "card_last4": card_last4,
+                        "card_exp_month": exp_month,
+                        "card_exp_year": exp_year,
+                        "card_network": network,
+                        "is_active": True,
+                        "is_default_for_subscriptions": True,
+                    },
+                )
+
     del request.session["yookassa_pending"]
     request.session.modified = True
 
@@ -427,7 +541,7 @@ def payment_return(request):
         return redirect("home")
 
     success_url = reverse("payment_success")
-    params = []
+    params: list[tuple[str, str]] = []
     if payment_type:
         params.append(("type", payment_type))
     if item_id:
@@ -442,12 +556,20 @@ def payment_return(request):
     return redirect(success_url)
 
 
-def payment_success(request):
-    """
-    Редирект после успешной оплаты (вызывается платёжным шлюзом).
-    GET: type=tournament, id=<tournament_id>, next=<url>.
-    Для турнира: записываем оплату в сессию (для парной регистрации),
-    для одиночного — добавляем участника и редирект на страницу турнира.
+def payment_success(request: HttpRequest) -> HttpResponse:
+    """Финальная обработка успешного платежа и перенаправление пользователя.
+
+    GET-параметры:
+
+    * ``type`` — тип платежа (``tournament``, ``subscription``, ``donation``);
+    * ``id`` — идентификатор объекта (турнир или тариф);
+    * ``next`` — опциональный URL для дальнейшего редиректа.
+
+    Args:
+        request (HttpRequest): Текущий HTTP-запрос.
+
+    Returns:
+        HttpResponse: Редирект на страницу профиля, турнира или список турниров.
     """
     if not request.user.is_authenticated:
         from django.conf import settings
@@ -576,3 +698,40 @@ def payment_success(request):
     if next_url:
         return redirect(next_url)
     return redirect("tournament_list")
+
+
+@login_required
+@require_POST
+def disable_subscription_autopay(request: HttpRequest) -> HttpResponse:
+    """Отключить автопродление подписки и отвязать сохранённую карту.
+
+    Функция не влияет на текущий оплаченный период подписки: доступ к сервису
+    сохраняется до окончания ``end_date``. Мы помечаем сохранённые способы
+    оплаты как неактивные и удаляем флаг использования для автопродления.
+
+    Args:
+        request (HttpRequest): Текущий HTTP-запрос.
+
+    Returns:
+        HttpResponse: Редирект на страницу профиля пользователя.
+    """
+    methods_qs = SavedPaymentMethod.objects.filter(
+        user=request.user,
+        is_active=True,
+    )
+    if not methods_qs.exists():
+        messages.info(
+            request,
+            "У вас нет активных сохранённых способов оплаты для автопродления.",
+        )
+    else:
+        methods_qs.update(is_active=False, is_default_for_subscriptions=False)
+        messages.success(
+            request,
+            "Автопродление подписки отключено, карта отвязана от автоплатежей.",
+        )
+
+    player = getattr(request.user, "player", None)
+    if player:
+        return redirect("profile", pk=player.pk)
+    return redirect("pricing")

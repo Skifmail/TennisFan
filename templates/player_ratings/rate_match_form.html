@@ -20,7 +20,7 @@
             <input type="number" name="{{ m.name }}" id="id_{{ m.name }}" class="form-control" min="1" max="10" step="1" placeholder="—">
         </div>
         {% endfor %}
-        <button type="submit" class="btn btn-primary">Отправить оценку</button>
+        <button type="submit" class="btn btn-primary" data-loading-text="Сохраняем оценку...">Отправить оценку</button>
         <a href="{% url 'match_detail' match.pk %}" class="btn btn-outline ms-2">Отмена</a>
     </form>
     <p id="rate-message" class="mt-3 small text-secondary" style="display:none;"></p>
@@ -35,9 +35,14 @@
     const rateApiUrl = '{{ rate_api_url|escapejs }}';
     const myMatchesUrl = '{{ my_matches_url|escapejs }}';
     const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+    const submitBtn = form.querySelector('button[type=submit]');
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
+        if (submitBtn && window.setButtonLoading) {
+            window.setButtonLoading(submitBtn, 'Сохраняем оценку...');
+        }
+        form.setAttribute('aria-busy', 'true');
         const payload = {};
         form.querySelectorAll('input[type=number]').forEach(function(inp) {
             const v = inp.value.trim();
@@ -69,6 +74,10 @@
                         }, 800);
                     }
                 } else {
+                    if (submitBtn && window.resetButtonLoading) {
+                        window.resetButtonLoading(submitBtn);
+                    }
+                    form.removeAttribute('aria-busy');
                     msgEl.textContent = data.error || 'Ошибка отправки';
                     msgEl.style.color = 'var(--color-danger, red)';
                     msgEl.style.display = 'block';
@@ -76,6 +85,10 @@
             });
         })
         .catch(function() {
+            if (submitBtn && window.resetButtonLoading) {
+                window.resetButtonLoading(submitBtn);
+            }
+            form.removeAttribute('aria-busy');
             msgEl.textContent = 'Ошибка сети';
             msgEl.style.color = 'var(--color-danger, red)';
             msgEl.style.display = 'block';

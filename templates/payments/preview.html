@@ -28,7 +28,7 @@
                 </ul>
             </div>
 
-            <form action="{{ process_url }}" method="post">
+            <form action="{{ process_url }}" method="post" data-loader-overlay>
                 {% csrf_token %}
                 <input type="hidden" name="type" value="{{ payment_type }}">
                 <input type="hidden" name="amount" value="{{ amount_value|default:amount }}">
@@ -61,7 +61,7 @@
                 <div style="margin-bottom: var(--spacing-xl);">
                     {% include 'includes/offer_consent.html' %}
                 </div>
-                <button type="submit" class="btn btn-primary btn-pay w-100" style="margin-bottom: var(--spacing-md);">Оплатить</button>
+                <button type="submit" class="btn btn-primary btn-pay w-100" style="margin-bottom: var(--spacing-md);" data-loading-text="Переход к оплате...">Оплатить</button>
                 <div class="text-center">
                     <a href="javascript:history.back()" class="text-secondary" style="font-size: 0.9em;">Назад</a>
                 </div>

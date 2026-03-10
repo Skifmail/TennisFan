@@ -26,7 +26,7 @@
 
             <!-- Форма регистрации (справа), два этапа -->
             <div class="auth-form register {% if active_mode == 'register' %}active{% endif %}">
-                <form method="post" id="register-form" class="register-form-layout register-form-steps" novalidate>
+                <form method="post" id="register-form" class="register-form-layout register-form-steps" novalidate data-loader-overlay>
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="register">
                     {{ register_form.ntrp_quiz_payload }}
@@ -158,7 +158,7 @@
                         </div>
                         <div class="register-step-actions register-step-actions-two" style="margin-top: 1rem;">
                             <button type="button" class="btn btn-outline" id="register-btn-back">← Назад</button>
-                            <button type="submit" class="btn btn-primary btn-lg register-form-submit">Зарегистрироваться</button>
+                            <button type="submit" class="btn btn-primary btn-lg register-form-submit" data-loading-text="Регистрация...">Зарегистрироваться</button>
                         </div>
                         <div class="register-ntrp-calc-toggle" style="margin-top: 1.5rem;">
                             <p class="text-secondary mb-1">Не знаете свой уровень?</p>
@@ -174,7 +174,7 @@
 
             <!-- Форма входа (слева) -->
             <div class="auth-form login {% if active_mode == 'login' %}active{% endif %}">
-                <form method="post" class="auth-login-form">
+                <form method="post" class="auth-login-form" data-loader-overlay>
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="login">
 
@@ -220,7 +220,7 @@
                             style="font-size: var(--font-size-sm);">Забыли пароль?</a>
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Войти</button>
+                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;" data-loading-text="Вход...">Войти</button>
                     <div class="auth-register-link">
                         <p class="text-secondary" style="margin: 0 0 var(--spacing-sm);">Нет аккаунта?</p>
                         <button type="button" class="btn btn-outline" style="width: 100%;"

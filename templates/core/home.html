@@ -356,6 +356,25 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (e) {}
 
     function cls(v) { return v > 0 ? 'up' : (v < 0 ? 'down' : 'none'); }
+    function renderSkeletonRows(count) {
+        var rows = [];
+        for (var i = 0; i < count; i++) {
+            rows.push(
+                '<div class="live-results__row-wrap">' +
+                '<div class="live-results__row skeleton-card" style="padding:12px; min-height:72px;">' +
+                '<div style="display:flex; align-items:center; gap:10px; width:100%;">' +
+                '<span class="skeleton-avatar"></span>' +
+                '<span class="skeleton-text" style="width:34%;"></span>' +
+                '<span class="skeleton-text" style="width:16%; margin-left:auto;"></span>' +
+                '<span class="skeleton-text" style="width:22%;"></span>' +
+                '<span class="skeleton-avatar"></span>' +
+                '</div>' +
+                '</div>' +
+                '</div>'
+            );
+        }
+        listEl.innerHTML = rows.join('');
+    }
     function avatarHtml(url) {
         var placeholder = (listEl.closest('.live-results') && listEl.closest('.live-results').getAttribute('data-avatar-placeholder')) || '/static/images/avatar_placeholder.jpg';
         var src = url || placeholder;
@@ -414,6 +433,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (matches.length > 0) {
         renderAll();
         startRotation();
+    } else {
+        renderSkeletonRows(3);
     }
     fetch('{% url "api_recent_matches" %}').then(function(r) { return r.json(); }).then(function(data) {
         var ms = data.matches || [];

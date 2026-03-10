@@ -315,6 +315,8 @@ def auth(request):
 
     register_form = None
     login_form = None
+    # По умолчанию при загрузке показываем шаг 1 регистрации.
+    show_register_step2 = False
 
     if request.method == "POST":
         # Проверяем какая форма была отправлена по наличию полей
@@ -374,6 +376,24 @@ def auth(request):
                 )
                 messages.success(request, "Регистрация успешна! Добро пожаловать.")
                 return redirect("home")
+            else:
+                # Если ошибка только в поле уровня силы (шаг 2),
+                # а все поля шага 1 валидны, то оставляем пользователя на шаге 2.
+                step1_fields = (
+                    "first_name",
+                    "last_name",
+                    "email",
+                    "city",
+                    "phone",
+                    "password",
+                    "password_confirm",
+                    "agree_legal",
+                )
+                has_step1_errors = any(
+                    field_name in register_form.errors for field_name in step1_fields
+                )
+                has_ntrp_errors = "ntrp_level" in register_form.errors
+                show_register_step2 = bool(has_ntrp_errors and not has_step1_errors)
         elif "username" in request.POST and "password" in request.POST:
             # Форма входа
             active_mode = "login"
@@ -399,6 +419,7 @@ def auth(request):
             "register_form": register_form,
             "login_form": login_form,
             "active_mode": active_mode,
+            "show_register_step2": show_register_step2,
         },
     )
 

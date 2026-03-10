@@ -213,6 +213,7 @@ class TrainingForm(forms.ModelForm):
             "city",
             "duration_minutes",
             "max_participants",
+            "court_has_extra_fee",
             "court_price_min",
             "court_price_max",
             "schedule",
@@ -230,6 +231,9 @@ class TrainingForm(forms.ModelForm):
             ),
             "max_participants": forms.NumberInput(
                 attrs={"class": "form-control", "min": 1}
+            ),
+            "court_has_extra_fee": forms.CheckboxInput(
+                attrs={"class": "form-checkbox"}
             ),
             "court_price_min": forms.NumberInput(
                 attrs={
@@ -346,6 +350,7 @@ class AdminTrainingForm(forms.ModelForm):
             "city",
             "duration_minutes",
             "max_participants",
+            "court_has_extra_fee",
             "court_price_min",
             "court_price_max",
             "schedule",

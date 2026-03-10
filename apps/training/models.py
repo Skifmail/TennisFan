@@ -286,6 +286,14 @@ class Training(CompressImageFieldsMixin, models.Model):
     court_price_max = models.DecimalField(
         "Цена за корт до", max_digits=10, decimal_places=2, null=True, blank=True
     )
+    court_has_extra_fee = models.BooleanField(
+        "Корт оплачивается отдельно",
+        default=False,
+        help_text=(
+            "Отметьте, если аренда корта оплачивается отдельно, но точная стоимость "
+            "не указана. На странице тренировки будет показано «+ корт»."
+        ),
+    )
 
     schedule = models.TextField(
         "Расписание", blank=True, help_text="Дни и время проведения"
@@ -370,6 +378,12 @@ class Training(CompressImageFieldsMixin, models.Model):
     @property
     def court_price_display(self) -> str:
         """Строковое представление диапазона цены за корт."""
+        if (
+            self.court_has_extra_fee
+            and not self.court_price_min
+            and not self.court_price_max
+        ):
+            return "+ корт"
         if self.court_price_min and self.court_price_max:
             if self.court_price_min == self.court_price_max:
                 return f"+ корт {self.court_price_min:,.0f} ₽"

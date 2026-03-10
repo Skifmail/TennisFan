@@ -180,6 +180,13 @@ class DoublesMatchRequestStatus(models.TextChoices):
     CANCELLED = "cancelled", "Отменена"
 
 
+class DoublesMatchKind(models.TextChoices):
+    """Тип парного спарринга."""
+
+    CLASSIC = "classic", "Парный 2×2"
+    TEAM = "team", "Командный спарринг"
+
+
 class TeamSide(models.TextChoices):
     AUTHOR = "author", "Команда автора"
     OPPONENT = "opponent", "Команда соперников"
@@ -204,6 +211,14 @@ class DoublesMatchRequest(models.Model):
         default=DoublesMatchRequestStatus.OPEN,
         db_index=True,
         verbose_name="Статус",
+    )
+    kind = models.CharField(
+        max_length=20,
+        choices=DoublesMatchKind.choices,
+        default=DoublesMatchKind.CLASSIC,
+        db_index=True,
+        verbose_name="Тип заявки",
+        help_text="Парный матч 2×2 или командный спарринг.",
     )
     created_by = models.ForeignKey(
         Player,

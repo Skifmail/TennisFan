@@ -17,7 +17,24 @@
         <a href="?type=doubles" class="sparring-tab {% if sparring_type == 'doubles' %}sparring-tab--active{% endif %}">
             Парный 2×2
         </a>
+        <a href="?type=team" class="sparring-tab {% if sparring_type == 'team' %}sparring-tab--active{% endif %}">
+            Командный спарринг
+        </a>
     </div>
+
+    {% if sparring_type == 'singles' %}
+    <p class="text-secondary mb-3" style="font-size: var(--font-size-sm);">
+        Здесь ваши заявки на одиночный спарринг 1×1: вы видите отклики игроков, можете подтвердить подходящий отклик, после чего заявка закроется и будет создан одиночный матч.
+    </p>
+    {% elif sparring_type == 'doubles' %}
+    <p class="text-secondary mb-3" style="font-size: var(--font-size-sm);">
+        Здесь ваши заявки на парный спарринг 2×2: вы собираете свою команду, принимаете или отклоняете отклики в обе команды и, когда в каждой по два игрока, подтверждаете состав — создаётся один парный матч.
+    </p>
+    {% elif sparring_type == 'team' %}
+    <p class="text-secondary mb-3" style="font-size: var(--font-size-sm);">
+        Здесь ваши командные спарринги: вы набираете две команды по 2 человека, одобряете отклики, а затем по кнопке «Сформировать матчи» получаете серию из четырёх одиночных и одного парного матча между командами.
+    </p>
+    {% endif %}
 
     <div class="d-flex flex-wrap gap-2 mb-4" style="align-items: center;">
         <a href="{% url 'sparring_list' %}?type={{ sparring_type }}" class="btn btn-ghost">← Все заявки</a>
@@ -155,7 +172,9 @@
         <div class="card sparring-card">
             <div class="card-body">
                 <div class="sparring-card__flags">
-                    <span class="sparring-flag sparring-flag--type">Парный 2×2</span>
+                    <span class="sparring-flag sparring-flag--type">
+                        {% if sparring_type == 'team' %}Командный спарринг{% else %}Парный 2×2{% endif %}
+                    </span>
                     <span class="sparring-flag sparring-flag--gender">{{ req.get_status_display }}</span>
                     {% if req.is_friendly %}
                     <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
@@ -167,7 +186,7 @@
                 {% endif %}
                 <div class="mt-2" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
                     Создано {{ req.created_at|date:"d.m.Y H:i" }}
-                    {% if req.match %}
+                    {% if req.match and sparring_type == 'doubles' %}
                     · <a href="{% url 'match_detail' pk=req.match_id %}">Матч создан</a>
                     {% endif %}
                 </div>
@@ -184,8 +203,13 @@
         </div>
         {% empty %}
         <p class="text-secondary" style="grid-column: 1 / -1;">
-            У вас пока нет заявок на парный матч 2×2.
-            {% if has_sparring_access %}<a href="{% url 'sparring_create' %}?type=doubles" class="text-primary">Создать заявку</a>{% endif %}
+            {% if sparring_type == 'team' %}
+                У вас пока нет заявок на командный спарринг.
+                {% if has_sparring_access %}<a href="{% url 'sparring_create' %}?type=team" class="text-primary">Создать заявку</a>{% endif %}
+            {% else %}
+                У вас пока нет заявок на парный матч 2×2.
+                {% if has_sparring_access %}<a href="{% url 'sparring_create' %}?type=doubles" class="text-primary">Создать заявку</a>{% endif %}
+            {% endif %}
         </p>
         {% endfor %}
     </div>

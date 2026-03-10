@@ -16,6 +16,7 @@ from .models import (
     DoublesJoinRequest,
     DoublesJoinRequestMember,
     DoublesJoinRequestStatus,
+    DoublesMatchKind,
     DoublesMatchRequest,
     DoublesMatchRequestStatus,
     DoublesTeam,
@@ -43,6 +44,7 @@ def create_doubles_request(
     desired_age_min: int | None = None,
     desired_age_max: int | None = None,
     preferred_location: str = "",
+    kind: str = "classic",
 ) -> DoublesMatchRequest:
     """Создать заявку на парный матч 2×2. Автор — капитан своей команды, опционально с партнёром."""
     with transaction.atomic():
@@ -59,6 +61,7 @@ def create_doubles_request(
             desired_age_min=desired_age_min,
             desired_age_max=desired_age_max,
             preferred_location=preferred_location,
+            kind=kind,
         )
         author_team = DoublesTeam.objects.create(
             match_request=req,
@@ -381,11 +384,18 @@ def _recompute_request_status(req: DoublesMatchRequest) -> None:
     opponent_team = req.teams.filter(side=TeamSide.OPPONENT).first()
     a_full = author_team is not None and author_team.members.count() == 2
     o_full = opponent_team is not None and opponent_team.members.count() == 2
+    old_status: str = req.status
     if a_full and o_full:
         req.status = DoublesMatchRequestStatus.READY
     else:
         req.status = DoublesMatchRequestStatus.FORMING
     req.save(update_fields=["status", "updated_at"])
+    if (
+        old_status != req.status
+        and req.status == DoublesMatchRequestStatus.READY
+        and req.kind == DoublesMatchKind.TEAM
+    ):
+        _notify_team_sparring_ready(req)
 
 
 def _create_doubles_match_from_teams(
@@ -433,3 +443,151 @@ def _create_doubles_match_from_teams(
         rating_status=rating_status,
     )
     return cast(Match, match)
+
+
+def _create_team_sparring_singles(
+    *,
+    author_team: DoublesTeam,
+    opponent_team: DoublesTeam,
+    is_friendly: bool,
+) -> list[Match]:
+    """
+    Создать одиночные матчи для командного спарринга.
+
+    Каждый игрок команды A играет с каждым игроком команды B (4 матча 1×1).
+    """
+    from apps.users.models import Player
+
+    a_ids = list(
+        author_team.members.order_by("-is_captain").values_list("player_id", flat=True)
+    )
+    o_ids = list(
+        opponent_team.members.order_by("-is_captain").values_list(
+            "player_id", flat=True
+        )
+    )
+    if len(a_ids) != 2 or len(o_ids) != 2:
+        raise ValueError(
+            "Обе команды должны быть по 2 человека для командного спарринга"
+        )
+
+    players = {p.id: p for p in Player.objects.filter(id__in=[*a_ids, *o_ids])}
+    if len(players) != 4:
+        raise ValueError("Не удалось загрузить всех игроков для командного спарринга")
+
+    rating_status = (
+        Match.RatingCalcStatus.NOT_APPLICABLE
+        if is_friendly
+        else Match.RatingCalcStatus.PENDING
+    )
+
+    pairs: list[tuple[int, int]] = [
+        (a_ids[0], o_ids[0]),
+        (a_ids[0], o_ids[1]),
+        (a_ids[1], o_ids[0]),
+        (a_ids[1], o_ids[1]),
+    ]
+
+    matches: list[Match] = []
+    for p1_id, p2_id in pairs:
+        match = Match.objects.create(
+            tournament=None,
+            match_type=Match.MatchType.SPARRING,
+            sparring_response=None,
+            player1=players[p1_id],
+            player2=players[p2_id],
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=timezone.now() + timedelta(days=7),
+            rating_status=rating_status,
+        )
+        matches.append(cast(Match, match))
+    return matches
+
+
+def confirm_team_sparring_series(
+    match_request_id: int, confirmed_by: "Player"
+) -> list[Match]:
+    """
+    Подтвердить состав командного спарринга и создать серию матчей.
+
+    Создаются 4 одиночных матча (каждый против каждого из другой команды)
+    и один парный матч 2×2 между командами.
+    """
+    with transaction.atomic():
+        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        if req.created_by_id != confirmed_by.id:
+            raise PermissionError("Только автор может сформировать матчи")
+        if req.kind != DoublesMatchKind.TEAM:
+            raise ValueError("Эта заявка не является командным спаррингом")
+        if req.status != DoublesMatchRequestStatus.READY:
+            raise ValueError(
+                "Матчи можно сформировать только при полных составах (ready)"
+            )
+
+        author_team = req.teams.get(side=TeamSide.AUTHOR)
+        opponent_team = req.teams.get(side=TeamSide.OPPONENT)
+        if author_team.members.count() != 2 or opponent_team.members.count() != 2:
+            raise ValueError("Обе команды должны быть по 2 человека")
+
+        singles_matches = _create_team_sparring_singles(
+            author_team=author_team,
+            opponent_team=opponent_team,
+            is_friendly=req.is_friendly,
+        )
+        doubles_match = _create_doubles_match_from_teams(
+            author_team=author_team,
+            opponent_team=opponent_team,
+            is_friendly=req.is_friendly,
+            request_created_at=req.created_at,
+        )
+
+        req.status = DoublesMatchRequestStatus.CONFIRMED
+        req.confirmed_at = timezone.now()
+        req.match = doubles_match
+        req.save(update_fields=["status", "confirmed_at", "match", "updated_at"])
+        logger.info(
+            "Team sparring request %s confirmed, %s matches created "
+            "(%s singles, doubles match %s)",
+            match_request_id,
+            len(singles_matches) + 1,
+            len(singles_matches),
+            doubles_match.pk,
+        )
+        return [*singles_matches, doubles_match]
+
+
+def _notify_team_sparring_ready(req: DoublesMatchRequest) -> None:
+    """Уведомить автора командного спарринга о готовности команд (4 участника)."""
+    from django.urls import reverse
+
+    from apps.users.models import Notification
+
+    try:
+        author_user = req.created_by.user
+    except Exception:
+        author_user = None
+
+    if author_user is not None:
+        try:
+            url = reverse("doubles_detail", args=[req.pk])
+            message = (
+                "Командный спарринг: все заявки одобрены, команды сформированы. "
+                "Нажмите «Сформировать матчи», чтобы создать одиночные и парный матчи."
+            )
+            Notification.objects.create(user=author_user, message=message, url=url)
+        except Exception as exc:  # pragma: no cover - защитное логирование
+            logger.warning(
+                "Failed to create Notification for team sparring ready "
+                "(request=%s): %s",
+                req.pk,
+                exc,
+            )
+
+    try:
+        from apps.telegram_bot.notifications import notify_team_sparring_ready
+
+        notify_team_sparring_ready(req)
+    except Exception as exc:  # pragma: no cover - защитное логирование
+        logger.warning(
+            "notify_team_sparring_ready failed for request %s: %s", req.pk, exc
+        )

@@ -142,8 +142,8 @@ class DoublesJoinRequestMemberInline(admin.TabularInline):
 
 @admin.register(DoublesMatchRequest)
 class DoublesMatchRequestAdmin(admin.ModelAdmin):
-    list_display = ("id", "created_by", "city", "status", "created_at", "match")
-    list_filter = ("status", "is_friendly", "created_at")
+    list_display = ("id", "created_by", "city", "kind", "status", "created_at", "match")
+    list_filter = ("kind", "status", "is_friendly", "created_at")
     search_fields = (
         "created_by__user__first_name",
         "created_by__user__last_name",
@@ -160,6 +160,7 @@ class DoublesMatchRequestAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "status",
+                    "kind",
                     "created_by",
                     "city",
                     "preferred_gender",

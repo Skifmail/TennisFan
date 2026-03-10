@@ -10,6 +10,19 @@
 </div>
 
 <div class="container">
+    {% if sparring_type == 'singles' %}
+    <p class="text-secondary mb-3" style="font-size: var(--font-size-sm);">
+        Одиночный спарринг 1×1: вы публикуете заявку, другие игроки откликаются, а вы выбираете соперника и по подтверждённому отклику создаётся один матч 1×1 (при желании — дружеский, без влияния на рейтинг).
+    </p>
+    {% elif sparring_type == 'doubles' %}
+    <p class="text-secondary mb-3" style="font-size: var(--font-size-sm);">
+        Парный спарринг 2×2: автор создаёт заявку и свою команду (можно добавить партнёра), остальные игроки откликаются в команду автора или соперников, автор одобряет отклики и при двух полных командах подтверждает один парный матч 2×2.
+    </p>
+    {% elif sparring_type == 'team' %}
+    <p class="text-secondary mb-3" style="font-size: var(--font-size-sm);">
+        Командный спарринг: формируются две команды по 2 человека. После того как автор одобрит отклики и наберётся 4 участника, бот и ЛК предложат сформировать серию матчей — каждый играет с каждым из противоположной команды 1×1, а затем создаётся один парный матч между командами.
+    </p>
+    {% endif %}
     <div class="sparring-tabs mb-4">
         <a href="?type=singles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}" 
            class="sparring-tab {% if sparring_type == 'singles' %}sparring-tab--active{% endif %}">
@@ -18,6 +31,10 @@
         <a href="?type=doubles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}" 
            class="sparring-tab {% if sparring_type == 'doubles' %}sparring-tab--active{% endif %}">
             Парный 2×2
+        </a>
+        <a href="?type=team{% if current_city %}&city={{ current_city }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}" 
+           class="sparring-tab {% if sparring_type == 'team' %}sparring-tab--active{% endif %}">
+            Командный спарринг
         </a>
     </div>
 
@@ -53,7 +70,7 @@
             </select>
         </form>
         <div class="sparring-toolbar__actions">
-            <a href="{% url 'sparring_my_requests' %}" class="btn btn-ghost">Мои заявки</a>
+            <a href="{% url 'sparring_my_requests' %}?type={{ sparring_type }}" class="btn btn-ghost">Мои заявки</a>
             {% if has_sparring_access %}
             <a href="{% url 'sparring_create' %}?type={{ sparring_type }}" class="btn btn-primary">Создать заявку</a>
             {% else %}
@@ -144,7 +161,7 @@
         </p>
         {% endfor %}
     </div>
-    {% else %}
+    {% elif sparring_type == 'doubles' %}
     <div class="grid grid-2">
         {% for req in doubles_requests %}
         <div class="card sparring-card">
@@ -210,6 +227,75 @@
         <p class="text-secondary" style="grid-column: 1 / -1;">
             Заявок на парный матч 2×2 пока нет.
             {% if has_sparring_access %}<a href="{% url 'sparring_create' %}?type=doubles" class="text-primary">Создайте первую!</a>{% else %}<a href="{% url 'pricing' %}" class="text-primary">Оформите подписку</a>, чтобы создавать заявки.{% endif %}
+        </p>
+        {% endfor %}
+    </div>
+    {% elif sparring_type == 'team' %}
+    <div class="grid grid-2">
+        {% for req in doubles_requests %}
+        <div class="card sparring-card">
+            <div class="card-body">
+                <div class="sparring-card__flags">
+                    <span class="sparring-flag sparring-flag--type">Командный спарринг</span>
+                    <span class="sparring-flag sparring-flag--gender">{{ req.get_status_display }}</span>
+                    {% if req.is_friendly %}
+                    <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex gap-3 sparring-card__main" style="align-items: flex-start;">
+                    {% include 'includes/avatar.html' with avatar=req.created_by.avatar class="player-avatar sparring-card__avatar" %}
+                    <div class="sparring-card__content">
+                        <div class="player-name-block">
+                            <a href="{% url 'profile' pk=req.created_by.pk %}" class="player-name">{{ req.created_by }}</a>
+                            {% include 'includes/subscription_badge.html' with tier=req.created_by.paid_subscription_tier %}
+                        </div>
+                        <div class="d-flex gap-1 mt-1 mb-2 flex-wrap">
+                            <span class="player-category">{{ req.created_by.get_skill_level_display }}</span>
+                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);" title="Уровень силы (NTRP)">Сила {{ req.created_by.ntrp_level }}</span>
+                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);" title="Рейтинг FAN">Рейтинг {{ req.created_by.total_points|floatformat:0 }}</span>
+                            {% if req.desired_level %}
+                            <span class="sparring-desired-category">Партнёры: {{ req.get_desired_level_display }}</span>
+                            {% endif %}
+                            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ req.city|default:"Город не указан" }}</span>
+                        </div>
+                        {% if req.description %}
+                        <p class="text-secondary sparring-card__desc">{{ req.description|truncatewords:20 }}</p>
+                        {% endif %}
+                        <div class="sparring-card__details mt-2" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                            {% if req.preferred_days or req.preferred_time %}
+                            <p>
+                                {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
+                                {% if req.preferred_time %} • {{ req.preferred_time }}{% endif %}
+                            </p>
+                            {% endif %}
+                            {% if req.preferred_location %}
+                            <p>📍 {{ req.preferred_location }}</p>
+                            {% endif %}
+                            {% if req.desired_age_min or req.desired_age_max %}
+                            <p>
+                                👤 Возраст партнёров:
+                                {% if req.desired_age_min and req.desired_age_max %}
+                                    {{ req.desired_age_min }}-{{ req.desired_age_max }} {{ req.desired_age_max|years_suffix }}
+                                {% elif req.desired_age_min %}
+                                    от {{ req.desired_age_min }} {{ req.desired_age_min|years_suffix }}
+                                {% elif req.desired_age_max %}
+                                    до {{ req.desired_age_max }} {{ req.desired_age_max|years_suffix }}
+                                {% endif %}
+                            </p>
+                            {% endif %}
+                            <p>Команды формируются из 4 игроков: автор и откликнувшиеся.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="sparring-card__actions mt-3">
+                    <a href="{% url 'doubles_detail' pk=req.pk %}" class="btn btn-primary">Подробнее</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-secondary" style="grid-column: 1 / -1;">
+            Заявок на командный спарринг пока нет.
+            {% if has_sparring_access %}<a href="{% url 'sparring_create' %}?type=team" class="text-primary">Создайте первую!</a>{% else %}<a href="{% url 'pricing' %}" class="text-primary">Оформите подписку</a>, чтобы создавать заявки.{% endif %}
         </p>
         {% endfor %}
     </div>

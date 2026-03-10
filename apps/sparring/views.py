@@ -36,6 +36,7 @@ from .doubles_services import (
     cancel_join_request,
     cancel_match_request,
     confirm_match,
+    confirm_team_sparring_series,
     create_doubles_request,
     create_join_request,
     reject_join_request,
@@ -49,6 +50,7 @@ from .forms import (
 from .models import (
     DoublesJoinRequest,
     DoublesJoinRequestStatus,
+    DoublesMatchKind,
     DoublesMatchRequest,
     DoublesMatchRequestStatus,
     SparringMatchType,
@@ -95,7 +97,7 @@ def _get_contact_url(player: Player, method: str) -> str | None:
 def sparring_list(request):
     """Объединённый список заявок на спарринг: одиночный (1×1) и парный (2×2)."""
     sparring_type = request.GET.get("type", "singles")
-    if sparring_type not in ("singles", "doubles"):
+    if sparring_type not in ("singles", "doubles", "team"):
         sparring_type = "singles"
 
     city = request.GET.get("city", "")
@@ -150,6 +152,10 @@ def sparring_list(request):
             .prefetch_related("teams__members__player__user")
             .order_by("-created_at")
         )
+        if sparring_type == "doubles":
+            doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.CLASSIC)
+        else:
+            doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.TEAM)
         if city:
             doubles_qs = doubles_qs.filter(city__icontains=city)
         if level:
@@ -182,14 +188,19 @@ def sparring_create(request):
     if request.method == "POST":
         sparring_type = request.POST.get("sparring_type", "singles")
 
-    if sparring_type not in ("singles", "doubles"):
+    if sparring_type not in ("singles", "doubles", "team"):
         sparring_type = "singles"
 
-    if sparring_type == "doubles":
+    if sparring_type in ("doubles", "team"):
         if request.method == "POST":
             form = DoublesMatchRequestForm(request.POST)
             if form.is_valid():
                 try:
+                    kind = (
+                        DoublesMatchKind.TEAM
+                        if sparring_type == "team"
+                        else DoublesMatchKind.CLASSIC
+                    )
                     req = create_doubles_request(
                         created_by=player,
                         city=form.cleaned_data.get("city", ""),
@@ -204,8 +215,16 @@ def sparring_create(request):
                         preferred_location=form.cleaned_data.get(
                             "preferred_location", ""
                         ),
+                        kind=kind,
                     )
-                    messages.success(request, "Заявка на парный матч создана.")
+                    messages.success(
+                        request,
+                        (
+                            "Заявка на командный спарринг создана."
+                            if sparring_type == "team"
+                            else "Заявка на парный матч создана."
+                        ),
+                    )
                     return redirect("doubles_detail", pk=req.pk)
                 except Exception as e:
                     messages.error(request, str(e))
@@ -292,7 +311,7 @@ def sparring_my_requests(request):
         return redirect("profile_edit")
 
     sparring_type = request.GET.get("type", "singles")
-    if sparring_type not in ("singles", "doubles"):
+    if sparring_type not in ("singles", "doubles", "team"):
         sparring_type = "singles"
 
     has_access = user_has_sparring_access(request.user)
@@ -317,6 +336,10 @@ def sparring_my_requests(request):
             )
             .order_by("-created_at")
         )
+        if sparring_type == "doubles":
+            doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.CLASSIC)
+        else:
+            doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.TEAM)
         context["doubles_requests"] = doubles_qs
 
     return render(request, "sparring/my_requests.html", context)
@@ -619,7 +642,8 @@ def doubles_detail(request, pk):
     except (AttributeError, Player.DoesNotExist):
         player = None
 
-    is_author = player and req.created_by_id == player.id
+    is_author = bool(player and req.created_by_id == player.id)
+    is_team_sparring = req.kind == DoublesMatchKind.TEAM
     author_team = req.teams.filter(side=TeamSide.AUTHOR).first()
     opponent_team = req.teams.filter(side=TeamSide.OPPONENT).first()
     pending_join_requests = req.join_requests.filter(
@@ -666,6 +690,7 @@ def doubles_detail(request, pk):
             "can_confirm": can_confirm,
             "can_edit_teams": can_edit_teams,
             "add_partner_form": add_partner_form,
+            "is_team_sparring": is_team_sparring,
             "has_sparring_access": user_has_sparring_access(request.user),
         },
     )
@@ -850,12 +875,38 @@ def doubles_remove_member(request, pk):
 @require_POST
 @login_required
 def doubles_confirm(request, pk):
-    """Подтвердить состав и создать матч."""
+    """Подтвердить состав и создать матч или серию матчей (для командного спарринга)."""
     try:
         player = request.user.player
     except (AttributeError, Player.DoesNotExist):
         return redirect("profile_edit")
     try:
+        req = DoublesMatchRequest.objects.get(pk=pk)
+    except DoublesMatchRequest.DoesNotExist:
+        messages.error(request, "Заявка не найдена.")
+        return redirect("sparring_my_requests")
+
+    try:
+        if req.kind == DoublesMatchKind.TEAM:
+            matches = confirm_team_sparring_series(
+                match_request_id=pk,
+                confirmed_by=player,
+            )
+            messages.success(
+                request,
+                (
+                    "Матчи командного спарринга созданы! "
+                    "Проверьте раздел «Мои матчи» для внесения результатов."
+                ),
+            )
+            logger.info(
+                "Team sparring matches created from request %s by user %s "
+                "(total_matches=%s)",
+                pk,
+                request.user.id,
+                len(matches),
+            )
+            return redirect("doubles_detail", pk=pk)
         match = confirm_match(match_request_id=pk, confirmed_by=player)
         messages.success(
             request, "Матч создан! Перейдите в «Мои матчи» для внесения результата."

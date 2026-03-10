@@ -520,6 +520,24 @@ def profile(request, pk):
 
     progress_data = _get_profile_progress_data(player) if can_view_profile_stats else []
 
+    # Сохранённый способ оплаты для автопродления подписки (если владелец профиля).
+    subscription_autopay_card = None
+    if is_profile_owner:
+        try:
+            from apps.payments.models import SavedPaymentMethod
+
+            subscription_autopay_card = (
+                SavedPaymentMethod.objects.filter(
+                    user=player.user,
+                    is_active=True,
+                    is_default_for_subscriptions=True,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+        except Exception:
+            subscription_autopay_card = None
+
     # Собираем данные о сезонных очках по датам
     def _get_season_points_data(player: Player) -> list[dict[str, Any]]:
         """Собрать данные о сезонных очках по датам для графика."""
@@ -715,6 +733,7 @@ def profile(request, pk):
         "player_skills_data": player_skills_data,
         "is_profile_owner": is_profile_owner,
         "can_view_profile_stats": can_view_profile_stats,
+        "subscription_autopay_card": subscription_autopay_card,
     }
     return render(request, "users/profile.html", context)
 

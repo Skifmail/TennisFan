@@ -10617,6 +10617,128 @@ select.form-control {
     white-space: nowrap;
 }
 
+/* --------------------------------------------------------------
+ * Subscription autopay block (profile)
+ * -------------------------------------------------------------- */
+
+.subscription-autopay {
+    margin-top: 1.25rem;
+    padding: 0.9rem 1rem;
+    border-radius: 10px;
+    background: radial-gradient(circle at top left, rgba(166, 130, 74, 0.25), transparent 55%),
+                rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(166, 130, 74, 0.6);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
+.subscription-autopay__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+}
+
+.subscription-autopay__eyebrow {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.subscription-autopay__status {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(46, 204, 113, 0.16);
+    color: #2ecc71;
+    border: 1px solid rgba(46, 204, 113, 0.65);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.subscription-autopay__status--off {
+    background: rgba(231, 76, 60, 0.16);
+    color: #e74c3c;
+    border-color: rgba(231, 76, 60, 0.7);
+}
+
+.subscription-autopay__card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+    padding: 0.7rem 0.8rem;
+    margin-bottom: 0.6rem;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(10, 10, 10, 0.9), rgba(40, 40, 40, 0.95));
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.subscription-autopay__card-main {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.subscription-autopay__card-brand {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.subscription-autopay__card-pan {
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.subscription-autopay__card-expiry {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.subscription-autopay__footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.subscription-autopay__hint {
+    margin: 0;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.subscription-autopay__form {
+    margin: 0;
+}
+
+.subscription-autopay__disable-btn {
+    width: 100%;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.55rem 0.9rem;
+    border-radius: 999px;
+    border-width: 0;
+    background: linear-gradient(135deg, #ff4b4b, #ff6a3d);
+    color: #ffffff;
+    box-shadow: 0 12px 24px rgba(255, 75, 75, 0.45);
+    text-transform: none;
+}
+
+.subscription-autopay__disable-btn:hover {
+    background: linear-gradient(135deg, #ff3b3b, #ff5a2d);
+    box-shadow: 0 14px 32px rgba(255, 75, 75, 0.6);
+}
+
+.subscription-autopay__disable-btn:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 2px;
+}
+
 .bracket-match-pending {
     text-align: center;
     padding: 0.75rem;

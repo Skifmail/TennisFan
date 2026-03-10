@@ -102,6 +102,11 @@
                                     </button>
                                 </div>
                                 <div class="field-error" id="password-error"></div>
+                                {% if register_form.password.errors %}
+                                    {% for error in register_form.password.errors %}
+                                        <p class="text-error form-error">{{ error }}</p>
+                                    {% endfor %}
+                                {% endif %}
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="id_password_confirm">{{ register_form.password_confirm.label }}</label>

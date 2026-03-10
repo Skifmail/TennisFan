@@ -3320,7 +3320,6 @@ select.form-control {
     max-width: 1000px;
     height: auto;
     min-height: 820px;
-    max-height: 94vh;
     border-radius: var(--radius-lg);
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);

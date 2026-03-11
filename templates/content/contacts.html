@@ -47,9 +47,9 @@
                     <div class="contacts-item__content" style="flex: 1; min-width: 0;">
                         <span class="contacts-item__label" style="display: block; font-weight: 600; margin-bottom: var(--spacing-xs); color: var(--color-text-secondary, #666); font-size: var(--font-size-sm);">{{ item.display_label }}</span>
                         {% if item.clickable_url %}
-                        <a href="{{ item.clickable_url }}" target="_blank" rel="noopener noreferrer" class="contacts-item__link" style="color: var(--color-primary); text-decoration: none; font-weight: 500;">{{ item.value }}</a>
+                        <a href="{{ item.clickable_url }}" target="_blank" rel="noopener noreferrer" class="contacts-item__link" style="color: silver; text-decoration: none; font-weight: 500;">{{ item.value }}</a>
                         {% else %}
-                        <span class="contacts-item__value" style="white-space: pre-wrap;">{{ item.value|linebreaksbr }}</span>
+                        <span class="contacts-item__value" style="white-space: pre-wrap; color: silver;">{{ item.value|linebreaksbr }}</span>
                         {% endif %}
                     </div>
                 </li>
@@ -61,7 +61,7 @@
     <p class="text-muted text-center mt-4">Контакты пока не добавлены. Добавьте их в админ-панели.</p>
     {% endif %}
 
-    <div class="card mt-4">
+    <div class="card mt-4 contacts-requisites-card">
         <div class="card-body legal-doc__body">
             <h2 style="font-size: var(--font-size-lg); margin-bottom: var(--spacing-md);">Реквизиты и платёжная информация</h2>
 
@@ -77,7 +77,7 @@
 
                     <h3 style="font-size: var(--font-size-md); margin: var(--spacing-md) 0 var(--spacing-sm);">Цены на подписки</h3>
                     <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-xs);">
-                        Актуальные цены.
+                        Актуальные цены на {% now "d.m.Y" %}.
                     </p>
                     {% if moscow_pricing %}
                     <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">
@@ -105,17 +105,7 @@
 
                     <h3 style="font-size: var(--font-size-md); margin: var(--spacing-md) 0 var(--spacing-sm);">Однодневные турниры OneDay</h3>
                     <p style="margin-bottom: var(--spacing-xs); font-size: var(--font-size-sm);">
-                        Стартовый взнос за участие в однодневном турнире OneDay:
-                        <strong>
-                            {% if one_day_min_fee %}
-                                {{ one_day_min_fee|floatformat:0 }} ₽
-                            {% else %}
-                                1&nbsp;000 ₽
-                            {% endif %}
-                        </strong>
-                    </p>
-                    <p class="text-secondary" style="font-size: var(--font-size-xs); margin-bottom: 0;">
-                        * Конкретная стоимость участия в каждом турнире может отличаться и указывается в карточке турнира.
+                        Стартовый взнос за участие в однодневном турнире OneDay указан в карточке турнира.
                     </p>
                 </div>
 

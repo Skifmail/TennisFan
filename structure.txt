@@ -1,0 +1,768 @@
+.
+├── apps
+│   ├── comments
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_initial.py
+│   │   │   └── __init__.py
+│   │   └── models.py
+│   ├── content
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── forms.py
+│   │   ├── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_initial.py
+│   │   │   ├── 0003_add_about_us.py
+│   │   │   ├── 0004_add_contact_item.py
+│   │   │   ├── 0005_add_contact_page_and_max.py
+│   │   │   ├── 0006_add_contact_item_fk.py
+│   │   │   ├── 0007_remove_rules_page.py
+│   │   │   ├── 0008_rulessection.py
+│   │   │   ├── 0009_populate_rules_sections.py
+│   │   │   ├── 0010_add_rules_olympic_section.py
+│   │   │   ├── 0011_add_rules_seeding_section.py
+│   │   │   ├── 0012_newsphoto.py
+│   │   │   ├── 0013_add_video_page.py
+│   │   │   ├── 0014_add_stringer_models.py
+│   │   │   ├── 0015_add_stringer_company_fk.py
+│   │   │   ├── 0016_add_stringer_company_contact.py
+│   │   │   ├── 0017_alter_aboutus_options_alter_contactpage_options_and_more.py
+│   │   │   ├── 0018_rename_rules_fan_title.py
+│   │   │   ├── 0019_add_rules_rating_algorithm_section.py
+│   │   │   ├── 0020_add_rules_tvd_section.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── urls_about.py
+│   │   ├── urls_contacts.py
+│   │   ├── urls_gallery.py
+│   │   ├── urls_news.py
+│   │   ├── urls_pages.py
+│   │   ├── urls_stringers.py
+│   │   ├── urls_videos.py
+│   │   ├── utils.py
+│   │   └── views.py
+│   ├── core
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── context_processors.py
+│   │   ├── decorators.py
+│   │   ├── email_service.py
+│   │   ├── forms.py
+│   │   ├── __init__.py
+│   │   ├── management
+│   │   │   ├── commands
+│   │   │   │   ├── check_telegram_notify_cache.py
+│   │   │   │   ├── clear_telegram_support_bindings.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── load_cities_from_csv.py
+│   │   │   └── __init__.py
+│   │   ├── middleware.py
+│   │   ├── migrations
+│   │   │   ├── 0001_add_feedback_models.py
+│   │   │   ├── 0002_support_telegram_models.py
+│   │   │   ├── 0003_supportmessage_admin_telegram_text.py
+│   │   │   ├── 0004_add_user_bot_chat_id.py
+│   │   │   ├── 0005_telegramtransferconsentlog.py
+│   │   │   ├── 0006_add_guest_fields_to_support_message.py
+│   │   │   ├── 0007_add_guest_telegram_fields.py
+│   │   │   ├── 0008_footer_social_links.py
+│   │   │   ├── 0009_populate_footer_social_links.py
+│   │   │   ├── 0010_add_footer_social_link.py
+│   │   │   ├── 0011_migrate_to_footer_social_link.py
+│   │   │   ├── 0012_usertelegramlink_binding_token_nullable.py
+│   │   │   ├── 0013_city_model.py
+│   │   │   ├── 0014_support_admin_delivery.py
+│   │   │   ├── 0015_legalacceptancelog.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── telegram_notify.py
+│   │   ├── telegram_support.py
+│   │   ├── templatetags
+│   │   │   ├── __init__.py
+│   │   │   └── skill_tags.py
+│   │   ├── urls.py
+│   │   └── views.py
+│   ├── courts
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── forms.py
+│   │   ├── geocoder.py
+│   │   ├── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_alter_court_city.py
+│   │   │   ├── 0003_add_court_application.py
+│   │   │   ├── 0004_enrollment_contact_fields.py
+│   │   │   ├── 0005_court_rating_and_extra_fields.py
+│   │   │   ├── 0006_alter_court_image_alter_courtapplication_image.py
+│   │   │   ├── 0007_surface_free_text.py
+│   │   │   ├── 0008_court_extra_fields_and_rental_price_range.py
+│   │   │   ├── 0009_courtphoto.py
+│   │   │   ├── 0010_alter_courtphoto_image.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── urls.py
+│   │   └── views.py
+│   ├── legal
+│   │   ├── apps.py
+│   │   ├── __init__.py
+│   │   ├── urls.py
+│   │   ├── utils.py
+│   │   └── views.py
+│   ├── navigation
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── context_processors.py
+│   │   ├── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_seed_menu_items.py
+│   │   │   ├── 0003_add_tournament_tables_menu.py
+│   │   │   ├── 0004_add_match_schedule_menu.py
+│   │   │   ├── 0005_remove_match_schedule_menu.py
+│   │   │   ├── 0006_add_shop_menu.py
+│   │   │   ├── 0007_remove_rules_menu_item.py
+│   │   │   ├── 0008_add_rules_menu_item.py
+│   │   │   ├── 0009_add_stringers_menu_item.py
+│   │   │   └── __init__.py
+│   │   └── models.py
+│   ├── payments
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── forms.py
+│   │   ├── __init__.py
+│   │   ├── management
+│   │   │   └── commands
+│   │   │       └── run_recurring_subscription_payments.py
+│   │   ├── migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_paymentrecord.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── urls.py
+│   │   ├── views.py
+│   │   └── yookassa_client.py
+│   ├── player_ratings
+│   │   ├── admin.py
+│   │   ├── constants.py
+│   │   ├── enums.py
+│   │   ├── __init__.py
+│   │   ├── management
+│   │   │   ├── commands
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── seed_ratings_for_player.py
+│   │   │   └── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_add_skill_rating_models.py
+│   │   │   ├── 0002_skillmetricconfig_alter_playerskillrating_accuracy_and_more.py
+│   │   │   ├── 0003_skillmetricconfig_display_on_page.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── notifications.py
+│   │   ├── README.md
+│   │   ├── services.py
+│   │   ├── urls.py
+│   │   └── views.py
+│   ├── shop
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── forms.py
+│   │   ├── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_alter_productphoto_image.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── tests.py
+│   │   ├── urls.py
+│   │   └── views.py
+│   ├── sparring
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── doubles_services.py
+│   │   ├── forms.py
+│   │   ├── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_initial.py
+│   │   │   ├── 0003_alter_sparringrequest_desired_category.py
+│   │   │   ├── 0004_alter_sparringrequest_city.py
+│   │   │   ├── 0005_alter_sparringrequest_desired_category.py
+│   │   │   ├── 0006_add_sparring_response.py
+│   │   │   ├── 0007_add_detailed_preferences_and_response_status.py
+│   │   │   ├── 0008_alter_sparringrequest_desired_category.py
+│   │   │   ├── 0009_add_is_friendly_to_sparring_request.py
+│   │   │   ├── 0010_add_match_type_and_preferred_gender.py
+│   │   │   ├── 0011_add_doubles_match_request_models.py
+│   │   │   ├── 0012_add_doubles_details_fields.py
+│   │   │   ├── 0013_doublesmatchrequest_kind.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── services.py
+│   │   ├── tests.py
+│   │   ├── urls.py
+│   │   ├── utils.py
+│   │   └── views.py
+│   ├── subscriptions
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── __init__.py
+│   │   ├── management
+│   │   │   ├── commands
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── send_subscription_expiry_reminders.py
+│   │   │   └── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_set_has_sparring_for_paid_tiers.py
+│   │   │   ├── 0003_set_diamond_max_tournaments_to_100.py
+│   │   │   ├── 0004_add_cancelled_at.py
+│   │   │   ├── 0005_regionaltierprice.py
+│   │   │   ├── 0006_add_original_price.py
+│   │   │   ├── 0007_add_original_price_ends_at.py
+│   │   │   ├── 0008_regional_tier_promo_fields.py
+│   │   │   ├── 0009_first_subscription_one_ruble.py
+│   │   │   ├── 0010_add_purchase_city.py
+│   │   │   ├── 0011_alter_subscriptiontier_options_and_more.py
+│   │   │   ├── 0012_subscriptiontier_duration_days_and_more.py
+│   │   │   ├── 0013_subscriptiontier_is_popular.py
+│   │   │   ├── 0014_add_card_theme.py
+│   │   │   ├── 0015_add_platinum_card_theme.py
+│   │   │   ├── 0016_subscription_registration_balance.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── urls.py
+│   │   ├── utils.py
+│   │   └── views.py
+│   ├── telegram_bot
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── __init__.py
+│   │   ├── management
+│   │   │   ├── commands
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── set_telegram_webhooks.py
+│   │   │   │   └── sync_private_chat_access.py
+│   │   │   └── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_add_telegram_broadcast.py
+│   │   │   ├── 0002_alter_telegrambroadcast_image.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── notifications.py
+│   │   ├── private_chat.py
+│   │   ├── services.py
+│   │   ├── tests.py
+│   │   ├── urls.py
+│   │   └── views.py
+│   ├── tournaments
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── cancel.py
+│   │   ├── fan.py
+│   │   ├── __init__.py
+│   │   ├── management
+│   │   │   ├── commands
+│   │   │   │   ├── auto_accept_stale_proposals.py
+│   │   │   │   ├── clean_database.py
+│   │   │   │   ├── debug_match_rating.py
+│   │   │   │   ├── fan_generate_past_deadlines.py
+│   │   │   │   ├── fan_process_overdue_matches.py
+│   │   │   │   ├── generate_brackets_past_deadlines.py
+│   │   │   │   ├── generate_fan_bracket.py
+│   │   │   │   ├── generate_olympic_bracket.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── monthly_rating_publish.py
+│   │   │   │   ├── olympic_process_overdue_matches.py
+│   │   │   │   ├── reset_season_points.py
+│   │   │   │   ├── round_robin_process_overdue_matches.py
+│   │   │   │   ├── send_deadline_reminders.py
+│   │   │   │   └── send_tournament_start_reminders.py
+│   │   │   └── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_initial.py
+│   │   │   ├── 0003_tournament_duration_tournament_gender.py
+│   │   │   ├── 0004_matchresultproposal.py
+│   │   │   ├── 0005_remove_tournament_points_multiplier_and_more.py
+│   │   │   ├── 0006_tournament_max_participants.py
+│   │   │   ├── 0007_alter_seasonrating_category_and_more.py
+│   │   │   ├── 0008_alter_tournament_city.py
+│   │   │   ├── 0009_tournament_entry_fee_tournament_is_one_day.py
+│   │   │   ├── 0010_alter_seasonrating_category_and_more.py
+│   │   │   ├── 0011_fan_bracket_and_results.py
+│   │   │   ├── 0012_add_match_schedule.py
+│   │   │   ├── 0013_remove_match_schedule.py
+│   │   │   ├── 0014_remove_tournament_format_other.py
+│   │   │   ├── 0015_add_round_robin_format.py
+│   │   │   ├── 0016_add_doubles_variant.py
+│   │   │   ├── 0017_olympic_consolation_format.py
+│   │   │   ├── 0018_tournament_min_participants_insufficient_notified.py
+│   │   │   ├── 0019_add_tournament_allowed_category.py
+│   │   │   ├── 0020_populate_allowed_categories.py
+│   │   │   ├── 0021_remove_tournament_category.py
+│   │   │   ├── 0022_add_deadline_extension_request.py
+│   │   │   ├── 0023_update_points_fields_help_text.py
+│   │   │   ├── 0024_improve_points_fields_descriptions.py
+│   │   │   ├── 0025_add_rating_calc_fields.py
+│   │   │   ├── 0026_add_season_points.py
+│   │   │   ├── 0027_add_season_archive.py
+│   │   │   ├── 0028_add_match_type_and_sparring_support.py
+│   │   │   ├── 0029_rename_fan_format_display.py
+│   │   │   ├── 0030_add_open_gender_category.py
+│   │   │   ├── 0031_alter_tournamentplayerresult_options_and_more.py
+│   │   │   ├── 0032_add_partner1_partner2_for_doubles_sparring.py
+│   │   │   ├── 0033_alter_match_status.py
+│   │   │   ├── 0034_tvd_models.py
+│   │   │   ├── 0035_tvd_group_member_team.py
+│   │   │   ├── 0036_add_tournament_entry_payment.py
+│   │   │   ├── 0037_add_entry_refund_request.py
+│   │   │   ├── 0038_add_tournament_court.py
+│   │   │   ├── 0039_add_skill_rating_models.py
+│   │   │   ├── 0040_tournamentphoto.py
+│   │   │   ├── 0041_alter_tournamentphoto_image.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── olympic_consolation.py
+│   │   ├── proposal_service.py
+│   │   ├── rating.py
+│   │   ├── round_robin.py
+│   │   ├── season_utils.py
+│   │   ├── signals.py
+│   │   ├── solo_teams.py
+│   │   ├── tests.py
+│   │   ├── tvd.py
+│   │   ├── urls.py
+│   │   ├── utils.py
+│   │   └── views.py
+│   ├── training
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── forms.py
+│   │   ├── __init__.py
+│   │   ├── migrations
+│   │   │   ├── 0001_initial.py
+│   │   │   ├── 0002_initial.py
+│   │   │   ├── 0003_alter_training_target_category.py
+│   │   │   ├── 0004_alter_coach_city_alter_training_city.py
+│   │   │   ├── 0005_map_training_skill_level.py
+│   │   │   ├── 0006_alter_training_skill_level.py
+│   │   │   ├── 0007_alter_training_target_category.py
+│   │   │   ├── 0008_add_coach_max_contact.py
+│   │   │   ├── 0009_add_coach_application.py
+│   │   │   ├── 0010_enrollment_contact_fields.py
+│   │   │   ├── 0011_coach_user_enrollment_contact.py
+│   │   │   ├── 0012_alter_coach_photo_alter_coachapplication_photo_and_more.py
+│   │   │   ├── 0013_alter_training_skill_level_and_more.py
+│   │   │   ├── 0014_alter_training_target_category.py
+│   │   │   ├── 0015_training_multiple_courts.py
+│   │   │   ├── 0016_multi_types_levels_price_range.py
+│   │   │   ├── 0017_type_prices_json.py
+│   │   │   ├── 0018_training_court_has_extra_fee.py
+│   │   │   └── __init__.py
+│   │   ├── models.py
+│   │   ├── templates
+│   │   │   └── training
+│   │   │       └── widgets
+│   │   │           └── type_prices.html
+│   │   ├── urls.py
+│   │   ├── views.py
+│   │   └── widgets.py
+│   └── users
+│       ├── admin.py
+│       ├── apps.py
+│       ├── context_processors.py
+│       ├── forms.py
+│       ├── __init__.py
+│       ├── management
+│       │   ├── commands
+│       │   │   ├── create_test_players.py
+│       │   │   ├── ensure_bye_player.py
+│       │   │   └── __init__.py
+│       │   └── __init__.py
+│       ├── migrations
+│       │   ├── 0001_initial.py
+│       │   ├── 0002_player_birth_date_player_forehand_player_gender_and_more.py
+│       │   ├── 0003_notification.py
+│       │   ├── 0004_map_skill_level_to_ntrp.py
+│       │   ├── 0005_alter_player_category_alter_player_skill_level.py
+│       │   ├── 0006_alter_player_city.py
+│       │   ├── 0007_map_skill_level_to_labels.py
+│       │   ├── 0008_alter_player_skill_level.py
+│       │   ├── 0009_map_categories_to_skilllevel.py
+│       │   ├── 0010_alter_player_category.py
+│       │   ├── 0011_add_player_max_contact.py
+│       │   ├── 0012_remove_player_category.py
+│       │   ├── 0013_alter_player_skill_level.py
+│       │   ├── 0014_registration_optional_fields_forehand_label.py
+│       │   ├── 0015_player_is_bye.py
+│       │   ├── 0016_create_bye_player.py
+│       │   ├── 0017_add_deadline_extension_request.py
+│       │   ├── 0018_update_ntrp_to_strength_level.py
+│       │   ├── 0019_add_hidden_rating.py
+│       │   ├── 0020_init_hidden_rating_from_total_points.py
+│       │   ├── 0021_change_total_points_to_float.py
+│       │   ├── 0022_set_is_verified_default_true.py
+│       │   ├── 0023_rename_advanced_to_masters.py
+│       │   ├── 0024_alter_player_total_points.py
+│       │   ├── 0025_update_ntrp_default_to_1_5.py
+│       │   ├── 0026_has_ever_paid_subscription.py
+│       │   ├── 0027_ntrp_test_result.py
+│       │   └── __init__.py
+│       ├── models.py
+│       ├── rating_utils.py
+│       ├── skill_levels.py
+│       ├── urls.py
+│       └── views.py
+├── config
+│   ├── asgi.py
+│   ├── __init__.py
+│   ├── settings.py
+│   ├── sitemaps.py
+│   ├── urls.py
+│   ├── validators.py
+│   └── wsgi.py
+├── cron-entrypoint.sh
+├── crontab.example
+├── docker-compose.dokploy.yml
+├── docker-compose.yml
+├── Dockerfile
+├── docs
+│   ├── COOKIE_CONSENT.md
+│   ├── CRON_DEPLOY.md
+│   ├── DATABASE_STRUCTURE.md
+│   ├── DEPLOY_DOKPLOY.md
+│   ├── DOUBLES_SPARRING_DESIGN.md
+│   ├── FAN_ALGORITHM_DESCRIPTION.txt
+│   ├── FAN_BYE_PLAYER.md
+│   ├── PASSWORD_RESET_SETUP.md
+│   ├── SECURITY_AUDIT.md
+│   ├── SUPPORT_TELEGRAM_ARCHITECTURE.md
+│   ├── TELEGRAM_FEEDBACK_WEBHOOK.md
+│   ├── TELEGRAM_USER_BOT.md
+│   ├── TVD_FORMATS_REPORT.md
+│   └── VIDEO_PAGE_SETUP.md
+├── entrypoint.sh
+├── google6308ddba4bfafc4d.html
+├── logging_config.py
+├── logs
+│   ├── all.2026-03-05_13-00-01_752924.log.zip
+│   ├── all.2026-03-06_11-50-01_583584.log.zip
+│   ├── all.2026-03-09_10-40-50_844124.log.zip
+│   ├── all.2026-03-10_10-10-02_659187.log.zip
+│   ├── all.2026-03-11_08-40-01_603893.log.zip
+│   ├── django_errors.log.2026-03-09
+│   ├── django_info.log.2026-03-05
+│   ├── django_info.log.2026-03-06
+│   ├── django_info.log.2026-03-09
+│   ├── django_info.log.2026-03-10
+│   ├── django_info.log.2026-03-11
+│   ├── django_warnings.log.2026-03-05
+│   ├── django_warnings.log.2026-03-09
+│   ├── errors.2026-03-03_21-00-01_633267.log.zip
+│   ├── errors.2026-03-06_11-50-01_584338.log.zip
+│   ├── info.2026-03-05_13-00-01_756526.log.zip
+│   ├── info.2026-03-06_11-50-01_589681.log.zip
+│   ├── info.2026-03-09_10-40-50_847618.log.zip
+│   ├── info.2026-03-10_10-10-02_658756.log.zip
+│   ├── info.2026-03-11_08-40-01_602764.log.zip
+│   ├── README.md
+│   ├── warnings.2026-03-03_21-00-01_636671.log.zip
+│   └── warnings.2026-03-06_11-50-01_589256.log.zip
+├── mainterance
+│   ├── docker-compose.yml
+│   ├── images
+│   │   ├── icons8-tennis-ball-96.png
+│   │   └── logo.png
+│   ├── maintenance.html
+│   └── nginx.conf
+├── manage.py
+├── media
+│   ├── about
+│   │   └── Generated_Image_January_23_2026_-_8_21PM.png
+│   ├── avatars
+│   │   ├── avatar.png
+│   │   ├── favicon.png
+│   │   ├── Generated_Image_January_23_2026_-_3_21PM_1.png
+│   │   ├── Generated_Image_January_23_2026_-_3_22PM_1.png
+│   │   ├── Generated_Image_January_23_2026_-_3_22PM.png
+│   │   ├── Generated_Image_January_23_2026_-_3_23PM_1.png
+│   │   ├── Generated_Image_January_23_2026_-_3_23PM.png
+│   │   ├── Generated_Image_January_23_2026_-_3_23PM_tsj1mkY.png
+│   │   ├── Generated_Image_January_23_2026_-_3_24PM.png
+│   │   ├── Generated_Image_January_23_2026_-_3_25PM_1_dwNNJ0E.png
+│   │   ├── Generated_Image_January_23_2026_-_3_25PM_1.png
+│   │   ├── Generated_Image_January_23_2026_-_3_25PM.png
+│   │   ├── Generated_Image_January_23_2026_-_3_25PM_sWtA6nC.png
+│   │   ├── Generated_Image_January_23_2026_-_3_25PM_yemB2ii.png
+│   │   ├── photo_2025-11-05_19-02-00.jpg
+│   │   ├── photo_2025-11-12_18-31-32.jpg
+│   │   └── photo_2025-11-12_18-31-32_nezoSSI.jpg
+│   ├── coaches
+│   │   └── applications
+│   │       ├── avatar.png
+│   │       ├── Generated_Image_January_23_2026_-_3_23PM_1.png
+│   │       └── Generated_Image_January_23_2026_-_3_25PM.png
+│   ├── courts
+│   │   ├── ________________2k_delpmaspu.png
+│   │   ├── applications
+│   │   │   ├── d217d813eb147da4b7308b04bbbaf0da_jw6qqXr.webp
+│   │   │   └── d217d813eb147da4b7308b04bbbaf0da.webp
+│   │   ├── gallery
+│   │   │   ├── ChatGPT_Image_9_февр._2026_г._19_06_46.png
+│   │   │   ├── Image_202601231132.jpeg
+│   │   │   └── Ultra_realistic_wideangle_202601311829.jpeg
+│   │   ├── The_camera_should_2k_202601311830.jpeg
+│   │   ├── travel1.jpg
+│   │   └── Ultra_realistic_wideangle_202601311830.jpeg
+│   ├── galleries
+│   │   ├── covers
+│   │   │   └── Generated_Image_January_21_2026_-_1_51PM.png
+│   │   └── photos
+│   │       ├── f4a983d57d7cfb94316fffefc15c1cf4.jpg
+│   │       ├── Generated_Image_December_16_2025_-_1_16PM.jpeg
+│   │       ├── Generated_Image_December_23_2025_-_11_48AM.jpeg
+│   │       ├── Generated_Image_December_23_2025_-_2_12PM_85NFNwa.jpeg
+│   │       ├── Generated_Image_December_23_2025_-_2_12PM.jpeg
+│   │       ├── Generated_Image_December_24_2025_-_3_07PM.jpeg
+│   │       └── travel1.jpg
+│   ├── news
+│   │   ├── d217d813eb147da4b7308b04bbbaf0da.webp
+│   │   ├── gallery
+│   │   │   ├── Generated_Image_December_23_2025_-_7_46PM.jpeg
+│   │   │   ├── Generated_Image_December_24_2025_-_3_07PM.jpeg
+│   │   │   └── travel1.jpg
+│   │   └── Generated_Image_December_24_2025_-_11_39AM.jpeg
+│   ├── schedule
+│   │   ├── Generated_Image_December_23_2025_-_2_12PM.jpeg
+│   │   └── sponsors
+│   │       └── Снимок_экрана_от_2026-01-30_12-35-50.png
+│   ├── shop
+│   │   └── products
+│   │       ├── Снимок_экрана_от_2026-01-30_14-30-56.png
+│   │       ├── Снимок_экрана_от_2026-01-30_14-31-05.png
+│   │       ├── Снимок_экрана_от_2026-01-30_14-31-14.png
+│   │       ├── Снимок_экрана_от_2026-01-30_14-31-18.png
+│   │       ├── Снимок_экрана_от_2026-01-30_14-31-24.png
+│   │       ├── Снимок_экрана_от_2026-01-30_14-31-29.png
+│   │       ├── Снимок_экрана_от_2026-01-30_14-31-34.png
+│   │       └── Снимок_экрана_от_2026-01-30_14-31-38.png
+│   ├── stringers
+│   │   └── photos
+│   │       └── ChatGPT_Image_9_февр._2026_г._19_06_46.png
+│   ├── tournaments
+│   │   ├── ChatGPT_Image_9_февр._2026_г._19_06_46.png
+│   │   ├── ChatGPT_Image_9_февр_d2ACw16._2026_г._19_06_46.png
+│   │   ├── d217d813eb147da4b7308b04bbbaf0da.webp
+│   │   ├── gallery
+│   │   │   ├── ________________2k_delpmaspu.png
+│   │   │   └── Gemini_Generated_Image_k1bh6fk1bh6fk1bh11.jpg
+│   │   ├── Generated_Image_December_23_2025_-_2_12PM.jpeg
+│   │   ├── Generated_Image_January_23_2026_-_8_21PM.png
+│   │   ├── hero_image_1.png
+│   │   ├── Image_202601231132.jpeg
+│   │   ├── image_404.png
+│   │   ├── The_camera_should_2k_202601311830.jpeg
+│   │   ├── travel1.jpg
+│   │   ├── travel1_tvQM52x.jpg
+│   │   ├── Ultrarealistic_8k_photography_2k_20260205130_2.jpeg
+│   │   ├── Ultra_realistic_wideangle_202601311830_1.jpeg
+│   │   ├── Ultra_realistic_wideangle_202601311830.jpeg
+│   │   └── Ultra_realistic_wideangle_2k_202601311829_1.jpeg
+│   └── trainings
+│       ├── Generated_Image_January_23_2026_-_8_21PM_9RU2heP.png
+│       ├── Generated_Image_January_23_2026_-_8_21PM_GRKeIY4.png
+│       ├── Generated_Image_January_23_2026_-_8_21PM.png
+│       ├── Generated_Image_January_23_2026_-_8_21PM_S0sj4DU.png
+│       └── travel1.jpg
+├── package.json
+├── Procfile
+├── pyproject.toml
+├── requirements.txt
+├── static
+│   ├── css
+│   │   ├── admin_tournament.css
+│   │   └── style.css
+│   ├── documents
+│   │   ├── 2020-rules-of-tennis-english.pdf
+│   │   ├── city.csv
+│   │   ├── Generated_Image_December_24_2025_-_3_07PM.jpeg
+│   │   ├── personal_data.txt
+│   │   ├── privacy.txt
+│   │   ├── public_offer.txt
+│   │   ├── user_agreement.txt
+│   │   └── Правила_тенниса_РФ.pdf
+│   ├── fonts
+│   │   ├── OpenSans-Bold.ttf
+│   │   ├── OpenSans-Regular.ttf
+│   │   ├── OpenSans-SemiBold.ttf
+│   │   ├── Roboto-Bold.ttf
+│   │   └── Roboto-Regular.ttf
+│   ├── images
+│   │   ├── avatar_placeholder.png
+│   │   ├── chat_icon.png
+│   │   ├── diamond.png
+│   │   ├── email.png
+│   │   ├── favicon.png
+│   │   ├── gold.png
+│   │   ├── hero_image_1.png
+│   │   ├── image_404.png
+│   │   ├── logo.svg
+│   │   ├── Max_logo_2025.png
+│   │   ├── silver.png
+│   │   ├── Telegram_logo.svg
+│   │   ├── tournament-placeholder.png
+│   │   ├── user_stat_image.jpg
+│   │   ├── VK.svg
+│   │   └── WhatsApp.svg
+│   ├── js
+│   │   ├── admin_broadcast.js
+│   │   ├── admin_tournament.js
+│   │   ├── admin_training_courts_search.js
+│   │   ├── city_autocomplete.js
+│   │   ├── cookie_consent.js
+│   │   ├── feedback_widget.js
+│   │   ├── lightbox.js
+│   │   ├── loading-system.js
+│   │   ├── main.js
+│   │   └── phone_input.js
+│   └── video
+│       ├── hero_video.mp4
+│       ├── logotip.MP4
+│       └── video_404.mp4
+├── structure.txt
+├── templates
+│   ├── 404.html
+│   ├── admin
+│   │   └── core
+│   │       └── supportconversation
+│   │           ├── change_list.html
+│   │           └── conversation_detail.html
+│   ├── axes
+│   │   └── lockout.html
+│   ├── base.html
+│   ├── content
+│   │   ├── about_us.html
+│   │   ├── contacts.html
+│   │   ├── gallery_detail.html
+│   │   ├── gallery_list.html
+│   │   ├── news_detail.html
+│   │   ├── news_list.html
+│   │   ├── page_detail.html
+│   │   ├── stringer_detail.html
+│   │   ├── stringers.html
+│   │   └── videos.html
+│   ├── core
+│   │   ├── feedback.html
+│   │   ├── hall_of_fame.html
+│   │   ├── home.html
+│   │   ├── private_chat_access.html
+│   │   ├── rating.html
+│   │   ├── results.html
+│   │   ├── rules_doubles.html
+│   │   ├── rules_fan.html
+│   │   ├── rules.html
+│   │   ├── rules_olympic.html
+│   │   ├── rules_rating_algorithm.html
+│   │   ├── rules_rating.html
+│   │   ├── rules_round_robin.html
+│   │   ├── rules_seeding.html
+│   │   ├── rules_site_usage.html
+│   │   ├── rules_tennis_editable.html
+│   │   ├── rules_tennis.html
+│   │   ├── rules_tvd.html
+│   │   ├── support_feedback.html
+│   │   └── support_feedback_success.html
+│   ├── courts
+│   │   ├── application_form.html
+│   │   ├── application_success.html
+│   │   ├── detail.html
+│   │   ├── list.html
+│   │   └── _star_rating.html
+│   ├── emails
+│   │   └── welcome.html
+│   ├── includes
+│   │   ├── avatar.html
+│   │   ├── manage_bracket_match.html
+│   │   ├── manage_group_match_result.html
+│   │   ├── match_fan_delta.html
+│   │   ├── messenger_links.html
+│   │   ├── offer_consent.html
+│   │   ├── player_skills_block.html
+│   │   ├── rating_badge.html
+│   │   ├── rating_stat_value.html
+│   │   ├── subscription_badge.html
+│   │   ├── tournament_card.html
+│   │   ├── tvd_bracket.html
+│   │   └── tvd_group_card.html
+│   ├── legal
+│   │   ├── document.html
+│   │   └── index.html
+│   ├── payments
+│   │   ├── donate.html
+│   │   └── preview.html
+│   ├── player_ratings
+│   │   └── rate_match_form.html
+│   ├── shop
+│   │   ├── list.html
+│   │   └── product_detail.html
+│   ├── sparring
+│   │   ├── create.html
+│   │   ├── doubles_detail.html
+│   │   ├── edit.html
+│   │   ├── list.html
+│   │   └── my_requests.html
+│   ├── subscriptions
+│   │   └── pricing.html
+│   ├── telegram_bot
+│   ├── tournaments
+│   │   ├── champions_league.html
+│   │   ├── detail.html
+│   │   ├── list.html
+│   │   ├── manage_add_participant_confirm.html
+│   │   ├── manage.html
+│   │   ├── manage_intermediate_results.html
+│   │   ├── match_detail.html
+│   │   ├── my_matches.html
+│   │   ├── my_sparring_matches.html
+│   │   ├── register_doubles.html
+│   │   ├── register_required.html
+│   │   ├── tables_detail.html
+│   │   ├── tables_list.html
+│   │   └── tvd_detail.html
+│   ├── training
+│   │   ├── coach_application_form.html
+│   │   ├── coach_application_success.html
+│   │   ├── coach_detail.html
+│   │   ├── coach_list.html
+│   │   ├── detail.html
+│   │   ├── enroll.html
+│   │   ├── list.html
+│   │   ├── my_trainings.html
+│   │   ├── training_form.html
+│   │   └── widgets
+│   │       └── type_prices.html
+│   └── users
+│       ├── auth.html
+│       ├── login.html
+│       ├── notifications.html
+│       ├── _ntrp_quiz.html
+│       ├── ntrp_test.html
+│       ├── password_change_done.html
+│       ├── password_change.html
+│       ├── password_reset_complete.html
+│       ├── password_reset_confirm.html
+│       ├── password_reset_done.html
+│       ├── password_reset_email.html
+│       ├── password_reset.html
+│       ├── password_reset_subject.txt
+│       ├── profile_edit.html
+│       └── profile.html
+└── yandex_4c25bfb73ce9f79f.html
+
+104 directories, 662 files

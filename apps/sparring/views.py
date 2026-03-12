@@ -27,7 +27,7 @@ from django.views.decorators.http import (
     require_POST,
 )
 
-from apps.core.decorators import login_required_with_message, require_filled_profile
+from apps.core.decorators import require_filled_profile
 from apps.users.models import Notification, Player
 
 from .doubles_services import (
@@ -91,11 +91,11 @@ def _get_contact_url(player: Player, method: str) -> str | None:
     return None
 
 
-@login_required_with_message(
-    "Раздел спарринга доступен только для зарегистрированных пользователей."
-)
 def sparring_list(request):
-    """Объединённый список заявок на спарринг: одиночный (1×1) и парный (2×2)."""
+    """Объединённый список заявок на спарринг: одиночный (1×1) и парный (2×2).
+
+    Доступен всем пользователям. Неавторизованные могут только просматривать информацию.
+    """
     sparring_type = request.GET.get("type", "singles")
     if sparring_type not in ("singles", "doubles", "team"):
         sparring_type = "singles"
@@ -625,9 +625,11 @@ def sparring_respond(request, pk):
 # ---------------------------------------------------------------------------
 
 
-@login_required
 def doubles_detail(request, pk):
-    """Детальная страница заявки на парный матч: команды, отклики, действия."""
+    """Детальная страница заявки на парный матч: команды, отклики, действия.
+
+    Доступна всем пользователям. Неавторизованные видят только информацию без действий.
+    """
     req = get_object_or_404(
         DoublesMatchRequest.objects.select_related(
             "created_by__user", "match"

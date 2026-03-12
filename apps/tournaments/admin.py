@@ -241,7 +241,7 @@ class TournamentAdmin(admin.ModelAdmin):
         "allowed_skill_levels",
         "format",
         "variant",
-        "tournament_type",
+        "gender",
         "status",
         "bracket_generated",
         "start_date",

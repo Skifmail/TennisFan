@@ -26,11 +26,8 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
-@login_required_with_message(
-    "Раздел тренировок доступен только для зарегистрированных пользователей."
-)
 def training_list(request):
-    """Список тренировок. Только для авторизованных пользователей."""
+    """Список тренировок. Доступен всем пользователям."""
     skill_level = request.GET.get("level", "")
     training_type = request.GET.get("type", "")
     city = request.GET.get("city", "")
@@ -54,11 +51,8 @@ def training_list(request):
     return render(request, "training/list.html", context)
 
 
-@login_required_with_message(
-    "Детали тренировки доступны только для зарегистрированных пользователей."
-)
 def training_detail(request, slug):
-    """Страница тренировки. Только для авторизованных пользователей."""
+    """Страница тренировки. Доступна всем пользователям."""
     training = get_object_or_404(
         Training.objects.select_related("coach").prefetch_related("courts"),
         slug=slug,
@@ -67,37 +61,44 @@ def training_detail(request, slug):
     return render(request, "training/detail.html", {"training": training})
 
 
-@login_required
 def training_enroll(request, slug):
-    """Enroll in training."""
+    """Запись на тренировку.
+
+    Для авторизованных пользователей привязывает заявку к профилю игрока.
+    Для неавторизованных создаёт анонимную заявку без привязки к игроку.
+    """
     training = get_object_or_404(Training, slug=slug, is_active=True)
 
-    try:
-        player = request.user.player
-    except AttributeError:
-        messages.error(request, "Заполните профиль игрока.")
-        return redirect("profile_edit")
+    player = None
+    if request.user.is_authenticated:
+        try:
+            player = request.user.player
+        except AttributeError:
+            player = None
 
     if request.method == "POST":
         form = TrainingEnrollmentForm(request.POST)
         if form.is_valid():
             enrollment = form.save(commit=False)
             enrollment.training = training
-            enrollment.player = player
+            if player is not None:
+                enrollment.player = player
             enrollment.save()
             messages.success(request, "Заявка на тренировку отправлена!")
             return redirect("training_detail", slug=slug)
     else:
         initial = {}
         user = request.user
-        if user.get_full_name():
-            initial["full_name"] = user.get_full_name().strip()
-        if user.email:
-            initial["email"] = user.email
-        if hasattr(player, "telegram") and player.telegram:
-            initial["telegram"] = player.telegram
-        if hasattr(player, "whatsapp") and player.whatsapp:
-            initial["whatsapp"] = player.whatsapp
+        if user.is_authenticated:
+            if user.get_full_name():
+                initial["full_name"] = user.get_full_name().strip()
+            if user.email:
+                initial["email"] = user.email
+            if player is not None:
+                if getattr(player, "telegram", None):
+                    initial["telegram"] = player.telegram
+                if getattr(player, "whatsapp", None):
+                    initial["whatsapp"] = player.whatsapp
         form = TrainingEnrollmentForm(initial=initial)
 
     return render(request, "training/enroll.html", {"training": training, "form": form})

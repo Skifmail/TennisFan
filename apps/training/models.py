@@ -416,6 +416,8 @@ class TrainingEnrollment(models.Model):
         on_delete=models.CASCADE,
         related_name="training_enrollments",
         verbose_name="Игрок",
+        null=True,
+        blank=True,
     )
     status = models.CharField(
         "Статус", max_length=20, choices=Status.choices, default=Status.PENDING
@@ -446,7 +448,8 @@ class TrainingEnrollment(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"{self.player} на {self.training}"
+        player_display = str(self.player) if self.player else "Анонимный игрок"
+        return f"{player_display} на {self.training}"
 
     @property
     def telegram_url(self) -> str | None:

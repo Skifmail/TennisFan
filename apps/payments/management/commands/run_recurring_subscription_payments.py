@@ -11,7 +11,10 @@ from apps.core.telegram_notify import notify_subscription_purchase
 from apps.payments.models import PaymentRecord, SavedPaymentMethod
 from apps.payments.yookassa_client import create_recurring_payment
 from apps.subscriptions.models import UserSubscription
-from apps.subscriptions.utils import get_subscription_renew_amount
+from apps.subscriptions.utils import (
+    get_subscription_renew_amount,
+    send_subscription_purchase_email,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +173,21 @@ class Command(BaseCommand):
                         logger.warning(
                             "notify_subscription_purchase failed for recurring payment "
                             "subscription=%s user=%s: %s",
+                            sub.pk,
+                            user.pk,
+                            exc,
+                        )
+
+                    try:
+                        send_subscription_purchase_email(
+                            user=user,
+                            subscription=sub,
+                            amount_paid=amount_str,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "send_subscription_purchase_email failed for recurring "
+                            "payment subscription=%s user=%s: %s",
                             sub.pk,
                             user.pk,
                             exc,

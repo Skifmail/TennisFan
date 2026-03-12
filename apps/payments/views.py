@@ -727,18 +727,32 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                 if not tier.is_unlimited and tier.max_tournaments > 0:
                     sub.add_tournament_registration_slots(tier.max_tournaments)
                 _mark_user_paid_subscription(request.user)
+                amount_paid = request.GET.get("amount")
                 try:
                     from apps.core.telegram_notify import notify_subscription_purchase
 
                     notify_subscription_purchase(
                         request.user,
                         tier,
-                        amount_paid=request.GET.get("amount"),
+                        amount_paid=amount_paid,
                     )
                 except Exception as e:
                     logger.warning(
                         "Telegram notify_subscription_purchase failed: %s", e
                     )
+                try:
+                    from apps.subscriptions.utils import (
+                        send_subscription_purchase_email,
+                    )
+
+                    send_subscription_purchase_email(
+                        user=request.user,
+                        subscription=sub,
+                        amount_paid=amount_paid,
+                    )
+                except Exception:
+                    # Ошибки отправки email не должны ломать успешный флоу оплаты.
+                    pass
                 messages.success(
                     request, f"Подписка «{tier.get_name_display()}» успешно оформлена."
                 )

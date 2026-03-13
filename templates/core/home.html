@@ -158,11 +158,11 @@
             <h2 class="section-title">Турниры</h2>
             <div class="d-flex gap-2" style="flex-wrap: wrap;">
                 <a href="{% url 'tournament_list' %}" class="btn btn-outline">Все турниры</a>
-                <a href="?" class="btn btn-ghost">Сбросить фильтры</a>
+                <a href="?" class="btn btn-ghost" data-home-tournaments-reset="1">Сбросить фильтры</a>
             </div>
         </div>
 
-        <form method="get" class="card mb-4">
+        <form method="get" class="card mb-4" id="home-tournaments-filter" action="{% url 'home' %}">
             <div class="card-body filter-grid">
                 <div class="form-group">
                     <label class="form-label">Город</label>
@@ -202,12 +202,8 @@
             </div>
         </form>
 
-        <div class="d-flex flex-col gap-2">
-            {% for tournament in filtered_tournaments %}
-                {% include 'includes/tournament_card.html' with tournament=tournament %}
-            {% empty %}
-            <p class="text-secondary">Подходящих турниров не найдено.</p>
-            {% endfor %}
+        <div id="home-tournaments-block">
+            {% include 'core/_home_tournaments.html' %}
         </div>
     </div>
 </section>

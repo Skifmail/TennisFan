@@ -63,7 +63,7 @@
                 <div class="rules-subtabs">
                     <div class="rules-subtabs__nav" role="tablist">
                         <button class="rules-subtabs__btn rules-subtabs__btn--active" data-subtab="fan" role="tab" aria-selected="true">
-                            Одноэтапная сетка
+                            Олимпийский (до 1 поражения)
                         </button>
                         <button class="rules-subtabs__btn" data-subtab="round-robin" role="tab" aria-selected="false">
                             Круговой
@@ -190,32 +190,73 @@
     // Вкладки первого уровня: Правила тенниса / Правила турниров
     const tabBtns = document.querySelectorAll('.rules-tabs__btn');
     const tabPanels = document.querySelectorAll('.rules-tabs__content');
+
+    function activateMainTab(targetId) {
+        if (!targetId) return;
+        tabBtns.forEach(function(b) {
+            const isActive = b.dataset.tab === targetId;
+            b.classList.toggle('rules-tabs__btn--active', isActive);
+            b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+        tabPanels.forEach(function(panel) {
+            panel.style.display = panel.id === targetId ? '' : 'none';
+        });
+    }
+
     tabBtns.forEach(function(btn) {
         btn.addEventListener('click', function() {
             const targetId = this.dataset.tab;
-            tabBtns.forEach(function(b) {
-                b.classList.toggle('rules-tabs__btn--active', b.dataset.tab === targetId);
-                b.setAttribute('aria-selected', b.dataset.tab === targetId);
-            });
-            tabPanels.forEach(function(panel) {
-                panel.style.display = panel.id === targetId ? '' : 'none';
-            });
+            activateMainTab(targetId);
+            history.replaceState(null, '', '#'+targetId);
         });
     });
 
-    // Вкладки второго уровня: Одноэтапная сетка / Круговой / Парные
+    // Вкладки второго уровня: Одноэтапная сетка / Круговой / Олимпийка / ТВД и т.д.
     const subtabBtns = document.querySelectorAll('.rules-subtabs__btn');
     const subtabPanels = document.querySelectorAll('.rules-subtabs__content');
+
+    function activateSubTab(targetId) {
+        if (!targetId) return;
+        subtabBtns.forEach(function(b) {
+            b.classList.toggle('rules-subtabs__btn--active', b.dataset.subtab === targetId);
+        });
+        subtabPanels.forEach(function(panel) {
+            panel.style.display = panel.id === targetId ? '' : 'none';
+        });
+    }
+
     subtabBtns.forEach(function(btn) {
         btn.addEventListener('click', function() {
             const targetId = this.dataset.subtab;
-            subtabBtns.forEach(function(b) {
-                b.classList.toggle('rules-subtabs__btn--active', b.dataset.subtab === targetId);
-            });
-            subtabPanels.forEach(function(panel) {
-                panel.style.display = panel.id === targetId ? '' : 'none';
-            });
+            activateSubTab(targetId);
         });
+    });
+
+    // Поддержка переходов по якорям вида #tournament-rules/fan
+    function applyHash(hash) {
+        if (!hash) return;
+        const clean = hash.replace(/^#/, '');
+        const parts = clean.split('/');
+        const mainId = parts[0];
+        const subId = parts[1] || null;
+
+        if (mainId) {
+            activateMainTab(mainId);
+        }
+        if (subId) {
+            // Убедимся, что открыт блок правил турниров
+            if (mainId === 'tournament-rules') {
+                activateSubTab(subId);
+            }
+        }
+    }
+
+    // Применяем текущий hash при загрузке
+    applyHash(window.location.hash);
+
+    // Реакция на смену hash (если пользователь меняет вручную или через back/forward)
+    window.addEventListener('hashchange', function() {
+        applyHash(window.location.hash);
     });
 })();
 </script>

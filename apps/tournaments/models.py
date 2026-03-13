@@ -172,24 +172,8 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         choices=TournamentStatus.choices,
         default=TournamentStatus.UPCOMING,
     )
-    points_winner = models.IntegerField(
-        "Очки за победу",
-        default=100,
-        help_text=(
-            "Используется для круговых и других форматов (не одноэтапная/Олимпийская). "
-            "Для кругового по умолчанию: 1 очко. Для других форматов: 100 очков."
-        ),
-    )
-    points_loser = models.IntegerField(
-        "Очки за проигрыш",
-        default=-50,
-        help_text=(
-            "Используется для круговых и других форматов (не одноэтапная/Олимпийская). "
-            "Для кругового по умолчанию: 0 очков (можно настроить отрицательные, например -1). "
-            "Для других форматов: -50 очков (очки отнимаются). "
-            "Одноэтапная сетка и Олимпийская система используют только положительные очки за раунды/места."
-        ),
-    )
+    # DEPRECATED: points_winner / points_loser не используются в логике.
+    # Поля оставлены в БД только для совместимости со старыми данными и миграциями.
     min_participants = models.PositiveIntegerField(
         "Минимальное количество участников",
         null=True,

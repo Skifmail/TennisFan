@@ -2663,6 +2663,12 @@ def tournament_register(request, slug):
     if player is None:
         player = Player.objects.create(user=request.user)
 
+    if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
+        messages.error(
+            request, "Регистрация недоступна: турнир уже завершён или отменён."
+        )
+        return redirect("tournament_detail", slug=tournament.slug)
+
     if getattr(tournament, "bracket_generated", False):
         messages.error(request, "Регистрация закрыта: сетка турнира уже сформирована.")
         return redirect("tournament_detail", slug=tournament.slug)
@@ -2791,6 +2797,12 @@ def tournament_register_doubles(request, slug):
     player = getattr(request.user, "player", None)
     if player is None:
         player = Player.objects.create(user=request.user)
+
+    if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
+        messages.error(
+            request, "Регистрация недоступна: турнир уже завершён или отменён."
+        )
+        return redirect("tournament_detail", slug=tournament.slug)
 
     if tournament.bracket_generated:
         messages.error(request, "Регистрация закрыта: сетка турнира уже сформирована.")

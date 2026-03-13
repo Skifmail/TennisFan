@@ -150,4 +150,89 @@ document.addEventListener('DOMContentLoaded', function() {
             this.setAttribute('aria-expanded', isOpen === true ? 'true' : 'false');
         });
     });
+
+    // Home tournaments: AJAX фильтры и пагинация
+    var tournamentsForm = document.getElementById('home-tournaments-filter');
+    var tournamentsBlock = document.getElementById('home-tournaments-block');
+    var tournamentsSection = document.querySelector('.section-tournaments-spaced');
+
+    if (tournamentsForm && tournamentsBlock) {
+        var baseUrl = tournamentsForm.getAttribute('action') || window.location.pathname;
+
+        function attachPaginationHandlers() {
+            tournamentsBlock.querySelectorAll('[data-page-link="home-tournaments"]').forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var url = new URL(this.href, window.location.origin);
+                    url.searchParams.set('partial', 'tournaments');
+                    loadTournaments(url.toString(), true);
+                });
+            });
+        }
+
+        function updateUrlWithoutPartial(fullUrl) {
+            try {
+                var url = new URL(fullUrl, window.location.origin);
+                url.searchParams.delete('partial');
+                history.pushState({ homeTournaments: true }, '', url.pathname + (url.search ? url.search : ''));
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        function scrollToTournaments() {
+            var target = tournamentsSection || tournamentsBlock;
+            if (!target) return;
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function loadTournaments(url, pushState) {
+            tournamentsBlock.classList.add('is-loading');
+            fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(function(response) { return response.text(); })
+                .then(function(html) {
+                    tournamentsBlock.innerHTML = html;
+                    tournamentsBlock.classList.remove('is-loading');
+                    if (pushState) {
+                        updateUrlWithoutPartial(url);
+                    }
+                    attachPaginationHandlers();
+                    scrollToTournaments();
+                })
+                .catch(function() {
+                    tournamentsBlock.classList.remove('is-loading');
+                });
+        }
+
+        tournamentsForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(tournamentsForm);
+            var params = new URLSearchParams(formData);
+            params.set('partial', 'tournaments');
+            var url = baseUrl + '?' + params.toString();
+            loadTournaments(url, true);
+        });
+
+        var resetLink = document.querySelector('[data-home-tournaments-reset="1"]');
+        if (resetLink) {
+            resetLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                tournamentsForm.reset();
+                var url = baseUrl + '?partial=tournaments';
+                loadTournaments(url, true);
+            });
+        }
+
+        attachPaginationHandlers();
+
+        window.addEventListener('popstate', function() {
+            var url = new URL(window.location.href);
+            url.searchParams.set('partial', 'tournaments');
+            loadTournaments(url.toString(), false);
+        });
+    }
 });

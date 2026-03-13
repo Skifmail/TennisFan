@@ -11,6 +11,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -247,6 +248,10 @@ def home(request):
 
     tournaments = tournaments.order_by("start_date")
 
+    paginator = Paginator(tournaments, 7)
+    page_number = request.GET.get("page")
+    tournaments_page = paginator.get_page(page_number)
+
     # Получаем топ игроков по сезонным очкам
     from django.db.models import Case, F, IntegerField, Value, When
 
@@ -302,7 +307,8 @@ def home(request):
     }
 
     context = {
-        "filtered_tournaments": tournaments,
+        "filtered_tournaments": tournaments_page.object_list,
+        "tournaments_page": tournaments_page,
         "upcoming_tournaments": upcoming_tournaments,
         "top_players": top_players,
         "recent_matches": recent_matches,
@@ -320,6 +326,13 @@ def home(request):
         "gender_choices": TournamentGender.choices,
         "duration_choices": TournamentDuration.choices,
     }
+
+    if (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        and request.GET.get("partial") == "tournaments"
+    ):
+        return render(request, "core/_home_tournaments.html", context)
+
     return render(request, "core/home.html", context)
 
 

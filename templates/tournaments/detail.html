@@ -142,6 +142,154 @@
         {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
     </p>
 
+    <div class="card mb-4 tournament-meta">
+        <div class="card-body tournament-meta-grid">
+            <div class="tournament-meta-group">
+                <h3 class="tournament-meta-title">Основная информация</h3>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Тип турнира</span>
+                    <span class="tournament-meta-value">{{ tournament.get_tournament_type_display }}</span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Формат</span>
+                    <span class="tournament-meta-value">
+                        {% if tournament.format == 'single_elimination' %}
+                        <a href="{% url 'rules' %}#tournament-rules/fan" class="tournament-meta-link">
+                            {{ tournament.get_format_display }}
+                        </a>
+                        {% elif tournament.format == 'olympic_consolation' %}
+                        <a href="{% url 'rules' %}#tournament-rules/olympic" class="tournament-meta-link">
+                            Олимпийская система
+                        </a>
+                        {% elif tournament.format == 'round_robin' %}
+                        <a href="{% url 'rules' %}#tournament-rules/round-robin" class="tournament-meta-link">
+                            Круговой
+                        </a>
+                        {% elif tournament.format == 'weekend_day' %}
+                        <a href="{% url 'rules' %}#tournament-rules/tvd" class="tournament-meta-link">
+                            {{ tournament.get_format_display }}
+                        </a>
+                        {% else %}
+                            {{ tournament.get_format_display }}
+                        {% endif %}
+                        {% if tournament.match_format %}
+                            · {{ tournament.get_match_format_display }}
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Вариант</span>
+                    <span class="tournament-meta-value">{{ tournament.get_variant_display }}</span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Пол</span>
+                    <span class="tournament-meta-value">{{ tournament.get_gender_display }}</span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Продолжительность</span>
+                    <span class="tournament-meta-value">{{ tournament.get_duration_display }}</span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Дней на раунд</span>
+                    <span class="tournament-meta-value">{{ tournament.match_days_per_round }}</span>
+                </div>
+            </div>
+
+            <div class="tournament-meta-group">
+                <h3 class="tournament-meta-title">Регистрация и участники</h3>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Вступительный взнос</span>
+                    <span class="tournament-meta-value">
+                        {% if tournament.entry_fee and tournament.entry_fee > 0 %}
+                            {{ tournament.entry_fee|floatformat:0|intcomma }} ₽
+                        {% else %}
+                            Бесплатно
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Формат проведения</span>
+                    <span class="tournament-meta-value">
+                        {% if tournament.is_one_day %}
+                            Однодневный турнир
+                        {% else %}
+                            Многодневный турнир
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Дедлайн регистрации</span>
+                    <span class="tournament-meta-value">
+                        {% if tournament.registration_deadline %}
+                            {{ tournament.registration_deadline|date:"d.m.Y H:i" }}
+                        {% else %}
+                            Не указан
+                        {% endif %}
+                    </span>
+                </div>
+                {% if tournament.is_doubles %}
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Минимум команд</span>
+                    <span class="tournament-meta-value">
+                        {% if tournament.min_teams %}{{ tournament.min_teams }}{% else %}Не задано{% endif %}
+                    </span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Максимум команд</span>
+                    <span class="tournament-meta-value">
+                        {% if tournament.max_teams %}{{ tournament.max_teams }}{% else %}Не ограничено{% endif %}
+                    </span>
+                </div>
+                {% else %}
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Минимум участников</span>
+                    <span class="tournament-meta-value">
+                        {% if tournament.min_participants %}{{ tournament.min_participants }}{% else %}Не задано{% endif %}
+                    </span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Максимум участников</span>
+                    <span class="tournament-meta-value">
+                        {% if tournament.max_participants %}{{ tournament.max_participants }}{% else %}Не ограничено{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Свободных мест</span>
+                    <span class="tournament-meta-value">
+                        {% with free=tournament.available_slots %}
+                            {% if free > 0 %}
+                                {{ free }}
+                            {% else %}
+                                Нет свободных мест
+                            {% endif %}
+                        {% endwith %}
+                    </span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Статус</span>
+                    <span class="tournament-meta-value">{{ tournament.get_status_display }}</span>
+                </div>
+            </div>
+
+            <div class="tournament-meta-group tournament-meta-group--compact">
+                <h3 class="tournament-meta-title">Система очков</h3>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">1 круг / 2 круг</span>
+                    <span class="tournament-meta-value">
+                        {{ tournament.fan_points_r1 }} / {{ tournament.fan_points_r2 }}
+                    </span>
+                </div>
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">Полуфинал / финал / победитель</span>
+                    <span class="tournament-meta-value">
+                        {{ tournament.fan_points_sf }} / {{ tournament.fan_points_final }} / {{ tournament.fan_points_winner }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {% if tournament.court %}
     <div class="card mb-4">
         <div class="card-body">
@@ -176,6 +324,18 @@
         <div class="card mb-4" style="background: rgba(166, 130, 74, 0.1); border-left: 3px solid var(--color-primary);">
             <div class="card-body">
                 <p class="mb-0" style="color: var(--color-primary); font-weight: 600;">✓ Вы зарегистрированы на этот турнир</p>
+            </div>
+        </div>
+        {% elif tournament.status == 'completed' %}
+        <div class="card mb-4" style="background: rgba(15, 118, 110, 0.12); border-left: 3px solid var(--color-border-light);">
+            <div class="card-body">
+                <p class="mb-0 text-secondary">Турнир завершён. Регистрация недоступна.</p>
+            </div>
+        </div>
+        {% elif tournament.status == 'cancelled' %}
+        <div class="card mb-4" style="background: rgba(127, 29, 29, 0.12); border-left: 3px solid var(--color-error);">
+            <div class="card-body">
+                <p class="mb-0" style="color: var(--color-error);">Турнир отменён. Регистрация недоступна.</p>
             </div>
         </div>
         {% elif can_register %}
@@ -220,7 +380,7 @@
         </div>
         {% endif %}
     {% else %}
-        {% if not registration_closed %}
+        {% if not registration_closed and not tournament.status == 'completed' and not tournament.status == 'cancelled' %}
         <div class="card mb-4">
             <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div>

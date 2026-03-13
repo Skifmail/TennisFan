@@ -1947,6 +1947,50 @@ def check_and_finalize(tournament: Tournament) -> tuple[bool, str]:
         logger.info("TVD tournament %s completed (3-group RR).", tournament.name)
         return True, "Турнир завершён, очки начислены."
 
+    # Общий круговой плей-офф (основная сетка в формате круговой мини-лиги)
+    main_rr_matches = list(
+        tournament.matches.filter(
+            tvd_stage=TVD_STAGE_MAIN_RR, is_consolation=False
+        ).select_related("player1", "player2", "team1", "team2")
+    )
+    if main_rr_matches:
+        from .round_robin import compute_standings_for_entities
+
+        completed = (
+            Match.MatchStatus.COMPLETED,
+            Match.MatchStatus.WALKOVER,
+        )
+        for m in main_rr_matches:
+            if m.status not in completed or not (m.winner_id or m.winner_team_id):
+                return False, "Завершите все матчи круговой основной сетки."
+
+        entities, _ = get_tvd_rr_entities_and_matches(tournament, TVD_STAGE_MAIN_RR)
+        if not entities:
+            return False, "Некорректные данные круговой основной сетки."
+
+        standings = compute_standings_for_entities(
+            tournament, entities, main_rr_matches
+        )
+        for place, row in enumerate(standings, 1):
+            entity = row.get("team") or row.get("player")
+            if not entity:
+                continue
+            pts = tvd_points_for_place(tournament, place)
+            _set_tvd_place_for_entity(
+                tournament,
+                entity,
+                place,
+                pts,
+                "winner" if place == 1 else "sf",
+                False,
+                None,
+            )
+
+        tournament.status = TournamentStatus.COMPLETED
+        tournament.save(update_fields=["status"])
+        logger.info("TVD tournament %s completed (main RR).", tournament.name)
+        return True, "Турнир завершён, очки начислены."
+
     final = tournament.matches.filter(
         tvd_stage=TVD_STAGE_MAIN_FINAL,
         is_consolation=False,

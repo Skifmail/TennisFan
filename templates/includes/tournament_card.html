@@ -133,16 +133,22 @@
         </div>
 
         <div class="tournament-action">
-            {% if user.is_authenticated %}
-                {% if tournament.bracket_generated %}
-                <button type="button" class="btn btn-outline" disabled>Регистрация закрыта</button>
-                {% elif tournament.is_full %}
-                <button type="button" class="btn btn-outline" disabled>Мест нет</button>
-                {% else %}
-                <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary" onclick="event.stopPropagation();">Записаться</a>
-                {% endif %}
+            {% if tournament.status == 'completed' %}
+                <button type="button" class="btn btn-outline" disabled>Турнир завершён</button>
+            {% elif tournament.status == 'cancelled' %}
+                <button type="button" class="btn btn-outline" disabled>Турнир отменён</button>
             {% else %}
-            <a href="{% url 'login' %}?next={% url 'tournament_list' %}" class="btn btn-outline" onclick="event.stopPropagation();">Войти</a>
+                {% if user.is_authenticated %}
+                    {% if tournament.bracket_generated %}
+                    <button type="button" class="btn btn-outline" disabled>Регистрация закрыта</button>
+                    {% elif tournament.is_full %}
+                    <button type="button" class="btn btn-outline" disabled>Мест нет</button>
+                    {% else %}
+                    <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary" onclick="event.stopPropagation();">Записаться</a>
+                    {% endif %}
+                {% else %}
+                <a href="{% url 'login' %}?next={% url 'tournament_list' %}" class="btn btn-outline" onclick="event.stopPropagation();">Войти</a>
+                {% endif %}
             {% endif %}
         </div>
     </div>

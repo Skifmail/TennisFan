@@ -1,0 +1,169 @@
+{% load skill_tags %}
+{% if tournaments_page and tournaments_page.paginator.count %}
+<div class="tournament-table-wrapper">
+    <table class="tournament-table">
+        <thead>
+            <tr>
+                <th>Статус</th>
+                <th>Турнир</th>
+                <th>Город / Корт</th>
+                <th>Уровень / Пол</th>
+                <th>Формат</th>
+                <th>Тип / Продолжительность</th>
+                <th>Взнос / Места</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for tournament in tournaments_page %}
+            <tr class="tournament-table__row" onclick="window.location.href='{% url 'tournament_detail' slug=tournament.slug %}'">
+                <td class="tournament-table__cell tournament-table__cell--status">
+                    <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }} tournament-status-badge--inline" title="{{ tournament.get_status_display }}">
+                        {% if tournament.status == 'upcoming' %}Идет набор{% elif tournament.status == 'active' %}В ИГРЕ{% elif tournament.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
+                    </span>
+                </td>
+                <td class="tournament-table__cell tournament-table__cell--title">
+                    <div class="tournament-table__title">{{ tournament.name }}</div>
+                    <div class="tournament-table__sub">
+                        {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
+                    </div>
+                    <div class="tournament-table__participants">
+                        {% if tournament.variant == 'doubles' %}
+                            {% with total=tournament.teams.count|add:tournament.teams.count %}
+                            {% for team in tournament.teams.all|slice:":4" %}
+                                {% if team.player1 %}
+                                <span class="tournament-participant-avatar" title="{{ team.player1 }}">
+                                    {% include 'includes/avatar.html' with avatar=team.player1.avatar size='sm' %}
+                                </span>
+                                {% endif %}
+                                {% if team.player2 %}
+                                <span class="tournament-participant-avatar" title="{{ team.player2 }}">
+                                    {% include 'includes/avatar.html' with avatar=team.player2.avatar size='sm' %}
+                                </span>
+                                {% endif %}
+                            {% endfor %}
+                            {% if tournament.teams.count > 4 %}
+                            <span class="tournament-participant-more">+{{ tournament.teams.count|add:"-4" }}</span>
+                            {% endif %}
+                            {% endwith %}
+                        {% else %}
+                            {% with total=tournament.participants.count %}
+                            {% for participant in tournament.participants.all|slice:":8" %}
+                            <span class="tournament-participant-avatar" title="{{ participant }}">
+                                {% include 'includes/avatar.html' with avatar=participant.avatar size='sm' %}
+                            </span>
+                            {% endfor %}
+                            {% if total > 8 %}
+                            <span class="tournament-participant-more">+{{ total|add:"-8" }}</span>
+                            {% endif %}
+                            {% endwith %}
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="tournament-table__cell tournament-table__cell--city">
+                    <div class="tournament-table__sub">
+                        {{ tournament.city }}
+                        {% if tournament.court %}
+                            • {{ tournament.court.name }}
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="tournament-table__cell tournament-table__cell--level">
+                    <div class="tournament-table__tags">
+                        {% for ac in tournament.allowed_categories.all %}
+                            <span class="badge badge-soft">{{ ac.category|skill_with_ntrp }}</span>
+                        {% endfor %}
+                        <span class="badge badge-soft">{{ tournament.get_gender_display }}</span>
+                    </div>
+                </td>
+                <td class="tournament-table__cell tournament-table__cell--format">
+                    <div class="tournament-table__tags">
+                        {% if tournament.format == 'single_elimination' %}
+                        <span class="badge badge-soft">Олимпийская (с утешением)</span>
+                        {% elif tournament.format == 'olympic_consolation' %}
+                        <span class="badge badge-soft">Олимпийская</span>
+                        {% elif tournament.format == 'round_robin' %}
+                        <span class="badge badge-soft">Круговой</span>
+                        {% elif tournament.format == 'weekend_day' %}
+                        <span class="badge badge-soft">OneDay</span>
+                        {% else %}
+                        <span class="badge badge-soft">{{ tournament.get_format_display }}</span>
+                        {% endif %}
+                        {% if tournament.match_format %}
+                        <span class="badge badge-muted">{{ tournament.get_match_format_display }}</span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="tournament-table__cell tournament-table__cell--type">
+                    <div class="tournament-table__sub tournament-table__sub--type">
+                        {{ tournament.get_tournament_type_display }}
+                    </div>
+                    <div class="tournament-table__sub tournament-table__sub--duration text-secondary">
+                        {{ tournament.get_duration_display }}
+                    </div>
+                </td>
+                <td class="tournament-table__cell tournament-table__cell--fee">
+                    <div class="tournament-table__fee">
+                        {% if tournament.entry_fee and tournament.entry_fee > 0 %}
+                            {{ tournament.entry_fee|floatformat:0 }} ₽
+                        {% else %}
+                            Бесплатно
+                        {% endif %}
+                    </div>
+                    <div class="tournament-table__places text-secondary">
+                        {% if tournament.variant == 'doubles' and tournament.max_teams %}
+                            Команд: {{ tournament.full_teams_count }}/{{ tournament.max_teams }}
+                        {% elif tournament.max_participants %}
+                            Мест: {{ tournament.participants.count }}/{{ tournament.max_participants }}
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="tournament-table__cell tournament-table__cell--action tournament-table__action" onclick="event.stopPropagation();">
+                    {% if tournament.status == 'completed' %}
+                        <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Завершён</button>
+                    {% elif tournament.status == 'cancelled' %}
+                        <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Отменён</button>
+                    {% else %}
+                        {% if user.is_authenticated %}
+                            {% if tournament.bracket_generated %}
+                            <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Регистрация закрыта</button>
+                            {% elif tournament.is_full %}
+                            <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Мест нет</button>
+                            {% else %}
+                            <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary btn-sm">Записаться</a>
+                            {% endif %}
+                        {% else %}
+                            <a href="{% url 'login' %}?next={% url 'tournament_list' %}" class="btn btn-outline btn-sm">Войти</a>
+                        {% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if tournaments_page.paginator.num_pages > 1 %}
+<div class="pagination pagination--center">
+    <ul class="pagination__list">
+        {% for page_num in tournaments_page.paginator.page_range %}
+            {% if page_num == tournaments_page.number %}
+            <li class="pagination__item pagination__item--active">
+                <span>{{ page_num }}</span>
+            </li>
+            {% else %}
+            <li class="pagination__item">
+                <a href="?page={{ page_num }}{% if current_filters.city %}&city={{ current_filters.city }}{% endif %}{% if current_filters.category %}&category={{ current_filters.category }}{% endif %}{% if current_filters.gender %}&gender={{ current_filters.gender }}{% endif %}{% if current_filters.duration %}&duration={{ current_filters.duration }}{% endif %}"
+                   data-page-link="home-tournaments">
+                    {{ page_num }}
+                </a>
+            </li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% else %}
+<p class="text-secondary">Подходящих турниров не найдено.</p>
+{% endif %}
+

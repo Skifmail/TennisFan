@@ -6025,15 +6025,16 @@ select.form-control {
     }
 
     .hero-metrics--premium {
-        flex-direction: row;
-        gap: var(--spacing-sm);
-        justify-content: center;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        column-gap: var(--spacing-sm);
+        row-gap: var(--spacing-sm);
+        justify-items: center;
         margin-bottom: var(--spacing-xl);
     }
 
     .hero-metric {
-        flex: 0 0 auto;
+        width: 100%;
     }
 
     .hero-metric__value {
@@ -6045,9 +6046,7 @@ select.form-control {
     }
 
     .hero-metric-divider {
-        width: 1px;
-        height: 30px;
-        display: block;
+        display: none;
     }
 }
 
@@ -7129,6 +7128,16 @@ select.form-control {
 }
 
 .tournament-meta-link:hover {
+    color: #facc6b;
+}
+
+.hero-metric--link {
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.hero-metric--link:hover .hero-metric__value,
+.hero-metric--link:hover .hero-metric__label {
     color: #facc6b;
 }
 

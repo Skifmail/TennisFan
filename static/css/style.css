@@ -7152,13 +7152,12 @@ select.form-control {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .tournament-meta-row {
-        flex-direction: column;
-        align-items: flex-start;
+    .tournament-meta-group {
+        gap: var(--spacing-xs);
     }
 
-    .tournament-meta-value {
-        text-align: left;
+    .tournament-meta-row {
+        font-size: 12px;
     }
 }
 
@@ -7476,20 +7475,22 @@ select.form-control {
 
     .tournament-card-badges {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         grid-template-areas:
-            "variant format city"
-            "level gender duration"
-            "capacity capacity capacity";
+            "variant format"
+            "level gender"
+            "city duration"
+            "capacity capacity";
         gap: 6px;
         align-items: stretch;
     }
 
     .tournament-card-badges--with-court {
         grid-template-areas:
-            "variant format city"
-            "level gender duration"
-            "court court capacity";
+            "variant format"
+            "level gender"
+            "city duration"
+            "court capacity";
     }
 
     .tournament-card-badge-slot {

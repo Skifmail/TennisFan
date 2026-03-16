@@ -44,6 +44,7 @@
 - [x] Phase 9: выполнить план 09-03 (вынесение навигации в components/nav.css) — `/gsd/execute-plan .planning/phases/09-css-refactor/09-03-PLAN.md`
 - [x] Phase 9: выполнить план 09-04 (вынесение кнопок в components/buttons.css) — `/gsd/execute-plan .planning/phases/09-css-refactor/09-04-PLAN.md`
 - [x] Phase 9: выполнить план 09-05 (вынесение форм в components/forms.css) — `/gsd/execute-plan .planning/phases/09-css-refactor/09-05-PLAN.md`
+- [x] Phase 9: выполнить план 09-06 (вынесение карточек в components/cards.css) — `/gsd/execute-plan .planning/phases/09-css-refactor/09-06-PLAN.md`
 
 ---
 
@@ -80,4 +81,5 @@
 - Выполнен план 09-03 (Phase 9 — CSS рефакторинг, вынос navigation): блоки `header/nav desktop/mobile` и `dropdown-навигация` вынесены в `static/css/components/nav.css`; в `static/css/style.css` добавлен `@import`; селекторы не изменялись.
 - Выполнен план 09-04 (Phase 9 — CSS рефакторинг, вынос buttons): button-блоки вынесены в `static/css/components/buttons.css`; в `style.css` добавлен `@import`; дублирующийся селектор `.sparring-response-row__actions .btn` консолидирован без изменения свойств.
 - Выполнен план 09-05 (Phase 9 — CSS рефакторинг, вынос forms): auth/login/register, filter/input/score и consent-блоки вынесены в `static/css/components/forms.css`; в `style.css` добавлен `@import`; дубли `\.auth-form` консолидированы в общем mobile-scope.
-- Следующий шаг: продолжить декомпозицию `style.css` по компонентам (`cards`) и page-specific секциям.
+- Выполнен план 09-06 (Phase 9 — CSS рефакторинг, вынос cards): блоки карточек тренировок/игроков и турнирных/ценовых карточек вынесены в `static/css/components/cards.css`; в `style.css` добавлен `@import`; дубли `\.player-card` в card-секции консолидированы по media-scope без изменения значений свойств.
+- Следующий шаг: продолжить декомпозицию `style.css` по page-specific секциям в `static/css/pages/`.

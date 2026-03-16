@@ -1,0 +1,21 @@
+/* Training detail layout */
+.training-detail-grid {
+    grid-template-columns: 1fr 400px;
+    gap: var(--spacing-xl);
+}
+
+.training-detail-sidebar-card {
+    position: sticky;
+    top: 100px;
+}
+
+@media (width <= 900px) {
+    .training-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .training-detail-sidebar-card {
+        position: static;
+        margin-top: var(--spacing-lg);
+    }
+}

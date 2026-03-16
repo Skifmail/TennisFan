@@ -1,0 +1,41 @@
+/* --- Modal overlay --- */
+.modal-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 10001 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(0 0 0 / 50%);
+    padding: var(--spacing-md);
+    overflow-y: auto;
+}
+
+.modal-dialog {
+    background: var(--color-bg);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-2xl);
+    max-width: 440px;
+    width: 100%;
+    box-shadow: 0 8px 32px rgb(0 0 0 / 24%);
+    position: relative;
+    z-index: 10002;
+}
+
+.modal-dialog__title {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+.modal-dialog__text {
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+    margin-bottom: var(--spacing-sm);
+}
+
+.modal-dialog__actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-lg);
+    flex-wrap: wrap;
+}

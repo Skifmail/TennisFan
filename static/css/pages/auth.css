@@ -1,3 +1,13 @@
+/*
+ * auth.css
+ *
+ * Описание: Специфичные стили авторизации: поле пароля с toggler и анимированный логотип-монета.
+ * Компоненты: .password-field-wrapper, .password-toggle-btn, .auth-login-logo, .coin, .coin__face
+ * Используется на: страницы входа и регистрации
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* Обертка для поля пароля с иконкой глаза */
 .password-field-wrapper {
     position: relative;

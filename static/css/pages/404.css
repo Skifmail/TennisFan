@@ -1,3 +1,13 @@
+/*
+ * 404.css
+ *
+ * Описание: Полноэкранная стилизация страницы ошибки 404 с видео/изображением и контентным слоем.
+ * Компоненты: .error-page, .error-video, .error-image, .error-overlay, .error-content, .error-code
+ * Используется на: шаблон страницы 404
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* 404 Error Page */
 .error-page {
     position: fixed;

@@ -1,0 +1,86 @@
+/*
+ * rating-chart.css
+ * 
+ * Описание: Визуализация рейтинга в виде строк/баров и адаптивное поведение.
+ * Компоненты: .rating-toggle, .rating-chart, .rating-chart-bars, .rating-chart-row, .rating-chart-bar, .rating-chart-value
+ * Используется на: профиль игрока, блоки статистики рейтинга
+ * 
+ * Последнее обновление: 2026-03
+ */
+
+/* ==========================================================================
+   Rating Chart
+   ========================================================================== */
+.rating-toggle {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--spacing-lg);
+}
+
+@media (width <= 480px) {
+    .rating-toggle {
+        justify-content: center;
+        margin-bottom: var(--spacing-md);
+    }
+}
+
+.rating-chart {
+    margin-top: var(--spacing-lg);
+}
+
+.rating-chart-bars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.rating-chart-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 1.5fr) 3fr minmax(60px, 0.6fr);
+    gap: var(--spacing-md);
+    align-items: center;
+}
+
+@media (width <= 768px) {
+    .rating-chart-row {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-sm);
+    }
+
+    .rating-chart-bar {
+        width: 100%;
+    }
+
+    .rating-chart-value {
+        text-align: left;
+    }
+}
+
+.rating-chart-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+}
+
+.rating-chart-bar {
+    position: relative;
+    height: 12px;
+    background: var(--color-bg-elevated);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    border: 1px solid var(--color-border-light);
+}
+
+.rating-chart-bar span {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: var(--color-primary);
+    border-radius: var(--radius-full);
+}
+
+.rating-chart-value {
+    text-align: right;
+    font-weight: 600;
+    color: var(--color-primary);
+}

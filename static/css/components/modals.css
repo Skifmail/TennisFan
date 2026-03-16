@@ -1,3 +1,13 @@
+/*
+ * modals.css
+ *
+ * Описание: Базовая обвязка модальных окон: оверлей, контейнер, текст и блок действий.
+ * Компоненты: .modal-overlay, .modal-dialog, .modal-dialog__title, .modal-dialog__text, .modal-dialog__actions
+ * Используется на: страницы и компоненты с подтверждениями и диалогами
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* --- Modal overlay --- */
 .modal-overlay {
     position: fixed !important;

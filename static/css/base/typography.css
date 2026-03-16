@@ -1,3 +1,13 @@
+/*
+ * typography.css
+ *
+ * Описание: Подключение шрифтов и базовые правила типографики для заголовков и ключевых текстовых блоков.
+ * Компоненты: @font-face, .main h1, .main h2, .main h3, .profile-info__name, .rules-doc__body h2, .legal-doc__body h1
+ * Используется на: все страницы и шаблоны проекта
+ *
+ * Последнее обновление: 2026-03
+ */
+
 @font-face {
     font-family: Roboto;
     src: url('../../fonts/Roboto-Regular.ttf') format('truetype');

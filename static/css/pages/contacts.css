@@ -1,3 +1,13 @@
+/*
+ * contacts.css
+ *
+ * Описание: Локальные стили страницы контактов, включая ссылки, значения и карточку реквизитов.
+ * Компоненты: .contacts-page .contacts-item__link, .contacts-page .contacts-item__value, .contacts-requisites-card
+ * Используется на: страница контактов
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* Страница контактов: значения (ссылки и текст) — silver */
 .contacts-page .contacts-item__link,
 .contacts-page .contacts-item__value {

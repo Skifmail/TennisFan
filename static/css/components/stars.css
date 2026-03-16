@@ -1,0 +1,55 @@
+/*
+ * stars.css
+ * 
+ * Описание: Звёздный рейтинг корта с частичной заливкой и счётчиком.
+ * Компоненты: .star-rating, .star-rating__empty, .star-rating__fill-clip, .star-rating__fill, .star-rating__count
+ * Используется на: карточки и детальные страницы кортов
+ * 
+ * Последнее обновление: 2026-03
+ */
+
+/* ==========================================================================
+   Court star rating (hollow stars, fill by average)
+   ========================================================================== */
+.star-rating {
+    position: relative;
+    display: inline-block;
+    line-height: 1;
+    color: var(--color-border-light);
+}
+
+.star-rating__empty {
+    display: inline-block;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    opacity: 0.8;
+}
+
+/* Обёртка с шириной N% — обрезает заливку по рейтингу */
+.star-rating__fill-clip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.star-rating__fill {
+    display: inline-block;
+    white-space: nowrap;
+    letter-spacing: 0.05em;
+    color: var(--color-primary);
+}
+
+.star-rating--sm .star-rating__empty,
+.star-rating--sm .star-rating__fill-clip,
+.star-rating--sm .star-rating__fill {
+    font-size: var(--font-size-sm);
+}
+
+.star-rating__count {
+    margin-left: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}

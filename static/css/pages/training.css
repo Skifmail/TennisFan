@@ -1,3 +1,13 @@
+/*
+ * training.css
+ *
+ * Описание: Макет страницы тренировки с двухколоночной структурой и sticky-сайдбаром.
+ * Компоненты: .training-detail-grid, .training-detail-sidebar-card
+ * Используется на: страница тренировки
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* Training detail layout */
 .training-detail-grid {
     grid-template-columns: 1fr 400px;

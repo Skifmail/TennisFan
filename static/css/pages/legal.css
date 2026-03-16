@@ -1,0 +1,103 @@
+/*
+ * legal.css
+ * 
+ * Описание: Базовая типографика и контейнеры для юридических документов.
+ * Компоненты: .legal-page, .container--legal, .legal-header, .legal-doc__body, .legal-list__link
+ * Используется на: страницы правовых документов (оферта, политика и т.п.)
+ * 
+ * Последнее обновление: 2026-03
+ */
+
+/* ==========================================================================
+   Legal documents
+   ========================================================================== */
+.legal-page {
+    padding-top: var(--spacing-2xl);
+    padding-bottom: var(--spacing-3xl);
+}
+
+.container--legal {
+    max-width: 800px;
+}
+
+.legal-header {
+    margin-bottom: var(--spacing-xl);
+}
+
+.page-title--legal {
+    text-align: left;
+}
+
+.legal-doc__body {
+    padding: var(--spacing-2xl) !important;
+}
+
+.legal-doc__body h1,
+.legal-doc__body h2 {
+    margin-top: var(--spacing-xl);
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-xl);
+    color: var(--color-primary);
+}
+
+.legal-doc__body h1:first-child,
+.legal-doc__body h2:first-child {
+    margin-top: 0;
+}
+
+.legal-doc__body p {
+    margin-bottom: var(--spacing-md);
+    line-height: 1.7;
+}
+
+.legal-doc__body ul {
+    margin-bottom: var(--spacing-md);
+    padding-left: var(--spacing-xl);
+}
+
+.legal-doc__body li {
+    margin-bottom: var(--spacing-xs);
+    list-style: disc;
+}
+
+.legal-doc__body a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.legal-doc__body a:hover {
+    color: var(--color-text-secondary);
+}
+
+.legal-doc__body hr {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: var(--spacing-xl) 0;
+}
+
+.legal-doc__body strong {
+    color: var(--color-text);
+}
+
+.legal-list__ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.legal-list__ul li {
+    margin-bottom: var(--spacing-sm);
+    list-style: none;
+}
+
+.legal-list__link {
+    display: block;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.legal-list__link:hover {
+    background: var(--color-primary-transparent);
+    color: var(--color-primary);
+}

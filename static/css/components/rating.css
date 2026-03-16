@@ -1,3 +1,13 @@
+/*
+ * rating.css
+ *
+ * Описание: Визуальные индикаторы изменения рейтинга и очков в матчах/профиле.
+ * Компоненты: .rating-badge, .rating-badge__value, .rating-badge__arrow, .match-fan-delta, .match-points-display
+ * Используется на: профиль игрока, карточки и детали матчей
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* Rating Badge */
 .rating-badge {
     display: inline-flex;

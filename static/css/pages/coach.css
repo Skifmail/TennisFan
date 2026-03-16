@@ -1,3 +1,13 @@
+/*
+ * coach.css
+ *
+ * Описание: Макет страницы тренера с сайдбаром и адаптивным переключением в одну колонку.
+ * Компоненты: .coach-detail-grid, .coach-detail-sidebar, .coach-detail-main
+ * Используется на: страница тренера
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* Coach detail layout */
 .coach-detail-grid {
     grid-template-columns: 300px 1fr;

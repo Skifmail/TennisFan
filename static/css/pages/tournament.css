@@ -1,3 +1,13 @@
+/*
+ * tournament.css
+ *
+ * Описание: Страница турниров: bracket/FAN, карточки матчей, управление участниками, мета-блоки и таблицы.
+ * Компоненты: .bracket-*, .match-players, .manage-page, .tournament-card-*, .tournament-detail-*, .tournaments-table-*
+ * Используется на: список/детали турниров, управление турниром, блоки турниров на главной
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* FAN bracket */
 .bracket-grid {
     display: flex;

@@ -118,6 +118,20 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         verbose_name="Корт",
         help_text="Площадка проведения турнира (опционально).",
     )
+    club = models.ForeignKey(
+        "clubs.Club",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tournaments",
+        verbose_name="Клуб",
+        help_text="Клуб-организатор (пусто — общий турнир платформы).",
+    )
+    is_open_interclub = models.BooleanField(
+        "Открытый межклубный",
+        default=False,
+        help_text="Другие клубы могут подавать заявки на участие (только тариф Про).",
+    )
 
     # Subscription & Entry Fee fields
     entry_fee = models.DecimalField(

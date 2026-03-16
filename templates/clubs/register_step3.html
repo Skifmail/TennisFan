@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Регистрация клуба — активация{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Активация клуба</h1>
+    <p class="page-subtitle">Шаг 3 из 3</p>
+</div>
+<div class="container" style="max-width: 560px;">
+    <div class="card" style="margin-bottom: var(--spacing-lg);">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <p><strong>{{ step1.name }}</strong> · {{ step1.city }}</p>
+            <p>Тариф: {{ plan_label }} ({{ period }}).</p>
+            {% if plan == "start" %}
+            <form method="post">
+                {% csrf_token %}
+                <p>Активировать бесплатный пробный период 14 дней для тарифа Старт.</p>
+                <button type="submit" class="btn btn-primary">Активировать бесплатно</button>
+                <a href="{% url 'clubs:register_step2' %}" class="btn btn-ghost">← Назад</a>
+            </form>
+            {% else %}
+            <p class="alert alert-info">Оплата тарифов Базовый и Про будет доступна в следующей версии. Пока можно активировать только тариф Старт (пробный период).</p>
+            <a href="{% url 'clubs:register_step2' %}" class="btn btn-primary">Выбрать тариф Старт</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

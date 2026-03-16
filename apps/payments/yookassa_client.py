@@ -18,6 +18,30 @@ logger = logging.getLogger(__name__)
 API_URL = "https://api.yookassa.ru/v3/payments"
 
 
+def _create_auth(
+    shop_id: str | None = None, secret_key: str | None = None
+) -> tuple[str, str]:
+    """Сформировать пару (shop_id, secret_key) для авторизации в ЮKassa.
+
+    Args:
+        shop_id (str | None): Явно переданный идентификатор магазина.
+        secret_key (str | None): Явно переданный секретный ключ магазина.
+
+    Returns:
+        tuple[str, str]: Пара ``(shop_id, secret_key)``, очищенная от пробелов.
+
+    Raises:
+        ValueError: Если не удалось получить корректные учётные данные.
+    """
+    sid = (shop_id or getattr(settings, "YOOKASSA_SHOP_ID", "") or "").strip()
+    skey = (secret_key or getattr(settings, "YOOKASSA_SECRET_KEY", "") or "").strip()
+    if not sid or not skey:
+        raise ValueError(
+            "YOOKASSA_SHOP_ID и YOOKASSA_SECRET_KEY должны быть заданы в настройках или переданы явно"
+        )
+    return sid, skey
+
+
 def create_payment(
     amount: str,
     return_url: str,
@@ -52,12 +76,7 @@ def create_payment(
         ValueError: Если не заданы ``YOOKASSA_SHOP_ID`` или ``YOOKASSA_SECRET_KEY``.
         RuntimeError: При ошибке ответа API (код не 200 или некорректный body).
     """
-    shop_id = (getattr(settings, "YOOKASSA_SHOP_ID", None) or "").strip()
-    secret_key = (getattr(settings, "YOOKASSA_SECRET_KEY", None) or "").strip()
-    if not shop_id or not secret_key:
-        raise ValueError(
-            "YOOKASSA_SHOP_ID и YOOKASSA_SECRET_KEY должны быть заданы в настройках"
-        )
+    shop_id, secret_key = _create_auth()
 
     payload: dict[str, Any] = {
         "amount": {"value": amount, "currency": "RUB"},
@@ -140,9 +159,9 @@ def get_payment_status(payment_id: str) -> str | None:
         str | None: Статус платежа (например, ``\"succeeded\"``, ``\"pending\"``,
         ``\"canceled\"``) или ``None`` при ошибке обращения к API.
     """
-    shop_id = (getattr(settings, "YOOKASSA_SHOP_ID", None) or "").strip()
-    secret_key = (getattr(settings, "YOOKASSA_SECRET_KEY", None) or "").strip()
-    if not shop_id or not secret_key:
+    try:
+        shop_id, secret_key = _create_auth()
+    except ValueError:
         return None
 
     url = f"{API_URL}/{payment_id}"
@@ -174,9 +193,9 @@ def get_payment_details(payment_id: str) -> dict[str, Any] | None:
         dict[str, Any] | None: Словарь с данными платежа (как возвращает API
         ЮKassa) или ``None`` при ошибке запроса.
     """
-    shop_id = (getattr(settings, "YOOKASSA_SHOP_ID", None) or "").strip()
-    secret_key = (getattr(settings, "YOOKASSA_SECRET_KEY", None) or "").strip()
-    if not shop_id or not secret_key:
+    try:
+        shop_id, secret_key = _create_auth()
+    except ValueError:
         return None
 
     url = f"{API_URL}/{payment_id}"
@@ -225,12 +244,7 @@ def create_recurring_payment(
         ValueError: Если не заданы ``YOOKASSA_SHOP_ID`` или ``YOOKASSA_SECRET_KEY``.
         RuntimeError: При ошибке ответа API (код не 200).
     """
-    shop_id = (getattr(settings, "YOOKASSA_SHOP_ID", None) or "").strip()
-    secret_key = (getattr(settings, "YOOKASSA_SECRET_KEY", None) or "").strip()
-    if not shop_id or not secret_key:
-        raise ValueError(
-            "YOOKASSA_SHOP_ID и YOOKASSA_SECRET_KEY должны быть заданы в настройках"
-        )
+    shop_id, secret_key = _create_auth()
 
     payload: dict[str, Any] = {
         "amount": {"value": amount, "currency": "RUB"},
@@ -276,3 +290,130 @@ def create_recurring_payment(
         raise RuntimeError("Неверный ответ ЮKassa при автоплатеже.")
 
     return payment_id, status
+
+
+def create_payment_with_credentials(
+    shop_id: str,
+    secret_key: str,
+    amount: str,
+    return_url: str,
+    description: str,
+    *,
+    metadata: dict | None = None,
+    customer_email: str | None = None,
+) -> tuple[str, str]:
+    """Создать платёж в ЮKassa с явными учётными данными магазина клуба.
+
+    Args:
+        shop_id (str): Идентификатор магазина ЮKassa (клуба).
+        secret_key (str): Секретный ключ API для магазина клуба.
+        amount (str): Сумма платежа в формате ``\"100.00\"``.
+        return_url (str): URL возврата игрока после оплаты.
+        description (str): Описание платежа.
+        metadata (dict | None): Метаданные для связывания платежа с объектами клуба.
+        customer_email (str | None): Email игрока для чека (если требуется).
+
+    Returns:
+        tuple[str, str]: Кортеж ``(payment_id, confirmation_url)``.
+    """
+    sid, skey = _create_auth(shop_id=shop_id, secret_key=secret_key)
+    payload: dict[str, Any] = {
+        "amount": {"value": amount, "currency": "RUB"},
+        "capture": True,
+        "confirmation": {"type": "redirect", "return_url": return_url},
+        "description": (description or "Оплата")[:128],
+    }
+    if metadata:
+        payload["metadata"] = {
+            str(k): str(v)
+            for k, v in metadata.items()
+            if v is not None and str(v).strip()
+        }
+    email = (customer_email or "").strip()
+    if email and "@" in email:
+        payload["receipt"] = {
+            "customer": {"email": email[:64]},
+            "items": [
+                {
+                    "description": (description or "Оплата")[:128],
+                    "quantity": 1.0,
+                    "amount": {"value": amount, "currency": "RUB"},
+                    "vat_code": 1,
+                    "payment_mode": "full_payment",
+                    "payment_subject": "service",
+                }
+            ],
+            "internet": "true",
+        }
+
+    idempotence_key = str(uuid.uuid4())
+    response = requests.post(
+        API_URL,
+        auth=(sid, skey),
+        headers={
+            "Idempotence-Key": idempotence_key,
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=15,
+    )
+
+    if response.status_code != 200:
+        logger.warning(
+            "YooKassa create payment (club credentials) failed: status=%s body=%s",
+            response.status_code,
+            response.text[:500],
+        )
+        raise RuntimeError(
+            f"ЮKassa вернула ошибку: {response.status_code}. Проверьте Shop ID и Secret Key клуба."
+        )
+
+    data: dict[str, Any] = response.json()
+    payment_id = data.get("id")
+    confirmation_url = (
+        (data.get("confirmation") or {}).get("confirmation_url")
+        if isinstance(data.get("confirmation"), dict)
+        else None
+    )
+    if not payment_id or not confirmation_url:
+        logger.warning(
+            "YooKassa response (club credentials) missing id or confirmation_url: %s",
+            data,
+        )
+        raise RuntimeError("Неверный ответ ЮKassa: нет ссылки на оплату.")
+    return payment_id, confirmation_url
+
+
+def get_payment_status_with_credentials(
+    payment_id: str,
+    shop_id: str,
+    secret_key: str,
+) -> str | None:
+    """Получить статус платежа с использованием учётных данных магазина клуба.
+
+    Args:
+        payment_id (str): Идентификатор платежа ЮKassa.
+        shop_id (str): Идентификатор магазина клуба.
+        secret_key (str): Секретный ключ магазина клуба.
+
+    Returns:
+        str | None: Статус платежа или ``None`` при ошибке.
+    """
+    try:
+        sid, skey = _create_auth(shop_id=shop_id, secret_key=secret_key)
+    except ValueError:
+        return None
+    url = f"{API_URL}/{payment_id}"
+    try:
+        response = requests.get(
+            url,
+            auth=(sid, skey),
+            timeout=10,
+        )
+        if response.status_code != 200:
+            return None
+        status = response.json().get("status")
+        return status if isinstance(status, str) else None
+    except Exception as exc:
+        logger.warning("YooKassa get payment with club credentials failed: %s", exc)
+        return None

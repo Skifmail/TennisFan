@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Ссылка создана — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Ссылка создана</h1>
+</div>
+<div class="container" style="max-width: 560px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <p>Отправьте эту ссылку участникам для вступления в клуб:</p>
+            <input type="text" value="{{ full_url }}" readonly style="width: 100%; padding: var(--spacing-sm);" id="invite-url">
+            <p style="margin-top: var(--spacing-md);"><button type="button" class="btn btn-ghost" onclick="navigator.clipboard.writeText(document.getElementById('invite-url').value); this.textContent='Скопировано!';">Копировать</button></p>
+            <p><a href="{% url 'clubs:dashboard' slug=club.slug %}" class="btn btn-primary">В панель клуба</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

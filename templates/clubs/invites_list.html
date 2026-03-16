@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Приглашения — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Инвайт-ссылки</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 900px;">
+    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a> · <a href="{% url 'clubs:invite_create' slug=club.slug %}" class="btn btn-primary">Создать ссылку</a></p>
+    <div class="card">
+        <div class="card-body">
+            {% if links %}
+            <table class="table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Токен</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Создал</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Срок</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Использовано</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Активна</th>
+                        <th style="text-align: right; padding: var(--spacing-sm);">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for link in links %}
+                    <tr>
+                        <td style="padding: var(--spacing-sm);">{{ link.token|slice:":12" }}…</td>
+                        <td style="padding: var(--spacing-sm);">{{ link.created_by.email }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ link.expires_at|date:"d.m.Y"|default:"—" }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ link.use_count }}{% if link.max_uses %} / {{ link.max_uses }}{% endif %}</td>
+                        <td style="padding: var(--spacing-sm);">{% if link.is_active %}Да{% else %}Нет{% endif %}</td>
+                        <td style="padding: var(--spacing-sm); text-align: right;">
+                            <button type="button" class="btn btn-ghost btn-sm copy-invite-btn" data-url="{{ link.full_join_url }}">Копировать</button>
+                            {% if link.is_active %}
+                            <form method="post" action="{% url 'clubs:invite_deactivate' slug=club.slug pk=link.id %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-ghost btn-sm">Деактивировать</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="margin: 0; color: var(--color-text-muted);">Ссылок пока нет.</p>
+            <a href="{% url 'clubs:invite_create' slug=club.slug %}" class="btn btn-primary" style="margin-top: var(--spacing-md);">Создать ссылку</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script>
+document.querySelectorAll('.copy-invite-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var path = this.getAttribute('data-url');
+        var full = path.startsWith('http') ? path : (window.location.origin + path);
+        navigator.clipboard.writeText(full).then(function() { btn.textContent = 'Скопировано'; });
+    });
+});
+</script>
+{% endblock %}

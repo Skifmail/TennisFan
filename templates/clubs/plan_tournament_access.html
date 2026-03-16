@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Доступ тарифов — {{ tournament.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Доступ тарифов к турниру</h1>
+    <p class="page-subtitle">{{ tournament.name }} · {{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 900px;">
+    <p>
+        <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}">← Турниры клуба</a>
+        ·
+        <a href="{% url 'clubs:plans_manage' slug=club.slug %}">Тарифы игроков</a>
+    </p>
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <table class="table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; padding: var(--spacing-sm);">Тариф</th>
+                            <th style="text-align: left; padding: var(--spacing-sm);">Взнос</th>
+                            <th style="text-align: left; padding: var(--spacing-sm);">Лимиты</th>
+                            <th style="text-align: left; padding: var(--spacing-sm);">Доступ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in plan_rows %}
+                        <tr>
+                            <td style="padding: var(--spacing-sm);">
+                                <strong>{{ row.plan.name }}</strong>
+                                {% if row.plan.description %}
+                                <div style="color: var(--color-text-muted); font-size: var(--font-size-sm);">
+                                    {{ row.plan.description }}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td style="padding: var(--spacing-sm);">{{ row.plan.monthly_fee }} ₽/мес</td>
+                            <td style="padding: var(--spacing-sm);">
+                                Турниры:
+                                {% if row.plan.max_tournaments_per_month is None %}
+                                    безлимит
+                                {% else %}
+                                    {{ row.plan.max_tournaments_per_month }}
+                                {% endif %}
+                                <br>
+                                Слоты: {{ row.plan.monthly_slots }}
+                            </td>
+                            <td style="padding: var(--spacing-sm);">
+                                <label>
+                                    <input type="checkbox" name="plan_{{ row.plan.id }}" {% if row.is_allowed %}checked{% endif %}>
+                                    Разрешить
+                                </label>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button type="submit" class="btn btn-primary">Сохранить доступы</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

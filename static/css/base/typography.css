@@ -1,0 +1,60 @@
+@font-face {
+    font-family: Roboto;
+    src: url('../../fonts/Roboto-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: Roboto;
+    src: url('../../fonts/Roboto-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    src: url('../../fonts/OpenSans-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    src: url('../../fonts/OpenSans-SemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    src: url('../../fonts/OpenSans-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Заголовки и навигация: Roboto */
+.main h1,
+.main h2,
+.main h3,
+.profile-info__name,
+.court-detail__title,
+.court-detail__section-title,
+.shop-detail__title,
+.shop-detail__desc-title,
+.feedback-modal__title,
+.rules-doc__title,
+.rules-doc__body h2,
+.tournament-table-title,
+.page-title--legal,
+.legal-doc__body h1,
+.legal-doc__body h2 {
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}

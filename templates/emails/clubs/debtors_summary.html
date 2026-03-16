@@ -1,0 +1,23 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Сводка по должникам — {{ club_name }}</h2>
+<p>Здравствуйте, {{ admin_name }}!</p>
+<p>Период: <b>{{ period_label }}</b>. Не оплатили взнос: <b>{{ debtors_count }}</b> чел.</p>
+{% if debtors %}
+<table style="width:100%; border-collapse:collapse; margin:16px 0;">
+<tr style="background:#f4f6f8;">
+  <th style="padding:8px; text-align:left; border-bottom:1px solid #ddd;">Участник</th>
+  <th style="padding:8px; text-align:left; border-bottom:1px solid #ddd;">Email</th>
+</tr>
+{% for d in debtors %}
+<tr>
+  <td style="padding:8px; border-bottom:1px solid #eee;">{{ d.name }}</td>
+  <td style="padding:8px; border-bottom:1px solid #eee;">{{ d.email }}</td>
+</tr>
+{% endfor %}
+</table>
+{% endif %}
+{% if fees_url %}
+<p><a href="{{ fees_url }}" class="btn">Перейти к оплатам</a></p>
+{% endif %}
+{% endblock %}

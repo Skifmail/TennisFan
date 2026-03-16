@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Настройка взносов — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Настройка взносов</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 560px;">
+    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a> · <a href="{% url 'clubs:fees_payments' slug=club.slug %}">Список оплат</a></p>
+    <div class="card">
+        <div class="card-body">
+            <p style="color: var(--color-text-muted); font-size: 0.9rem;">
+                Укажите сумму, период, а также реквизиты ЮKassa клуба. Secret Key хранится зашифрованно и
+                не отображается в открытом виде.
+            </p>
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

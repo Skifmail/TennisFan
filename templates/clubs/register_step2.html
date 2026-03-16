@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Регистрация клуба — выбор тарифа{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Выбор тарифа</h1>
+    <p class="page-subtitle">Шаг 2 из 3 · Прогресс: 2/3</p>
+</div>
+<div class="container" style="max-width: 720px;">
+    <form method="post">
+        {% csrf_token %}
+        <div class="card" style="margin-bottom: var(--spacing-lg);">
+            <div class="card-body" style="padding: var(--spacing-2xl);">
+                <p style="margin-bottom: var(--spacing-lg);">Период оплаты: <label><input type="radio" name="period" value="monthly"> Помесячно</label> &nbsp; <label><input type="radio" name="period" value="yearly" checked> Ежегодно (выгода)</label></p>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-lg);">
+                    <label class="card" style="cursor: pointer; border: 2px solid var(--color-border); padding: var(--spacing-lg);">
+                        <input type="radio" name="plan" value="{{ plans.START }}" required>
+                        <strong>Старт</strong>
+                        <p style="margin: var(--spacing-sm) 0;">{{ prices.START.yearly|floatformat:0 }} ₽/год</p>
+                        <p style="font-size: var(--font-size-sm);">Пробный период 14 дней бесплатно</p>
+                    </label>
+                    <label class="card" style="cursor: pointer; border: 2px solid var(--color-primary); padding: var(--spacing-lg);">
+                        <input type="radio" name="plan" value="{{ plans.BASIC }}">
+                        <strong>Базовый</strong>
+                        <p style="margin: var(--spacing-sm) 0;">{{ prices.BASIC.yearly|floatformat:0 }} ₽/год</p>
+                        <p style="font-size: var(--font-size-sm);">Публичная страница, больше игроков</p>
+                    </label>
+                    <label class="card" style="cursor: pointer; border: 2px solid var(--color-border); padding: var(--spacing-lg);">
+                        <input type="radio" name="plan" value="{{ plans.PRO }}">
+                        <strong>Про</strong>
+                        <p style="margin: var(--spacing-sm) 0;">{{ prices.PRO.yearly|floatformat:0 }} ₽/год</p>
+                        <p style="font-size: var(--font-size-sm);">Всё + межклубные турниры</p>
+                    </label>
+                </div>
+                <div style="margin-top: var(--spacing-xl);">
+                    <button type="submit" class="btn btn-primary">Продолжить →</button>
+                    <a href="{% url 'clubs:register_step1' %}" class="btn btn-ghost">← Назад</a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

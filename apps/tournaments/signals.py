@@ -438,10 +438,12 @@ def _apply_fan_shadow(match: Match) -> None:
             loser_team = match.team2 if a_won else match.team1
         loser = None
         side_a_players = (
-            (match.team1.player1, match.team1.player2) if match.team1 else ()
+            (match.team1.player1 if match.team1 else None),
+            (match.team1.player2 if match.team1 else None),
         )
         side_b_players = (
-            (match.team2.player1, match.team2.player2) if match.team2 else ()
+            (match.team2.player1 if match.team2 else None),
+            (match.team2.player2 if match.team2 else None),
         )
         loser_side_players = None
     else:

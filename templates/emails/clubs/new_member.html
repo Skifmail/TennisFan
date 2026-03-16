@@ -1,0 +1,10 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Новый участник клуба</h2>
+<p>Здравствуйте, {{ admin_name }}!</p>
+<p>В клуб <b>{{ club_name }}</b> вступил новый участник:</p>
+<p><b>{{ member_name }}</b> ({{ member_email }})</p>
+{% if dashboard_url %}
+<p><a href="{{ dashboard_url }}" class="btn">Перейти в панель клуба</a></p>
+{% endif %}
+{% endblock %}

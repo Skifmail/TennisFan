@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Оплата подписки — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Оплата подписки клуба</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 640px;">
+    <p><a href="{% url 'clubs:subscription' slug=club.slug %}">← Назад к подписке</a></p>
+    <div class="card">
+        <div class="card-body">
+            <h2 style="font-size: 1.25rem; margin-bottom: var(--spacing-md);">Выберите тариф и период</h2>
+            <form method="post">
+                {% csrf_token %}
+                <div style="margin-bottom: var(--spacing-md);">
+                    <label style="display: block; margin-bottom: var(--spacing-sm); font-weight: bold;">Тариф:</label>
+                    {% for plan in plans %}
+                    <label style="display: block; margin-bottom: var(--spacing-xs);">
+                        <input type="radio" name="plan" value="{{ plan.value }}" {% if forloop.first %}checked{% endif %} required>
+                        {{ plan.label }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <div style="margin-bottom: var(--spacing-md);">
+                    <label style="display: block; margin-bottom: var(--spacing-sm); font-weight: bold;">Период:</label>
+                    <label style="display: block; margin-bottom: var(--spacing-xs);">
+                        <input type="radio" name="period" value="monthly" required>
+                        Ежемесячно
+                    </label>
+                    <label style="display: block; margin-bottom: var(--spacing-xs);">
+                        <input type="radio" name="period" value="yearly" checked required>
+                        Ежегодно (скидка)
+                    </label>
+                </div>
+                <div style="margin-bottom: var(--spacing-md); color: var(--color-text-muted); font-size: 0.9rem;">
+                    <p style="margin: 0;">Цены:</p>
+                    <ul style="margin-top: var(--spacing-xs); padding-left: var(--spacing-lg);">
+                        {% for plan, prices in plan_prices.items %}
+                        <li>{{ plan.label }}: {{ prices.monthly }} ₽/мес, {{ prices.yearly }} ₽/год</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <button type="submit" class="btn btn-primary">Перейти к оплате</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

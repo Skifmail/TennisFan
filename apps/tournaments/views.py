@@ -7,15 +7,21 @@ import logging
 from collections import defaultdict
 from functools import wraps
 from itertools import groupby
+from typing import cast
 
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db import models
 from django.db.models import Count, Min, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from apps.clubs.models import ClubMember, ClubMemberStatus
+from apps.clubs.plan_services import (
+    can_member_register_for_tournament,
+    consume_member_tournament_limit,
+)
+from apps.clubs.services import user_can_manage_club
 from apps.core.decorators import require_filled_profile
 from apps.users.models import Notification, Player, SkillLevel
 
@@ -275,6 +281,55 @@ def tournament_list(request):
         "category_choices": SkillLevel.choices,
     }
     return render(request, "tournaments/list.html", context)
+
+
+def _get_interclub_context(request, tournament):
+    """Контекст межклубных заявок для страницы турнира."""
+    if not tournament.is_open_interclub or not tournament.club_id:
+        return {}
+
+    from apps.clubs.models import (
+        ClubMemberRole,
+        ClubMemberStatus,
+        ClubTournamentApplication,
+    )
+
+    ctx: dict = {"is_interclub": True}
+
+    if not request.user.is_authenticated:
+        return ctx
+
+    admin_clubs = list(
+        request.user.club_memberships.filter(
+            role=ClubMemberRole.ADMIN,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        .exclude(club_id=tournament.club_id)
+        .select_related("club")
+    )
+    if not admin_clubs:
+        return ctx
+
+    existing_apps = {
+        a.applicant_club_id: a
+        for a in ClubTournamentApplication.objects.filter(
+            tournament=tournament,
+            applicant_club_id__in=[m.club_id for m in admin_clubs],
+        )
+    }
+
+    can_apply_clubs = []
+    applied_clubs = []
+    for m in admin_clubs:
+        app = existing_apps.get(m.club_id)
+        if app:
+            applied_clubs.append({"club": m.club, "application": app})
+        else:
+            can_apply_clubs.append(m.club)
+
+    ctx["interclub_can_apply_clubs"] = can_apply_clubs
+    ctx["interclub_applied_clubs"] = applied_clubs
+    return ctx
 
 
 def tournament_detail(request, slug):
@@ -644,6 +699,7 @@ def tournament_detail(request, slug):
     # Проверяем, может ли пользователь зарегистрироваться
     user_is_registered = False
     can_register = False
+    club_plan_error = ""
     registration_closed = tournament.bracket_generated or tournament.is_full()
 
     if request.user.is_authenticated:
@@ -660,6 +716,22 @@ def tournament_detail(request, slug):
 
             # Может зарегистрироваться, если не зарегистрирован и регистрация открыта
             can_register = not user_is_registered and not registration_closed
+            if can_register:
+                tournament_member = _get_tournament_club_member(
+                    request.user, tournament
+                )
+                if tournament_member:
+                    can_register_by_plan, plan_error = (
+                        can_member_register_for_tournament(
+                            tournament_member,
+                            tournament,
+                        )
+                    )
+                    if not can_register_by_plan:
+                        can_register = False
+                        club_plan_error = plan_error
+
+    interclub_ctx = _get_interclub_context(request, tournament)
 
     context = {
         "tournament": tournament,
@@ -680,7 +752,9 @@ def tournament_detail(request, slug):
         "can_join_team": can_join_team,
         "user_is_registered": user_is_registered,
         "can_register": can_register,
+        "club_plan_error": club_plan_error,
         "registration_closed": registration_closed,
+        **interclub_ctx,
         "tvd_groups": tvd_groups if is_tvd else None,
         "tvd_main_matches": tvd_main_matches if is_tvd else None,
         "tvd_consolation_matches": tvd_consolation_matches if is_tvd else None,
@@ -724,9 +798,20 @@ def _group_matches_by_round(matches):
     return list(rounds.items())
 
 
-@staff_member_required
+def _can_manage_tournament(request, tournament):
+    """Доступ к управлению турниром: staff или admin/manager клуба турнира."""
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return False
+    if request.user.is_staff:
+        return True
+    if tournament.club_id and user_can_manage_club(request.user, tournament.club):
+        return True
+    return False
+
+
+@login_required
 def tournament_manage(request, slug):
-    """Интерактивная страница управления ТВД-турниром (только для staff)."""
+    """Интерактивная страница управления ТВД-турниром (staff или admin/manager клуба)."""
     tournament = get_object_or_404(
         Tournament.objects.prefetch_related(
             "participants__user",
@@ -754,6 +839,10 @@ def tournament_manage(request, slug):
         ),
         slug=slug,
     )
+    if not _can_manage_tournament(request, tournament):
+        from django.http import HttpResponseForbidden
+
+        return HttpResponseForbidden("Нет доступа к управлению этим турниром.")
     if not _is_tvd(tournament):
         messages.error(request, "Управление доступно только для турниров формата ТВД.")
         return redirect("tournament_detail", slug=slug)
@@ -968,8 +1057,11 @@ def tournament_manage(request, slug):
 
 
 def _tournament_manage_get_tournament(request, slug):
-    """Get TVD tournament by slug; redirect with error if not TVD."""
+    """Get TVD tournament by slug; check access (staff or club admin/manager); return None if no access."""
     t = get_object_or_404(Tournament, slug=slug)
+    if not _can_manage_tournament(request, t):
+        messages.error(request, "Нет доступа к управлению этим турниром.")
+        return None
     if not _is_tvd(t):
         messages.error(request, "Управление доступно только для турниров формата ТВД.")
         return None
@@ -986,7 +1078,7 @@ def _player_in_full_team(tournament, player_id: int) -> bool:
     )
 
 
-@staff_member_required
+@login_required
 def tournament_manage_compose_pair(request, slug):
     """POST: составить пару (два игрока → одна команда) для парного ТВД."""
     if request.method != "POST":
@@ -1068,7 +1160,7 @@ def tournament_manage_compose_pair(request, slug):
     return redirect("tournament_manage", slug=slug)
 
 
-@staff_member_required
+@login_required
 def tournament_manage_generate_groups(request, slug):
     """POST: сформировать группы ТВД (HTMX)."""
     if request.method != "POST":
@@ -1084,7 +1176,7 @@ def tournament_manage_generate_groups(request, slug):
     return redirect("tournament_manage", slug=slug)
 
 
-@staff_member_required
+@login_required
 def tournament_manage_generate_playoffs(request, slug):
     """POST: сформировать плей-офф ТВД (HTMX)."""
     if request.method != "POST":
@@ -1100,7 +1192,7 @@ def tournament_manage_generate_playoffs(request, slug):
     return redirect("tournament_manage", slug=slug)
 
 
-@staff_member_required
+@login_required
 def tournament_manage_finalize(request, slug):
     """POST: завершить турнир ТВД (HTMX)."""
     if request.method != "POST":
@@ -1121,7 +1213,7 @@ def _tvd_group_member_key(member, is_doubles):
     return member.team_id if is_doubles else member.player_id
 
 
-@staff_member_required
+@login_required
 def tournament_manage_intermediate_results(request, slug):
     """GET: промежуточные результаты после группового этапа — кто в основную сетку, кто в утешительную."""
     tournament = _tournament_manage_get_tournament(request, slug)
@@ -1250,7 +1342,7 @@ def tournament_manage_intermediate_results(request, slug):
     return render(request, "tournaments/manage_intermediate_results.html", context)
 
 
-@staff_member_required
+@login_required
 def tournament_manage_intermediate_generate_main(request, slug):
     """POST: создать только основную сетку (формат olympic или circular)."""
     if request.method != "POST":
@@ -1269,7 +1361,7 @@ def tournament_manage_intermediate_generate_main(request, slug):
     return redirect("tournament_manage_intermediate_results", slug=slug)
 
 
-@staff_member_required
+@login_required
 def tournament_manage_intermediate_generate_consolation(request, slug):
     """POST: создать только утешительную сетку (формат olympic или circular)."""
     if request.method != "POST":
@@ -1326,7 +1418,7 @@ def _get_players_available_to_add_queryset(tournament):
     )
 
 
-@staff_member_required
+@login_required
 def tournament_manage_search_participants(request, slug):
     """GET ?q=... — поиск участников по имени или телефону для добавления в турнир. JSON."""
     tournament = _tournament_manage_get_tournament(request, slug)
@@ -1381,7 +1473,7 @@ def _tournament_manage_player_already_in(tournament, player) -> tuple[bool, str 
         return False, None
 
 
-@staff_member_required
+@login_required
 def tournament_manage_add_participant(request, slug):
     """POST: добавить участника по player_id. При отсутствии оплаты — редирект на страницу выбора."""
     if request.method != "POST":
@@ -1424,7 +1516,7 @@ def _do_add_participant_to_tournament(tournament, player):
         tournament.participants.add(player)
 
 
-@staff_member_required
+@login_required
 def tournament_manage_add_participant_confirm(request, slug, player_id):
     """Страница выбора: участник не оплатил — добавить всё равно или отправить уведомление об оплате."""
     tournament = _tournament_manage_get_tournament(request, slug)
@@ -1454,7 +1546,7 @@ def tournament_manage_add_participant_confirm(request, slug, player_id):
     return render(request, "tournaments/manage_add_participant_confirm.html", context)
 
 
-@staff_member_required
+@login_required
 def tournament_manage_add_participant_force(request, slug):
     """POST: добавить участника без проверки оплаты (player_id)."""
     if request.method != "POST":
@@ -1491,7 +1583,7 @@ def tournament_manage_add_participant_force(request, slug):
     return redirect("tournament_manage", slug=slug)
 
 
-@staff_member_required
+@login_required
 def tournament_manage_send_payment_notification(request, slug):
     """POST: отправить участнику уведомление со ссылкой на оплату (player_id). После оплаты он будет добавлен автоматически."""
     if request.method != "POST":
@@ -1610,7 +1702,7 @@ def _notify_removed_participant_no_refund(request, user, tournament):
         )
 
 
-@staff_member_required
+@login_required
 def tournament_manage_remove_participant(request, slug):
     """POST: удалить участника (player_id для одиночного, team_id для парного). При оплаченном взносе — заявка на возврат и уведомление."""
     import secrets
@@ -1684,7 +1776,7 @@ def _parse_int_post(request, key, default=None):
         return default
 
 
-@staff_member_required
+@login_required
 def tournament_manage_match_result(request, slug, pk):
     """POST: внести результат матча (score1/score2, winner_id/winner_team_id). Опционально walkover=1 — тех. результат (неявка/просрочка)."""
     from django.utils import timezone
@@ -2653,6 +2745,30 @@ def _remove_solo_teams_for_teamed_players(tournament):
     ).delete()
 
 
+def _get_tournament_club_member(user, tournament) -> ClubMember | None:
+    """Возвращает активное членство пользователя в клубе-организаторе турнира.
+
+    Args:
+        user: Текущий пользователь.
+        tournament: Турнир для проверки членства.
+
+    Returns:
+        ClubMember | None: Активное членство или None.
+    """
+    if not tournament.club_id or not user.is_authenticated:
+        return None
+    member = (
+        ClubMember.objects.filter(
+            club_id=tournament.club_id,
+            user=user,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        .select_related("club")
+        .first()
+    )
+    return cast(ClubMember | None, member)
+
+
 @login_required
 @require_filled_profile
 def tournament_register(request, slug):
@@ -2695,6 +2811,17 @@ def tournament_register(request, slug):
     if tournament.participants.filter(id=player.id).exists():
         messages.info(request, "Вы уже зарегистрированы на этот турнир.")
         return redirect("tournament_detail", slug=tournament.slug)
+
+    # Проверка клубных тарифов участников (Phase 8), если турнир клубный.
+    tournament_member = _get_tournament_club_member(request.user, tournament)
+    if tournament_member:
+        can_register_by_plan, plan_error = can_member_register_for_tournament(
+            tournament_member,
+            tournament,
+        )
+        if not can_register_by_plan:
+            messages.error(request, plan_error)
+            return redirect("tournament_detail", slug=tournament.slug)
 
     # SUBSCRIPTION CHECK
     try:
@@ -2746,6 +2873,15 @@ def tournament_register(request, slug):
                     messages.success(request, "Вы зарегистрированы!")
             else:
                 messages.success(request, "Вы зарегистрированы!")
+
+        if tournament_member:
+            consumed, consume_error = consume_member_tournament_limit(
+                tournament_member,
+                tournament,
+            )
+            if not consumed:
+                messages.error(request, consume_error)
+                return redirect("tournament_detail", slug=tournament.slug)
 
         tournament.participants.add(player)
         try:
@@ -2824,6 +2960,16 @@ def tournament_register_doubles(request, slug):
     if _is_player_registered_in_doubles(tournament, player):
         messages.info(request, "Вы уже зарегистрированы на этот турнир.")
         return redirect("tournament_detail", slug=slug)
+
+    tournament_member = _get_tournament_club_member(request.user, tournament)
+    if tournament_member:
+        can_register_by_plan, plan_error = can_member_register_for_tournament(
+            tournament_member,
+            tournament,
+        )
+        if not can_register_by_plan:
+            messages.error(request, plan_error)
+            return redirect("tournament_detail", slug=tournament.slug)
 
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
@@ -2935,6 +3081,14 @@ def tournament_register_doubles(request, slug):
         action = request.POST.get("action")
 
         if action == "solo":
+            if tournament_member:
+                consumed, consume_error = consume_member_tournament_limit(
+                    tournament_member,
+                    tournament,
+                )
+                if not consumed:
+                    messages.error(request, consume_error)
+                    return redirect("tournament_detail", slug=tournament.slug)
             TournamentTeam.objects.create(tournament=tournament, player1=player)
             if not _tournament_does_not_consume_subscription_limit(tournament):
                 try:
@@ -3003,6 +3157,16 @@ def _do_join_team(request, tournament, player, team):
                 request,
                 f"Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола ({gender_text}).",
             )
+            return redirect("tournament_detail", slug=tournament.slug)
+
+    tournament_member = _get_tournament_club_member(request.user, tournament)
+    if tournament_member:
+        consumed, consume_error = consume_member_tournament_limit(
+            tournament_member,
+            tournament,
+        )
+        if not consumed:
+            messages.error(request, consume_error)
             return redirect("tournament_detail", slug=tournament.slug)
 
     team.player2 = player
@@ -3082,6 +3246,28 @@ def _do_add_partner(request, tournament, player, partner_id):
     if not partner_ok:
         messages.error(request, f"Партнёр не может участвовать: {partner_err}")
         return redirect("tournament_register_doubles", slug=tournament.slug)
+
+    tournament_member = _get_tournament_club_member(request.user, tournament)
+    if tournament_member:
+        consumed, consume_error = consume_member_tournament_limit(
+            tournament_member,
+            tournament,
+        )
+        if not consumed:
+            messages.error(request, consume_error)
+            return redirect("tournament_detail", slug=tournament.slug)
+
+    partner_tournament_member = _get_tournament_club_member(partner.user, tournament)
+    if partner_tournament_member:
+        partner_consumed, partner_consume_error = consume_member_tournament_limit(
+            partner_tournament_member,
+            tournament,
+        )
+        if not partner_consumed:
+            messages.error(
+                request, f"Партнёр не может участвовать: {partner_consume_error}"
+            )
+            return redirect("tournament_register_doubles", slug=tournament.slug)
 
     TournamentTeam.objects.create(
         tournament=tournament, player1=player, player2=partner

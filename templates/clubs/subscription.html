@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Подписка — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Подписка клуба</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 640px;">
+    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a></p>
+    {% if subscription %}
+    <div class="card" style="margin-bottom: var(--spacing-lg);">
+        <div class="card-body">
+            <h2 style="font-size: 1.25rem; margin-bottom: var(--spacing-sm);">Текущий тариф</h2>
+            <p style="margin: 0;"><strong>{{ subscription.get_plan_display }}</strong> · до {{ subscription.ends_at|date:"d.m.Y" }}</p>
+            <p style="margin-top: var(--spacing-md);">
+                {% if subscription %}
+                <a href="{% url 'clubs:subscription_pay' slug=club.slug %}" class="btn btn-primary">Продлить</a>
+                {% else %}
+                <a href="{% url 'clubs:subscription_pay' slug=club.slug %}" class="btn btn-primary">Оформить подписку</a>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+    {% else %}
+    <div class="card" style="margin-bottom: var(--spacing-lg);">
+        <div class="card-body">
+            <p style="margin: 0; color: var(--color-text-muted);">Подписка не активна.</p>
+    <div class="card">
+        <div class="card-body">
+            <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">История подписок</h2>
+            {% if history %}
+            <table class="table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Тариф</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Период</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Начало</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Окончание</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in history %}
+                    <tr>
+                        <td style="padding: var(--spacing-sm);">{{ s.get_plan_display }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ s.get_period_display }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ s.started_at|date:"d.m.Y" }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ s.ends_at|date:"d.m.Y" }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ s.get_status_display }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="margin: 0; color: var(--color-text-muted);">Истории нет.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

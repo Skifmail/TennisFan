@@ -1,0 +1,42 @@
+# Python / Django
+venv/
+docs_venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+htmlcov/
+*.coverage
+
+# Node
+node_modules/
+package-lock.json
+
+# Базы данных
+db.sqlite3
+*.sqlite3
+
+# Логи
+logs/
+*.log
+
+# Медиа и статика (генерируется)
+media/
+staticfiles/
+
+# Docker
+.dockerignore
+
+# Секреты и окружение
+.env
+.env.local
+.passwords
+
+# Временные / генерируемые файлы
+google6308ddba4bfafc4d.h...
+yandex_4c25bfb73ce9f79f.h...
+
+# Кэш Cursor
+.cursor/

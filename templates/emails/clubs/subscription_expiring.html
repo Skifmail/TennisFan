@@ -1,0 +1,11 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Подписка клуба скоро истечёт</h2>
+<p>Здравствуйте, {{ admin_name }}!</p>
+<p>Подписка клуба <b>{{ club_name }}</b> (тариф <b>{{ plan_name }}</b>) истекает <b>{{ ends_at }}</b>.</p>
+<p>До окончания осталось <b>{{ days_left }} дн.</b></p>
+{% if renew_url %}
+<p><a href="{{ renew_url }}" class="btn">Продлить подписку</a></p>
+{% endif %}
+<p>При просрочке функционал клуба будет ограничен.</p>
+{% endblock %}

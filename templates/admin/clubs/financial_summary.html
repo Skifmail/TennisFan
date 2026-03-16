@@ -1,0 +1,66 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block content_title %}<h1>{{ title }}</h1>{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px;">
+    <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; border-left: 4px solid #417690;">
+        <div style="font-size: 2rem; font-weight: 700;">{{ total_active }}</div>
+        <div style="color: #666;">Активных подписок</div>
+    </div>
+    <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; border-left: 4px solid #79aec8;">
+        <div style="font-size: 2rem; font-weight: 700;">{{ mrr|floatformat:0 }} ₽</div>
+        <div style="color: #666;">MRR (расчётный)</div>
+    </div>
+    <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; border-left: 4px solid #417690;">
+        <div style="font-size: 2rem; font-weight: 700;">{{ month_revenue|floatformat:0 }} ₽</div>
+        <div style="color: #666;">Выручка за текущий месяц</div>
+    </div>
+    <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; border-left: 4px solid #e09d2c;">
+        <div style="font-size: 2rem; font-weight: 700;">{{ suspended_count }}</div>
+        <div style="color: #666;">Suspended клубов</div>
+    </div>
+</div>
+
+<h2 style="margin-bottom: 15px;">Активные подписки по тарифам</h2>
+<table style="border-collapse: collapse; width: 100%; max-width: 500px; margin-bottom: 30px;">
+    <thead>
+        <tr>
+            <th style="text-align: left; padding: 8px 12px; border-bottom: 2px solid #ddd;">Тариф</th>
+            <th style="text-align: right; padding: 8px 12px; border-bottom: 2px solid #ddd;">Количество</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for plan_name, count in plan_stats.items %}
+        <tr>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{{ plan_name }}</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right;">{{ count }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2 style="margin-bottom: 15px;">Истечение подписок</h2>
+<table style="border-collapse: collapse; width: 100%; max-width: 500px;">
+    <thead>
+        <tr>
+            <th style="text-align: left; padding: 8px 12px; border-bottom: 2px solid #ddd;">Период</th>
+            <th style="text-align: right; padding: 8px 12px; border-bottom: 2px solid #ddd;">Количество</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">Истекает в ближайшие 7 дней</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right; {% if expiring_7 > 0 %}color: #e09d2c; font-weight: 600;{% endif %}">{{ expiring_7 }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">Истекает в ближайшие 30 дней</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right;">{{ expiring_30 }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<p style="margin-top: 30px;"><a href="../">&larr; Назад к списку клубов</a></p>
+{% endblock %}

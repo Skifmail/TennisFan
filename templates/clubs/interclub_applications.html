@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Межклубные заявки — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Межклубные заявки</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 960px;">
+    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a></p>
+    <div style="margin-bottom: var(--spacing-lg); display: flex; gap: var(--spacing-sm); flex-wrap: wrap;">
+        <a href="{% url 'clubs:interclub_applications' slug=club.slug %}" class="btn btn-ghost btn-sm {% if not current_status_filter %}btn-primary{% endif %}">Все</a>
+        <a href="{% url 'clubs:interclub_applications' slug=club.slug %}?status=pending" class="btn btn-ghost btn-sm {% if current_status_filter == 'pending' %}btn-primary{% endif %}">На рассмотрении</a>
+        <a href="{% url 'clubs:interclub_applications' slug=club.slug %}?status=approved" class="btn btn-ghost btn-sm {% if current_status_filter == 'approved' %}btn-primary{% endif %}">Одобренные</a>
+        <a href="{% url 'clubs:interclub_applications' slug=club.slug %}?status=rejected" class="btn btn-ghost btn-sm {% if current_status_filter == 'rejected' %}btn-primary{% endif %}">Отклонённые</a>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            {% if applications %}
+            <table class="table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Турнир</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Клуб-заявитель</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Дата заявки</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Статус</th>
+                        <th style="text-align: right; padding: var(--spacing-sm);">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for app in applications %}
+                    <tr>
+                        <td style="padding: var(--spacing-sm);">
+                            <a href="{% url 'tournament_detail' slug=app.tournament.slug %}">{{ app.tournament.name }}</a>
+                        </td>
+                        <td style="padding: var(--spacing-sm);">{{ app.applicant_club.name }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ app.created_at|date:"d.m.Y H:i" }}</td>
+                        <td style="padding: var(--spacing-sm);">
+                            {% if app.status == 'pending' %}
+                                <span style="color: var(--color-warning);">На рассмотрении</span>
+                            {% elif app.status == 'approved' %}
+                                <span style="color: var(--color-success);">Одобрена</span>
+                            {% elif app.status == 'rejected' %}
+                                <span style="color: var(--color-error);">Отклонена</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: var(--spacing-sm); text-align: right;">
+                            {% if app.status == 'pending' %}
+                            <form method="post" action="{% url 'clubs:interclub_application_respond' slug=club.slug pk=app.pk %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" name="action" value="approve" class="btn btn-primary btn-sm">Одобрить</button>
+                                <button type="submit" name="action" value="reject" class="btn btn-ghost btn-sm">Отклонить</button>
+                            </form>
+                            {% elif app.responded_by %}
+                                <span class="text-secondary" style="font-size: 0.85rem;">{{ app.responded_by.get_full_name|default:app.responded_by.email }}, {{ app.responded_at|date:"d.m.Y" }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="margin: 0; color: var(--color-text-muted);">Заявок пока нет.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

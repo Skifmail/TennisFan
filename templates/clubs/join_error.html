@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Ошибка вступления{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Ссылка недействительна</h1>
+    {% if error == "no_token" %}
+    <p class="page-subtitle">В ссылке отсутствует токен приглашения.</p>
+    {% elif error == "invalid_token" %}
+    <p class="page-subtitle">Ссылка не найдена или деактивирована.</p>
+    {% elif error == "expired" %}
+    <p class="page-subtitle">Срок действия ссылки истёк.</p>
+    {% elif error == "limit_reached" %}
+    <p class="page-subtitle">Лимит использований ссылки исчерпан.</p>
+    {% else %}
+    <p class="page-subtitle">Невозможно вступить по этой ссылке.</p>
+    {% endif %}
+</div>
+<div class="container" style="max-width: 480px;">
+    {% if club %}<a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="btn btn-ghost">На страницу клуба</a>{% endif %}
+    <a href="{% url 'home' %}" class="btn btn-primary">На главную</a>
+</div>
+{% endblock %}

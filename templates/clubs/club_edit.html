@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Редактировать {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Редактировать профиль клуба</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 560px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="form-group">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for err in field.errors %}<p class="text-error">{{ err }}</p>{% endfor %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+                <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="btn btn-ghost">Отмена</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

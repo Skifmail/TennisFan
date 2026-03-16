@@ -1,0 +1,76 @@
+/* CSS Variables */
+:root {
+    /* Colors */
+    --color-bg: #012b1c;
+    --color-bg-secondary: #012b1c;
+    --color-bg-card: #001f14;
+    --color-bg-elevated: #012b1c;
+    --color-primary: #A6824A;
+    --color-accent: #83530cd3;
+
+    /* заголовки, «теннису», Fan в логотипе */
+    --color-primary-gradient: linear-gradient(90deg, #A6824A 0%, #390517 100%);
+    --color-primary-dark: #03110D;
+    --color-primary-transparent: rgb(166 130 74 / 15%);
+    --color-text: silver;
+    --color-text-secondary: #A6824A;
+    --color-text-muted: silver;
+    --color-border: #A6824A;
+    --color-border-light: #012b1c;
+    --color-success: #A6824A;
+    --color-warning: #013220;
+    --color-error: #a00000;
+    --color-info: #A6824A;
+
+    /* Typography */
+    --font-family: 'Open Sans', -apple-system, blinkmacsystemfont, 'Segoe UI', sans-serif;
+    --font-heading: 'Roboto', sans-serif;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 2rem;
+    --font-size-4xl: 2.5rem;
+    --font-size-5xl: 3rem;
+
+    /* Spacing */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+    --spacing-3xl: 4rem;
+
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 50%;
+
+    /* Transitions */
+    --transition-fast: 150ms ease;
+    --transition-base: 250ms ease;
+    --transition-slow: 350ms ease;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 50%);
+    --shadow-md: 0 4px 6px rgb(0 0 0 / 50%);
+    --shadow-lg: 0 10px 20px rgb(0 0 0 / 50%);
+    --shadow-glow: 0 0 20px rgb(163 133 96 / 30%);
+
+    /* Hero liquid glass: высота и сдвиг */
+    --hero-glass-padding-y: var(--spacing-xl);
+    --hero-glass-padding-x: var(--spacing-2xl);
+    --hero-glass-min-height: 0;
+    --hero-content-offset-y: -15rem;
+}
+
+:root {
+    --loading-accent: #c7ff00;
+    --loading-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --loading-shadow: 0 10px 28px rgb(0 0 0 / 0.28);
+}

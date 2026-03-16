@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{% if is_edit %}Редактирование тарифа{% else %}Создание тарифа{% endif %} — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{% if is_edit %}Редактирование тарифа{% else %}Создание тарифа{% endif %}</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 720px;">
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <div style="display: flex; gap: var(--spacing-sm);">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <a href="{% url 'clubs:plans_manage' slug=club.slug %}" class="btn btn-ghost">Отмена</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

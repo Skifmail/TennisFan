@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Импорт приглашений — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Импорт приглашений из CSV</h1>
+    <p class="page-subtitle">Клуб {{ club.name }} · Один email на строку</p>
+</div>
+<div class="container" style="max-width: 480px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label">Файл CSV или TXT</label>
+                    <input type="file" name="file" accept=".csv,.txt" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Загрузить</button>
+                <a href="{% url 'clubs:dashboard' slug=club.slug %}" class="btn btn-ghost">Отмена</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

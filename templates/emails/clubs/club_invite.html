@@ -1,0 +1,9 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Приглашение в клуб «{{ club_name }}»</h2>
+<p>Здравствуйте, {{ player_name }}!</p>
+<p>Вас пригласили вступить в теннисный клуб <b>{{ club_name }}</b> на платформе TennisFan.</p>
+<p>Чтобы принять приглашение, перейдите по ссылке:</p>
+<p><a href="{{ accept_url }}" class="btn">Принять приглашение</a></p>
+<p>Если ссылка не работает, скопируйте и вставьте в браузер:<br>{{ accept_url }}</p>
+{% endblock %}

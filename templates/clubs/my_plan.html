@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Мой тариф — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Мой тариф</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 800px;">
+    <div class="card">
+        <div class="card-body">
+            {% if member_plan %}
+            <p style="margin-top: 0;"><strong>Тариф:</strong> {{ member_plan.plan.name }}</p>
+            <p><strong>Описание:</strong> {{ member_plan.plan.description|default:"—" }}</p>
+            <p><strong>Взнос:</strong> {{ member_plan.plan.monthly_fee }} ₽/мес</p>
+            {% if plan_limits %}
+            <p>
+                <strong>Турниры в этом месяце:</strong>
+                {% if plan_limits.tournaments_left is None %}
+                    без лимита
+                {% else %}
+                    использовано {{ plan_limits.tournaments_used }}, осталось {{ plan_limits.tournaments_left }} из {{ plan_limits.monthly_tournaments_limit }}
+                {% endif %}
+            </p>
+            <p><strong>Слоты:</strong> использовано {{ plan_limits.slots_used }}, осталось {{ plan_limits.slots_left }} из {{ plan_limits.monthly_slots_limit }}</p>
+            {% endif %}
+            <div style="display: flex; gap: var(--spacing-sm); flex-wrap: wrap;">
+                {% if can_self_change %}
+                <a href="{% url 'clubs:my_plan_change' %}" class="btn btn-primary">Сменить тариф</a>
+                {% endif %}
+                <a href="{% url 'clubs:my_tournaments' %}" class="btn btn-ghost">К турнирам</a>
+            </div>
+            {% else %}
+            <p style="margin: 0;">Тариф пока не назначен. Обратитесь к администратору клуба.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

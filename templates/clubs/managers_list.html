@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Менеджеры — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Менеджеры</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 700px;">
+    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a></p>
+    <div class="card">
+        <div class="card-body">
+            <p style="color: var(--color-text-muted); margin-bottom: var(--spacing-md);">Назначьте участников менеджерами — они смогут управлять игроками, турнирами и приглашениями (без доступа к настройкам и финансам).</p>
+            <table class="table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Участник</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Роль</th>
+                        <th style="text-align: right; padding: var(--spacing-sm);">Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in members %}
+                    <tr>
+                        <td style="padding: var(--spacing-sm);">{{ m.user.get_full_name|default:m.user.email }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ m.get_role_display }}</td>
+                        <td style="padding: var(--spacing-sm); text-align: right;">
+                            {% if m.role == 'admin' %}
+                            — 
+                            {% elif m.role == 'manager' %}
+                            <form method="post" action="{% url 'clubs:manager_set_role' slug=club.slug %}" style="display: inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="member_id" value="{{ m.id }}">
+                                <input type="hidden" name="action" value="remove_manager">
+                                <button type="submit" class="btn btn-ghost btn-sm">Убрать права</button>
+                            </form>
+                            {% else %}
+                            <form method="post" action="{% url 'clubs:manager_set_role' slug=club.slug %}" style="display: inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="member_id" value="{{ m.id }}">
+                                <input type="hidden" name="action" value="set_manager">
+                                <button type="submit" class="btn btn-primary btn-sm">Сделать менеджером</button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" style="padding: var(--spacing-md); color: var(--color-text-muted);">Нет участников.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

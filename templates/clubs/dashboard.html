@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Панель клуба — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{{ club.name }}</h1>
+    <p class="page-subtitle">Панель управления</p>
+</div>
+<div class="container" style="max-width: 960px;">
+    <nav class="club-dashboard-nav" style="margin-bottom: var(--spacing-xl); display: flex; flex-wrap: wrap; gap: var(--spacing-sm);">
+        <a href="{% url 'clubs:dashboard' slug=club.slug %}" class="btn btn-ghost btn-sm">Дашборд</a>
+        <a href="{% url 'clubs:members_list' slug=club.slug %}" class="btn btn-ghost btn-sm">Игроки</a>
+        <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-ghost btn-sm">Турниры</a>
+        <a href="{% url 'clubs:dashboard_rating' slug=club.slug %}" class="btn btn-ghost btn-sm">Рейтинг</a>
+        {% if can_manage_fees %}
+        <a href="{% url 'clubs:fees_settings' slug=club.slug %}" class="btn btn-ghost btn-sm">Взносы</a>
+        {% endif %}
+        <a href="{% url 'clubs:plans_manage' slug=club.slug %}" class="btn btn-ghost btn-sm">Тарифы игроков</a>
+        <a href="{% url 'clubs:invites_list' slug=club.slug %}" class="btn btn-ghost btn-sm">Приглашения</a>
+        {% if can_manage_managers %}
+        <a href="{% url 'clubs:managers_list' slug=club.slug %}" class="btn btn-ghost btn-sm">Менеджеры</a>
+        {% endif %}
+        <a href="{% url 'clubs:interclub_applications' slug=club.slug %}" class="btn btn-ghost btn-sm">Межклубные заявки</a>
+        {% if can_edit_settings %}
+        <a href="{% url 'clubs:club_edit' slug=club.slug %}" class="btn btn-ghost btn-sm">Настройки</a>
+        <a href="{% url 'clubs:subscription' slug=club.slug %}" class="btn btn-ghost btn-sm">Подписка</a>
+        <a href="{% url 'clubs:club_notification_config' slug=club.slug %}" class="btn btn-ghost btn-sm">Уведомления</a>
+        {% endif %}
+    </nav>
+    <div class="dashboard-cards" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--spacing-lg); margin-bottom: var(--spacing-xl);">
+        <div class="card">
+            <div class="card-body">
+                <div style="font-size: 1.5rem; font-weight: 700;">{{ members_count }}</div>
+                <div style="color: var(--color-text-muted);">Участников</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div style="font-size: 1.5rem; font-weight: 700;">{{ tournaments_count }}</div>
+                <div style="color: var(--color-text-muted);">Турниров</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                {% if subscription %}
+                <div style="font-size: 1rem; font-weight: 600;">{{ subscription.get_plan_display }}</div>
+                <div style="color: var(--color-text-muted); font-size: 0.9rem;">до {{ subscription.ends_at|date:"d.m.Y" }}</div>
+                {% else %}
+                <div style="color: var(--color-text-muted);">Подписка не активна</div>
+                {% endif %}
+            </div>
+        </div>
+        {% if fee_active %}
+        <div class="card">
+            <div class="card-body">
+                <div style="color: var(--color-text-muted);">Взносы включены</div>
+            </div>
+        </div>
+        {% endif %}
+        <div class="card">
+            <div class="card-body">
+                <div style="font-size: 1.5rem; font-weight: 700;">{{ plans_count }}</div>
+                <div style="color: var(--color-text-muted);">Тарифов игроков</div>
+            </div>
+        </div>
+    </div>
+    <div class="quick-actions" style="margin-bottom: var(--spacing-xl);">
+        <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">Быстрые действия</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-md);">
+            <a href="{% url 'clubs:invite_by_email' slug=club.slug %}" class="btn btn-primary">Добавить игрока</a>
+            <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary">Создать турнир</a>
+            <a href="{% url 'clubs:invite_create' slug=club.slug %}" class="btn btn-ghost">Создать приглашение</a>
+            <a href="{% url 'clubs:dashboard_rating' slug=club.slug %}" class="btn btn-ghost">Рейтинг</a>
+            {% if can_edit_settings %}
+            <a href="{% url 'clubs:club_edit' slug=club.slug %}" class="btn btn-ghost">Настройки</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="recent-section" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-xl);">
+        <div class="card">
+            <div class="card-body">
+                <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">Последние турниры</h2>
+                {% if recent_tournaments %}
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for t in recent_tournaments %}
+                    <li style="padding: var(--spacing-xs) 0; border-bottom: 1px solid var(--color-border-light);">
+                        <a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a> — {{ t.start_date|date:"d.m.Y" }}
+                    </li>
+                    {% endfor %}
+                </ul>
+                <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" style="display: inline-block; margin-top: var(--spacing-sm);">Все турниры →</a>
+                {% else %}
+                <p style="margin: 0; color: var(--color-text-muted);">Турниров пока нет.</p>
+                <a href="{% url 'clubs:tournament_create' slug=club.slug %}">Создать турнир</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">Недавно вступившие</h2>
+                {% if recent_members %}
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for m in recent_members %}
+                    <li style="padding: var(--spacing-xs) 0; border-bottom: 1px solid var(--color-border-light);">
+                        {{ m.user.get_full_name|default:m.user.email }}
+                    </li>
+                    {% endfor %}
+                </ul>
+                <a href="{% url 'clubs:members_list' slug=club.slug %}" style="display: inline-block; margin-top: var(--spacing-sm);">Все участники →</a>
+                {% else %}
+                <p style="margin: 0; color: var(--color-text-muted);">Участников пока нет.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

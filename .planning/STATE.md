@@ -48,6 +48,7 @@
 - [x] Phase 9: выполнить план 09-07 (вынесение page-specific секций в pages/*.css) — `/gsd/execute-plan .planning/phases/09-css-refactor/09-07-PLAN.md`
 - [x] Phase 9: выполнить план 09-08 (вынесение auth/tournament секций в pages/*.css) — `/gsd/execute-plan .planning/phases/09-css-refactor/09-08-PLAN.md`
 - [x] Phase 9: выполнить план 09-09 (вынесение home/404/modals/rating/coach/training) — `/gsd/execute-plan .planning/phases/09-css-refactor/09-09-PLAN.md`
+- [x] Phase 9: выполнить план 09-10 (вынесение shop/rules/applications/chat + доп. tournament) — `/gsd/execute-plan .planning/phases/09-css-refactor/09-10-PLAN.md`
 
 ---
 
@@ -88,4 +89,5 @@
 - Выполнен план 09-07 (Phase 9 — CSS рефакторинг, вынос page-specific): профайл/матчи/контакты вынесены в `static/css/pages/profile.css`, `static/css/pages/matches.css`, `static/css/pages/contacts.css`; в `style.css` добавлены `@import`; селекторы и свойства не изменялись.
 - Выполнен план 09-08 (Phase 9 — CSS рефакторинг, вынос auth/tournament page-specific): блоки auth (password-toggle, rotating coin logo) и tournament (FAN bracket, manage-page blocks, intermediate table) вынесены в `static/css/pages/auth.css` и `static/css/pages/tournament.css`; в `style.css` добавлены `@import`; селекторы и свойства не изменялись.
 - Выполнен план 09-09 (Phase 9 — CSS рефакторинг, вынос home/404/modals/rating/coach/training): hero/live-results секции вынесены в `static/css/pages/home.css`, страница ошибки — в `static/css/pages/404.css`, модальные окна — в `static/css/components/modals.css`, рейтинг/дельты — в `static/css/components/rating.css`, layout тренера/тренировки — в `static/css/pages/coach.css` и `static/css/pages/training.css`; в `style.css` добавлены `@import`; селекторы и свойства не изменялись.
+- Выполнен план 09-10 (Phase 9 — CSS рефакторинг, вынос shop/rules/applications/chat + доп. tournament): shop-секции вынесены в `static/css/pages/shop.css`, rules-блоки (PDF links и round-robin таблицы) — в `static/css/pages/rules.css`, блоки заявок/откликов и sparring modal — в `static/css/pages/applications.css`, чат-виджет — в `static/css/components/chat.css`, а секции `Tournament Card Styles`, `Tournament detail meta`, `Compact tournaments table on home` перенесены в `static/css/pages/tournament.css`; в `style.css` добавлены `@import`; селекторы и свойства не изменялись.
 - Следующий шаг: ревизия оставшихся универсальных секций (`utilities/helpers`) и финальная чистка `style.css`.

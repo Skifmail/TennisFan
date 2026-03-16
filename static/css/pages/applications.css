@@ -1,0 +1,231 @@
+/* Строка отклика в «Мои заявки»: аватар | имя + статус | рейтинг | кнопки */
+.sparring-response-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    background: var(--color-bg-elevated);
+    border-radius: var(--radius-md);
+}
+
+.sparring-response-row__avatar {
+    flex-shrink: 0;
+    display: block;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.sparring-response-row__avatar .player-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    object-fit: cover;
+    background: var(--color-bg);
+    display: block;
+}
+
+.sparring-response-row__avatar div.player-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    background: var(--color-bg);
+}
+
+.sparring-response-row__info {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.sparring-response-row__rating {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+.sparring-response-rating__ntrp {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.sparring-response-rating__fan {
+    color: var(--color-text-muted);
+}
+
+.sparring-response-row__actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: nowrap;
+}
+
+.sparring-response-form {
+    display: inline-flex;
+    margin: 0;
+    align-items: center;
+}
+
+/* Бейджи статуса отклика */
+.sparring-response-badge {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    padding: 2px var(--spacing-xs);
+    border-radius: var(--radius-sm);
+}
+.sparring-response-badge--pending {
+    background: #fef08a;
+    color: #713f12;
+    border: 1px solid #eab308;
+}
+.sparring-response-badge--accepted {
+    background: #bbf7d0;
+    color: #14532d;
+    border: 1px solid #22c55e;
+}
+.sparring-response-badge--rejected {
+    background: #fecaca;
+    color: #7f1d1d;
+    border: 1px solid #ef4444;
+}
+
+/* Планшет и узкий экран: кнопки откликов на отдельную строку, флаги переносятся */
+@media (max-width: 640px) {
+    .sparring-response-row {
+        gap: var(--spacing-md);
+    }
+
+    .sparring-response-row__actions {
+        flex-basis: 100%;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        padding-top: var(--spacing-sm);
+        margin-top: var(--spacing-xs);
+        border-top: 1px solid var(--color-border-light);
+    }
+
+    .sparring-card__flags {
+        flex-wrap: wrap;
+    }
+}
+
+/* Мобильный: рейтинг под инфо, кнопки на всю ширину с крупными областями нажатия */
+@media (max-width: 480px) {
+    .sparring-response-row {
+        padding: var(--spacing-md);
+        gap: var(--spacing-sm);
+    }
+
+    .sparring-response-row__avatar .player-avatar,
+    .sparring-response-row__avatar div.player-avatar {
+        width: 48px;
+        height: 48px;
+    }
+
+    .sparring-response-row__rating {
+        flex-basis: 100%;
+        align-items: flex-start;
+        margin-top: 2px;
+    }
+
+    .sparring-response-row__actions {
+        gap: var(--spacing-sm);
+    }
+
+}
+
+/* Кнопка «Для отклика нужна подписка» — визуально неактивная, но ведёт на страницу тарифов */
+.sparring-btn--locked {
+    opacity: 0.85;
+    color: var(--color-text-muted);
+    border-color: var(--color-text-muted);
+}
+.sparring-btn--locked:hover {
+    background: transparent;
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    opacity: 1;
+}
+
+.sparring-card--closed .sparring-card__desc {
+    opacity: 0.85;
+}
+
+/* Sparring respond modal */
+.sparring-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-md);
+}
+
+/* Модалка покупки — вверху страницы */
+.sparring-modal.shop-purchase-modal {
+    align-items: flex-start !important;
+    padding-top: var(--spacing-lg) !important;
+    padding-bottom: var(--spacing-md);
+    overflow-y: auto;
+}
+
+.sparring-modal.shop-purchase-modal .sparring-modal__box {
+    align-self: flex-start;
+    margin-top: 0;
+}
+
+.sparring-modal.hidden {
+    display: none !important;
+}
+
+.sparring-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 0 0 / 60%);
+    cursor: pointer;
+}
+
+.sparring-modal__box {
+    position: relative;
+    width: 100%;
+    max-width: 360px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    box-shadow: var(--shadow-lg);
+}
+
+.sparring-modal__title {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-text);
+}
+
+.sparring-modal__sub {
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.sparring-modal__buttons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.sparring-modal__link {
+    justify-content: center;
+}
+
+.sparring-modal__close {
+    margin-top: var(--spacing-md);
+    width: 100%;
+}

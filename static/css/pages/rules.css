@@ -1,0 +1,148 @@
+/* Ссылки на документы (PDF) в правилах тенниса */
+.rules-doc__meta--links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
+.rules-doc__doc-link {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-weight: 500;
+    color: var(--color-primary);
+    text-decoration: none;
+    background: var(--color-primary-transparent);
+    border: 1px solid rgb(166 130 74 / 35%);
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.rules-doc__doc-link:hover {
+    background: rgb(166 130 74 / 20%);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.rules-doc__doc-link::after {
+    content: " ↗";
+    font-size: 0.85em;
+    opacity: 0.8;
+}
+
+/* Round-robin matrix and standings */
+.round-robin-matrix,
+.round-robin-standings {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.round-robin-matrix th,
+.round-robin-matrix td,
+.round-robin-standings th,
+.round-robin-standings td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    text-align: center;
+}
+
+.round-robin-matrix th,
+.round-robin-standings th {
+    background: var(--color-primary-transparent);
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.round-robin-matrix .matrix-player-cell,
+.round-robin-standings td:first-child+td {
+    text-align: left;
+    white-space: nowrap;
+}
+
+.round-robin-matrix .matrix-cell--diagonal {
+    background: rgb(128 128 128 / 20%);
+    color: var(--color-text-secondary);
+}
+
+.round-robin-matrix .matrix-cell-win {
+    font-weight: 600;
+}
+
+.round-robin-matrix .matrix-cell-games {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+.round-robin-matrix .matrix-col {
+    min-width: 50px;
+}
+
+.round-robin-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Round-robin tables: mobile responsive */
+@media (width <= 768px) {
+    .round-robin-matrix,
+    .round-robin-standings {
+        font-size: var(--font-size-xs);
+    }
+
+    .round-robin-matrix th,
+    .round-robin-matrix td,
+    .round-robin-standings th,
+    .round-robin-standings td {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .round-robin-matrix .matrix-player-cell,
+    .round-robin-standings td:first-child+td {
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .round-robin-matrix .matrix-col {
+        min-width: 36px;
+    }
+
+    .round-robin-matrix .matrix-cell-games {
+        font-size: 0.65rem;
+    }
+
+    .round-robin-matrix {
+        min-width: 320px;
+    }
+
+    .round-robin-standings {
+        min-width: 280px;
+    }
+}
+
+@media (width <= 480px) {
+    .round-robin-matrix,
+    .round-robin-standings {
+        font-size: 0.7rem;
+    }
+
+    .round-robin-matrix th,
+    .round-robin-matrix td,
+    .round-robin-standings th,
+    .round-robin-standings td {
+        padding: var(--spacing-xs) 6px;
+    }
+
+    .round-robin-matrix .matrix-player-cell,
+    .round-robin-standings td:first-child+td {
+        max-width: 80px;
+    }
+
+    .round-robin-matrix .matrix-col {
+        min-width: 32px;
+    }
+}

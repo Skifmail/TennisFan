@@ -8,6 +8,163 @@
  * Последнее обновление: 2026-03
  */
 
+/* ==========================================================================
+   Rules page (Правила турниров, FAN)
+   ========================================================================== */
+.rules-page {
+    padding-top: var(--spacing-2xl);
+    padding-bottom: var(--spacing-3xl);
+}
+
+.container--rules {
+    max-width: 900px;
+}
+
+.rules-header {
+    margin-bottom: var(--spacing-xl);
+}
+
+.page-title--rules {
+    text-align: left;
+}
+
+.rules-tabs__nav {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.rules-tabs__btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.rules-tabs__btn:hover {
+    color: var(--color-primary);
+}
+
+.rules-tabs__btn--active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+.rules-tabs__btn--disabled {
+    color: var(--color-text-muted);
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.rules-tabs__btn--disabled:hover {
+    color: var(--color-text-secondary);
+}
+
+.rules-subtabs__nav {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+.rules-subtabs__btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast),
+                color var(--transition-fast), transform var(--transition-fast);
+}
+
+.rules-subtabs__btn:hover {
+    background: rgb(166 130 74 / 15%);
+    color: var(--color-primary);
+}
+
+.rules-subtabs__btn--active {
+    background: var(--color-primary);
+    color: var(--color-bg);
+    border-color: var(--color-primary);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgb(166 130 74 / 35%);
+}
+
+.rules-doc__body {
+    padding: var(--spacing-2xl) !important;
+}
+
+.rules-doc__body h2 {
+    margin-top: var(--spacing-xl);
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-xl);
+    color: var(--color-primary);
+}
+
+.rules-doc__body h2:first-child {
+    margin-top: 0;
+}
+
+.rules-doc__body h3 {
+    margin-top: var(--spacing-lg);
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-lg);
+    color: var(--color-text);
+}
+
+.rules-doc__body h4 {
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-xs);
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+}
+
+.rules-doc__body p {
+    margin-top: 0;
+    margin-bottom: var(--spacing-md);
+    line-height: 1.7;
+}
+
+.rules-doc__body p+p {
+    margin-top: var(--spacing-sm);
+}
+
+.rules-doc__body ul {
+    margin-bottom: var(--spacing-md);
+    padding-left: var(--spacing-xl);
+}
+
+.rules-doc__body li {
+    margin-bottom: var(--spacing-xs);
+    list-style: disc;
+}
+
+.rules-doc__body code {
+    padding: 0.1em 0.3em;
+    font-size: 0.9em;
+    background: var(--color-primary-transparent);
+    border-radius: var(--radius-sm);
+}
+
+.rules-doc__body hr {
+    border: none;
+    border-top: 1px solid var(--color-border);
+    margin: var(--spacing-xl) 0;
+}
+
+.rules-doc__body strong {
+    color: var(--color-text);
+}
+
 /* Ссылки на документы (PDF) в правилах тенниса */
 .rules-doc__meta--links {
     display: flex;

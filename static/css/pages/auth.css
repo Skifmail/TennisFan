@@ -8,6 +8,145 @@
  * Последнее обновление: 2026-03
  */
 
+/* ==========================================================================
+   Auth page: объединённая страница регистрации/входа с анимацией
+   ========================================================================== */
+.auth-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 200px);
+    padding: var(--spacing-2xl) var(--spacing-md);
+}
+
+.auth-card {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    max-width: 1000px;
+    height: auto;
+    min-height: 820px;
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-lg);
+}
+
+.auth-card-bg {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 50%;
+    background: linear-gradient(135deg, rgb(166 130 74 / 15%) 0%, rgb(166 130 74 / 5%) 100%);
+    border-radius: var(--radius-lg);
+    transform: translateX(0);
+    transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.auth-card-bg.login {
+    transform: translateX(100%);
+}
+
+.auth-hero,
+.auth-form {
+    position: absolute;
+    width: 50%;
+    height: 100%;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.65s cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 0.65s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.auth-form {
+    padding: var(--spacing-lg);
+    padding-left: calc(var(--spacing-lg) + var(--spacing-xl));
+    overflow-y: auto;
+}
+
+.auth-hero.active,
+.auth-form.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.auth-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-lg);
+    color: var(--color-text);
+    text-align: center;
+    padding: var(--spacing-2xl);
+    padding-right: calc(var(--spacing-2xl) + var(--spacing-lg));
+}
+
+.auth-hero h2 {
+    font-size: var(--font-size-3xl);
+    font-weight: 700;
+    font-family: var(--font-heading);
+    margin: 0;
+    color: var(--color-text);
+}
+
+.auth-hero p {
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    margin: 0;
+    max-width: 300px;
+}
+
+.auth-hero.register {
+    left: 0;
+    transform: translateX(-100%);
+}
+
+.auth-hero.register.active {
+    transform: translateX(0);
+}
+
+.auth-hero.login {
+    left: 50%;
+    transform: translateX(100%);
+}
+
+.auth-hero.login.active {
+    transform: translateX(0);
+}
+
+.auth-toggle-btn {
+    margin-top: var(--spacing-md);
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.auth-login-title {
+    display: none;
+    margin: 0 0 var(--spacing-lg);
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    font-family: var(--font-heading);
+    color: var(--color-text);
+}
+
+.auth-wrapper {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
 /* Обертка для поля пароля с иконкой глаза */
 .password-field-wrapper {
     position: relative;

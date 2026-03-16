@@ -8,6 +8,55 @@
  * Последнее обновление: 2026-03
  */
 
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+.form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-weight: 500;
+    font-size: var(--font-size-sm);
+}
+
+.form-control {
+    width: 100%;
+    padding: var(--spacing-md);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    transition: background var(--transition-fast), border-color var(--transition-fast),
+                color var(--transition-fast), transform var(--transition-fast);
+    font-size: 16px;
+
+    /* Prevents zoom on iOS */
+}
+
+@media (width <= 480px) {
+    .form-control {
+        padding: var(--spacing-sm);
+        font-size: 16px;
+    }
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-transparent);
+}
+
+.form-control::placeholder {
+    color: var(--color-text-muted);
+}
+
+select.form-control {
+    cursor: pointer;
+}
+
 /* Формы страницы управления турниром (мобильная адаптация) */
 @media (width <= 768px) {
     /* Форма «Составить пару» — селекты и кнопка на всю ширину */

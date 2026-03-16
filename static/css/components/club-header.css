@@ -1,0 +1,132 @@
+/*
+ * club-header.css
+ *
+ * Описание: Шапка личного кабинета игрока клуба — бренд, навигация, переключатель клубов.
+ * Компоненты: .club-header-bar, .club-header-bar__inner, .club-header-bar__brand, .club-header-bar__nav
+ * Используется на: страницы ЛК игрока клуба
+ *
+ * Последнее обновление: 2026-03
+ */
+
+/* --------------------------------------------------------------------------
+   Club header bar (ЛК игрока клуба)
+   -------------------------------------------------------------------------- */
+.club-header-bar {
+    padding: var(--spacing-sm) 0;
+    margin-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--color-border-light);
+}
+.club-header-bar__inner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+.club-header-bar__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    text-decoration: none;
+    color: var(--color-text);
+    font-weight: 600;
+}
+.club-header-bar__brand:hover {
+    color: var(--color-text-secondary);
+}
+.club-header-bar__logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    border-radius: 6px;
+}
+.club-header-bar__logo-placeholder {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-card);
+    border-radius: 6px;
+    font-size: 1.2rem;
+}
+.club-header-bar__name {
+    font-size: var(--font-size-lg);
+}
+.club-header-bar__nav {
+    display: flex;
+    gap: var(--spacing-lg);
+}
+.club-header-bar__link {
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+}
+.club-header-bar__link:hover {
+    color: var(--color-text-secondary);
+}
+.club-header-bar__meta {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+.club-header-bar__badge {
+    font-size: var(--font-size-xs);
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+}
+.club-header-bar__badge--paid {
+    background: rgba(0, 80, 50, 0.5);
+    color: var(--color-success);
+}
+.club-header-bar__badge--unpaid {
+    background: rgba(160, 0, 0, 0.2);
+    color: #e88;
+}
+.club-header-bar__badge--expiring {
+    background: rgba(166, 130, 74, 0.3);
+    color: var(--color-text-secondary);
+}
+.club-header-bar__dropdown {
+    position: relative;
+}
+.club-header-bar__switch-btn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    padding: 0.25rem 0.5rem;
+    font-size: var(--font-size-sm);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+.club-header-bar__switch-btn:hover {
+    background: var(--color-primary-transparent);
+}
+.club-header-bar__dropdown-list {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin: 4px 0 0;
+    padding: var(--spacing-xs);
+    list-style: none;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    min-width: 180px;
+    z-index: 10;
+}
+.club-header-bar__club-item {
+    display: block;
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--color-text);
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+}
+.club-header-bar__club-item:hover {
+    background: var(--color-primary-transparent);
+    color: var(--color-text-secondary);
+}
+.club-header-bar__club-item--current {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}

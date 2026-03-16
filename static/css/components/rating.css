@@ -1,0 +1,113 @@
+/* Rating Badge */
+.rating-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 10px;
+    background: #000;
+    border-radius: 8px;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.rating-badge__arrow {
+    font-size: var(--font-size-xs);
+    line-height: 1;
+    font-weight: 700;
+}
+
+.rating-badge__arrow--up {
+    color: rgb(14, 203, 129);
+}
+
+.rating-badge__arrow--down {
+    color: rgb(230, 67, 90);
+}
+
+.rating-badge__value {
+    color: #fff;
+}
+
+.rating-badge__value--up {
+    color: rgb(14, 203, 129);
+}
+
+.rating-badge__value--down {
+    color: rgb(230, 67, 90);
+}
+
+.rating-badge__value--none {
+    color: inherit;
+}
+
+/* В контексте rating-badge тёмный фон — для none оставляем белый */
+.rating-badge .rating-badge__value--none {
+    color: #fff;
+}
+
+.rating-badge__separator {
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0 2px;
+}
+
+.rating-badge__delta {
+    margin-left: 2px;
+    font-size: 0.9em;
+    opacity: 0.95;
+}
+
+.rating-stat-delta {
+    margin-left: 2px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.stat-value--rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.stat-value--rating .rating-badge__arrow {
+    font-size: 0.85em;
+}
+
+/* Match FAN delta (результат за матч) */
+.match-fan-delta {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    line-height: 1.2;
+}
+.match-fan-delta--up {
+    color: rgb(14, 203, 129);
+}
+.match-fan-delta--down {
+    color: rgb(230, 67, 90);
+}
+.match-fan-delta--neutral {
+    color: var(--color-text-muted);
+}
+
+.match-points-display {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+}
+.match-points--up {
+    color: rgb(14, 203, 129);
+}
+.match-points--down {
+    color: rgb(230, 67, 90);
+}
+.match-points--neutral {
+    color: var(--color-text-muted);
+}
+
+.match-season-points {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}

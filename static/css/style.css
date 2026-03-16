@@ -7,6 +7,7 @@
 @import url('./base/variables.css');
 @import url('./base/reset.css');
 @import url('./components/nav.css');
+@import url('./components/buttons.css');
 
 /* Container */
 .container {
@@ -20,78 +21,6 @@
     .container {
         padding: 0 var(--spacing-sm);
     }
-}
-
-/* ==========================================================================
-   Buttons
-   ========================================================================== */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    border-radius: var(--radius-md);
-    transition: background var(--transition-fast), color var(--transition-fast),
-                border-color var(--transition-fast), transform var(--transition-fast),
-                opacity var(--transition-fast);
-    white-space: nowrap;
-    min-width: auto;
-    text-align: center;
-}
-
-@media (width <= 480px) {
-    .btn {
-        padding: var(--spacing-xs) var(--spacing-sm);
-        font-size: var(--font-size-xs);
-    }
-
-    .btn-lg {
-        padding: var(--spacing-sm) var(--spacing-md);
-        font-size: var(--font-size-sm);
-    }
-}
-
-.btn-primary {
-    background: #A6824A;
-    color: silver;
-    border: none;
-    border-radius: 6px;
-}
-
-.btn-primary:hover {
-    background: #A6824A;
-    color: silver;
-    box-shadow: var(--shadow-glow);
-}
-
-.btn-outline {
-    border: 1px solid var(--color-primary);
-    color: var(--color-primary);
-}
-
-.btn-outline.btn-disabled,
-.btn-outline[disabled] {
-    background: transparent;
-    border-color: #334155;
-    color: #64748b;
-    cursor: default;
-}
-
-.btn-outline:hover {
-    background: var(--color-primary);
-    color: var(--color-bg);
-}
-
-.btn-ghost {
-    color: var(--color-text-secondary);
-}
-
-.btn-ghost:hover {
-    color: var(--color-text);
-    background: var(--color-bg-elevated);
 }
 
 /* ==========================================================================
@@ -394,111 +323,6 @@ body.has-fullscreen-loader {
 
 .profile-info__telegram-consent {
     align-items: flex-start;
-}
-
-/* Кнопка в фирменном стиле Telegram */
-.btn-telegram {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    overflow: hidden;
-    max-width: 100%;
-    background: #08c;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-weight: 500;
-    text-decoration: none;
-    transition: background 0.2s, box-shadow 0.2s;
-}
-
-.btn-telegram:hover {
-    background: #0077b5;
-    color: #fff;
-    box-shadow: 0 2px 8px rgb(0 136 204 / 35%);
-}
-
-.btn-telegram__icon {
-    flex-shrink: 0;
-    display: block;
-    width: 20px;
-    height: 20px;
-    max-width: 20px;
-    max-height: 20px;
-}
-
-.btn-telegram--outline {
-    background: transparent;
-    color: #08c;
-    border: 1px solid #08c;
-}
-
-.btn-telegram--outline:hover {
-    background: rgb(0 136 204 / 10%);
-    color: #08c;
-}
-
-@keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-}
-
-@keyframes pulse-ring {
-    0%, 100% { transform: scale(1); opacity: 0.7; }
-    50% { transform: scale(1.15); opacity: 0; }
-}
-
-.btn-pulse {
-    position: relative;
-    animation: pulse 2s infinite;
-    will-change: transform;
-}
-
-.btn-pulse::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    box-shadow: 0 0 0 6px rgb(166 130 74 / 70%);
-    animation: pulse-ring 2s infinite;
-    pointer-events: none;
-    will-change: transform, opacity;
-}
-
-/** Кнопка по высоте как поля фильтра (form-control). */
-.btn--filter-size {
-    height: 59px;
-    line-height: 16px;
-    padding: 0 var(--spacing-md);
-
-    /* горизонтальные отступы */
-    margin-top: 24px;
-}
-
-.btn-donate {
-    background: #889b73;
-    color: white;
-    border: none;
-}
-
-.btn-donate:hover {
-    background: #7a8d66;
-    color: white;
-    box-shadow: var(--shadow-glow);
-}
-
-.btn-sm {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font-size: var(--font-size-xs);
-    min-height: 28px;
-    line-height: 1.4;
-    white-space: nowrap;
-}
-
-.btn-lg {
-    padding: var(--spacing-md) var(--spacing-xl);
-    font-size: var(--font-size-base);
 }
 
 /* ==========================================================================
@@ -1146,95 +970,6 @@ body.has-fullscreen-loader {
     gap: var(--spacing-sm);
     margin-top: var(--spacing-md);
     flex-wrap: wrap;
-}
-
-.btn-danger {
-    background: #dc3545;
-    color: #fff;
-    border: 1px solid #dc3545;
-}
-
-.btn-danger:hover {
-    background: #c82333;
-    border-color: #bd2130;
-}
-
-.btn-danger-text {
-    color: #dc3545;
-}
-
-.btn-danger-text:hover {
-    color: #a71d2a;
-    background: rgb(220 53 69 / 8%);
-}
-
-/* Кнопка «Управление турниром» с бегущей змейкой по контуру */
-.btn-manage-tournament-wrap {
-    position: relative;
-    display: inline-block;
-    border-radius: 8px;
-    padding: 2px; /* толщина рамки */
-    overflow: hidden;
-    transition: transform 0.2s ease;
-}
-
-/* Бегущая змейка — градиент больше обводки, центрирован через transform */
-.btn-manage-tournament-wrap::before {
-    content: "";
-    position: absolute;
-    z-index: 0;
-    width: 200%;
-    height: 200%;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    transform-origin: 50% 50%;
-    background: conic-gradient(
-        from 0deg,
-        transparent 0deg 300deg,
-        #e8c547 320deg,
-        #a6824a 340deg,
-        transparent 360deg
-    );
-    animation: snake-rotate 3s linear infinite;
-    will-change: transform;
-}
-
-/* Маска — оставляем только рамку */
-.btn-manage-tournament-wrap::after {
-    content: "";
-    position: absolute;
-    inset: 2px; /* = padding */
-    background: #012b1c;
-    border-radius: 6px;
-    z-index: 1;
-}
-
-/* Сама кнопка */
-.btn-manage-tournament {
-    position: relative;
-    z-index: 2;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem 1.25rem;
-    border-radius: 6px;
-    background: #012b1c;
-    color: #a6824a;
-    font-weight: 600;
-    text-decoration: none;
-    border: none;
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-/* Hover */
-.btn-manage-tournament-wrap:hover {
-    transform: translateY(-2px);
-}
-
-.btn-manage-tournament:hover {
-    background: rgb(166 130 74 / 0.18);
 }
 
 /* Анимация по часовой стрелке (сохраняем центрирование) */
@@ -6156,29 +5891,6 @@ select.form-control {
 }
 
 
-/* Admin Button */
-.btn-admin {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.35rem 0.6rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    border-radius: var(--radius-md);
-    background: #A6824A;
-    color: silver;
-    border: none;
-    transition: background var(--transition-fast), border-color var(--transition-fast),
-                color var(--transition-fast), transform var(--transition-fast);
-    box-shadow: var(--shadow-glow);
-}
-
-.btn-admin:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-glow);
-    color: silver;
-}
-
 /* Tournament Card Styles */
 .tournament-card,
 .tournament-preview-card,
@@ -8976,20 +8688,6 @@ select.form-control {
     align-items: center;
 }
 
-.sparring-response-form .btn,
-.sparring-response-row__actions .btn {
-    white-space: nowrap;
-    min-height: 32px;
-}
-
-.sparring-response-row__actions .contact-btn--disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    pointer-events: none;
-    color: var(--color-text-muted);
-    border-color: var(--color-border-light);
-}
-
 /* Бейджи статуса отклика */
 .sparring-response-badge {
     font-size: var(--font-size-xs);
@@ -9013,12 +8711,6 @@ select.form-control {
     border: 1px solid #ef4444;
 }
 
-.sparring-response-row__actions .btn,
-.sparring-response-row__actions .text-muted,
-.sparring-response-row__actions .text-success {
-    flex-shrink: 0;
-}
-
 /* Планшет и узкий экран: кнопки откликов на отдельную строку, флаги переносятся */
 @media (max-width: 640px) {
     .sparring-response-row {
@@ -9032,13 +8724,6 @@ select.form-control {
         padding-top: var(--spacing-sm);
         margin-top: var(--spacing-xs);
         border-top: 1px solid var(--color-border-light);
-    }
-
-    .sparring-response-form .btn,
-    .sparring-response-row__actions .btn {
-        min-height: 44px;
-        padding-left: var(--spacing-md);
-        padding-right: var(--spacing-md);
     }
 
     .sparring-card__flags {
@@ -9069,22 +8754,6 @@ select.form-control {
         gap: var(--spacing-sm);
     }
 
-    .sparring-response-form .btn,
-    .sparring-response-row__actions .btn {
-        min-height: 44px;
-        flex: 1 1 auto;
-        min-width: 100px;
-    }
-}
-
-/* Кнопки управления заявкой (Редактировать, Отменить, Удалить) — удобный тап на мобильных */
-@media (max-width: 480px) {
-    .sparring-card__actions .btn,
-    .sparring-card__actions button {
-        min-height: 44px;
-        padding-left: var(--spacing-md);
-        padding-right: var(--spacing-md);
-    }
 }
 
 .sparring-card__avatar {

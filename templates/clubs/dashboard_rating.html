@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Рейтинг — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Рейтинг клуба</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 800px;">
+    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a> · <a href="{% url 'clubs:dashboard_rating_export' slug=club.slug %}">Экспорт CSV</a></p>
+    <div class="card">
+        <div class="card-body">
+            {% if ratings %}
+            <table class="table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Место</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Участник</th>
+                        <th style="text-align: right; padding: var(--spacing-sm);">Очки</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in ratings %}
+                    <tr>
+                        <td style="padding: var(--spacing-sm);">{{ r.display_rank }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ r.member.user.get_full_name|default:r.member.user.email }}</td>
+                        <td style="padding: var(--spacing-sm); text-align: right;">{{ r.points }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="margin: 0; color: var(--color-text-muted);">Рейтинг пуст.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

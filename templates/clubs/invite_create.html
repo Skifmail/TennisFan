@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Создать приглашение — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Создать приглашение</h1>
+    <p class="page-subtitle">Клуб {{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 480px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="form-group">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for err in field.errors %}<p class="text-error">{{ err }}</p>{% endfor %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Создать ссылку</button>
+                <a href="{% url 'clubs:dashboard' slug=club.slug %}" class="btn btn-ghost">Отмена</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

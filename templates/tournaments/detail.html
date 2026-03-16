@@ -364,6 +364,12 @@
                 </div>
             </div>
         </div>
+        {% elif club_plan_error %}
+        <div class="card mb-4" style="background: rgba(255, 0, 0, 0.05); border-left: 3px solid var(--color-error);">
+            <div class="card-body">
+                <p class="mb-0" style="color: var(--color-error);">{{ club_plan_error }}</p>
+            </div>
+        </div>
         {% elif registration_closed %}
         <div class="card mb-4" style="background: rgba(255, 0, 0, 0.05); border-left: 3px solid var(--color-error);">
             <div class="card-body">
@@ -396,7 +402,38 @@
         </div>
         {% endif %}
     {% endif %}
-    
+
+    {% if is_interclub %}
+    <div class="card mb-4" style="border-left: 3px solid var(--color-info);">
+        <div class="card-body">
+            <h3 style="font-size: var(--font-size-lg); margin-bottom: var(--spacing-sm);">Межклубный турнир</h3>
+            <p class="text-secondary" style="margin-bottom: var(--spacing-md);">Этот турнир открыт для заявок от других клубов.</p>
+            {% if interclub_can_apply_clubs %}
+                {% for club in interclub_can_apply_clubs %}
+                <form method="post" action="{% url 'clubs:club_tournament_apply' slug=club.slug tournament_id=tournament.id %}" style="display: inline-block; margin-right: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-sm">Подать заявку от «{{ club.name }}»</button>
+                </form>
+                {% endfor %}
+            {% endif %}
+            {% if interclub_applied_clubs %}
+                {% for item in interclub_applied_clubs %}
+                <p style="margin: var(--spacing-xs) 0;">
+                    <strong>{{ item.club.name }}</strong> —
+                    {% if item.application.status == 'pending' %}
+                        <span style="color: var(--color-warning);">Заявка на рассмотрении</span>
+                    {% elif item.application.status == 'approved' %}
+                        <span style="color: var(--color-success);">Заявка одобрена</span>
+                    {% elif item.application.status == 'rejected' %}
+                        <span style="color: var(--color-error);">Заявка отклонена</span>
+                    {% endif %}
+                </p>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     {% if participants %}
     <h2 class="section-title mb-3">{% if tournament.variant == 'doubles' %}Команды{% else %}Участники{% endif %} ({{ participants|length }})</h2>
     {% if can_join_team and solo_teams %}

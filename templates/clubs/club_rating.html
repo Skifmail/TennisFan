@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Рейтинг клуба — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Рейтинг клуба</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 800px;">
+    {% if my_rating %}
+    <div class="card" style="margin-bottom: var(--spacing-lg);">
+        <div class="card-body">
+            <h2 style="font-size: 1.25rem; margin-bottom: var(--spacing-sm);">Ваше место</h2>
+            <p style="font-size: 1.5rem; margin: 0;">
+                <strong>#{{ my_rating.display_rank }}</strong> из {{ ratings|length }} игроков
+                · <strong>{{ my_rating.points }}</strong> очков
+            </p>
+        </div>
+    </div>
+    {% endif %}
+    <div class="card" style="margin-bottom: var(--spacing-lg);">
+        <div class="card-body">
+            <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">Таблица рейтинга</h2>
+            {% if ratings %}
+            <table class="table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Место</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Участник</th>
+                        <th style="text-align: right; padding: var(--spacing-sm);">Очки</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in ratings %}
+                    <tr {% if my_rating and r.member_id == my_rating.member_id %}style="background: var(--color-primary-transparent);"{% endif %}>
+                        <td style="padding: var(--spacing-sm);">{{ r.display_rank }}</td>
+                        <td style="padding: var(--spacing-sm);">
+                            {{ r.member.user.get_full_name|default:r.member.user.email }}
+                        </td>
+                        <td style="padding: var(--spacing-sm); text-align: right;">{{ r.points }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="margin: 0; color: var(--color-text-muted);">Рейтинг пока пуст.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% if history %}
+    <div class="card">
+        <div class="card-body">
+            <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">История изменений рейтинга</h2>
+            <table class="table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Дата</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Турнир</th>
+                        <th style="text-align: right; padding: var(--spacing-sm);">Было</th>
+                        <th style="text-align: right; padding: var(--spacing-sm);">Δ</th>
+                        <th style="text-align: right; padding: var(--spacing-sm);">Стало</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in history %}
+                    <tr>
+                        <td style="padding: var(--spacing-sm);">{{ h.created_at|date:"d.m.Y" }}</td>
+                        <td style="padding: var(--spacing-sm);">
+                            {% if h.tournament %}
+                            <a href="{% url 'tournament_detail' slug=h.tournament.slug %}">{{ h.tournament.name }}</a>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td style="padding: var(--spacing-sm); text-align: right;">{{ h.points_before }}</td>
+                        <td style="padding: var(--spacing-sm); text-align: right;">{% if h.delta >= 0 %}+{% endif %}{{ h.delta }}</td>
+                        <td style="padding: var(--spacing-sm); text-align: right;">{{ h.points_after }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

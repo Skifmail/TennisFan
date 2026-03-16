@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Смена тарифа — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Смена тарифа</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 640px;">
+    <div class="card">
+        <div class="card-body">
+            {% if current_member_plan %}
+            <p><strong>Текущий тариф:</strong> {{ current_member_plan.plan.name }}</p>
+            {% endif %}
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <div style="display: flex; gap: var(--spacing-sm);">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <a href="{% url 'clubs:my_plan' %}" class="btn btn-ghost">Отмена</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

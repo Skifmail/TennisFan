@@ -1,0 +1,11 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Напоминание о турнире</h2>
+<p>Здравствуйте, {{ player_name }}!</p>
+<p>Турнир <b>{{ tournament_name }}</b> начинается {{ start_info }}.</p>
+<p>Город: {{ city }}.</p>
+{% if tournament_url %}
+<p><a href="{{ tournament_url }}" class="btn">Подробнее о турнире</a></p>
+{% endif %}
+<p>Удачи!</p>
+{% endblock %}

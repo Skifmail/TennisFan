@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Клуб не найден{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Клуб недоступен</h1>
+    {% if reason == "start_plan" %}
+    <p class="page-subtitle">Публичная страница клуба доступна только на тарифах Базовый и Про.</p>
+    {% else %}
+    <p class="page-subtitle">Такой клуб не найден или страница скрыта.</p>
+    {% endif %}
+</div>
+<div class="container" style="max-width: 480px;">
+    <p><a href="{% url 'home' %}" class="btn btn-primary">На главную</a></p>
+</div>
+{% endblock %}

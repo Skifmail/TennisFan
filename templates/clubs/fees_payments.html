@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Оплаты взносов — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Оплаты взносов</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 900px;">
+    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a> · <a href="{% url 'clubs:fees_settings' slug=club.slug %}">Настройки</a></p>
+    {% if mark_form %}
+    <div class="card" style="margin-bottom: var(--spacing-lg);">
+        <div class="card-body">
+            <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">Отметить оплату вручную</h2>
+            <form method="post" action="{% url 'clubs:fees_mark_paid' slug=club.slug %}">
+                {% csrf_token %}
+                {{ mark_form.as_p }}
+                <button type="submit" class="btn btn-primary">Отметить</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+    <div class="card">
+        <div class="card-body">
+            <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">История оплат</h2>
+            {% if payments %}
+            <table class="table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Участник</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Период</th>
+                        <th style="text-align: right; padding: var(--spacing-sm);">Сумма</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Дата</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Способ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in payments %}
+                    <tr>
+                        <td style="padding: var(--spacing-sm);">{{ p.member.user.get_full_name|default:p.member.user.email }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ p.period_label }}</td>
+                        <td style="padding: var(--spacing-sm); text-align: right;">{{ p.amount }} {{ p.fee.currency }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ p.paid_at|date:"d.m.Y H:i" }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ p.get_method_display }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="margin: 0; color: var(--color-text-muted);">Оплат пока нет.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

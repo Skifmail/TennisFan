@@ -1,0 +1,13 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Просрочка членского взноса</h2>
+<p>Здравствуйте, {{ player_name }}!</p>
+<p>Срок оплаты членского взноса в клубе <b>{{ club_name }}</b> за период {{ period_label }} истёк.</p>
+<p>Сумма: <b>{{ amount }} ₽</b>.</p>
+{% if restrict_access %}
+<p>⚠️ Доступ к турнирам клуба ограничен до момента оплаты.</p>
+{% endif %}
+{% if pay_url %}
+<p><a href="{{ pay_url }}" class="btn">Оплатить сейчас</a></p>
+{% endif %}
+{% endblock %}

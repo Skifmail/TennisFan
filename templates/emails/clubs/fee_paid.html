@@ -1,0 +1,8 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Взнос успешно оплачен</h2>
+<p>Здравствуйте, {{ player_name }}!</p>
+<p>Ваш членский взнос в клубе <b>{{ club_name }}</b> за период {{ period_label }} успешно оплачен.</p>
+<p>Сумма: <b>{{ amount }} ₽</b>.</p>
+<p>Спасибо за своевременную оплату!</p>
+{% endblock %}

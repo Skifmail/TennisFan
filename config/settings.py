@@ -3,6 +3,8 @@ Django settings for TennisFan project.
 Production-ready configuration.
 """
 
+import base64
+import hashlib
 import os
 from datetime import timedelta
 from pathlib import Path
@@ -96,6 +98,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.users",
     "apps.tournaments",
+    "apps.clubs",
     "apps.courts",
     "apps.sparring",
     "apps.training",
@@ -151,6 +154,7 @@ TEMPLATES = [
                 "apps.core.context_processors.telegram_community_url",
                 "apps.core.context_processors.footer_social_links",
                 "apps.core.context_processors.search_engine_verification",
+                "apps.clubs.context_processors.club_context",
             ],
         },
     },
@@ -326,6 +330,17 @@ YOOKASSA_SHOP_ID = os.environ.get("YOOKASSA_SHOP_ID", "")
 YOOKASSA_SECRET_KEY = os.environ.get("YOOKASSA_SECRET_KEY", "")
 
 # ------------------------------------------------------------------------------
+# CLUB PAYMENTS ENCRYPTION
+# ------------------------------------------------------------------------------
+CLUB_PAYMENT_ENCRYPTION_KEY = os.environ.get("CLUB_PAYMENT_ENCRYPTION_KEY", "").strip()
+if not CLUB_PAYMENT_ENCRYPTION_KEY and SECRET_KEY:
+    # Генерируем детерминированный ключ Fernet из SECRET_KEY,
+    # чтобы в dev не требовать отдельной переменной окружения.
+    CLUB_PAYMENT_ENCRYPTION_KEY = base64.urlsafe_b64encode(
+        hashlib.sha256(SECRET_KEY.encode("utf-8")).digest()
+    ).decode("ascii")
+
+# ------------------------------------------------------------------------------
 # SITES (для sitemap.xml — домен берётся из модели Site, id=1)
 # ------------------------------------------------------------------------------
 SITE_ID = 1
@@ -408,6 +423,36 @@ CRONJOBS = [
         "0 10 * * *",
         "django.core.management.call_command",
         ["send_subscription_expiry_reminders"],
+    ),
+    (
+        "0 9 * * *",
+        "django.core.management.call_command",
+        ["send_club_fee_reminders"],
+    ),
+    (
+        "0 9 * * *",
+        "django.core.management.call_command",
+        ["send_club_subscription_reminders"],
+    ),
+    (
+        "0 10 * * *",
+        "django.core.management.call_command",
+        ["send_club_tournament_reminders"],
+    ),
+    (
+        "0 2 * * *",
+        "django.core.management.call_command",
+        ["suspend_expired_clubs"],
+    ),
+    (
+        "0 3 * * *",
+        "django.core.management.call_command",
+        ["cleanup_suspended_clubs"],
+    ),
+    (
+        "0 1 1 * *",
+        "django.core.management.call_command",
+        ["rollover_club_plan_slots"],
     ),
 ]
 
@@ -536,6 +581,11 @@ LOGGING = {
             "propagate": False,
         },
         "apps.core": {
+            "handlers": _APPS_HANDLERS,
+            "level": "INFO",
+            "propagate": False,
+        },
+        "apps.clubs": {
             "handlers": _APPS_HANDLERS,
             "level": "INFO",
             "propagate": False,

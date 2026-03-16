@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Создать турнир — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Создать турнир</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 560px;">
+    <p><a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}">← К списку турниров</a></p>
+    {% if not can_create %}
+    <p style="color: var(--color-warning);">Лимит турниров в месяц по вашему тарифу исчерпан.</p>
+    {% endif %}
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                    {% if field.name == "is_open_interclub" %}
+                        {% if is_pro %}
+                        <p>
+                            {{ field }}
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {% if field.help_text %}<br><small style="color: var(--color-text-muted);">{{ field.help_text }}</small>{% endif %}
+                            {% if field.errors %}<br><span class="error">{{ field.errors.0 }}</span>{% endif %}
+                        </p>
+                        {% endif %}
+                    {% else %}
+                        <p>
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.help_text %}<br><small style="color: var(--color-text-muted);">{{ field.help_text }}</small>{% endif %}
+                            {% if field.errors %}<br><span class="error">{{ field.errors.0 }}</span>{% endif %}
+                        </p>
+                    {% endif %}
+                {% endfor %}
+                <button type="submit" class="btn btn-primary" {% if not can_create %}disabled{% endif %}>Создать</button>
+                <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-ghost">Отмена</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

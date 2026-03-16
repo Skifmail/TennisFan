@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Турниры — {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Турниры клуба</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+<div class="container" style="max-width: 900px;">
+    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a> · <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary">Создать турнир</a></p>
+    <div class="card">
+        <div class="card-body">
+            {% if tournaments %}
+            <table class="table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Турнир</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Дата</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Статус</th>
+                        <th style="text-align: left; padding: var(--spacing-sm);">Участники</th>
+                        <th style="text-align: right; padding: var(--spacing-sm);"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in tournaments %}
+                    <tr>
+                        <td style="padding: var(--spacing-sm);"><a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a></td>
+                        <td style="padding: var(--spacing-sm);">{{ t.start_date|date:"d.m.Y" }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ t.get_status_display }}</td>
+                        <td style="padding: var(--spacing-sm);">{{ t.participants.count }}{% if t.max_participants %} / {{ t.max_participants }}{% endif %}</td>
+                        <td style="padding: var(--spacing-sm); text-align: right;">
+                            <a href="{% url 'clubs:tournament_plan_access' slug=club.slug tournament_id=t.id %}" class="btn btn-ghost btn-sm">Доступ тарифов</a>
+                            <a href="{% url 'tournament_manage' slug=t.slug %}" class="btn btn-primary btn-sm">Управление</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="margin: 0; color: var(--color-text-muted);">Турниров пока нет.</p>
+            <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary" style="margin-top: var(--spacing-md);">Создать турнир</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

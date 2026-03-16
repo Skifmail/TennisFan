@@ -126,6 +126,16 @@
                             <li><a href="{% url 'my_matches' %}">Мои матчи</a></li>
                             <li><a href="{% url 'my_sparring_matches' %}">Личные встречи</a></li>
                             <li><a href="{% url 'my_trainings' %}">Мои тренировки</a></li>
+                            <li><a href="{% url 'clubs:invitations_list' %}">Приглашения в клубы</a></li>
+                            {% if user_clubs %}
+                            <li><a href="{% url 'clubs:my_tournaments' %}">Мой клуб — Турниры</a></li>
+                            <li><a href="{% url 'clubs:my_plan' %}">Мой клуб — Тариф</a></li>
+                            <li><a href="{% url 'clubs:club_rating' %}">Мой клуб — Рейтинг</a></li>
+                            {% if current_club_fee_status is not None %}
+                            <li><a href="{% url 'clubs:my_fees' %}">Мой клуб — Взнос</a></li>
+                            {% endif %}
+                            <li><a href="{% url 'clubs:my_notification_settings' %}">Мой клуб — Уведомления</a></li>
+                            {% endif %}
                             <li><a href="{% url 'notifications' %}" class="nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a></li>
                             {% if user.is_staff or user.is_superuser %}
                             <li><a href="{% url 'admin:index' %}">Админ панель</a></li>
@@ -164,6 +174,7 @@
 
     <!-- Main Content -->
     <main class="main">
+        {% include "clubs/_club_header_context.html" %}
         {% block content %}{% endblock %}
     </main>
 
@@ -253,6 +264,19 @@
                         </a>
                         {% endfor %}
                     </div>
+                    {% if user.is_authenticated %}
+                    <div class="footer-club-cta">
+                        <div class="footer-club-cta__inner">
+                            <div class="footer-club-cta__text">
+                                <span class="footer-club-cta__label">Управляете клубом?</span>
+                                <span class="footer-club-cta__subtitle">Подключите клуб к платформе и проводите свои турниры.</span>
+                            </div>
+                            <a href="{% url 'clubs:register_choice' %}" class="footer-club-cta__button">
+                                Зарегистрировать клуб
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 

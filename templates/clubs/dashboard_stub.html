@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Панель клуба {{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{{ club.name }}</h1>
+    <p class="page-subtitle">Панель управления клубом</p>
+</div>
+<div class="container" style="max-width: 640px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <p>Добро пожаловать в панель клуба. Полноценный дашборд (игроки, турниры, рейтинги, настройки) будет в следующей версии.</p>
+            <ul style="margin-top: var(--spacing-lg);">
+                <li><a href="{% url 'clubs:club_public_detail' slug=club.slug %}">Публичная страница клуба</a></li>
+                <li><a href="{% url 'clubs:invite_create' slug=club.slug %}">Создать приглашение (инвайт-ссылка)</a></li>
+                <li><a href="{% url 'clubs:invite_by_email' slug=club.slug %}">Пригласить по email</a></li>
+                <li><a href="{% url 'clubs:invite_import_csv' slug=club.slug %}">Импорт CSV</a></li>
+                <li><a href="{% url 'clubs:club_edit' slug=club.slug %}">Редактировать профиль клуба</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

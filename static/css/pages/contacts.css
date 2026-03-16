@@ -1,0 +1,27 @@
+/* Страница контактов: значения (ссылки и текст) — silver */
+.contacts-page .contacts-item__link,
+.contacts-page .contacts-item__value {
+    color: silver !important;
+}
+
+.contacts-page .contacts-item__link:hover {
+    color: #c0c0c0 !important;
+}
+
+/* Блок «Реквизиты и платёжная информация» — весь текст silver */
+.contacts-page .contacts-requisites-card,
+.contacts-page .contacts-requisites-card .card-body {
+    color: silver;
+}
+
+.contacts-page .contacts-requisites-card a {
+    color: silver !important;
+}
+
+.contacts-page .contacts-requisites-card a:hover {
+    color: #c0c0c0 !important;
+}
+
+.contacts-page .contacts-requisites-card .text-secondary {
+    color: silver !important;
+}

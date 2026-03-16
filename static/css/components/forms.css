@@ -1,0 +1,730 @@
+/* Формы страницы управления турниром (мобильная адаптация) */
+@media (width <= 768px) {
+    /* Форма «Составить пару» — селекты и кнопка на всю ширину */
+    .manage-page .manage-block-bg .form-select.manage-player-select {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .manage-page .manage-block-bg .d-flex.flex-wrap.gap-2 {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .manage-page .manage-block-bg .d-flex.flex-wrap.gap-2 .form-select {
+        width: 100%;
+    }
+
+    .manage-page .participant-search-wrap {
+        min-width: 0 !important;
+        width: 100%;
+    }
+
+    .manage-page .manage-match-result .manage-match-form .d-flex,
+    .manage-page .manage-match-result .d-flex.flex-wrap {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .manage-page .manage-match-result .form-control {
+        width: 100%;
+        max-width: none;
+    }
+
+    .manage-page .manage-match-result .manage-match-winner {
+        flex-wrap: wrap;
+    }
+
+    .manage-page .card-body .p-3.border.rounded .d-flex.flex-wrap {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .manage-page .card-body .p-3.border.rounded .form-control {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+@media (width <= 640px) {
+    .match-card-item .form-group label,
+    .match-card-item .form-label {
+        font-size: var(--font-size-sm);
+    }
+
+    .match-card-item .form-control {
+        padding: var(--spacing-sm);
+    }
+
+    .match-card-item .btn-primary[type="submit"] {
+        padding: var(--spacing-sm) var(--spacing-md);
+        font-size: var(--font-size-sm);
+    }
+}
+
+/* Форма ввода счёта: строки = игроки, столбцы = сеты */
+.match-score-input {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) repeat(3, minmax(0, 80px));
+    gap: var(--spacing-xs) var(--spacing-sm);
+    align-items: center;
+}
+
+.match-score-input__row {
+    display: contents;
+}
+
+.match-score-input__header .match-score-input__cell {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+.match-score-input__label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+}
+
+.match-score-input__cell input {
+    width: 100%;
+}
+
+.auth-form.register {
+    left: 50%;
+}
+
+.auth-form.login {
+    left: 0;
+    transform: translateX(-100%);
+}
+
+.auth-form.login.active {
+    transform: translateX(0);
+}
+
+.auth-form form {
+    width: 100%;
+    max-width: 100%;
+}
+
+.auth-form .form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.auth-form .form-group:last-of-type {
+    margin-bottom: 0;
+}
+
+.auth-form .form-control {
+    width: 100%;
+}
+
+.auth-form .alert {
+    width: 100%;
+}
+
+/* Регистрация: два этапа (шага) */
+.register-form-steps .register-step {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+}
+
+.register-form-steps .register-step.hidden {
+    display: none !important;
+}
+
+.register-step-title {
+    margin: 0 0 var(--spacing-sm);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    font-family: var(--font-heading);
+    color: var(--color-text);
+}
+
+.register-step-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+}
+
+.register-step-fields .form-group {
+    margin-bottom: var(--spacing-xs);
+}
+
+.register-step-fields .form-group:last-of-type {
+    margin-bottom: 0;
+}
+
+/* Компактные поля ввода в форме регистрации (auth) */
+.auth-form.register .register-step-fields .form-control {
+    padding: 0.45rem 0.6rem;
+    min-height: 2.25rem;
+    line-height: 1.35;
+    font-size: 0.95rem;
+}
+
+.auth-form.register .register-step-fields .form-label {
+    margin-bottom: 0.2rem;
+    font-size: 0.9rem;
+}
+
+.register-step-actions {
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    justify-content: center;
+}
+
+.register-step-actions-two {
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.register-step-actions .btn,
+.register-step-actions-two .btn {
+    min-width: 140px;
+}
+
+.register-step-ntrp {
+    margin-top: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+}
+
+.register-form-steps .register-step-ntrp .form-control,
+.register-form-steps .register-step-ntrp .ntrp-option {
+    padding: 0.35rem 0.55rem;
+    min-height: 0;
+    font-size: 0.9rem;
+    line-height: 1.3;
+}
+
+.register-form-steps .register-step-ntrp .ntrp-option {
+    padding: 0.35rem 0.55rem;
+}
+
+.register-form-steps .register-step-ntrp .ntrp-quiz {
+    gap: var(--spacing-xs);
+}
+
+.register-form-steps .register-step-ntrp .ntrp-options {
+    gap: 2px;
+}
+
+.register-form-steps .register-step-ntrp .ntrp-quiz .form-label,
+.register-form-steps .register-step-ntrp .ntrp-quiz h4 {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Стили для формы регистрации внутри auth-card */
+.auth-form.register .register-form-footer {
+    margin-top: var(--spacing-md);
+}
+
+/* Стили для формы входа внутри auth-card */
+.auth-form.login form {
+    max-width: 400px;
+}
+
+.auth-form.login form button[type="submit"] {
+    margin-top: var(--spacing-lg);
+}
+
+/* Ошибка входа — выше логотипа, не перекрывается им */
+.auth-form.login form .alert.alert-error {
+    position: relative;
+    z-index: 2;
+    margin-bottom: calc(7 * var(--spacing-lg));
+}
+
+.auth-login-logo {
+    position: relative;
+    z-index: 1;
+}
+
+.auth-form.login .auth-register-link {
+    display: none;
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+    text-align: center;
+}
+
+@media (width <= 768px) {
+    .auth-page {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        padding: var(--spacing-lg) var(--spacing-md);
+        min-height: calc(100vh - 120px);
+        overflow-x: hidden;
+    }
+
+    .auth-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        height: auto;
+        min-height: 0;
+        border-radius: var(--radius-md);
+        display: flex;
+        flex-direction: column;
+        overflow: visible !important;
+        max-height: none;
+    }
+
+    .auth-wrapper .auth-page,
+    .auth-wrapper .auth-card,
+    .auth-wrapper .auth-hero,
+    .auth-wrapper .auth-form,
+    .auth-wrapper .auth-form form,
+    .auth-wrapper .auth-form .form-group,
+    .auth-wrapper .auth-form input,
+    .auth-wrapper .auth-form select,
+    .auth-wrapper .auth-form textarea,
+    .auth-wrapper .auth-form .form-control,
+    .auth-wrapper .register-form-steps,
+    .auth-wrapper .register-step,
+    .auth-wrapper .register-step-fields {
+        box-sizing: border-box;
+        max-width: 100%;
+    }
+
+    .auth-hero,
+    .auth-form {
+        position: relative;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: auto;
+        min-height: 0;
+        padding: var(--spacing-lg) var(--spacing-md) !important;
+        padding-left: var(--spacing-lg) !important;
+        padding-right: var(--spacing-lg) !important;
+        left: auto !important;
+        transform: none !important;
+        overflow: visible !important;
+    }
+
+    /* Явный сброс позиционирования для форм */
+    .auth-form.register,
+    .auth-form.login {
+        left: 0 !important;
+        transform: none !important;
+    }
+
+    .auth-hero:not(.active),
+    .auth-form:not(.active) {
+        display: none !important;
+    }
+
+    /* На мобильных экран входа — только форма, без hero (нет обрезки и слияния) */
+    .auth-hero.login.active {
+        display: none !important;
+    }
+
+    .auth-hero.register.active {
+        order: 1;
+        display: flex;
+        flex-shrink: 0;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .auth-form.login.active {
+        order: 1;
+        display: flex;
+    }
+
+    .auth-form.register.active {
+        order: 2;
+        display: flex;
+    }
+
+    .auth-form form {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    /* Консолидация дубликатов .auth-form.* в mobile scope */
+    .auth-form.register .register-form-steps,
+    .auth-form.register .register-step,
+    .auth-form.register .register-step-fields,
+    .auth-form.register .register-step-actions {
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .auth-form.register .register-step-title {
+        overflow-wrap: break-word;
+    }
+
+    .auth-form.register .register-step-fields .form-control {
+        max-width: 100%;
+        box-sizing: border-box;
+        padding: 0.65rem 0.85rem;
+        min-height: 2.75rem;
+        font-size: 1rem;
+    }
+
+    .auth-form.register .register-step-fields .form-label {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .auth-form input:not([type="checkbox"]),
+    .auth-form select,
+    .auth-form textarea {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Чекбоксы и радио-кнопки не должны растягиваться */
+    .auth-form input[type="checkbox"],
+    .auth-form input[type="radio"],
+    .form-checkbox {
+        width: auto !important;
+        max-width: 1.25rem !important;
+        min-width: 1.25rem !important;
+        height: 1.25rem !important;
+        flex-shrink: 0;
+    }
+
+    .auth-form .form-control {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .auth-form .form-group {
+        margin-bottom: var(--spacing-lg);
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .auth-form.login .form-group {
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .auth-form.login form button[type="submit"] {
+        margin-top: var(--spacing-xl);
+    }
+
+    .auth-form.login .auth-register-link {
+        display: block;
+        margin-top: var(--spacing-xl);
+        padding-top: var(--spacing-lg);
+        border-top: 1px solid var(--color-border);
+    }
+
+    .auth-form.login .auth-register-link p {
+        margin-bottom: var(--spacing-md) !important;
+    }
+
+    .auth-form.login .auth-register-link .btn {
+        margin-top: 0;
+    }
+
+    .auth-login-title {
+        display: block;
+    }
+
+    /* Скрываем вращающийся логотип на мобильных */
+    .auth-login-logo {
+        display: none !important;
+    }
+
+    .auth-card-bg {
+        display: none;
+    }
+}
+
+/* Дополнительные адаптации для очень узких экранов */
+@media (width <= 480px) {
+    /* Отступы от краёв экрана сохраняем (не убираем на маленьких экранах) */
+    .auth-page {
+        padding: var(--spacing-md) var(--spacing-md);
+    }
+
+    .auth-hero,
+    .auth-form {
+        padding: var(--spacing-md) var(--spacing-md) !important;
+    }
+
+    /* Компактные, но читаемые поля */
+    .auth-form.register .register-step-fields .form-control {
+        padding: 0.6rem 0.75rem;
+        min-height: 2.6rem;
+        font-size: 0.95rem;
+    }
+
+    .auth-form.register .register-step-fields .form-label {
+        font-size: 0.85rem;
+        margin-bottom: 0.15rem;
+    }
+
+    /* Уменьшаем заголовки */
+    .register-step-title {
+        font-size: 0.95rem;
+        margin-bottom: var(--spacing-xs);
+    }
+
+    /* Компактнее группы полей */
+    .register-step-fields .form-group {
+        margin-bottom: 0.5rem;
+    }
+
+    .auth-form .form-group {
+        margin-bottom: var(--spacing-sm);
+    }
+
+    /* Кнопки на всю ширину */
+    .register-step-actions .btn,
+    .register-step-actions-two .btn {
+        width: 100%;
+        min-width: 0;
+        padding: 0.65rem 1rem;
+    }
+
+    /* Заметка о силе */
+    .register-form-ntrp-note {
+        font-size: 0.8rem;
+        margin-bottom: var(--spacing-xs);
+    }
+
+    /* Компактный калькулятор силы */
+    .register-step-ntrp .ntrp-option {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .register-step-ntrp .ntrp-quiz .form-label,
+    .register-step-ntrp .ntrp-quiz h4 {
+        font-size: 0.85rem;
+        margin-bottom: 0.2rem;
+    }
+}
+
+/* Контейнер формы (используется в login.html при необходимости) */
+.auth-form-container {
+    max-width: 960px;
+}
+
+/* Общие стили для формы регистрации (auth.html) */
+.register-form-layout {
+    display: flex;
+    flex-direction: column;
+}
+
+.register-form-ntrp-note {
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text-secondary);
+}
+
+.register-form-submit {
+    width: auto;
+    min-width: 200px;
+    margin-top: var(--spacing-xs);
+}
+
+.register-form-layout .form-error,
+.register-form-layout .field-error {
+    margin-top: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-error);
+}
+
+/* Форма входа: обычный размер */
+.auth-form-container.auth-form--login {
+    max-width: 420px;
+}
+
+.auth-form-container.auth-form--login .card-body {
+    padding: var(--spacing-2xl);
+}
+
+/* ==========================================================================
+   Filter Bar
+   ========================================================================== */
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-xl);
+}
+
+.filter-bar .form-control {
+    flex: 1;
+    min-width: 150px;
+}
+
+.filter-grid {
+    display: grid;
+    gap: var(--spacing-md);
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.filter-grid .form-group {
+    margin-bottom: 0;
+}
+
+.filter-grid .form-control {
+    height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.25;
+}
+
+.filter-grid .form-group-submit {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.filter-grid .form-group-submit .form-label {
+    visibility: hidden;
+}
+
+.filter-grid .form-group-submit .btn {
+    width: 100%;
+    height: 44px;
+    min-height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.25;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (width <= 600px) {
+    .filter-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (width <= 768px) {
+    .filter-bar {
+        padding: var(--spacing-md);
+        gap: var(--spacing-sm);
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .filter-bar .form-control {
+        min-width: 100%;
+        flex: 1 1 100%;
+    }
+}
+
+/* ==========================================================================
+   Consent (registration) & offer consent (payments)
+   ========================================================================== */
+.form-group-consent {
+    margin-top: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+.consent-label {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+.form-checkbox {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+
+.consent-text a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.consent-text a:hover {
+    color: var(--color-text-secondary);
+}
+
+.offer-consent {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    margin-bottom: var(--spacing-md);
+    line-height: 1.5;
+}
+
+.offer-consent__label {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    user-select: none;
+}
+
+.offer-consent__checkbox {
+    flex-shrink: 0;
+    margin-top: 2px;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--color-primary);
+}
+
+.offer-consent__text {
+    flex: 1;
+    color: var(--color-text);
+    line-height: 1.5;
+}
+
+.offer-consent a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.offer-consent a:hover {
+    color: var(--color-text-secondary);
+    text-decoration: none;
+}
+
+.btn-pay {
+    margin-top: var(--spacing-xs);
+}
+
+.order-details {
+    background: var(--color-bg-secondary);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+}
+
+@media (width <= 768px) {
+    .legal-doc__body {
+        padding: var(--spacing-lg) !important;
+    }
+
+    .consent-label {
+        font-size: var(--font-size-xs);
+    }
+
+    .offer-consent {
+        font-size: var(--font-size-xs);
+    }
+}

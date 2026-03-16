@@ -1,0 +1,111 @@
+/*
+ * lightbox.css
+ * 
+ * Описание: Полноэкранный просмотр изображений с навигацией и подписью.
+ * Компоненты: .lightbox-overlay, .lightbox-content, .lightbox-img, .lightbox-caption, .lightbox-close, .lightbox-prev, .lightbox-next
+ * Используется на: страницы/карточки с галереями и фото
+ * 
+ * Последнее обновление: 2026-03
+ */
+
+/* ==========================================================================
+   Lightbox — просмотр фото во всплывающем окне с подписью и листанием
+   ========================================================================== */
+.lightbox-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 100dvh;
+    z-index: 10000;
+    background: rgb(0 0 0 / 90%);
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+    box-sizing: border-box;
+    overflow: hidden auto;
+}
+
+.lightbox-overlay.lightbox-open {
+    display: flex;
+    flex-wrap: nowrap;
+}
+
+.lightbox-content {
+    margin: auto;
+    min-height: 0;
+    max-width: 95vw;
+    max-height: min(90vh, 90dvh);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.lightbox-img {
+    max-width: 95vw;
+    max-height: min(75vh, 75dvh);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: center;
+    border-radius: var(--radius-md);
+    display: block;
+}
+
+.lightbox-caption {
+    margin: var(--spacing-md) 0 0;
+    padding: 0;
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    text-align: center;
+    max-width: 90vw;
+    flex-shrink: 0;
+}
+
+.lightbox-close,
+.lightbox-prev,
+.lightbox-next {
+    position: fixed;
+    border: none;
+    background: rgb(166 130 74 / 30%);
+    color: var(--color-text);
+    font-size: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    padding: 0;
+    line-height: 1;
+}
+
+.lightbox-close:hover,
+.lightbox-prev:hover,
+.lightbox-next:hover {
+    background: var(--color-primary);
+}
+
+.lightbox-close {
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    font-size: 2.5rem;
+}
+
+.lightbox-prev {
+    left: var(--spacing-md);
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.lightbox-next {
+    right: var(--spacing-md);
+    top: 50%;
+    transform: translateY(-50%);
+}

@@ -1,0 +1,525 @@
+/*
+ * bracket.css
+ * 
+ * Описание: Стили управления плей-офф сеткой турнира (брекет, матчи, сеты, ввод результатов).
+ * Компоненты: .bracket-*, .tvd-group-*, .subscription-autopay*
+ * Используется на: страницы управления сеткой турнира (playoff/manage bracket)
+ * 
+ * Последнее обновление: 2026-03
+ */
+
+/* ==========================================================================
+   Manage Bracket — Tournament Playoff Bracket View
+   ========================================================================== */
+
+.tvd-group-col {
+    margin-bottom: var(--spacing-xl, 1.5rem);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    border-bottom: 3px solid var(--color-primary);
+}
+
+.tvd-group-col:last-child {
+    border-bottom: none;
+}
+
+.tvd-group-col:nth-child(odd) {
+    background: rgba(0, 26, 18, 0.6);
+}
+
+.tvd-group-col:nth-child(even) {
+    background: rgba(1, 50, 34, 0.5);
+}
+
+.tvd-group-matches-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+@media (width <= 768px) {
+    .tvd-group-matches-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.bracket-section-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-primary);
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.bracket-container {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: var(--spacing-md);
+    align-items: stretch;
+}
+
+.bracket-round-col {
+    flex: 0 0 auto;
+    min-width: 280px;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.bracket-round-col + .bracket-round-col {
+    margin-left: 2rem;
+}
+
+.bracket-round-col + .bracket-round-col::before {
+    content: '';
+    position: absolute;
+    left: -1rem;
+    top: 2.5rem;
+    bottom: 1rem;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--color-primary) 0%, transparent 100%);
+    opacity: 0.3;
+}
+
+.bracket-round-header {
+    text-align: center;
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-primary);
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 2px solid var(--color-primary);
+    background: linear-gradient(180deg, rgba(166, 130, 74, 0.1) 0%, transparent 100%);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.bracket-round-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    flex: 1;
+    justify-content: space-around;
+}
+
+.bracket-match {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.bracket-match:hover {
+    border-color: var(--color-primary);
+}
+
+.bracket-match--done {
+    opacity: 0.85;
+}
+
+.bracket-match--done:hover {
+    opacity: 1;
+}
+
+.bracket-match-players {
+    display: flex;
+    flex-direction: column;
+}
+
+.bracket-match-player {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+    min-height: 2.25rem;
+    border-bottom: 1px solid rgba(166, 130, 74, 0.15);
+}
+
+.bracket-match-player:last-child {
+    border-bottom: none;
+}
+
+.bracket-match-player--winner {
+    background: rgba(166, 130, 74, 0.15);
+}
+
+.bracket-match-player--winner .bracket-player-name {
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.bracket-player-name {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+}
+
+.bracket-player-scores {
+    display: flex;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.bracket-set {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    background: rgba(166, 130, 74, 0.12);
+    color: var(--color-text);
+    border-radius: 3px;
+}
+
+.bracket-match-player--winner .bracket-set {
+    background: rgba(166, 130, 74, 0.3);
+    color: var(--color-primary);
+}
+
+.bracket-match-badge {
+    text-align: center;
+    padding: 0.15rem;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    background: rgba(166, 130, 74, 0.08);
+}
+
+.bracket-match-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.bracket-match-form .bracket-match-players {
+    border-bottom: 1px solid rgba(166, 130, 74, 0.2);
+}
+
+.bracket-match-form .bracket-match-player--input {
+    background: rgba(1, 43, 28, 0.5);
+}
+
+.bracket-match-sets {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgba(166, 130, 74, 0.15);
+    flex-wrap: wrap;
+}
+
+.bracket-set-column-headers {
+    flex: 0 0 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.15rem;
+    margin-bottom: 0.2rem;
+    padding-bottom: 0.2rem;
+    border-bottom: 1px dashed rgba(166, 130, 74, 0.25);
+}
+
+.bracket-set-column-headers .bracket-set-col-player {
+    min-width: 2.5rem;
+    width: 3.5rem;
+    max-width: 4.5rem;
+    text-align: center;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    color: var(--color-primary);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bracket-set-column-headers .bracket-set-sep {
+    flex-shrink: 0;
+}
+
+.bracket-set-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.bracket-set-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+    letter-spacing: 0.05em;
+}
+
+.bracket-set-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.bracket-set-input {
+    width: 2.5rem;
+    height: 2rem;
+    text-align: center;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    background: var(--color-bg-elevated);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 0;
+    -moz-appearance: textfield;
+}
+
+.bracket-set-input::-webkit-inner-spin-button,
+.bracket-set-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.bracket-set-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(166, 130, 74, 0.25);
+}
+
+.bracket-set-sep {
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+}
+
+.bracket-match-actions {
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.bracket-winner-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.bracket-winner-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+.bracket-radio {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: var(--font-size-xs);
+    color: var(--color-text);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.bracket-radio input[type="radio"] {
+    accent-color: var(--color-primary);
+}
+
+.bracket-submit-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.bracket-walkover {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+}
+
+.bracket-walkover input[type="checkbox"] {
+    accent-color: var(--color-primary);
+}
+
+.bracket-submit-btn {
+    font-size: var(--font-size-xs);
+    padding: 0.3rem 0.75rem;
+    white-space: nowrap;
+}
+
+/* --------------------------------------------------------------
+ * Subscription autopay block (profile)
+ * -------------------------------------------------------------- */
+
+.subscription-autopay {
+    margin-top: 1.25rem;
+    padding: 0.9rem 1rem;
+    border-radius: 10px;
+    background: radial-gradient(circle at top left, rgba(166, 130, 74, 0.25), transparent 55%),
+                rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(166, 130, 74, 0.6);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
+.subscription-autopay__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+}
+
+.subscription-autopay__eyebrow {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.subscription-autopay__status {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(46, 204, 113, 0.16);
+    color: #2ecc71;
+    border: 1px solid rgba(46, 204, 113, 0.65);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.subscription-autopay__status--off {
+    background: rgba(231, 76, 60, 0.16);
+    color: #e74c3c;
+    border-color: rgba(231, 76, 60, 0.7);
+}
+
+.subscription-autopay__card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+    padding: 0.7rem 0.8rem;
+    margin-bottom: 0.6rem;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(10, 10, 10, 0.9), rgba(40, 40, 40, 0.95));
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.subscription-autopay__card-main {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.subscription-autopay__card-brand {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.subscription-autopay__card-pan {
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.subscription-autopay__card-expiry {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.subscription-autopay__footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.subscription-autopay__hint {
+    margin: 0;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.subscription-autopay__form {
+    margin: 0;
+}
+
+.subscription-autopay__disable-btn {
+    width: 100%;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.55rem 0.9rem;
+    border-radius: 999px;
+    border-width: 0;
+    background: linear-gradient(135deg, #ff4b4b, #ff6a3d);
+    color: #ffffff;
+    box-shadow: 0 12px 24px rgba(255, 75, 75, 0.45);
+    text-transform: none;
+}
+
+.subscription-autopay__disable-btn:hover {
+    background: linear-gradient(135deg, #ff3b3b, #ff5a2d);
+    box-shadow: 0 14px 32px rgba(255, 75, 75, 0.6);
+}
+
+.subscription-autopay__disable-btn:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 2px;
+}
+
+.bracket-match-pending {
+    text-align: center;
+    padding: 0.75rem;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    font-style: italic;
+}
+
+.bracket-match-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.bracket-match-link:hover {
+    color: inherit;
+}
+
+@media (width <= 768px) {
+    .bracket-container {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .bracket-round-col {
+        min-width: 100%;
+        max-width: 100%;
+    }
+
+    .bracket-round-col + .bracket-round-col {
+        margin-left: 0;
+    }
+
+    .bracket-round-col + .bracket-round-col::before {
+        display: none;
+    }
+
+    .bracket-round-header {
+        text-align: left;
+    }
+}

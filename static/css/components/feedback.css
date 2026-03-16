@@ -1,0 +1,96 @@
+/*
+ * feedback.css
+ * 
+ * Описание: Плавающий виджет обратной связи (кнопка и анимации).
+ * Компоненты: .feedback-widget, .feedback-widget__btn, .feedback-widget__icon, .feedback-widget__label
+ * Используется на: глобально на страницах сайта
+ * 
+ * Последнее обновление: 2026-03
+ */
+
+/* ==========================================================================
+   Feedback widget (floating button + modal)
+   ========================================================================== */
+.feedback-widget {
+    position: fixed;
+    right: var(--spacing-lg);
+    bottom: var(--spacing-lg);
+    z-index: 1000;
+}
+
+@keyframes feedback-widget-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+}
+
+@keyframes feedback-widget-ring {
+    0%, 100% { transform: scale(1); opacity: 0.35; }
+    50% { transform: scale(1.12); opacity: 0; }
+}
+
+.feedback-widget__btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: transparent;
+    color: var(--color-primary);
+    border: none;
+    border-radius: var(--radius-xl);
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    box-shadow: none;
+    transition: transform var(--transition-fast), background-color 0.2s ease;
+    animation: feedback-widget-pulse 2s ease-in-out infinite;
+    will-change: transform;
+}
+
+.feedback-widget__btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 0 8px rgb(166 130 74 / 25%);
+    animation: feedback-widget-ring 2s ease-in-out infinite;
+    pointer-events: none;
+    will-change: transform, opacity;
+}
+
+.feedback-widget__btn:hover {
+    animation: none;
+    transform: scale(1.02);
+    background: rgb(166 130 74 / 0.12);
+    box-shadow: none;
+}
+
+.feedback-widget__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.feedback-widget__icon-img {
+    display: block;
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    /* на прозрачной кнопке иконка видна без blend */
+    opacity: 0.9;
+}
+
+.feedback-widget__btn .feedback-widget__label {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    white-space: nowrap;
+    transition: max-width 0.25s ease, opacity 0.2s ease;
+}
+
+.feedback-widget__btn:hover .feedback-widget__label {
+    max-width: 140px;
+    opacity: 1;
+    margin-left: 0;
+}

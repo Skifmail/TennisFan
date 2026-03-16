@@ -1,3 +1,13 @@
+/*
+ * rules.css
+ *
+ * Описание: Стили страниц правил и round-robin таблиц, включая ссылки на PDF и мобильную адаптацию.
+ * Компоненты: .rules-doc__doc-link, .round-robin-matrix, .round-robin-standings, .round-robin-table-wrapper
+ * Используется на: страницы правил турниров и FAN
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* Ссылки на документы (PDF) в правилах тенниса */
 .rules-doc__meta--links {
     display: flex;

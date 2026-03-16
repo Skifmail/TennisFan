@@ -1,3 +1,13 @@
+/*
+ * profile.css
+ *
+ * Описание: Разметка и визуальные блоки страницы профиля, включая Telegram, подписку, карточку и статистику.
+ * Компоненты: .profile-card--wide, .profile-card__inner, .profile-info__*, .subscription-info__actions, .profile-info__telegram
+ * Используется на: страница профиля пользователя
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* Блок Telegram-бот на странице профиля */
 .profile-info__telegram {
     margin-top: var(--spacing-lg);

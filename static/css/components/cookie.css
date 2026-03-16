@@ -1,0 +1,130 @@
+/*
+ * cookie.css
+ * 
+ * Описание: Баннер согласия на cookie с действиями подтверждения/отказа.
+ * Компоненты: .cookie-banner, .cookie-banner__inner, .cookie-banner__text, .cookie-banner__actions, .cookie-banner__btn
+ * Используется на: глобально в базовом шаблоне сайта
+ * 
+ * Последнее обновление: 2026-03
+ */
+
+/* ==========================================================================
+   Cookie consent banner
+   ========================================================================== */
+.cookie-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    padding: var(--spacing-md);
+    background: var(--color-bg-card);
+    border-top: 1px solid var(--color-border);
+    box-shadow: 0 -4px 20px rgb(0 0 0 / 30%);
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cookie-banner[hidden] {
+    display: block !important;
+    visibility: hidden;
+    transform: translateY(100%);
+}
+
+.cookie-banner--visible {
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.cookie-banner__inner {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.cookie-banner__text {
+    flex: 1 1 280px;
+    margin: 0;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    color: var(--color-text);
+}
+
+.cookie-banner__link {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.cookie-banner__link:hover {
+    color: var(--color-text-secondary);
+}
+
+.cookie-banner__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+.cookie-banner__btn {
+    padding: 0.5rem 1rem;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.cookie-banner__btn--accept {
+    background: var(--color-primary);
+    color: var(--color-bg);
+    border-color: var(--color-primary);
+}
+
+.cookie-banner__btn--accept:hover {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #fff;
+}
+
+.cookie-banner__btn--refuse {
+    background: transparent;
+    color: var(--color-text-secondary);
+    border-color: var(--color-border);
+}
+
+.cookie-banner__btn--refuse:hover {
+    background: var(--color-bg-elevated);
+    color: var(--color-text);
+    border-color: var(--color-text-muted);
+}
+
+@media (width <= 600px) {
+    .cookie-banner__inner {
+        flex-direction: column;
+        align-items: stretch;
+        align-content: flex-start;
+        gap: var(--spacing-sm);
+        text-align: left;
+    }
+
+    .cookie-banner__text {
+        flex: none;
+    }
+
+    .cookie-banner__actions {
+        justify-content: stretch;
+        display: flex;
+        gap: var(--spacing-sm);
+    }
+
+    .cookie-banner__actions .cookie-banner__btn {
+        flex: 1;
+        min-width: 0;
+    }
+}

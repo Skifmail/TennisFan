@@ -1,0 +1,115 @@
+/*
+ * calculator.css
+ * 
+ * Описание: Стили блока калькулятора силы (NTRP) и результатов.
+ * Компоненты: .ntrp-card .section-title, .ntrp-toggle, .ntrp-quiz, .ntrp-actions, .ntrp-result, .ntrp-level
+ * Используется на: страницы с калькулятором силы в пользовательском разделе
+ * 
+ * Последнее обновление: 2026-03
+ */
+
+/* ==========================================================================
+   Калькулятор силы
+   ========================================================================== */
+.ntrp-card .section-title {
+    margin-bottom: var(--spacing-sm);
+}
+
+.ntrp-toggle {
+    margin-bottom: var(--spacing-md);
+}
+
+.ntrp-note {
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
+.ntrp-quiz {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.ntrp-progress {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--font-size-sm);
+}
+
+.ntrp-question {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+}
+
+.ntrp-options {
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.ntrp-option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast),
+                color var(--transition-fast), transform var(--transition-fast);
+}
+
+.ntrp-option input {
+    accent-color: var(--color-primary);
+}
+
+.ntrp-option:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.ntrp-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.ntrp-actions .btn {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (width <= 480px) {
+    .ntrp-actions {
+        flex-direction: column;
+    }
+
+    .ntrp-actions .btn {
+        flex: none;
+        min-width: 100%;
+        width: 100%;
+    }
+
+    .ntrp-question {
+        font-size: var(--font-size-base);
+    }
+}
+
+.ntrp-result {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.ntrp-level {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+@media (width <= 480px) {
+    .ntrp-level {
+        font-size: var(--font-size-xl);
+    }
+}

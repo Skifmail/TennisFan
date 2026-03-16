@@ -1,0 +1,168 @@
+/*
+ * sparring.css
+ * 
+ * Описание: Структура и элементы страницы спаррингов (табы, флаги, карточки, тулбар).
+ * Компоненты: .sparring-tabs, .sparring-tab, .sparring-toolbar, .sparring-flag, .sparring-card__*
+ * Используется на: страницы спаррингов и связанные списки заявок
+ * 
+ * Последнее обновление: 2026-03
+ */
+
+/* ==========================================================================
+   Sparring
+   ========================================================================== */
+
+.sparring-tabs {
+    display: flex;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    background: var(--color-bg-elevated);
+    border-radius: var(--border-radius-lg);
+    width: fit-content;
+}
+
+.sparring-tab {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: 2px solid transparent;
+    border-radius: var(--border-radius-md);
+    text-decoration: none;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.sparring-tab:hover {
+    color: var(--color-text);
+    background: rgb(166 130 74 / 0.12);
+}
+
+.sparring-tab--active {
+    color: var(--color-text);
+    background: var(--color-primary-transparent);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.sparring-tab--active:hover {
+    color: var(--color-text);
+    background: var(--color-primary-transparent);
+    border-color: var(--color-primary);
+}
+
+.sparring-toolbar {
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sparring-filters {
+    flex: 1;
+    margin-bottom: 0;
+    min-width: 200px;
+}
+
+.sparring-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+.sparring-card__flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-xs);
+}
+
+.sparring-flag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+}
+
+.sparring-flag--recruiting {
+    background: rgb(34 197 94 / 15%);
+    color: #22c55e;
+    border: 1px solid rgb(34 197 94 / 35%);
+}
+
+.sparring-flag--responses {
+    background: var(--color-primary-transparent);
+    color: var(--color-primary);
+    border: 1px solid var(--color-border);
+}
+
+.sparring-flag--closed {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border-light);
+}
+
+.sparring-flag--friendly {
+    background: rgb(234 179 8 / 15%);
+    color: #ca8a04;
+    border: 1px solid rgb(234 179 8 / 35%);
+}
+
+.sparring-flag--type {
+    background: rgb(59 130 246 / 15%);
+    color: #2563eb;
+    border: 1px solid rgb(59 130 246 / 35%);
+}
+
+.sparring-flag--gender {
+    background: rgb(168 85 247 / 12%);
+    color: #7c3aed;
+    border: 1px solid rgb(168 85 247 / 30%);
+}
+
+.sparring-card__avatar {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+}
+
+.sparring-card__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.sparring-card__desc {
+    font-size: var(--font-size-sm);
+}
+
+.sparring-desired-category {
+    display: inline-flex;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    background: var(--color-bg-elevated);
+    color: var(--color-text-secondary);
+    border-radius: var(--radius-sm);
+}
+
+.sparring-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    align-items: center;
+}
+
+@media (width <= 768px) {
+    .sparring-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .sparring-toolbar__actions {
+        justify-content: flex-start;
+    }
+}

@@ -1,3 +1,13 @@
+/*
+ * chat.css
+ *
+ * Описание: Виджет чата обратной связи с областью сообщений, заголовком и формой ввода.
+ * Компоненты: .feedback-chat-widget, .feedback-chat-widget__header, .feedback-chat-widget__messages, .feedback-chat-widget__message, .feedback-chat-widget__form
+ * Используется на: страницы с плавающим чатом обратной связи
+ *
+ * Последнее обновление: 2026-03
+ */
+
 /* Виджет чата */
 .feedback-chat-widget {
     position: fixed;

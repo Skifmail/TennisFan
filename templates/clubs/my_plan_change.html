@@ -5,7 +5,8 @@
     <h1 class="page-title">Смена тарифа</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
-<div class="container" style="max-width: 640px;">
+<div class="container club-player-dashboard" style="max-width: 640px;">
+    {% include "clubs/_club_player_nav.html" with current="plan" %}
     <div class="card">
         <div class="card-body">
             {% if current_member_plan %}

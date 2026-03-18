@@ -5,38 +5,117 @@
     <h1 class="page-title">Выбор тарифа</h1>
     <p class="page-subtitle">Шаг 2 из 3 · Прогресс: 2/3</p>
 </div>
-<div class="container" style="max-width: 720px;">
-    <form method="post">
+<div class="container" style="max-width: 960px;">
+    <form method="post" id="club-plan-form">
         {% csrf_token %}
-        <div class="card" style="margin-bottom: var(--spacing-lg);">
-            <div class="card-body" style="padding: var(--spacing-2xl);">
-                <p style="margin-bottom: var(--spacing-lg);">Период оплаты: <label><input type="radio" name="period" value="monthly"> Помесячно</label> &nbsp; <label><input type="radio" name="period" value="yearly" checked> Ежегодно (выгода)</label></p>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-lg);">
-                    <label class="card" style="cursor: pointer; border: 2px solid var(--color-border); padding: var(--spacing-lg);">
-                        <input type="radio" name="plan" value="{{ plans.START }}" required>
-                        <strong>Старт</strong>
-                        <p style="margin: var(--spacing-sm) 0;">{{ prices.START.yearly|floatformat:0 }} ₽/год</p>
-                        <p style="font-size: var(--font-size-sm);">Пробный период 14 дней бесплатно</p>
-                    </label>
-                    <label class="card" style="cursor: pointer; border: 2px solid var(--color-primary); padding: var(--spacing-lg);">
-                        <input type="radio" name="plan" value="{{ plans.BASIC }}">
-                        <strong>Базовый</strong>
-                        <p style="margin: var(--spacing-sm) 0;">{{ prices.BASIC.yearly|floatformat:0 }} ₽/год</p>
-                        <p style="font-size: var(--font-size-sm);">Публичная страница, больше игроков</p>
-                    </label>
-                    <label class="card" style="cursor: pointer; border: 2px solid var(--color-border); padding: var(--spacing-lg);">
-                        <input type="radio" name="plan" value="{{ plans.PRO }}">
-                        <strong>Про</strong>
-                        <p style="margin: var(--spacing-sm) 0;">{{ prices.PRO.yearly|floatformat:0 }} ₽/год</p>
-                        <p style="font-size: var(--font-size-sm);">Всё + межклубные турниры</p>
+        <div class="club-plan-selector">
+            <div class="club-plan-period">
+                <span class="club-plan-period__label">Период оплаты</span>
+                <div class="period-toggle">
+                    <input type="radio" name="period" value="monthly" id="period-monthly" class="period-toggle__input">
+                    <input type="radio" name="period" value="yearly" id="period-yearly" checked class="period-toggle__input">
+                    <div class="period-toggle__track">
+                        <div class="period-toggle__slider"></div>
+                    </div>
+                    <label for="period-monthly" class="period-toggle__label period-toggle__label--monthly">Помесячно</label>
+                    <label for="period-yearly" class="period-toggle__label period-toggle__label--yearly">Ежегодно <span class="period-toggle__badge">выгода</span></label>
+                </div>
+            </div>
+            <div class="pricing-grid club-plan-grid">
+                {% for plan in platform_plans %}
+                <div class="club-plan-card-wrapper">
+                    <label class="pricing-card club-plan-card {% if plan.slug == 'basic' %}pricing-card--silver_theme{% elif plan.slug == 'pro' %}pricing-card--gold_theme{% endif %}" data-plan="{{ plan.slug }}">
+                        <input type="radio" name="plan" value="{{ plan.slug }}" {% if forloop.first %}required{% endif %} class="club-plan-radio">
+                        <span class="club-plan-card__check" aria-hidden="true">&#10003;</span>
+                        <h3 class="pricing-card__title">{{ plan.name }}</h3>
+                    <div class="pricing-card__price">
+                        <span class="price-amount club-plan-price" data-monthly="{{ plan.price_monthly|floatformat:0 }}" data-yearly="{{ plan.price_yearly|floatformat:0 }}">{{ plan.price_yearly|floatformat:0 }} ₽</span>
+                        <span class="price-period club-plan-period-label">в год</span>
+                    </div>
+                    <div class="pricing-card__features">
+                        <div class="pricing-feature">
+                            <span class="pricing-feature__icon {% if plan.trial_days %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                                {% if plan.trial_days %}&#10003;{% else %}&#10007;{% endif %}
+                            </span>
+                            <div class="pricing-feature__content">
+                                <strong>Пробный период:</strong>
+                                {% if plan.trial_days %}
+                                <span class="pricing-feature__value">{{ plan.trial_days }} дней бесплатно</span>
+                                {% else %}
+                                <span class="pricing-feature__value pricing-feature__value--disabled">Нет</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="pricing-feature">
+                            <span class="pricing-feature__icon {% if plan.is_public_page %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                                {% if plan.is_public_page %}&#10003;{% else %}&#10007;{% endif %}
+                            </span>
+                            <div class="pricing-feature__content">Публичная страница клуба</div>
+                        </div>
+                        <div class="pricing-feature">
+                            <span class="pricing-feature__icon {% if plan.is_open_interclub %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                                {% if plan.is_open_interclub %}&#10003;{% else %}&#10007;{% endif %}
+                            </span>
+                            <div class="pricing-feature__content">Межклубные турниры</div>
+                        </div>
+                        <div class="pricing-feature">
+                            <span class="pricing-feature__icon pricing-feature__icon--success">&#10003;</span>
+                            <div class="pricing-feature__content">
+                                <strong>Турниров в месяц:</strong>
+                                {% if plan.max_tournaments_per_month %}
+                                <span class="pricing-feature__value">{{ plan.max_tournaments_per_month }}</span>
+                                {% else %}
+                                <span class="pricing-feature__value">Без лимита</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="pricing-feature">
+                            <span class="pricing-feature__icon pricing-feature__icon--success">&#10003;</span>
+                            <div class="pricing-feature__content">
+                                <strong>Участников:</strong>
+                                {% if plan.max_members %}
+                                <span class="pricing-feature__value">до {{ plan.max_members }}</span>
+                                {% else %}
+                                <span class="pricing-feature__value">Без лимита</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
                     </label>
                 </div>
-                <div style="margin-top: var(--spacing-xl);">
-                    <button type="submit" class="btn btn-primary">Продолжить →</button>
-                    <a href="{% url 'clubs:register_step1' %}" class="btn btn-ghost">← Назад</a>
-                </div>
+                {% endfor %}
+            </div>
+            <div class="club-plan-actions">
+                <button type="submit" class="btn btn-primary">Продолжить →</button>
+                <a href="{% url 'clubs:register_step1' %}" class="btn btn-ghost">← Назад</a>
             </div>
         </div>
     </form>
 </div>
+<script>
+(function() {
+    var form = document.getElementById('club-plan-form');
+    if (!form) return;
+    var periodMonthly = document.getElementById('period-monthly');
+    var periodYearly = document.getElementById('period-yearly');
+    var priceEls = form.querySelectorAll('.club-plan-price');
+    var periodLabels = form.querySelectorAll('.club-plan-period-label');
+
+    function updatePrices() {
+        var isYearly = periodYearly && periodYearly.checked;
+        var suffix = isYearly ? ' в год' : ' в месяц';
+        var key = isYearly ? 'yearly' : 'monthly';
+        priceEls.forEach(function(el) {
+            var val = el.getAttribute('data-' + key);
+            if (val) el.textContent = val + ' ₽';
+        });
+        periodLabels.forEach(function(el) {
+            el.textContent = suffix;
+        });
+    }
+
+    if (periodMonthly) periodMonthly.addEventListener('change', updatePrices);
+    if (periodYearly) periodYearly.addEventListener('change', updatePrices);
+})();
+</script>
 {% endblock %}

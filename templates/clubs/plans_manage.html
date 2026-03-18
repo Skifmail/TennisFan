@@ -1,18 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Тарифы игроков — {{ club.name }}{% endblock %}
 {% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="plans" %}
 <div class="page-header">
     <h1 class="page-title">Тарифы игроков</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
 <div class="container" style="max-width: 980px;">
-    <nav class="club-dashboard-nav" style="margin-bottom: var(--spacing-xl); display: flex; flex-wrap: wrap; gap: var(--spacing-sm);">
-        <a href="{% url 'clubs:dashboard' slug=club.slug %}" class="btn btn-ghost btn-sm">Дашборд</a>
-        <a href="{% url 'clubs:plans_manage' slug=club.slug %}" class="btn btn-primary btn-sm">Тарифы игроков</a>
-        <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-ghost btn-sm">Турниры</a>
-        <a href="{% url 'clubs:members_list' slug=club.slug %}" class="btn btn-ghost btn-sm">Игроки</a>
-    </nav>
-
     <div style="margin-bottom: var(--spacing-lg);">
         <a href="{% url 'clubs:plan_create' slug=club.slug %}" class="btn btn-primary">Создать тариф</a>
     </div>
@@ -27,7 +21,6 @@
                         <th>Название</th>
                         <th>Взнос</th>
                         <th>Лимит турниров</th>
-                        <th>Слоты</th>
                         <th>Статус</th>
                         <th></th>
                     </tr>
@@ -38,7 +31,6 @@
                         <td>{{ plan.name }}</td>
                         <td>{{ plan.monthly_fee }} ₽/мес</td>
                         <td>{% if plan.max_tournaments_per_month is None %}Без лимита{% else %}{{ plan.max_tournaments_per_month }}{% endif %}</td>
-                        <td>{{ plan.monthly_slots }}{% if plan.allow_rollover_slots %} + перенос (до {{ plan.rollover_cap }}){% endif %}</td>
                         <td>{% if plan.is_active %}Активен{% else %}Архив{% endif %}</td>
                         <td><a href="{% url 'clubs:plan_edit' slug=club.slug plan_id=plan.id %}" class="btn btn-ghost btn-sm">Изменить</a></td>
                     </tr>

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Редактировать {{ club.name }}{% endblock %}
 {% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="settings" %}
 <div class="page-header">
     <h1 class="page-title">Редактировать профиль клуба</h1>
     <p class="page-subtitle">{{ club.name }}</p>

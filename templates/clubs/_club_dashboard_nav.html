@@ -1,0 +1,168 @@
+{# Верхняя навигация (desktop / tablet) #}
+<div class="club-dashboard-toolbar-shell">
+    <div class="container">
+        <nav class="club-dashboard-nav">
+            <a href="{% url 'clubs:dashboard' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'dashboard' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Дашборд
+            </a>
+            <a href="{% url 'clubs:members_list' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'members' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Игроки
+            </a>
+            <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'tournaments' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Турниры
+            </a>
+            <a href="{% url 'clubs:dashboard_rating' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'rating' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Рейтинг
+            </a>
+            <a href="{% url 'clubs:fees_settings' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'fees' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Взносы
+            </a>
+            <a href="{% url 'clubs:plans_manage' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'plans' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Тарифы игроков
+            </a>
+            <a href="{% url 'clubs:invites_list' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'invites' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Приглашения
+            </a>
+            <a href="{% url 'clubs:managers_list' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'managers' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Менеджеры
+            </a>
+            <a href="{% url 'clubs:interclub_applications' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'interclub' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Межклубные заявки
+            </a>
+            <a href="{% url 'clubs:club_edit' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'settings' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Настройки
+            </a>
+            <a href="{% url 'clubs:subscription' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'subscription' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Подписка
+            </a>
+            <a href="{% url 'clubs:club_notification_config' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'notifications' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Уведомления
+            </a>
+        </nav>
+    </div>
+</div>
+
+{# Нижняя навигация (mobile, ≤768px) #}
+<nav class="club-bottom-nav" data-club-bottom-nav>
+    <a href="{% url 'clubs:dashboard' slug=club.slug %}"
+       class="club-bottom-nav__item {% if current == 'dashboard' %}club-bottom-nav__item--active{% endif %}"
+       data-club-tab="dashboard">
+        <span class="club-bottom-nav__item-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4 11L12 4L20 11V19A1 1 0 0 1 19 20H5A1 1 0 0 1 4 19V11Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M10 20V14H14V20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        </span>
+        <span class="club-bottom-nav__item-label">Дашборд</span>
+    </a>
+    <a href="{% url 'clubs:members_list' slug=club.slug %}"
+       class="club-bottom-nav__item {% if current == 'members' %}club-bottom-nav__item--active{% endif %}"
+       data-club-tab="members">
+        <span class="club-bottom-nav__item-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+                <path d="M7 11A3 3 0 1 0 7 5A3 3 0 0 0 7 11Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M17 11A3 3 0 1 0 17 5A3 3 0 0 0 17 11Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M3 19C3.6 16.5 5.6 15 7.9 15C9.6 15 11.1 15.6 12 17" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M13.9 15C16.2 15 18.3 16.5 18.9 19" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        </span>
+        <span class="club-bottom-nav__item-label">Игроки</span>
+    </a>
+    <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}"
+       class="club-bottom-nav__item {% if current == 'tournaments' %}club-bottom-nav__item--active{% endif %}"
+       data-club-tab="tournaments">
+        <span class="club-bottom-nav__item-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+                <circle cx="8" cy="8" r="3" stroke="currentColor" />
+                <circle cx="16" cy="16" r="3" stroke="currentColor" />
+                <path d="M10.5 10.5L13.5 13.5" stroke="currentColor" stroke-linecap="round" />
+            </svg>
+        </span>
+        <span class="club-bottom-nav__item-label">Турниры</span>
+    </a>
+    <a href="{% url 'clubs:dashboard_rating' slug=club.slug %}"
+       class="club-bottom-nav__item {% if current == 'rating' %}club-bottom-nav__item--active{% endif %}"
+       data-club-tab="rating">
+        <span class="club-bottom-nav__item-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+                <path d="M5 20V12" stroke="currentColor" stroke-linecap="round" />
+                <path d="M10 20V4" stroke="currentColor" stroke-linecap="round" />
+                <path d="M15 20V10" stroke="currentColor" stroke-linecap="round" />
+                <path d="M20 20V7" stroke="currentColor" stroke-linecap="round" />
+            </svg>
+        </span>
+        <span class="club-bottom-nav__item-label">Рейтинг</span>
+    </a>
+    <button type="button" class="club-bottom-nav__item club-bottom-nav__item--more" data-club-bottom-more>
+        <span class="club-bottom-nav__item-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+                <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                <circle cx="19" cy="12" r="1.5" fill="currentColor" />
+            </svg>
+        </span>
+        <span class="club-bottom-nav__item-label">Ещё</span>
+    </button>
+</nav>
+
+{# Bottom sheet "Ещё" с дополнительными разделами #}
+<div class="club-bottom-sheet" id="club-bottom-sheet" aria-hidden="true">
+    <div class="club-bottom-sheet__backdrop" data-club-bottom-close></div>
+    <div class="club-bottom-sheet__panel">
+        <div class="club-bottom-sheet__handle"></div>
+        <nav class="club-bottom-sheet__list">
+            <a href="{% url 'clubs:fees_settings' slug=club.slug %}"
+               class="club-bottom-sheet__link">
+                <span class="club-bottom-sheet__link-icon">₽</span>
+                <span>Взносы</span>
+            </a>
+            <a href="{% url 'clubs:plans_manage' slug=club.slug %}"
+               class="club-bottom-sheet__link">
+                <span class="club-bottom-sheet__link-icon">★</span>
+                <span>Тарифы игроков</span>
+            </a>
+            <a href="{% url 'clubs:invites_list' slug=club.slug %}"
+               class="club-bottom-sheet__link">
+                <span class="club-bottom-sheet__link-icon">✉</span>
+                <span>Приглашения</span>
+            </a>
+            <a href="{% url 'clubs:managers_list' slug=club.slug %}"
+               class="club-bottom-sheet__link">
+                <span class="club-bottom-sheet__link-icon">◎</span>
+                <span>Менеджеры</span>
+            </a>
+            <a href="{% url 'clubs:interclub_applications' slug=club.slug %}"
+               class="club-bottom-sheet__link">
+                <span class="club-bottom-sheet__link-icon">↔</span>
+                <span>Межклубные заявки</span>
+            </a>
+            <a href="{% url 'clubs:club_edit' slug=club.slug %}"
+               class="club-bottom-sheet__link">
+                <span class="club-bottom-sheet__link-icon">⚙</span>
+                <span>Настройки</span>
+            </a>
+            <a href="{% url 'clubs:subscription' slug=club.slug %}"
+               class="club-bottom-sheet__link">
+                <span class="club-bottom-sheet__link-icon">∞</span>
+                <span>Подписка</span>
+            </a>
+            <a href="{% url 'clubs:club_notification_config' slug=club.slug %}"
+               class="club-bottom-sheet__link">
+                <span class="club-bottom-sheet__link-icon">🔔</span>
+                <span>Уведомления</span>
+            </a>
+        </nav>
+    </div>
+</div>

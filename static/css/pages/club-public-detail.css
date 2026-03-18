@@ -1,0 +1,583 @@
+/*
+ * club-public-detail.css
+ *
+ * Описание: Стили публичной страницы клуба.
+ * Компоненты: hero-блок, метрики, карточки турниров, правый сайдбар.
+ * Используется на: templates/clubs/club_public_detail.html
+ */
+
+.container--club-public {
+    max-width: 1120px;
+}
+
+.club-public__hero {
+    position: relative;
+    padding: 44px 0 34px;
+    background:
+        radial-gradient(circle at 15% 20%, rgba(22, 163, 74, 0.24), transparent 42%),
+        radial-gradient(circle at 85% 10%, rgba(201, 168, 76, 0.2), transparent 34%),
+        linear-gradient(135deg, #042617 0%, #06311f 54%, #022219 100%);
+    border-bottom: 1px solid rgba(34, 197, 94, 0.22);
+    overflow: hidden;
+}
+
+.club-public__hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(2, 18, 12, 0.2), rgba(2, 18, 12, 0.55));
+    pointer-events: none;
+}
+
+.club-public__hero--image::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--club-hero-bg-image);
+    background-size: cover;
+    background-position: center;
+    opacity: 0.22;
+}
+
+.club-public__hero-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1.9fr) minmax(320px, 1fr);
+    gap: 24px;
+    align-items: stretch;
+}
+
+.club-public__panel {
+    background: linear-gradient(155deg, rgba(2, 38, 30, 0.9), rgba(5, 42, 27, 0.82));
+    border: 1px solid rgba(201, 168, 76, 0.3);
+    border-radius: 20px;
+    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
+}
+
+.club-public__identity {
+    padding: 22px 24px;
+}
+
+.club-public__brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.club-public__logo-wrap,
+.club-public__logo-fallback {
+    width: 68px;
+    height: 68px;
+    border-radius: 18px;
+    flex-shrink: 0;
+}
+
+.club-public__logo-wrap {
+    overflow: hidden;
+    background: rgba(248, 250, 252, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.club-public__logo-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.club-public__logo-fallback {
+    background: linear-gradient(145deg, #064e3b, #022c22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #facc15;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.club-public__title {
+    margin: 0;
+    font-size: clamp(1.55rem, 2.5vw, 2.25rem);
+    line-height: 1.1;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #facc15;
+}
+
+.club-public__location {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+    font-size: 0.92rem;
+    color: rgba(226, 232, 240, 0.86);
+}
+
+.club-public__location-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #22c55e;
+}
+
+.club-public__description {
+    margin: 0 0 18px;
+    max-width: 56ch;
+    font-size: 0.98rem;
+    line-height: 1.62;
+    color: rgba(226, 232, 240, 0.88);
+}
+
+.club-public__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.club-public__actions .btn {
+    border-radius: 999px;
+    min-height: 42px;
+    padding-inline: 20px;
+    justify-content: center;
+}
+
+.club-public__actions .btn-primary {
+    min-width: 220px;
+    border: none;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32);
+}
+
+.club-public__actions .btn-primary.club-public__btn--manage {
+    background: #c9a84c;
+    color: #102117;
+}
+
+.club-public__actions .btn-primary.club-public__btn--join {
+    background: #16a34a;
+}
+
+.club-public__stats {
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.club-public__stats-title {
+    margin: 0;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: rgba(209, 213, 219, 0.88);
+}
+
+.club-public__stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.club-public__metric {
+    padding-left: 10px;
+    border-left: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.club-public__metric:first-child {
+    border-left: none;
+    padding-left: 0;
+}
+
+.club-public__metric-value {
+    font-size: 1.22rem;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.club-public__metric-value--accent {
+    color: #facc15;
+}
+
+.club-public__metric-label {
+    margin-top: 2px;
+    font-size: 0.75rem;
+    color: rgba(148, 163, 184, 0.94);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.club-public__contacts {
+    border-top: 1px dashed rgba(34, 197, 94, 0.45);
+    padding-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.club-public__contact {
+    display: flex;
+    gap: 8px;
+}
+
+.club-public__contact-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    flex-shrink: 0;
+}
+
+.club-public__contact-icon--mail {
+    background: rgba(201, 168, 76, 0.22);
+    color: #facc15;
+}
+
+.club-public__contact-icon--phone {
+    background: rgba(21, 128, 61, 0.3);
+    color: #bbf7d0;
+}
+
+.club-public__contact-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(209, 213, 219, 0.9);
+}
+
+.club-public__contact a {
+    color: #f8fafc;
+    text-decoration: none;
+    font-size: 0.89rem;
+}
+
+.club-public__content {
+    padding: 30px 0 44px;
+}
+
+.club-public__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+    gap: 22px;
+    align-items: stretch;
+}
+
+.club-public__layout > div:first-child,
+.club-public__layout > aside {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.club-public__matches-widget {
+    flex: 1 1 auto;
+}
+
+.club-public__matches-widget .card-body {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.club-public__card {
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: linear-gradient(160deg, rgba(4, 60, 35, 0.58), rgba(3, 44, 30, 0.45));
+    box-shadow: 0 12px 30px rgba(2, 20, 14, 0.32);
+}
+
+.club-public__card .card-body {
+    padding: 18px 18px 20px;
+}
+
+.club-public__section-title {
+    margin: 0;
+    font-size: 0.98rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(203, 213, 225, 0.9);
+}
+
+.club-public__about-text {
+    margin: 10px 0 0;
+    font-size: 0.96rem;
+    line-height: 1.7;
+    color: rgba(226, 232, 240, 0.92);
+}
+
+.club-public__section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.club-public__section-count {
+    font-size: 0.82rem;
+    color: rgba(203, 213, 225, 0.75);
+}
+
+.club-public__tournament-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.club-public__tournament-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(201, 168, 76, 0.25);
+    background: linear-gradient(145deg, rgba(250, 250, 246, 0.97), rgba(242, 236, 224, 0.96));
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.club-public__tournament-title {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.32;
+}
+
+.club-public__tournament-title a {
+    color: #111827;
+    text-decoration: none;
+}
+
+.club-public__tournament-date {
+    margin: 2px 0 0;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.club-public__tournament-meta {
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 12px;
+}
+
+.club-public__tournament-meta dt {
+    margin: 0;
+    font-size: 0.69rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.club-public__tournament-meta dd {
+    margin: 0;
+    font-size: 0.82rem;
+    color: #374151;
+}
+
+.club-public__tournament-footer {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.club-public__tournament-fee {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.club-public__empty {
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px dashed rgba(201, 168, 76, 0.35);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(226, 232, 240, 0.88);
+}
+
+.club-public__empty p {
+    margin: 0;
+}
+
+.club-public__empty p + p {
+    margin-top: 5px;
+    color: rgba(203, 213, 225, 0.75);
+    font-size: 0.87rem;
+}
+
+.club-public__hint-title {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    color: #e5e7eb;
+}
+
+.club-public__hint-text {
+    margin: 0;
+    color: rgba(203, 213, 225, 0.84);
+    line-height: 1.55;
+    font-size: 0.87rem;
+}
+
+.club-public__hint-text + .club-public__hint-text {
+    margin-top: 6px;
+}
+
+.club-public__matches-list {
+    display: grid;
+    gap: 10px;
+}
+
+.club-public__match-item {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(201, 168, 76, 0.2);
+    background: rgba(255, 255, 255, 0.03);
+    text-decoration: none;
+    transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.club-public__match-item:hover {
+    transform: translateY(-1px);
+    border-color: rgba(201, 168, 76, 0.38);
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.club-public__match-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.club-public__match-tournament {
+    color: #f8fafc;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.club-public__match-date {
+    flex-shrink: 0;
+    color: rgba(203, 213, 225, 0.72);
+    font-size: 0.76rem;
+}
+
+.club-public__match-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+}
+
+.club-public__match-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.club-public__match-player--right {
+    justify-content: flex-end;
+}
+
+.club-public__match-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.club-public__match-name {
+    color: rgba(248, 250, 252, 0.92);
+    font-size: 0.84rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.club-public__match-score {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(201, 168, 76, 0.14);
+    color: #facc15;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+@media (max-width: 1024px) {
+    .club-public__hero-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .club-public__layout {
+        grid-template-columns: 1fr;
+    }
+
+    .club-public__layout > div:first-child,
+    .club-public__layout > aside {
+        gap: 0;
+    }
+
+    .club-public__tournament-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .club-public__hero {
+        padding: 28px 0 22px;
+    }
+
+    .club-public__identity,
+    .club-public__stats {
+        padding: 16px;
+    }
+
+    .club-public__brand {
+        align-items: flex-start;
+    }
+
+    .club-public__logo-wrap,
+    .club-public__logo-fallback {
+        width: 54px;
+        height: 54px;
+        border-radius: 14px;
+    }
+
+    .club-public__contacts {
+        grid-template-columns: 1fr;
+    }
+
+    .club-public__actions .btn,
+    .club-public__actions .btn-primary {
+        width: 100%;
+    }
+
+    .club-public__content {
+        padding-top: 20px;
+    }
+
+    .club-public__tournament-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .club-public__match-body {
+        grid-template-columns: 1fr;
+    }
+
+    .club-public__match-player--right {
+        justify-content: flex-start;
+    }
+
+    .club-public__match-score {
+        justify-self: flex-start;
+    }
+}

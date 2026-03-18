@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Оплаты взносов — {{ club.name }}{% endblock %}
 {% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="fees" %}
 <div class="page-header">
     <h1 class="page-title">Оплаты взносов</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
 <div class="container" style="max-width: 900px;">
-    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a> · <a href="{% url 'clubs:fees_settings' slug=club.slug %}">Настройки</a></p>
+    <p><a href="{% url 'clubs:fees_settings' slug=club.slug %}">Настройки</a></p>
     {% if mark_form %}
     <div class="card" style="margin-bottom: var(--spacing-lg);">
         <div class="card-body">

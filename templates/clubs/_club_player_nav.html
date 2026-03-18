@@ -1,0 +1,17 @@
+<nav class="club-player-nav">
+    <a href="{% url 'clubs:my_tournaments' %}" class="btn btn-sm {% if current == 'tournaments' %}btn-primary{% else %}btn-ghost{% endif %}">
+        Турниры
+    </a>
+    <a href="{% url 'clubs:my_plan' %}" class="btn btn-sm {% if current == 'plan' %}btn-primary{% else %}btn-ghost{% endif %}">
+        Подписка и лимиты
+    </a>
+    <a href="{% url 'clubs:club_rating' %}" class="btn btn-sm {% if current == 'rating' %}btn-primary{% else %}btn-ghost{% endif %}">
+        Рейтинг
+    </a>
+    <a href="{% url 'clubs:my_fees' %}" class="btn btn-sm {% if current == 'fees' %}btn-primary{% else %}btn-ghost{% endif %}">
+        Взносы
+    </a>
+    <a href="{% url 'clubs:my_notification_settings' %}" class="btn btn-sm {% if current == 'notifications' %}btn-primary{% else %}btn-ghost{% endif %}">
+        Уведомления
+    </a>
+</nav>

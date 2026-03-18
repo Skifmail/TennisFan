@@ -7,7 +7,11 @@
 {% block content %}
 <div class="container" style="padding-top: var(--spacing-2xl);">
     <div class="mb-4">
+        {% if tournament.club %}
+        <a href="{% url 'clubs:club_tournaments_list' slug=tournament.club.slug %}" class="text-secondary">&larr; Турниры клуба</a>
+        {% else %}
         <a href="{% url 'tournament_list' %}" class="text-secondary">&larr; Все турниры</a>
+        {% endif %}
     </div>
 
     <div class="d-flex gap-2 mb-2 flex-wrap">

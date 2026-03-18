@@ -256,10 +256,18 @@ def tournament_list(request):
     category = request.GET.get("category", "")
     status = request.GET.get("status", "")
 
+    # На общей странице показываем только турниры платформы (без клуба)
+    # и межклубные турниры (is_open_interclub=True). Внутриклубные турниры
+    # остаются внутри панели клуба.
     tournaments = (
-        Tournament.objects.all()
+        Tournament.objects.filter(
+            models.Q(club__isnull=True) | models.Q(is_open_interclub=True)
+        )
         .select_related("court")
-        .prefetch_related("participants__user", "allowed_categories")
+        .prefetch_related(
+            "participants__user",
+            "allowed_categories",
+        )
     )
 
     if city:
@@ -333,7 +341,12 @@ def _get_interclub_context(request, tournament):
 
 
 def tournament_detail(request, slug):
-    """Tournament detail page. Доступна всем пользователям, в том числе незарегистрированным."""
+    """Tournament detail page.
+
+    Для турниров клуба, которые не помечены как межклубные (is_open_interclub=False),
+    доступ ограничен участниками соответствующего клуба.
+    Общие турниры платформы и межклубные турниры доступны всем.
+    """
     # Проверяем и формируем сетки для турниров с истёкшим дедлайном регистрации
     from apps.tournaments.fan import check_and_generate_past_deadline_brackets
 
@@ -360,6 +373,29 @@ def tournament_detail(request, slug):
         ),
         slug=slug,
     )
+
+    # Ограничиваем доступ к внутриклубным турнирам:
+    # - если у турнира есть клуб и он не межклубный (is_open_interclub=False),
+    #   страницу могут смотреть только участники этого клуба.
+    club_for_panel = None
+    if tournament.club_id and not tournament.is_open_interclub:
+        club = tournament.club
+        if not request.user.is_authenticated:
+            login_url = reverse("login")
+            next_url = request.build_absolute_uri(request.get_full_path())
+            return redirect(f"{login_url}?next={next_url}")
+        is_member = ClubMember.objects.filter(
+            club=club,
+            user=request.user,
+            status=ClubMemberStatus.ACTIVE,
+        ).exists()
+        if not is_member:
+            messages.error(
+                request,
+                "Этот турнир доступен только участникам клуба.",
+            )
+            return redirect("clubs:club_public_detail", slug=club.slug)
+        club_for_panel = club
     is_fan = _is_fan(tournament)
     is_olympic = _is_olympic(tournament)
     is_round_robin = _is_round_robin(tournament)
@@ -782,6 +818,9 @@ def tournament_detail(request, slug):
             tvd_rr_4_6_matrix_participants if is_tvd else None
         ),
     }
+    if club_for_panel is not None:
+        context["is_club_panel"] = True
+        context["club"] = club_for_panel
     if is_tvd:
         return render(request, "tournaments/tvd_detail.html", context)
     return render(request, "tournaments/detail.html", context)

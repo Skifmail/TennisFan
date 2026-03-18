@@ -5,15 +5,17 @@ Views клубного раздела: регистрация клуба, пуб
 import csv
 import logging
 import secrets
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 from io import StringIO
-from typing import cast
+from typing import Any, cast
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.files.uploadedfile import UploadedFile
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -26,7 +28,12 @@ from apps.payments.yookassa_client import (
     create_payment_with_credentials,
     get_payment_status_with_credentials,
 )
-from apps.tournaments.models import Tournament
+from apps.tournaments.models import (
+    Match,
+    Tournament,
+    TournamentDuration,
+    TournamentStatus,
+)
 
 from .forms import (
     ClubInviteLinkForm,
@@ -78,11 +85,16 @@ from .plan_services import (
     get_member_plan_limits,
 )
 from .services import (
+    club_can_add_member,
     club_can_create_tournament_this_month,
+    club_has_public_page_access,
+    club_is_operational,
     create_club_with_trial,
     get_club_current_subscription,
     get_current_period_label,
     get_fee_status_for_member,
+    get_platform_plan,
+    get_platform_plans,
     user_can_edit_club_settings,
     user_can_manage_club,
     user_can_manage_fees,
@@ -91,12 +103,54 @@ from .services import (
 
 logger = logging.getLogger(__name__)
 
-# Цены тарифов для отображения (руб/мес и руб/год), можно вынести в настройки
-PLAN_PRICES = {
-    ClubPlan.START: {"monthly": 990, "yearly": 9900},
-    ClubPlan.BASIC: {"monthly": 1990, "yearly": 19900},
-    ClubPlan.PRO: {"monthly": 4990, "yearly": 49900},
-}
+
+def _get_plan_prices_for_template() -> dict:
+    """Словарь цен по тарифам для register_step2: {START: {monthly, yearly, description}, ...}."""
+    defaults = {
+        "START": {
+            "monthly": 990,
+            "yearly": 9900,
+            "description": "Пробный период 14 дней бесплатно",
+        },
+        "BASIC": {
+            "monthly": 1990,
+            "yearly": 19900,
+            "description": "Публичная страница, больше игроков",
+        },
+        "PRO": {
+            "monthly": 4990,
+            "yearly": 49900,
+            "description": "Всё + межклубные турниры",
+        },
+    }
+    result = dict(defaults)
+    for p in get_platform_plans():
+        key = p.slug.upper()
+        result[key] = {
+            "monthly": float(p.price_monthly),
+            "yearly": float(p.price_yearly),
+            "description": p.description
+            or defaults.get(key, {}).get("description", ""),
+        }
+    return result
+
+
+def _get_plan_prices_for_subscription() -> dict:
+    """Словарь цен для subscription_pay: {ClubPlan.START: {monthly, yearly}, ...}."""
+    result = {}
+    for plan_slug in ("start", "basic", "pro"):
+        pp = get_platform_plan(plan_slug)
+        if pp:
+            result[plan_slug] = {
+                "monthly": pp.price_monthly,
+                "yearly": pp.price_yearly,
+            }
+        else:
+            result[plan_slug] = {
+                "monthly": Decimal("0"),
+                "yearly": Decimal("0"),
+            }
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -154,17 +208,47 @@ def register_step2(request: HttpRequest) -> HttpResponse:
             return redirect("clubs:register_step3")
         messages.error(request, "Выберите тариф.")
 
+    prices_for_template = _get_plan_prices_for_template()
+    platform_plans: Any = list(get_platform_plans())
+    if not platform_plans:
+        # Fallback: миграция не применена или таблица пуста
+        from types import SimpleNamespace
+
+        defaults = [
+            ("start", "Старт", 990, 9900, 14, False, False, 1, 20),
+            ("basic", "Базовый", 1990, 19900, 0, True, False, 5, 100),
+            ("pro", "Про", 4990, 49900, 0, True, True, None, None),
+        ]
+        platform_plans = [
+            SimpleNamespace(
+                slug=s,
+                name=n,
+                price_monthly=Decimal(str(pm)),
+                price_yearly=Decimal(str(py)),
+                trial_days=td,
+                is_public_page=ipp,
+                is_open_interclub=ioc,
+                max_tournaments_per_month=mt,
+                max_members=mm,
+            )
+            for s, n, pm, py, td, ipp, ioc, mt, mm in defaults
+        ]
     return render(
         request,
         "clubs/register_step2.html",
-        {"step": 2, "plans": ClubPlan, "prices": PLAN_PRICES},
+        {
+            "step": 2,
+            "plans": ClubPlan,
+            "prices": prices_for_template,
+            "platform_plans": platform_plans,
+        },
     )
 
 
 @login_required
 @require_http_methods(["GET", "POST"])
 def register_step3(request: HttpRequest) -> HttpResponse:
-    """Шаг 3 — активация trial (без оплаты)."""
+    """Шаг 3 — активация клуба с trial-периодом."""
     step1 = request.session.get("club_registration_step1")
     plan = request.session.get("club_registration_plan", ClubPlan.START)
     period = request.session.get("club_registration_period", "yearly")
@@ -173,13 +257,10 @@ def register_step3(request: HttpRequest) -> HttpResponse:
         return redirect("clubs:register_step1")
 
     if request.method == "POST":
-        if plan != ClubPlan.START:
-            messages.info(
-                request,
-                "Оплата будет доступна в следующей версии. Пока только trial для тарифа Старт.",
-            )
-            return redirect("clubs:register_step2")
-        data = {**step1, "plan": plan, "period": period}
+        # На этапе регистрации всегда создаём клуб с бесплатным trial по тарифу Старт.
+        # После создания ведём в панель клуба; оплату выбранного тарифа админ может
+        # оформить позже в разделе «Подписка».
+        data = {**step1, "plan": ClubPlan.START, "period": period}
         try:
             club = create_club_with_trial(data, request.user)
         except ValueError as e:
@@ -192,7 +273,12 @@ def register_step3(request: HttpRequest) -> HttpResponse:
         ):
             request.session.pop(key, None)
         messages.success(
-            request, f"Клуб «{club.name}» создан. Добро пожаловать в панель управления!"
+            request,
+            f"Клуб «{club.name}» создан. Активирован бесплатный пробный период по тарифу Старт.",
+        )
+        messages.info(
+            request,
+            "Оплатить выбранный тариф можно в разделе «Подписка» в панели клуба.",
         )
         return redirect("clubs:dashboard", slug=club.slug)
 
@@ -216,29 +302,96 @@ def register_step3(request: HttpRequest) -> HttpResponse:
 
 @require_GET
 def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
-    """Публичная страница клуба. На тарифе Старт — 404."""
+    """Публичная страница клуба. 404 если страница скрыта или клуб приостановлен."""
     club = get_object_or_404(Club, slug=slug)
-    if not club.is_public:
-        return render(request, "clubs/club_404.html", {"club": club}, status=404)
-    sub = get_club_current_subscription(club)
-    if sub and sub.plan == ClubPlan.START:
+    can_manage = user_can_manage_club(request.user, club)
+
+    if not club_has_public_page_access(club):
+        # Для админа/менеджера не показываем 404, а ведём в нужный раздел.
+        if can_manage:
+            if not club_is_operational(club):
+                return redirect("clubs:subscription", slug=slug)
+            if not club.is_public:
+                return redirect("clubs:club_edit", slug=slug)
+
+        reason: str
+        if not club_is_operational(club):
+            reason = "suspended"
+        elif not club.is_public:
+            reason = "hidden"
+        else:
+            reason = ""
         return render(
             request,
             "clubs/club_404.html",
-            {"club": club, "reason": "start_plan"},
+            {"club": club, "reason": reason},
             status=404,
         )
 
-    upcoming = Tournament.objects.filter(club=club, status="upcoming").order_by(
-        "start_date"
-    )[:10]
+    upcoming = Tournament.objects.filter(
+        club=club, status=TournamentStatus.UPCOMING
+    ).order_by("start_date")[:10]
+    recent_matches_qs = (
+        Match.objects.filter(
+            tournament__club=club,
+            status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER],
+            completed_datetime__gte=timezone.now() - timedelta(days=60),
+        )
+        .select_related(
+            "tournament",
+            "player1__user",
+            "player2__user",
+            "team1__player1__user",
+            "team2__player1__user",
+        )
+        .order_by("-completed_datetime", "-pk")[:5]
+    )
+
+    recent_club_matches: list[dict[str, Any]] = []
+    for match in recent_matches_qs:
+        side1_player = match.get_side1_player()
+        side2_player = match.get_side2_player()
+        if not side1_player or not side2_player:
+            continue
+        if getattr(side1_player, "is_bye", False) or getattr(
+            side2_player, "is_bye", False
+        ):
+            continue
+        recent_club_matches.append(
+            {
+                "id": match.pk,
+                "match_url": reverse("match_detail", kwargs={"pk": match.pk}),
+                "tournament_name": match.tournament.name,
+                "date": (match.completed_datetime or match.scheduled_datetime),
+                "player1": match.get_player1_display(),
+                "player2": match.get_player2_display(),
+                "score": match.score_display,
+                "p1_avatar": side1_player.avatar.url if side1_player.avatar else None,
+                "p2_avatar": side2_player.avatar.url if side2_player.avatar else None,
+            }
+        )
+
+    members_count = club.members.filter(status=ClubMemberStatus.ACTIVE).count()
+    active_tournaments_count = club.tournaments.filter(
+        status__in=[
+            TournamentStatus.UPCOMING,
+            TournamentStatus.ACTIVE,
+            TournamentStatus.GROUP_STAGE,
+            TournamentStatus.PLAYOFFS,
+        ]
+    ).count()
+    foundation_year = club.created_at.year if club.created_at else None
+
     is_member = False
     is_pending_invite = False
+    member_role: str | None = None
     if request.user.is_authenticated:
         membership = club.members.filter(user=request.user).first()
         if membership:
             is_member = membership.status == ClubMemberStatus.ACTIVE
             is_pending_invite = membership.status == ClubMemberStatus.INVITED
+            if is_member:
+                member_role = membership.role
 
     join_url = reverse("clubs:join", kwargs={"slug": club.slug})
     if not request.user.is_authenticated:
@@ -247,15 +400,44 @@ def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
             f"{login_url}?next={request.build_absolute_uri(request.get_full_path())}"
         )
 
+    cta_label = "Вступить в клуб"
+    cta_url = join_url
+    cta_variant = "join"
+
+    if request.user.is_authenticated and is_member and member_role:
+        if member_role in (ClubMemberRole.ADMIN, ClubMemberRole.MANAGER):
+            cta_label = "Панель управления →"
+            cta_url = reverse("clubs:dashboard", kwargs={"slug": club.slug})
+            cta_variant = "manage"
+        else:
+            # Для игрока ведём в личный кабинет текущего клуба.
+            next_url = reverse("clubs:my_dashboard")
+            set_current_url = reverse(
+                "clubs:set_current_club", kwargs={"slug": club.slug}
+            )
+            cta_label = "Личный кабинет клуба →"
+            cta_url = f"{set_current_url}?next={next_url}"
+            cta_variant = "player"
+
     return render(
         request,
         "clubs/club_public_detail.html",
         {
             "club": club,
             "upcoming_tournaments": upcoming,
+            "recent_club_matches": recent_club_matches,
             "is_member": is_member,
             "is_pending_invite": is_pending_invite,
             "join_url": join_url,
+            "members_count": members_count,
+            "active_tournaments_count": active_tournaments_count,
+            "foundation_year": foundation_year,
+            "cta_label": cta_label,
+            "cta_url": cta_url,
+            "cta_variant": cta_variant,
+            "is_club_panel": is_member,
+            "can_manage_club": can_manage,
+            "hide_club_header": True,
         },
     )
 
@@ -268,9 +450,22 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
     if not user_can_manage_club(request.user, club):
         messages.error(request, "У вас нет доступа к управлению этим клубом.")
         return redirect("clubs:club_public_detail", slug=slug)
+    if not club_is_operational(club):
+        messages.error(
+            request,
+            "Клуб приостановлен. Продлите подписку для возобновления доступа.",
+        )
+        return redirect("clubs:club_public_detail", slug=slug)
+    subscription = get_club_current_subscription(club)
+    # Лимиты по тарифу платформы (участники и турниры)
+    plan_slug: str = subscription.plan if subscription else "start"
+    platform_plan = get_platform_plan(plan_slug)
+    members_limit = platform_plan.max_members if platform_plan else None
+    tournaments_limit = (
+        platform_plan.max_tournaments_per_month if platform_plan else None
+    )
     members_count = club.members.filter(status=ClubMemberStatus.ACTIVE).count()
     tournaments_count = club.tournaments.count()
-    subscription = get_club_current_subscription(club)
     fee_active = ClubMembershipFee.objects.filter(club=club, is_active=True).exists()
     plans_count = ClubPlayerPlan.objects.filter(club=club, is_active=True).count()
     recent_tournaments = club.tournaments.order_by("-start_date")[:5]
@@ -283,9 +478,12 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
         request,
         "clubs/dashboard.html",
         {
+            "is_club_panel": True,
             "club": club,
             "members_count": members_count,
             "tournaments_count": tournaments_count,
+            "members_limit": members_limit,
+            "tournaments_limit": tournaments_limit,
             "subscription": subscription,
             "fee_active": fee_active,
             "plans_count": plans_count,
@@ -319,6 +517,7 @@ def plans_manage(request: HttpRequest, slug: str) -> HttpResponse:
         request,
         "clubs/plans_manage.html",
         {
+            "is_club_panel": True,
             "club": club,
             "plans": plans,
             "assign_form": assign_form,
@@ -359,7 +558,7 @@ def plan_create(request: HttpRequest, slug: str) -> HttpResponse:
     return render(
         request,
         "clubs/plan_form.html",
-        {"club": club, "form": form, "is_edit": False},
+        {"club": club, "form": form, "is_edit": False, "is_club_panel": True},
     )
 
 
@@ -393,7 +592,13 @@ def plan_edit(request: HttpRequest, slug: str, plan_id: int) -> HttpResponse:
     return render(
         request,
         "clubs/plan_form.html",
-        {"club": club, "form": form, "is_edit": True, "plan": plan},
+        {
+            "club": club,
+            "form": form,
+            "is_edit": True,
+            "plan": plan,
+            "is_club_panel": True,
+        },
     )
 
 
@@ -448,6 +653,12 @@ def invite_create(request: HttpRequest, slug: str) -> HttpResponse:
     if not user_can_manage_club(request.user, club):
         messages.error(request, "Нет доступа.")
         return redirect("clubs:club_public_detail", slug=slug)
+    if not club_is_operational(club):
+        messages.error(
+            request,
+            "Клуб приостановлен. Продлите подписку для возобновления доступа.",
+        )
+        return redirect("clubs:club_public_detail", slug=slug)
 
     if request.method == "POST":
         form = ClubInviteLinkForm(request.POST)
@@ -479,13 +690,27 @@ def invite_create(request: HttpRequest, slug: str) -> HttpResponse:
     else:
         form = ClubInviteLinkForm()
 
-    return render(request, "clubs/invite_create.html", {"club": club, "form": form})
+    return render(
+        request,
+        "clubs/invite_create.html",
+        {"club": club, "form": form, "is_club_panel": True},
+    )
 
 
 @require_http_methods(["GET", "POST"])
 def club_join(request: HttpRequest, slug: str) -> HttpResponse:
     """Вступление в клуб по инвайт-токену."""
     club = get_object_or_404(Club, slug=slug)
+    if not club_is_operational(club):
+        return render(
+            request,
+            "clubs/join_error.html",
+            {
+                "club": club,
+                "error": "club_suspended",
+                "message": "Клуб приостановлен. Вступление временно недоступно.",
+            },
+        )
     token_value = request.GET.get("token") or (
         request.POST.get("token") if request.method == "POST" else None
     )
@@ -557,6 +782,13 @@ def club_join(request: HttpRequest, slug: str) -> HttpResponse:
                 club=club, member=member, defaults={"points": 0}
             )
         else:
+            can_add, limit_msg = club_can_add_member(club)
+            if not can_add:
+                return render(
+                    request,
+                    "clubs/join_error.html",
+                    {"club": club, "error": "member_limit", "message": limit_msg},
+                )
             member = ClubMember.objects.create(
                 club=club,
                 user=request.user,
@@ -709,6 +941,12 @@ def invite_by_email(request: HttpRequest, slug: str) -> HttpResponse:
     if not user_can_manage_club(request.user, club):
         messages.error(request, "Нет доступа.")
         return redirect("clubs:club_public_detail", slug=slug)
+    if not club_is_operational(club):
+        messages.error(
+            request,
+            "Клуб приостановлен. Продлите подписку для возобновления доступа.",
+        )
+        return redirect("clubs:club_public_detail", slug=slug)
 
     if request.method == "POST":
         form = InviteByEmailForm(request.POST)
@@ -724,18 +962,35 @@ def invite_by_email(request: HttpRequest, slug: str) -> HttpResponse:
                     f"Пользователь с email {email} не найден. Отправьте ему ссылку на регистрацию.",
                 )
                 return redirect("clubs:invite_by_email", slug=slug)
-            if club.members.filter(user=user).exists():
-                messages.warning(
-                    request, "Этот пользователь уже в клубе или приглашён."
+            existing_member = club.members.filter(user=user).first()
+            if existing_member:
+                if existing_member.status in (
+                    ClubMemberStatus.ACTIVE,
+                    ClubMemberStatus.INVITED,
+                ):
+                    messages.warning(
+                        request, "Этот пользователь уже в клубе или приглашён."
+                    )
+                    return redirect("clubs:invite_by_email", slug=slug)
+                # Если участник был исключён, реактивируем его и отправляем новое приглашение.
+                existing_member.status = ClubMemberStatus.INVITED
+                existing_member.role = ClubMemberRole.PLAYER
+                existing_member.invited_by = request.user
+                existing_member.save(
+                    update_fields=["status", "role", "invited_by", "joined_at"]
                 )
-                return redirect("clubs:invite_by_email", slug=slug)
-            ClubMember.objects.create(
-                club=club,
-                user=user,
-                role=ClubMemberRole.PLAYER,
-                status=ClubMemberStatus.INVITED,
-                invited_by=request.user,
-            )
+            else:
+                can_add, limit_msg = club_can_add_member(club)
+                if not can_add:
+                    messages.error(request, limit_msg)
+                    return redirect("clubs:invite_by_email", slug=slug)
+                ClubMember.objects.create(
+                    club=club,
+                    user=user,
+                    role=ClubMemberRole.PLAYER,
+                    status=ClubMemberStatus.INVITED,
+                    invited_by=request.user,
+                )
 
             try:
                 accept_url = request.build_absolute_uri(
@@ -751,7 +1006,11 @@ def invite_by_email(request: HttpRequest, slug: str) -> HttpResponse:
     else:
         form = InviteByEmailForm()
 
-    return render(request, "clubs/invite_by_email.html", {"club": club, "form": form})
+    return render(
+        request,
+        "clubs/invite_by_email.html",
+        {"club": club, "form": form, "is_club_panel": True},
+    )
 
 
 @login_required
@@ -761,6 +1020,12 @@ def invite_import_csv(request: HttpRequest, slug: str) -> HttpResponse:
     club = get_object_or_404(Club, slug=slug)
     if not user_can_manage_club(request.user, club):
         messages.error(request, "Нет доступа.")
+        return redirect("clubs:club_public_detail", slug=slug)
+    if not club_is_operational(club):
+        messages.error(
+            request,
+            "Клуб приостановлен. Продлите подписку для возобновления доступа.",
+        )
         return redirect("clubs:club_public_detail", slug=slug)
 
     if request.method == "POST":
@@ -789,6 +1054,10 @@ def invite_import_csv(request: HttpRequest, slug: str) -> HttpResponse:
             if club.members.filter(user=user).exists():
                 already += 1
                 continue
+            can_add, limit_msg = club_can_add_member(club)
+            if not can_add:
+                messages.error(request, limit_msg)
+                return redirect("clubs:invite_import_csv", slug=slug)
             ClubMember.objects.create(
                 club=club,
                 user=user,
@@ -805,7 +1074,11 @@ def invite_import_csv(request: HttpRequest, slug: str) -> HttpResponse:
         messages.success(request, msg)
         return redirect("clubs:dashboard", slug=slug)
 
-    return render(request, "clubs/invite_import_csv.html", {"club": club})
+    return render(
+        request,
+        "clubs/invite_import_csv.html",
+        {"club": club, "is_club_panel": True},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -833,7 +1106,11 @@ def club_edit(request: HttpRequest, slug: str) -> HttpResponse:
     else:
         form = ClubProfileEditForm(instance=club)
 
-    return render(request, "clubs/club_edit.html", {"club": club, "form": form})
+    return render(
+        request,
+        "clubs/club_edit.html",
+        {"club": club, "form": form, "is_club_panel": True},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -889,14 +1166,369 @@ def set_current_club(request: HttpRequest, slug: str) -> HttpResponse:
         messages.error(request, "Клуб не найден или вы не являетесь участником.")
         return redirect("clubs:register_choice")
     request.session["current_club_slug"] = slug
-    next_url = request.GET.get("next") or reverse("clubs:my_tournaments")
+    next_url = request.GET.get("next") or reverse("clubs:my_dashboard")
     return redirect(next_url)
+
+
+def _build_club_profile_context(
+    request: HttpRequest,
+    *,
+    club: Club,
+    member: ClubMember,
+    player: Any,
+    is_profile_owner: bool,
+) -> dict[str, Any]:
+    """Собирает контекст клубного кабинета игрока."""
+    from apps.tournaments.models import Match
+    from apps.users.rating_utils import rating_to_ntrp_level
+
+    fee = (
+        ClubMembershipFee.objects.filter(club=club, is_active=True)
+        .order_by("-id")
+        .first()
+    )
+    fee_status = get_fee_status_for_member(club, member) if fee else None
+    member_plan = get_member_active_plan(member)
+    plan_limits = get_member_plan_limits(member)
+
+    all_matches_qs = (
+        Match.objects.filter(
+            tournament__club=club,
+        )
+        .filter(
+            Q(player1=player)
+            | Q(player2=player)
+            | Q(team1__player1=player)
+            | Q(team1__player2=player)
+            | Q(team2__player1=player)
+            | Q(team2__player2=player)
+        )
+        .select_related(
+            "tournament",
+            "player1",
+            "player2",
+            "winner",
+            "team1",
+            "team2",
+            "winner_team",
+        )
+        .annotate(
+            effective_date=Coalesce(
+                "scheduled_datetime", "deadline", "completed_datetime"
+            ),
+        )
+        .order_by("-effective_date")
+        .distinct()
+    )
+
+    filter_year = request.GET.get("year")
+    filter_month = request.GET.get("month")
+    filter_status = request.GET.get("status")
+
+    from django.db.models import Max, Min
+
+    date_range = all_matches_qs.aggregate(
+        min_date=Min("effective_date"),
+        max_date=Max("effective_date"),
+    )
+    min_date = date_range["min_date"]
+    max_date = date_range["max_date"]
+
+    available_years: list[int] = []
+    if min_date and max_date:
+        available_years = list(range(max_date.year, min_date.year - 1, -1))
+
+    active_year: int | None = None
+    active_month: int | None = None
+    active_status: str | None = None
+
+    if filter_year:
+        try:
+            active_year = int(filter_year)
+        except (ValueError, TypeError):
+            active_year = None
+
+    if filter_month:
+        try:
+            active_month = int(filter_month)
+            if not (1 <= active_month <= 12):
+                active_month = None
+        except (ValueError, TypeError):
+            active_month = None
+
+    if filter_status:
+        valid_statuses = [s[0] for s in Match.MatchStatus.choices]
+        if filter_status in valid_statuses:
+            active_status = filter_status
+
+    if active_year:
+        all_matches_qs = all_matches_qs.filter(effective_date__year=active_year)
+    if active_month and active_year:
+        all_matches_qs = all_matches_qs.filter(effective_date__month=active_month)
+    if active_status:
+        all_matches_qs = all_matches_qs.filter(status=active_status)
+
+    recent_matches = list(all_matches_qs)
+
+    months_ru = [
+        (1, "Январь"),
+        (2, "Февраль"),
+        (3, "Март"),
+        (4, "Апрель"),
+        (5, "Май"),
+        (6, "Июнь"),
+        (7, "Июль"),
+        (8, "Август"),
+        (9, "Сентябрь"),
+        (10, "Октябрь"),
+        (11, "Ноябрь"),
+        (12, "Декабрь"),
+    ]
+
+    def _build_club_profile_progress_data() -> list[dict[str, Any]]:
+        completed_qs = (
+            Match.objects.filter(
+                tournament__club=club,
+            )
+            .filter(
+                Q(player1=player)
+                | Q(player2=player)
+                | Q(team1__player1=player)
+                | Q(team1__player2=player)
+                | Q(team2__player1=player)
+                | Q(team2__player2=player)
+            )
+            .filter(
+                status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
+            )
+            .select_related("winner", "winner_team", "team1", "team2")
+            .order_by("completed_datetime", "scheduled_datetime", "pk")
+            .distinct()
+        )
+
+        start = player.created_at.date() if player.created_at else timezone.now().date()
+        result: list[dict[str, Any]] = [
+            {
+                "date": start.isoformat(),
+                "points": 0.0,
+                "matches": 0,
+                "win_rate": 0.0,
+                "won": None,
+                "fan_delta": 0.0,
+                "ntrp_before": 0.0,
+                "ntrp_after": 0.0,
+            }
+        ]
+
+        rating_points = 0.0
+        cum_matches = 0
+        cum_wins = 0
+
+        for match in completed_qs:
+            event_date = (
+                (match.completed_datetime and match.completed_datetime.date())
+                or (match.scheduled_datetime and match.scheduled_datetime.date())
+                or timezone.now().date()
+            )
+            if match.team1_id and match.team2_id:
+                on_team1 = match.team1 and (
+                    match.team1.player1_id == player.pk
+                    or match.team1.player2_id == player.pk
+                )
+                fan_delta = float(
+                    match.rating_delta_player1
+                    if on_team1
+                    else match.rating_delta_player2
+                )
+            else:
+                fan_delta = float(
+                    match.rating_delta_player1
+                    if match.player1_id == player.pk
+                    else match.rating_delta_player2
+                )
+
+            won = bool(
+                (match.winner_id == player.pk)
+                or (
+                    match.winner_team_id
+                    and match.team1_id
+                    and match.winner_team_id == match.team1_id
+                    and (
+                        match.team1.player1_id == player.pk
+                        or match.team1.player2_id == player.pk
+                    )
+                )
+                or (
+                    match.winner_team_id
+                    and match.team2_id
+                    and match.winner_team_id == match.team2_id
+                    and (
+                        match.team2.player1_id == player.pk
+                        or match.team2.player2_id == player.pk
+                    )
+                )
+            )
+
+            rating_before = rating_points
+            rating_points += fan_delta
+            ntrp_before_val = rating_to_ntrp_level(rating_before)
+            ntrp_after_val = rating_to_ntrp_level(rating_points)
+            ntrp_before = float(ntrp_before_val) if ntrp_before_val else 0.0
+            ntrp_after = float(ntrp_after_val) if ntrp_after_val else 0.0
+
+            cum_matches += 1
+            if won:
+                cum_wins += 1
+            win_rate = round(cum_wins / cum_matches * 100, 1) if cum_matches else 0.0
+
+            on_team1 = (
+                match.team1_id
+                and (
+                    match.team1.player1_id == player.pk
+                    or match.team1.player2_id == player.pk
+                )
+            ) or (match.player1_id == player.pk)
+            opponent = (
+                match.get_player2_display() if on_team1 else match.get_player1_display()
+            )
+
+            result.append(
+                {
+                    "date": event_date.isoformat(),
+                    "points": round(rating_points, 1),
+                    "matches": cum_matches,
+                    "win_rate": win_rate,
+                    "won": won,
+                    "fan_delta": fan_delta,
+                    "ntrp_before": ntrp_before,
+                    "ntrp_after": ntrp_after,
+                    "match_id": match.pk,
+                    "match_opponent": opponent,
+                    "match_score": match.score_display,
+                }
+            )
+
+        return result
+
+    def _build_club_season_points_data(
+        progress_data: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        points_series: list[dict[str, Any]] = []
+        for item in progress_data:
+            if item.get("matches", 0) <= 0:
+                continue
+            points_series.append(
+                {
+                    "date": item["date"],
+                    "season_points": int(round(float(item.get("points", 0.0)))),
+                }
+            )
+        if not points_series:
+            today = timezone.now().date().isoformat()
+            return [{"date": today, "season_points": 0}]
+        return points_series
+
+    progress_data = _build_club_profile_progress_data()
+    season_points_data = _build_club_season_points_data(progress_data)
+    season_points_current = (
+        season_points_data[-1]["season_points"] if season_points_data else 0
+    )
+
+    from types import SimpleNamespace
+
+    season_points = SimpleNamespace(current_season_points=season_points_current)
+    current_season_display = f"Клуб {club.name}"
+
+    matches_played = sum(1 for row in progress_data if row.get("matches", 0) > 0)
+    wins = sum(
+        1
+        for row in progress_data
+        if row.get("matches", 0) > 0 and row.get("won") is True
+    )
+    club_win_rate = round((wins / matches_played) * 100, 1) if matches_played else 0.0
+    club_points_now = (
+        float(progress_data[-1].get("points", 0.0)) if progress_data else 0.0
+    )
+
+    if (
+        progress_data
+        and progress_data[-1]["date"] != timezone.now().date().isoformat()
+        and matches_played > 0
+    ):
+        progress_data.append(
+            {
+                "date": timezone.now().date().isoformat(),
+                "points": club_points_now,
+                "matches": matches_played,
+                "win_rate": club_win_rate,
+                "won": None,
+                "fan_delta": 0.0,
+                "ntrp_before": 0.0,
+                "ntrp_after": float(rating_to_ntrp_level(club_points_now) or 0.0),
+            }
+        )
+
+    subscription_usage_percent = 0
+    if plan_limits and plan_limits.monthly_tournaments_limit:
+        if plan_limits.monthly_tournaments_limit > 0:
+            used = plan_limits.tournaments_used
+            limit = plan_limits.monthly_tournaments_limit
+            subscription_usage_percent = min(100, int((used / limit) * 100))
+
+    from apps.player_ratings.services import get_player_skills
+
+    player_skills_data = None
+    try:
+        player_skills_data = get_player_skills(
+            player, request.user, include_lowest_three=True
+        )
+    except Exception:
+        player_skills_data = None
+
+    return {
+        "club": club,
+        "is_club_panel": True,
+        "is_club_profile": True,
+        "player": player,
+        "member": member,
+        "member_plan": member_plan,
+        "plan_limits": plan_limits,
+        "fee": fee,
+        "fee_status": fee_status,
+        "recent_matches": recent_matches,
+        "profile_progress_data": progress_data,
+        "subscription_usage_percent": subscription_usage_percent,
+        "available_years": available_years,
+        "months_ru": months_ru,
+        "active_year": active_year,
+        "active_month": active_month,
+        "active_status": active_status,
+        "match_statuses": Match.MatchStatus.choices,
+        "season_points": season_points,
+        "current_season_display": current_season_display,
+        "season_points_data": season_points_data,
+        "season_championships": [],
+        "player_skills_data": player_skills_data,
+        "is_profile_owner": is_profile_owner,
+        "can_view_profile_stats": True,
+        "subscription_autopay_card": None,
+        "club_matches_played": matches_played,
+        "club_win_rate": club_win_rate,
+        "club_points_now": club_points_now,
+    }
 
 
 @login_required
 @require_GET
-def my_tournaments(request: HttpRequest) -> HttpResponse:
-    """Раздел «Мои турниры» — турниры текущего клуба."""
+def my_dashboard(request: HttpRequest) -> HttpResponse:
+    """Отображает личный кабинет игрока внутри текущего клуба.
+
+    Args:
+        request (HttpRequest): HTTP-запрос пользователя.
+
+    Returns:
+        HttpResponse: Страница личного кабинета клуба.
+    """
     member = _get_current_club_member(request)
     if not member:
         messages.info(
@@ -906,8 +1538,76 @@ def my_tournaments(request: HttpRequest) -> HttpResponse:
         return redirect("clubs:register_choice")
 
     club = member.club
+    player = getattr(request.user, "player", None)
+    if player is None:
+        messages.error(request, "Профиль игрока не найден.")
+        return redirect("clubs:register_choice")
+    context = _build_club_profile_context(
+        request,
+        club=club,
+        member=member,
+        player=player,
+        is_profile_owner=True,
+    )
+    return render(request, "users/profile.html", context)
+
+
+@login_required
+@require_GET
+def member_detail(request: HttpRequest, slug: str, member_id: int) -> HttpResponse:
+    """Клубный кабинет выбранного участника для управляющих клубом."""
+    club, redir = _get_club_and_check_manage(request, slug)
+    if redir:
+        return redir
+
+    member = get_object_or_404(
+        ClubMember.objects.select_related("user", "user__player"),
+        pk=member_id,
+        club=club,
+    )
+    player = getattr(member.user, "player", None)
+    if player is None:
+        messages.error(request, "У этого участника нет профиля игрока.")
+        return redirect("clubs:members_list", slug=slug)
+
+    context = _build_club_profile_context(
+        request,
+        club=club,
+        member=member,
+        player=player,
+        is_profile_owner=request.user.id == member.user_id,
+    )
+    return render(request, "users/profile.html", context)
+
+
+@login_required
+@require_GET
+def my_tournaments(request: HttpRequest) -> HttpResponse:
+    """Раздел «Мои турниры» — турниры текущего клуба, в которых участвует игрок.
+
+    Показываются только те турниры, где текущий игрок (request.user.player)
+    записан в участники конкретного клубного турнира.
+    """
+    member = _get_current_club_member(request)
+    if not member:
+        messages.info(
+            request,
+            "Вы не состоите в клубе. Вступите по приглашению или создайте клуб.",
+        )
+        return redirect("clubs:register_choice")
+
+    club = member.club
+    player = getattr(request.user, "player", None)
     status_filter = request.GET.get("status", "upcoming")
-    qs = Tournament.objects.filter(club=club).order_by("start_date")
+
+    # Если у пользователя нет связанного игрока, для "Мои турниры" ничего не показываем.
+    qs = Tournament.objects.none()
+    if player is not None:
+        qs = (
+            Tournament.objects.filter(club=club, participants=player)
+            .order_by("start_date")
+            .distinct()
+        )
     if status_filter == "upcoming":
         qs = qs.filter(status="upcoming")
     elif status_filter == "active":
@@ -930,6 +1630,7 @@ def my_tournaments(request: HttpRequest) -> HttpResponse:
         "clubs/my_tournaments.html",
         {
             "club": club,
+            "is_club_panel": True,
             "tournaments": qs[:50],
             "status_filter": status_filter,
             "fee_restrict": fee_restrict,
@@ -968,6 +1669,7 @@ def my_plan(request: HttpRequest) -> HttpResponse:
         "clubs/my_plan.html",
         {
             "club": club,
+            "is_club_panel": True,
             "member_plan": member_plan,
             "plan_limits": plan_limits,
             "active_plans": active_plans,
@@ -1012,7 +1714,12 @@ def my_plan_change(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "clubs/my_plan_change.html",
-        {"club": member.club, "form": form, "current_member_plan": current_member_plan},
+        {
+            "club": member.club,
+            "is_club_panel": True,
+            "form": form,
+            "current_member_plan": current_member_plan,
+        },
     )
 
 
@@ -1047,6 +1754,7 @@ def club_rating(request: HttpRequest) -> HttpResponse:
         "clubs/club_rating.html",
         {
             "club": club,
+            "is_club_panel": True,
             "ratings": ratings,
             "my_rating": my_rating,
             "history": history,
@@ -1082,6 +1790,7 @@ def my_fees(request: HttpRequest) -> HttpResponse:
         "clubs/my_fees.html",
         {
             "club": club,
+            "is_club_panel": True,
             "fee": fee,
             "fee_status": fee_status,
             "payments": payments,
@@ -1100,6 +1809,12 @@ def _get_club_and_check_manage(request: HttpRequest, slug: str):
     if not user_can_manage_club(request.user, club):
         messages.error(request, "Нет доступа к управлению клубом.")
         return None, redirect("clubs:club_public_detail", slug=slug)
+    if not club_is_operational(club):
+        messages.error(
+            request,
+            "Клуб приостановлен. Продлите подписку для возобновления доступа.",
+        )
+        return None, redirect("clubs:club_public_detail", slug=slug)
     return club, None
 
 
@@ -1112,11 +1827,8 @@ def members_list(request: HttpRequest, slug: str) -> HttpResponse:
         return redir
     status_filter = request.GET.get("status", "")
     search = (request.GET.get("q") or "").strip()
-    qs = (
-        ClubMember.objects.filter(club=club)
-        .select_related("user")
-        .order_by("-joined_at")
-    )
+    members_qs = ClubMember.objects.filter(club=club)
+    qs = members_qs.select_related("user", "user__player").order_by("-joined_at")
     if status_filter:
         qs = qs.filter(status=status_filter)
     if search:
@@ -1132,9 +1844,29 @@ def members_list(request: HttpRequest, slug: str) -> HttpResponse:
         "clubs/members_list.html",
         {
             "club": club,
+            "is_club_panel": True,
             "page": page,
             "status_filter": status_filter,
             "search": search,
+            "members_total": members_qs.count(),
+            "members_filtered_count": qs.count(),
+            "members_active_count": members_qs.filter(
+                status=ClubMemberStatus.ACTIVE
+            ).count(),
+            "members_invited_count": members_qs.filter(
+                status=ClubMemberStatus.INVITED
+            ).count(),
+            "members_removed_count": members_qs.filter(
+                status=ClubMemberStatus.REMOVED
+            ).count(),
+            "members_admin_count": members_qs.filter(
+                status=ClubMemberStatus.ACTIVE,
+                role=ClubMemberRole.ADMIN,
+            ).count(),
+            "members_manager_count": members_qs.filter(
+                status=ClubMemberStatus.ACTIVE,
+                role=ClubMemberRole.MANAGER,
+            ).count(),
             "can_edit_settings": user_can_edit_club_settings(request.user, club),
         },
     )
@@ -1206,7 +1938,7 @@ def club_tournaments_list(request: HttpRequest, slug: str) -> HttpResponse:
     return render(
         request,
         "clubs/club_tournaments_list.html",
-        {"club": club, "tournaments": tournaments},
+        {"club": club, "tournaments": tournaments, "is_club_panel": True},
     )
 
 
@@ -1281,6 +2013,7 @@ def tournament_plan_access(
         "clubs/plan_tournament_access.html",
         {
             "club": club,
+            "is_club_panel": True,
             "tournament": tournament,
             "plan_rows": plan_rows,
             "can_edit_settings": user_can_edit_club_settings(request.user, club),
@@ -1299,55 +2032,69 @@ def tournament_create(request: HttpRequest, slug: str) -> HttpResponse:
         return redir
     can_create, limit_msg = club_can_create_tournament_this_month(club)
     sub = get_club_current_subscription(club)
-    is_pro = sub and sub.plan == ClubPlan.PRO
+    platform_plan = get_platform_plan(sub.plan) if sub else None
+    is_pro = platform_plan and platform_plan.is_open_interclub
     if request.method == "POST":
-        form = ClubTournamentCreateForm(request.POST)
+        form = ClubTournamentCreateForm(
+            request.POST,
+            request.FILES,
+            club=club,
+            is_pro=bool(is_pro),
+        )
         if form.is_valid() and can_create:
-            slug_val = form.cleaned_data.get("slug") or ""
-            if not slug_val:
-                from django.utils.text import slugify
-
-                slug_val = slugify(form.cleaned_data["name"]) or "tournament"
-            if Tournament.objects.filter(slug=slug_val).exists():
-                form.add_error("slug", "Турнир с таким URL уже существует.")
-            else:
-                open_interclub = (
-                    bool(form.cleaned_data.get("is_open_interclub")) and is_pro
+            tournament = form.save(commit=False)
+            tournament.club = club
+            tournament.status = TournamentStatus.UPCOMING
+            tournament.is_open_interclub = bool(
+                form.cleaned_data.get("is_open_interclub")
+            ) and bool(is_pro)
+            tournament.duration = (
+                TournamentDuration.SINGLE_DAY
+                if form.cleaned_data.get("is_one_day")
+                else TournamentDuration.MULTI_DAY
+            )
+            if not tournament.registration_deadline and tournament.start_date:
+                tournament.registration_deadline = timezone.make_aware(
+                    datetime.combine(
+                        tournament.start_date,
+                        time(23, 59),
+                    ),
+                    timezone.get_current_timezone(),
                 )
-                tournament = Tournament.objects.create(
-                    club=club,
-                    name=form.cleaned_data["name"],
-                    slug=slug_val[:100],
-                    city=form.cleaned_data["city"],
-                    start_date=form.cleaned_data["start_date"],
-                    end_date=form.cleaned_data.get("end_date"),
-                    format=form.cleaned_data["format"],
-                    variant=form.cleaned_data["variant"],
-                    gender=form.cleaned_data["gender"],
-                    min_participants=form.cleaned_data.get("min_participants"),
-                    max_participants=form.cleaned_data.get("max_participants"),
-                    is_open_interclub=open_interclub,
+            tournament.save()
+            tournament.allowed_categories.all().delete()
+            for category in form.cleaned_data["allowed_categories"]:
+                tournament.allowed_categories.create(category=category)
+            for player_plan in ClubPlayerPlan.objects.filter(club=club, is_active=True):
+                ClubPlanTournamentAccess.objects.get_or_create(
+                    plan=player_plan,
+                    tournament=tournament,
+                    defaults={"is_allowed": True},
                 )
-                for player_plan in ClubPlayerPlan.objects.filter(
-                    club=club, is_active=True
-                ):
-                    ClubPlanTournamentAccess.objects.get_or_create(
-                        plan=player_plan,
-                        tournament=tournament,
-                        defaults={"is_allowed": True},
-                    )
-                messages.success(request, f"Турнир «{tournament.name}» создан.")
-                return redirect("tournament_manage", slug=tournament.slug)
+            messages.success(request, f"Турнир «{tournament.name}» создан.")
+            return redirect("tournament_manage", slug=tournament.slug)
         elif not can_create:
             messages.error(request, limit_msg)
     else:
         form = ClubTournamentCreateForm(
-            initial={"city": club.city, "format": "weekend_day"}
+            club=club,
+            is_pro=bool(is_pro),
+            initial={
+                "city": club.city,
+                "format": "weekend_day",
+                "allowed_categories": ["amateur"],
+            },
         )
     return render(
         request,
         "clubs/tournament_create.html",
-        {"club": club, "form": form, "can_create": can_create, "is_pro": is_pro},
+        {
+            "club": club,
+            "is_club_panel": True,
+            "form": form,
+            "can_create": can_create,
+            "is_pro": is_pro,
+        },
     )
 
 
@@ -1412,7 +2159,7 @@ def dashboard_rating(request: HttpRequest, slug: str) -> HttpResponse:
     return render(
         request,
         "clubs/dashboard_rating.html",
-        {"club": club, "ratings": ratings},
+        {"club": club, "ratings": ratings, "is_club_panel": True},
     )
 
 
@@ -1447,6 +2194,12 @@ def fees_settings(request: HttpRequest, slug: str) -> HttpResponse:
     if not user_can_manage_fees(request.user, club):
         messages.error(request, "Настраивать взносы может только администратор.")
         return redirect("clubs:dashboard", slug=slug)
+    if not club_is_operational(club):
+        messages.error(
+            request,
+            "Клуб приостановлен. Продлите подписку для возобновления доступа.",
+        )
+        return redirect("clubs:club_public_detail", slug=slug)
     fee = (
         ClubMembershipFee.objects.filter(club=club, is_active=True)
         .order_by("-id")
@@ -1470,7 +2223,9 @@ def fees_settings(request: HttpRequest, slug: str) -> HttpResponse:
     else:
         form = ClubMembershipFeeSettingsForm(instance=fee)
     return render(
-        request, "clubs/fees_settings.html", {"club": club, "form": form, "fee": fee}
+        request,
+        "clubs/fees_settings.html",
+        {"club": club, "form": form, "fee": fee, "is_club_panel": True},
     )
 
 
@@ -1496,7 +2251,13 @@ def fees_payments(request: HttpRequest, slug: str) -> HttpResponse:
     return render(
         request,
         "clubs/fees_payments.html",
-        {"club": club, "payments": qs[:100], "fee": fee, "mark_form": mark_form},
+        {
+            "club": club,
+            "payments": qs[:100],
+            "fee": fee,
+            "mark_form": mark_form,
+            "is_club_panel": True,
+        },
     )
 
 
@@ -1546,7 +2307,11 @@ def invites_list(request: HttpRequest, slug: str) -> HttpResponse:
         link.full_join_url = request.build_absolute_uri(
             reverse("clubs:join", kwargs={"slug": club.slug}) + "?token=" + link.token
         )
-    return render(request, "clubs/invites_list.html", {"club": club, "links": links})
+    return render(
+        request,
+        "clubs/invites_list.html",
+        {"club": club, "links": links, "is_club_panel": True},
+    )
 
 
 @login_required
@@ -1571,13 +2336,21 @@ def managers_view(request: HttpRequest, slug: str) -> HttpResponse:
     if not user_can_manage_managers(request.user, club):
         messages.error(request, "Управлять менеджерами может только администратор.")
         return redirect("clubs:dashboard", slug=slug)
+    if not club_is_operational(club):
+        messages.error(
+            request,
+            "Клуб приостановлен. Продлите подписку для возобновления доступа.",
+        )
+        return redirect("clubs:club_public_detail", slug=slug)
     members = (
         club.members.filter(status=ClubMemberStatus.ACTIVE)
         .select_related("user")
         .order_by("user__email")
     )
     return render(
-        request, "clubs/managers_list.html", {"club": club, "members": members}
+        request,
+        "clubs/managers_list.html",
+        {"club": club, "members": members, "is_club_panel": True},
     )
 
 
@@ -1625,7 +2398,8 @@ def subscription_view(request: HttpRequest, slug: str) -> HttpResponse:
             "club": club,
             "subscription": subscription,
             "history": history,
-            "plan_prices": PLAN_PRICES,
+            "plan_prices": _get_plan_prices_for_subscription(),
+            "is_club_panel": True,
         },
     )
 
@@ -1639,6 +2413,9 @@ def subscription_pay(request: HttpRequest, slug: str) -> HttpResponse:
         messages.error(request, "Оплата подписки доступна только администратору.")
         return redirect("clubs:subscription", slug=slug)
 
+    initial_plan = request.GET.get("plan", "").strip()
+    initial_period = request.GET.get("period", "").strip()
+
     if request.method == "POST":
         plan = request.POST.get("plan", "").strip()
         period = request.POST.get("period", "").strip()
@@ -1649,8 +2426,11 @@ def subscription_pay(request: HttpRequest, slug: str) -> HttpResponse:
             messages.error(request, "Выберите период оплаты (месяц или год).")
             return redirect("clubs:subscription_pay", slug=slug)
 
-        price_dict = PLAN_PRICES.get(plan, {})
-        amount = Decimal(str(price_dict.get(period, 0)))
+        platform_plan = get_platform_plan(plan)
+        if not platform_plan:
+            messages.error(request, "Тариф не найден. Обратитесь в поддержку.")
+            return redirect("clubs:subscription_pay", slug=slug)
+        amount = platform_plan.get_price_for_period(period)
         if amount <= 0:
             messages.error(request, "Неверная сумма для выбранного тарифа.")
             return redirect("clubs:subscription_pay", slug=slug)
@@ -1691,11 +2471,18 @@ def subscription_pay(request: HttpRequest, slug: str) -> HttpResponse:
         )
         return redirect(confirmation_url)
 
-    return render(
-        request,
-        "clubs/subscription_pay.html",
-        {"club": club, "plan_prices": PLAN_PRICES, "plans": ClubPlan},
-    )
+    context = {
+        "club": club,
+        "plan_prices": _get_plan_prices_for_subscription(),
+        "plans": ClubPlan,
+    }
+    if initial_plan in (ClubPlan.START, ClubPlan.BASIC, ClubPlan.PRO):
+        context["initial_plan"] = initial_plan
+    if initial_period in ("monthly", "yearly"):
+        context["initial_period"] = initial_period
+
+    context["is_club_panel"] = True
+    return render(request, "clubs/subscription_pay.html", context)
 
 
 @login_required
@@ -1707,10 +2494,25 @@ def subscription_return(request: HttpRequest, slug: str) -> HttpResponse:
         messages.error(request, "Нет доступа.")
         return redirect("clubs:subscription", slug=slug)
 
-    payment_id = request.GET.get("payment_id") or request.GET.get("orderId")
+    # ЮKassa может возвращать идентификатор платежа в разных параметрах query
+    # или вовсе не добавлять его в URL (редирект без параметров).
+    # Сначала пытаемся прочитать его из query-параметров, а если не получилось,
+    # берём последний ожидающий платёж для этого клуба.
+    payment_id = (
+        request.GET.get("payment_id")
+        or request.GET.get("orderId")
+        or request.GET.get("paymentId")
+    )
     if not payment_id:
-        messages.warning(request, "ID платежа не найден в запросе.")
-        return redirect("clubs:subscription", slug=slug)
+        pending_fallback = (
+            ClubSubscriptionPaymentPending.objects.filter(club=club)
+            .order_by("-id")
+            .first()
+        )
+        if not pending_fallback:
+            messages.warning(request, "ID платежа не найден в запросе.")
+            return redirect("clubs:subscription", slug=slug)
+        payment_id = pending_fallback.payment_id
 
     pending = ClubSubscriptionPaymentPending.objects.filter(
         payment_id=payment_id, club=club
@@ -1843,7 +2645,13 @@ def my_fees_return(request: HttpRequest) -> HttpResponse:
         messages.error(request, "Клуб не найден.")
         return redirect("clubs:register_choice")
 
-    payment_id = request.GET.get("payment_id") or request.GET.get("orderId")
+    # Аналогично return URL подписки, пытаемся прочитать ID платежа из
+    # нескольких возможных имён параметров, которые может вернуть ЮKassa.
+    payment_id = (
+        request.GET.get("payment_id")
+        or request.GET.get("orderId")
+        or request.GET.get("paymentId")
+    )
     if not payment_id:
         messages.warning(request, "ID платежа не найден.")
         return redirect("clubs:my_fees")
@@ -1925,7 +2733,7 @@ def my_notification_settings(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "clubs/my_notification_settings.html",
-        {"club": club, "form": form},
+        {"club": club, "form": form, "is_club_panel": True},
     )
 
 
@@ -1952,7 +2760,7 @@ def club_notification_config(request: HttpRequest, slug: str) -> HttpResponse:
     return render(
         request,
         "clubs/club_notification_config.html",
-        {"club": club, "form": form},
+        {"club": club, "form": form, "is_club_panel": True},
     )
 
 
@@ -1984,6 +2792,7 @@ def interclub_applications(request: HttpRequest, slug: str) -> HttpResponse:
         "clubs/interclub_applications.html",
         {
             "club": club,
+            "is_club_panel": True,
             "applications": applications,
             "current_status_filter": status_filter or "",
         },

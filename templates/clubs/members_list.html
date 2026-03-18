@@ -1,68 +1,263 @@
 {% extends "base.html" %}
 {% block title %}Участники — {{ club.name }}{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">Участники</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
+{% include "clubs/_club_dashboard_nav.html" with current="members" %}
+<div class="page-header club-members-page-header">
+    <div class="container club-members-page">
+        <div class="club-members-hero">
+            <div class="club-members-hero__copy">
+                <span class="club-members-hero__eyebrow">Состав клуба</span>
+                <h1 class="page-title club-members-hero__title">Участники</h1>
+                <p class="page-subtitle club-members-hero__subtitle">{{ club.name }}</p>
+            </div>
+            <div class="club-members-hero__stats">
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ members_total }}</span>
+                    <span class="club-members-stat__label">Всего в базе</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ members_active_count }}</span>
+                    <span class="club-members-stat__label">Активных</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ members_invited_count }}</span>
+                    <span class="club-members-stat__label">Приглашены</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ members_admin_count|add:members_manager_count }}</span>
+                    <span class="club-members-stat__label">Управляют клубом</span>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-<div class="container" style="max-width: 900px;">
-    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a> · <a href="{% url 'clubs:members_export' slug=club.slug %}">Экспорт CSV</a></p>
-    <form method="get" style="display: flex; gap: var(--spacing-md); flex-wrap: wrap; margin-bottom: var(--spacing-lg);">
-        <input type="text" name="q" value="{{ search }}" placeholder="Поиск по email или имени" style="min-width: 200px;">
-        <select name="status">
-            <option value="">Все статусы</option>
-            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Активен</option>
-            <option value="invited" {% if status_filter == 'invited' %}selected{% endif %}>Приглашён</option>
-            <option value="removed" {% if status_filter == 'removed' %}selected{% endif %}>Исключён</option>
-        </select>
-        <button type="submit" class="btn btn-primary">Найти</button>
-    </form>
-    <div class="card">
-        <div class="card-body">
-            <table class="table" style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Email</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">ФИО</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Роль</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Статус</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Вступление</th>
-                        <th style="text-align: right; padding: var(--spacing-sm);">Действия</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for m in page %}
-                    <tr>
-                        <td style="padding: var(--spacing-sm);">{{ m.user.email }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ m.user.get_full_name|default:"—" }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ m.get_role_display }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ m.get_status_display }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ m.joined_at|date:"d.m.Y"|default:"—" }}</td>
-                        <td style="padding: var(--spacing-sm); text-align: right;">
-                            {% if m.user.player_id %}
-                            <a href="{% url 'profile' pk=m.user.player.pk %}" class="btn btn-ghost btn-sm">Профиль</a>
+<div class="container club-members-page">
+    <section class="card club-members-toolbar">
+        <div class="card-body club-members-toolbar__body">
+            <div class="club-members-toolbar__intro">
+                <div>
+                    <h2 class="club-members-toolbar__title">База участников</h2>
+                    <p class="club-members-toolbar__text">
+                        {% if search or status_filter %}
+                        Найдено {{ members_filtered_count }} из {{ members_total }} участников
+                        {% else %}
+                        Следите за ролями, статусами и быстрым доступом к профилям игроков
+                        {% endif %}
+                    </p>
+                </div>
+                <a href="{% url 'clubs:members_export' slug=club.slug %}" class="btn btn-ghost club-members-toolbar__export">Экспорт CSV</a>
+            </div>
+
+            <form method="get" class="club-members-filters">
+                <label class="club-members-field">
+                    <span class="club-members-field__label">Поиск</span>
+                    <input type="text" name="q" value="{{ search }}" placeholder="Email, имя или фамилия">
+                </label>
+                <label class="club-members-field">
+                    <span class="club-members-field__label">Статус</span>
+                    <select name="status">
+                        <option value="">Все статусы</option>
+                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Активен</option>
+                        <option value="invited" {% if status_filter == 'invited' %}selected{% endif %}>Приглашён</option>
+                        <option value="removed" {% if status_filter == 'removed' %}selected{% endif %}>Исключён</option>
+                    </select>
+                </label>
+                <div class="club-members-filters__actions">
+                    <button type="submit" class="btn btn-primary">Найти</button>
+                    {% if search or status_filter %}
+                    <a href="{% url 'clubs:members_list' slug=club.slug %}" class="btn btn-ghost">Сбросить</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="card club-members-table-card">
+        <div class="card-body club-members-table-card__body">
+            <div class="club-members-table-wrap">
+                <table class="club-members-table">
+                    <thead>
+                        <tr>
+                            <th>Участник</th>
+                            <th>Роль</th>
+                            <th>Статус</th>
+                            <th>Вступление</th>
+                            <th class="club-members-table__actions-head">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in page %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'clubs:member_detail' slug=club.slug member_id=m.id %}" class="club-members-person club-members-person--link">
+                                    {% if m.user.player and m.user.player.avatar %}
+                                    <img src="{{ m.user.player.avatar.url }}" alt="{{ m.user.get_full_name|default:m.user.email }}" class="club-members-person__avatar">
+                                    {% else %}
+                                    <span class="club-members-person__avatar club-members-person__avatar--fallback">
+                                        {% if m.user.first_name %}
+                                        {{ m.user.first_name|slice:":1"|upper }}
+                                        {% else %}
+                                        {{ m.user.email|slice:":1"|upper }}
+                                        {% endif %}
+                                    </span>
+                                    {% endif %}
+                                    <div class="club-members-person__content">
+                                        <div class="club-members-person__name-row">
+                                            <span class="club-members-person__name">{{ m.user.get_full_name|default:"Без имени" }}</span>
+                                            {% if m.role == 'admin' %}
+                                            <span class="club-members-badge club-members-badge--accent">Core</span>
+                                            {% elif m.role == 'manager' %}
+                                            <span class="club-members-badge club-members-badge--soft">Manager</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="club-members-person__meta">{{ m.user.email }}</div>
+                                        {% if m.user.player %}
+                                        <div class="club-members-person__stats">
+                                            <span class="club-members-inline-stat">
+                                                <span class="club-members-inline-stat__label">Уровень</span>
+                                                <span class="club-members-inline-stat__value">{{ m.user.player.get_skill_level_display }}</span>
+                                            </span>
+                                            <span class="club-members-inline-stat">
+                                                <span class="club-members-inline-stat__label">Сила</span>
+                                                <span class="club-members-inline-stat__value">{{ m.user.player.ntrp_level }}</span>
+                                            </span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </a>
+                            </td>
+                            <td>
+                                <span class="club-members-badge club-members-badge--role">{{ m.get_role_display }}</span>
+                            </td>
+                            <td>
+                                <span class="club-members-badge club-members-badge--status {% if m.status == 'active' %}club-members-badge--success{% elif m.status == 'invited' %}club-members-badge--warning{% else %}club-members-badge--danger{% endif %}">
+                                    {{ m.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="club-members-date">{{ m.joined_at|date:"d.m.Y"|default:"—" }}</div>
+                                <div class="club-members-date-note">
+                                    {% if m.status == 'invited' %}
+                                    Ожидает подтверждения
+                                    {% elif m.status == 'removed' %}
+                                    Доступ закрыт
+                                    {% else %}
+                                    В составе клуба
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="club-members-table__actions">
+                                <a href="{% url 'clubs:member_detail' slug=club.slug member_id=m.id %}" class="btn btn-ghost btn-sm">Кабинет</a>
+                                {% if m.status == 'active' and m.role != 'admin' and m.user_id != user.id %}
+                                <form method="post" action="{% url 'clubs:member_remove' slug=club.slug member_id=m.id %}" class="club-members-table__remove-form">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-ghost btn-sm btn-danger-text" onclick="return confirm('Исключить участника?');">Исключить</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="club-members-table__empty">
+                                {% if search or status_filter %}
+                                По текущим фильтрам участники не найдены.
+                                {% else %}
+                                В клубе пока нет участников.
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="club-members-mobile-list">
+                {% for m in page %}
+                <article class="club-members-mobile-card">
+                    <a href="{% url 'clubs:member_detail' slug=club.slug member_id=m.id %}" class="club-members-person club-members-person--link">
+                        {% if m.user.player and m.user.player.avatar %}
+                        <img src="{{ m.user.player.avatar.url }}" alt="{{ m.user.get_full_name|default:m.user.email }}" class="club-members-person__avatar">
+                        {% else %}
+                        <span class="club-members-person__avatar club-members-person__avatar--fallback">
+                            {% if m.user.first_name %}
+                            {{ m.user.first_name|slice:":1"|upper }}
+                            {% else %}
+                            {{ m.user.email|slice:":1"|upper }}
                             {% endif %}
-                            {% if m.status == 'active' and m.role != 'admin' and m.user_id != user.id %}
-                            <form method="post" action="{% url 'clubs:member_remove' slug=club.slug member_id=m.id %}" style="display: inline;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-ghost btn-sm" style="color: var(--color-error);" onclick="return confirm('Исключить участника?');">Исключить</button>
-                            </form>
+                        </span>
+                        {% endif %}
+                        <div class="club-members-person__content">
+                            <div class="club-members-person__name-row">
+                                <span class="club-members-person__name">{{ m.user.get_full_name|default:"Без имени" }}</span>
+                            </div>
+                            <div class="club-members-person__meta">{{ m.user.email }}</div>
+                            {% if m.user.player %}
+                            <div class="club-members-person__stats">
+                                <span class="club-members-inline-stat">
+                                    <span class="club-members-inline-stat__label">Уровень</span>
+                                    <span class="club-members-inline-stat__value">{{ m.user.player.get_skill_level_display }}</span>
+                                </span>
+                                <span class="club-members-inline-stat">
+                                    <span class="club-members-inline-stat__label">Сила</span>
+                                    <span class="club-members-inline-stat__value">{{ m.user.player.ntrp_level }}</span>
+                                </span>
+                            </div>
                             {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="6" style="padding: var(--spacing-md); color: var(--color-text-muted);">Нет участников.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </div>
+                    </a>
+                    <div class="club-members-mobile-card__grid">
+                        <div>
+                            <span class="club-members-mobile-card__label">Роль</span>
+                            <span class="club-members-badge club-members-badge--role">{{ m.get_role_display }}</span>
+                        </div>
+                        <div>
+                            <span class="club-members-mobile-card__label">Статус</span>
+                            <span class="club-members-badge club-members-badge--status {% if m.status == 'active' %}club-members-badge--success{% elif m.status == 'invited' %}club-members-badge--warning{% else %}club-members-badge--danger{% endif %}">
+                                {{ m.get_status_display }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="club-members-mobile-card__label">Вступление</span>
+                            <span class="club-members-mobile-card__value">{{ m.joined_at|date:"d.m.Y"|default:"—" }}</span>
+                        </div>
+                    </div>
+                    <div class="club-members-mobile-card__actions">
+                        <a href="{% url 'clubs:member_detail' slug=club.slug member_id=m.id %}" class="btn btn-ghost btn-sm">Кабинет</a>
+                        {% if m.status == 'active' and m.role != 'admin' and m.user_id != user.id %}
+                        <form method="post" action="{% url 'clubs:member_remove' slug=club.slug member_id=m.id %}" class="club-members-table__remove-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-ghost btn-sm btn-danger-text" onclick="return confirm('Исключить участника?');">Исключить</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </article>
+                {% empty %}
+                <div class="club-members-mobile-list__empty">
+                    {% if search or status_filter %}
+                    По текущим фильтрам участники не найдены.
+                    {% else %}
+                    В клубе пока нет участников.
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
             {% if page.has_other_pages %}
-            <div style="margin-top: var(--spacing-md);">
-                {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}{% if search %}&q={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">←</a>{% endif %}
-                {{ page.number }} / {{ page.paginator.num_pages }}
-                {% if page.has_next %}<a href="?page={{ page.next_page_number }}{% if search %}&q={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">→</a>{% endif %}
+            <div class="club-members-pagination">
+                {% if page.has_previous %}
+                <a href="?page={{ page.previous_page_number }}{% if search %}&q={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="club-members-pagination__link">← Назад</a>
+                {% else %}
+                <span class="club-members-pagination__link club-members-pagination__link--disabled">← Назад</span>
+                {% endif %}
+                <span class="club-members-pagination__current">Страница {{ page.number }} из {{ page.paginator.num_pages }}</span>
+                {% if page.has_next %}
+                <a href="?page={{ page.next_page_number }}{% if search %}&q={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="club-members-pagination__link">Вперёд →</a>
+                {% else %}
+                <span class="club-members-pagination__link club-members-pagination__link--disabled">Вперёд →</span>
+                {% endif %}
             </div>
             {% endif %}
         </div>
-    </div>
+    </section>
 </div>
 {% endblock %}

@@ -5,6 +5,9 @@
     <h1 class="page-title">Мои турниры</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
+<div class="container club-player-dashboard">
+    {% include "clubs/_club_player_nav.html" with current="tournaments" %}
+</div>
 {% if fee_restrict %}
 <div class="container" style="max-width: 800px; margin-bottom: var(--spacing-lg);">
     <div class="card" style="border-color: var(--color-warning);">
@@ -34,7 +37,6 @@
                         {% else %}
                             {{ plan_limits.tournaments_left }} из {{ plan_limits.monthly_tournaments_limit }}
                         {% endif %}
-                        · Слоты: {{ plan_limits.slots_left }} из {{ plan_limits.monthly_slots_limit }}
                     </div>
                     {% endif %}
                 </div>

@@ -3,7 +3,20 @@
 """
 
 from django import forms
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.utils.text import slugify
+
+from apps.courts.models import Court
+from apps.tournaments.models import (
+    MatchFormat,
+    Tournament,
+    TournamentFormat,
+    TournamentType,
+    TournamentVariant,
+)
+from apps.tournaments.utils import generate_unique_tournament_slug
+from apps.users.models import SkillLevel
 
 from .models import (
     Club,
@@ -25,40 +38,58 @@ class ClubRegistrationStep1Form(forms.Form):
         max_length=255,
         min_length=2,
         widget=forms.TextInput(
-            attrs={"placeholder": "Например: Теннисный клуб «Спартак»"}
+            attrs={
+                "class": "form-control",
+                "placeholder": "Например: Теннисный клуб «Спартак»",
+            }
         ),
     )
     city = forms.CharField(
         label="Город",
         max_length=100,
-        widget=forms.TextInput(attrs={"placeholder": "Москва"}),
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Москва"}
+        ),
     )
     address = forms.CharField(
         label="Адрес",
-        widget=forms.Textarea(attrs={"rows": 2, "placeholder": "Улица, дом, корпус"}),
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 2,
+                "placeholder": "Улица, дом, корпус",
+            }
+        ),
     )
     logo = forms.ImageField(
         label="Логотип клуба",
         required=False,
         help_text="JPG, PNG или WebP до 5 МБ",
+        widget=forms.ClearableFileInput(attrs={"class": "form-control"}),
     )
-    email = forms.EmailField(label="Контактный email")
+    email = forms.EmailField(
+        label="Контактный email",
+        widget=forms.EmailInput(attrs={"class": "form-control"}),
+    )
     phone = forms.CharField(
         label="Контактный телефон",
         max_length=50,
         required=False,
-        widget=forms.TextInput(attrs={"placeholder": "+7 (999) 123-45-67"}),
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "+7 (999) 123-45-67"}
+        ),
     )
     admin_name = forms.CharField(
         label="ФИО ответственного / администратора",
         max_length=255,
         min_length=2,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
     )
     description = forms.CharField(
         label="Краткое описание клуба",
         required=False,
         max_length=1000,
-        widget=forms.Textarea(attrs={"rows": 4}),
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 4}),
     )
 
     def get_slug(self) -> str:
@@ -101,12 +132,13 @@ class ClubProfileEditForm(forms.ModelForm):
             "name",
             "city",
             "address",
+            "logo",
+            "hero_image",
             "email",
             "phone",
             "admin_name",
             "description",
             "is_public",
-            "logo",
         ]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 4}),
@@ -231,59 +263,213 @@ class MarkFeePaidForm(forms.Form):
             self.fields["amount"].initial = fee.amount
 
 
-class ClubTournamentCreateForm(forms.Form):
-    """Создание турнира клуба (минимальный набор полей)."""
+class ClubTournamentCreateForm(forms.ModelForm):
+    """Создание турнира клуба по модели Tournament с логикой глобальной платформы."""
 
-    name = forms.CharField(label="Название", max_length=200)
-    slug = forms.SlugField(label="URL", max_length=100, required=False)
-    city = forms.CharField(label="Город", max_length=100)
-    start_date = forms.DateField(label="Дата начала")
-    end_date = forms.DateField(label="Дата окончания", required=False)
-    format = forms.ChoiceField(
-        label="Формат",
-        choices=[
-            ("single_elimination", "Олимпийский (до 1 поражения)"),
-            ("olympic_consolation", "Олимпийский (за все места)"),
-            ("round_robin", "Круговой"),
-            ("weekend_day", "Однодневный турнир"),
-        ],
+    allowed_categories = forms.MultipleChoiceField(
+        choices=SkillLevel.choices,
+        widget=forms.CheckboxSelectMultiple,
+        required=True,
+        label="Допустимые уровни участников",
+        help_text="Выберите от 1 до 5 уровней. Зарегистрироваться смогут только игроки выбранных категорий.",
     )
-    variant = forms.ChoiceField(
-        label="Вариант",
-        choices=[("singles", "Одиночный"), ("doubles", "Парный")],
-    )
-    gender = forms.ChoiceField(
-        label="Категория по полу",
-        choices=[
-            ("male", "Мужчины"),
-            ("female", "Женщины"),
-            ("open", "Смешанный"),
-            ("mixed", "Микст"),
-        ],
-    )
-    min_participants = forms.IntegerField(
-        label="Мин. участников",
-        required=False,
-        min_value=2,
-    )
-    max_participants = forms.IntegerField(
-        label="Макс. участников",
-        required=False,
-        min_value=2,
-    )
-    is_open_interclub = forms.BooleanField(
-        label="Открытый межклубный турнир",
-        required=False,
-        help_text="Другие клубы смогут подать заявку на участие.",
-    )
+
+    class Meta:
+        model = Tournament
+        fields = [
+            "name",
+            "slug",
+            "description",
+            "image",
+            "format",
+            "variant",
+            "entry_fee",
+            "is_one_day",
+            "city",
+            "court",
+            "gender",
+            "allowed_categories",
+            "tournament_type",
+            "start_date",
+            "end_date",
+            "registration_deadline",
+            "min_participants",
+            "max_participants",
+            "min_teams",
+            "max_teams",
+            "match_days_per_round",
+            "match_format",
+            "fan_points_r1",
+            "fan_points_r2",
+            "fan_points_sf",
+            "fan_points_final",
+            "fan_points_winner",
+            "is_open_interclub",
+        ]
+
+    def __init__(self, *args, club: Club | None = None, is_pro: bool = False, **kwargs):
+        self.club = club
+        self.is_pro = is_pro
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.pk:
+            self.fields["allowed_categories"].initial = list(
+                self.instance.allowed_categories.values_list("category", flat=True)
+            )
+
+        self.fields["city"].initial = club.city if club else self.fields["city"].initial
+        self.fields["format"].initial = TournamentFormat.WEEKEND_DAY
+        self.fields["variant"].initial = TournamentVariant.SINGLES
+        self.fields["tournament_type"].initial = TournamentType.REGULAR
+        self.fields["match_days_per_round"].initial = 7
+        self.fields["entry_fee"].initial = 0
+
+        self.fields["description"].required = False
+        self.fields["image"].required = False
+        self.fields["court"].required = False
+        self.fields["registration_deadline"].required = False
+        self.fields["end_date"].required = False
+        self.fields["match_format"].required = False
+        self.fields["min_participants"].required = False
+        self.fields["max_participants"].required = False
+        self.fields["min_teams"].required = False
+        self.fields["max_teams"].required = False
+        self.fields["entry_fee"].required = False
+
+        self.fields["description"].widget = forms.Textarea(
+            attrs={
+                "rows": 5,
+                "placeholder": "Описание турнира, покрытие, правила, регистрация, расписание и важные детали",
+            }
+        )
+        self.fields["start_date"].widget = forms.DateInput(attrs={"type": "date"})
+        self.fields["end_date"].widget = forms.DateInput(attrs={"type": "date"})
+        self.fields["registration_deadline"].widget = forms.DateTimeInput(
+            attrs={"type": "datetime-local"}
+        )
+        self.fields["court"].queryset = (
+            Court.objects.filter(city=club.city).order_by("name")
+            if club
+            else Court.objects.all().order_by("city", "name")
+        )
+        self.fields["court"].empty_label = "Без привязки к корту"
+        self.fields["match_format"].choices = [("", "Выберите формат матча")] + list(
+            MatchFormat.choices
+        )
+        self.fields["image"].help_text = "Афиша или обложка турнира, до 2 МБ."
+        self.fields["slug"].help_text = (
+            "Можно оставить пустым: при совпадении система сама добавит уникальный суффикс."
+        )
+        self.fields["registration_deadline"].help_text = (
+            "Если поле пустое, регистрация будет открыта до старта турнира."
+        )
+        self.fields["is_open_interclub"].disabled = not is_pro
+        if not is_pro:
+            self.fields["is_open_interclub"].help_text = (
+                "Межклубный режим доступен только на соответствующем тарифе платформы."
+            )
+
+        for _, field in self.fields.items():
+            widget = field.widget
+            if isinstance(widget, forms.CheckboxSelectMultiple):
+                widget.attrs["class"] = "club-tournament-create__checkboxes"
+            elif isinstance(widget, forms.CheckboxInput):
+                widget.attrs["class"] = "club-tournament-create__toggle"
+            elif isinstance(widget, forms.ClearableFileInput):
+                widget.attrs["class"] = "club-tournament-create__file"
+            else:
+                existing = widget.attrs.get("class", "")
+                widget.attrs["class"] = (existing + " form-control").strip()
+
+    def clean_allowed_categories(self):
+        value = self.cleaned_data.get("allowed_categories") or []
+        if len(value) == 0:
+            raise ValidationError("Выберите хотя бы одну категорию участников.")
+        if len(value) > 5:
+            raise ValidationError("Можно выбрать не более 5 категорий.")
+        return value
 
     def clean_slug(self):
-        slug = self.cleaned_data.get("slug") or ""
-        if not slug and self.cleaned_data.get("name"):
-            from django.utils.text import slugify
+        return generate_unique_tournament_slug(
+            name=self.cleaned_data.get("name") or "",
+            slug=self.cleaned_data.get("slug") or None,
+            instance=self.instance,
+        )
 
-            slug = slugify(self.cleaned_data["name"]) or "tournament"
-        return (slug or "tournament")[:100]
+    def clean_registration_deadline(self):
+        value = self.cleaned_data.get("registration_deadline")
+        if value and timezone.is_naive(value):
+            value = timezone.make_aware(value, timezone.get_current_timezone())
+        return value
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        variant = cleaned_data.get("variant")
+        gender = cleaned_data.get("gender")
+        is_one_day = cleaned_data.get("is_one_day")
+        entry_fee = cleaned_data.get("entry_fee")
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        registration_deadline = cleaned_data.get("registration_deadline")
+
+        if variant == TournamentVariant.SINGLES and gender == "mixed":
+            raise ValidationError(
+                "Категория «Микст» доступна только для парных турниров."
+            )
+
+        if start_date and end_date and end_date < start_date:
+            self.add_error(
+                "end_date", "Дата окончания не может быть раньше даты начала."
+            )
+
+        if registration_deadline and start_date:
+            deadline_date = timezone.localtime(registration_deadline).date()
+            if deadline_date > start_date:
+                self.add_error(
+                    "registration_deadline",
+                    "Дедлайн регистрации не может быть позже даты начала турнира.",
+                )
+
+        if is_one_day is False and (entry_fee is None or float(entry_fee or 0) <= 0):
+            raise ValidationError(
+                "Для многодневного турнира укажите вступительный взнос больше 0 ₽."
+            )
+
+        if variant == TournamentVariant.DOUBLES:
+            cleaned_data["min_participants"] = None
+            cleaned_data["max_participants"] = None
+            min_teams = cleaned_data.get("min_teams")
+            max_teams = cleaned_data.get("max_teams")
+            if not cleaned_data.get("max_teams"):
+                self.add_error(
+                    "max_teams",
+                    "Для парного турнира укажите максимальное количество команд.",
+                )
+            if min_teams and max_teams and min_teams > max_teams:
+                self.add_error(
+                    "min_teams",
+                    "Минимум команд не может быть больше максимума.",
+                )
+        else:
+            cleaned_data["min_teams"] = None
+            cleaned_data["max_teams"] = None
+            min_participants = cleaned_data.get("min_participants")
+            max_participants = cleaned_data.get("max_participants")
+            if (
+                min_participants
+                and max_participants
+                and min_participants > max_participants
+            ):
+                self.add_error(
+                    "min_participants",
+                    "Минимум участников не может быть больше максимума.",
+                )
+
+        if cleaned_data.get("is_open_interclub") and not self.is_pro:
+            cleaned_data["is_open_interclub"] = False
+
+        return cleaned_data
 
 
 class ClubNotificationSettingsForm(forms.ModelForm):
@@ -323,27 +509,18 @@ class ClubPlayerPlanForm(forms.ModelForm):
             "is_active",
             "monthly_fee",
             "max_tournaments_per_month",
-            "monthly_slots",
-            "allow_rollover_slots",
-            "rollover_cap",
             "allow_self_change",
             "sort_order",
         ]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
         }
-
-    def clean(self):
-        """Валидация зависимостей rollover-полей тарифа."""
-        cleaned_data = super().clean()
-        allow_rollover = bool(cleaned_data.get("allow_rollover_slots"))
-        rollover_cap = int(cleaned_data.get("rollover_cap") or 0)
-        if not allow_rollover and rollover_cap > 0:
-            self.add_error(
-                "rollover_cap",
-                "Лимит переноса должен быть 0, если перенос слотов отключен.",
-            )
-        return cleaned_data
+        help_texts = {
+            "max_tournaments_per_month": (
+                "Оставьте пустым для безлимитного участия. "
+                "Однодневные турниры не расходуют лимит."
+            ),
+        }
 
 
 class ClubMemberPlanSelectForm(forms.Form):

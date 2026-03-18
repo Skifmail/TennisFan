@@ -1,9 +1,14 @@
 {% extends 'base.html' %}
 {% load static skill_tags %}
 
-{% block title %}{{ player }} - Профиль{% endblock %}
+{% block title %}{% if is_club_profile %}{{ player }} - Личный кабинет клуба{% else %}{{ player }} - Профиль{% endif %}{% endblock %}
 
 {% block content %}
+{% if is_club_profile %}
+<div class="container club-player-dashboard" style="padding-top: var(--spacing-lg);">
+    {% include "clubs/_club_player_nav.html" with current="dashboard" %}
+</div>
+{% endif %}
 <div class="container container--profile" style="padding-top: var(--spacing-2xl);">
     <!-- Profile Card: full width, left info + right charts -->
     <div class="card profile-card profile-card--wide">
@@ -16,7 +21,11 @@
                     <div class="profile-info__title">
                         <h1 class="profile-info__name">{{ player }}</h1>
                         <div class="profile-info__badges">
-                            {% if player.paid_subscription_tier %}
+                            {% if is_club_profile and member_plan %}
+                            <span class="profile-info__subscription-badge">
+                                <span class="badge badge-primary">{{ member_plan.plan.name }}</span>
+                            </span>
+                            {% elif player.paid_subscription_tier %}
                             <span class="profile-info__subscription-badge">
                                 {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
                             </span>
@@ -80,14 +89,19 @@
                         </tr>
                         <tr class="stats-table__data-row">
                             <td><strong>{{ season_points.current_season_points }} ({{ current_season_display }})</strong></td>
+                            {% if is_club_profile %}
+                            <td><strong>{{ club_matches_played }}</strong></td>
+                            <td><strong>{{ club_win_rate }}%</strong></td>
+                            {% else %}
                             <td><strong>{{ player.matches_played }}</strong></td>
                             <td><strong>{{ player.win_rate }}%</strong></td>
+                            {% endif %}
                         </tr>
                     </table>
                 </div>
 
                 <!-- Бейджи чемпионов -->
-                {% if season_championships %}
+                {% if season_championships and not is_club_profile %}
                 <div class="profile-championships">
                     <h3 class="profile-championships__title">🏆 Чемпион сезонов</h3>
                     <div class="profile-championships__badges">
@@ -101,7 +115,60 @@
                 {% endif %}
 
                 {% if request.user == player.user %}
-                {% if player.user.subscription %}
+                {% if is_club_profile %}
+                <div class="subscription-info profile-info__subscription">
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Клуб:</span>
+                        <strong class="subscription-info__value">{{ club.name }}</strong>
+                    </div>
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Тариф клуба:</span>
+                        {% if member_plan %}
+                        <strong class="subscription-info__value">{{ member_plan.plan.name }}</strong>
+                        {% else %}
+                        <span>Не назначен</span>
+                        {% endif %}
+                    </div>
+                    {% if member_plan %}
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Действует с:</span>
+                        <span>{{ member_plan.started_at|date:"d.m.Y" }}</span>
+                    </div>
+                    {% endif %}
+                    {% if plan_limits and plan_limits.monthly_tournaments_limit %}
+                    <div class="subscription-info__limit">
+                        <div class="subscription-info__row">
+                            <span class="subscription-info__label">Остаток турниров:</span>
+                            <span>{{ plan_limits.tournaments_left }} из {{ plan_limits.monthly_tournaments_limit }}</span>
+                        </div>
+                        <div class="subscription-info__bar">
+                            <div class="subscription-info__bar-fill" data-width-pct="{{ subscription_usage_percent }}"></div>
+                        </div>
+                    </div>
+                    {% elif plan_limits %}
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Ограничение турниров:</span>
+                        <span>Безлимит</span>
+                    </div>
+                    {% endif %}
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Членский взнос:</span>
+                        {% if fee_status == 'paid' %}
+                        <span class="badge badge-success">Оплачен</span>
+                        {% elif fee_status == 'expiring_soon' %}
+                        <span class="badge badge-warning">Скоро истекает</span>
+                        {% elif fee_status == 'unpaid' %}
+                        <span class="badge badge-danger">Не оплачен</span>
+                        {% else %}
+                        <span>Не используется</span>
+                        {% endif %}
+                    </div>
+                    <div class="subscription-info__actions">
+                        <a href="{% url 'clubs:my_plan' %}" class="btn btn-sm btn-outline" style="flex: 1;">Открыть тариф</a>
+                        <a href="{% url 'clubs:my_fees' %}" class="btn btn-sm btn-ghost" style="flex: 1;">Взносы</a>
+                    </div>
+                </div>
+                {% elif player.user.subscription %}
                 <div class="subscription-info profile-info__subscription">
                     <div class="subscription-info__row">
                         <span class="subscription-info__label">Тариф:</span>
@@ -210,7 +277,11 @@
                     <p class="profile-stats-placeholder__text">
                         Графики, сильные стороны и рекомендации доступны только при активной подписке.
                     </p>
+                    {% if is_club_profile %}
+                    <a href="{% url 'clubs:my_plan' %}" class="profile-stats-placeholder__link">Мой тариф клуба</a>
+                    {% else %}
                     <a href="{% url 'pricing' %}" class="profile-stats-placeholder__link">Выбрать тариф</a>
+                    {% endif %}
                 </div>
                 {% endif %}
 
@@ -238,7 +309,7 @@
                 <div class="profile-charts__header">
                     <div class="profile-charts__title-wrap">
                         <h3 class="profile-charts__title">Прогресс</h3>
-                        <p class="profile-charts__subtitle">Живая аналитика формы, стабильности и темпа вашего сезона.</p>
+                        <p class="profile-charts__subtitle">{% if is_club_profile %}Живая аналитика игрока внутри выбранного клуба.{% else %}Живая аналитика формы, стабильности и темпа вашего сезона.{% endif %}</p>
                     </div>
                     <div class="profile-charts__controls">
                         <div class="profile-charts__pill-groups">
@@ -393,7 +464,11 @@
                     </select>
                 </div>
                 {% if active_year or active_month or active_status %}
+                {% if is_club_profile %}
+                <a href="{% url 'clubs:my_dashboard' %}#matches" class="matches-filter-reset">Сбросить</a>
+                {% else %}
                 <a href="{% url 'profile' pk=player.pk %}#matches" class="matches-filter-reset">Сбросить</a>
+                {% endif %}
                 {% endif %}
             </div>
         </form>
@@ -1362,7 +1437,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
 {% endif %}
 
 {# --- Модальное окно подтверждения отмены подписки (в конце страницы для правильного z-index) --- #}
-{% if user.is_authenticated and player.user.subscription.is_valid and not player.user.subscription.is_cancelled %}
+{% if not is_club_profile and user.is_authenticated and player.user.subscription.is_valid and not player.user.subscription.is_cancelled %}
 <div id="cancel-sub-modal" class="modal-overlay" style="display:none;">
     <div class="modal-dialog">
         <h3 class="modal-dialog__title">Отменить подписку?</h3>

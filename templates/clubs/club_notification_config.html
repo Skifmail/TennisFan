@@ -1,16 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Уведомления клуба — {{ club.name }}{% endblock %}
 {% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="notifications" %}
 <div class="page-header">
     <h1 class="page-title">{{ club.name }}</h1>
     <p class="page-subtitle">Настройки уведомлений клуба</p>
 </div>
 <div class="container" style="max-width: 720px;">
-    <nav class="club-dashboard-nav" style="margin-bottom: var(--spacing-xl); display: flex; flex-wrap: wrap; gap: var(--spacing-sm);">
-        <a href="{% url 'clubs:dashboard' slug=club.slug %}" class="btn btn-ghost btn-sm">Дашборд</a>
-        <a href="{% url 'clubs:club_edit' slug=club.slug %}" class="btn btn-ghost btn-sm">Настройки</a>
-        <a href="{% url 'clubs:club_notification_config' slug=club.slug %}" class="btn btn-ghost btn-sm" style="font-weight: 700;">Уведомления</a>
-    </nav>
     <div class="card">
         <div class="card-body">
             <form method="post">

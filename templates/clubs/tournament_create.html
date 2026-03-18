@@ -1,42 +1,252 @@
 {% extends "base.html" %}
 {% block title %}Создать турнир — {{ club.name }}{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">Создать турнир</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container" style="max-width: 560px;">
-    <p><a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}">← К списку турниров</a></p>
-    {% if not can_create %}
-    <p style="color: var(--color-warning);">Лимит турниров в месяц по вашему тарифу исчерпан.</p>
-    {% endif %}
-    <div class="card">
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-                {% for field in form %}
-                    {% if field.name == "is_open_interclub" %}
-                        {% if is_pro %}
-                        <p>
-                            {{ field }}
-                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                            {% if field.help_text %}<br><small style="color: var(--color-text-muted);">{{ field.help_text }}</small>{% endif %}
-                            {% if field.errors %}<br><span class="error">{{ field.errors.0 }}</span>{% endif %}
-                        </p>
-                        {% endif %}
-                    {% else %}
-                        <p>
-                            {{ field.label_tag }}
-                            {{ field }}
-                            {% if field.help_text %}<br><small style="color: var(--color-text-muted);">{{ field.help_text }}</small>{% endif %}
-                            {% if field.errors %}<br><span class="error">{{ field.errors.0 }}</span>{% endif %}
-                        </p>
-                    {% endif %}
-                {% endfor %}
-                <button type="submit" class="btn btn-primary" {% if not can_create %}disabled{% endif %}>Создать</button>
-                <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-ghost">Отмена</a>
-            </form>
+{% include "clubs/_club_dashboard_nav.html" with current="tournaments" %}
+
+<div class="page-header club-tournament-create-header">
+    <div class="container club-tournament-create">
+        <div class="club-tournament-create__hero">
+            <div class="club-tournament-create__hero-copy">
+                <span class="club-tournament-create__eyebrow">Новый турнир клуба</span>
+                <h1 class="page-title club-tournament-create__title">Создать турнир</h1>
+                <p class="page-subtitle club-tournament-create__subtitle">
+                    Соберите турнир с теми же ключевыми параметрами, что используются на глобальной платформе: формат, лимиты, уровни допуска, взносы и правила проведения.
+                </p>
+            </div>
+            <div class="club-tournament-create__hero-side">
+                <div class="club-tournament-create__hero-stat">
+                    <span class="club-tournament-create__hero-stat-label">Клуб</span>
+                    <strong>{{ club.name }}</strong>
+                </div>
+                <div class="club-tournament-create__hero-stat">
+                    <span class="club-tournament-create__hero-stat-label">Город</span>
+                    <strong>{{ club.city }}</strong>
+                </div>
+                <div class="club-tournament-create__hero-stat">
+                    <span class="club-tournament-create__hero-stat-label">Межклубный режим</span>
+                    <strong>{% if is_pro %}Доступен{% else %}Недоступен{% endif %}</strong>
+                </div>
+            </div>
         </div>
     </div>
+</div>
+
+<div class="container club-tournament-create">
+    <div class="club-tournament-create__backline">
+        <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="club-tournament-create__backlink">← К списку турниров</a>
+        {% if not can_create %}
+        <div class="club-tournament-create__limit-warning">Лимит турниров в текущем месяце исчерпан.</div>
+        {% endif %}
+    </div>
+
+    {% if form.non_field_errors %}
+    <div class="club-tournament-create__errors">
+        {% for error in form.non_field_errors %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="card club-tournament-create__form-card">
+        {% csrf_token %}
+        <div class="card-body club-tournament-create__form-body">
+            <section class="club-tournament-create__section">
+                <div class="club-tournament-create__section-head">
+                    <h2 class="club-tournament-create__section-title">Базовая информация</h2>
+                    <p class="club-tournament-create__section-text">Название, адрес страницы, описание и визуальная обложка турнира.</p>
+                </div>
+                <div class="club-tournament-create__grid club-tournament-create__grid--basic">
+                    <div class="club-tournament-create__field club-tournament-create__field--wide">
+                        <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+                        {{ form.name }}
+                        {% if form.name.help_text %}<p class="club-tournament-create__help">{{ form.name.help_text }}</p>{% endif %}
+                        {% for error in form.name.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.slug.id_for_label }}" class="form-label">{{ form.slug.label }}</label>
+                        {{ form.slug }}
+                        <p class="club-tournament-create__help">Можно оставить пустым: система сама создаст уникальный URL.</p>
+                        {% for error in form.slug.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.image.id_for_label }}" class="form-label">{{ form.image.label }}</label>
+                        {{ form.image }}
+                        {% if form.image.help_text %}<p class="club-tournament-create__help">{{ form.image.help_text }}</p>{% endif %}
+                        {% for error in form.image.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field club-tournament-create__field--wide">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
+                        {{ form.description }}
+                        {% for error in form.description.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="club-tournament-create__section">
+                <div class="club-tournament-create__section-head">
+                    <h2 class="club-tournament-create__section-title">Формат и допуск</h2>
+                    <p class="club-tournament-create__section-text">Тип турнира, дисциплина, пол, уровень игроков и ключевые настройки структуры.</p>
+                </div>
+                <div class="club-tournament-create__grid club-tournament-create__grid--triple">
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.format.id_for_label }}" class="form-label">{{ form.format.label }}</label>
+                        {{ form.format }}
+                        {% for error in form.format.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.variant.id_for_label }}" class="form-label">{{ form.variant.label }}</label>
+                        {{ form.variant }}
+                        {% for error in form.variant.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.gender.id_for_label }}" class="form-label">{{ form.gender.label }}</label>
+                        {{ form.gender }}
+                        {% if form.gender.help_text %}<p class="club-tournament-create__help">{{ form.gender.help_text }}</p>{% endif %}
+                        {% for error in form.gender.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.tournament_type.id_for_label }}" class="form-label">{{ form.tournament_type.label }}</label>
+                        {{ form.tournament_type }}
+                        {% for error in form.tournament_type.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.match_format.id_for_label }}" class="form-label">{{ form.match_format.label }}</label>
+                        {{ form.match_format }}
+                        {% if form.match_format.help_text %}<p class="club-tournament-create__help">{{ form.match_format.help_text }}</p>{% endif %}
+                        {% for error in form.match_format.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.match_days_per_round.id_for_label }}" class="form-label">{{ form.match_days_per_round.label }}</label>
+                        {{ form.match_days_per_round }}
+                        {% if form.match_days_per_round.help_text %}<p class="club-tournament-create__help">{{ form.match_days_per_round.help_text }}</p>{% endif %}
+                        {% for error in form.match_days_per_round.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                </div>
+
+                <div class="club-tournament-create__field club-tournament-create__field--wide">
+                    <span class="form-label">{{ form.allowed_categories.label }}</span>
+                    <div class="club-tournament-create__checkbox-panel">
+                        {{ form.allowed_categories }}
+                    </div>
+                    {% if form.allowed_categories.help_text %}<p class="club-tournament-create__help">{{ form.allowed_categories.help_text }}</p>{% endif %}
+                    {% for error in form.allowed_categories.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                </div>
+            </section>
+
+            <section class="club-tournament-create__section">
+                <div class="club-tournament-create__section-head">
+                    <h2 class="club-tournament-create__section-title">Локация и календарь</h2>
+                    <p class="club-tournament-create__section-text">Где проходит турнир, когда стартует и до какого момента открыта регистрация.</p>
+                </div>
+                <div class="club-tournament-create__grid club-tournament-create__grid--triple">
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.city.id_for_label }}" class="form-label">{{ form.city.label }}</label>
+                        {{ form.city }}
+                        {% if form.city.help_text %}<p class="club-tournament-create__help">{{ form.city.help_text }}</p>{% endif %}
+                        {% for error in form.city.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.court.id_for_label }}" class="form-label">{{ form.court.label }}</label>
+                        {{ form.court }}
+                        {% if form.court.help_text %}<p class="club-tournament-create__help">{{ form.court.help_text }}</p>{% endif %}
+                        {% for error in form.court.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field club-tournament-create__field--toggle">
+                        <label class="club-tournament-create__toggle-row" for="{{ form.is_open_interclub.id_for_label }}">
+                            {{ form.is_open_interclub }}
+                            <span>
+                                <span class="club-tournament-create__toggle-title">{{ form.is_open_interclub.label }}</span>
+                                {% if form.is_open_interclub.help_text %}<span class="club-tournament-create__toggle-help">{{ form.is_open_interclub.help_text }}</span>{% endif %}
+                            </span>
+                        </label>
+                        {% for error in form.is_open_interclub.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.start_date.id_for_label }}" class="form-label">{{ form.start_date.label }}</label>
+                        {{ form.start_date }}
+                        {% for error in form.start_date.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.end_date.id_for_label }}" class="form-label">{{ form.end_date.label }}</label>
+                        {{ form.end_date }}
+                        {% for error in form.end_date.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.registration_deadline.id_for_label }}" class="form-label">{{ form.registration_deadline.label }}</label>
+                        {{ form.registration_deadline }}
+                        {% if form.registration_deadline.help_text %}<p class="club-tournament-create__help">{{ form.registration_deadline.help_text }}</p>{% endif %}
+                        {% for error in form.registration_deadline.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="club-tournament-create__section">
+                <div class="club-tournament-create__section-head">
+                    <h2 class="club-tournament-create__section-title">Лимиты и экономика</h2>
+                    <p class="club-tournament-create__section-text">Укажите взнос, режим однодневного турнира и ограничения по участникам или командам.</p>
+                </div>
+                <div class="club-tournament-create__grid club-tournament-create__grid--quad">
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.entry_fee.id_for_label }}" class="form-label">{{ form.entry_fee.label }}</label>
+                        {{ form.entry_fee }}
+                        {% for error in form.entry_fee.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field club-tournament-create__field--toggle">
+                        <label class="club-tournament-create__toggle-row" for="{{ form.is_one_day.id_for_label }}">
+                            {{ form.is_one_day }}
+                            <span>
+                                <span class="club-tournament-create__toggle-title">{{ form.is_one_day.label }}</span>
+                                {% if form.is_one_day.help_text %}<span class="club-tournament-create__toggle-help">{{ form.is_one_day.help_text }}</span>{% endif %}
+                            </span>
+                        </label>
+                        {% for error in form.is_one_day.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.min_participants.id_for_label }}" class="form-label">{{ form.min_participants.label }}</label>
+                        {{ form.min_participants }}
+                        {% for error in form.min_participants.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.max_participants.id_for_label }}" class="form-label">{{ form.max_participants.label }}</label>
+                        {{ form.max_participants }}
+                        {% for error in form.max_participants.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.min_teams.id_for_label }}" class="form-label">{{ form.min_teams.label }}</label>
+                        {{ form.min_teams }}
+                        {% for error in form.min_teams.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.max_teams.id_for_label }}" class="form-label">{{ form.max_teams.label }}</label>
+                        {{ form.max_teams }}
+                        {% for error in form.max_teams.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="club-tournament-create__section">
+                <div class="club-tournament-create__section-head">
+                    <h2 class="club-tournament-create__section-title">Очки турнира</h2>
+                    <p class="club-tournament-create__section-text">Начисление очков как в глобальной платформе: по раундам и итоговому месту.</p>
+                </div>
+                <div class="club-tournament-create__grid club-tournament-create__grid--points">
+                    {% for field in form.visible_fields %}
+                        {% if field.name == "fan_points_r1" or field.name == "fan_points_r2" or field.name == "fan_points_sf" or field.name == "fan_points_final" or field.name == "fan_points_winner" %}
+                        <div class="club-tournament-create__field">
+                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                            {{ field }}
+                            {% for error in field.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </section>
+
+            <div class="club-tournament-create__actions">
+                <button type="submit" class="btn btn-primary btn-lg" {% if not can_create %}disabled{% endif %}>Создать турнир</button>
+                <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-ghost btn-lg">Отмена</a>
+            </div>
+        </div>
+    </form>
 </div>
 {% endblock %}

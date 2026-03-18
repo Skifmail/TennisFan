@@ -28,9 +28,10 @@ urlpatterns = [
     path("set-current/<slug:slug>/", views.set_current_club, name="set_current_club"),
     path(
         "my/",
-        RedirectView.as_view(pattern_name="clubs:my_tournaments", permanent=False),
+        RedirectView.as_view(pattern_name="clubs:my_dashboard", permanent=False),
         name="club_my_home",
     ),
+    path("my/dashboard/", views.my_dashboard, name="my_dashboard"),
     path("my/tournaments/", views.my_tournaments, name="my_tournaments"),
     path("my/rating/", views.club_rating, name="club_rating"),
     path("my/fees/", views.my_fees, name="my_fees"),
@@ -68,6 +69,11 @@ urlpatterns = [
         name="invite_import_csv",
     ),
     path("<slug:slug>/members/", views.members_list, name="members_list"),
+    path(
+        "<slug:slug>/members/<int:member_id>/",
+        views.member_detail,
+        name="member_detail",
+    ),
     path("<slug:slug>/members/export/", views.members_export, name="members_export"),
     path(
         "<slug:slug>/members/<int:member_id>/remove/",

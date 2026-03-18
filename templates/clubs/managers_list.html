@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Менеджеры — {{ club.name }}{% endblock %}
 {% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="managers" %}
 <div class="page-header">
     <h1 class="page-title">Менеджеры</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
 <div class="container" style="max-width: 700px;">
-    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a></p>
     <div class="card">
         <div class="card-body">
             <p style="color: var(--color-text-muted); margin-bottom: var(--spacing-md);">Назначьте участников менеджерами — они смогут управлять игроками, турнирами и приглашениями (без доступа к настройкам и финансам).</p>

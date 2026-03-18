@@ -1,9 +1,27 @@
-"""Сервисная логика клубных тарифов игроков (Phase 8)."""
+"""Сервисная логика клубных тарифов игроков (Phase 8).
+
+Логика лимитов (аналогично глобальной платформе):
+
+**Однодневные турниры:**
+- Тариф не обязателен для регистрации
+- Если есть взнос → игрок платит взнос
+- Лимит НЕ расходуется
+
+**Многодневные турниры с взносом:**
+- Если есть тариф и лимит → регистрация бесплатно, лимит расходуется
+- Если нет тарифа или лимит исчерпан → игрок платит взнос
+
+**Многодневные турниры без взноса:**
+- Обязателен тариф с доступным лимитом
+- Лимит расходуется
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
+from enum import Enum
 from typing import TYPE_CHECKING, cast
 
 from django.db import transaction
@@ -24,6 +42,29 @@ if TYPE_CHECKING:
     from apps.tournaments.models import Tournament
 
 
+class RegistrationMode(Enum):
+    """Режим регистрации на клубный турнир."""
+
+    FREE = "free"  # Бесплатно по тарифу (лимит расходуется)
+    PAID = "paid"  # Оплата вступительного взноса (лимит НЕ расходуется)
+    BLOCKED = "blocked"  # Регистрация невозможна
+
+
+@dataclass(slots=True, frozen=True)
+class RegistrationEligibility:
+    """Результат проверки возможности регистрации на турнир.
+
+    Attributes:
+        mode: Режим регистрации (FREE/PAID/BLOCKED).
+        message: Сообщение для пользователя (ошибка или информация).
+        consumes_limit: Будет ли расходоваться лимит при регистрации.
+    """
+
+    mode: RegistrationMode
+    message: str
+    consumes_limit: bool
+
+
 @dataclass(slots=True, frozen=True)
 class MemberPlanLimits:
     """Снимок лимитов участника по клубному тарифу.
@@ -32,17 +73,11 @@ class MemberPlanLimits:
         monthly_tournaments_limit: Лимит турниров на месяц (None — без лимита).
         tournaments_used: Уже использовано турниров в текущем месяце.
         tournaments_left: Остаток турниров (None — безлимит).
-        monthly_slots_limit: Лимит слотов в месяце с учетом переноса.
-        slots_used: Уже использовано слотов.
-        slots_left: Остаток слотов.
     """
 
     monthly_tournaments_limit: int | None
     tournaments_used: int
     tournaments_left: int | None
-    monthly_slots_limit: int
-    slots_used: int
-    slots_left: int
 
 
 def get_current_period(today: date | None = None) -> tuple[int, int]:
@@ -154,12 +189,7 @@ def get_member_plan_limits(
         plan=plan,
         period_year=year,
         period_month=month,
-        defaults={
-            "tournaments_used": 0,
-            "slots_used": 0,
-            "rollover_in": 0,
-            "rollover_out": 0,
-        },
+        defaults={"tournaments_used": 0},
     )
 
     monthly_tournaments_limit = plan.max_tournaments_per_month
@@ -170,18 +200,154 @@ def get_member_plan_limits(
     else:
         tournaments_left = max(monthly_tournaments_limit - tournaments_used, 0)
 
-    monthly_slots_limit = plan.monthly_slots + usage.rollover_in
-    slots_used = usage.slots_used
-    slots_left = max(monthly_slots_limit - slots_used, 0)
-
     return MemberPlanLimits(
         monthly_tournaments_limit=monthly_tournaments_limit,
         tournaments_used=tournaments_used,
         tournaments_left=tournaments_left,
-        monthly_slots_limit=monthly_slots_limit,
-        slots_used=slots_used,
-        slots_left=slots_left,
     )
+
+
+def _tournament_has_entry_fee(tournament: Tournament) -> bool:
+    """Проверяет, установлен ли вступительный взнос для турнира."""
+    fee = getattr(tournament, "entry_fee", None) or Decimal("0")
+    return fee > Decimal("0")
+
+
+def _member_has_available_limit(member: ClubMember) -> bool:
+    """Проверяет, есть ли у участника доступный лимит турниров."""
+    limits = get_member_plan_limits(member)
+    if limits is None:
+        return False
+    # Безлимитный тариф
+    if limits.monthly_tournaments_limit is None:
+        return True
+    # Есть остаток
+    return limits.tournaments_left is not None and limits.tournaments_left > 0
+
+
+def check_tournament_registration_eligibility(
+    member: ClubMember,
+    tournament: Tournament,
+) -> RegistrationEligibility:
+    """Проверяет возможность и режим регистрации участника на клубный турнир.
+
+    Логика (аналогично глобальной платформе):
+
+    **Однодневные турниры:**
+    - Тариф не обязателен
+    - Если есть взнос → PAID (оплата взноса)
+    - Если нет взноса → FREE (бесплатно, лимит НЕ расходуется)
+
+    **Многодневные турниры с взносом:**
+    - Если есть тариф и лимит → FREE (бесплатно, лимит расходуется)
+    - Если нет тарифа или лимит исчерпан → PAID (оплата взноса)
+
+    **Многодневные турниры без взноса:**
+    - Обязателен тариф с доступным лимитом
+    - FREE (бесплатно, лимит расходуется)
+
+    Args:
+        member: Участник клуба.
+        tournament: Турнир для проверки.
+
+    Returns:
+        RegistrationEligibility: Результат проверки.
+    """
+    # Турнир другого клуба — пропускаем проверку тарифов
+    if tournament.club_id != member.club_id:
+        return RegistrationEligibility(
+            mode=RegistrationMode.FREE,
+            message="",
+            consumes_limit=False,
+        )
+
+    # Проверяем, использует ли клуб систему тарифов
+    active_plans_qs = ClubPlayerPlan.objects.filter(
+        club_id=member.club_id,
+        is_active=True,
+    )
+    if not active_plans_qs.exists():
+        # Клуб не использует тарифы — свободная регистрация
+        return RegistrationEligibility(
+            mode=RegistrationMode.FREE,
+            message="",
+            consumes_limit=False,
+        )
+
+    member_plan = get_member_active_plan(member)
+    has_entry_fee = _tournament_has_entry_fee(tournament)
+
+    # Проверка доступа по тарифу (если настроены правила доступа)
+    if member_plan:
+        access_rules_qs = ClubPlanTournamentAccess.objects.filter(tournament=tournament)
+        if access_rules_qs.exists():
+            access = access_rules_qs.filter(
+                plan=member_plan.plan, is_allowed=True
+            ).exists()
+            if not access:
+                return RegistrationEligibility(
+                    mode=RegistrationMode.BLOCKED,
+                    message="Ваш тариф не дает доступ к этому турниру.",
+                    consumes_limit=False,
+                )
+
+    # === ОДНОДНЕВНЫЕ ТУРНИРЫ ===
+    if tournament.is_one_day:
+        if has_entry_fee:
+            # Однодневный с взносом → всегда оплата, лимит НЕ расходуется
+            return RegistrationEligibility(
+                mode=RegistrationMode.PAID,
+                message="Для участия необходимо оплатить вступительный взнос.",
+                consumes_limit=False,
+            )
+        else:
+            # Однодневный без взноса → бесплатно, лимит НЕ расходуется
+            return RegistrationEligibility(
+                mode=RegistrationMode.FREE,
+                message="",
+                consumes_limit=False,
+            )
+
+    # === МНОГОДНЕВНЫЕ ТУРНИРЫ ===
+    has_limit = _member_has_available_limit(member)
+
+    if has_entry_fee:
+        # Многодневный с взносом
+        if has_limit:
+            # Есть лимит → бесплатно по тарифу, лимит расходуется
+            return RegistrationEligibility(
+                mode=RegistrationMode.FREE,
+                message="",
+                consumes_limit=True,
+            )
+        else:
+            # Нет лимита → оплата взноса
+            return RegistrationEligibility(
+                mode=RegistrationMode.PAID,
+                message="Лимит турниров по тарифу исчерпан. "
+                "Вы можете оплатить вступительный взнос.",
+                consumes_limit=False,
+            )
+    else:
+        # Многодневный без взноса — обязателен тариф с лимитом
+        if not member_plan:
+            return RegistrationEligibility(
+                mode=RegistrationMode.BLOCKED,
+                message="Для участия в турнирах клуба нужно выбрать тариф.",
+                consumes_limit=False,
+            )
+        if not has_limit:
+            return RegistrationEligibility(
+                mode=RegistrationMode.BLOCKED,
+                message="Лимит турниров по вашему тарифу на этот месяц исчерпан.",
+                consumes_limit=False,
+            )
+        # Есть тариф и лимит → бесплатно, лимит расходуется
+        return RegistrationEligibility(
+            mode=RegistrationMode.FREE,
+            message="",
+            consumes_limit=True,
+        )
 
 
 def can_member_register_for_tournament(
@@ -190,6 +356,9 @@ def can_member_register_for_tournament(
 ) -> tuple[bool, str]:
     """Проверяет возможность регистрации участника на клубный турнир по тарифу.
 
+    Упрощённая обёртка для обратной совместимости.
+    Возвращает True, если регистрация возможна (FREE или PAID).
+
     Args:
         member: Участник клуба.
         tournament: Турнир для проверки.
@@ -197,41 +366,9 @@ def can_member_register_for_tournament(
     Returns:
         tuple[bool, str]: Пара (можно_ли, сообщение_об_ошибке).
     """
-    if tournament.club_id != member.club_id:
-        return True, ""
-
-    active_plans_qs = ClubPlayerPlan.objects.filter(
-        club_id=member.club_id,
-        is_active=True,
-    )
-    if not active_plans_qs.exists():
-        # Fallback: клуб не использует тарифы игроков.
-        return True, ""
-
-    member_plan = get_member_active_plan(member)
-    if not member_plan:
-        return False, "Для участия в турнирах клуба нужно выбрать тариф."
-
-    access_rules_qs = ClubPlanTournamentAccess.objects.filter(tournament=tournament)
-    if access_rules_qs.exists():
-        access = access_rules_qs.filter(plan=member_plan.plan, is_allowed=True).exists()
-        if not access:
-            return False, "Ваш тариф не дает доступ к этому турниру."
-
-    limits = get_member_plan_limits(member)
-    if limits is None:
-        return False, "Тариф участника не найден."
-
-    if (
-        limits.monthly_tournaments_limit is not None
-        and limits.tournaments_used >= limits.monthly_tournaments_limit
-    ):
-        return False, "Лимит турниров по вашему тарифу на этот месяц исчерпан."
-
-    required_slots = 0 if tournament.is_one_day else 1
-    if required_slots > 0 and limits.slots_left < required_slots:
-        return False, "Недостаточно слотов по вашему тарифу для участия в турнире."
-
+    eligibility = check_tournament_registration_eligibility(member, tournament)
+    if eligibility.mode == RegistrationMode.BLOCKED:
+        return False, eligibility.message
     return True, ""
 
 
@@ -241,6 +378,14 @@ def consume_member_tournament_limit(
 ) -> tuple[bool, str]:
     """Списывает лимиты участника при регистрации на турнир.
 
+    Лимит расходуется ТОЛЬКО если:
+    - Многодневный турнир с взносом и есть доступный лимит
+    - Многодневный турнир без взноса
+
+    Лимит НЕ расходуется:
+    - Однодневные турниры (любые)
+    - Многодневные с взносом при оплате взноса (лимит исчерпан)
+
     Args:
         member: Участник клуба.
         tournament: Турнир, на который выполняется регистрация.
@@ -248,15 +393,16 @@ def consume_member_tournament_limit(
     Returns:
         tuple[bool, str]: Пара (успех, сообщение).
     """
-    if tournament.club_id != member.club_id:
+    eligibility = check_tournament_registration_eligibility(member, tournament)
+
+    if eligibility.mode == RegistrationMode.BLOCKED:
+        return False, eligibility.message
+
+    # Лимит не нужно списывать
+    if not eligibility.consumes_limit:
         return True, ""
 
-    active_plans_qs = ClubPlayerPlan.objects.filter(
-        club_id=member.club_id, is_active=True
-    )
-    if not active_plans_qs.exists():
-        return True, ""
-
+    # Списываем лимит
     with transaction.atomic():
         member_plan = (
             ClubMemberPlan.objects.select_for_update()
@@ -269,7 +415,7 @@ def consume_member_tournament_limit(
             .first()
         )
         if not member_plan:
-            return False, "Для участия в турнирах клуба нужно выбрать тариф."
+            return False, "Тариф не найден."
 
         plan = member_plan.plan
         year, month = get_current_period()
@@ -278,97 +424,15 @@ def consume_member_tournament_limit(
             plan=plan,
             period_year=year,
             period_month=month,
-            defaults={
-                "tournaments_used": 0,
-                "slots_used": 0,
-                "rollover_in": 0,
-                "rollover_out": 0,
-            },
+            defaults={"tournaments_used": 0},
         )
 
-        access_rules_qs = ClubPlanTournamentAccess.objects.filter(tournament=tournament)
-        if access_rules_qs.exists():
-            if not access_rules_qs.filter(plan=plan, is_allowed=True).exists():
-                return False, "Ваш тариф не дает доступ к этому турниру."
+        # Повторная проверка лимита внутри транзакции
+        if plan.max_tournaments_per_month is not None:
+            if usage.tournaments_used >= plan.max_tournaments_per_month:
+                return False, "Лимит турниров по вашему тарифу на этот месяц исчерпан."
 
-        if (
-            plan.max_tournaments_per_month is not None
-            and usage.tournaments_used >= plan.max_tournaments_per_month
-        ):
-            return False, "Лимит турниров по вашему тарифу на этот месяц исчерпан."
-
-        required_slots = 0 if tournament.is_one_day else 1
-        available_slots = max(
-            plan.monthly_slots + usage.rollover_in - usage.slots_used, 0
-        )
-        if required_slots > 0 and available_slots < required_slots:
-            return False, "Недостаточно слотов по вашему тарифу для участия в турнире."
-
-        # Внутри транзакции: сначала валидация, потом атомарное списание usage.
         usage.tournaments_used += 1
-        if required_slots > 0:
-            usage.slots_used += required_slots
-        usage.save(update_fields=["tournaments_used", "slots_used", "updated_at"])
+        usage.save(update_fields=["tournaments_used", "updated_at"])
 
     return True, ""
-
-
-def rollover_member_slots(
-    member_plan: ClubMemberPlan,
-    *,
-    source_year: int,
-    source_month: int,
-    target_year: int,
-    target_month: int,
-) -> int:
-    """Переносит остаток слотов участника из одного периода в следующий.
-
-    Args:
-        member_plan: Активное назначение тарифа участнику.
-        source_year: Год исходного периода.
-        source_month: Месяц исходного периода.
-        target_year: Год целевого периода.
-        target_month: Месяц целевого периода.
-
-    Returns:
-        int: Количество перенесенных слотов.
-    """
-    plan = member_plan.plan
-    if not plan.allow_rollover_slots:
-        return 0
-
-    source_usage, _ = ClubPlanSlotUsage.objects.get_or_create(
-        club_member=member_plan.club_member,
-        plan=plan,
-        period_year=source_year,
-        period_month=source_month,
-        defaults={
-            "tournaments_used": 0,
-            "slots_used": 0,
-            "rollover_in": 0,
-            "rollover_out": 0,
-        },
-    )
-    available_slots = max(
-        plan.monthly_slots + source_usage.rollover_in - source_usage.slots_used, 0
-    )
-    rollover: int = min(available_slots, plan.rollover_cap)
-
-    target_usage, _ = ClubPlanSlotUsage.objects.get_or_create(
-        club_member=member_plan.club_member,
-        plan=plan,
-        period_year=target_year,
-        period_month=target_month,
-        defaults={
-            "tournaments_used": 0,
-            "slots_used": 0,
-            "rollover_in": 0,
-            "rollover_out": 0,
-        },
-    )
-    source_usage.rollover_out = rollover
-    source_usage.save(update_fields=["rollover_out", "updated_at"])
-
-    target_usage.rollover_in = rollover
-    target_usage.save(update_fields=["rollover_in", "updated_at"])
-    return rollover

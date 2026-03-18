@@ -22,10 +22,15 @@
 
 .rules-header {
     margin-bottom: var(--spacing-xl);
+    text-align: center;
 }
 
 .page-title--rules {
-    text-align: left;
+    text-align: center;
+}
+
+.rules-header .page-subtitle {
+    text-align: center;
 }
 
 .rules-tabs__nav {
@@ -33,6 +38,10 @@
     gap: var(--spacing-sm);
     margin-bottom: var(--spacing-lg);
     border-bottom: 1px solid var(--color-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
 }
 
 .rules-tabs__btn {
@@ -45,6 +54,8 @@
     border-bottom: 2px solid transparent;
     cursor: pointer;
     transition: color var(--transition-fast), border-color var(--transition-fast);
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 .rules-tabs__btn:hover {
@@ -254,6 +265,25 @@
 
 /* Round-robin tables: mobile responsive */
 @media (width <= 768px) {
+    .rules-tabs__nav {
+        flex-wrap: nowrap;
+        padding-bottom: var(--spacing-xs);
+    }
+
+    .rules-subtabs__nav {
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex-wrap: nowrap;
+        padding-bottom: var(--spacing-xs);
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .rules-subtabs__btn {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
     .round-robin-matrix,
     .round-robin-standings {
         font-size: var(--font-size-xs);

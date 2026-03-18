@@ -30,31 +30,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // User dropdown toggle (desktop hover + mobile click via .open)
-    const userMenuToggle = document.getElementById('user-menu-toggle');
-    const userDropdown = document.getElementById('user-dropdown');
-
-    if (userMenuToggle && userDropdown) {
+    function setupUserDropdown(toggleId, dropdownId) {
+        const userMenuToggle = document.getElementById(toggleId);
+        const userDropdown = document.getElementById(dropdownId);
+        if (!userMenuToggle || !userDropdown) return;
         const dropdown = userMenuToggle.closest('.nav-dropdown');
-        if (dropdown) {
-            userMenuToggle.addEventListener('click', function(e) {
-                e.stopPropagation();
-                e.preventDefault();
-                const isOpen = dropdown.classList.contains('open');
-                document.querySelectorAll('.nav-dropdown').forEach(function(d) {
-                    d.classList.remove('open');
-                });
-                if (!isOpen) {
-                    dropdown.classList.add('open');
-                }
+        if (!dropdown) return;
+        userMenuToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            const isOpen = dropdown.classList.contains('open');
+            document.querySelectorAll('.nav-dropdown').forEach(function(d) {
+                d.classList.remove('open');
             });
-
-            document.addEventListener('click', function(e) {
-                if (!dropdown.contains(e.target)) {
-                    dropdown.classList.remove('open');
-                }
-            });
-        }
+            if (!isOpen) {
+                dropdown.classList.add('open');
+            }
+        });
+        document.addEventListener('click', function(e) {
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('open');
+            }
+        });
     }
+    setupUserDropdown('user-menu-toggle', 'user-dropdown');
+    setupUserDropdown('club-user-menu-toggle', 'club-user-dropdown');
 
     // Auto-hide alerts after 5 seconds
     document.querySelectorAll('.alert').forEach(function(el) {
@@ -235,4 +235,43 @@ document.addEventListener('DOMContentLoaded', function() {
             loadTournaments(url.toString(), false);
         });
     }
+
+    // Club dashboard: bottom nav "Ещё" sheet (mobile)
+    (function() {
+        var bottomNav = document.querySelector('.club-bottom-nav');
+        var sheet = document.getElementById('club-bottom-sheet');
+        if (!bottomNav || !sheet) return;
+
+        var moreBtn = bottomNav.querySelector('[data-club-bottom-more]');
+        var backdrop = sheet.querySelector('[data-club-bottom-close]');
+
+        function openSheet() {
+            sheet.classList.add('is-open');
+            sheet.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeSheet() {
+            sheet.classList.remove('is-open');
+            sheet.setAttribute('aria-hidden', 'true');
+        }
+
+        if (moreBtn) {
+            moreBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                openSheet();
+            });
+        }
+
+        if (backdrop) {
+            backdrop.addEventListener('click', function() {
+                closeSheet();
+            });
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSheet();
+            }
+        });
+    })();
 });

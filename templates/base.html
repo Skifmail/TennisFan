@@ -62,8 +62,11 @@
     <!-- /Yandex.Metrika counter -->
 </head>
 
-<body>
+<body class="{% if is_club_panel and club %}body--club-panel{% endif %}">
     <!-- Header -->
+    {% if is_club_panel and club %}
+    {% include "clubs/_club_top_nav.html" %}
+    {% else %}
     <header class="header">
         <div class="container">
             <nav class="nav">
@@ -127,14 +130,10 @@
                             <li><a href="{% url 'my_sparring_matches' %}">Личные встречи</a></li>
                             <li><a href="{% url 'my_trainings' %}">Мои тренировки</a></li>
                             <li><a href="{% url 'clubs:invitations_list' %}">Приглашения в клубы</a></li>
-                            {% if user_clubs %}
-                            <li><a href="{% url 'clubs:my_tournaments' %}">Мой клуб — Турниры</a></li>
-                            <li><a href="{% url 'clubs:my_plan' %}">Мой клуб — Тариф</a></li>
-                            <li><a href="{% url 'clubs:club_rating' %}">Мой клуб — Рейтинг</a></li>
-                            {% if current_club_fee_status is not None %}
-                            <li><a href="{% url 'clubs:my_fees' %}">Мой клуб — Взнос</a></li>
-                            {% endif %}
-                            <li><a href="{% url 'clubs:my_notification_settings' %}">Мой клуб — Уведомления</a></li>
+                            {% if current_club %}
+                            <li><a href="{% url 'clubs:club_public_detail' slug=current_club.slug %}">Мой клуб</a></li>
+                            {% elif user_clubs %}
+                            <li><a href="{% url 'clubs:club_public_detail' slug=user_clubs.0.slug %}">Мой клуб</a></li>
                             {% endif %}
                             <li><a href="{% url 'notifications' %}" class="nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a></li>
                             {% if user.is_staff or user.is_superuser %}
@@ -157,6 +156,7 @@
             </nav>
         </div>
     </header>
+    {% endif %}
 
     <!-- Messages -->
     {% if messages %}
@@ -174,7 +174,6 @@
 
     <!-- Main Content -->
     <main class="main">
-        {% include "clubs/_club_header_context.html" %}
         {% block content %}{% endblock %}
     </main>
 
@@ -271,7 +270,7 @@
                                 <span class="footer-club-cta__label">Управляете клубом?</span>
                                 <span class="footer-club-cta__subtitle">Подключите клуб к платформе и проводите свои турниры.</span>
                             </div>
-                            <a href="{% url 'clubs:register_choice' %}" class="footer-club-cta__button">
+                            <a href="{% url 'clubs:register_step1' %}" class="footer-club-cta__button">
                                 Зарегистрировать клуб
                             </a>
                         </div>

@@ -267,3 +267,434 @@
 .auth-login-logo .coin__front {
     transform: translateZ(4px);
 }
+
+/* ==========================================================================
+   Club registration choice: выбор типа аккаунта (игрок / клуб)
+   ========================================================================== */
+.register-choice {
+    max-width: 960px;
+    margin: 0 auto var(--spacing-3xl);
+}
+
+.register-choice__card {
+    margin-bottom: var(--spacing-xl);
+}
+
+.register-choice__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-xl);
+    padding: var(--spacing-2xl);
+}
+
+.register-choice__option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-xl);
+    text-align: center;
+    text-decoration: none;
+    border-radius: var(--radius-lg);
+    min-height: 190px;
+}
+
+.register-choice__icon {
+    font-size: 2.25rem;
+}
+
+.register-choice__title {
+    display: block;
+    margin-top: 0;
+    font-size: var(--font-size-lg);
+}
+
+.register-choice__text {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+@media (width <= 900px) {
+    .register-choice__grid {
+        padding: var(--spacing-xl);
+        gap: var(--spacing-lg);
+    }
+
+    .register-choice__option {
+        padding: var(--spacing-lg);
+        min-height: 170px;
+    }
+}
+
+@media (width <= 640px) {
+    .register-choice {
+        max-width: 100%;
+    }
+
+    .register-choice__grid {
+        grid-template-columns: 1fr;
+        padding: var(--spacing-lg);
+    }
+
+    .register-choice__option {
+        width: 100%;
+        min-height: 0;
+        padding: var(--spacing-lg) var(--spacing-md);
+    }
+}
+
+/* ==========================================================================
+   Club registration step 1: форма данных клуба
+   ========================================================================== */
+.club-register {
+    max-width: 720px;
+    margin: 0 auto var(--spacing-3xl);
+    width: 100%;
+}
+
+.club-register__card {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-xl);
+    background:
+        radial-gradient(circle at top left, rgb(166 130 74 / 18%) 0%, transparent 55%),
+        radial-gradient(circle at bottom right, rgb(34 197 94 / 12%) 0%, transparent 55%),
+        var(--color-bg-card);
+    border: 1px solid rgb(166 130 74 / 35%);
+    box-shadow:
+        0 22px 60px rgb(0 0 0 / 55%),
+        inset 0 1px 0 rgb(255 255 255 / 4%);
+}
+
+.club-register__card::before {
+    content: "";
+    position: absolute;
+    inset: -1px -1px auto;
+    height: 70px;
+    background:
+        linear-gradient(90deg, rgb(250 204 21 / 40%) 0%, rgb(16 185 129 / 26%) 45%, rgb(37 99 235 / 22%) 100%);
+    opacity: 0.18;
+    pointer-events: none;
+}
+
+.club-register__body {
+    position: relative;
+    z-index: 1;
+    padding: var(--spacing-2xl);
+}
+
+.club-register__body .form-group:last-of-type {
+    margin-bottom: 0;
+}
+
+.club-register__errors {
+    margin-bottom: var(--spacing-xl);
+}
+
+.club-register__actions {
+    margin-top: var(--spacing-xl);
+    flex-wrap: wrap;
+}
+
+.club-register__actions .btn {
+    min-width: 180px;
+}
+
+/* Поля ввода в фирменном стиле: тёмный фон, читаемые подсказки */
+.club-register__body .form-label {
+    color: rgb(224 215 193 / 92%);
+    font-weight: 600;
+}
+
+.club-register__body .form-control,
+.club-register__body input[type="text"],
+.club-register__body input[type="email"],
+.club-register__body input[type="tel"],
+.club-register__body input[type="email"],
+.club-register__body textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 16px;
+    min-height: 44px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgb(166 130 74 / 28%);
+    background: linear-gradient(180deg, rgb(2 36 25 / 95%) 0%, rgb(1 24 17 / 98%) 100%);
+    color: #f6ecd1;
+    font-size: var(--font-size-base);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.club-register__body .form-control::placeholder,
+.club-register__body input::placeholder,
+.club-register__body textarea::placeholder {
+    color: rgb(166 130 74 / 0.65);
+}
+
+.club-register__body .form-control:focus,
+.club-register__body input:focus,
+.club-register__body textarea:focus {
+    outline: none;
+    border-color: rgb(166 130 74 / 0.65);
+    box-shadow: 0 0 0 3px rgb(166 130 74 / 0.15);
+}
+
+.club-register__body textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* Файловый инпут */
+.club-register__body input[type="file"] {
+    padding: 10px 14px;
+    font-size: var(--font-size-sm);
+    color: rgb(224 215 193 / 88%);
+    background: linear-gradient(180deg, rgb(2 36 25 / 95%) 0%, rgb(1 24 17 / 98%) 100%);
+    border: 1px solid rgb(166 130 74 / 28%);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.club-register__body input[type="file"]::file-selector-button {
+    padding: 8px 14px;
+    margin-right: 12px;
+    border: 1px solid rgb(166 130 74 / 35%);
+    border-radius: var(--radius-sm);
+    background: linear-gradient(180deg, rgb(166 130 74 / 0.25) 0%, rgb(166 130 74 / 0.12) 100%);
+    color: #f6ecd1;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.club-register__body .form-help {
+    margin-top: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: rgb(166 130 74 / 0.7);
+}
+
+@media (width <= 768px) {
+    .club-register {
+        max-width: 100%;
+    }
+
+    .club-register__body {
+        padding: var(--spacing-xl) var(--spacing-lg);
+    }
+
+    .club-register__actions {
+        margin-top: var(--spacing-lg);
+    }
+
+    .club-register__actions .btn {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+@media (width <= 480px) {
+    .club-register__body {
+        padding: var(--spacing-lg);
+    }
+
+    .club-register__body .form-control,
+    .club-register__body input, .club-register__body textarea {
+        padding: 10px 14px;
+        min-height: 42px;
+    }
+}
+
+/* ==========================================================================
+   Club plan selector (register_step2)
+   ========================================================================== */
+.club-plan-selector {
+    margin-bottom: var(--spacing-2xl);
+}
+
+.club-plan-period {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-lg) 0;
+    flex-wrap: wrap;
+}
+
+.club-plan-period__label {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+/* Анимированный переключатель период */
+.period-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    background: rgb(166 130 74 / 0.12);
+    border: 1px solid rgb(166 130 74 / 0.25);
+    border-radius: 999px;
+    padding: 4px;
+    min-width: 280px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.period-toggle:hover {
+    border-color: rgb(166 130 74 / 0.4);
+    box-shadow: 0 0 0 1px rgb(166 130 74 / 0.15);
+}
+
+.period-toggle__input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.period-toggle__track {
+    position: absolute;
+    inset: 4px;
+    border-radius: 999px;
+    pointer-events: none;
+}
+
+.period-toggle__slider {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    width: calc(50% - 4px);
+    height: calc(100% - 8px);
+    background: linear-gradient(135deg, rgb(166 130 74 / 0.95) 0%, rgb(139 110 60 / 1) 100%);
+    border-radius: 999px;
+    box-shadow: 0 2px 12px rgb(0 0 0 / 0.3), 0 0 20px rgb(166 130 74 / 0.2);
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 0;
+}
+
+#period-monthly:checked ~ .period-toggle__track .period-toggle__slider {
+    transform: translateX(0);
+}
+
+#period-yearly:checked ~ .period-toggle__track .period-toggle__slider {
+    transform: translateX(100%);
+}
+
+.period-toggle__label {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    padding: 10px 14px;
+    text-align: center;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: rgba(255 255 255 / 0.6);
+    cursor: pointer;
+    transition: color 0.25s ease;
+}
+
+.period-toggle__label:hover {
+    color: rgba(255 255 255 / 0.85);
+}
+
+#period-monthly:checked ~ .period-toggle__label--monthly,
+#period-yearly:checked ~ .period-toggle__label--yearly {
+    color: #fff;
+    text-shadow: 0 0 12px rgb(255 255 255 / 0.3);
+}
+
+.period-toggle__badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgb(76 175 80 / 0.9);
+    color: #fff;
+    border-radius: 100px;
+    vertical-align: middle;
+}
+
+.club-plan-grid {
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: var(--spacing-md);
+}
+
+.club-plan-card-wrapper {
+    position: relative;
+    display: block;
+    border-radius: 20px;
+}
+
+.club-plan-card {
+    cursor: pointer;
+    position: relative;
+    height: 100%;
+    margin: 0;
+}
+
+.club-plan-card .club-plan-radio {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.club-plan-card__check {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #4caf50;
+    color: #fff;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgb(76 175 80 / 0.5);
+    opacity: 0;
+    transform: scale(0.5);
+    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 2;
+}
+
+.club-plan-card:has(.club-plan-radio:checked) .club-plan-card__check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.club-plan-card:has(.club-plan-radio:checked) {
+    border-color: rgb(76 175 80 / 0.55);
+    box-shadow: 0 0 0 1px rgb(76 175 80 / 0.28), 0 14px 34px rgb(0 0 0 / 0.16);
+}
+
+.club-plan-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-xl);
+    padding-top: var(--spacing-xl);
+    border-top: 1px solid var(--color-border);
+}
+
+@media (width <= 900px) {
+    .club-plan-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (width <= 480px) {
+    .club-plan-period {
+        flex-direction: column;
+        gap: var(--spacing-md);
+    }
+
+    .period-toggle {
+        min-width: 100%;
+        width: 100%;
+    }
+}

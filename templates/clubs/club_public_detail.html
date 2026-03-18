@@ -1,54 +1,229 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}{{ club.name }}{% endblock %}
+
 {% block content %}
-<div class="page-header">
-    <div style="display: flex; align-items: center; gap: var(--spacing-lg); flex-wrap: wrap;">
-        {% if club.logo %}
-        <img src="{{ club.logo.url }}" alt="{{ club.name }}" style="width: 80px; height: 80px; object-fit: contain; border-radius: 8px;">
-        {% endif %}
-        <div>
-            <h1 class="page-title">{{ club.name }}</h1>
-            <p class="page-subtitle">{{ club.city }}{% if club.address %} · {{ club.address }}{% endif %}</p>
+<section class="club-public__hero{% if club.hero_image %} club-public__hero--image{% endif %}"
+    {% if club.hero_image %}style="--club-hero-bg-image: url('{{ club.hero_image.url }}');"{% endif %}>
+    <div class="container container--club-public">
+        <div class="club-public__hero-grid">
+            <div class="club-public__panel club-public__identity">
+                <div class="club-public__brand">
+                    {% if club.logo %}
+                    <div class="club-public__logo-wrap">
+                        <img src="{{ club.logo.url }}" alt="{{ club.name }}">
+                    </div>
+                    {% else %}
+                    <div class="club-public__logo-fallback">{{ club.name|first|upper }}</div>
+                    {% endif %}
+                    <div>
+                        <h1 class="club-public__title">{{ club.name }}</h1>
+                        <div class="club-public__location">
+                            <span class="club-public__location-dot"></span>
+                            <span>{{ club.city }}</span>
+                            {% if club.address %}
+                            <span>·</span>
+                            <span>{{ club.address }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if club.description %}
+                <p class="club-public__description">{{ club.description|truncatewords:34 }}</p>
+                {% endif %}
+
+                <div class="club-public__actions">
+                    {% if cta_variant == 'manage' %}
+                    <a href="{{ cta_url }}" class="btn btn-primary club-public__btn--manage">{{ cta_label }}</a>
+                    {% else %}
+                    <a href="{{ cta_url }}" class="btn btn-primary club-public__btn--join">{{ cta_label }}</a>
+                    {% endif %}
+                    {% if not is_member and not is_pending_invite and not user.is_authenticated %}
+                    <a href="{{ join_url }}" class="btn btn-outline">Узнать подробнее</a>
+                    {% elif is_pending_invite %}
+                    <a href="{% url 'clubs:invitations_list' %}" class="btn btn-outline">У вас приглашение в клуб</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <aside class="club-public__panel club-public__stats">
+                <h2 class="club-public__stats-title">О клубе в цифрах</h2>
+                <div class="club-public__stats-grid">
+                    <div class="club-public__metric">
+                        <div class="club-public__metric-value club-public__metric-value--accent">{{ members_count }}</div>
+                        <div class="club-public__metric-label">Игроков</div>
+                    </div>
+                    <div class="club-public__metric">
+                        <div class="club-public__metric-value">{{ active_tournaments_count }}</div>
+                        <div class="club-public__metric-label">Активных турниров</div>
+                    </div>
+                    <div class="club-public__metric">
+                        <div class="club-public__metric-value">{% if foundation_year %}с {{ foundation_year }}{% else %}на платформе{% endif %}</div>
+                        <div class="club-public__metric-label">{{ club.city }}</div>
+                    </div>
+                </div>
+
+                {% if club.email or club.phone %}
+                <div class="club-public__contacts">
+                    {% if club.email %}
+                    <div class="club-public__contact">
+                        <span class="club-public__contact-icon club-public__contact-icon--mail">@</span>
+                        <div>
+                            <div class="club-public__contact-label">Email</div>
+                            <a href="mailto:{{ club.email }}">{{ club.email }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if club.phone %}
+                    <div class="club-public__contact">
+                        <span class="club-public__contact-icon club-public__contact-icon--phone">☎</span>
+                        <div>
+                            <div class="club-public__contact-label">Телефон</div>
+                            <a href="tel:{{ club.phone }}">{{ club.phone }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </aside>
         </div>
     </div>
-</div>
-<div class="container" style="max-width: 800px;">
-    {% if club.description %}
-    <div class="card" style="margin-bottom: var(--spacing-lg);">
-        <div class="card-body">
-            <h2 style="font-size: 1.1rem;">О клубе</h2>
-            <p>{{ club.description }}</p>
+</section>
+
+<section class="club-public__content">
+    <div class="container container--club-public">
+        <div class="club-public__layout">
+            <div>
+                {% if club.description %}
+                <article class="card club-public__card club-public__card--spaced">
+                    <div class="card-body">
+                        <h2 class="club-public__section-title">О клубе</h2>
+                        <p class="club-public__about-text">{{ club.description }}</p>
+                    </div>
+                </article>
+                {% endif %}
+
+                <section class="card club-public__card">
+                    <div class="card-body">
+                        <div class="club-public__section-head">
+                            <h2 class="club-public__section-title">Открытые турниры клуба</h2>
+                            {% if upcoming_tournaments %}
+                            <span class="club-public__section-count">{{ upcoming_tournaments|length }} турнир(ов)</span>
+                            {% endif %}
+                        </div>
+
+                        {% if upcoming_tournaments %}
+                        <div class="club-public__tournament-grid">
+                            {% for t in upcoming_tournaments %}
+                            <article class="club-public__tournament-card">
+                                <header>
+                                    <h3 class="club-public__tournament-title">
+                                        <a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a>
+                                    </h3>
+                                    <p class="club-public__tournament-date">
+                                        {{ t.start_date }}{% if t.end_date and t.end_date != t.start_date %} — {{ t.end_date }}{% endif %}
+                                    </p>
+                                </header>
+
+                                <dl class="club-public__tournament-meta">
+                                    <div>
+                                        <dt>Формат</dt>
+                                        <dd>{{ t.get_format_display }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Категория</dt>
+                                        <dd>{{ t.get_gender_display }}, {{ t.get_variant_display }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Свободных мест</dt>
+                                        <dd>
+                                            {% with slots=t.available_slots %}
+                                            {% if slots > 0 %}
+                                            {{ slots }} мест
+                                            {% else %}
+                                            Запись ограничена
+                                            {% endif %}
+                                            {% endwith %}
+                                        </dd>
+                                    </div>
+                                </dl>
+
+                                <div class="club-public__tournament-footer">
+                                    <a href="{% url 'tournament_detail' slug=t.slug %}" class="btn btn-sm btn-primary">Записаться</a>
+                                    {% if t.entry_fee and t.entry_fee|floatformat:0 != "0" %}
+                                    <span class="club-public__tournament-fee">Взнос {{ t.entry_fee }} ₽</span>
+                                    {% endif %}
+                                </div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="club-public__empty">
+                            <p>Нет открытых турниров.</p>
+                            <p>Подпишитесь на клуб, чтобы первыми узнавать о новых событиях.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </section>
+            </div>
+
+            <aside>
+                <article class="card club-public__card club-public__card--spaced club-public__matches-widget">
+                    <div class="card-body">
+                        <div class="club-public__section-head">
+                            <h2 class="club-public__section-title">Последние матчи клуба</h2>
+                            {% if recent_club_matches %}
+                            <span class="club-public__section-count">{{ recent_club_matches|length }} матч(ей)</span>
+                            {% endif %}
+                        </div>
+
+                        {% if recent_club_matches %}
+                        <div class="club-public__matches-list">
+                            {% for match in recent_club_matches %}
+                            <a href="{{ match.match_url }}" class="club-public__match-item">
+                                <div class="club-public__match-top">
+                                    <span class="club-public__match-tournament">{{ match.tournament_name }}</span>
+                                    <span class="club-public__match-date">{{ match.date|date:"d.m.Y" }}</span>
+                                </div>
+                                <div class="club-public__match-body">
+                                    <div class="club-public__match-player">
+                                        {% include 'includes/avatar.html' with url=match.p1_avatar class="club-public__match-avatar" %}
+                                        <span class="club-public__match-name">{{ match.player1 }}</span>
+                                    </div>
+                                    <div class="club-public__match-score">{{ match.score }}</div>
+                                    <div class="club-public__match-player club-public__match-player--right">
+                                        <span class="club-public__match-name">{{ match.player2 }}</span>
+                                        {% include 'includes/avatar.html' with url=match.p2_avatar class="club-public__match-avatar" %}
+                                    </div>
+                                </div>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="club-public__empty">
+                            <p>У клуба пока нет завершённых матчей.</p>
+                            <p>Когда появятся результаты, они будут показаны здесь.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </article>
+
+                {% if not is_member and user.is_authenticated and not is_pending_invite %}
+                <article class="card club-public__card">
+                    <div class="card-body">
+                        <h3 class="club-public__hint-title">Как вступить в клуб</h3>
+                        <p class="club-public__hint-text">
+                            Для вступления в этот клуб администратор должен отправить вам приглашение.
+                        </p>
+                        <p class="club-public__hint-text">
+                            Попросите администратора поделиться инвайт-ссылкой или добавить вас по email.
+                        </p>
+                    </div>
+                </article>
+                {% endif %}
+            </aside>
         </div>
     </div>
-    {% endif %}
-    {% if club.email or club.phone %}
-    <p style="margin-bottom: var(--spacing-lg);">Контакты: {% if club.email %}<a href="mailto:{{ club.email }}">{{ club.email }}</a>{% endif %}{% if club.phone %} · {{ club.phone }}{% endif %}</p>
-    {% endif %}
-    {% if upcoming_tournaments %}
-    <div class="card" style="margin-bottom: var(--spacing-lg);">
-        <div class="card-body">
-            <h2 style="font-size: 1.1rem;">Ближайшие турниры</h2>
-            <ul>
-                {% for t in upcoming_tournaments %}
-                <li><a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a> — {{ t.start_date }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-    {% endif %}
-    <div class="card">
-        <div class="card-body">
-            {% if is_member %}
-            <p>Вы уже в этом клубе. <a href="{% url 'clubs:dashboard' slug=club.slug %}">Панель клуба</a></p>
-            {% elif is_pending_invite %}
-            <p>Вам отправлено приглашение. <a href="{% url 'clubs:invitations_list' %}">Принять или отклонить</a></p>
-            {% elif user.is_authenticated %}
-            <p>Для вступления в клуб получите пригласительную ссылку от администратора.</p>
-            {% else %}
-            <a href="{{ join_url }}" class="btn btn-primary">Вступить в клуб</a>
-            {% endif %}
-        </div>
-    </div>
-</div>
+</section>
 {% endblock %}

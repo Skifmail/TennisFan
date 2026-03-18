@@ -1,0 +1,112 @@
+{% load static %}
+<header class="header header--club">
+    <div class="container">
+        <nav class="nav">
+            <button class="nav-toggle" aria-label="Меню" id="nav-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
+            <a href="{% url 'home' %}" class="logo">
+                <span class="logo-text">Tennis<span class="logo-accent">Fan</span></span>
+                <img src="{% static 'images/logo.svg' %}" class="coin-logo" alt="TennisFan логотип">
+                <span class="logo-text logo-text-ru">Теннис<span class="logo-accent">Фан</span></span>
+            </a>
+
+            <div class="nav-menu-desktop">
+                <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="club-top-nav__club-pill">
+                    <span class="club-top-nav__club-logo">
+                        {% if club.logo %}
+                        <img src="{{ club.logo.url }}" alt="">
+                        {% else %}
+                        <span class="club-top-nav__club-logo-fallback">{{ club.name|first|upper }}</span>
+                        {% endif %}
+                    </span>
+                    <span class="club-top-nav__club-name">{{ club.name }}</span>
+                </a>
+                {% if can_manage_club %}
+                <a href="{% url 'clubs:dashboard' slug=club.slug %}" class="btn btn-ghost btn-sm">
+                    Панель клуба
+                </a>
+                {% else %}
+                <a href="{% url 'clubs:my_dashboard' %}" class="btn btn-ghost btn-sm">
+                    Мой клуб
+                </a>
+                {% endif %}
+                <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="btn btn-ghost btn-sm">
+                    Публичная страница
+                </a>
+                <a href="{% url 'home' %}" class="btn btn-primary btn-sm">
+                    На платформу
+                </a>
+            </div>
+
+        </nav>
+    </div>
+    <div class="nav-menu-mobile club-nav-mobile club-nav-mobile--fullwidth" id="nav-menu-mobile">
+        <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="club-nav-mobile__pill nav-menu-link">
+            <span class="club-top-nav__club-logo">
+                {% if club.logo %}
+                <img src="{{ club.logo.url }}" alt="">
+                {% else %}
+                <span class="club-top-nav__club-logo-fallback">{{ club.name|first|upper }}</span>
+                {% endif %}
+            </span>
+            <span class="club-nav-mobile__club-name">{{ club.name }}</span>
+        </a>
+        <div class="club-nav-mobile__links">
+            {% if can_manage_club %}
+            <a href="{% url 'clubs:dashboard' slug=club.slug %}" class="club-nav-mobile__link nav-menu-link">Панель клуба</a>
+            {% else %}
+            <a href="{% url 'clubs:my_dashboard' %}" class="club-nav-mobile__link nav-menu-link">Мой клуб</a>
+            {% endif %}
+            <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="club-nav-mobile__link nav-menu-link">Публичная страница</a>
+            <a href="{% url 'home' %}" class="club-nav-mobile__link club-nav-mobile__link--primary nav-menu-link">На платформу</a>
+        </div>
+        {% if user.is_authenticated %}
+        <div class="club-nav-mobile__user">
+            <div class="nav-dropdown">
+                <button type="button" class="nav-dropdown-toggle club-nav-mobile__user-btn" id="club-user-menu-toggle">
+                    {% if user.player %}
+                    <span class="nav-user-avatar-wrap">
+                        {% if user.player.avatar %}
+                        <img src="{{ user.player.avatar.url }}" alt="" class="nav-user-avatar">
+                        {% else %}
+                        <span class="nav-user-avatar nav-user-avatar--fallback">{{ user.first_name|default:'?'|slice:':1'|upper }}</span>
+                        {% endif %}
+                    </span>
+                    {% with fn=user.first_name ln=user.last_name %}
+                    <span class="user-name-text">{% if fn %}{{ fn|upper }}{% else %}{{ user.player|stringformat:'s'|upper }}{% endif %}{% if ln %} {{ ln|slice:':1'|upper }}.{% endif %}</span>
+                    {% endwith %}
+                    {% else %}
+                    <span class="user-name-text">{{ user.email|truncatechars:10 }}</span>
+                    {% endif %}
+                    <span class="nav-dropdown-arrow">▼</span>
+                </button>
+                <ul class="nav-dropdown-content club-nav-mobile__dropdown" id="club-user-dropdown">
+                    {% if user.player %}
+                    <li><a href="{% url 'profile' pk=user.player.pk %}">Профиль</a></li>
+                    {% endif %}
+                    <li><a href="{% url 'pricing' %}">Купить подписку</a></li>
+                    <li><a href="{% url 'my_matches' %}">Мои матчи</a></li>
+                    <li><a href="{% url 'my_sparring_matches' %}">Личные встречи</a></li>
+                    <li><a href="{% url 'my_trainings' %}">Мои тренировки</a></li>
+                    <li><a href="{% url 'clubs:invitations_list' %}">Приглашения в клубы</a></li>
+                    <li><a href="{% url 'notifications' %}" class="nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a></li>
+                    {% if user.is_staff or user.is_superuser %}
+                    <li><a href="{% url 'admin:index' %}">Админ панель</a></li>
+                    {% endif %}
+                    <li>
+                        <form action="{% url 'logout' %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit">Выйти</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</header>
+

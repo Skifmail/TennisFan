@@ -37,14 +37,12 @@
                             </td>
                             <td style="padding: var(--spacing-sm);">{{ row.plan.monthly_fee }} ₽/мес</td>
                             <td style="padding: var(--spacing-sm);">
-                                Турниры:
+                                Лимит турниров:
                                 {% if row.plan.max_tournaments_per_month is None %}
                                     безлимит
                                 {% else %}
-                                    {{ row.plan.max_tournaments_per_month }}
+                                    {{ row.plan.max_tournaments_per_month }}/мес
                                 {% endif %}
-                                <br>
-                                Слоты: {{ row.plan.monthly_slots }}
                             </td>
                             <td style="padding: var(--spacing-sm);">
                                 <label>

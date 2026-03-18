@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Межклубные заявки — {{ club.name }}{% endblock %}
 {% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="interclub" %}
 <div class="page-header">
     <h1 class="page-title">Межклубные заявки</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
 <div class="container" style="max-width: 960px;">
-    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a></p>
     <div style="margin-bottom: var(--spacing-lg); display: flex; gap: var(--spacing-sm); flex-wrap: wrap;">
         <a href="{% url 'clubs:interclub_applications' slug=club.slug %}" class="btn btn-ghost btn-sm {% if not current_status_filter %}btn-primary{% endif %}">Все</a>
         <a href="{% url 'clubs:interclub_applications' slug=club.slug %}?status=pending" class="btn btn-ghost btn-sm {% if current_status_filter == 'pending' %}btn-primary{% endif %}">На рассмотрении</a>

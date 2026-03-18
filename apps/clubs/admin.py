@@ -34,6 +34,7 @@ from .models import (
     ClubSubscriptionStatus,
     ClubTournamentApplication,
     PlatformAuditLog,
+    PlatformPlan,
     PlatformSettings,
 )
 from .services import log_platform_action
@@ -435,10 +436,8 @@ class ClubPlayerPlanAdmin(admin.ModelAdmin):
         "is_active",
         "monthly_fee",
         "max_tournaments_per_month",
-        "monthly_slots",
-        "allow_rollover_slots",
     )
-    list_filter = ("is_active", "allow_rollover_slots", "club")
+    list_filter = ("is_active", "club")
     search_fields = ("name", "club__name")
     ordering = ("club", "sort_order", "name")
 
@@ -471,7 +470,7 @@ class ClubPlanTournamentAccessAdmin(admin.ModelAdmin):
 
 @admin.register(ClubPlanSlotUsage)
 class ClubPlanSlotUsageAdmin(admin.ModelAdmin):
-    """Админка учёта лимитов и слотов тарифов."""
+    """Админка учёта лимитов тарифов."""
 
     list_display = (
         "club_member",
@@ -479,9 +478,6 @@ class ClubPlanSlotUsageAdmin(admin.ModelAdmin):
         "period_year",
         "period_month",
         "tournaments_used",
-        "slots_used",
-        "rollover_in",
-        "rollover_out",
     )
     list_filter = ("period_year", "period_month", "plan__club")
     search_fields = ("club_member__user__email", "plan__name", "plan__club__name")
@@ -491,6 +487,68 @@ class ClubPlanSlotUsageAdmin(admin.ModelAdmin):
 # ---------------------------------------------------------------------------
 # Аудит-лог и настройки платформы
 # ---------------------------------------------------------------------------
+
+
+@admin.register(PlatformPlan)
+class PlatformPlanAdmin(admin.ModelAdmin):
+    """Редактируемые тарифы платформы (Старт/Базовый/Про)."""
+
+    list_display = (
+        "name",
+        "price_monthly",
+        "price_yearly",
+        "max_tournaments_per_month",
+        "max_members",
+        "trial_days",
+        "is_public_page",
+        "is_open_interclub",
+        "is_active",
+        "sort_order",
+    )
+    list_editable = (
+        "price_monthly",
+        "price_yearly",
+        "max_tournaments_per_month",
+        "max_members",
+        "trial_days",
+        "is_public_page",
+        "is_open_interclub",
+        "is_active",
+        "sort_order",
+    )
+    search_fields = ("name",)
+    ordering = ("sort_order", "slug")
+    exclude = ("slug",)
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": ("name", "description", "is_active", "sort_order"),
+            },
+        ),
+        (
+            "Цены",
+            {
+                "fields": ("price_monthly", "price_yearly"),
+            },
+        ),
+        (
+            "Возможности",
+            {
+                "fields": (
+                    "max_tournaments_per_month",
+                    "max_members",
+                    "trial_days",
+                    "is_public_page",
+                    "is_open_interclub",
+                ),
+            },
+        ),
+    )
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Запрет добавления: тарифы создаются миграцией, slug менять нельзя."""
+        return False
 
 
 @admin.register(PlatformAuditLog)

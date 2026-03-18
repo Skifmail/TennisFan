@@ -2,6 +2,7 @@
 Модели клубного раздела: клубы, подписки, участники, инвайты, взносы, рейтинги, заявки на турниры.
 """
 
+import decimal
 from typing import cast
 
 from django.conf import settings
@@ -88,6 +89,83 @@ class ClubApplicationStatus(models.TextChoices):
     REJECTED = "rejected", "Отклонена"
 
 
+class PlatformPlan(models.Model):
+    """
+    Редактируемый тариф подписки клуба на платформу (Старт/Базовый/Про).
+
+    slug должен совпадать со значением ClubPlan (start, basic, pro) для совместимости
+    с ClubSubscription.plan. Владелец платформы редактирует цены и возможности в админке.
+    """
+
+    slug = models.SlugField(
+        "Код тарифа",
+        max_length=20,
+        unique=True,
+        help_text="Должен совпадать с ClubPlan: start, basic, pro",
+    )
+    name = models.CharField("Название", max_length=100)
+    description = models.TextField(
+        "Описание возможностей",
+        blank=True,
+        help_text="Краткое описание для отображения при выборе тарифа",
+    )
+    price_monthly = models.DecimalField(
+        "Цена за месяц (₽)",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+    price_yearly = models.DecimalField(
+        "Цена за год (₽)",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+    max_tournaments_per_month = models.PositiveIntegerField(
+        "Лимит турниров в месяц",
+        null=True,
+        blank=True,
+        help_text="Пусто — без лимита",
+    )
+    max_members = models.PositiveIntegerField(
+        "Лимит участников клуба",
+        null=True,
+        blank=True,
+        help_text="Пусто — без лимита. Учитываются активные и приглашённые.",
+    )
+    trial_days = models.PositiveIntegerField(
+        "Пробный период (дней)",
+        default=0,
+        help_text="Для тарифа Старт обычно 14",
+    )
+    is_public_page = models.BooleanField(
+        "Публичная страница клуба",
+        default=True,
+        help_text="На тарифе Старт — обычно False",
+    )
+    is_open_interclub = models.BooleanField(
+        "Межклубные турниры",
+        default=False,
+        help_text="Доступно только для тарифа Про",
+    )
+    is_active = models.BooleanField("Активен", default=True)
+    sort_order = models.PositiveSmallIntegerField("Порядок отображения", default=0)
+
+    class Meta:
+        verbose_name = "Тариф платформы"
+        verbose_name_plural = "Тарифы платформы"
+        ordering = ["sort_order", "slug"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.slug})"
+
+    def get_price_for_period(self, period: str) -> decimal.Decimal:
+        """Возвращает цену для периода (monthly/yearly)."""
+        if period == "monthly":
+            return cast(decimal.Decimal, self.price_monthly)
+        return cast(decimal.Decimal, self.price_yearly)
+
+
 class Club(CompressImageFieldsMixin, models.Model):
     """
     Клуб — организация (теннисный клуб), зарегистрированная на платформе по подписке.
@@ -102,6 +180,13 @@ class Club(CompressImageFieldsMixin, models.Model):
         upload_to="clubs/",
         blank=True,
         validators=[validate_image_max_2mb],
+    )
+    hero_image = models.ImageField(
+        "Баннер публичной страницы",
+        upload_to="clubs/banners/",
+        blank=True,
+        validators=[validate_image_max_2mb],
+        help_text="Рекомендуется широкое изображение 1920×600 px, без текста, JPG/PNG/WebP до 2 МБ.",
     )
     email = models.EmailField("Контактный email")
     phone = models.CharField("Телефон", max_length=50, blank=True)
@@ -241,9 +326,11 @@ class ClubPlayerPlan(models.Model):
         name: Название тарифа (например, Юниор/VIP).
         monthly_fee: Ежемесячный взнос по тарифу.
         max_tournaments_per_month: Лимит турниров в месяц (None — без лимита).
-        monthly_slots: Базовый лимит слотов на месяц.
-        allow_rollover_slots: Разрешён перенос неиспользованных слотов.
-        rollover_cap: Максимум переносимых слотов.
+
+    Логика лимитов (аналогично глобальной платформе):
+        - Однодневные турниры: лимит НЕ расходуется (оплата взноса, если есть)
+        - Многодневные с взносом: лимит расходуется, если есть; иначе оплата взноса
+        - Многодневные без взноса: лимит обязателен и расходуется
     """
 
     club = models.ForeignKey(
@@ -265,15 +352,7 @@ class ClubPlayerPlan(models.Model):
         "Лимит турниров в месяц",
         null=True,
         blank=True,
-    )
-    monthly_slots = models.PositiveIntegerField("Слотов в месяц", default=0)
-    allow_rollover_slots = models.BooleanField(
-        "Разрешить перенос слотов на следующий месяц",
-        default=False,
-    )
-    rollover_cap = models.PositiveIntegerField(
-        "Лимит переносимых слотов",
-        default=0,
+        help_text="Пусто — без лимита. Однодневные турниры не расходуют лимит.",
     )
     allow_self_change = models.BooleanField(
         "Разрешить самостоятельную смену тарифа игроком",
@@ -301,19 +380,6 @@ class ClubPlayerPlan(models.Model):
                 condition=models.Q(max_tournaments_per_month__gte=0)
                 | models.Q(max_tournaments_per_month__isnull=True),
                 name="club_player_plan_tournaments_gte_0_or_null",
-            ),
-            models.CheckConstraint(
-                condition=models.Q(monthly_slots__gte=0),
-                name="club_player_plan_monthly_slots_gte_0",
-            ),
-            models.CheckConstraint(
-                condition=models.Q(rollover_cap__gte=0),
-                name="club_player_plan_rollover_cap_gte_0",
-            ),
-            models.CheckConstraint(
-                condition=models.Q(allow_rollover_slots=True)
-                | models.Q(rollover_cap=0),
-                name="club_player_plan_rollover_cap_when_disabled",
             ),
         ]
 
@@ -428,10 +494,8 @@ class ClubPlanSlotUsage(models.Model):
         plan: Тариф, по которому учитывается usage.
         period_year: Год учётного периода.
         period_month: Месяц учётного периода.
-        tournaments_used: Сколько турниров использовано.
-        slots_used: Сколько слотов использовано.
-        rollover_in: Сколько слотов перенесено из прошлого периода.
-        rollover_out: Сколько слотов перенесено в следующий период.
+        tournaments_used: Сколько турниров (лимитных) использовано.
+            Платные однодневные турниры не учитываются.
     """
 
     club_member = models.ForeignKey(
@@ -449,16 +513,13 @@ class ClubPlanSlotUsage(models.Model):
     period_year = models.PositiveIntegerField("Год периода")
     period_month = models.PositiveSmallIntegerField("Месяц периода")
     tournaments_used = models.PositiveIntegerField("Турниров использовано", default=0)
-    slots_used = models.PositiveIntegerField("Слотов использовано", default=0)
-    rollover_in = models.PositiveIntegerField("Перенесено в период", default=0)
-    rollover_out = models.PositiveIntegerField("Перенесено из периода", default=0)
     created_at = models.DateTimeField("Дата создания", auto_now_add=True)
     updated_at = models.DateTimeField("Дата обновления", auto_now=True)
 
     class Meta:
         db_table = "club_plan_slot_usage"
-        verbose_name = "Учёт слотов тарифа"
-        verbose_name_plural = "Учёт слотов тарифов"
+        verbose_name = "Учёт лимитов тарифа"
+        verbose_name_plural = "Учёт лимитов тарифов"
         ordering = ["-period_year", "-period_month", "club_member_id"]
         constraints = [
             models.UniqueConstraint(
@@ -474,7 +535,7 @@ class ClubPlanSlotUsage(models.Model):
     def __str__(self) -> str:
         return (
             f"{self.club_member} — {self.period_year:04d}-{self.period_month:02d} "
-            f"(турниры={self.tournaments_used}, слоты={self.slots_used})"
+            f"(турниров={self.tournaments_used})"
         )
 
 

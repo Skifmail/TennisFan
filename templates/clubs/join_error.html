@@ -11,6 +11,10 @@
     <p class="page-subtitle">Срок действия ссылки истёк.</p>
     {% elif error == "limit_reached" %}
     <p class="page-subtitle">Лимит использований ссылки исчерпан.</p>
+    {% elif error == "member_limit" %}
+    <p class="page-subtitle">{% if message %}{{ message }}{% else %}Достигнут лимит участников клуба по тарифу.{% endif %}</p>
+    {% elif error == "club_suspended" %}
+    <p class="page-subtitle">{% if message %}{{ message }}{% else %}Клуб приостановлен. Вступление временно недоступно.{% endif %}</p>
     {% else %}
     <p class="page-subtitle">Невозможно вступить по этой ссылке.</p>
     {% endif %}

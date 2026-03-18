@@ -5,22 +5,54 @@
     <h1 class="page-title">Активация клуба</h1>
     <p class="page-subtitle">Шаг 3 из 3</p>
 </div>
-<div class="container" style="max-width: 560px;">
+<div class="container" style="max-width: 720px;">
     <div class="card" style="margin-bottom: var(--spacing-lg);">
-        <div class="card-body" style="padding: var(--spacing-2xl);">
-            <p><strong>{{ step1.name }}</strong> · {{ step1.city }}</p>
-            <p>Тариф: {{ plan_label }} ({{ period }}).</p>
-            {% if plan == "start" %}
+        <div class="card-body" style="padding: var(--spacing-2xl) var(--spacing-2xl) var(--spacing-xl);">
+            <div style="margin-bottom: var(--spacing-xl);">
+                <p style="font-size: var(--font-size-lg); font-weight: 600;">
+                    {{ step1.name }}{% if step1.city %} · {{ step1.city }}{% endif %}
+                </p>
+                <p style="margin-top: var(--spacing-xs); color: var(--color-text-secondary);">
+                    Вы выбрали тариф <strong>{{ plan_label }}</strong> ({{ period }}).
+                </p>
+            </div>
+
             <form method="post">
                 {% csrf_token %}
-                <p>Активировать бесплатный пробный период 14 дней для тарифа Старт.</p>
-                <button type="submit" class="btn btn-primary">Активировать бесплатно</button>
-                <a href="{% url 'clubs:register_step2' %}" class="btn btn-ghost">← Назад</a>
+                <div style="margin-bottom: var(--spacing-xl); padding: var(--spacing-lg) var(--spacing-xl); border-radius: var(--radius-md); background: rgb(5 43 31 / 0.9); border: 1px solid rgb(166 130 74 / 0.35);">
+                    {% if plan == "start" %}
+                    <p style="margin-bottom: var(--spacing-sm);">
+                        <strong>Что произойдёт дальше</strong>
+                    </p>
+                    <p style="margin-bottom: var(--spacing-xs);">
+                        Клуб будет создан с бесплатным пробным периодом <strong>14 дней</strong> по тарифу
+                        <strong>Старт</strong>.
+                    </p>
+                    <p style="margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                        После создания вы сможете в любой момент перейти в раздел «Подписка» и протестировать оплату
+                        через ЮKassa в тестовом режиме.
+                    </p>
+                    {% else %}
+                    <p style="margin-bottom: var(--spacing-sm);">
+                        <strong>Как активируется клуб</strong>
+                    </p>
+                    <p style="margin-bottom: var(--spacing-xs);">
+                        На этапе регистрации клуб создаётся с бесплатным пробным периодом по тарифу
+                        <strong>Старт</strong> (14 дней).
+                    </p>
+                    <p style="margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                        После создания вы сможете открыть раздел «Подписка» в панели клуба и
+                        <strong>оформить оплату выбранного тарифа</strong> («Старт», «Базовый» или «Про»)
+                        через ЮKassa (тестовый режим уже подключён).
+                    </p>
+                    {% endif %}
+                </div>
+
+                <div style="display: flex; gap: var(--spacing-md); align-items: center;">
+                    <button type="submit" class="btn btn-primary">Создать клуб</button>
+                    <a href="{% url 'clubs:register_step2' %}" class="btn btn-ghost">← Назад</a>
+                </div>
             </form>
-            {% else %}
-            <p class="alert alert-info">Оплата тарифов Базовый и Про будет доступна в следующей версии. Пока можно активировать только тариф Старт (пробный период).</p>
-            <a href="{% url 'clubs:register_step2' %}" class="btn btn-primary">Выбрать тариф Старт</a>
-            {% endif %}
         </div>
     </div>
 </div>

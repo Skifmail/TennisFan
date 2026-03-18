@@ -34,6 +34,8 @@
 @import url('./pages/legal.css');
 @import url('./pages/sparring.css');
 @import url('./pages/bracket.css');
+@import url('./pages/club-public-detail.css');
+@import url('./pages/club-dashboard.css');
 @import url('./components/modals.css');
 @import url('./components/rating.css');
 @import url('./components/chat.css');

@@ -12,6 +12,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import models
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -217,15 +218,18 @@ def home(request):
     """Home page view. Формирование сеток по дедлайну выполняется по cron (generate_brackets_past_deadlines)."""
     tournaments = (
         Tournament.objects.filter(
-            status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE]
+            status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE],
         )
+        .filter(models.Q(club__isnull=True) | models.Q(is_open_interclub=True))
         .select_related("court")
         .prefetch_related("participants__user", "allowed_categories")
     )
 
+    upcoming_tournaments = Tournament.objects.filter(
+        status=TournamentStatus.UPCOMING,
+    ).filter(models.Q(club__isnull=True) | models.Q(is_open_interclub=True))
     upcoming_tournaments = (
-        Tournament.objects.filter(status=TournamentStatus.UPCOMING)
-        .select_related("court")
+        upcoming_tournaments.select_related("court")
         .prefetch_related("allowed_categories")
         .order_by("start_date")[:6]
     )
@@ -291,8 +295,10 @@ def home(request):
         ),
         "tournaments_count": format_number(
             Tournament.objects.filter(
-                status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE]
-            ).count()
+                status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE],
+            )
+            .filter(models.Q(club__isnull=True) | models.Q(is_open_interclub=True))
+            .count()
         ),
         "matches_count": format_number(
             Match.objects.filter(

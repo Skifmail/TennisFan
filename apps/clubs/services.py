@@ -29,18 +29,89 @@ from .models import (
     ClubSubscriptionStatus,
     FeePeriod,
     PlatformAuditLog,
+    PlatformPlan,
     PlatformSettings,
 )
 
 # Дней до конца периода, при которых показываем «истекает через N дней»
 FEE_EXPIRING_DAYS = 7
 
-# Лимиты турниров в месяц по тарифу клуба (None — без лимита)
-CLUB_PLAN_TOURNAMENTS_PER_MONTH = {
-    ClubPlan.START: 1,
-    ClubPlan.BASIC: 5,
-    ClubPlan.PRO: None,
-}
+
+def get_platform_plan(slug: str) -> PlatformPlan | None:
+    """
+    Возвращает тариф платформы по slug (start, basic, pro).
+
+    Args:
+        slug: Код тарифа, совпадающий с ClubPlan.
+
+    Returns:
+        PlatformPlan или None, если не найден.
+    """
+    return cast(
+        PlatformPlan | None,
+        PlatformPlan.objects.filter(slug=slug, is_active=True).first(),
+    )
+
+
+def get_platform_plans() -> list[PlatformPlan]:
+    """Возвращает список активных тарифов платформы."""
+    return list(
+        PlatformPlan.objects.filter(is_active=True).order_by("sort_order", "slug")
+    )
+
+
+def club_is_operational(club: Club) -> bool:
+    """
+    Проверяет, может ли клуб использовать функции платформы (не приостановлен).
+
+    Returns:
+        False если клуб suspended или trial истёк; True иначе.
+    """
+    if club.status == ClubStatus.SUSPENDED:
+        return False
+    if club.status == ClubStatus.TRIAL and club.trial_ends_at:
+        if club.trial_ends_at <= timezone.now():
+            return False
+    return True
+
+
+def club_has_public_page_access(club: Club) -> bool:
+    """
+    Проверяет, доступна ли публичная страница клуба.
+
+    Учитывает только настройки клуба (is_public) и статус/истечение trial.
+    Тариф платформы (START/BASIC/PRO) на доступность страницы не влияет:
+    публичная страница должна быть доступна на всех тарифах.
+
+    Returns:
+        True если страницу можно показывать.
+    """
+    return bool(club.is_public and club_is_operational(club))
+
+
+def club_can_add_member(club: Club) -> tuple[bool, str]:
+    """
+    Проверяет, может ли клуб добавить участника (лимит по тарифу).
+
+    Учитываются участники со статусом ACTIVE и INVITED.
+
+    Returns:
+        (True, '') если можно; (False, сообщение) если лимит исчерпан.
+    """
+    sub = get_club_current_subscription(club)
+    plan_slug: str = sub.plan if sub else "start"
+    platform_plan = get_platform_plan(plan_slug)
+    if not platform_plan or platform_plan.max_members is None:
+        return True, ""
+    count = club.members.filter(
+        status__in=(ClubMemberStatus.ACTIVE, ClubMemberStatus.INVITED)
+    ).count()
+    if count >= platform_plan.max_members:
+        return (
+            False,
+            f"Лимит участников по тарифу «{platform_plan.name}»: {platform_plan.max_members}. Сейчас: {count}.",
+        )
+    return True, ""
 
 
 def create_club_with_trial(data: dict[str, Any], user: AbstractUser) -> Club:
@@ -77,7 +148,9 @@ def create_club_with_trial(data: dict[str, Any], user: AbstractUser) -> Club:
 
     now = timezone.now()
     ps = get_platform_settings()
-    trial_ends = now + timedelta(days=ps.trial_days)
+    platform_plan = get_platform_plan("start")
+    trial_days = platform_plan.trial_days if platform_plan else ps.trial_days
+    trial_ends = now + timedelta(days=trial_days)
 
     with transaction.atomic():
         club = cast(
@@ -125,11 +198,17 @@ def get_club_current_subscription(club: Club) -> ClubSubscription | None:
     """
     Возвращает текущую активную подписку клуба (последнюю по ends_at).
 
+    Учитываются только подписки со status=ACTIVE и ends_at > now.
+
     Returns:
-        ClubSubscription с status=active или None.
+        ClubSubscription с status=active и не истёкшим сроком или None.
     """
+    now = timezone.now()
     sub = (
-        club.subscriptions.filter(status=ClubSubscriptionStatus.ACTIVE)
+        club.subscriptions.filter(
+            status=ClubSubscriptionStatus.ACTIVE,
+            ends_at__gt=now,
+        )
         .order_by("-ends_at")
         .first()
     )
@@ -185,8 +264,9 @@ def club_can_create_tournament_this_month(club: Club) -> tuple[bool, str]:
         (True, '') если можно; (False, сообщение) если лимит исчерпан.
     """
     sub = get_club_current_subscription(club)
-    plan = sub.plan if sub else ClubPlan.START
-    limit = CLUB_PLAN_TOURNAMENTS_PER_MONTH.get(plan)
+    plan_slug: str = sub.plan if sub else "start"
+    platform_plan = get_platform_plan(plan_slug)
+    limit = platform_plan.max_tournaments_per_month if platform_plan else None
     if limit is None:
         return True, ""
     today = timezone.now().date()
@@ -195,7 +275,7 @@ def club_can_create_tournament_this_month(club: Club) -> tuple[bool, str]:
         start_date__month=today.month,
     ).count()
     if count >= limit:
-        plan_label = dict(ClubPlan.choices).get(plan, str(plan))
+        plan_label = platform_plan.name if platform_plan else str(plan_slug)
         return (
             False,
             f"Лимит турниров в месяц по тарифу «{plan_label}»: {limit}. Создано: {count}.",

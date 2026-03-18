@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Рейтинг — {{ club.name }}{% endblock %}
 {% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="rating" %}
 <div class="page-header">
     <h1 class="page-title">Рейтинг клуба</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
 <div class="container" style="max-width: 800px;">
-    <p><a href="{% url 'clubs:dashboard' slug=club.slug %}">← Панель</a> · <a href="{% url 'clubs:dashboard_rating_export' slug=club.slug %}">Экспорт CSV</a></p>
+    <p><a href="{% url 'clubs:dashboard_rating_export' slug=club.slug %}">Экспорт CSV</a></p>
     <div class="card">
         <div class="card-body">
             {% if ratings %}

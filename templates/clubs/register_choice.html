@@ -6,25 +6,25 @@
     <h1 class="page-title">Регистрация на платформе</h1>
     <p class="page-subtitle">Выберите тип аккаунта</p>
 </div>
-<div class="container" style="max-width: 640px;">
-    <div class="card" style="margin-bottom: var(--spacing-lg);">
-        <div class="card-body" style="padding: var(--spacing-2xl); display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-xl);">
-            <a href="{% url 'auth' %}?mode=register" class="btn btn-outline" style="padding: var(--spacing-xl); text-align: center; text-decoration: none;">
-                <span style="font-size: 2rem;">👤</span>
-                <strong style="display: block; margin-top: var(--spacing-md);">Я игрок</strong>
-                <span style="font-size: var(--font-size-sm); color: var(--color-text-muted);">Регистрация как участник турниров</span>
+<div class="container register-choice">
+    <div class="card register-choice__card">
+        <div class="card-body register-choice__grid">
+            <a href="{% url 'auth' %}?mode=register" class="btn btn-outline register-choice__option register-choice__option--player">
+                <span class="register-choice__icon">👤</span>
+                <strong class="register-choice__title">Я игрок</strong>
+                <span class="register-choice__text">Регистрация как участник турниров</span>
             </a>
             {% if user.is_authenticated %}
-            <a href="{% url 'clubs:register_step1' %}" class="btn btn-primary" style="padding: var(--spacing-xl); text-align: center; text-decoration: none;">
-                <span style="font-size: 2rem;">🏟</span>
-                <strong style="display: block; margin-top: var(--spacing-md);">Я представляю клуб</strong>
-                <span style="font-size: var(--font-size-sm); opacity: 0.9;">Создать клуб на платформе</span>
+            <a href="{% url 'clubs:register_step1' %}" class="btn btn-primary register-choice__option register-choice__option--club">
+                <span class="register-choice__icon">🏟</span>
+                <strong class="register-choice__title">Я представляю клуб</strong>
+                <span class="register-choice__text">Создать клуб на платформе</span>
             </a>
             {% else %}
-            <a href="{% url 'login' %}?next={% url 'clubs:register_step1' %}" class="btn btn-primary" style="padding: var(--spacing-xl); text-align: center; text-decoration: none;">
-                <span style="font-size: 2rem;">🏟</span>
-                <strong style="display: block; margin-top: var(--spacing-md);">Я представляю клуб</strong>
-                <span style="font-size: var(--font-size-sm); opacity: 0.9;">Войдите, чтобы создать клуб</span>
+            <a href="{% url 'login' %}?next={% url 'clubs:register_step1' %}" class="btn btn-primary register-choice__option register-choice__option--club">
+                <span class="register-choice__icon">🏟</span>
+                <strong class="register-choice__title">Я представляю клуб</strong>
+                <span class="register-choice__text">Войдите, чтобы создать клуб</span>
             </a>
             {% endif %}
         </div>

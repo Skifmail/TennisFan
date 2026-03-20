@@ -46,6 +46,12 @@ CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf.split(",") if o.strip()]
 # На мобильных 403 CSRF часто из‑за кэша страницы (устаревший токен) или из‑за www/non-www.
 # Убедитесь, что в CSRF_TRUSTED_ORIGINS есть и https://tennisfan.ru и https://www.tennisfan.ru.
 
+# Дополнительные хосты для бренда TennisTop (через запятую). По умолчанию: tennistop.ru, www.tennistop.ru.
+_tennistop_extra = os.environ.get("TENNISTOP_EXTRA_HOSTS", "").strip()
+TENNISTOP_EXTRA_HOSTS: list[str] | str | None = (
+    _tennistop_extra if _tennistop_extra else None
+)
+
 # ------------------------------------------------------------------------------
 # SECURITY
 # ------------------------------------------------------------------------------

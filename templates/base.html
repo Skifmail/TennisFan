@@ -5,9 +5,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}TennisFan{% endblock %} - Всероссийская теннисная платформа для игроков всех уровней</title>
+    <title>{% block title %}{{ site_brand_copyright }}{% endblock %} - Всероссийская теннисная платформа для игроков всех уровней</title>
     <meta name="description"
-        content="{% block meta_description %}TennisFan - платформа любительских теннисных турниров по всей России. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
+        content="{% block meta_description %}{{ site_brand_copyright }} - платформа любительских теннисных турниров по всей России. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
     {% block meta_og %}{% endblock %}
     {% for token in google_site_verifications %}
     <meta name="google-site-verification" content="{{ token }}">
@@ -80,9 +80,9 @@
 
                 <!-- Logo (centered on mobile) -->
                 <a href="{% url 'home' %}" class="logo">
-                    <span class="logo-text">Tennis<span class="logo-accent">Fan</span></span>
+                    <span class="logo-text">{{ site_brand_en_base }}<span class="logo-accent">{{ site_brand_en_accent }}</span></span>
                     <img src="{% static site_logo_path %}" class="coin-logo" alt="{{ site_logo_alt }} логотип">
-                    <span class="logo-text logo-text-ru">Теннис<span class="logo-accent">Фан</span></span>
+                    <span class="logo-text logo-text-ru">{{ site_brand_ru_base }}<span class="logo-accent">{{ site_brand_ru_accent }}</span></span>
                 </a>
 
                 <!-- Desktop Navigation Links (управляются в админке: Навигация → Пункты меню) -->
@@ -284,7 +284,7 @@
 
             <div class="footer-bottom">
                 <div class="footer-copy">
-                    <p>&copy; 2026 TennisFan. Все права защищены.</p>
+                    <p>&copy; 2026 {{ site_brand_copyright }} / {{ site_brand_footer_ru }}. Все права защищены.</p>
                     <p>ИП Ермолаев Леонид · ИНН 561417897115</p>
                     <p>ОГРНИП 325508100579372</p>
                 </div>

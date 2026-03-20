@@ -66,23 +66,66 @@ def site_meta(request):
     }
 
 
-def site_branding(request):
+def _tennistop_host_set() -> frozenset[str]:
+    """Возвращает множество хостов, для которых показывается бренд TennisTop.
+
+    Returns:
+        frozenset[str]: Нормализованные имена хостов (нижний регистр).
     """
-    Возвращает доменно-зависимый брендинг.
+    extra_raw = getattr(settings, "TENNISTOP_EXTRA_HOSTS", None)
+    hosts = {"tennistop.ru", "www.tennistop.ru"}
+    if extra_raw:
+        if isinstance(extra_raw, str):
+            for part in extra_raw.split(","):
+                h = part.strip().lower()
+                if h:
+                    hosts.add(h)
+        else:
+            for part in extra_raw:
+                h = str(part).strip().lower()
+                if h:
+                    hosts.add(h)
+    return frozenset(hosts)
+
+
+def site_branding(request):
+    """Возвращает доменно-зависимый брендинг (логотип, подписи в шапке и футере).
+
+    Args:
+        request: HTTP-запрос (для чтения Host). Может быть пустым в редких случаях.
+
+    Returns:
+        dict[str, object]: Ключи для шаблонов: пути к логотипу/фавиконку, части текста бренда.
     """
     host = ""
     if request:
         host = (request.get_host() or "").split(":", 1)[0].strip().lower()
 
-    tennistop_hosts = {"tennistop.ru", "www.tennistop.ru"}
-    is_tennistop = host in tennistop_hosts
+    is_tennistop = host in _tennistop_host_set()
+
+    if is_tennistop:
+        return {
+            "is_tennistop": True,
+            "site_logo_path": "images/logo_tennistop.png",
+            "site_logo_alt": "TennisTop",
+            "site_favicon_path": "images/logo_tennistop.png",
+            "site_brand_en_base": "Tennis",
+            "site_brand_en_accent": "Top",
+            "site_brand_ru_base": "Теннис",
+            "site_brand_ru_accent": "Топ",
+            "site_brand_copyright": "TennisTop",
+            "site_brand_footer_ru": "ТеннисТоп",
+        }
 
     return {
-        "site_logo_path": (
-            "images/logo_tennistop.png" if is_tennistop else "images/logo.png"
-        ),
-        "site_logo_alt": "TennisTop" if is_tennistop else "TennisFan",
-        "site_favicon_path": (
-            "images/logo_tennistop.png" if is_tennistop else "images/favicon.png"
-        ),
+        "is_tennistop": False,
+        "site_logo_path": "images/logo.png",
+        "site_logo_alt": "TennisFan",
+        "site_favicon_path": "images/favicon.png",
+        "site_brand_en_base": "Tennis",
+        "site_brand_en_accent": "Fan",
+        "site_brand_ru_base": "Теннис",
+        "site_brand_ru_accent": "Фан",
+        "site_brand_copyright": "TennisFan",
+        "site_brand_footer_ru": "ТеннисФан",
     }

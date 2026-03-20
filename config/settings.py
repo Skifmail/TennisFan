@@ -154,6 +154,8 @@ TEMPLATES = [
                 "apps.core.context_processors.telegram_community_url",
                 "apps.core.context_processors.footer_social_links",
                 "apps.core.context_processors.search_engine_verification",
+                "apps.core.context_processors.site_meta",
+                "apps.core.context_processors.site_branding",
                 "apps.clubs.context_processors.club_context",
             ],
         },

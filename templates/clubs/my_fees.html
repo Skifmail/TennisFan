@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Членский взнос — {{ club.name }}{% endblock %}
 {% block content %}
+{% include "clubs/_club_player_nav.html" with current="fees" %}
 <div class="page-header">
     <h1 class="page-title">Членский взнос</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
 <div class="container club-player-dashboard" style="max-width: 640px;">
-    {% include "clubs/_club_player_nav.html" with current="fees" %}
     {% if fee %}
     <div class="card" style="margin-bottom: var(--spacing-lg);">
         <div class="card-body">

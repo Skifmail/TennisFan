@@ -43,6 +43,16 @@ urlpatterns = [
         name="tournament_manage",
     ),
     path(
+        "<slug:slug>/manage/generate-bracket/",
+        views.tournament_manage_generate_bracket,
+        name="tournament_manage_generate_bracket",
+    ),
+    path(
+        "<slug:slug>/manage/cancel/",
+        views.tournament_manage_cancel,
+        name="tournament_manage_cancel",
+    ),
+    path(
         "<slug:slug>/manage/compose-pair/",
         views.tournament_manage_compose_pair,
         name="tournament_manage_compose_pair",

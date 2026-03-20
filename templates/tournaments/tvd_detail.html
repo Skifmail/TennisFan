@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load humanize %}
-{% load skill_tags %}
+{% load skill_tags club_tags %}
 
 {% block title %}{{ tournament.name }}{% endblock %}
 
@@ -263,7 +263,7 @@
                         {% endfor %}
                         {% else %}
                         {% for participant in participants %}
-                        <a href="{% url 'profile' pk=participant.pk %}" style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md); transition: all var(--transition-fast); text-decoration: none;">
+                        <a href="{% player_profile_url participant %}" style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md); transition: all var(--transition-fast); text-decoration: none;">
                             {% include 'includes/avatar.html' with avatar=participant.avatar class="player-avatar" size="48" %}
                             <div style="flex: 1; min-width: 0;">
                                 <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px;">{{ participant.user.first_name }} {{ participant.user.last_name }}</div>
@@ -325,9 +325,9 @@
                                 <td>{{ forloop.counter }}</td>
                                 <td class="matrix-player-cell">
                                     {% if tournament.is_doubles %}
-                                    <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                    <a href="{% player_profile_url row.participant.player1 %}">{{ row.participant }}</a>
                                     {% else %}
-                                    <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                    <a href="{% player_profile_url row.participant %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
                                     {% endif %}
                                 </td>
                                 {% for cell in row.cells %}
@@ -372,9 +372,9 @@
                                 <td>{{ row.place|default:"—" }}</td>
                                 <td>
                                     {% if row.team %}
-                                    <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                    <a href="{% player_profile_url row.team.player1 %}">{{ row.team }}</a>
                                     {% else %}
-                                    <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                    <a href="{% player_profile_url row.player %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
                                     {% endif %}
                                 </td>
                                 <td>{{ row.matches }}</td>
@@ -414,9 +414,9 @@
                                 <td>{{ forloop.counter }}</td>
                                 <td class="matrix-player-cell">
                                     {% if tournament.is_doubles %}
-                                    <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                    <a href="{% player_profile_url row.participant.player1 %}">{{ row.participant }}</a>
                                     {% else %}
-                                    <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                    <a href="{% player_profile_url row.participant %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
                                     {% endif %}
                                 </td>
                                 {% for cell in row.cells %}
@@ -461,9 +461,9 @@
                                 <td>{{ row.place|default:"—" }}</td>
                                 <td>
                                     {% if row.team %}
-                                    <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                    <a href="{% player_profile_url row.team.player1 %}">{{ row.team }}</a>
                                     {% else %}
-                                    <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                    <a href="{% player_profile_url row.player %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
                                     {% endif %}
                                 </td>
                                 <td>{{ row.matches }}</td>
@@ -503,9 +503,9 @@
                                 <td>{{ forloop.counter }}</td>
                                 <td class="matrix-player-cell">
                                     {% if tournament.is_doubles %}
-                                    <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                    <a href="{% player_profile_url row.participant.player1 %}">{{ row.participant }}</a>
                                     {% else %}
-                                    <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                    <a href="{% player_profile_url row.participant %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
                                     {% endif %}
                                 </td>
                                 {% for cell in row.cells %}
@@ -552,9 +552,9 @@
                                 <td>{{ row.place|default:"—" }}</td>
                                 <td>
                                     {% if row.team %}
-                                    <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                    <a href="{% player_profile_url row.team.player1 %}">{{ row.team }}</a>
                                     {% else %}
-                                    <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                    <a href="{% player_profile_url row.player %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
                                     {% endif %}
                                 </td>
                                 <td>{{ row.matches }}</td>
@@ -594,9 +594,9 @@
                                 <td>{{ forloop.counter }}</td>
                                 <td class="matrix-player-cell">
                                     {% if tournament.is_doubles %}
-                                    <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                    <a href="{% player_profile_url row.participant.player1 %}">{{ row.participant }}</a>
                                     {% else %}
-                                    <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                    <a href="{% player_profile_url row.participant %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
                                     {% endif %}
                                 </td>
                                 {% for cell in row.cells %}
@@ -643,9 +643,9 @@
                                 <td>{{ row.place|default:"—" }}</td>
                                 <td>
                                     {% if row.team %}
-                                    <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                    <a href="{% player_profile_url row.team.player1 %}">{{ row.team }}</a>
                                     {% else %}
-                                    <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                    <a href="{% player_profile_url row.player %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
                                     {% endif %}
                                 </td>
                                 <td>{{ row.matches }}</td>
@@ -685,7 +685,7 @@
                                         {% if r.place == 1 %}🥇{% elif r.place == 2 %}🥈{% elif r.place == 3 %}🥉{% else %}{{ r.place }}{% endif %}
                                     </td>
                                     <td style="padding: var(--spacing-sm) var(--spacing-md);">
-                                        <a href="{% url 'profile' pk=r.player.pk %}">{{ r.player.user.last_name }} {{ r.player.user.first_name }}</a>
+                                        <a href="{% player_profile_url r.player %}">{{ r.player.user.last_name }} {{ r.player.user.first_name }}</a>
                                     </td>
                                     <td style="padding: var(--spacing-sm) var(--spacing-md); font-weight: 600; color: var(--color-primary);">{{ r.fan_points }}</td>
                                 </tr>

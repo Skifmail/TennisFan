@@ -89,6 +89,9 @@
                     <span class="live-results__center">
                         <span class="live-results__date">{{ m.date }}</span>
                         <span class="live-results__score">{{ m.score_column|default:m.score }}</span>
+                        {% if m.club_name %}
+                        <span class="live-results__club">{{ m.club_name }}</span>
+                        {% endif %}
                     </span>
                     <span class="live-results__vals live-results__vals--col live-results__vals--right">
                         <span class="live-results__val live-results__val--{% if m.p2_ntrp_delta > 0 %}up{% elif m.p2_ntrp_delta < 0 %}down{% else %}none{% endif %}">{% if m.p2_ntrp_delta > 0 %}↑{% elif m.p2_ntrp_delta < 0 %}↓{% endif %} {{ m.p2_ntrp|floatformat:1 }}{% if m.p2_ntrp_delta %}({% if m.p2_ntrp_delta > 0 %}+{% endif %}{{ m.p2_ntrp_delta }}){% endif %}</span>
@@ -388,7 +391,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var rowHtml = '<a href="' + (m.match_url || '#') + '" class="live-results__row" data-match-id="' + m.id + '">' +
             '<span class="live-results__player1">' + avatarHtml(m.p1_avatar) + '<span class="live-results__name">' + (m.player1 || '') + '</span></span>' +
             '<span class="live-results__vals live-results__vals--col"><span class="live-results__val live-results__val--' + cls(m.p1_ntrp_delta) + '">' + a1n + ' ' + (m.p1_ntrp != null ? m.p1_ntrp.toFixed(1) : '—') + (n1d ? '(' + n1d + ')' : '') + '</span><span class="live-results__val live-results__val--' + cls(m.p1_rating_delta) + '">' + a1r + ' ' + (m.p1_rating != null ? m.p1_rating.toFixed(1) : '—') + (r1d ? '(' + r1d + ')' : '') + '</span></span>' +
-            '<span class="live-results__center"><span class="live-results__date">' + (m.date || '') + '</span><span class="live-results__score">' + ((m.score_column || m.score || '—').replace(/ /g, '\n')) + '</span></span>' +
+            '<span class="live-results__center"><span class="live-results__date">' + (m.date || '') + '</span><span class="live-results__score">' + ((m.score_column || m.score || '—').replace(/ /g, '\n')) + '</span>' + (m.club_name ? '<span class="live-results__club">' + m.club_name + '</span>' : '') + '</span>' +
             '<span class="live-results__vals live-results__vals--col live-results__vals--right"><span class="live-results__val live-results__val--' + cls(m.p2_ntrp_delta) + '">' + a2n + ' ' + (m.p2_ntrp != null ? m.p2_ntrp.toFixed(1) : '—') + (n2d ? '(' + n2d + ')' : '') + '</span><span class="live-results__val live-results__val--' + cls(m.p2_rating_delta) + '">' + a2r + ' ' + (m.p2_rating != null ? m.p2_rating.toFixed(1) : '—') + (r2d ? '(' + r2d + ')' : '') + '</span></span>' +
             '<span class="live-results__player2"><span class="live-results__name">' + (m.player2 || '') + '</span>' + avatarHtml(m.p2_avatar) + '</span></a>';
         var wrapClass = 'live-results__row-wrap' + (isEntering ? ' live-results__row-wrap--entering' : '');

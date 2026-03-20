@@ -4,8 +4,17 @@
 
 from datetime import date
 
-from django.test import TestCase
+from django.test import Client, TestCase
+from django.urls import reverse
 
+from apps.clubs.models import (
+    Club,
+    ClubMember,
+    ClubMemberRole,
+    ClubMemberStatus,
+    ClubPlayerPlan,
+)
+from apps.clubs.plan_services import assign_member_plan
 from apps.tournaments.fan import _bracket_r1_count, _expected_final_round
 from apps.tournaments.fan import generate_bracket as fan_generate_bracket
 from apps.tournaments.models import Match, Tournament, TournamentStatus
@@ -887,3 +896,364 @@ class TVDParticipantCountTestCase(TestCase):
                     0,
                     f"n={n}: должны быть матчи круговой основной сетки",
                 )
+
+
+class MyMatchesVisibilityTestCase(TestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            email="viewer@test.local",
+            password="testpass123",
+        )
+        self.player = Player.objects.create(user=self.user)
+        self.opponent = Player.objects.create(
+            user=User.objects.create_user(
+                email="opponent@test.local",
+                password="testpass123",
+            )
+        )
+        self.client.force_login(self.user)
+
+    def test_my_matches_hides_club_tournaments(self) -> None:
+        global_tournament = Tournament.objects.create(
+            name="Глобальный турнир",
+            slug="global-visible",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+        )
+        club = Club.objects.create(
+            name="Клуб",
+            slug="club-hidden",
+            city="Москва",
+            address="ул. Пушкина, 1",
+            email="club@test.local",
+            admin_name="Администратор клуба",
+        )
+        club_tournament = Tournament.objects.create(
+            name="Клубный турнир",
+            slug="club-hidden-tournament",
+            city="Москва",
+            club=club,
+            start_date=date.today(),
+            format="single_elimination",
+        )
+
+        Match.objects.create(
+            tournament=global_tournament,
+            player1=self.player,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+        )
+        Match.objects.create(
+            tournament=club_tournament,
+            player1=self.player,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+        )
+
+        response = self.client.get(reverse("my_matches"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Глобальный турнир")
+        self.assertNotContains(response, "Клубный турнир")
+
+
+class TournamentListCardStateTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="list-user@test.local",
+            password="testpass123",
+        )
+        self.player = Player.objects.create(user=self.user, skill_level="amateur")
+        self.opponent = Player.objects.create(
+            user=User.objects.create_user(
+                email="list-opponent@test.local",
+                password="testpass123",
+            )
+        )
+        self.client.force_login(self.user)
+
+    def test_tournament_list_shows_actual_registration_state(self) -> None:
+        registered = Tournament.objects.create(
+            name="Уже записан",
+            slug="already-registered",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.UPCOMING,
+        )
+        registered.allowed_categories.create(category="amateur")
+        registered.participants.add(self.player)
+
+        bracket_closed = Tournament.objects.create(
+            name="Сетка сформирована",
+            slug="bracket-closed",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.UPCOMING,
+            bracket_generated=True,
+        )
+        bracket_closed.allowed_categories.create(category="amateur")
+
+        completed = Tournament.objects.create(
+            name="Завершённый турнир",
+            slug="completed-tournament",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.COMPLETED,
+        )
+        completed.allowed_categories.create(category="amateur")
+
+        open_tournament = Tournament.objects.create(
+            name="Открытый турнир",
+            slug="open-tournament",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.UPCOMING,
+            is_one_day=True,
+        )
+        open_tournament.allowed_categories.create(category="amateur")
+
+        response = self.client.get(reverse("tournament_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Вы записаны")
+        self.assertContains(response, "Регистрация закрыта")
+        self.assertContains(response, "Турнир завершён")
+        self.assertContains(
+            response,
+            reverse("tournament_register", kwargs={"slug": open_tournament.slug}),
+        )
+
+
+class MatchDetailPlayerActionsTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="match-player@test.local",
+            password="testpass123",
+        )
+        self.player = Player.objects.create(user=self.user)
+        self.opponent = Player.objects.create(
+            user=User.objects.create_user(
+                email="match-opponent@test.local",
+                password="testpass123",
+            )
+        )
+        self.tournament = Tournament.objects.create(
+            name="Турнир для матча",
+            slug="match-detail-actions",
+            city="Москва",
+            start_date=date.today(),
+            format="round_robin",
+        )
+        self.match = Match.objects.create(
+            tournament=self.tournament,
+            player1=self.player,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+        )
+        self.client.force_login(self.user)
+
+    def test_match_detail_shows_result_form_for_participant(self) -> None:
+        response = self.client.get(
+            reverse("match_detail", kwargs={"pk": self.match.pk}),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Действия игрока")
+        self.assertContains(response, "Отправить на подтверждение")
+
+
+class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="club-member@test.local",
+            password="testpass123",
+            first_name="Леонид",
+            last_name="Ермолаев",
+            phone="+79990000000",
+        )
+        self.player = Player.objects.create(
+            user=self.user,
+            skill_level="amateur",
+            birth_date=date(1990, 1, 1),
+        )
+        self.club = Club.objects.create(
+            name="Спартак",
+            slug="spartak-club",
+            city="Москва",
+            address="ул. Спортивная, 1",
+            email="club@test.local",
+            admin_name="Админ клуба",
+        )
+        self.member = ClubMember.objects.create(
+            club=self.club,
+            user=self.user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        self.plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Стандарт",
+            monthly_fee=1000,
+            max_tournaments_per_month=3,
+            is_active=True,
+        )
+        assign_member_plan(self.member, self.plan)
+        self.client.force_login(self.user)
+
+    def test_member_can_register_for_multiday_club_tournament_without_global_subscription(
+        self,
+    ) -> None:
+        tournament = Tournament.objects.create(
+            name="Клубный многодневный",
+            slug="club-multiday-no-global-sub",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format="round_robin",
+            status=TournamentStatus.UPCOMING,
+            gender="open",
+            is_one_day=False,
+            entry_fee=0,
+        )
+        tournament.allowed_categories.create(category="amateur")
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("tournament_detail", kwargs={"slug": tournament.slug}),
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(tournament.participants.filter(pk=self.player.pk).exists())
+
+    def test_member_can_register_doubles_team_for_club_tournament_without_global_subscription(
+        self,
+    ) -> None:
+        partner_user = User.objects.create_user(
+            email="club-partner@test.local",
+            password="testpass123",
+            first_name="Иван",
+            last_name="Петров",
+            phone="+79990000001",
+        )
+        partner = Player.objects.create(
+            user=partner_user,
+            skill_level="amateur",
+            birth_date=date(1991, 1, 1),
+        )
+        partner_member = ClubMember.objects.create(
+            club=self.club,
+            user=partner_user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        assign_member_plan(partner_member, self.plan)
+
+        tournament = Tournament.objects.create(
+            name="Клубный парный",
+            slug="club-doubles-no-global-sub",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format="round_robin",
+            status=TournamentStatus.UPCOMING,
+            gender="open",
+            is_one_day=False,
+            entry_fee=0,
+            variant="doubles",
+        )
+        tournament.allowed_categories.create(category="amateur")
+
+        response = self.client.post(
+            reverse("tournament_register_doubles", kwargs={"slug": tournament.slug}),
+            {"action": "add_partner", "partner_id": str(partner.pk)},
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("tournament_detail", kwargs={"slug": tournament.slug}),
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(
+            tournament.teams.filter(player1=self.player, player2=partner).exists()
+        )
+
+
+class MatchDetailPlayerActionsRedirectTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="match-player-2@test.local",
+            password="testpass123",
+        )
+        self.player = Player.objects.create(user=self.user)
+        self.opponent = Player.objects.create(
+            user=User.objects.create_user(
+                email="match-opponent-2@test.local",
+                password="testpass123",
+            )
+        )
+        self.tournament = Tournament.objects.create(
+            name="Турнир для матча 2",
+            slug="match-detail-actions-2",
+            city="Москва",
+            start_date=date.today(),
+            format="round_robin",
+        )
+        self.match = Match.objects.create(
+            tournament=self.tournament,
+            player1=self.player,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+        )
+        self.client.force_login(self.user)
+
+    def test_propose_result_redirects_back_to_match_detail_when_next_passed(
+        self,
+    ) -> None:
+        next_url = reverse("match_detail", kwargs={"pk": self.match.pk})
+
+        response = self.client.post(
+            reverse("propose_result", kwargs={"pk": self.match.pk}),
+            {
+                "next": next_url,
+                "result": "win",
+                "p1s1": "6",
+                "p2s1": "4",
+                "p1s2": "6",
+                "p2s2": "3",
+            },
+            secure=True,
+        )
+
+        self.assertRedirects(response, next_url, fetch_redirect_response=False)
+        self.assertEqual(self.match.result_proposals.count(), 1)
+
+    def test_match_detail_works_for_match_without_tournament(self) -> None:
+        sparring_match = Match.objects.create(
+            player1=self.player,
+            player2=self.opponent,
+            match_type=Match.MatchType.SPARRING,
+            status=Match.MatchStatus.SCHEDULED,
+        )
+
+        response = self.client.get(
+            reverse("match_detail", kwargs={"pk": sparring_match.pk}),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Действия игрока")

@@ -89,6 +89,14 @@ class ClubApplicationStatus(models.TextChoices):
     REJECTED = "rejected", "Отклонена"
 
 
+class ClubJoinRequestStatus(models.TextChoices):
+    """Статус заявки игрока на вступление в клуб."""
+
+    PENDING = "pending", "На рассмотрении"
+    APPROVED = "approved", "Одобрена"
+    REJECTED = "rejected", "Отклонена"
+
+
 class PlatformPlan(models.Model):
     """
     Редактируемый тариф подписки клуба на платформу (Старт/Базовый/Про).
@@ -569,6 +577,50 @@ class ClubInviteLink(models.Model):
 
     def __str__(self) -> str:
         return f"{self.club.name} — {self.token[:8]}..."
+
+
+class ClubJoinRequest(models.Model):
+    """Заявка игрока на вступление в клуб с модерацией администратором."""
+
+    club = models.ForeignKey(
+        Club,
+        on_delete=models.CASCADE,
+        related_name="join_requests",
+        verbose_name="Клуб",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="club_join_requests",
+        verbose_name="Пользователь",
+    )
+    status = models.CharField(
+        "Статус",
+        max_length=20,
+        choices=ClubJoinRequestStatus.choices,
+        default=ClubJoinRequestStatus.PENDING,
+    )
+    message = models.CharField("Комментарий игрока", max_length=255, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_club_join_requests",
+        verbose_name="Кто обработал",
+    )
+    reviewed_at = models.DateTimeField("Дата обработки", null=True, blank=True)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Заявка на вступление в клуб"
+        verbose_name_plural = "Заявки на вступление в клуб"
+        ordering = ["-created_at"]
+        unique_together = [("club", "user")]
+
+    def __str__(self) -> str:
+        return f"{self.user} → {self.club.name} ({self.get_status_display()})"
 
 
 class ClubMembershipFee(models.Model):

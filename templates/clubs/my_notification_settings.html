@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Уведомления — {{ club.name }}{% endblock %}
 {% block content %}
+{% include "clubs/_club_player_nav.html" with current="notifications" %}
 <div class="page-header">
     <h1 class="page-title">Настройки уведомлений</h1>
     <p class="page-subtitle">Клуб «{{ club.name }}»</p>
 </div>
 <div class="container club-player-dashboard" style="max-width: 640px;">
-    {% include "clubs/_club_player_nav.html" with current="notifications" %}
     <div class="card">
         <div class="card-body">
             <form method="post">

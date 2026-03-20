@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Создать турнир — {{ club.name }}{% endblock %}
+{% block title %}{% if page_mode == 'edit' %}Редактировать турнир{% else %}Создать турнир{% endif %} — {{ club.name }}{% endblock %}
 {% block content %}
 {% include "clubs/_club_dashboard_nav.html" with current="tournaments" %}
 
@@ -7,8 +7,8 @@
     <div class="container club-tournament-create">
         <div class="club-tournament-create__hero">
             <div class="club-tournament-create__hero-copy">
-                <span class="club-tournament-create__eyebrow">Новый турнир клуба</span>
-                <h1 class="page-title club-tournament-create__title">Создать турнир</h1>
+                <span class="club-tournament-create__eyebrow">{% if page_mode == 'edit' %}Редактирование турнира{% else %}Новый турнир клуба{% endif %}</span>
+                <h1 class="page-title club-tournament-create__title">{% if page_mode == 'edit' %}Редактировать турнир{% else %}Создать турнир{% endif %}</h1>
                 <p class="page-subtitle club-tournament-create__subtitle">
                     Соберите турнир с теми же ключевыми параметрами, что используются на глобальной платформе: формат, лимиты, уровни допуска, взносы и правила проведения.
                 </p>
@@ -44,6 +44,11 @@
         {% for error in form.non_field_errors %}
         <div class="alert alert-error">{{ error }}</div>
         {% endfor %}
+    </div>
+    {% endif %}
+    {% if structure_locked %}
+    <div class="alert alert-info" style="margin-bottom: var(--spacing-lg);">
+        Сетка или группы уже сформированы. Структурные поля турнира заблокированы, но описание, даты и другие безопасные настройки можно менять.
     </div>
     {% endif %}
 
@@ -243,7 +248,7 @@
             </section>
 
             <div class="club-tournament-create__actions">
-                <button type="submit" class="btn btn-primary btn-lg" {% if not can_create %}disabled{% endif %}>Создать турнир</button>
+                <button type="submit" class="btn btn-primary btn-lg" {% if not can_create and page_mode != 'edit' %}disabled{% endif %}>{% if page_mode == 'edit' %}Сохранить изменения{% else %}Создать турнир{% endif %}</button>
                 <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-ghost btn-lg">Отмена</a>
             </div>
         </div>

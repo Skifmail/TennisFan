@@ -25,7 +25,11 @@ def _decrement_subscription_for_user(user) -> None:
         )
 
 
-def cancel_tournament(tournament: Tournament) -> bool:
+def cancel_tournament(
+    tournament: Tournament,
+    *,
+    notify_message: str | None = None,
+) -> bool:
     """
     Отменить турнир: установить статус «Отменён», вернуть лимиты регистраций
     всем зарегистрированным (участникам или членам команд) и отправить уведомления.
@@ -46,7 +50,7 @@ def cancel_tournament(tournament: Tournament) -> bool:
     except Exception:
         pass
 
-    message = (
+    message = notify_message or (
         f"Турнир «{tournament.name}» отменён из-за недостаточного количества участников. "
         "Лимит регистраций на турниры восстановлен (+1)."
     )

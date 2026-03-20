@@ -9,17 +9,18 @@
     <meta name="description"
         content="{% block meta_description %}TennisFan - платформа любительских теннисных турниров по всей России. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
     {% block meta_og %}{% endblock %}
-    {% if google_site_verification %}
-    <meta name="google-site-verification" content="{{ google_site_verification }}">
-    {% endif %}
-    {% if yandex_verification %}
-    <meta name="yandex-verification" content="{{ yandex_verification }}">
-    {% endif %}
+    {% for token in google_site_verifications %}
+    <meta name="google-site-verification" content="{{ token }}">
+    {% endfor %}
+    {% for token in yandex_verifications %}
+    <meta name="yandex-verification" content="{{ token }}">
+    {% endfor %}
+    <link rel="canonical" href="{{ canonical_url }}">
 
-    <link rel="icon" type="image/png" sizes="64x64" href="{% static 'images/favicon.png' %}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon.png' %}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon.png' %}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/favicon.png' %}">
+    <link rel="icon" type="image/png" sizes="64x64" href="{% static site_favicon_path %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static site_favicon_path %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static site_favicon_path %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static site_favicon_path %}">
 
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% block extra_css %}{% endblock %}
@@ -80,7 +81,7 @@
                 <!-- Logo (centered on mobile) -->
                 <a href="{% url 'home' %}" class="logo">
                     <span class="logo-text">Tennis<span class="logo-accent">Fan</span></span>
-                    <img src="{% static 'images/logo.svg' %}" class="coin-logo" alt="TennisFan логотип">
+                    <img src="{% static site_logo_path %}" class="coin-logo" alt="{{ site_logo_alt }} логотип">
                     <span class="logo-text logo-text-ru">Теннис<span class="logo-accent">Фан</span></span>
                 </a>
 
@@ -137,6 +138,7 @@
                             {% endif %}
                             <li><a href="{% url 'notifications' %}" class="nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a></li>
                             {% if user.is_staff or user.is_superuser %}
+                            <li><a href="{% url 'platform_dashboard' %}">Панель платформы</a></li>
                             <li><a href="{% url 'admin:index' %}">Админ панель</a></li>
                             {% endif %}
                             <li>
@@ -178,6 +180,7 @@
     </main>
 
     <!-- Footer -->
+    {% if not is_club_panel or not club %}
     <footer class="footer">
         <div class="container">
             <div class="footer-grid">
@@ -288,8 +291,10 @@
             </div>
         </div>
     </footer>
+    {% endif %}
 
     <!-- Плавающая кнопка «Написать нам» -->
+    {% if not is_club_panel or not club %}
     <div id="feedback-widget" class="feedback-widget" data-submit-url="{% url 'feedback_submit' %}" data-threads-url="{% url 'feedback_threads' %}" data-csrf="{{ csrf_token }}" data-is-authenticated="{% if user.is_authenticated %}1{% else %}0{% endif %}">
         <!-- Кнопка открытия чата -->
         <button type="button" class="feedback-widget__btn" id="feedback-widget-btn" aria-label="Написать нам">
@@ -354,6 +359,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     {% block modals %}{% endblock %}
 

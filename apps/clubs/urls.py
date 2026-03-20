@@ -61,6 +61,11 @@ urlpatterns = [
         name="plan_assign_member",
     ),
     path("<slug:slug>/join/", views.club_join, name="join"),
+    path(
+        "<slug:slug>/join/request/",
+        views.join_request_create,
+        name="join_request_create",
+    ),
     path("<slug:slug>/invite/create/", views.invite_create, name="invite_create"),
     path("<slug:slug>/invite/email/", views.invite_by_email, name="invite_by_email"),
     path(
@@ -73,6 +78,11 @@ urlpatterns = [
         "<slug:slug>/members/<int:member_id>/",
         views.member_detail,
         name="member_detail",
+    ),
+    path(
+        "<slug:slug>/players/<int:player_id>/",
+        views.player_profile,
+        name="player_profile",
     ),
     path("<slug:slug>/members/export/", views.members_export, name="members_export"),
     path(
@@ -95,6 +105,11 @@ urlpatterns = [
         views.tournament_create,
         name="tournament_create",
     ),
+    path(
+        "<slug:slug>/tournaments/<int:tournament_id>/edit/",
+        views.tournament_edit,
+        name="tournament_edit",
+    ),
     path("<slug:slug>/rating/", views.dashboard_rating, name="dashboard_rating"),
     path(
         "<slug:slug>/rating/export/",
@@ -109,6 +124,16 @@ urlpatterns = [
         name="fees_mark_paid",
     ),
     path("<slug:slug>/invites/", views.invites_list, name="invites_list"),
+    path(
+        "<slug:slug>/join-requests/<int:pk>/approve/",
+        views.join_request_approve,
+        name="join_request_approve",
+    ),
+    path(
+        "<slug:slug>/join-requests/<int:pk>/reject/",
+        views.join_request_reject,
+        name="join_request_reject",
+    ),
     path(
         "<slug:slug>/invites/<int:pk>/deactivate/",
         views.invite_deactivate,

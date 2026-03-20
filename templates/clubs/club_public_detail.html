@@ -36,6 +36,13 @@
                 <div class="club-public__actions">
                     {% if cta_variant == 'manage' %}
                     <a href="{{ cta_url }}" class="btn btn-primary club-public__btn--manage">{{ cta_label }}</a>
+                    {% elif cta_variant == 'request' %}
+                    <form method="post" action="{{ cta_url }}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary club-public__btn--join">{{ cta_label }}</button>
+                    </form>
+                    {% elif cta_variant == 'requested' %}
+                    <button type="button" class="btn btn-outline club-public__btn--join" disabled>{{ cta_label }}</button>
                     {% else %}
                     <a href="{{ cta_url }}" class="btn btn-primary club-public__btn--join">{{ cta_label }}</a>
                     {% endif %}
@@ -43,6 +50,8 @@
                     <a href="{{ join_url }}" class="btn btn-outline">Узнать подробнее</a>
                     {% elif is_pending_invite %}
                     <a href="{% url 'clubs:invitations_list' %}" class="btn btn-outline">У вас приглашение в клуб</a>
+                    {% elif is_pending_join_request %}
+                    <span class="btn btn-ghost" aria-disabled="true">Заявка рассматривается</span>
                     {% endif %}
                 </div>
             </div>
@@ -117,6 +126,9 @@
                         <div class="club-public__tournament-grid">
                             {% for t in upcoming_tournaments %}
                             <article class="club-public__tournament-card">
+                                <span class="tournament-status-badge club-public__tournament-status tournament-status-badge--{{ t.public_badge_status }}" title="{{ t.get_status_display }}">
+                                    {{ t.public_badge_label }}
+                                </span>
                                 <header>
                                     <h3 class="club-public__tournament-title">
                                         <a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a>
@@ -150,7 +162,7 @@
                                 </dl>
 
                                 <div class="club-public__tournament-footer">
-                                    <a href="{% url 'tournament_detail' slug=t.slug %}" class="btn btn-sm btn-primary">Записаться</a>
+                                    <a href="{% url 'tournament_detail' slug=t.slug %}" class="btn btn-sm btn-primary">{{ t.public_action_label }}</a>
                                     {% if t.entry_fee and t.entry_fee|floatformat:0 != "0" %}
                                     <span class="club-public__tournament-fee">Взнос {{ t.entry_fee }} ₽</span>
                                     {% endif %}

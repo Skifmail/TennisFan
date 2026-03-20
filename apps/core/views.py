@@ -6,14 +6,18 @@ import json
 import logging
 import re
 import secrets
+from calendar import monthrange
 from datetime import timedelta
+from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Q
+from django.db.models import Count, Q, Sum
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -22,8 +26,19 @@ from django.utils.html import linebreaks
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_safe
 
+from apps.clubs.models import (
+    Club,
+    ClubApplicationStatus,
+    ClubJoinRequestStatus,
+    ClubMemberStatus,
+    ClubStatus,
+    ClubSubscription,
+    ClubSubscriptionStatus,
+)
 from apps.content.models import News, RulesSection
 from apps.courts.models import Court
+from apps.payments.models import PaymentRecord
+from apps.subscriptions.models import UserSubscription
 from apps.tournaments.models import (
     Match,
     SeasonArchive,
@@ -41,6 +56,677 @@ from .forms import FeedbackForm
 from .models import City, SupportMessage, SupportMessageAdminDelivery, UserTelegramLink
 
 logger = logging.getLogger(__name__)
+
+
+@login_required
+def platform_dashboard(request):
+    """Глобальный дашборд платформы для staff/superuser."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(
+            request, "Доступ к панели платформы есть только у администратора."
+        )
+        return redirect("home")
+
+    now = timezone.now()
+    today = timezone.localdate()
+    current_month_start = today.replace(day=1)
+    previous_month_end = current_month_start - timedelta(days=1)
+    previous_month_start = previous_month_end.replace(day=1)
+    next_14_days = today + timedelta(days=14)
+    next_7_days = now + timedelta(days=7)
+    last_30_days = now - timedelta(days=30)
+    previous_30_days_start = now - timedelta(days=60)
+    month_names_ru = (
+        "Январь",
+        "Февраль",
+        "Март",
+        "Апрель",
+        "Май",
+        "Июнь",
+        "Июль",
+        "Август",
+        "Сентябрь",
+        "Октябрь",
+        "Ноябрь",
+        "Декабрь",
+    )
+
+    clubs_total = Club.objects.count()
+    operational_clubs_count = Club.objects.filter(
+        status__in=[ClubStatus.ACTIVE, ClubStatus.TRIAL]
+    ).count()
+    suspended_clubs_count = Club.objects.filter(status=ClubStatus.SUSPENDED).count()
+    new_clubs_30d = Club.objects.filter(created_at__gte=last_30_days).count()
+    previous_new_clubs_30d = Club.objects.filter(
+        created_at__gte=previous_30_days_start,
+        created_at__lt=last_30_days,
+    ).count()
+
+    players_total = Player.objects.filter(is_bye=False).count()
+    active_player_ids = set(
+        Match.objects.filter(
+            match_type=Match.MatchType.TOURNAMENT,
+            created_at__gte=last_30_days,
+        )
+        .filter(Q(player1__is_bye=False) | Q(player2__is_bye=False))
+        .values_list("player1_id", "player2_id", "partner1_id", "partner2_id")
+    )
+    active_player_ids_flat = {
+        player_id for ids in active_player_ids for player_id in ids if player_id
+    }
+    previous_active_matches = Match.objects.filter(
+        match_type=Match.MatchType.TOURNAMENT,
+        created_at__gte=previous_30_days_start,
+        created_at__lt=last_30_days,
+    ).values_list("player1_id", "player2_id", "partner1_id", "partner2_id")
+    previous_active_player_ids = {
+        player_id for ids in previous_active_matches for player_id in ids if player_id
+    }
+    active_players_count = len(active_player_ids_flat)
+    previous_active_players_count = len(previous_active_player_ids)
+    activity_rate = (
+        round((active_players_count / players_total) * 100) if players_total else 0
+    )
+
+    tournaments_this_month = Tournament.objects.filter(
+        start_date__year=today.year,
+        start_date__month=today.month,
+    ).count()
+    tournaments_previous_month = Tournament.objects.filter(
+        start_date__gte=previous_month_start,
+        start_date__lte=previous_month_end,
+    ).count()
+    upcoming_tournaments_qs = (
+        Tournament.objects.filter(start_date__gte=today)
+        .select_related("club")
+        .order_by("start_date", "registration_deadline")
+    )
+    nearest_tournaments_count = upcoming_tournaments_qs.filter(
+        start_date__lte=next_14_days
+    ).count()
+
+    active_user_subscriptions = UserSubscription.objects.filter(
+        is_active=True,
+        end_date__gt=now,
+    ).count()
+    expiring_user_subscriptions_count = UserSubscription.objects.filter(
+        is_active=True,
+        end_date__gt=now,
+        end_date__lte=next_7_days,
+    ).count()
+    expiring_club_subscriptions_count = ClubSubscription.objects.filter(
+        status=ClubSubscriptionStatus.ACTIVE,
+        ends_at__gt=now,
+        ends_at__lte=next_7_days,
+    ).count()
+    ending_trials_count = Club.objects.filter(
+        status=ClubStatus.TRIAL,
+        trial_ends_at__gt=now,
+        trial_ends_at__lte=next_7_days,
+    ).count()
+
+    payments_this_month = PaymentRecord.objects.filter(
+        status="succeeded",
+        paid_at__gte=current_month_start,
+    )
+    payments_previous_month = PaymentRecord.objects.filter(
+        status="succeeded",
+        paid_at__gte=previous_month_start,
+        paid_at__lte=previous_month_end,
+    )
+    subscription_revenue_month = payments_this_month.filter(
+        payment_type=PaymentRecord.PaymentType.SUBSCRIPTION
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal("0")
+    tournament_revenue_month = payments_this_month.filter(
+        payment_type=PaymentRecord.PaymentType.TOURNAMENT
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal("0")
+    donation_revenue_month = payments_this_month.filter(
+        payment_type=PaymentRecord.PaymentType.DONATION
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal("0")
+    club_subscription_revenue_month = ClubSubscription.objects.filter(
+        started_at__gte=current_month_start,
+        price__gt=0,
+    ).aggregate(total=Coalesce(Sum("price"), Decimal("0")))["total"] or Decimal("0")
+    total_platform_revenue_month = (
+        subscription_revenue_month
+        + tournament_revenue_month
+        + donation_revenue_month
+        + club_subscription_revenue_month
+    )
+    previous_platform_revenue_month = (
+        payments_previous_month.aggregate(total=Coalesce(Sum("amount"), Decimal("0")))[
+            "total"
+        ]
+        or Decimal("0")
+    ) + (
+        ClubSubscription.objects.filter(
+            started_at__gte=previous_month_start,
+            started_at__lte=previous_month_end,
+            price__gt=0,
+        ).aggregate(total=Coalesce(Sum("price"), Decimal("0")))["total"]
+        or Decimal("0")
+    )
+    total_platform_revenue = (
+        PaymentRecord.objects.filter(status="succeeded").aggregate(
+            total=Coalesce(Sum("amount"), Decimal("0"))
+        )["total"]
+        or Decimal("0")
+    ) + (
+        ClubSubscription.objects.filter(price__gt=0).aggregate(
+            total=Coalesce(Sum("price"), Decimal("0"))
+        )["total"]
+        or Decimal("0")
+    )
+
+    payment_years = {
+        dt.year
+        for dt in PaymentRecord.objects.filter(status="succeeded").dates(
+            "paid_at", "year"
+        )
+    }
+    club_subscription_years = {
+        dt.year
+        for dt in ClubSubscription.objects.filter(price__gt=0).dates(
+            "started_at", "year"
+        )
+    }
+    available_years = {today.year, *payment_years, *club_subscription_years}
+    finance_year_options = sorted(
+        {int(year) for year in available_years if year},
+        reverse=True,
+    )
+    selected_year = today.year
+    selected_year_raw = request.GET.get("finance_year")
+    if selected_year_raw and selected_year_raw.isdigit():
+        selected_year_candidate = int(selected_year_raw)
+        if selected_year_candidate in finance_year_options:
+            selected_year = selected_year_candidate
+
+    selected_month: int | None = None
+    selected_month_raw = request.GET.get("finance_month")
+    if selected_month_raw and selected_month_raw.isdigit():
+        selected_month_candidate = int(selected_month_raw)
+        if 1 <= selected_month_candidate <= 12:
+            selected_month = selected_month_candidate
+
+    if selected_month:
+        finance_period_label = f"{month_names_ru[selected_month - 1]} {selected_year}"
+        finance_period_start = timezone.datetime(
+            selected_year, selected_month, 1, tzinfo=timezone.get_current_timezone()
+        )
+        finance_period_end = timezone.datetime(
+            selected_year,
+            selected_month,
+            monthrange(selected_year, selected_month)[1],
+            23,
+            59,
+            59,
+            tzinfo=timezone.get_current_timezone(),
+        )
+        previous_month = 12 if selected_month == 1 else selected_month - 1
+        previous_month_year = (
+            selected_year - 1 if selected_month == 1 else selected_year
+        )
+        previous_period_label = (
+            f"{month_names_ru[previous_month - 1]} {previous_month_year}"
+        )
+        previous_period_start = timezone.datetime(
+            previous_month_year,
+            previous_month,
+            1,
+            tzinfo=timezone.get_current_timezone(),
+        )
+        previous_period_end = timezone.datetime(
+            previous_month_year,
+            previous_month,
+            monthrange(previous_month_year, previous_month)[1],
+            23,
+            59,
+            59,
+            tzinfo=timezone.get_current_timezone(),
+        )
+    else:
+        finance_period_label = f"{selected_year} год"
+        finance_period_start = timezone.datetime(
+            selected_year, 1, 1, tzinfo=timezone.get_current_timezone()
+        )
+        finance_period_end = timezone.datetime(
+            selected_year, 12, 31, 23, 59, 59, tzinfo=timezone.get_current_timezone()
+        )
+        previous_period_label = f"{selected_year - 1} год"
+        previous_period_start = timezone.datetime(
+            selected_year - 1, 1, 1, tzinfo=timezone.get_current_timezone()
+        )
+        previous_period_end = timezone.datetime(
+            selected_year - 1,
+            12,
+            31,
+            23,
+            59,
+            59,
+            tzinfo=timezone.get_current_timezone(),
+        )
+
+    finance_payments = PaymentRecord.objects.filter(
+        status="succeeded",
+        paid_at__gte=finance_period_start,
+        paid_at__lte=finance_period_end,
+    )
+    finance_previous_payments = PaymentRecord.objects.filter(
+        status="succeeded",
+        paid_at__gte=previous_period_start,
+        paid_at__lte=previous_period_end,
+    )
+    finance_club_subscriptions = ClubSubscription.objects.filter(
+        started_at__gte=finance_period_start,
+        started_at__lte=finance_period_end,
+        price__gt=0,
+    )
+    finance_previous_club_subscriptions = ClubSubscription.objects.filter(
+        started_at__gte=previous_period_start,
+        started_at__lte=previous_period_end,
+        price__gt=0,
+    )
+
+    finance_subscription_revenue = finance_payments.filter(
+        payment_type=PaymentRecord.PaymentType.SUBSCRIPTION
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal("0")
+    finance_tournament_revenue = finance_payments.filter(
+        payment_type=PaymentRecord.PaymentType.TOURNAMENT
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal("0")
+    finance_donation_revenue = finance_payments.filter(
+        payment_type=PaymentRecord.PaymentType.DONATION
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal("0")
+    finance_club_revenue = finance_club_subscriptions.aggregate(
+        total=Coalesce(Sum("price"), Decimal("0"))
+    )["total"] or Decimal("0")
+    finance_total_revenue = (
+        finance_subscription_revenue
+        + finance_tournament_revenue
+        + finance_donation_revenue
+        + finance_club_revenue
+    )
+    finance_previous_total_revenue = (
+        finance_previous_payments.aggregate(
+            total=Coalesce(Sum("amount"), Decimal("0"))
+        )["total"]
+        or Decimal("0")
+    ) + (
+        finance_previous_club_subscriptions.aggregate(
+            total=Coalesce(Sum("price"), Decimal("0"))
+        )["total"]
+        or Decimal("0")
+    )
+
+    pending_join_requests = (
+        Club.objects.filter(join_requests__status=ClubJoinRequestStatus.PENDING)
+        .distinct()
+        .count()
+    )
+    pending_interclub_applications = (
+        Club.objects.filter(
+            tournament_applications__status=ClubApplicationStatus.PENDING
+        )
+        .distinct()
+        .count()
+    )
+
+    low_fill_tournaments_count = 0
+    upcoming_tournaments: list[dict[str, Any]] = []
+    for tournament in upcoming_tournaments_qs[:5]:
+        participants_count = (
+            tournament.full_teams_count()
+            if tournament.is_doubles()
+            else tournament.participants.count()
+        )
+        target_participants = (
+            tournament.max_teams
+            if tournament.is_doubles()
+            else tournament.max_participants
+        )
+        needs_attention = bool(
+            tournament.min_participants
+            and participants_count < tournament.min_participants
+        )
+        if needs_attention:
+            low_fill_tournaments_count += 1
+        upcoming_tournaments.append(
+            {
+                "object": tournament,
+                "participants_count": participants_count,
+                "target_participants": target_participants,
+                "needs_attention": needs_attention,
+                "host_label": (
+                    tournament.club.name if tournament.club_id else "Платформа"
+                ),
+            }
+        )
+
+    recent_clubs = list(Club.objects.order_by("-created_at")[:4])
+    clubs_expiring = list(
+        ClubSubscription.objects.filter(
+            status=ClubSubscriptionStatus.ACTIVE,
+            ends_at__gt=now,
+            ends_at__lte=next_7_days,
+        )
+        .select_related("club")
+        .order_by("ends_at")[:4]
+    )
+    top_clubs = list(
+        Club.objects.annotate(
+            active_members_count=Count(
+                "members",
+                filter=Q(members__status=ClubMemberStatus.ACTIVE),
+                distinct=True,
+            ),
+            tournaments_month_count=Count(
+                "tournaments",
+                filter=Q(
+                    tournaments__start_date__year=today.year,
+                    tournaments__start_date__month=today.month,
+                ),
+                distinct=True,
+            ),
+        ).order_by("-active_members_count", "-tournaments_month_count", "name")[:4]
+    )
+
+    months_ru = (
+        "янв",
+        "фев",
+        "мар",
+        "апр",
+        "мая",
+        "июн",
+        "июл",
+        "авг",
+        "сен",
+        "окт",
+        "ноя",
+        "дек",
+    )
+    growth_raw: list[dict[str, Any]] = []
+    for offset in range(5, -1, -1):
+        month_index = current_month_start.month - offset
+        month_anchor_year = current_month_start.year + ((month_index - 1) // 12)
+        month_anchor_month = ((month_index - 1) % 12) + 1
+        month_anchor = current_month_start.replace(
+            year=month_anchor_year,
+            month=month_anchor_month,
+        )
+        month_end = (month_anchor.replace(day=28) + timedelta(days=4)).replace(
+            day=1
+        ) - timedelta(days=1)
+        value = Player.objects.filter(
+            is_bye=False,
+            created_at__date__gte=month_anchor,
+            created_at__date__lte=month_end,
+        ).count()
+        growth_raw.append(
+            {
+                "label": f"{months_ru[month_anchor.month - 1]} {str(month_anchor.year)[-2:]}",
+                "value": value,
+            }
+        )
+    growth_max = max([point["value"] for point in growth_raw] + [1])
+    player_growth_points = [
+        {**point, "height": max(14, round((point["value"] / growth_max) * 100))}
+        for point in growth_raw
+    ]
+
+    attention_items: list[dict[str, str]] = []
+    if suspended_clubs_count:
+        attention_items.append(
+            {
+                "tone": "critical",
+                "title": "Есть приостановленные клубы",
+                "description": f"{suspended_clubs_count} клубов сейчас в suspended-статусе.",
+                "action_label": "Клубы в админке",
+                "action_url": reverse("admin:clubs_club_changelist"),
+            }
+        )
+    if expiring_club_subscriptions_count:
+        attention_items.append(
+            {
+                "tone": "warning",
+                "title": "Истекают подписки клубов",
+                "description": f"{expiring_club_subscriptions_count} клубов требуют продления в ближайшие 7 дней.",
+                "action_label": "Подписки клубов",
+                "action_url": reverse("admin:clubs_clubsubscription_changelist"),
+            }
+        )
+    if ending_trials_count:
+        attention_items.append(
+            {
+                "tone": "warning",
+                "title": "Заканчиваются trial-периоды",
+                "description": f"{ending_trials_count} клубов скоро перейдут в зону риска.",
+                "action_label": "Клубы",
+                "action_url": reverse("admin:clubs_club_changelist"),
+            }
+        )
+    if low_fill_tournaments_count:
+        attention_items.append(
+            {
+                "tone": "warning",
+                "title": "Турниры с недобором участников",
+                "description": f"{low_fill_tournaments_count} ближайших турниров не набрали минимальный состав.",
+                "action_label": "Турниры",
+                "action_url": reverse("admin:tournaments_tournament_changelist"),
+            }
+        )
+    if pending_interclub_applications:
+        attention_items.append(
+            {
+                "tone": "info",
+                "title": "Есть межклубные заявки",
+                "description": f"{pending_interclub_applications} клубов ждут ответа по межклубным заявкам.",
+                "action_label": "Клубы",
+                "action_url": reverse(
+                    "admin:clubs_clubtournamentapplication_changelist"
+                ),
+            }
+        )
+    if pending_join_requests:
+        attention_items.append(
+            {
+                "tone": "info",
+                "title": "Заявки на вступление в клубы",
+                "description": f"{pending_join_requests} заявок ожидают решения.",
+                "action_label": "Клубы",
+                "action_url": reverse("admin:clubs_club_changelist"),
+            }
+        )
+    if expiring_user_subscriptions_count:
+        attention_items.append(
+            {
+                "tone": "info",
+                "title": "Истекают подписки игроков",
+                "description": f"{expiring_user_subscriptions_count} пользовательских подписок закончатся в 7 дней.",
+                "action_label": "Подписки игроков",
+                "action_url": reverse(
+                    "admin:subscriptions_usersubscription_changelist"
+                ),
+            }
+        )
+
+    status_summary = (
+        attention_items[0]["description"]
+        if attention_items
+        else f"Платформа работает стабильно: {nearest_tournaments_count} стартов на горизонте 14 дней."
+    )
+
+    summary_cards = [
+        {
+            "label": "Клубы на платформе",
+            "value": str(clubs_total),
+            "delta": f"{new_clubs_30d - previous_new_clubs_30d:+d} к прошлым 30 дням",
+            "meta": f"{operational_clubs_count} работают, {suspended_clubs_count} приостановлены",
+            "tone": "default",
+        },
+        {
+            "label": "Игроки платформы",
+            "value": str(players_total),
+            "delta": f"{active_players_count - previous_active_players_count:+d} активных к прошлым 30 дням",
+            "meta": f"{activity_rate}% базы участвовали в матчах",
+            "tone": "accent",
+        },
+        {
+            "label": "Турниры в этом месяце",
+            "value": str(tournaments_this_month),
+            "delta": f"{tournaments_this_month - tournaments_previous_month:+d} к прошлому месяцу",
+            "meta": f"{nearest_tournaments_count} стартов в следующие 14 дней",
+            "tone": "default",
+        },
+        {
+            "label": "Подписки игроков",
+            "value": str(active_user_subscriptions),
+            "delta": f"{expiring_user_subscriptions_count} истекают скоро",
+            "meta": "Активные пользовательские подписки",
+            "tone": "default",
+        },
+        {
+            "label": "Выручка платформы",
+            "value": f"{total_platform_revenue_month:.0f} ₽",
+            "delta": f"{total_platform_revenue_month - previous_platform_revenue_month:+.0f} ₽ к прошлому месяцу",
+            "meta": "Все платежи платформы за текущий месяц",
+            "tone": (
+                "warning"
+                if total_platform_revenue_month < previous_platform_revenue_month
+                else "default"
+            ),
+        },
+    ]
+
+    finance_summary = (
+        f"За период {finance_period_label} платформа собрала {finance_total_revenue:.0f} ₽. "
+        f"Изменение к периоду {previous_period_label}: {finance_total_revenue - finance_previous_total_revenue:+.0f} ₽."
+    )
+    finance_cards = [
+        {
+            "label": "Подписки игроков",
+            "value": f"{finance_subscription_revenue:.0f} ₽",
+            "meta": f"Доход от пользовательских подписок за {finance_period_label.lower()}",
+            "tone": "accent",
+        },
+        {
+            "label": "Подписки клубов",
+            "value": f"{finance_club_revenue:.0f} ₽",
+            "meta": f"Доход от подписок клубов за {finance_period_label.lower()}",
+            "tone": "default",
+        },
+        {
+            "label": "Турнирные оплаты",
+            "value": f"{finance_tournament_revenue:.0f} ₽",
+            "meta": f"Платежи за турниры за {finance_period_label.lower()}",
+            "tone": "default",
+        },
+        {
+            "label": "Донаты и всё время",
+            "value": f"{finance_donation_revenue:.0f} ₽",
+            "meta": f"Суммарно платформа обработала {total_platform_revenue:.0f} ₽",
+            "tone": "default",
+        },
+    ]
+
+    finance_chart_raw: list[dict[str, Any]] = []
+    if selected_month:
+        days_in_month = monthrange(selected_year, selected_month)[1]
+        for day in range(1, days_in_month + 1):
+            point_date = timezone.datetime(
+                selected_year,
+                selected_month,
+                day,
+                tzinfo=timezone.get_current_timezone(),
+            ).date()
+            payment_total = PaymentRecord.objects.filter(
+                status="succeeded",
+                paid_at__date=point_date,
+            ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))[
+                "total"
+            ] or Decimal(
+                "0"
+            )
+            club_total = ClubSubscription.objects.filter(
+                started_at__date=point_date,
+                price__gt=0,
+            ).aggregate(total=Coalesce(Sum("price"), Decimal("0")))["total"] or Decimal(
+                "0"
+            )
+            finance_chart_raw.append(
+                {
+                    "label": f"{day:02d}",
+                    "value": int(payment_total + club_total),
+                }
+            )
+    else:
+        for month_number in range(1, 13):
+            month_start = timezone.datetime(
+                selected_year, month_number, 1, tzinfo=timezone.get_current_timezone()
+            )
+            month_end = timezone.datetime(
+                selected_year,
+                month_number,
+                monthrange(selected_year, month_number)[1],
+                23,
+                59,
+                59,
+                tzinfo=timezone.get_current_timezone(),
+            )
+            payment_total = PaymentRecord.objects.filter(
+                status="succeeded",
+                paid_at__gte=month_start,
+                paid_at__lte=month_end,
+            ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))[
+                "total"
+            ] or Decimal(
+                "0"
+            )
+            club_total = ClubSubscription.objects.filter(
+                started_at__gte=month_start,
+                started_at__lte=month_end,
+                price__gt=0,
+            ).aggregate(total=Coalesce(Sum("price"), Decimal("0")))["total"] or Decimal(
+                "0"
+            )
+            finance_chart_raw.append(
+                {
+                    "label": month_names_ru[month_number - 1][:3],
+                    "value": int(payment_total + club_total),
+                }
+            )
+    finance_chart_max = max([point["value"] for point in finance_chart_raw] + [1])
+    finance_chart_points = [
+        {**point, "height": max(14, round((point["value"] / finance_chart_max) * 100))}
+        for point in finance_chart_raw
+    ]
+
+    finance_month_options = [
+        {"value": month_number, "label": month_names_ru[month_number - 1]}
+        for month_number in range(1, 13)
+    ]
+
+    context = {
+        "status_summary": status_summary,
+        "summary_cards": summary_cards,
+        "finance_summary": finance_summary,
+        "finance_cards": finance_cards,
+        "finance_chart_points": finance_chart_points,
+        "finance_year_options": finance_year_options,
+        "finance_month_options": finance_month_options,
+        "selected_finance_year": selected_year,
+        "selected_finance_month": selected_month,
+        "finance_period_label": finance_period_label,
+        "attention_items": attention_items,
+        "upcoming_tournaments": upcoming_tournaments,
+        "player_growth_points": player_growth_points,
+        "recent_clubs": recent_clubs,
+        "clubs_expiring": clubs_expiring,
+        "top_clubs": top_clubs,
+        "activity_rate": activity_rate,
+        "nearest_tournaments_count": nearest_tournaments_count,
+        "active_user_subscriptions": active_user_subscriptions,
+    }
+    return render(request, "core/platform_dashboard.html", context)
 
 
 @require_safe
@@ -76,7 +762,11 @@ def robots_txt(request: Any) -> HttpResponse:
     Отдача robots.txt для поисковых систем.
     Разрешает индексацию, запрещает админку и платёжные переходы, указывает sitemap.
     """
-    sitemap_url = request.build_absolute_uri(reverse("sitemap"))
+    base_url = getattr(settings, "TELEGRAM_BOT_SITE_BASE_URL", "").strip()
+    if not base_url:
+        domain = getattr(settings, "SITE_DOMAIN", "tennisfan.ru").strip()
+        base_url = f"https://{domain}"
+    sitemap_url = f"{base_url.rstrip('/')}{reverse('sitemap')}"
     lines = [
         "User-agent: *",
         "Allow: /",
@@ -100,6 +790,7 @@ def _build_recent_matches(limit: int = 10, days: int = 5):
             completed_datetime__gte=since,
         )
         .select_related(
+            "tournament__club",
             "player1__user",
             "player2__user",
             "winner__user",
@@ -152,6 +843,11 @@ def _build_recent_matches(limit: int = 10, days: int = 5):
                     if m.completed_datetime
                     else ""
                 ),
+                "club_name": (
+                    m.tournament.club.name
+                    if m.tournament_id and m.tournament and m.tournament.club_id
+                    else ""
+                ),
                 "match_url": f"/tournaments/match/{m.pk}/",
             }
         )
@@ -169,6 +865,7 @@ def _build_upcoming_matches(limit: int = 10, days: int = 5):
             scheduled_datetime__lte=until,
         )
         .select_related(
+            "tournament__club",
             "player1__user",
             "player2__user",
             "team1__player1__user",
@@ -206,6 +903,11 @@ def _build_upcoming_matches(limit: int = 10, days: int = 5):
                 "date": (
                     m.scheduled_datetime.strftime("%d.%m.%Y %H:%M")
                     if m.scheduled_datetime
+                    else ""
+                ),
+                "club_name": (
+                    m.tournament.club.name
+                    if m.tournament_id and m.tournament and m.tournament.club_id
                     else ""
                 ),
                 "match_url": f"/tournaments/match/{m.pk}/",

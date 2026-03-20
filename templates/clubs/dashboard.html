@@ -3,138 +3,371 @@
 
 {% block content %}
 {% include "clubs/_club_dashboard_nav.html" with current="dashboard" %}
+
 <div class="page-header club-dashboard-page-header">
-    <div class="container">
-        <div class="club-dashboard-page-header__row">
-            {% if club.logo %}
-            <img src="{{ club.logo.url }}" alt="{{ club.name }}" class="club-dashboard-page-header__logo">
-            {% else %}
-            <!-- Placeholder logo just in case -->
-            <div class="club-dashboard-page-header__logo-fallback">
-                {{ club.name|first|upper }}
-            </div>
-            {% endif %}
-            <div class="club-dashboard-page-header__content">
-                <h1 class="page-title club-dashboard-page-header__title">{{ club.name }}</h1>
-                <p class="page-subtitle club-dashboard-page-header__subtitle">Панель управления клубом</p>
-                <p class="club-dashboard-page-header__meta">
-                    Добро пожаловать{% if request.user.first_name %}, {{ request.user.first_name }}{% endif %}. Сегодня {% now "j E Y" %}.
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="container club-dashboard">
-    <section class="club-dashboard__summary-grid">
-        <div class="club-dashboard__summary-card">
-            <div class="club-dashboard__summary-label">Активных игроков</div>
-            <div class="club-dashboard__summary-value">
-                {{ members_count }}{% if members_limit %} из {{ members_limit }}{% endif %}
-            </div>
-            <div class="club-dashboard__summary-hint">
-                {% if members_limit %}
-                Следите за ростом клуба и лимитом по тарифу.
-                {% else %}
-                Следите за ростом клуба по игрокам.
-                {% endif %}
-            </div>
-        </div>
-        <div class="club-dashboard__summary-card">
-            <div class="club-dashboard__summary-label">Турниров всего</div>
-            <div class="club-dashboard__summary-value">
-                {{ tournaments_count }}{% if tournaments_limit %} из {{ tournaments_limit }}{% endif %}
-            </div>
-            <div class="club-dashboard__summary-hint">
-                {% if tournaments_limit %}
-                Лимит турниров в месяц зависит от тарифа.
-                {% else %}
-                Создавайте новые события для игроков.
-                {% endif %}
-            </div>
-        </div>
-        <div class="club-dashboard__summary-card">
-            <div class="club-dashboard__summary-label">Тариф платформы</div>
-            {% if subscription %}
-            <div class="club-dashboard__summary-value club-dashboard__summary-value--compact">
-                {{ subscription.get_plan_display }}
-            </div>
-            <div class="club-dashboard__summary-hint">
-                Активна до {{ subscription.ends_at|date:"d.m.Y" }}.
-            </div>
-            {% else %}
-            <div class="club-dashboard__summary-value club-dashboard__summary-value--compact">Нет</div>
-            <div class="club-dashboard__summary-hint">Подписка не активна.</div>
-            {% endif %}
-        </div>
-        <div class="club-dashboard__summary-card">
-            <div class="club-dashboard__summary-label">Тарифы игроков</div>
-            <div class="club-dashboard__summary-value">{{ plans_count }}</div>
-            <div class="club-dashboard__summary-hint">Настройте клубные планы и лимиты.</div>
-        </div>
-    </section>
+    <div class="container club-dashboard-shell">
+        <section class="club-dashboard-hero">
+            <div class="club-dashboard-hero__main">
+                <div class="club-dashboard-hero__eyebrow-row">
+                    <span class="club-dashboard-hero__eyebrow">Панель управления</span>
+                    {% if subscription %}
+                    <span class="club-dashboard-hero__status-pill">
+                        {{ subscription.get_plan_display }} до {{ subscription.ends_at|date:"d.m.Y" }}
+                    </span>
+                    {% endif %}
+                </div>
 
-    <section class="club-dashboard__quick">
-        <h2 class="club-dashboard__quick-title">Быстрые действия</h2>
-        <div class="club-dashboard__quick-row">
-            <a href="{% url 'clubs:invite_by_email' slug=club.slug %}" class="btn btn-primary">Добавить игрока</a>
-            <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary">Создать турнир</a>
-            <a href="{% url 'clubs:invite_create' slug=club.slug %}" class="btn btn-ghost">Создать приглашение</a>
-            <a href="{% url 'clubs:dashboard_rating' slug=club.slug %}" class="btn btn-ghost">Рейтинг</a>
-            {% if can_edit_settings %}
-            <a href="{% url 'clubs:club_edit' slug=club.slug %}" class="btn btn-ghost">Настройки</a>
-            {% endif %}
-        </div>
-    </section>
+                <div class="club-dashboard-hero__identity">
+                    {% if club.logo %}
+                    <img src="{{ club.logo.url }}" alt="{{ club.name }}" class="club-dashboard-page-header__logo">
+                    {% else %}
+                    <div class="club-dashboard-page-header__logo-fallback">
+                        {{ club.name|first|upper }}
+                    </div>
+                    {% endif %}
 
-    <section class="club-dashboard__grid">
-        <div class="card">
-            <div class="card-body">
-                <h2 class="club-dashboard__card-title">Последние турниры клуба</h2>
-                {% if recent_tournaments %}
-                <table class="club-dashboard__activity-table">
-                    <thead>
-                        <tr>
-                            <th>Турнир</th>
-                            <th>Дата</th>
-                            <th>Статус</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for t in recent_tournaments %}
-                        <tr>
-                            <td><a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a></td>
-                            <td>{{ t.start_date|date:"d.m.Y" }}</td>
-                            <td>{{ t.get_status_display }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}"
-                    class="club-dashboard__inline-link">Все турниры →</a>
-                {% else %}
-                <p class="club-dashboard__empty-text">Турниров пока нет.</p>
-                <a href="{% url 'clubs:tournament_create' slug=club.slug %}">Создать турнир</a>
+                    <div class="club-dashboard-hero__copy">
+                        <h1 class="page-title club-dashboard-page-header__title">{{ club.name }}</h1>
+                        <p class="club-dashboard-page-header__subtitle">
+                            {{ club.city }}{% if club.address %}, {{ club.address }}{% endif %}
+                        </p>
+                        <p class="club-dashboard-hero__summary">{{ status_summary }}</p>
+                    </div>
+                </div>
+
+                <div class="club-dashboard-hero__actions">
+                    <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary club-dashboard-hero__cta">Создать турнир</a>
+                    <a href="{% url 'clubs:invite_by_email' slug=club.slug %}" class="btn btn-ghost">Добавить игрока</a>
+                    <a href="{% url 'clubs:dashboard_rating' slug=club.slug %}" class="btn btn-ghost">Открыть рейтинг</a>
+                </div>
+            </div>
+
+            <aside class="club-dashboard-hero__side">
+                <div class="club-dashboard-hero__side-card">
+                    <div class="club-dashboard-hero__side-label">На контроле сегодня</div>
+                    <div class="club-dashboard-hero__side-value">
+                        {{ attention_items|length }}
+                    </div>
+                    <div class="club-dashboard-hero__side-meta">
+                        {% if attention_items %}
+                        Есть задачи, которые требуют решения до следующего запуска турниров.
+                        {% else %}
+                        Критичных сигналов нет, можно работать в плановом режиме.
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="club-dashboard-hero__mini-stats">
+                    <div class="club-dashboard-hero__mini-stat">
+                        <span class="club-dashboard-hero__mini-value">{{ activity_rate }}%</span>
+                        <span class="club-dashboard-hero__mini-label">активность игроков</span>
+                    </div>
+                    <div class="club-dashboard-hero__mini-stat">
+                        <span class="club-dashboard-hero__mini-value">{{ nearest_tournaments_count }}</span>
+                        <span class="club-dashboard-hero__mini-label">стартов в 14 дней</span>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="club-dashboard-kpi-grid">
+            {% for card in summary_cards %}
+            <article class="club-dashboard-kpi-card club-dashboard-kpi-card--{{ card.tone }}">
+                <div class="club-dashboard-kpi-card__label">{{ card.label }}</div>
+                <div class="club-dashboard-kpi-card__value">{{ card.value }}</div>
+                <div class="club-dashboard-kpi-card__delta">{{ card.delta }}</div>
+                <div class="club-dashboard-kpi-card__meta">{{ card.meta }}</div>
+            </article>
+            {% endfor %}
+        </section>
+
+        <section class="club-dashboard-panel club-dashboard-panel--finance">
+            <div class="club-dashboard-panel__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">Финансы</p>
+                    <h2 class="club-dashboard-panel__title">Доходы и взносы</h2>
+                </div>
+                {% if can_manage_fees %}
+                <a href="{% url 'clubs:fees_payments' slug=club.slug %}" class="club-dashboard-panel__link">Все платежи</a>
                 {% endif %}
             </div>
-        </div>
-        <div class="card">
-            <div class="card-body">
-                <h2 class="club-dashboard__card-title">Недавно вступившие</h2>
-                {% if recent_members %}
-                <ul class="club-dashboard__members-list">
-                    {% for m in recent_members %}
-                    <li class="club-dashboard__members-item">
-                        {{ m.user.get_full_name|default:m.user.email }}
-                    </li>
+            <p class="club-dashboard-finance__summary">{{ finance_summary }}</p>
+            <div class="club-dashboard-finance-grid">
+                {% for card in finance_cards %}
+                <article class="club-dashboard-finance-card club-dashboard-finance-card--{{ card.tone }}">
+                    <div class="club-dashboard-finance-card__label">{{ card.label }}</div>
+                    <div class="club-dashboard-finance-card__value">{{ card.value }}</div>
+                    <div class="club-dashboard-finance-card__meta">{{ card.meta }}</div>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="club-dashboard-command-grid">
+            <article class="club-dashboard-panel club-dashboard-panel--attention">
+                <div class="club-dashboard-panel__header">
+                    <div>
+                        <p class="club-dashboard-panel__eyebrow">Главный фокус</p>
+                        <h2 class="club-dashboard-panel__title">Требует внимания</h2>
+                    </div>
+                </div>
+
+                {% if attention_items %}
+                <div class="club-dashboard-alert-list">
+                    {% for item in attention_items %}
+                    <div class="club-dashboard-alert club-dashboard-alert--{{ item.tone }}">
+                        <div class="club-dashboard-alert__body">
+                            <div class="club-dashboard-alert__title">{{ item.title }}</div>
+                            <div class="club-dashboard-alert__description">{{ item.description }}</div>
+                        </div>
+                        <a href="{{ item.action_url }}" class="club-dashboard-alert__action">{{ item.action_label }}</a>
+                    </div>
                     {% endfor %}
-                </ul>
-                <a href="{% url 'clubs:members_list' slug=club.slug %}"
-                    class="club-dashboard__inline-link">Все участники →</a>
+                </div>
                 {% else %}
-                <p class="club-dashboard__empty-text">Участников пока нет.</p>
+                <div class="club-dashboard-empty-state">
+                    <div class="club-dashboard-empty-state__title">Операционных блокеров нет</div>
+                    <div class="club-dashboard-empty-state__text">На главном экране сейчас нет сигналов, которые требуют немедленного вмешательства.</div>
+                </div>
                 {% endif %}
+            </article>
+
+            <article class="club-dashboard-panel club-dashboard-panel--actions">
+                <div class="club-dashboard-panel__header">
+                    <div>
+                        <p class="club-dashboard-panel__eyebrow">Сценарии</p>
+                        <h2 class="club-dashboard-panel__title">Быстрые действия</h2>
+                    </div>
+                </div>
+                <div class="club-dashboard-action-stack">
+                    <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="club-dashboard-action club-dashboard-action--primary">
+                        <span class="club-dashboard-action__title">Создать турнир</span>
+                        <span class="club-dashboard-action__text">Запустить новый турнир и сразу перейти к настройке состава.</span>
+                    </a>
+                    <a href="{% url 'clubs:invite_by_email' slug=club.slug %}" class="club-dashboard-action">
+                        <span class="club-dashboard-action__title">Добавить игрока</span>
+                        <span class="club-dashboard-action__text">Отправить приглашение новому участнику клуба.</span>
+                    </a>
+                    <a href="{% url 'clubs:invite_create' slug=club.slug %}" class="club-dashboard-action">
+                        <span class="club-dashboard-action__title">Создать приглашение</span>
+                        <span class="club-dashboard-action__text">Сформировать инвайт-ссылку или пакет приглашений.</span>
+                    </a>
+                    <a href="{% url 'clubs:dashboard_rating' slug=club.slug %}" class="club-dashboard-action">
+                        <span class="club-dashboard-action__title">Открыть рейтинг</span>
+                        <span class="club-dashboard-action__text">Проверить динамику мест и форму активных игроков.</span>
+                    </a>
+                    {% if can_edit_settings %}
+                    <a href="{% url 'clubs:club_edit' slug=club.slug %}" class="club-dashboard-action">
+                        <span class="club-dashboard-action__title">Настройки клуба</span>
+                        <span class="club-dashboard-action__text">Обновить профиль клуба, правила и параметры доступа.</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </article>
+        </section>
+
+        <section class="club-dashboard-analytics-grid">
+            <article class="club-dashboard-panel">
+                <div class="club-dashboard-panel__header">
+                    <div>
+                        <p class="club-dashboard-panel__eyebrow">Аналитика</p>
+                        <h2 class="club-dashboard-panel__title">Рост игроков</h2>
+                    </div>
+                </div>
+                <div class="club-dashboard-chart">
+                    {% for point in player_growth_points %}
+                    <div class="club-dashboard-chart__item">
+                        <div class="club-dashboard-chart__bar-wrap">
+                            <div class="club-dashboard-chart__bar" style="height: {{ point.height }}%;"></div>
+                        </div>
+                        <div class="club-dashboard-chart__value">{{ point.value }}</div>
+                        <div class="club-dashboard-chart__label">{{ point.label }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="club-dashboard-panel">
+                <div class="club-dashboard-panel__header">
+                    <div>
+                        <p class="club-dashboard-panel__eyebrow">Живая система</p>
+                        <h2 class="club-dashboard-panel__title">Активность по неделям</h2>
+                    </div>
+                </div>
+                <div class="club-dashboard-chart club-dashboard-chart--soft">
+                    {% for point in activity_points %}
+                    <div class="club-dashboard-chart__item">
+                        <div class="club-dashboard-chart__bar-wrap">
+                            <div class="club-dashboard-chart__bar club-dashboard-chart__bar--soft" style="height: {{ point.height }}%;"></div>
+                        </div>
+                        <div class="club-dashboard-chart__value">{{ point.value }}</div>
+                        <div class="club-dashboard-chart__label">{{ point.label }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+
+        <section class="club-dashboard-main-grid">
+            <article class="club-dashboard-panel club-dashboard-panel--tournaments">
+                <div class="club-dashboard-panel__header">
+                    <div>
+                        <p class="club-dashboard-panel__eyebrow">Турниры</p>
+                        <h2 class="club-dashboard-panel__title">Ближайшие старты</h2>
+                    </div>
+                    <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="club-dashboard-panel__link">Все турниры</a>
+                </div>
+
+                {% if upcoming_tournaments %}
+                <div class="club-dashboard-table">
+                    <div class="club-dashboard-table__head">
+                        <span>Турнир</span>
+                        <span>Дата</span>
+                        <span>Статус</span>
+                        <span>Участники</span>
+                        <span></span>
+                    </div>
+                    {% for item in upcoming_tournaments %}
+                    <div class="club-dashboard-table__row">
+                        <div class="club-dashboard-table__cell club-dashboard-table__cell--title">
+                            <a href="{% url 'tournament_detail' slug=item.object.slug %}">{{ item.object.name }}</a>
+                            {% if item.object.registration_deadline %}
+                            <span class="club-dashboard-table__hint">Регистрация до {{ item.object.registration_deadline|date:"d.m.Y H:i" }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="club-dashboard-table__cell">{{ item.object.start_date|date:"d.m.Y" }}</div>
+                        <div class="club-dashboard-table__cell">
+                            <span class="tournament-status-badge tournament-status-badge--inline {% if item.object.status == 'upcoming' %}tournament-status-badge--upcoming{% elif item.object.status == 'completed' %}tournament-status-badge--completed{% elif item.object.status == 'cancelled' %}tournament-status-badge--cancelled{% else %}tournament-status-badge--active{% endif %}">
+                                {{ item.object.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="club-dashboard-table__cell">
+                            {{ item.participants_count }}
+                            {% if item.target_participants %}/{{ item.target_participants }}{% endif %}
+                            {% if item.needs_attention %}
+                            <span class="club-dashboard-table__hint club-dashboard-table__hint--warn">Нужно добрать состав</span>
+                            {% endif %}
+                        </div>
+                        <div class="club-dashboard-table__cell club-dashboard-table__cell--actions">
+                            <a href="{% url 'tournament_detail' slug=item.object.slug %}">Открыть</a>
+                            <a href="{% url 'clubs:tournament_edit' slug=club.slug tournament_id=item.object.id %}">Редактировать</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="club-dashboard-empty-state">
+                    <div class="club-dashboard-empty-state__title">Ближайших турниров нет</div>
+                    <div class="club-dashboard-empty-state__text">На главном экране должен быть хотя бы один следующий старт, иначе у панели пропадает операционный смысл.</div>
+                    <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="club-dashboard-panel__link">Создать турнир</a>
+                </div>
+                {% endif %}
+            </article>
+
+            <div class="club-dashboard-side-grid">
+                <article class="club-dashboard-panel">
+                    <div class="club-dashboard-panel__header">
+                        <div>
+                            <p class="club-dashboard-panel__eyebrow">Игроки</p>
+                            <h2 class="club-dashboard-panel__title">Новые и под риском</h2>
+                        </div>
+                        <a href="{% url 'clubs:members_list' slug=club.slug %}" class="club-dashboard-panel__link">Все участники</a>
+                    </div>
+
+                    <div class="club-dashboard-persona-section">
+                        <div class="club-dashboard-persona-section__title">Недавно вступили</div>
+                        {% if recent_members %}
+                        <ul class="club-dashboard-persona-list">
+                            {% for member in recent_members %}
+                            <li class="club-dashboard-persona-item">
+                                <span class="club-dashboard-persona-item__name">{{ member.user.get_full_name|default:member.user.email }}</span>
+                                <span class="club-dashboard-persona-item__meta">{{ member.joined_at|default:member.created_at|date:"d.m.Y" }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="club-dashboard__empty-text">Новых участников пока нет.</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="club-dashboard-persona-section">
+                        <div class="club-dashboard-persona-section__title">Неактивные игроки</div>
+                        {% if inactive_members %}
+                        <ul class="club-dashboard-persona-list">
+                            {% for member in inactive_members %}
+                            <li class="club-dashboard-persona-item">
+                                <span class="club-dashboard-persona-item__name">{{ member.user.get_full_name|default:member.user.email }}</span>
+                                <span class="club-dashboard-persona-item__meta">Нет участия в турнирах за 30 дней</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="club-dashboard__empty-text">Вся активная база вовлечена в турниры.</p>
+                        {% endif %}
+                    </div>
+
+                    {% if fee_active %}
+                    <div class="club-dashboard-persona-section">
+                        <div class="club-dashboard-persona-section__title">С задолженностью</div>
+                        {% if overdue_members %}
+                        <ul class="club-dashboard-persona-list">
+                            {% for member in overdue_members %}
+                            <li class="club-dashboard-persona-item">
+                                <span class="club-dashboard-persona-item__name">{{ member.user.get_full_name|default:member.user.email }}</span>
+                                <span class="club-dashboard-persona-item__meta">Не оплачен текущий период</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="club-dashboard__empty-text">Просроченных оплат нет.</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </article>
+
+                <article class="club-dashboard-panel">
+                    <div class="club-dashboard-panel__header">
+                        <div>
+                            <p class="club-dashboard-panel__eyebrow">Форма игроков</p>
+                            <h2 class="club-dashboard-panel__title">Самые активные</h2>
+                        </div>
+                    </div>
+
+                    {% if top_active_players %}
+                    <ul class="club-dashboard-persona-list">
+                        {% for item in top_active_players %}
+                        <li class="club-dashboard-persona-item">
+                            <span class="club-dashboard-persona-item__name">{{ item.member.user.get_full_name|default:item.member.user.email }}</span>
+                            <span class="club-dashboard-persona-item__meta">{{ item.matches }} матчей за 30 дней</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="club-dashboard__empty-text">Пока не хватает данных, чтобы выделить лидеров по активности.</p>
+                    {% endif %}
+
+                    <div class="club-dashboard-meta-grid">
+                        <div class="club-dashboard-meta-card">
+                            <span class="club-dashboard-meta-card__label">Заявки</span>
+                            <span class="club-dashboard-meta-card__value">{{ pending_join_requests }}</span>
+                        </div>
+                        <div class="club-dashboard-meta-card">
+                            <span class="club-dashboard-meta-card__label">Инвайты</span>
+                            <span class="club-dashboard-meta-card__value">{{ active_invites_count }}</span>
+                        </div>
+                        <div class="club-dashboard-meta-card">
+                            <span class="club-dashboard-meta-card__label">Межклубные</span>
+                            <span class="club-dashboard-meta-card__value">{{ pending_interclub_applications }}</span>
+                        </div>
+                        {% if fee_active %}
+                        <div class="club-dashboard-meta-card">
+                            <span class="club-dashboard-meta-card__label">Долги</span>
+                            <span class="club-dashboard-meta-card__value">{{ unpaid_members_count }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </article>
             </div>
-        </div>
-    </section>
+        </section>
+    </div>
 </div>
 {% endblock %}

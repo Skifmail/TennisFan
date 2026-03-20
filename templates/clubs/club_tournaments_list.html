@@ -1,13 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Турниры — {{ club.name }}{% endblock %}
 {% block content %}
+{% if can_manage_club %}
 {% include "clubs/_club_dashboard_nav.html" with current="tournaments" %}
+{% endif %}
 <div class="page-header">
     <h1 class="page-title">Турниры клуба</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
 <div class="container" style="max-width: 900px;">
+    {% if can_manage_club %}
     <p><a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary">Создать турнир</a></p>
+    {% endif %}
     <div class="card">
         <div class="card-body">
             {% if tournaments %}
@@ -18,7 +22,9 @@
                         <th style="text-align: left; padding: var(--spacing-sm);">Дата</th>
                         <th style="text-align: left; padding: var(--spacing-sm);">Статус</th>
                         <th style="text-align: left; padding: var(--spacing-sm);">Участники</th>
+                        {% if can_manage_club %}
                         <th style="text-align: right; padding: var(--spacing-sm);"></th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -28,17 +34,22 @@
                         <td style="padding: var(--spacing-sm);">{{ t.start_date|date:"d.m.Y" }}</td>
                         <td style="padding: var(--spacing-sm);">{{ t.get_status_display }}</td>
                         <td style="padding: var(--spacing-sm);">{{ t.participants.count }}{% if t.max_participants %} / {{ t.max_participants }}{% endif %}</td>
+                        {% if can_manage_club %}
                         <td style="padding: var(--spacing-sm); text-align: right;">
                             <a href="{% url 'clubs:tournament_plan_access' slug=club.slug tournament_id=t.id %}" class="btn btn-ghost btn-sm">Доступ тарифов</a>
+                            <a href="{% url 'clubs:tournament_edit' slug=club.slug tournament_id=t.id %}" class="btn btn-ghost btn-sm">Редактировать</a>
                             <a href="{% url 'tournament_manage' slug=t.slug %}" class="btn btn-primary btn-sm">Управление</a>
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
             {% else %}
             <p style="margin: 0; color: var(--color-text-muted);">Турниров пока нет.</p>
+            {% if can_manage_club %}
             <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary" style="margin-top: var(--spacing-md);">Создать турнир</a>
+            {% endif %}
             {% endif %}
         </div>
     </div>

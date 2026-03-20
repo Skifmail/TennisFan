@@ -73,7 +73,9 @@ def _map_ntrp_to_skill_level(level: Decimal) -> str:
     return map_ntrp_to_skill_level(level)
 
 
-def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
+def _get_profile_progress_data(
+    player: Player, *, platform_only: bool = False
+) -> list[dict[str, Any]]:
     """
     Build time series for profile charts: from registration to today,
     cumulative points, matches count, win rate %.
@@ -110,6 +112,8 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         )
         .order_by("completed_datetime", "scheduled_datetime", "pk")
     )
+    if platform_only:
+        match_qs = match_qs.filter(tournament__club__isnull=True)
 
     # Текущий рейтинг для расчета изменений
     current_rating = float(player.total_points)
@@ -200,6 +204,8 @@ def _get_profile_progress_data(player: Player) -> list[dict[str, Any]]:
         .select_related("tournament")
         .order_by("tournament__end_date", "tournament__pk")
     )
+    if platform_only:
+        fan_results = fan_results.filter(tournament__club__isnull=True)
     for r in fan_results:
         event_date = (
             r.tournament.end_date or r.tournament.start_date or timezone.now().date()
@@ -497,6 +503,7 @@ def profile(request, pk):
                 "scheduled_datetime", "deadline", "completed_datetime"
             ),
         )
+        .filter(tournament__club__isnull=True)
         .order_by("-effective_date")
     )
 
@@ -568,7 +575,11 @@ def profile(request, pk):
         (12, "Декабрь"),
     ]
 
-    progress_data = _get_profile_progress_data(player) if can_view_profile_stats else []
+    progress_data = (
+        _get_profile_progress_data(player, platform_only=True)
+        if can_view_profile_stats
+        else []
+    )
 
     # Сохранённый способ оплаты для автопродления подписки (если владелец профиля).
     subscription_autopay_card = None
@@ -600,6 +611,7 @@ def profile(request, pk):
             TournamentPlayerResult.objects.filter(
                 player=player,
                 tournament__status="completed",
+                tournament__club__isnull=True,
             )
             .select_related("tournament")
             .order_by(

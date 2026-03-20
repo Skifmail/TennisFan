@@ -77,7 +77,7 @@ services:
       - "traefik.enable=true"
 
       # Явно описываем HTTP‑router для боевого сайта
-      - "traefik.http.routers.tennisfan.rule=Host(`tennisfan.ru`) || Host(`www.tennisfan.ru`)"
+      - "traefik.http.routers.tennisfan.rule=Host(`tennisfan.ru`) || Host(`www.tennisfan.ru`) || Host(`tennistop.ru`) || Host(`www.tennistop.ru`)"
       - "traefik.http.routers.tennisfan.entrypoints=websecure"
       - "traefik.http.routers.tennisfan.tls.certresolver=letsencrypt"
       - "traefik.http.routers.tennisfan.priority=1000"

@@ -326,6 +326,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
 
         self.fields["description"].required = False
         self.fields["image"].required = False
+        self.fields["slug"].required = False
         self.fields["court"].required = False
         self.fields["registration_deadline"].required = False
         self.fields["end_date"].required = False
@@ -389,10 +390,44 @@ class ClubTournamentCreateForm(forms.ModelForm):
             raise ValidationError("Можно выбрать не более 5 категорий.")
         return value
 
+    def lock_structure_fields(self) -> None:
+        """Блокирует поля, которые меняют структуру уже запущенного турнира."""
+        for field_name in (
+            "slug",
+            "format",
+            "variant",
+            "gender",
+            "allowed_categories",
+            "tournament_type",
+            "min_participants",
+            "max_participants",
+            "min_teams",
+            "max_teams",
+            "match_days_per_round",
+            "match_format",
+            "fan_points_r1",
+            "fan_points_r2",
+            "fan_points_sf",
+            "fan_points_final",
+            "fan_points_winner",
+            "is_open_interclub",
+        ):
+            if field_name in self.fields:
+                self.fields[field_name].disabled = True
+                self.fields[field_name].help_text = (
+                    "Поле заблокировано после формирования сетки/групп."
+                )
+
     def clean_slug(self):
+        raw_slug = (self.cleaned_data.get("slug") or "").strip()
+        if not raw_slug:
+            raw_slug = slugify(self.cleaned_data.get("name") or "")
+        if not raw_slug and self.club:
+            club_slug = slugify(self.club.slug) or "club"
+            raw_slug = f"{club_slug}-tournament"
         return generate_unique_tournament_slug(
             name=self.cleaned_data.get("name") or "",
-            slug=self.cleaned_data.get("slug") or None,
+            slug=raw_slug or None,
             instance=self.instance,
         )
 

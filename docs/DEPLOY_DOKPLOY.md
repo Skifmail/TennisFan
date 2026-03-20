@@ -124,8 +124,8 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 | Переменная | Пример / описание |
 |------------|-------------------|
 | `SECRET_KEY` | Длинная случайная строка (Django). Если в строке есть символ `$`, в Dokploy замените его на `$$`, иначе Compose будет трактовать `$буквы` как переменную (например `$iu` → предупреждение и пустая подстановка). |
-| `ALLOWED_HOSTS` | `tennisfan.ru,www.tennisfan.ru` |
-| `CSRF_TRUSTED_ORIGINS` | Обязательно оба: `https://tennisfan.ru,https://www.tennisfan.ru` (иначе на мобильных возможна 403 при входе). |
+| `ALLOWED_HOSTS` | `tennisfan.ru,www.tennisfan.ru,tennistop.ru,www.tennistop.ru` |
+| `CSRF_TRUSTED_ORIGINS` | Добавьте все боевые origin: `https://tennisfan.ru,https://www.tennisfan.ru,https://tennistop.ru,https://www.tennistop.ru` |
 | `POSTGRES_DB` | `tennisfan` |
 | `POSTGRES_USER` | `tennisfan` |
 | `POSTGRES_PASSWORD` | Надёжный пароль БД |
@@ -133,7 +133,8 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 | `TELEGRAM_SUPPORT_BOT_TOKEN` | Токен бота поддержки |
 | `TELEGRAM_USER_BOT_TOKEN` | Токен бота ЛК |
 | `TELEGRAM_ADMIN_CHAT_ID` | ID чата для уведомлений админа |
-| `TELEGRAM_BOT_SITE_BASE_URL` | `https://tennisfan.ru` (без слэша в конце) |
+| `TELEGRAM_BOT_SITE_BASE_URL` | `https://tennisfan.ru` (без слэша в конце). Это основной домен для ссылок в письмах, Telegram и canonical SEO. |
+| `SITE_DOMAIN` | `tennisfan.ru` — основной SEO-домен для `sitemap.xml` и `canonical`. Второй домен можно подключить параллельно, но основным лучше оставить один. |
 | `TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID` | ID приватного чата (если есть) |
 | `TELEGRAM_PUBLIC_COMMUNITY_URL` | Например `https://t.me/TennisFanu` |
 
@@ -142,6 +143,7 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 ### 4.2 Остальные (по необходимости)
 
 - **Яндекс:** `YANDEX_MAPS_API_KEY`, `YANDEX_GEOCODER_API_KEY`, `YANDEX_GEOCODER_REFERER`
+- **Верификация поисковиков:** `GOOGLE_SITE_VERIFICATION`, `YANDEX_VERIFICATION`. Если для `tennisfan.ru` и `tennistop.ru` будут разные meta-токены, укажите оба через запятую.
 - **Почта:** `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`
 - **S3:** `USE_S3`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET_NAME`, `S3_ENDPOINT_URL`, `S3_REGION`
 - **Опционально:** `TELEGRAM_USER_BOT_WEBHOOK_SECRET`, `TELEGRAM_SUPPORT_WEBHOOK_SECRET`, `ADMIN_URL`
@@ -160,8 +162,9 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 
 1. В приложении откройте вкладку **Domains**.
 2. **Add Domain**:
-   - Укажите домен, например `tennisfan.ru`.
-   - При необходимости добавьте `www.tennisfan.ru` отдельно или настройте редирект в Traefik/Dokploy.
+   - Добавьте домены: `tennisfan.ru`, `www.tennisfan.ru`, `tennistop.ru`, `www.tennistop.ru`.
+   - Привяжите их к сервису `web`.
+   - Основным SEO-доменом оставьте `tennisfan.ru`: сайт будет открываться по обоим доменам, но `canonical` и `sitemap` будут указывать на него.
 3. Выберите сервис, к которому привязать домен: **web** (порт 8000).
 4. Включите **HTTPS** (Let's Encrypt), если Dokploy это поддерживает в вашей конфигурации.
 
@@ -169,6 +172,8 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 
 - `tennisfan.ru` → IP вашего сервера  
 - `www.tennisfan.ru` → IP вашего сервера  
+- `tennistop.ru` → IP вашего сервера  
+- `www.tennistop.ru` → IP вашего сервера  
 
 (или CNAME на домен Dokploy/Traefik, если так задумано.)
 

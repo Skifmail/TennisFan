@@ -133,22 +133,21 @@
         </div>
 
         <div class="tournament-action">
-            {% if tournament.status == 'completed' %}
-                <button type="button" class="btn btn-outline" disabled>Турнир завершён</button>
-            {% elif tournament.status == 'cancelled' %}
-                <button type="button" class="btn btn-outline" disabled>Турнир отменён</button>
+            {% if tournament.card_action_disabled %}
+                <button
+                    type="button"
+                    class="btn btn-outline"
+                    disabled
+                    {% if tournament.card_action_reason %}title="{{ tournament.card_action_reason }}"{% endif %}
+                >{{ tournament.card_action_label }}</button>
+            {% elif tournament.card_action_url %}
+                <a
+                    href="{{ tournament.card_action_url }}"
+                    class="btn {% if tournament.card_action_is_primary %}btn-primary{% else %}btn-outline{% endif %}"
+                    onclick="event.stopPropagation();"
+                >{{ tournament.card_action_label }}</a>
             {% else %}
-                {% if user.is_authenticated %}
-                    {% if tournament.bracket_generated %}
-                    <button type="button" class="btn btn-outline" disabled>Регистрация закрыта</button>
-                    {% elif tournament.is_full %}
-                    <button type="button" class="btn btn-outline" disabled>Мест нет</button>
-                    {% else %}
-                    <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary" onclick="event.stopPropagation();">Записаться</a>
-                    {% endif %}
-                {% else %}
-                <a href="{% url 'login' %}?next={% url 'tournament_list' %}" class="btn btn-outline" onclick="event.stopPropagation();">Войти</a>
-                {% endif %}
+                <button type="button" class="btn btn-outline" disabled>{{ tournament.card_action_label|default:"Недоступно" }}</button>
             {% endif %}
         </div>
     </div>

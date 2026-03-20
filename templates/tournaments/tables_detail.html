@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load humanize %}
-{% load skill_tags %}
+{% load skill_tags club_tags %}
 
 {% block title %}Турнирная таблица: {{ tournament.name }}{% endblock %}
 
@@ -164,12 +164,12 @@
                             </td>
                             <td>
                                 {% if s.team %}
-                                <a href="{% url 'profile' pk=s.team.player1.pk %}" class="player-link">
+                                <a href="{% player_profile_url s.team.player1 %}" class="player-link">
                                         {% include 'includes/avatar.html' with avatar=s.team.player1.avatar class="player-avatar-sm" %}
                                     {{ s.team }}
                                 </a>
                                 {% else %}
-                                <a href="{% url 'profile' pk=s.player.pk %}" class="player-link">
+                                <a href="{% player_profile_url s.player %}" class="player-link">
                                     {% include 'includes/avatar.html' with avatar=s.player.avatar class="player-avatar-sm" %}
                                     {{ s.player.user.first_name }} {{ s.player.user.last_name }}
                                 </a>

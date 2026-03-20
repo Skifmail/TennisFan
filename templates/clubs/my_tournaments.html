@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Мои турниры — {{ club.name }}{% endblock %}
 {% block content %}
+{% include "clubs/_club_player_nav.html" with current="tournaments" %}
 <div class="page-header">
     <h1 class="page-title">Мои турниры</h1>
     <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container club-player-dashboard">
-    {% include "clubs/_club_player_nav.html" with current="tournaments" %}
 </div>
 {% if fee_restrict %}
 <div class="container" style="max-width: 800px; margin-bottom: var(--spacing-lg);">

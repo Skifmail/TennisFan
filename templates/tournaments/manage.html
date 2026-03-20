@@ -1,13 +1,20 @@
 {% extends 'base.html' %}
-{% load humanize %}
+{% load humanize club_tags %}
 
 {% block title %}Управление: {{ tournament.name }}{% endblock %}
 
 {% block content %}
+{% if is_club_panel and club %}
+{% include "clubs/_club_dashboard_nav.html" with current="tournaments" %}
+{% endif %}
 <div class="container manage-page" style="padding-top: var(--spacing-2xl);">
     <div class="manage-page-header mb-4 d-flex flex-wrap gap-2 align-items-center justify-content-between">
         <div class="d-flex flex-wrap gap-2 align-items-center">
+            {% if is_club_panel and club %}
+            <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="text-secondary">&larr; Турниры</a>
+            {% else %}
             <a href="{% url 'tournament_list' %}" class="text-secondary">&larr; Турниры</a>
+            {% endif %}
             <span class="text-secondary">/</span>
             <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="text-secondary">{{ tournament.name }}</a>
             <span class="text-secondary">/</span>
@@ -37,6 +44,12 @@
         <div class="card-body">
             <h2 class="section-title mb-3">Действия</h2>
             <div class="d-flex flex-wrap gap-2">
+                {% if can_generate_primary_structure %}
+                <form action="{% url 'tournament_manage_generate_bracket' slug=tournament.slug %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">{{ generate_primary_structure_label }}</button>
+                </form>
+                {% endif %}
                 {% if can_generate_groups %}
                 <form action="{% url 'tournament_manage_generate_groups' slug=tournament.slug %}" method="post" class="d-inline">
                     {% csrf_token %}
@@ -52,7 +65,16 @@
                     <button type="submit" class="btn btn-primary">Завершить турнир</button>
                 </form>
                 {% endif %}
-                {% if not can_generate_groups and not can_generate_playoffs and not can_finalize %}
+                {% if can_edit_tournament %}
+                <a href="{% url 'clubs:tournament_edit' slug=tournament.club.slug tournament_id=tournament.id %}" class="btn btn-outline-primary">Редактировать турнир</a>
+                {% endif %}
+                {% if can_cancel_tournament %}
+                <form action="{% url 'tournament_manage_cancel' slug=tournament.slug %}" method="post" class="d-inline" onsubmit="return confirm('Отменить турнир? Участникам будут отправлены уведомления.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline btn-danger-text">Отменить турнир</button>
+                </form>
+                {% endif %}
+                {% if not can_generate_primary_structure and not can_generate_groups and not can_generate_playoffs and not can_finalize and not can_edit_tournament and not can_cancel_tournament %}
                 <p class="text-secondary mb-0">Нет доступных действий для текущего статуса.</p>
                 {% endif %}
             </div>
@@ -144,7 +166,7 @@
                 {% for p in participants %}
                 <li class="manage-list-item">
                     <div class="manage-list-item-content">
-                        <a href="{% url 'profile' pk=p.pk %}">{{ p.user.last_name }} {{ p.user.first_name }}</a>
+                        <a href="{% player_profile_url p %}">{{ p.user.last_name }} {{ p.user.first_name }}</a>
                         <span class="text-secondary"> (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</span>
                     </div>
                     {% if not tournament.bracket_generated %}
@@ -210,7 +232,7 @@
     {% if tvd_main_matches or tvd_consolation_matches %}
     <div class="card mb-4">
         <div class="card-body">
-            <h2 class="section-title mb-3">Плей-офф</h2>
+            <h2 class="section-title mb-3">{{ matches_section_title }}</h2>
 
             {% if tvd_main_rounds %}
             <h3 class="bracket-section-title">Основная сетка</h3>
@@ -266,9 +288,9 @@
                             <td>{{ forloop.counter }}</td>
                             <td class="matrix-player-cell">
                                 {% if is_doubles_tvd %}
-                                <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                <a href="{% player_profile_url row.participant.player1 %}">{{ row.participant }}</a>
                                 {% else %}
-                                <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                <a href="{% player_profile_url row.participant %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
                                 {% endif %}
                             </td>
                             {% for cell in row.cells %}
@@ -311,9 +333,9 @@
                             <td>{{ row.place|default:"—" }}</td>
                             <td>
                                 {% if row.team %}
-                                <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                <a href="{% player_profile_url row.team.player1 %}">{{ row.team }}</a>
                                 {% else %}
-                                <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                <a href="{% player_profile_url row.player %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
                                 {% endif %}
                             </td>
                             <td>{{ row.matches }}</td>
@@ -351,9 +373,9 @@
                             <td>{{ forloop.counter }}</td>
                             <td class="matrix-player-cell">
                                 {% if is_doubles_tvd %}
-                                <a href="{% url 'profile' pk=row.participant.player1.pk %}">{{ row.participant }}</a>
+                                <a href="{% player_profile_url row.participant.player1 %}">{{ row.participant }}</a>
                                 {% else %}
-                                <a href="{% url 'profile' pk=row.participant.pk %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                <a href="{% player_profile_url row.participant %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
                                 {% endif %}
                             </td>
                             {% for cell in row.cells %}
@@ -396,9 +418,9 @@
                             <td>{{ row.place|default:"—" }}</td>
                             <td>
                                 {% if row.team %}
-                                <a href="{% url 'profile' pk=row.team.player1.pk %}">{{ row.team }}</a>
+                                <a href="{% player_profile_url row.team.player1 %}">{{ row.team }}</a>
                                 {% else %}
-                                <a href="{% url 'profile' pk=row.player.pk %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                <a href="{% player_profile_url row.player %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
                                 {% endif %}
                             </td>
                             <td>{{ row.matches }}</td>
@@ -435,7 +457,7 @@
                         {% for r in tvd_standings %}
                         <tr>
                             <td class="text-center">{% if r.place == 1 %}🥇{% elif r.place == 2 %}🥈{% elif r.place == 3 %}🥉{% else %}{{ r.place }}{% endif %}</td>
-                            <td><a href="{% url 'profile' pk=r.player.pk %}">{{ r.player.user.last_name }} {{ r.player.user.first_name }}</a></td>
+                            <td><a href="{% player_profile_url r.player %}">{{ r.player.user.last_name }} {{ r.player.user.first_name }}</a></td>
                             <td class="text-center">{{ r.fan_points }}</td>
                         </tr>
                         {% endfor %}

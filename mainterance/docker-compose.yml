@@ -9,7 +9,7 @@ services:
     restart: always
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.maintenance.rule=Host(`tennisfan.ru`) || Host(`www.tennisfan.ru`)"
+      - "traefik.http.routers.maintenance.rule=Host(`tennisfan.ru`) || Host(`www.tennisfan.ru`) || Host(`tennistop.ru`) || Host(`www.tennistop.ru`)"
       - "traefik.http.routers.maintenance.entrypoints=websecure"
       - "traefik.http.routers.maintenance.tls.certresolver=letsencrypt"
       - "traefik.http.routers.maintenance.priority=1"

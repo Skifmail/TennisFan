@@ -2,8 +2,16 @@
 {% block title %}Ошибка вступления{% endblock %}
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">Ссылка недействительна</h1>
-    {% if error == "no_token" %}
+    <h1 class="page-title">
+        {% if error == "invite_required" %}
+        Вступление по приглашению
+        {% else %}
+        Ссылка недействительна
+        {% endif %}
+    </h1>
+    {% if error == "invite_required" %}
+    <p class="page-subtitle">Для вступления в клуб администратор должен отправить вам приглашение.</p>
+    {% elif error == "no_token" %}
     <p class="page-subtitle">В ссылке отсутствует токен приглашения.</p>
     {% elif error == "invalid_token" %}
     <p class="page-subtitle">Ссылка не найдена или деактивирована.</p>

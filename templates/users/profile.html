@@ -5,9 +5,7 @@
 
 {% block content %}
 {% if is_club_profile %}
-<div class="container club-player-dashboard" style="padding-top: var(--spacing-lg);">
-    {% include "clubs/_club_player_nav.html" with current="dashboard" %}
-</div>
+{% include "clubs/_club_player_nav.html" with current="dashboard" %}
 {% endif %}
 <div class="container container--profile" style="padding-top: var(--spacing-2xl);">
     <!-- Profile Card: full width, left info + right charts -->
@@ -24,6 +22,10 @@
                             {% if is_club_profile and member_plan %}
                             <span class="profile-info__subscription-badge">
                                 <span class="badge badge-primary">{{ member_plan.plan.name }}</span>
+                            </span>
+                            {% elif is_club_profile and club_subscription %}
+                            <span class="profile-info__subscription-badge">
+                                <span class="badge badge-primary">{{ club_subscription.get_plan_display }}</span>
                             </span>
                             {% elif player.paid_subscription_tier %}
                             <span class="profile-info__subscription-badge">
@@ -465,7 +467,7 @@
                 </div>
                 {% if active_year or active_month or active_status %}
                 {% if is_club_profile %}
-                <a href="{% url 'clubs:my_dashboard' %}#matches" class="matches-filter-reset">Сбросить</a>
+                <a href="{{ club_profile_url }}#matches" class="matches-filter-reset">Сбросить</a>
                 {% else %}
                 <a href="{% url 'profile' pk=player.pk %}#matches" class="matches-filter-reset">Сбросить</a>
                 {% endif %}

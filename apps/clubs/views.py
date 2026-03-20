@@ -5,6 +5,7 @@ Views клубного раздела: регистрация клуба, пуб
 import csv
 import logging
 import secrets
+from collections import defaultdict
 from datetime import datetime, time, timedelta
 from decimal import Decimal
 from io import StringIO
@@ -14,7 +15,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.files.uploadedfile import UploadedFile
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -32,8 +33,10 @@ from apps.tournaments.models import (
     Match,
     Tournament,
     TournamentDuration,
+    TournamentPlayerResult,
     TournamentStatus,
 )
+from apps.users.models import Notification
 
 from .forms import (
     ClubInviteLinkForm,
@@ -55,6 +58,8 @@ from .models import (
     ClubFeePayment,
     ClubFeePaymentPending,
     ClubInviteLink,
+    ClubJoinRequest,
+    ClubJoinRequestStatus,
     ClubMember,
     ClubMemberRole,
     ClubMembershipFee,
@@ -328,9 +333,44 @@ def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
             status=404,
         )
 
-    upcoming = Tournament.objects.filter(
-        club=club, status=TournamentStatus.UPCOMING
-    ).order_by("start_date")[:10]
+    upcoming = list(
+        Tournament.objects.filter(
+            club=club,
+            status__in=[
+                TournamentStatus.UPCOMING,
+                TournamentStatus.ACTIVE,
+                TournamentStatus.GROUP_STAGE,
+                TournamentStatus.PLAYOFFS,
+            ],
+        ).order_by("start_date")[:10]
+    )
+    for tournament in upcoming:
+        if tournament.status == TournamentStatus.CANCELLED:
+            tournament.public_badge_status = "cancelled"
+            tournament.public_badge_label = "ОТМЕНЕН"
+        elif tournament.status == TournamentStatus.COMPLETED:
+            tournament.public_badge_status = "completed"
+            tournament.public_badge_label = "ЗАВЕРШЕН"
+        elif (
+            tournament.status
+            in (
+                TournamentStatus.ACTIVE,
+                TournamentStatus.GROUP_STAGE,
+                TournamentStatus.PLAYOFFS,
+            )
+            or tournament.bracket_generated
+        ):
+            tournament.public_badge_status = "active"
+            tournament.public_badge_label = "В ИГРЕ"
+        else:
+            tournament.public_badge_status = "upcoming"
+            tournament.public_badge_label = "Идет набор"
+
+        tournament.public_action_label = (
+            "Записаться"
+            if tournament.public_badge_status == "upcoming" and not tournament.is_full()
+            else "Подробнее"
+        )
     recent_matches_qs = (
         Match.objects.filter(
             tournament__club=club,
@@ -384,6 +424,7 @@ def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
 
     is_member = False
     is_pending_invite = False
+    is_pending_join_request = False
     member_role: str | None = None
     if request.user.is_authenticated:
         membership = club.members.filter(user=request.user).first()
@@ -392,6 +433,11 @@ def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
             is_pending_invite = membership.status == ClubMemberStatus.INVITED
             if is_member:
                 member_role = membership.role
+        is_pending_join_request = ClubJoinRequest.objects.filter(
+            club=club,
+            user=request.user,
+            status=ClubJoinRequestStatus.PENDING,
+        ).exists()
 
     join_url = reverse("clubs:join", kwargs={"slug": club.slug})
     if not request.user.is_authenticated:
@@ -418,6 +464,15 @@ def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
             cta_label = "Личный кабинет клуба →"
             cta_url = f"{set_current_url}?next={next_url}"
             cta_variant = "player"
+    elif request.user.is_authenticated and not is_pending_invite:
+        if is_pending_join_request:
+            cta_label = "Заявка отправлена"
+            cta_url = ""
+            cta_variant = "requested"
+        else:
+            cta_label = "Подать заявку в клуб"
+            cta_url = reverse("clubs:join_request_create", kwargs={"slug": club.slug})
+            cta_variant = "request"
 
     return render(
         request,
@@ -428,6 +483,7 @@ def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
             "recent_club_matches": recent_club_matches,
             "is_member": is_member,
             "is_pending_invite": is_pending_invite,
+            "is_pending_join_request": is_pending_join_request,
             "join_url": join_url,
             "members_count": members_count,
             "active_tournaments_count": active_tournaments_count,
@@ -456,39 +512,558 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
             "Клуб приостановлен. Продлите подписку для возобновления доступа.",
         )
         return redirect("clubs:club_public_detail", slug=slug)
+    now = timezone.now()
+    today = timezone.localdate()
+    current_month_start = today.replace(day=1)
+    previous_month_end = current_month_start - timedelta(days=1)
+    previous_month_start = previous_month_end.replace(day=1)
+    next_14_days = today + timedelta(days=14)
+    last_7_days = now - timedelta(days=7)
+    last_30_days = today - timedelta(days=30)
+    previous_30_days_start = today - timedelta(days=60)
+
     subscription = get_club_current_subscription(club)
-    # Лимиты по тарифу платформы (участники и турниры)
     plan_slug: str = subscription.plan if subscription else "start"
     platform_plan = get_platform_plan(plan_slug)
     members_limit = platform_plan.max_members if platform_plan else None
     tournaments_limit = (
         platform_plan.max_tournaments_per_month if platform_plan else None
     )
-    members_count = club.members.filter(status=ClubMemberStatus.ACTIVE).count()
+
+    active_members_qs = (
+        club.members.filter(status=ClubMemberStatus.ACTIVE)
+        .select_related("user", "user__player")
+        .order_by("user__first_name", "user__last_name", "user__email")
+    )
+    active_members = list(active_members_qs)
+    members_count = len(active_members)
+    player_members = [
+        member for member in active_members if hasattr(member.user, "player")
+    ]
+    player_ids = [member.user.player.id for member in player_members]
+
     tournaments_count = club.tournaments.count()
-    fee_active = ClubMembershipFee.objects.filter(club=club, is_active=True).exists()
-    plans_count = ClubPlayerPlan.objects.filter(club=club, is_active=True).count()
-    recent_tournaments = club.tournaments.order_by("-start_date")[:5]
+    tournaments_this_month = club.tournaments.filter(
+        start_date__year=today.year,
+        start_date__month=today.month,
+    ).count()
+    tournaments_previous_month = club.tournaments.filter(
+        start_date__gte=previous_month_start,
+        start_date__lte=previous_month_end,
+    ).count()
+    upcoming_tournaments_qs = club.tournaments.filter(start_date__gte=today).order_by(
+        "start_date", "registration_deadline"
+    )
+    nearest_tournaments_count = upcoming_tournaments_qs.filter(
+        start_date__lte=next_14_days
+    ).count()
+
+    active_player_ids = set(
+        club.tournaments.filter(
+            start_date__gte=last_30_days,
+            start_date__lte=next_14_days,
+            participants__in=player_ids,
+        )
+        .values_list("participants__id", flat=True)
+        .distinct()
+    )
+    previous_active_player_ids = set(
+        club.tournaments.filter(
+            start_date__gte=previous_30_days_start,
+            start_date__lt=last_30_days,
+            participants__in=player_ids,
+        )
+        .values_list("participants__id", flat=True)
+        .distinct()
+    )
+    active_players_count = len(active_player_ids)
+    previous_active_players_count = len(previous_active_player_ids)
+    activity_rate = (
+        round((active_players_count / members_count) * 100) if members_count else 0
+    )
+
+    fee = (
+        ClubMembershipFee.objects.filter(club=club, is_active=True)
+        .order_by("-id")
+        .first()
+    )
+    fee_active = fee is not None
+    paid_members_count = 0
+    unpaid_members_count = 0
+    collected_fees_amount = Decimal("0")
+    expected_fees_amount = Decimal("0")
+    outstanding_fees_amount = Decimal("0")
+    total_fee_revenue = Decimal("0")
+    previous_period_collected_amount = Decimal("0")
+    fee_collection_rate = 0
+    finance_summary = "Взносы не настроены."
+    overdue_members: list[ClubMember] = []
+    if fee_active and fee:
+        if fee.period == "monthly":
+            previous_period_date = current_month_start - timedelta(days=1)
+            previous_period_label = previous_period_date.strftime("%Y-%m")
+        elif fee.period == "quarterly":
+            previous_quarter_date = current_month_start - timedelta(days=90)
+            previous_period_label = get_current_period_label(
+                ClubMembershipFee(
+                    period=fee.period,
+                    period_start_day=fee.period_start_day,
+                )
+            )
+            quarter = ((previous_quarter_date.month - 1) // 3) + 1
+            previous_period_label = f"{previous_quarter_date.year}-Q{quarter}"
+        else:
+            previous_period_label = str(today.year - 1)
+
+        current_fee_period = get_current_period_label(fee)
+        expected_fees_amount = fee.amount * members_count
+        paid_member_ids = set(
+            ClubFeePayment.objects.filter(
+                club=club,
+                fee=fee,
+                period_label=current_fee_period,
+            ).values_list("member_id", flat=True)
+        )
+        paid_members_count = len(paid_member_ids)
+        unpaid_members_count = max(0, members_count - paid_members_count)
+        collected_fees_amount = ClubFeePayment.objects.filter(
+            club=club,
+            fee=fee,
+            period_label=current_fee_period,
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal(
+            "0"
+        )
+        previous_period_collected_amount = ClubFeePayment.objects.filter(
+            club=club,
+            fee=fee,
+            period_label=previous_period_label,
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal(
+            "0"
+        )
+        total_fee_revenue = ClubFeePayment.objects.filter(club=club).aggregate(
+            total=Coalesce(Sum("amount"), Decimal("0"))
+        )["total"] or Decimal("0")
+        outstanding_fees_amount = max(
+            Decimal("0"), expected_fees_amount - collected_fees_amount
+        )
+        fee_collection_rate = (
+            round((collected_fees_amount / expected_fees_amount) * 100)
+            if expected_fees_amount
+            else 0
+        )
+        finance_summary = (
+            f"Собрано {collected_fees_amount:.0f} ₽ из {expected_fees_amount:.0f} ₽ "
+            f"за текущий период. Покрытие {fee_collection_rate}%."
+        )
+        overdue_members = [
+            member for member in active_members if member.id not in paid_member_ids
+        ][:4]
+
+    pending_join_requests = club.join_requests.filter(
+        status=ClubJoinRequestStatus.PENDING
+    ).count()
+    pending_interclub_applications = club.tournament_applications.filter(
+        status=ClubApplicationStatus.PENDING
+    ).count()
+    active_invites_count = (
+        club.invite_links.filter(is_active=True)
+        .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+        .count()
+    )
+
+    member_usage_ratio = (members_count / members_limit) if members_limit else 0
+    tournament_usage_ratio = (
+        tournaments_this_month / tournaments_limit if tournaments_limit else 0
+    )
+
     recent_members = (
         club.members.filter(status=ClubMemberStatus.ACTIVE)
         .select_related("user")
-        .order_by("-joined_at")[:5]
+        .order_by("-joined_at", "-created_at")[:4]
     )
+    new_members_week = club.members.filter(
+        club=club,
+        status=ClubMemberStatus.ACTIVE,
+        joined_at__gte=last_7_days,
+    ).count()
+
+    low_fill_tournaments_count = 0
+    upcoming_tournaments: list[dict[str, Any]] = []
+    for tournament in upcoming_tournaments_qs[:5]:
+        participants_count = (
+            tournament.full_teams_count()
+            if tournament.is_doubles()
+            else tournament.participants.count()
+        )
+        target_participants = (
+            tournament.max_teams
+            if tournament.is_doubles()
+            else tournament.max_participants
+        )
+        fill_ratio = (
+            participants_count / target_participants if target_participants else 0
+        )
+        needs_attention = bool(
+            tournament.min_participants
+            and participants_count < tournament.min_participants
+        )
+        if needs_attention:
+            low_fill_tournaments_count += 1
+        upcoming_tournaments.append(
+            {
+                "object": tournament,
+                "participants_count": participants_count,
+                "target_participants": target_participants,
+                "fill_ratio": round(fill_ratio * 100) if target_participants else None,
+                "needs_attention": needs_attention,
+            }
+        )
+
+    inactive_members = [
+        member
+        for member in player_members
+        if member.user.player.id not in active_player_ids
+    ][:4]
+
+    recent_matches = Match.objects.filter(
+        tournament__club=club,
+        match_type=Match.MatchType.TOURNAMENT,
+    )
+    player_match_counts: dict[int, int] = defaultdict(int)
+    for match in recent_matches.filter(created_at__gte=now - timedelta(days=30)):
+        for player_attr in ("player1", "player2", "partner1", "partner2"):
+            player = getattr(match, player_attr, None)
+            if player and player.id in active_player_ids:
+                player_match_counts[player.id] += 1
+    top_active_players = sorted(
+        [
+            {
+                "member": member,
+                "matches": player_match_counts.get(member.user.player.id, 0),
+            }
+            for member in player_members
+            if member.user.player.id in player_match_counts
+        ],
+        key=lambda item: (
+            -item["matches"],
+            item["member"].user.last_name,
+            item["member"].user.first_name,
+        ),
+    )[:4]
+
+    months_ru = (
+        "янв",
+        "фев",
+        "мар",
+        "апр",
+        "мая",
+        "июн",
+        "июл",
+        "авг",
+        "сен",
+        "окт",
+        "ноя",
+        "дек",
+    )
+    growth_raw: list[dict[str, Any]] = []
+    month_cursor_year = current_month_start.year
+    month_cursor_month = current_month_start.month
+    for offset in range(5, -1, -1):
+        month_index = month_cursor_month - offset
+        month_anchor_year = month_cursor_year + ((month_index - 1) // 12)
+        month_anchor_month = ((month_index - 1) % 12) + 1
+        month_anchor = current_month_start.replace(
+            year=month_anchor_year,
+            month=month_anchor_month,
+        )
+        month_end = (month_anchor.replace(day=28) + timedelta(days=4)).replace(
+            day=1
+        ) - timedelta(days=1)
+        value = club.members.filter(
+            status=ClubMemberStatus.ACTIVE,
+            joined_at__date__gte=month_anchor,
+            joined_at__date__lte=month_end,
+        ).count()
+        growth_raw.append(
+            {
+                "label": f"{months_ru[month_anchor.month - 1]} {str(month_anchor.year)[-2:]}",
+                "value": value,
+            }
+        )
+    growth_max = max([point["value"] for point in growth_raw] + [1])
+    player_growth_points = [
+        {**point, "height": max(14, round((point["value"] / growth_max) * 100))}
+        for point in growth_raw
+    ]
+
+    weekly_activity_raw: list[dict[str, Any]] = []
+    week_start = today - timedelta(days=today.weekday())
+    for offset in range(5, -1, -1):
+        start = week_start - timedelta(days=offset * 7)
+        end = start + timedelta(days=6)
+        value = recent_matches.filter(
+            created_at__date__gte=start, created_at__date__lte=end
+        ).count()
+        weekly_activity_raw.append(
+            {
+                "label": start.strftime("%d.%m"),
+                "value": value,
+            }
+        )
+    activity_max = max([point["value"] for point in weekly_activity_raw] + [1])
+    activity_points = [
+        {**point, "height": max(14, round((point["value"] / activity_max) * 100))}
+        for point in weekly_activity_raw
+    ]
+
+    attention_items: list[dict[str, str]] = []
+    if tournaments_limit and tournaments_this_month >= tournaments_limit:
+        attention_items.append(
+            {
+                "tone": "critical",
+                "title": "Лимит турниров на месяц исчерпан",
+                "description": f"Создано {tournaments_this_month} из {tournaments_limit}. Новый турнир сейчас не запустить без изменения тарифа.",
+                "action_label": "Подписка",
+                "action_url": reverse("clubs:subscription", kwargs={"slug": club.slug}),
+            }
+        )
+    elif tournaments_limit and tournament_usage_ratio >= 0.8:
+        attention_items.append(
+            {
+                "tone": "warning",
+                "title": "Лимит турниров близко",
+                "description": f"В этом месяце уже {tournaments_this_month} из {tournaments_limit} турниров.",
+                "action_label": "Все турниры",
+                "action_url": reverse(
+                    "clubs:club_tournaments_list", kwargs={"slug": club.slug}
+                ),
+            }
+        )
+    if fee_active and unpaid_members_count:
+        attention_items.append(
+            {
+                "tone": "critical" if unpaid_members_count >= 3 else "warning",
+                "title": "Есть неоплаченные взносы",
+                "description": f"{unpaid_members_count} игроков не оплатили текущий период.",
+                "action_label": "Платежи",
+                "action_url": reverse(
+                    "clubs:fees_payments", kwargs={"slug": club.slug}
+                ),
+            }
+        )
+    if pending_join_requests:
+        attention_items.append(
+            {
+                "tone": "warning",
+                "title": "Ожидают заявки на вступление",
+                "description": f"{pending_join_requests} заявки ждут решения администратора.",
+                "action_label": "Приглашения",
+                "action_url": reverse("clubs:invites_list", kwargs={"slug": club.slug}),
+            }
+        )
+    if low_fill_tournaments_count:
+        attention_items.append(
+            {
+                "tone": "warning",
+                "title": "Турниры с недобором",
+                "description": f"{low_fill_tournaments_count} ближайших турниров пока не набрали минимальный состав.",
+                "action_label": "Турниры",
+                "action_url": reverse(
+                    "clubs:club_tournaments_list", kwargs={"slug": club.slug}
+                ),
+            }
+        )
+    if pending_interclub_applications:
+        attention_items.append(
+            {
+                "tone": "info",
+                "title": "Есть межклубные заявки",
+                "description": f"{pending_interclub_applications} заявок находятся на рассмотрении.",
+                "action_label": "Межклубные",
+                "action_url": reverse(
+                    "clubs:interclub_applications", kwargs={"slug": club.slug}
+                ),
+            }
+        )
+    if active_invites_count:
+        attention_items.append(
+            {
+                "tone": "info",
+                "title": "Активные приглашения в работе",
+                "description": f"Сейчас активно {active_invites_count} приглашений или ссылок для вступления.",
+                "action_label": "Инвайты",
+                "action_url": reverse("clubs:invites_list", kwargs={"slug": club.slug}),
+            }
+        )
+    if members_limit and member_usage_ratio >= 0.85:
+        attention_items.append(
+            {
+                "tone": "warning",
+                "title": "Лимит игроков почти заполнен",
+                "description": f"Активно {members_count} из {members_limit} игроков по текущему тарифу.",
+                "action_label": "Участники",
+                "action_url": reverse("clubs:members_list", kwargs={"slug": club.slug}),
+            }
+        )
+
+    if attention_items:
+        status_summary = attention_items[0]["description"]
+    elif nearest_tournaments_count:
+        status_summary = f"В ближайшие 14 дней запланировано {nearest_tournaments_count} турнира(ов), клуб работает без критических сигналов."
+    else:
+        status_summary = "Критических сигналов нет. Можно сфокусироваться на росте игроков и новых запусках."
+
+    summary_cards = [
+        {
+            "label": "Игроки в клубе",
+            "value": str(members_count),
+            "delta": (
+                f"+{new_members_week} за 7 дней"
+                if new_members_week
+                else "Без новых вступлений за 7 дней"
+            ),
+            "meta": (
+                f"{members_limit - members_count} мест осталось"
+                if members_limit and members_limit >= members_count
+                else ("Без лимита по тарифу" if not members_limit else "Лимит заполнен")
+            ),
+            "tone": "default",
+        },
+        {
+            "label": "Активные игроки",
+            "value": f"{active_players_count}",
+            "delta": (
+                f"{active_players_count - previous_active_players_count:+d} к прошлым 30 дням"
+                if previous_active_players_count or active_players_count
+                else "Пока нет активности"
+            ),
+            "meta": f"{activity_rate}% состава участвовали в турнирах",
+            "tone": "accent",
+        },
+        {
+            "label": "Турниры в этом месяце",
+            "value": str(tournaments_this_month),
+            "delta": f"{tournaments_this_month - tournaments_previous_month:+d} к прошлому месяцу",
+            "meta": (
+                f"{tournaments_limit - tournaments_this_month} слотов осталось"
+                if tournaments_limit and tournaments_limit >= tournaments_this_month
+                else (
+                    "Без лимита по тарифу"
+                    if not tournaments_limit
+                    else "Лимит месяца исчерпан"
+                )
+            ),
+            "tone": "default",
+        },
+        {
+            "label": "Ближайшие турниры",
+            "value": str(nearest_tournaments_count),
+            "delta": "Следующие 14 дней",
+            "meta": (
+                f"Следующий старт {upcoming_tournaments[0]['object'].start_date.strftime('%d.%m.%Y')}"
+                if upcoming_tournaments
+                else "Нет стартов в расписании"
+            ),
+            "tone": "default",
+        },
+        {
+            "label": "Взносы и оплаты" if fee_active else "Заявки и приглашения",
+            "value": (
+                f"{paid_members_count}/{members_count}"
+                if fee_active
+                else str(pending_join_requests + active_invites_count)
+            ),
+            "delta": (
+                f"{collected_fees_amount:.0f} ₽ собрано"
+                if fee_active
+                else f"{pending_join_requests} заявок, {active_invites_count} инвайтов"
+            ),
+            "meta": (
+                f"{unpaid_members_count} ждут оплату"
+                if fee_active
+                else "Поток вступлений под контролем"
+            ),
+            "tone": (
+                "warning"
+                if (fee_active and unpaid_members_count) or pending_join_requests
+                else "default"
+            ),
+        },
+    ]
+    finance_cards = [
+        {
+            "label": "Собрано за период",
+            "value": f"{collected_fees_amount:.0f} ₽" if fee_active else "0 ₽",
+            "meta": (
+                f"{collected_fees_amount - previous_period_collected_amount:+.0f} ₽ к прошлому периоду"
+                if fee_active
+                else "Подключите клубные взносы"
+            ),
+            "tone": "accent",
+        },
+        {
+            "label": "Ожидаемый доход",
+            "value": f"{expected_fees_amount:.0f} ₽" if fee_active else "0 ₽",
+            "meta": (
+                f"{paid_members_count} из {members_count} игроков оплатили"
+                if fee_active
+                else "Нет активного тарифа взносов"
+            ),
+            "tone": "default",
+        },
+        {
+            "label": "Задолженность",
+            "value": f"{outstanding_fees_amount:.0f} ₽" if fee_active else "0 ₽",
+            "meta": (
+                f"{unpaid_members_count} игроков в долге"
+                if fee_active
+                else "Долги появятся после настройки взносов"
+            ),
+            "tone": "warning" if outstanding_fees_amount else "default",
+        },
+        {
+            "label": "Оплачено всего",
+            "value": f"{total_fee_revenue:.0f} ₽" if fee_active else "0 ₽",
+            "meta": (
+                f"Покрытие текущего периода {fee_collection_rate}%"
+                if fee_active
+                else "История оплат ещё не формируется"
+            ),
+            "tone": "default",
+        },
+    ]
+
     return render(
         request,
         "clubs/dashboard.html",
         {
             "is_club_panel": True,
             "club": club,
+            "status_summary": status_summary,
             "members_count": members_count,
             "tournaments_count": tournaments_count,
             "members_limit": members_limit,
             "tournaments_limit": tournaments_limit,
             "subscription": subscription,
             "fee_active": fee_active,
-            "plans_count": plans_count,
-            "recent_tournaments": recent_tournaments,
+            "summary_cards": summary_cards,
+            "finance_cards": finance_cards,
+            "finance_summary": finance_summary,
+            "attention_items": attention_items,
+            "upcoming_tournaments": upcoming_tournaments,
             "recent_members": recent_members,
+            "inactive_members": inactive_members,
+            "overdue_members": overdue_members,
+            "top_active_players": top_active_players,
+            "player_growth_points": player_growth_points,
+            "activity_points": activity_points,
+            "pending_join_requests": pending_join_requests,
+            "active_invites_count": active_invites_count,
+            "pending_interclub_applications": pending_interclub_applications,
+            "activity_rate": activity_rate,
+            "unpaid_members_count": unpaid_members_count,
+            "paid_members_count": paid_members_count,
+            "nearest_tournaments_count": nearest_tournaments_count,
             "can_edit_settings": user_can_edit_club_settings(request.user, club),
             "can_manage_fees": user_can_manage_fees(request.user, club),
             "can_manage_managers": user_can_manage_managers(request.user, club),
@@ -717,7 +1292,9 @@ def club_join(request: HttpRequest, slug: str) -> HttpResponse:
 
     if not token_value:
         return render(
-            request, "clubs/join_error.html", {"club": club, "error": "no_token"}
+            request,
+            "clubs/join_error.html",
+            {"club": club, "error": "invite_required"},
         )
 
     link = ClubInviteLink.objects.filter(
@@ -833,6 +1410,166 @@ def club_join(request: HttpRequest, slug: str) -> HttpResponse:
             "has_plans": active_plans.exists(),
         },
     )
+
+
+@login_required
+@require_POST
+def join_request_create(request: HttpRequest, slug: str) -> HttpResponse:
+    """Подать заявку на вступление в клуб без инвайт-ссылки."""
+    club = get_object_or_404(Club, slug=slug)
+    if not club_is_operational(club):
+        messages.error(request, "Клуб временно недоступен для вступления.")
+        return redirect("clubs:club_public_detail", slug=slug)
+
+    existing_member = club.members.filter(user=request.user).first()
+    if existing_member:
+        if existing_member.status == ClubMemberStatus.ACTIVE:
+            messages.info(request, "Вы уже состоите в этом клубе.")
+        elif existing_member.status == ClubMemberStatus.INVITED:
+            messages.info(
+                request,
+                "У вас уже есть приглашение в этот клуб. Примите его в разделе приглашений.",
+            )
+        else:
+            messages.info(request, "Ваш статус в этом клубе уже существует.")
+        return redirect("clubs:club_public_detail", slug=slug)
+
+    can_add, limit_msg = club_can_add_member(club)
+    if not can_add:
+        messages.error(request, limit_msg)
+        return redirect("clubs:club_public_detail", slug=slug)
+
+    join_request, created = ClubJoinRequest.objects.get_or_create(
+        club=club,
+        user=request.user,
+        defaults={
+            "status": ClubJoinRequestStatus.PENDING,
+            "message": (request.POST.get("message") or "").strip(),
+        },
+    )
+    if not created:
+        if join_request.status == ClubJoinRequestStatus.PENDING:
+            messages.info(request, "Заявка в этот клуб уже отправлена.")
+            return redirect("clubs:club_public_detail", slug=slug)
+        join_request.status = ClubJoinRequestStatus.PENDING
+        join_request.message = (request.POST.get("message") or "").strip()
+        join_request.reviewed_by = None
+        join_request.reviewed_at = None
+        join_request.save(
+            update_fields=[
+                "status",
+                "message",
+                "reviewed_by",
+                "reviewed_at",
+                "updated_at",
+            ]
+        )
+
+    for admin_member in club.members.filter(
+        role=ClubMemberRole.ADMIN,
+        status=ClubMemberStatus.ACTIVE,
+    ).select_related("user"):
+        Notification.objects.create(
+            user=admin_member.user,
+            message=f"Новая заявка на вступление в клуб «{club.name}» от {request.user}.",
+            url=reverse("clubs:invites_list", kwargs={"slug": club.slug}),
+        )
+
+    messages.success(
+        request,
+        "Заявка на вступление отправлена. Дождитесь решения администратора клуба.",
+    )
+    return redirect("clubs:club_public_detail", slug=slug)
+
+
+@login_required
+@require_POST
+def join_request_approve(request: HttpRequest, slug: str, pk: int) -> HttpResponse:
+    """Одобрить заявку на вступление в клуб."""
+    club, redir = _get_club_and_check_manage(request, slug)
+    if redir:
+        return redir
+
+    join_request = get_object_or_404(
+        ClubJoinRequest.objects.select_related("user", "club"),
+        pk=pk,
+        club=club,
+        status=ClubJoinRequestStatus.PENDING,
+    )
+
+    member, created = ClubMember.objects.get_or_create(
+        club=club,
+        user=join_request.user,
+        defaults={
+            "role": ClubMemberRole.PLAYER,
+            "status": ClubMemberStatus.ACTIVE,
+            "invited_by": request.user,
+            "joined_at": timezone.now(),
+        },
+    )
+    if not created:
+        member.role = ClubMemberRole.PLAYER
+        member.status = ClubMemberStatus.ACTIVE
+        member.invited_by = request.user
+        member.joined_at = timezone.now()
+        member.save(update_fields=["role", "status", "invited_by", "joined_at"])
+
+    ClubRating.objects.get_or_create(club=club, member=member, defaults={"points": 0})
+
+    join_request.status = ClubJoinRequestStatus.APPROVED
+    join_request.reviewed_by = request.user
+    join_request.reviewed_at = timezone.now()
+    join_request.save(
+        update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"]
+    )
+
+    Notification.objects.create(
+        user=join_request.user,
+        message=f"Ваша заявка на вступление в клуб «{club.name}» одобрена.",
+        url=reverse("clubs:club_public_detail", kwargs={"slug": club.slug}),
+    )
+
+    try:
+        dashboard_url = request.build_absolute_uri(
+            reverse("clubs:dashboard", kwargs={"slug": club.slug})
+        )
+        send_new_member_notification(club, member, dashboard_url=dashboard_url)
+    except Exception:
+        logger.exception("Ошибка отправки уведомления о новом участнике")
+
+    messages.success(request, "Заявка одобрена. Игрок добавлен в клуб.")
+    return redirect("clubs:invites_list", slug=slug)
+
+
+@login_required
+@require_POST
+def join_request_reject(request: HttpRequest, slug: str, pk: int) -> HttpResponse:
+    """Отклонить заявку на вступление в клуб."""
+    club, redir = _get_club_and_check_manage(request, slug)
+    if redir:
+        return redir
+
+    join_request = get_object_or_404(
+        ClubJoinRequest.objects.select_related("user", "club"),
+        pk=pk,
+        club=club,
+        status=ClubJoinRequestStatus.PENDING,
+    )
+    join_request.status = ClubJoinRequestStatus.REJECTED
+    join_request.reviewed_by = request.user
+    join_request.reviewed_at = timezone.now()
+    join_request.save(
+        update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"]
+    )
+
+    Notification.objects.create(
+        user=join_request.user,
+        message=f"Ваша заявка на вступление в клуб «{club.name}» отклонена.",
+        url=reverse("clubs:club_public_detail", kwargs={"slug": club.slug}),
+    )
+
+    messages.success(request, "Заявка отклонена.")
+    return redirect("clubs:invites_list", slug=slug)
 
 
 # ---------------------------------------------------------------------------
@@ -1190,6 +1927,7 @@ def _build_club_profile_context(
     fee_status = get_fee_status_for_member(club, member) if fee else None
     member_plan = get_member_active_plan(member)
     plan_limits = get_member_plan_limits(member)
+    club_subscription = get_club_current_subscription(club)
 
     all_matches_qs = (
         Match.objects.filter(
@@ -1410,17 +2148,33 @@ def _build_club_profile_context(
 
         return result
 
-    def _build_club_season_points_data(
-        progress_data: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
+    def _build_club_season_points_data() -> list[dict[str, Any]]:
         points_series: list[dict[str, Any]] = []
-        for item in progress_data:
-            if item.get("matches", 0) <= 0:
-                continue
+        cumulative_points = 0
+        fan_results = (
+            TournamentPlayerResult.objects.filter(
+                player=player,
+                tournament__club=club,
+                tournament__status=TournamentStatus.COMPLETED,
+            )
+            .select_related("tournament")
+            .order_by(
+                "tournament__end_date",
+                "tournament__start_date",
+                "tournament__pk",
+                "pk",
+            )
+        )
+        for result_item in fan_results:
+            tournament = result_item.tournament
+            event_date = (
+                tournament.end_date or tournament.start_date or timezone.now().date()
+            )
+            cumulative_points += int(result_item.fan_points or 0)
             points_series.append(
                 {
-                    "date": item["date"],
-                    "season_points": int(round(float(item.get("points", 0.0)))),
+                    "date": event_date.isoformat(),
+                    "season_points": cumulative_points,
                 }
             )
         if not points_series:
@@ -1429,7 +2183,7 @@ def _build_club_profile_context(
         return points_series
 
     progress_data = _build_club_profile_progress_data()
-    season_points_data = _build_club_season_points_data(progress_data)
+    season_points_data = _build_club_season_points_data()
     season_points_current = (
         season_points_data[-1]["season_points"] if season_points_data else 0
     )
@@ -1492,6 +2246,7 @@ def _build_club_profile_context(
         "player": player,
         "member": member,
         "member_plan": member_plan,
+        "club_subscription": club_subscription,
         "plan_limits": plan_limits,
         "fee": fee,
         "fee_status": fee_status,
@@ -1549,6 +2304,55 @@ def my_dashboard(request: HttpRequest) -> HttpResponse:
         player=player,
         is_profile_owner=True,
     )
+    context["club_profile_url"] = reverse(
+        "clubs:player_profile",
+        kwargs={"slug": club.slug, "player_id": player.pk},
+    )
+    return render(request, "users/profile.html", context)
+
+
+@login_required
+@require_GET
+def player_profile(request: HttpRequest, slug: str, player_id: int) -> HttpResponse:
+    """Клубный профиль участника, доступный любому активному члену клуба."""
+    viewer_member = (
+        ClubMember.objects.filter(
+            user=request.user,
+            club__slug=slug,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        .select_related("club")
+        .first()
+    )
+    if viewer_member is None:
+        messages.error(
+            request, "Профиль игрока в клубе доступен только участникам клуба."
+        )
+        return redirect("clubs:club_public_detail", slug=slug)
+
+    club = viewer_member.club
+    member = get_object_or_404(
+        ClubMember.objects.select_related("user", "user__player"),
+        club=club,
+        user__player__pk=player_id,
+        status=ClubMemberStatus.ACTIVE,
+    )
+    player = getattr(member.user, "player", None)
+    if player is None:
+        messages.error(request, "У этого участника нет профиля игрока.")
+        return redirect("clubs:club_public_detail", slug=slug)
+
+    context = _build_club_profile_context(
+        request,
+        club=club,
+        member=member,
+        player=player,
+        is_profile_owner=request.user.id == member.user_id,
+    )
+    context["club_profile_url"] = reverse(
+        "clubs:player_profile",
+        kwargs={"slug": club.slug, "player_id": player.pk},
+    )
     return render(request, "users/profile.html", context)
 
 
@@ -1576,6 +2380,10 @@ def member_detail(request: HttpRequest, slug: str, member_id: int) -> HttpRespon
         member=member,
         player=player,
         is_profile_owner=request.user.id == member.user_id,
+    )
+    context["club_profile_url"] = reverse(
+        "clubs:player_profile",
+        kwargs={"slug": club.slug, "player_id": player.pk},
     )
     return render(request, "users/profile.html", context)
 
@@ -1931,14 +2739,38 @@ def member_remove(request: HttpRequest, slug: str, member_id: int) -> HttpRespon
 @require_GET
 def club_tournaments_list(request: HttpRequest, slug: str) -> HttpResponse:
     """Список турниров клуба."""
-    club, redir = _get_club_and_check_manage(request, slug)
-    if redir:
-        return redir
+    club = get_object_or_404(Club, slug=slug)
+    member = (
+        ClubMember.objects.filter(
+            club=club,
+            user=request.user,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        .select_related("club")
+        .first()
+    )
+    if not member:
+        messages.error(request, "Этот раздел доступен только участникам клуба.")
+        return redirect("clubs:club_public_detail", slug=slug)
+
+    can_manage = user_can_manage_club(request.user, club)
+    if can_manage and not club_is_operational(club):
+        messages.error(
+            request,
+            "Клуб приостановлен. Продлите подписку для возобновления доступа.",
+        )
+        return redirect("clubs:club_public_detail", slug=slug)
+
     tournaments = club.tournaments.order_by("-start_date")
     return render(
         request,
         "clubs/club_tournaments_list.html",
-        {"club": club, "tournaments": tournaments, "is_club_panel": True},
+        {
+            "club": club,
+            "tournaments": tournaments,
+            "is_club_panel": True,
+            "can_manage_club": can_manage,
+        },
     )
 
 
@@ -2094,6 +2926,84 @@ def tournament_create(request: HttpRequest, slug: str) -> HttpResponse:
             "form": form,
             "can_create": can_create,
             "is_pro": is_pro,
+            "page_mode": "create",
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def tournament_edit(
+    request: HttpRequest, slug: str, tournament_id: int
+) -> HttpResponse:
+    """Редактирование клубного турнира."""
+    club, redir = _get_club_and_check_manage(request, slug)
+    if redir:
+        return redir
+
+    tournament = get_object_or_404(Tournament, pk=tournament_id, club=club)
+    sub = get_club_current_subscription(club)
+    platform_plan = get_platform_plan(sub.plan) if sub else None
+    is_pro = platform_plan and platform_plan.is_open_interclub
+    structure_locked = bool(tournament.bracket_generated)
+
+    if request.method == "POST":
+        form = ClubTournamentCreateForm(
+            request.POST,
+            request.FILES,
+            instance=tournament,
+            club=club,
+            is_pro=bool(is_pro),
+        )
+        if structure_locked:
+            form.lock_structure_fields()
+        if form.is_valid():
+            tournament = form.save(commit=False)
+            tournament.club = club
+            tournament.is_open_interclub = bool(
+                form.cleaned_data.get("is_open_interclub")
+            ) and bool(is_pro)
+            tournament.duration = (
+                TournamentDuration.SINGLE_DAY
+                if form.cleaned_data.get("is_one_day")
+                else TournamentDuration.MULTI_DAY
+            )
+            if not tournament.registration_deadline and tournament.start_date:
+                tournament.registration_deadline = timezone.make_aware(
+                    datetime.combine(
+                        tournament.start_date,
+                        time(23, 59),
+                    ),
+                    timezone.get_current_timezone(),
+                )
+            tournament.save()
+            if not structure_locked:
+                tournament.allowed_categories.all().delete()
+                for category in form.cleaned_data["allowed_categories"]:
+                    tournament.allowed_categories.create(category=category)
+            messages.success(request, f"Турнир «{tournament.name}» обновлён.")
+            return redirect("tournament_manage", slug=tournament.slug)
+    else:
+        form = ClubTournamentCreateForm(
+            instance=tournament,
+            club=club,
+            is_pro=bool(is_pro),
+        )
+        if structure_locked:
+            form.lock_structure_fields()
+
+    return render(
+        request,
+        "clubs/tournament_create.html",
+        {
+            "club": club,
+            "is_club_panel": True,
+            "form": form,
+            "can_create": True,
+            "is_pro": is_pro,
+            "page_mode": "edit",
+            "tournament": tournament,
+            "structure_locked": structure_locked,
         },
     )
 
@@ -2307,10 +3217,20 @@ def invites_list(request: HttpRequest, slug: str) -> HttpResponse:
         link.full_join_url = request.build_absolute_uri(
             reverse("clubs:join", kwargs={"slug": club.slug}) + "?token=" + link.token
         )
+    join_requests = list(
+        ClubJoinRequest.objects.filter(club=club)
+        .select_related("user", "user__player", "reviewed_by")
+        .order_by("-created_at")
+    )
     return render(
         request,
         "clubs/invites_list.html",
-        {"club": club, "links": links, "is_club_panel": True},
+        {
+            "club": club,
+            "links": links,
+            "join_requests": join_requests,
+            "is_club_panel": True,
+        },
     )
 
 

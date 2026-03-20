@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load skill_tags %}
+{% load skill_tags club_tags %}
 
 {% block title %}Матч: {{ match.get_player1_display }} vs {{ match.get_player2_display }}{% endblock %}
 
@@ -40,7 +40,7 @@
 
             <div class="d-flex" style="align-items: center; justify-content: center; gap: var(--spacing-2xl); margin-bottom: var(--spacing-xl);">
                 <!-- Player/Team 1 -->
-                <a href="{% url 'profile' pk=match.get_side1_player.pk %}" class="text-center" style="flex: 1; text-decoration: none; color: inherit;">
+                <a href="{% player_profile_url match.get_side1_player %}" class="text-center" style="flex: 1; text-decoration: none; color: inherit;">
                     {% if match.team1 %}{% include 'includes/avatar.html' with avatar=match.team1.player1.avatar class="player-avatar" size="80" %}
                     {% else %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" size="80" %}{% endif %}
                     <div class="{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player1_display }}</div>
@@ -91,7 +91,7 @@
                 </div>
 
                 <!-- Player/Team 2 -->
-                <a href="{% url 'profile' pk=match.get_side2_player.pk %}" class="text-center" style="flex: 1; text-decoration: none; color: inherit;">
+                <a href="{% player_profile_url match.get_side2_player %}" class="text-center" style="flex: 1; text-decoration: none; color: inherit;">
                     {% if match.team2 %}{% include 'includes/avatar.html' with avatar=match.team2.player1.avatar class="player-avatar" size="80" %}
                     {% else %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" size="80" %}{% endif %}
                     <div class="{% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player2_display }}</div>
@@ -116,6 +116,88 @@
             {% if match.winner or match.winner_team %}
             <div class="text-center">
                 <p class="text-primary" style="font-weight: 600;">Победитель: {% if match.winner_team %}{{ match.winner_team }}{% else %}{{ match.winner }}{% endif %}</p>
+            </div>
+            {% endif %}
+
+            {% if can_view_match_actions %}
+            <div class="match-player-actions card mt-4" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">Действия игрока</h3>
+
+                    {% if pending_proposals %}
+                    {% for proposal in pending_proposals %}
+                    <div class="match-proposal-card">
+                        <div class="match-proposal-card__body">
+                            <div class="match-proposal-card__text">
+                                <div><strong>{{ proposal.proposer }}</strong> предложил: {{ proposal.get_result_display }}</div>
+                                <div class="text-secondary match-proposal-card__score">
+                                    Счёт по сетам:
+                                    {% if proposal.player1_set1 is not None %} 1-й сет {{ proposal.player1_set1 }}:{{ proposal.player2_set1 }}{% endif %}
+                                    {% if proposal.player1_set2 is not None %} · 2-й сет {{ proposal.player1_set2 }}:{{ proposal.player2_set2 }}{% endif %}
+                                    {% if proposal.player1_set3 is not None %} · 3-й сет {{ proposal.player1_set3 }}:{{ proposal.player2_set3 }}{% endif %}
+                                </div>
+                            </div>
+                            {% if proposal.proposer != player %}
+                            <div class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">
+                                У вас есть 3 часа на подтверждение. Если не ответите, результат будет подтверждён автоматически.
+                            </div>
+                            <form method="post" action="{% url 'confirm_proposal' proposal.pk %}" class="match-proposal-card__form">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ next_url }}">
+                                <div class="match-proposal-card__form-row">
+                                    <button type="submit" name="action" value="accept" class="btn btn-primary match-proposal-card__btn">Подтвердить</button>
+                                    <button type="submit" name="action" value="reject" class="btn btn-ghost match-proposal-card__btn">Отклонить</button>
+                                </div>
+                            </form>
+                            {% else %}
+                            <span class="text-secondary match-proposal-card__waiting">Ожидание подтверждения соперником (3 часа)</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% elif can_submit_result %}
+                    <form method="post" action="{% url 'propose_result' match.pk %}" class="match-player-actions__form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ next_url }}">
+                        <div class="form-group">
+                            <label class="form-label">Кто победил?</label>
+                            <select name="result" class="form-control">
+                                <option value="win">Я (мы) победил(и)</option>
+                                <option value="loss">Соперник победил</option>
+                                <option value="walkover_win">Техническая победа</option>
+                                <option value="walkover_loss">Техническое поражение</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Счёт по сетам</label>
+                            <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">Укажите, сколько геймов выиграла каждая сторона в каждом сете.</p>
+                            <div class="match-score-input">
+                                <div class="match-score-input__row match-score-input__header">
+                                    <span class="match-score-input__label"></span>
+                                    <span class="match-score-input__cell">1-й сет</span>
+                                    <span class="match-score-input__cell">2-й сет</span>
+                                    <span class="match-score-input__cell">3-й сет</span>
+                                </div>
+                                <div class="match-score-input__row">
+                                    <span class="match-score-input__label">{{ match.get_player1_display }}</span>
+                                    <input class="form-control match-score-input__cell" name="p1s1" type="number" min="0" placeholder="0">
+                                    <input class="form-control match-score-input__cell" name="p1s2" type="number" min="0" placeholder="0">
+                                    <input class="form-control match-score-input__cell" name="p1s3" type="number" min="0" placeholder="—">
+                                </div>
+                                <div class="match-score-input__row">
+                                    <span class="match-score-input__label">{{ match.get_player2_display }}</span>
+                                    <input class="form-control match-score-input__cell" name="p2s1" type="number" min="0" placeholder="0">
+                                    <input class="form-control match-score-input__cell" name="p2s2" type="number" min="0" placeholder="0">
+                                    <input class="form-control match-score-input__cell" name="p2s3" type="number" min="0" placeholder="—">
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Отправить на подтверждение</button>
+                    </form>
+                    {% else %}
+                    <p class="text-secondary mb-0">Сейчас действие игрока недоступно.</p>
+                    {% endif %}
+                </div>
             </div>
             {% endif %}
 

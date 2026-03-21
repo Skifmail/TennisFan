@@ -630,7 +630,6 @@ class ClubMembershipFee(models.Model):
 
     class PaymentProvider(models.TextChoices):
         YOOKASSA = "yookassa", "ЮKassa"
-        STRIPE = "stripe", "Stripe"
 
     club = models.ForeignKey(
         Club,

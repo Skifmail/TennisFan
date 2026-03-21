@@ -111,13 +111,18 @@
     </div>
 </header>
 
-<div id="club-leave-confirm-modal" class="modal-overlay" style="display:none;" aria-hidden="true">
-    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="club-leave-confirm-title">
-        <h3 id="club-leave-confirm-title" class="modal-dialog__title">Уверены, что хотите выйти из клуба?</h3>
-        <p class="modal-dialog__text">Вы перейдёте на главную страницу платформы.</p>
-        <div class="modal-dialog__actions">
-            <a href="#" id="club-leave-confirm-yes" class="btn btn-primary btn-sm">Да</a>
-            <button type="button" id="club-leave-confirm-no" class="btn btn-outline btn-sm">Нет</button>
+<div id="club-leave-confirm-modal" class="modal-overlay club-leave-modal" style="display:none;" aria-hidden="true">
+    <div class="modal-dialog club-leave-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="club-leave-confirm-title" aria-describedby="club-leave-confirm-text">
+        <div class="club-leave-modal__eyebrow">Выход из раздела клуба</div>
+        <h3 id="club-leave-confirm-title" class="modal-dialog__title club-leave-modal__title">Выйти на платформу?</h3>
+        <p id="club-leave-confirm-text" class="modal-dialog__text club-leave-modal__text">Вы покинете интерфейс клуба и перейдёте на главную страницу платформы. Все несохранённые действия в текущем разделе будут потеряны.</p>
+        <div class="club-leave-modal__note">
+            <span class="club-leave-modal__note-icon" aria-hidden="true">↗</span>
+            <span>К клубу можно будет вернуться из меню или по прямой ссылке.</span>
+        </div>
+        <div class="modal-dialog__actions club-leave-modal__actions">
+            <button type="button" id="club-leave-confirm-no" class="btn btn-outline club-leave-modal__btn club-leave-modal__btn--secondary">Остаться в клубе</button>
+            <a href="#" id="club-leave-confirm-yes" class="btn btn-primary club-leave-modal__btn club-leave-modal__btn--primary">Да, выйти</a>
         </div>
     </div>
 </div>

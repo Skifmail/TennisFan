@@ -66,6 +66,11 @@
     flex-wrap: wrap;
 }
 
+.subscription-info__actions--separated {
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border-light);
+}
+
 /* Full-width profile card: left info + right charts */
 .profile-card.profile-card--wide {
     max-width: none;
@@ -420,6 +425,38 @@
     border-top: 1px solid var(--color-border-light);
 }
 
+.subscription-info__section {
+    margin-top: var(--spacing-lg);
+    padding: var(--spacing-md);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    background: rgb(255 255 255 / 0.02);
+}
+
+.subscription-info__section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.subscription-info__section-eyebrow {
+    font-size: 0.75rem;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+.subscription-info__section-note {
+    margin: var(--spacing-sm) 0 0;
+    color: var(--color-text-muted);
+    font-size: 0.92em;
+    line-height: 1.5;
+}
+
 .subscription-info__bar {
     background: var(--color-border-light);
     height: 4px;
@@ -432,6 +469,10 @@
     background: var(--color-primary);
     height: 100%;
     transition: width 0.2s ease;
+}
+
+.subscription-autopay--fee {
+    margin-top: var(--spacing-md);
 }
 
 .profile-info__btn-edit,

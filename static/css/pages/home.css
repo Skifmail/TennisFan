@@ -938,3 +938,124 @@
         font-size: var(--font-size-sm);
     }
 }
+
+/* ==========================================================================
+   Home Bottom Sections
+   ========================================================================== */
+@media (width <= 768px) {
+    .home-section--upcoming .section-header,
+    .home-section--news .section-header {
+        align-items: stretch;
+    }
+
+    .home-section--upcoming .section-header .btn,
+    .home-section--news .section-header .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .home-grid--tournaments,
+    .home-grid--news {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--spacing-md);
+    }
+
+    .home-grid--tournaments > .card,
+    .home-grid--news > .card {
+        min-width: 0;
+    }
+
+    .home-grid--tournaments .card-image,
+    .home-grid--news .card-image {
+        aspect-ratio: 16 / 9;
+    }
+
+    .home-grid--tournaments .card-title,
+    .home-grid--news .card-title {
+        font-size: var(--font-size-base);
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+
+    .home-grid--tournaments .card-text,
+    .home-grid--news .card-text,
+    .home-grid--news .text-muted {
+        overflow-wrap: anywhere;
+    }
+
+    .home-grid--tournaments .tournament-preview-card .card-body,
+    .home-grid--news .card-body {
+        padding: var(--spacing-md);
+    }
+}
+
+@media (width <= 480px) {
+    .home-section--upcoming,
+    .home-section--news {
+        overflow-x: clip;
+    }
+
+    .home-grid--tournaments,
+    .home-grid--news {
+        gap: var(--spacing-sm);
+    }
+
+    .home-grid--tournaments .card-title,
+    .home-grid--news .card-title {
+        font-size: var(--font-size-sm);
+    }
+
+    .home-grid--tournaments .card-text,
+    .home-grid--news .card-text,
+    .home-grid--news .text-muted {
+        font-size: var(--font-size-xs);
+    }
+
+    .home-grid--tournaments .tournament-preview-card__categories {
+        gap: 6px;
+    }
+}
+
+@media (max-width: 768px) {
+    .home-section--upcoming .grid-3,
+    .home-section--upcoming .home-grid--tournaments,
+    .home-section--news .grid-4,
+    .home-section--news .home-grid--news {
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: var(--spacing-md) !important;
+    }
+
+    .home-section--upcoming .tournament-preview-card,
+    .home-section--news .card {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .home-section--upcoming .tournament-preview-card .tournament-status-badge {
+        position: static;
+        align-self: flex-end;
+        margin: var(--spacing-md) var(--spacing-md) 0;
+        max-width: none;
+    }
+
+    .home-section--upcoming .tournament-preview-card--no-image .card-body {
+        padding-top: var(--spacing-md);
+    }
+
+    .home-section--upcoming .tournament-preview-card__categories {
+        gap: 6px;
+    }
+
+    .home-section--upcoming .tournament-preview-card__category {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .home-section--upcoming .grid-3,
+    .home-section--upcoming .home-grid--tournaments,
+    .home-section--news .grid-4,
+    .home-section--news .home-grid--news {
+        gap: var(--spacing-sm) !important;
+    }
+}

@@ -7,12 +7,18 @@ from django.utils import timezone
 from apps.clubs.forms import ClubTournamentCreateForm
 from apps.clubs.models import (
     Club,
+    ClubFeePayment,
     ClubJoinRequest,
     ClubJoinRequestStatus,
     ClubMember,
+    ClubMemberPlan,
     ClubMemberRole,
+    ClubMembershipFee,
     ClubMemberStatus,
+    ClubPlayerPlan,
+    FeePaymentMethod,
 )
+from apps.payments.models import PaymentRecord, SavedPaymentMethod
 from apps.tournaments.models import (
     Match,
     Tournament,
@@ -20,6 +26,7 @@ from apps.tournaments.models import (
     TournamentGender,
     TournamentPlayerResult,
     TournamentStatus,
+    TournamentTeam,
     TournamentType,
 )
 from apps.users.models import Notification, Player, SkillLevel, User
@@ -383,6 +390,284 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         self.assertNotContains(response, "Нет доступа к управлению клубом.")
         self.assertNotContains(response, "Создать турнир")
         self.assertNotContains(response, "Управление")
+
+    def test_club_tournaments_list_supports_search_and_status_filter(self) -> None:
+        Tournament.objects.create(
+            name="Клубный микст",
+            slug="club-mixed",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.ROUND_ROBIN,
+            status=TournamentStatus.ACTIVE,
+            entry_fee=1000,
+        )
+        Tournament.objects.create(
+            name="Весенний кубок",
+            slug="spring-cup",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.ROUND_ROBIN,
+            status=TournamentStatus.COMPLETED,
+            entry_fee=1000,
+        )
+
+        response = self.client.get(
+            reverse(
+                "clubs:club_tournaments_list",
+                kwargs={"slug": self.club.slug},
+            ),
+            {"q": "микст", "status": TournamentStatus.ACTIVE},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Клубный микст")
+        self.assertNotContains(response, "Весенний кубок")
+
+    def test_club_tournaments_list_supports_category_gender_and_variant_filters(
+        self,
+    ) -> None:
+        target = Tournament.objects.create(
+            name="Женский парный любители",
+            slug="women-doubles-amateur",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.ROUND_ROBIN,
+            status=TournamentStatus.UPCOMING,
+            gender=TournamentGender.FEMALE,
+            variant="doubles",
+            entry_fee=1000,
+        )
+        target.allowed_categories.create(category="amateur")
+
+        other = Tournament.objects.create(
+            name="Мужской одиночный новички",
+            slug="men-singles-novice",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.ROUND_ROBIN,
+            status=TournamentStatus.UPCOMING,
+            gender=TournamentGender.MALE,
+            variant="singles",
+            entry_fee=1000,
+        )
+        other.allowed_categories.create(category="novice")
+
+        response = self.client.get(
+            reverse(
+                "clubs:club_tournaments_list",
+                kwargs={"slug": self.club.slug},
+            ),
+            {
+                "category": "amateur",
+                "gender": TournamentGender.FEMALE,
+                "variant": "doubles",
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, target.name)
+        self.assertNotContains(response, other.name)
+
+    def test_my_tournaments_includes_club_doubles_team_membership(self) -> None:
+        partner_user = User.objects.create_user(
+            email="my-tournaments-partner@test.local",
+            password="testpass123",
+            first_name="Иван",
+            last_name="Петров",
+        )
+        partner = Player.objects.create(user=partner_user)
+        ClubMember.objects.create(
+            club=self.club,
+            user=partner_user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+
+        player = Player.objects.create(user=self.user)
+        tournament = Tournament.objects.create(
+            name="Парный клубный турнир",
+            slug="my-tournaments-doubles",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.ROUND_ROBIN,
+            status=TournamentStatus.UPCOMING,
+            gender=TournamentGender.OPEN,
+            variant="doubles",
+            entry_fee=1000,
+        )
+        TournamentTeam.objects.create(
+            tournament=tournament,
+            player1=player,
+            player2=partner,
+        )
+
+        response = self.client.get(
+            reverse("clubs:my_tournaments"),
+            {"status": "upcoming"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, tournament.name)
+
+    def test_member_can_open_club_plan_selection_with_payment_links(self) -> None:
+        plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Платина",
+            monthly_fee=2500,
+            max_tournaments_per_month=6,
+            is_active=True,
+        )
+
+        response = self.client.get(reverse("clubs:my_plan_change"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, plan.name)
+        self.assertContains(
+            response,
+            reverse("clubs:my_plan_payment_preview", kwargs={"plan_id": plan.id}),
+        )
+
+    def test_payment_success_activates_paid_club_plan_for_member(self) -> None:
+        plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Золото",
+            monthly_fee=3000,
+            max_tournaments_per_month=8,
+            is_active=True,
+        )
+
+        response = self.client.get(
+            reverse("payment_success"),
+            {"type": "club_plan", "id": str(plan.id), "autopay": "1"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        assignment = ClubMemberPlan.objects.get(
+            club_member__club=self.club,
+            club_member__user=self.user,
+            status="active",
+        )
+        self.assertEqual(assignment.plan, plan)
+        self.assertTrue(assignment.auto_renew)
+        self.assertIsNotNone(assignment.ended_at)
+        session = self.client.session
+        self.assertEqual(session.get("current_club_slug"), self.club.slug)
+
+    def test_member_can_disable_club_plan_autopay_without_affecting_subscription_flag(
+        self,
+    ) -> None:
+        SavedPaymentMethod.objects.create(
+            user=self.user,
+            club=self.club,
+            payment_method_id="club-plan-card-1",
+            card_last4="4477",
+            card_network="Mastercard",
+            is_active=True,
+            is_default_for_subscriptions=True,
+            is_default_for_club_plans=True,
+        )
+
+        response = self.client.post(
+            reverse("clubs:my_plan_disable_autopay"),
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        method = SavedPaymentMethod.objects.get(payment_method_id="club-plan-card-1")
+        self.assertTrue(method.is_active)
+        self.assertTrue(method.is_default_for_subscriptions)
+        self.assertFalse(method.is_default_for_club_plans)
+
+    def test_member_can_disable_club_fee_autopay_without_affecting_plan_flag(
+        self,
+    ) -> None:
+        SavedPaymentMethod.objects.create(
+            user=self.user,
+            club=self.club,
+            payment_method_id="club-fee-card-1",
+            card_last4="1122",
+            card_network="Mir",
+            is_active=True,
+            is_default_for_subscriptions=False,
+            is_default_for_club_plans=True,
+            is_default_for_club_fees=True,
+        )
+
+        response = self.client.post(
+            reverse("clubs:my_fee_disable_autopay"),
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        method = SavedPaymentMethod.objects.get(payment_method_id="club-fee-card-1")
+        self.assertTrue(method.is_active)
+        self.assertTrue(method.is_default_for_club_plans)
+        self.assertFalse(method.is_default_for_club_fees)
+
+    def test_my_fees_redirects_to_club_profile(self) -> None:
+        self.player = Player.objects.create(user=self.user)
+        response = self.client.get(reverse("clubs:my_fees"), secure=True)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            reverse(
+                "clubs:player_profile",
+                kwargs={"slug": self.club.slug, "player_id": self.player.id},
+            ),
+        )
+
+    def test_my_payments_shows_club_plan_and_fee_history(self) -> None:
+        member = ClubMember.objects.get(club=self.club, user=self.user)
+        fee = ClubMembershipFee.objects.create(
+            club=self.club,
+            amount="400.00",
+            currency="RUB",
+            period="monthly",
+            period_start_day=1,
+            description="Ежемесячный взнос",
+            is_active=True,
+        )
+        ClubFeePayment.objects.create(
+            club=self.club,
+            member=member,
+            fee=fee,
+            amount="400.00",
+            period_label="2026-03",
+            paid_at=timezone.now(),
+            method=FeePaymentMethod.ONLINE,
+            payment_ref="fee-payment-1",
+        )
+        PaymentRecord.objects.create(
+            user=self.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_PLAN,
+            item_id="12",
+            item_label=f"{self.club.name}: Платина",
+            amount="1000.00",
+            currency="RUB",
+            status="succeeded",
+            yookassa_payment_id="plan-payment-1",
+            metadata={"club_id": self.club.id},
+        )
+
+        response = self.client.get(reverse("clubs:my_payments"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Мои платежи")
+        self.assertContains(response, "Платина")
+        self.assertContains(response, "Членский взнос")
+        self.assertContains(response, "fee-payment-1")
 
     def test_club_public_detail_shows_in_game_badge_when_bracket_generated(
         self,

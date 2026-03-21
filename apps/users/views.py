@@ -590,6 +590,7 @@ def profile(request, pk):
             subscription_autopay_card = (
                 SavedPaymentMethod.objects.filter(
                     user=player.user,
+                    club__isnull=True,
                     is_active=True,
                     is_default_for_subscriptions=True,
                 )

@@ -35,6 +35,7 @@
 @import url('./pages/sparring.css');
 @import url('./pages/bracket.css');
 @import url('./pages/club-public-detail.css');
+@import url('./pages/club-discover.css');
 @import url('./pages/club-dashboard.css');
 @import url('./components/modals.css');
 @import url('./components/rating.css');
@@ -322,4 +323,3 @@
     color: #e5ffe8;
     font-weight: 600;
 }
-

@@ -50,7 +50,13 @@
 
             <div>
                 <h3 class="h5 mb-2">Указать партнёра сейчас</h3>
-                <p class="text-secondary mb-2">Найдите партнёра по ID, имени, телефону или email.</p>
+                <p class="text-secondary mb-2">
+                    {% if tournament.club_id %}
+                    Найдите партнёра среди участников клуба по ID, имени, телефону или email.
+                    {% else %}
+                    Найдите партнёра по ID, имени, телефону или email.
+                    {% endif %}
+                </p>
                 {% if tournament.is_mixed_doubles %}
                 <div class="alert alert-info mb-3" style="padding: var(--spacing-md); background: rgba(166, 130, 74, 0.1); border-left: 3px solid var(--color-primary); border-radius: var(--radius-sm);">
                     <strong>Микст-турнир:</strong> В команде должны быть мужчина и женщина. Система покажет только игроков противоположного пола.

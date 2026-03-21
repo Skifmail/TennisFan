@@ -1,41 +1,284 @@
 {% extends "base.html" %}
+{% load humanize %}
+
 {% block title %}Мой тариф — {{ club.name }}{% endblock %}
+
 {% block content %}
 {% include "clubs/_club_player_nav.html" with current="plan" %}
 <div class="page-header">
     <h1 class="page-title">Мой тариф</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
-<div class="container club-player-dashboard" style="max-width: 800px;">
+
+<div class="container club-player-dashboard" style="max-width: 860px;">
     <div class="card">
         <div class="card-body">
             {% if member_plan %}
-            <p style="margin-top: 0;"><strong>Тариф:</strong> {{ member_plan.plan.name }}</p>
-            <p><strong>Описание:</strong> {{ member_plan.plan.description|default:"—" }}</p>
-            <p><strong>Взнос:</strong> {{ member_plan.plan.monthly_fee }} ₽/мес</p>
-            {% if plan_limits %}
-            <p>
-                <strong>Турниры в этом месяце:</strong>
-                {% if plan_limits.tournaments_left is None %}
-                    без лимита
-                {% else %}
-                    использовано {{ plan_limits.tournaments_used }}, осталось {{ plan_limits.tournaments_left }} из {{ plan_limits.monthly_tournaments_limit }}
+            <div class="subscription-info profile-info__subscription">
+                <div class="subscription-info__row">
+                    <span class="subscription-info__label">Тариф:</span>
+                    <strong class="subscription-info__value">{{ member_plan.plan.name }}</strong>
+                </div>
+                <div class="subscription-info__row">
+                    <span class="subscription-info__label">Статус:</span>
+                    {% if member_plan.ended_at and not member_plan.auto_renew %}
+                    <span class="badge badge-warning">Активна</span>
+                    {% else %}
+                    <span class="badge badge-success">Активна</span>
+                    {% endif %}
+                </div>
+                {% if member_plan.ended_at %}
+                <div class="subscription-info__row">
+                    <span class="subscription-info__label">{% if member_plan.auto_renew %}Истекает:{% else %}Действует до:{% endif %}</span>
+                    <span>{{ member_plan.ended_at|date:"d.m.Y" }}</span>
+                </div>
                 {% endif %}
-            </p>
-            <p class="text-secondary" style="font-size: 0.9em;">
-                Однодневные турниры не расходуют лимит.
-            </p>
-            {% endif %}
-            <div style="display: flex; gap: var(--spacing-sm); flex-wrap: wrap;">
-                {% if can_self_change %}
-                <a href="{% url 'clubs:my_plan_change' %}" class="btn btn-primary">Сменить тариф</a>
+                <div class="subscription-info__row">
+                    <span class="subscription-info__label">Стоимость:</span>
+                    <span>{{ member_plan.plan.monthly_fee|floatformat:0 }} ₽ / 30 дней</span>
+                </div>
+
+                {% if plan_limits and plan_limits.monthly_tournaments_limit %}
+                <div class="subscription-info__limit">
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Остаток регистраций:</span>
+                        <span>{{ plan_limits.tournaments_left }} из {{ plan_limits.monthly_tournaments_limit }}</span>
+                    </div>
+                    <div class="subscription-info__bar">
+                        <div class="subscription-info__bar-fill" data-width-pct="{{ subscription_usage_percent }}"></div>
+                    </div>
+                </div>
+                {% elif plan_limits %}
+                <div class="subscription-info__row">
+                    <span class="subscription-info__label">Остаток регистраций:</span>
+                    <span>Безлимит</span>
+                </div>
                 {% endif %}
-                <a href="{% url 'clubs:my_tournaments' %}" class="btn btn-ghost">К турнирам</a>
+
+                <div class="subscription-info__actions">
+                    <a href="{% url 'clubs:my_plan_change' %}" class="btn btn-sm btn-outline" style="flex: 1;">Сменить тариф</a>
+                    {% if member_plan.ended_at and member_plan.auto_renew %}
+                    <button type="button" class="btn btn-sm btn-ghost btn-danger-text" onclick="document.getElementById('cancel-club-plan-modal').style.display='flex'">Отменить подписку</button>
+                    {% else %}
+                    <a href="{% url 'clubs:my_tournaments' %}" class="btn btn-sm btn-ghost">К турнирам</a>
+                    {% endif %}
+                </div>
+
+                <div class="subscription-autopay">
+                    <div class="subscription-autopay__header">
+                        <span class="subscription-autopay__eyebrow">Автосписание за подписку</span>
+                        <span class="subscription-autopay__status {% if not club_plan_autopay_card %}subscription-autopay__status--off{% endif %}">
+                            {% if club_plan_autopay_card %}Подключено{% else %}Отключено{% endif %}
+                        </span>
+                    </div>
+
+                    {% if club_plan_autopay_card %}
+                    <div class="subscription-autopay__card">
+                        <div class="subscription-autopay__card-main">
+                            <span class="subscription-autopay__card-brand">
+                                {{ club_plan_autopay_card.card_network|default:"Банковская карта" }}
+                            </span>
+                            <span class="subscription-autopay__card-pan">**** {{ club_plan_autopay_card.card_last4 }}</span>
+                        </div>
+                        {% if club_plan_autopay_card.card_exp_month and club_plan_autopay_card.card_exp_year %}
+                        <div class="subscription-autopay__card-expiry">
+                            Действует до {{ club_plan_autopay_card.card_exp_month }}/{{ club_plan_autopay_card.card_exp_year }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="subscription-autopay__footer">
+                        {% if club_plan_autopay_card %}
+                        <p class="subscription-autopay__hint">
+                            Средства будут списываться автоматически в день продления клубного тарифа.
+                            Вы можете в любой момент отключить автосписание клуба и отвязать карту.
+                        </p>
+                        <form method="post" action="{% url 'clubs:my_plan_disable_autopay' %}" class="subscription-autopay__form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger subscription-autopay__disable-btn">
+                                Отключить автосписание и отвязать карту
+                            </button>
+                        </form>
+                        {% else %}
+                        <p class="subscription-autopay__hint">
+                            Автосписание сейчас <strong>отключено</strong>. Тариф не будет продлён автоматически.
+                            Вы сможете подключить автосписание при следующей оплате, отметив опцию «Сохранить карту и включить автоматическое продление».
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if fee %}
+                <div class="subscription-info__section">
+                    <div class="subscription-info__section-header">
+                        <span class="subscription-info__section-eyebrow">Членский взнос</span>
+                    </div>
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Сумма:</span>
+                        <div style="display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; justify-content: flex-end;">
+                            <span>{{ fee.amount|floatformat:0 }} ₽ / {{ fee.get_period_display|lower }}</span>
+                            {% if fee_status == 'paid' %}
+                            <span class="badge badge-success">Оплачен</span>
+                            {% elif fee_status == 'expiring_soon' %}
+                            <span class="badge badge-warning">Скоро истекает</span>
+                            {% elif fee_status == 'unpaid' %}
+                            <span class="badge badge-danger">Не оплачен</span>
+                            {% else %}
+                            <span>Не используется</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if fee.description %}
+                    <p class="subscription-info__section-note">{{ fee.description }}</p>
+                    {% endif %}
+                    {% if fee_status != 'paid' %}
+                    <div class="subscription-info__actions subscription-info__actions--separated">
+                        <a href="{% url 'clubs:my_fee_payment_preview' %}?next={{ request.path|urlencode }}" class="btn btn-sm btn-outline" style="flex: 1;">Оплатить взнос</a>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="subscription-autopay subscription-autopay--fee">
+                    <div class="subscription-autopay__header">
+                        <span class="subscription-autopay__eyebrow">Автосписание членского взноса</span>
+                        <span class="subscription-autopay__status {% if not club_fee_autopay_card %}subscription-autopay__status--off{% endif %}">
+                            {% if club_fee_autopay_card %}Подключено{% else %}Отключено{% endif %}
+                        </span>
+                    </div>
+
+                    {% if club_fee_autopay_card %}
+                    <div class="subscription-autopay__card">
+                        <div class="subscription-autopay__card-main">
+                            <span class="subscription-autopay__card-brand">
+                                {{ club_fee_autopay_card.card_network|default:"Банковская карта" }}
+                            </span>
+                            <span class="subscription-autopay__card-pan">**** {{ club_fee_autopay_card.card_last4 }}</span>
+                        </div>
+                        {% if club_fee_autopay_card.card_exp_month and club_fee_autopay_card.card_exp_year %}
+                        <div class="subscription-autopay__card-expiry">
+                            Действует до {{ club_fee_autopay_card.card_exp_month }}/{{ club_fee_autopay_card.card_exp_year }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="subscription-autopay__footer">
+                        {% if club_fee_autopay_card %}
+                        <p class="subscription-autopay__hint">
+                            Членский взнос будет списываться автоматически в начале нового периода клуба.
+                            Вы можете отключить автосписание одним нажатием.
+                        </p>
+                        <form method="post" action="{% url 'clubs:my_fee_disable_autopay' %}" class="subscription-autopay__form">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.path }}">
+                            <button type="submit" class="btn btn-danger subscription-autopay__disable-btn">
+                                Отключить автосписание взноса
+                            </button>
+                        </form>
+                        {% elif fee_status != 'paid' %}
+                        <p class="subscription-autopay__hint">
+                            Включите автосписание при оплате взноса, и карта будет сохранена для следующего периода.
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
             {% else %}
-            <p style="margin: 0;">Тариф пока не назначен. Обратитесь к администратору клуба.</p>
+            {% if fee %}
+            <div class="subscription-info profile-info__subscription">
+                <div class="subscription-info__row">
+                    <span class="subscription-info__label">Тариф:</span>
+                    <strong class="subscription-info__value">Не подключен</strong>
+                </div>
+                <div class="subscription-info__actions">
+                    <a href="{% url 'clubs:my_plan_change' %}" class="btn btn-sm btn-outline" style="flex: 1;">Выбрать тариф</a>
+                </div>
+                <div class="subscription-info__section">
+                    <div class="subscription-info__section-header">
+                        <span class="subscription-info__section-eyebrow">Членский взнос</span>
+                    </div>
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Сумма:</span>
+                        <div style="display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; justify-content: flex-end;">
+                            <span>{{ fee.amount|floatformat:0 }} ₽ / {{ fee.get_period_display|lower }}</span>
+                            {% if fee_status == 'paid' %}
+                            <span class="badge badge-success">Оплачен</span>
+                            {% else %}
+                            <span class="badge badge-danger">Не оплачен</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if fee.description %}
+                    <p class="subscription-info__section-note">{{ fee.description }}</p>
+                    {% endif %}
+                    {% if fee_status != 'paid' %}
+                    <div class="subscription-info__actions subscription-info__actions--separated">
+                        <a href="{% url 'clubs:my_fee_payment_preview' %}?next={{ request.path|urlencode }}" class="btn btn-sm btn-outline" style="flex: 1;">Оплатить взнос</a>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="subscription-autopay subscription-autopay--fee">
+                    <div class="subscription-autopay__header">
+                        <span class="subscription-autopay__eyebrow">Автосписание членского взноса</span>
+                        <span class="subscription-autopay__status {% if not club_fee_autopay_card %}subscription-autopay__status--off{% endif %}">
+                            {% if club_fee_autopay_card %}Подключено{% else %}Отключено{% endif %}
+                        </span>
+                    </div>
+                    {% if club_fee_autopay_card %}
+                    <div class="subscription-autopay__card">
+                        <div class="subscription-autopay__card-main">
+                            <span class="subscription-autopay__card-brand">{{ club_fee_autopay_card.card_network|default:"Банковская карта" }}</span>
+                            <span class="subscription-autopay__card-pan">**** {{ club_fee_autopay_card.card_last4 }}</span>
+                        </div>
+                        {% if club_fee_autopay_card.card_exp_month and club_fee_autopay_card.card_exp_year %}
+                        <div class="subscription-autopay__card-expiry">
+                            Действует до {{ club_fee_autopay_card.card_exp_month }}/{{ club_fee_autopay_card.card_exp_year }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="subscription-autopay__footer">
+                        <form method="post" action="{% url 'clubs:my_fee_disable_autopay' %}" class="subscription-autopay__form">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.path }}">
+                            <button type="submit" class="btn btn-danger subscription-autopay__disable-btn">
+                                Отключить автосписание взноса
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-warning profile-info__subscription-alert" style="margin-bottom: 0;">
+                У вас нет активного клубного тарифа. <a href="{% url 'clubs:my_plan_change' %}">Выбрать и оплатить</a>
+            </div>
+            {% endif %}
             {% endif %}
         </div>
     </div>
 </div>
+
+{% if member_plan and member_plan.ended_at and member_plan.auto_renew %}
+<div id="cancel-club-plan-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-dialog">
+        <h3 class="modal-dialog__title">Отменить клубный тариф?</h3>
+        <p class="modal-dialog__text">
+            Вы уверены, что хотите отключить автопродление тарифа «{{ member_plan.plan.name }}»?
+        </p>
+        <p class="modal-dialog__text text-secondary">
+            Доступ ко всем возможностям тарифа сохранится до
+            <strong>{{ member_plan.ended_at|date:"d.m.Y" }}</strong>.
+            После этой даты продление не произойдёт автоматически.
+        </p>
+        <div class="modal-dialog__actions">
+            <form method="post" action="{% url 'clubs:my_plan_cancel' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger">Да, отменить</button>
+            </form>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-club-plan-modal').style.display='none'">Не отменять</button>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

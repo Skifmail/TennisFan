@@ -328,6 +328,7 @@ TELEGRAM_PUBLIC_COMMUNITY_URL = (
     or "https://t.me/TennisFanu"
 )
 TELEGRAM_BOT_SITE_BASE_URL = os.environ.get("TELEGRAM_BOT_SITE_BASE_URL", "")
+SITE_URL = os.environ.get("SITE_URL", "").strip()
 
 # ------------------------------------------------------------------------------
 # ЮKassa (YooKassa)
@@ -354,6 +355,8 @@ if not CLUB_PAYMENT_ENCRYPTION_KEY and SECRET_KEY:
 SITE_ID = 1
 # Домен для sitemap (по умолчанию первый из ALLOWED_HOSTS или tennisfan.ru)
 SITE_DOMAIN = os.environ.get("SITE_DOMAIN", "").strip() or "tennisfan.ru"
+if not SITE_URL:
+    SITE_URL = f"https://{SITE_DOMAIN}"
 
 # ------------------------------------------------------------------------------
 # Верификация в поисковиках (Google Search Console, Yandex Webmaster)
@@ -426,6 +429,11 @@ CRONJOBS = [
         "0 4 * * *",
         "django.core.management.call_command",
         ["run_recurring_subscription_payments"],
+    ),
+    (
+        "5 4 * * *",
+        "django.core.management.call_command",
+        ["run_recurring_club_fee_payments"],
     ),
     (
         "0 10 * * *",

@@ -5,7 +5,7 @@
  * Компоненты: .footer, .footer-grid, .footer-club-cta__*, .footer-section__*, .social-link, .footer-bottom
  * Используется на: глобально в базовом шаблоне (подвал сайта)
  * 
- * Последнее обновление: 2026-03
+ * Последнее обновление: 2026-03 (компактная высота футера)
  */
 
 /* ==========================================================================
@@ -14,13 +14,13 @@
 .footer {
     background: linear-gradient(to bottom, #012b1c, #001f14);
     border-top: 1px solid var(--color-border);
-    padding: var(--spacing-xl) 0 var(--spacing-lg);
+    padding: var(--spacing-md) 0 var(--spacing-sm);
     margin-top: auto;
     position: relative;
 }
 
 .footer-club-cta {
-    margin-top: var(--spacing-md);
+    margin-top: var(--spacing-sm);
     width: 100%;
     display: flex;
     justify-content: flex-end;
@@ -60,6 +60,13 @@
 .footer-club-cta__subtitle {
     font-size: var(--font-size-sm);
     color: var(--color-text-muted);
+}
+
+.footer-club-cta__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
 .footer-club-cta__button {
@@ -104,6 +111,18 @@
     transform: translateX(3px);
 }
 
+.footer-club-cta__button--secondary {
+    border-color: rgba(34, 197, 94, 0.65);
+    color: #d8fbe6;
+    background: rgba(5, 30, 22, 0.72);
+    box-shadow: 0 0 14px rgba(22, 163, 74, 0.18);
+}
+
+.footer-club-cta__button--secondary:hover {
+    box-shadow: 0 0 18px rgba(22, 163, 74, 0.3);
+    background: rgba(7, 38, 28, 0.96);
+}
+
 @keyframes footer-club-cta-pulse {
     0% {
         box-shadow:
@@ -136,6 +155,39 @@
         width: 100%;
         justify-content: center;
     }
+
+    .footer-club-cta__actions {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .footer-join-club-modal {
+        padding: 1rem;
+        align-items: flex-end;
+    }
+
+    .footer-join-club-modal__dialog {
+        max-width: none;
+        border-radius: 1.2rem 1.2rem 0.9rem 0.9rem;
+    }
+
+    .footer-join-club-modal__header,
+    .footer-join-club-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .footer-join-club-card {
+        display: grid;
+    }
+
+    .footer-join-club-card__actions {
+        justify-content: stretch;
+    }
+
+    .footer-join-club-card__actions > * {
+        width: 100%;
+    }
 }
 
 .footer::before {
@@ -149,8 +201,8 @@
 .footer-grid {
     display: grid;
     grid-template-columns: 1.4fr 1fr 1fr 1fr auto;
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-lg);
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
     position: relative;
     z-index: 1;
     align-items: start;
@@ -162,13 +214,14 @@
 }
 
 .footer-brand-title {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 600;
     letter-spacing: 0.5px;
-    margin: 0 0 var(--spacing-sm) 0;
+    margin: 0 0 4px 0;
     color: var(--color-text);
-    padding-bottom: var(--spacing-sm);
+    padding-bottom: 6px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    line-height: 1.15;
 }
 
 .footer-brand-accent {
@@ -179,11 +232,12 @@
     color: var(--color-text-secondary);
     font-size: var(--font-size-sm);
     max-width: 280px;
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: 6px;
+    line-height: 1.35;
 }
 
 .footer-btn-extra {
-    margin-top: var(--spacing-xs) !important;
+    margin-top: 4px !important;
     display: inline-block;
 }
 
@@ -198,7 +252,7 @@
     justify-content: space-between;
     gap: var(--spacing-sm);
     padding: 0;
-    margin: 0 0 var(--spacing-sm) 0;
+    margin: 0 0 6px 0;
     border: none;
     background: none;
     cursor: pointer;
@@ -257,11 +311,154 @@
 .footer-social__title {
     font-size: 11px;
     font-weight: 600;
-    margin: 0 0 var(--spacing-sm) 0;
+    margin: 0 0 6px 0;
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 1.2px;
     opacity: 0.8;
+}
+
+.footer-join-club-modal {
+    background:
+        radial-gradient(circle at top left, rgba(22, 163, 74, 0.12), transparent 34%),
+        radial-gradient(circle at top right, rgba(201, 168, 76, 0.14), transparent 30%),
+        rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(12px);
+}
+
+.footer-join-club-modal__dialog {
+    max-width: 920px;
+    padding: clamp(1rem, 2vw, 1.5rem);
+    border: 1px solid rgba(201, 168, 76, 0.28);
+    background:
+        linear-gradient(180deg, rgba(7, 50, 38, 0.98), rgba(3, 31, 23, 0.98));
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+}
+
+.footer-join-club-modal__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid rgba(201, 168, 76, 0.28);
+    border-radius: 999px;
+    color: #f3d27d;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(201, 168, 76, 0.1);
+}
+
+.footer-join-club-modal__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.footer-join-club-modal__title {
+    margin-bottom: 6px;
+    color: #f4efe6;
+    font-size: clamp(1.3rem, 2vw, 1.75rem);
+}
+
+.footer-join-club-modal__text {
+    margin-bottom: 0;
+    color: rgba(218, 225, 220, 0.92);
+}
+
+.footer-join-club-modal__close {
+    border: 0;
+    background: transparent;
+    color: rgba(244, 239, 230, 0.86);
+    font-size: 1.8rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.footer-join-club-modal__list {
+    display: grid;
+    gap: 10px;
+    max-height: min(65vh, 720px);
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.footer-join-club-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(201, 168, 76, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.footer-join-club-card__main {
+    min-width: 0;
+}
+
+.footer-join-club-card__title-row,
+.footer-join-club-card__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.footer-join-club-card__title {
+    color: #fefce8;
+    font-size: 1rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.footer-join-club-card__city,
+.footer-join-club-card__meta,
+.footer-join-club-card__description,
+.footer-join-club-card__hint {
+    color: rgba(226, 232, 240, 0.76);
+}
+
+.footer-join-club-card__city {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.footer-join-club-card__meta {
+    margin-top: 5px;
+    font-size: 0.82rem;
+}
+
+.footer-join-club-card__description,
+.footer-join-club-card__hint {
+    margin: 6px 0 0;
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.footer-join-club-card__hint {
+    color: #f3d27d;
+}
+
+.footer-join-club-card__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.footer-join-club-modal__empty {
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px dashed rgba(201, 168, 76, 0.22);
+    color: rgba(226, 232, 240, 0.8);
+    text-align: center;
 }
 
 .social-links {
@@ -295,17 +492,17 @@
 }
 
 .footer-club-cta {
-    margin-top: var(--spacing-md);
+    margin-top: var(--spacing-sm);
 }
 
 .footer-club-cta__inner {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
+    gap: 6px;
     max-width: 320px;
 }
 
@@ -324,7 +521,7 @@
 
 .footer-club-cta__button {
     width: 100%;
-    margin-top: var(--spacing-sm);
+    margin-top: 4px;
 }
 
 @media (width <= 768px) {
@@ -338,14 +535,16 @@
     background: #caa94f !important;
     color: #0f3f40 !important;
     border-radius: 8px;
-    padding: 10px 18px;
+    padding: 7px 14px;
     transition: 0.2s ease;
     border: none;
     font-weight: 600;
+    font-size: var(--font-size-sm);
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    line-height: 1.2;
 }
 
 .footer-donate:hover,
@@ -365,24 +564,25 @@
 }
 
 .footer-bottom {
-    margin-top: var(--spacing-lg);
-    padding-top: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
     border-top: 1px solid rgba(202, 169, 79, 0.15);
-    font-size: 12px;
+    font-size: 11px;
     opacity: 0.7;
     display: flex;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
     color: var(--color-text-muted);
     position: relative;
     z-index: 1;
+    line-height: 1.35;
 }
 
 .footer-copy {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-xs);
+    gap: 2px;
 }
 
 .footer-copy p {
@@ -444,7 +644,7 @@
 @media (width <= 900px) {
     .footer-grid {
         grid-template-columns: 1fr 1fr;
-        gap: var(--spacing-md);
+        gap: var(--spacing-sm);
     }
 }
 
@@ -459,12 +659,12 @@
 
     .footer-grid {
         grid-template-columns: 1fr 1fr;
-        gap: var(--spacing-md);
-        margin-bottom: var(--spacing-md);
+        gap: var(--spacing-sm);
+        margin-bottom: var(--spacing-sm);
     }
 
     .footer-brand-title {
-        font-size: 18px;
+        font-size: 17px;
     }
 
     .hero-title {
@@ -485,12 +685,12 @@
     }
 
     .footer {
-        padding: var(--spacing-lg) 0 var(--spacing-md);
+        padding: var(--spacing-sm) 0 var(--spacing-xs);
     }
 
     .footer-grid {
         grid-template-columns: 1fr;
-        gap: var(--spacing-md);
+        gap: var(--spacing-sm);
     }
 
     .footer-section__toggle {
@@ -556,7 +756,7 @@
     .footer-brand {
         display: flex;
         flex-direction: column;
-        gap: var(--spacing-sm);
+        gap: 6px;
     }
 
     .footer-brand .logo {
@@ -566,7 +766,7 @@
 
     .footer-desc {
         margin-top: 0;
-        margin-bottom: var(--spacing-md);
+        margin-bottom: var(--spacing-sm);
     }
 
     .match-players {

@@ -75,7 +75,7 @@ class ClubMembershipFeeInline(admin.TabularInline):
 
     model = ClubMembershipFee
     extra = 0
-    fields = ("amount", "currency", "period", "is_active", "payment_provider")
+    fields = ("amount", "currency", "period", "is_active")
     show_change_link = True
 
 

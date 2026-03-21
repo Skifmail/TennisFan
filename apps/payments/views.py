@@ -46,6 +46,21 @@ def _get_item_label(payment_type: str, item_id: str) -> str:
             return "Подписка"
         return cast(str, tier.get_name_display())
 
+    if payment_type == "club_plan":
+        try:
+            from apps.clubs.models import ClubPlayerPlan
+
+            plan = (
+                ClubPlayerPlan.objects.select_related("club")
+                .filter(pk=int(item_id))
+                .first()
+            )
+        except (TypeError, ValueError):
+            plan = None
+        if plan is None:
+            return "Тариф клуба"
+        return cast(str, f"{plan.club.name}: {plan.name}")
+
     if payment_type == "tournament":
         try:
             tournament = Tournament.objects.filter(pk=int(item_id)).first()
@@ -141,10 +156,13 @@ def _build_preview_redirect(request: HttpRequest, payment_type: str | None):
     if payment_type:
         params["type"] = payment_type
 
-    # subscription / tournament
+    # subscription / club_plan / tournament
     item_id = request.POST.get("id") or request.GET.get("id")
     if item_id:
         params["id"] = str(item_id)
+    next_url = request.POST.get("next") or request.GET.get("next")
+    if next_url:
+        params["next"] = str(next_url)
 
     # donation
     amount = request.POST.get("amount")
@@ -214,7 +232,7 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
 
     # Для подписок и турниров требуется авторизация
     if (
-        payment_type in ("subscription", "tournament")
+        payment_type in ("subscription", "club_plan", "tournament")
         and not request.user.is_authenticated
     ):
         from django.conf import settings
@@ -277,6 +295,20 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
             "details": details,
         }
 
+    elif payment_type == "club_plan":
+        try:
+            plan_id = int(str(request.GET.get("id") or "").strip())
+        except (TypeError, ValueError) as err:
+            raise Http404("Unknown club plan") from err
+        next_url = request.GET.get("next", "").strip()
+        redirect_url = reverse(
+            "clubs:my_plan_payment_preview",
+            kwargs={"plan_id": plan_id},
+        )
+        if next_url:
+            redirect_url = f"{redirect_url}?{urlencode({'next': next_url})}"
+        return redirect(redirect_url)
+
     elif payment_type == "tournament":
         tournament_id = request.GET.get("id")
         tournament = get_object_or_404(Tournament, pk=tournament_id)
@@ -287,8 +319,6 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
             getattr(request.user, "is_staff", False)
             or getattr(request.user, "is_superuser", False)
         ):
-            from urllib.parse import urlencode
-
             messages.success(
                 request,
                 "Регистрация без оплаты.",
@@ -386,9 +416,20 @@ def payment_process(request: HttpRequest) -> HttpResponse:
     """
     payment_type = request.POST.get("type") or request.GET.get("type")
 
+    if payment_type == "club_plan":
+        try:
+            plan_id = int(
+                str(request.POST.get("id") or request.GET.get("id") or "").strip()
+            )
+        except (TypeError, ValueError):
+            plan_id = None
+        if plan_id is not None:
+            return redirect("clubs:my_plan_payment_preview", plan_id=plan_id)
+        return redirect("clubs:my_plan_change")
+
     # Для подписок и турниров требуется авторизация
     if (
-        payment_type in ("subscription", "tournament")
+        payment_type in ("subscription", "club_plan", "tournament")
         and not request.user.is_authenticated
     ):
         messages.info(request, "Для оплаты необходимо зарегистрироваться.")
@@ -423,7 +464,7 @@ def payment_process(request: HttpRequest) -> HttpResponse:
 
     # Для подписки пользователь может включить автопродление и сохранение карты.
     enable_autopay = False
-    if payment_type == "subscription" and request.user.is_authenticated:
+    if payment_type in ("subscription", "club_plan") and request.user.is_authenticated:
         raw_autopay = str(request.POST.get("enable_autopay", "")).strip().lower()
         enable_autopay = raw_autopay in {"1", "true", "on", "yes"}
 
@@ -436,6 +477,21 @@ def payment_process(request: HttpRequest) -> HttpResponse:
                 tier = SubscriptionTier.objects.filter(pk=int(item_id)).first()
                 if tier:
                     description = f"Подписка TennisFan: {tier.get_name_display()}"
+            except (ValueError, TypeError):
+                pass
+    elif payment_type == "club_plan":
+        description = "Оплата клубного тарифа TennisFan"
+        if item_id:
+            try:
+                from apps.clubs.models import ClubPlayerPlan
+
+                plan = (
+                    ClubPlayerPlan.objects.select_related("club")
+                    .filter(pk=int(item_id))
+                    .first()
+                )
+                if plan:
+                    description = f"Клубный тариф {plan.club.name}: {plan.name}"
             except (ValueError, TypeError):
                 pass
     elif payment_type == "tournament":
@@ -466,7 +522,7 @@ def payment_process(request: HttpRequest) -> HttpResponse:
     }
     if request.user.is_authenticated:
         metadata["user_id"] = str(request.user.pk)
-    if payment_type == "subscription" and enable_autopay:
+    if payment_type in ("subscription", "club_plan") and enable_autopay:
         # Маркер в metadata — в логах и ЛК ЮKassa будет видно, что платёж
         # используется для включения автопродления подписки.
         metadata["enable_autopay"] = "1"
@@ -492,7 +548,9 @@ def payment_process(request: HttpRequest) -> HttpResponse:
             metadata=metadata,
             customer_email=receipt_email,
             save_payment_method=(
-                enable_autopay if payment_type == "subscription" else None
+                enable_autopay
+                if payment_type in ("subscription", "club_plan")
+                else None
             ),
         )
     except (ValueError, RuntimeError) as e:
@@ -509,7 +567,9 @@ def payment_process(request: HttpRequest) -> HttpResponse:
         "item_id": item_id,
         "next": next_url,
         "enable_autopay": (
-            "1" if payment_type == "subscription" and enable_autopay else ""
+            "1"
+            if payment_type in ("subscription", "club_plan") and enable_autopay
+            else ""
         ),
     }
     if payment_type == "donation":
@@ -583,9 +643,9 @@ def payment_return(request: HttpRequest) -> HttpResponse:
         except Exception as e:
             logger.warning("Telegram notify_donation failed: %s", e)
 
-    # Для подписки и включённого автопродления пробуем сохранить способ оплаты.
+    # Для подписки и клубного тарифа при включённом автопродлении пробуем сохранить способ оплаты.
     if (
-        payment_type == "subscription"
+        payment_type in ("subscription", "club_plan")
         and enable_autopay
         and request.user.is_authenticated
         and payment_id
@@ -601,24 +661,56 @@ def payment_return(request: HttpRequest) -> HttpResponse:
                 exp_year = str(card.get("expiry_year") or "")[:4]
                 network = str(card.get("card_type") or card.get("brand") or "").strip()
 
-                # Старые способы оплаты пользователя перестают быть дефолтными
-                # для автопродления, чтобы не дублировать списания.
-                SavedPaymentMethod.objects.filter(
-                    user=request.user,
-                    is_default_for_subscriptions=True,
-                ).update(is_default_for_subscriptions=False)
+                if payment_type == "subscription":
+                    SavedPaymentMethod.objects.filter(
+                        user=request.user,
+                        club__isnull=True,
+                        is_default_for_subscriptions=True,
+                    ).update(is_default_for_subscriptions=False)
+                else:
+                    SavedPaymentMethod.objects.filter(
+                        user=request.user,
+                        is_default_for_club_plans=True,
+                    ).update(is_default_for_club_plans=False)
+
+                existing_method = SavedPaymentMethod.objects.filter(
+                    payment_method_id=pm_id
+                ).first()
+                defaults = {
+                    "user": request.user,
+                    "club": (
+                        None
+                        if payment_type == "subscription"
+                        else (existing_method.club if existing_method else None)
+                    ),
+                    "card_last4": card_last4,
+                    "card_exp_month": exp_month,
+                    "card_exp_year": exp_year,
+                    "card_network": network,
+                    "is_active": True,
+                    "is_default_for_subscriptions": (
+                        True
+                        if payment_type == "subscription"
+                        else bool(
+                            existing_method
+                            and existing_method.is_default_for_subscriptions
+                        )
+                    ),
+                    "is_default_for_club_plans": (
+                        True
+                        if payment_type == "club_plan"
+                        else bool(
+                            existing_method
+                            and existing_method.is_default_for_club_plans
+                        )
+                    ),
+                    "is_default_for_club_fees": bool(
+                        existing_method and existing_method.is_default_for_club_fees
+                    ),
+                }
 
                 SavedPaymentMethod.objects.update_or_create(
-                    payment_method_id=pm_id,
-                    defaults={
-                        "user": request.user,
-                        "card_last4": card_last4,
-                        "card_exp_month": exp_month,
-                        "card_exp_year": exp_year,
-                        "card_network": network,
-                        "is_active": True,
-                        "is_default_for_subscriptions": True,
-                    },
+                    payment_method_id=pm_id, defaults=defaults
                 )
 
     if request.user.is_authenticated and payment_id:
@@ -658,6 +750,8 @@ def payment_return(request: HttpRequest) -> HttpResponse:
     if amount_paid:
         params.append(("amount", amount_paid))
     if params:
+        if payment_type == "club_plan" and enable_autopay:
+            params.append(("autopay", "1"))
         success_url += "?" + urlencode(params)
     return redirect(success_url)
 
@@ -761,6 +855,50 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                 except Exception:
                     return redirect("pricing")
 
+    if payment_type == "club_plan" and item_id:
+        try:
+            plan_id = int(item_id)
+        except (TypeError, ValueError):
+            plan_id = None
+        if plan_id is not None:
+            from apps.clubs.models import ClubMember, ClubMemberStatus, ClubPlayerPlan
+            from apps.clubs.plan_services import purchase_member_plan
+
+            plan = (
+                ClubPlayerPlan.objects.select_related("club").filter(pk=plan_id).first()
+            )
+            if plan is not None:
+                member = (
+                    ClubMember.objects.select_related("club")
+                    .filter(
+                        club=plan.club,
+                        user=request.user,
+                        status=ClubMemberStatus.ACTIVE,
+                    )
+                    .first()
+                )
+                if member is None:
+                    messages.error(request, "Вы не состоите в клубе для этого тарифа.")
+                    return redirect("clubs:club_public_detail", slug=plan.club.slug)
+
+                request.session["current_club_slug"] = plan.club.slug
+                request.session.modified = True
+                auto_renew_enabled = str(
+                    request.GET.get("autopay", "")
+                ).strip().lower() in {"1", "true"}
+                purchase_member_plan(
+                    member,
+                    plan,
+                    assigned_by=request.user,
+                    change_reason="Оплата клубного тарифа участником",
+                    auto_renew=auto_renew_enabled,
+                )
+                messages.success(
+                    request,
+                    f"Клубный тариф «{plan.name}» успешно оформлен.",
+                )
+                return redirect("clubs:my_plan")
+
     if payment_type == "tournament" and item_id:
         try:
             tid = int(item_id)
@@ -837,7 +975,9 @@ def disable_subscription_autopay(request: HttpRequest) -> HttpResponse:
     """
     methods_qs = SavedPaymentMethod.objects.filter(
         user=request.user,
+        club__isnull=True,
         is_active=True,
+        is_default_for_subscriptions=True,
     )
     if not methods_qs.exists():
         messages.info(
@@ -845,7 +985,8 @@ def disable_subscription_autopay(request: HttpRequest) -> HttpResponse:
             "У вас нет активных сохранённых способов оплаты для автопродления.",
         )
     else:
-        methods_qs.update(is_active=False, is_default_for_subscriptions=False)
+        for method in methods_qs:
+            method.deactivate_for_subscriptions()
         messages.success(
             request,
             "Автопродление подписки отключено, карта отвязана от автоплатежей.",

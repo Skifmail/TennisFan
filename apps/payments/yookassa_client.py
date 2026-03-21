@@ -301,6 +301,7 @@ def create_payment_with_credentials(
     *,
     metadata: dict | None = None,
     customer_email: str | None = None,
+    save_payment_method: bool | None = None,
 ) -> tuple[str, str]:
     """Создать платёж в ЮKassa с явными учётными данными магазина клуба.
 
@@ -329,6 +330,8 @@ def create_payment_with_credentials(
             for k, v in metadata.items()
             if v is not None and str(v).strip()
         }
+    if save_payment_method is not None:
+        payload["save_payment_method"] = bool(save_payment_method)
     email = (customer_email or "").strip()
     if email and "@" in email:
         payload["receipt"] = {
@@ -382,6 +385,140 @@ def create_payment_with_credentials(
         )
         raise RuntimeError("Неверный ответ ЮKassa: нет ссылки на оплату.")
     return payment_id, confirmation_url
+
+
+def get_payment_details_with_credentials(
+    payment_id: str,
+    shop_id: str,
+    secret_key: str,
+) -> dict[str, Any] | None:
+    """Получить полный объект платежа с использованием ключей конкретного клуба."""
+    try:
+        sid, skey = _create_auth(shop_id=shop_id, secret_key=secret_key)
+    except ValueError:
+        return None
+
+    url = f"{API_URL}/{payment_id}"
+    try:
+        response = requests.get(
+            url,
+            auth=(sid, skey),
+            timeout=10,
+        )
+        if response.status_code != 200:
+            logger.warning(
+                "YooKassa get payment details with club credentials failed: status=%s body=%s",
+                response.status_code,
+                response.text[:500],
+            )
+            return None
+        data: dict[str, Any] = response.json()
+        return data
+    except Exception as exc:
+        logger.warning(
+            "YooKassa get payment details with club credentials exception: %s",
+            exc,
+        )
+        return None
+
+
+def create_recurring_payment_with_credentials(
+    shop_id: str,
+    secret_key: str,
+    amount: str,
+    description: str,
+    payment_method_id: str,
+    *,
+    metadata: dict | None = None,
+) -> tuple[str, str]:
+    """Создать клубный автоплатёж по сохранённому способу оплаты текущего клуба."""
+    sid, skey = _create_auth(shop_id=shop_id, secret_key=secret_key)
+
+    payload: dict[str, Any] = {
+        "amount": {"value": amount, "currency": "RUB"},
+        "capture": True,
+        "payment_method_id": payment_method_id,
+        "description": (description or "Автоплатёж")[:128],
+    }
+    if metadata:
+        payload["metadata"] = {
+            str(k): str(v)
+            for k, v in metadata.items()
+            if v is not None and str(v).strip()
+        }
+
+    idempotence_key = str(uuid.uuid4())
+    response = requests.post(
+        API_URL,
+        auth=(sid, skey),
+        headers={
+            "Idempotence-Key": idempotence_key,
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=15,
+    )
+
+    if response.status_code != 200:
+        logger.warning(
+            "YooKassa create recurring payment with club credentials failed: status=%s body=%s",
+            response.status_code,
+            response.text[:500],
+        )
+        raise RuntimeError(
+            f"ЮKassa вернула ошибку при клубном автоплатеже: {response.status_code}."
+        )
+
+    data: dict[str, Any] = response.json()
+    payment_id = data.get("id")
+    status = data.get("status")
+
+    if not isinstance(payment_id, str) or not isinstance(status, str):
+        logger.warning(
+            "YooKassa recurring response with club credentials missing id or status: %s",
+            data,
+        )
+        raise RuntimeError("Неверный ответ ЮKassa при клубном автоплатеже.")
+
+    return payment_id, status
+
+
+def test_yookassa_credentials(
+    shop_id: str,
+    secret_key: str,
+) -> tuple[bool, str]:
+    """Проверить, что учётные данные YooKassa клуба валидны и API отвечает."""
+    try:
+        sid, skey = _create_auth(shop_id=shop_id, secret_key=secret_key)
+    except ValueError as exc:
+        return False, str(exc)
+
+    test_payment_id = "00000000-0000-0000-0000-000000000000"
+    url = f"{API_URL}/{test_payment_id}"
+    try:
+        response = requests.get(
+            url,
+            auth=(sid, skey),
+            timeout=10,
+        )
+    except Exception as exc:
+        logger.warning("YooKassa credentials test failed: %s", exc)
+        return False, "Не удалось связаться с API YooKassa. Проверьте сеть и повторите."
+
+    if response.status_code in {200, 400, 404}:
+        return True, "Связь с YooKassa установлена. Ключи клуба выглядят корректно."
+    if response.status_code in {401, 403}:
+        return False, "YooKassa отклонила авторизацию. Проверьте Shop ID и Secret Key."
+
+    logger.warning(
+        "Unexpected YooKassa credentials test response: status=%s body=%s",
+        response.status_code,
+        response.text[:500],
+    )
+    return (
+        False,
+        f"YooKassa вернула неожиданный ответ: {response.status_code}. Проверьте реквизиты и повторите.",
+    )
 
 
 def get_payment_status_with_credentials(

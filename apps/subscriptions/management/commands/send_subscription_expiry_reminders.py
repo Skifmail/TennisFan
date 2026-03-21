@@ -115,6 +115,7 @@ class Command(BaseCommand):
                 try:
                     has_autopay = SavedPaymentMethod.objects.filter(
                         user=subscription.user,
+                        club__isnull=True,
                         is_active=True,
                         is_default_for_subscriptions=True,
                     ).exists()

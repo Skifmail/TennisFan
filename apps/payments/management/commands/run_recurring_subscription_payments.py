@@ -79,6 +79,7 @@ class Command(BaseCommand):
             payment_method = (
                 SavedPaymentMethod.objects.filter(
                     user=user,
+                    club__isnull=True,
                     is_active=True,
                     is_default_for_subscriptions=True,
                 )

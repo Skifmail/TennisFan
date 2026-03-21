@@ -1191,6 +1191,140 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
             tournament.teams.filter(player1=self.player, player2=partner).exists()
         )
 
+    def test_club_doubles_registration_uses_club_shell_without_global_footer(
+        self,
+    ) -> None:
+        tournament = Tournament.objects.create(
+            name="Клубный парный интерфейс",
+            slug="club-doubles-shell",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format="round_robin",
+            status=TournamentStatus.UPCOMING,
+            gender="open",
+            is_one_day=False,
+            entry_fee=0,
+            variant="doubles",
+        )
+        tournament.allowed_categories.create(category="amateur")
+
+        response = self.client.get(
+            reverse("tournament_register_doubles", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.club.name)
+        self.assertContains(response, "ЛИЧНЫЙ КАБИНЕТ")
+        self.assertNotContains(response, "Всероссийская теннисная платформа")
+        self.assertNotContains(response, "РЕЙТИНГ")
+
+    def test_club_doubles_partner_search_is_limited_to_active_club_members(
+        self,
+    ) -> None:
+        club_partner_user = User.objects.create_user(
+            email="club-search-partner@test.local",
+            password="testpass123",
+            first_name="Анна",
+            last_name="Клубная",
+            phone="+79990000002",
+        )
+        club_partner = Player.objects.create(
+            user=club_partner_user,
+            skill_level="amateur",
+            birth_date=date(1991, 1, 1),
+        )
+        ClubMember.objects.create(
+            club=self.club,
+            user=club_partner_user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+
+        outsider_user = User.objects.create_user(
+            email="platform-search-partner@test.local",
+            password="testpass123",
+            first_name="Анна",
+            last_name="Платформа",
+            phone="+79990000003",
+        )
+        outsider = Player.objects.create(
+            user=outsider_user,
+            skill_level="amateur",
+            birth_date=date(1992, 1, 1),
+        )
+
+        tournament = Tournament.objects.create(
+            name="Клубный поиск пары",
+            slug="club-doubles-search",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format="round_robin",
+            status=TournamentStatus.UPCOMING,
+            gender="open",
+            is_one_day=False,
+            entry_fee=0,
+            variant="doubles",
+        )
+        tournament.allowed_categories.create(category="amateur")
+
+        response = self.client.get(
+            reverse("tournament_register_doubles", kwargs={"slug": tournament.slug}),
+            {"q": "Анна"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, club_partner.user.last_name)
+        self.assertNotContains(response, outsider.user.last_name)
+        self.assertNotContains(response, f'value="{outsider.pk}"')
+
+    def test_club_doubles_registration_rejects_partner_outside_club(self) -> None:
+        outsider_user = User.objects.create_user(
+            email="outsider-post@test.local",
+            password="testpass123",
+            first_name="Анна",
+            last_name="Внешняя",
+        )
+        outsider = Player.objects.create(
+            user=outsider_user,
+            skill_level="amateur",
+            birth_date=date(1992, 1, 1),
+        )
+
+        tournament = Tournament.objects.create(
+            name="Клубный POST поиск",
+            slug="club-doubles-post-check",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format="round_robin",
+            status=TournamentStatus.UPCOMING,
+            gender="open",
+            is_one_day=False,
+            entry_fee=0,
+            variant="doubles",
+        )
+        tournament.allowed_categories.create(category="amateur")
+
+        response = self.client.post(
+            reverse("tournament_register_doubles", kwargs={"slug": tournament.slug}),
+            {"action": "add_partner", "partner_id": str(outsider.pk)},
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Для клубного турнира можно выбрать партнёра только из активных участников клуба.",
+        )
+        self.assertFalse(
+            tournament.teams.filter(player1=self.player, player2=outsider).exists()
+        )
+
 
 class MatchDetailPlayerActionsRedirectTestCase(TestCase):
     def setUp(self) -> None:

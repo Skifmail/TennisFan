@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Подтверждение оплаты — {{ club.name }}{% endblock %}
+
+{% block content %}
+{% include "clubs/_club_player_nav.html" with current="plan" %}
+<div class="container" style="max-width: 600px; padding-top: var(--spacing-2xl);">
+    <div class="card">
+        <div class="card-header" style="padding: var(--spacing-lg) var(--spacing-2xl);">
+            <h1 class="card-title" style="margin: 0;">Подтверждение оплаты</h1>
+        </div>
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <h2 class="mb-2" style="font-size: 1.25rem; margin-bottom: var(--spacing-md);">{{ title }}</h2>
+            <p class="text-secondary" style="margin-bottom: var(--spacing-xl);">{{ description }}</p>
+
+            <div class="order-details" style="margin-bottom: var(--spacing-xl); padding: var(--spacing-lg); background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for label, value in details %}
+                    <li style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-md); border-bottom: 1px solid var(--color-border-light); padding-bottom: var(--spacing-md);">
+                        <span class="text-secondary">{{ label }}</span>
+                        <span style="font-weight: 500;">{{ value }}</span>
+                    </li>
+                    {% endfor %}
+                    <li style="display: flex; justify-content: space-between; margin-top: var(--spacing-lg); padding-top: var(--spacing-md); border-top: 2px solid var(--color-border); font-size: 1.1em; font-weight: bold;">
+                        <span>Итого к оплате</span>
+                        <span style="color: var(--color-primary);">{{ amount }} ₽</span>
+                    </li>
+                </ul>
+            </div>
+
+            <form action="{{ process_url }}" method="post" data-loader-overlay>
+                {% csrf_token %}
+                <input type="hidden" name="type" value="{{ payment_type }}">
+                <input type="hidden" name="amount" value="{{ amount_value|default:amount }}">
+                <input type="hidden" name="id" value="{{ item_id }}">
+                {% if payment_next_url %}
+                <input type="hidden" name="next" value="{{ payment_next_url }}">
+                {% endif %}
+
+                {% if payment_type == "club_plan" %}
+                <div class="form-group" style="margin-bottom: var(--spacing-lg);">
+                    <label class="offer-consent__label">
+                        <input type="checkbox" name="enable_autopay" class="offer-consent__checkbox">
+                        <span class="offer-consent__text">
+                            Сохранить карту и включить автоматическое продление клубного тарифа.
+                            Автосписание будет выполняться через YooKassa этого клуба.
+                        </span>
+                    </label>
+                </div>
+                {% elif payment_type == "club_fee" %}
+                <div class="form-group" style="margin-bottom: var(--spacing-lg);">
+                    <label class="offer-consent__label">
+                        <input type="checkbox" name="enable_autopay" class="offer-consent__checkbox">
+                        <span class="offer-consent__text">
+                            Сохранить карту и включить автоматическую оплату членского взноса в следующих периодах.
+                            Автосписание будет выполняться через YooKassa этого клуба.
+                        </span>
+                    </label>
+                </div>
+                {% endif %}
+
+                <div style="margin-bottom: var(--spacing-xl);">
+                    {% include "includes/offer_consent.html" %}
+                </div>
+                <button type="submit" class="btn btn-primary btn-pay w-100" style="margin-bottom: var(--spacing-md);" data-loading-text="Переход к оплате...">
+                    {% if payment_type == "club_fee" %}Оплатить взнос{% else %}Оплатить{% endif %}
+                </button>
+                <div class="text-center">
+                    <a href="javascript:history.back()" class="text-secondary" style="font-size: 0.9em;">Назад</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

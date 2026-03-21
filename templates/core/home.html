@@ -269,14 +269,14 @@
 </section>
 
 <!-- Upcoming Tournaments -->
-<section class="section">
+<section class="section home-section home-section--upcoming">
     <div class="container">
         <div class="section-header">
             <h2 class="section-title">Ближайшие турниры</h2>
             <a href="{% url 'tournament_list' %}" class="btn btn-outline">Все турниры</a>
         </div>
 
-        <div class="grid grid-3">
+        <div class="grid grid-3 home-grid home-grid--tournaments">
             {% for tournament in upcoming_tournaments %}
             <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card tournament-preview-card{% if not tournament.image %} tournament-preview-card--no-image{% endif %}">
                 <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}">
@@ -286,13 +286,20 @@
                 <img src="{{ tournament.image.url }}" alt="" class="card-image">
                 {% endif %}
                 <div class="card-body">
-                    {% for ac in tournament.allowed_categories.all %}
-                    <span class="player-category mb-1">{{ ac.category|skill_with_ntrp }}</span>
-                    {% endfor %}
                     <h3 class="card-title">{{ tournament.name }}</h3>
+                    {% if tournament.allowed_categories.all %}
+                    <div class="tournament-preview-card__categories">
+                        {% for ac in tournament.allowed_categories.all %}
+                        <span class="tournament-preview-card__category">{{ ac.category|skill_with_ntrp }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     <p class="card-text">
                         {{ tournament.city }}{% if tournament.court %} • {{ tournament.court.name }}{% endif %} • {{ tournament.start_date|date:"d.m.Y" }}
                     </p>
+                    {% if tournament.get_gender_display %}
+                    <p class="tournament-preview-card__meta">{{ tournament.get_gender_display }}</p>
+                    {% endif %}
                 </div>
             </a>
             {% empty %}
@@ -304,14 +311,14 @@
 
 <!-- Latest News -->
 {% if latest_news %}
-<section class="section">
+<section class="section home-section home-section--news">
     <div class="container">
         <div class="section-header">
             <h2 class="section-title">Новости</h2>
             <a href="{% url 'news_list' %}" class="btn btn-outline">Все новости</a>
         </div>
 
-        <div class="grid grid-4">
+        <div class="grid grid-4 home-grid home-grid--news">
             {% for news in latest_news %}
             <a href="{% url 'news_detail' slug=news.slug %}" class="card">
                 {% if news.image %}

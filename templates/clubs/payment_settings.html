@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Платежи клуба — {{ club.name }}{% endblock %}
+{% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="payments" %}
+
+<section class="club-payments-page">
+    <div class="container club-payments-page__container">
+        <div class="club-payments-page__hero">
+            <div class="club-payments-page__copy">
+                <div class="club-payments-page__eyebrow">YooKassa Integration</div>
+                <h1 class="club-payments-page__title">Платежи клуба</h1>
+                <p class="club-payments-page__subtitle">
+                    {{ club.name }} принимает оплату клубных тарифов и членских взносов
+                    напрямую на свой расчётный счёт через собственную YooKassa.
+                </p>
+
+                <div class="club-payments-page__status-row">
+                    <span class="club-payments-status {% if payment_connected %}club-payments-status--connected{% else %}club-payments-status--idle{% endif %}">
+                        <span class="club-payments-status__dot"></span>
+                        {% if payment_connected %}YooKassa подключена{% else %}YooKassa не подключена{% endif %}
+                    </span>
+                    {% if masked_shop_id %}
+                    <span class="club-payments-page__shop">Shop ID: {{ masked_shop_id }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="club-payments-page__links">
+                    <a href="{% url 'clubs:fees_settings' slug=club.slug %}" class="btn btn-ghost btn-sm">Настройка взносов</a>
+                    <a href="{% url 'clubs:fees_payments' slug=club.slug %}" class="btn btn-ghost btn-sm">История оплат</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="club-payments-grid club-payments-grid--single">
+            <div class="club-payments-card club-payments-card--form">
+                <div class="club-payments-card__header">
+                    <div>
+                        <div class="club-payments-card__eyebrow">Подключение</div>
+                        <h2 class="club-payments-card__title">Реквизиты YooKassa</h2>
+                    </div>
+                    <div class="club-payments-card__state {% if payment_connected %}club-payments-card__state--ok{% endif %}">
+                        {% if payment_connected %}Активно{% else %}Требует настройки{% endif %}
+                    </div>
+                </div>
+
+                <form method="post" class="club-payments-form">
+                    {% csrf_token %}
+
+                    <div class="club-payments-form__field">
+                        <label class="club-payments-form__label">URL для уведомлений YooKassa</label>
+                        <div class="club-payments-webhook">
+                            <code class="club-payments-webhook__value">{{ webhook_url }}</code>
+                            <div class="club-payments-form__hint">
+                                Этот полный URL нужно указать в кабинете YooKassa клуба в настройке уведомлений.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="club-payments-form__field">
+                        <label for="{{ form.payment_shop_id.id_for_label }}" class="club-payments-form__label">
+                            ID магазина YooKassa
+                        </label>
+                        {{ form.payment_shop_id }}
+                        {% if form.payment_shop_id.errors %}
+                        <div class="club-payments-form__error">{{ form.payment_shop_id.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="club-payments-form__field">
+                        <label for="{{ form.new_secret_key.id_for_label }}" class="club-payments-form__label">
+                            Secret Key YooKassa
+                        </label>
+                        {{ form.new_secret_key }}
+                        <div class="club-payments-form__hint">{{ form.new_secret_key.help_text }}</div>
+                        {% if form.new_secret_key.errors %}
+                        <div class="club-payments-form__error">{{ form.new_secret_key.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    {% if connection_test_message %}
+                    <div class="club-payments-check {% if connection_test_ok %}club-payments-check--ok{% else %}club-payments-check--error{% endif %}">
+                        <span class="club-payments-check__icon">{% if connection_test_ok %}✓{% else %}!{% endif %}</span>
+                        <span>{{ connection_test_message }}</span>
+                    </div>
+                    {% endif %}
+
+                    <div class="club-payments-form__actions">
+                        <button type="submit" name="action" value="test" class="btn btn-outline">
+                            Проверить связь с YooKassa
+                        </button>
+                        <button type="submit" name="action" value="save" class="btn btn-primary">
+                            Сохранить подключение
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

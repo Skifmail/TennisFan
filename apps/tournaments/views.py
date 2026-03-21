@@ -3336,13 +3336,14 @@ def tournament_register_doubles(request, slug):
             if str(q).isdigit():
                 filters = filters | Q(id=int(q))
 
-            # Выполняем поиск
-            all_results = list(
-                Player.objects.filter(filters)
-                .exclude(id=player.id)
-                .select_related("user")
-                .distinct()[:10]
-            )
+            partner_queryset = Player.objects.filter(filters).exclude(id=player.id)
+            if tournament.club_id:
+                partner_queryset = partner_queryset.filter(
+                    user__club_memberships__club=tournament.club,
+                    user__club_memberships__status=ClubMemberStatus.ACTIVE,
+                )
+
+            all_results = list(partner_queryset.select_related("user").distinct()[:10])
 
             partner_search_results = all_results
 
@@ -3439,7 +3440,9 @@ def tournament_register_doubles(request, slug):
         "tournament": tournament,
         "solo_teams": solo_teams,
         "partner_search_results": partner_search_results,
+        "persist_messages": True,
     }
+    context.update(_get_club_panel_context_for_tournament(request, tournament))
     return render(request, "tournaments/register_doubles.html", context)
 
 
@@ -3516,6 +3519,19 @@ def _do_add_partner(request, tournament, player, partner_id):
     except Player.DoesNotExist:
         messages.error(request, "Игрок не найден.")
         return redirect("tournament_register_doubles", slug=tournament.slug)
+
+    if tournament.club_id:
+        is_active_club_member = ClubMember.objects.filter(
+            club=tournament.club,
+            user=partner.user,
+            status=ClubMemberStatus.ACTIVE,
+        ).exists()
+        if not is_active_club_member:
+            messages.error(
+                request,
+                "Для клубного турнира можно выбрать партнёра только из активных участников клуба.",
+            )
+            return redirect("tournament_register_doubles", slug=tournament.slug)
 
     if partner.id == player.id:
         messages.error(request, "Нельзя добавить себя в пару.")

@@ -1,0 +1,236 @@
+/*
+ * club-discover.css
+ *
+ * Описание: Каталог клубов платформы с фильтрами и карточками вступления.
+ * Используется на: clubs/discover.html
+ */
+
+.club-discover-header {
+    padding-bottom: var(--spacing-lg);
+}
+
+.club-discover-header__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(201, 168, 76, 0.26);
+    background: rgba(201, 168, 76, 0.08);
+    color: var(--color-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: var(--spacing-md);
+}
+
+.club-discover-section {
+    padding-top: var(--spacing-lg);
+}
+
+.club-discover-filters {
+    margin-bottom: var(--spacing-lg);
+}
+
+.club-discover-filters__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--spacing-md);
+    align-items: end;
+}
+
+.club-discover-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.club-discover-toolbar__count {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.club-discover-grid {
+    display: grid;
+    gap: var(--spacing-lg);
+}
+
+.club-discover-card {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr);
+    gap: var(--spacing-lg);
+    padding: var(--spacing-lg);
+}
+
+.club-discover-card__media {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.club-discover-card__logo {
+    width: 112px;
+    height: 112px;
+    border-radius: 24px;
+    object-fit: cover;
+    border: 1px solid rgba(201, 168, 76, 0.18);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.club-discover-card__logo--fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-family: var(--font-heading);
+    color: var(--color-primary);
+}
+
+.club-discover-card__body {
+    min-width: 0;
+}
+
+.club-discover-card__topline {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+}
+
+.club-discover-card__title {
+    margin: 0;
+    font-size: clamp(1.2rem, 2vw, 1.6rem);
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    line-height: 1.15;
+}
+
+.club-discover-card__title a {
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.club-discover-card__title a:hover {
+    color: var(--color-primary);
+}
+
+.club-discover-card__city {
+    margin-top: var(--spacing-xs);
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.club-discover-card__members {
+    flex-shrink: 0;
+    padding: 0.55rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(201, 168, 76, 0.18);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.club-discover-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.9rem;
+    margin-top: var(--spacing-sm);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.club-discover-card__description {
+    margin: var(--spacing-md) 0 0;
+    color: var(--color-text-secondary);
+    line-height: 1.65;
+}
+
+.club-discover-card__description--muted {
+    color: var(--color-text-muted);
+}
+
+.club-discover-card__hint {
+    margin: var(--spacing-sm) 0 0;
+    color: #f3d27d;
+    font-size: var(--font-size-sm);
+}
+
+.club-discover-card__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    margin-top: var(--spacing-lg);
+}
+
+.club-discover-empty {
+    text-align: center;
+}
+
+.club-discover-empty__title {
+    margin: 0 0 var(--spacing-sm);
+    font-size: var(--font-size-xl);
+}
+
+.club-discover-empty__text {
+    margin: 0;
+    color: var(--color-text-secondary);
+}
+
+@media (max-width: 900px) {
+    .club-discover-filters__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .club-discover-card {
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: var(--spacing-md);
+    }
+
+    .club-discover-card__logo {
+        width: 88px;
+        height: 88px;
+        border-radius: 20px;
+    }
+}
+
+@media (max-width: 640px) {
+    .club-discover-filters__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .club-discover-toolbar {
+        margin-bottom: var(--spacing-md);
+    }
+
+    .club-discover-card {
+        grid-template-columns: 1fr;
+        padding: var(--spacing-md);
+    }
+
+    .club-discover-card__media {
+        justify-content: flex-start;
+    }
+
+    .club-discover-card__topline {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .club-discover-card__members {
+        padding: 0.45rem 0.7rem;
+    }
+
+    .club-discover-card__actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .club-discover-card__actions > * {
+        width: 100%;
+    }
+}

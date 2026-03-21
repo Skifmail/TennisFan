@@ -22,6 +22,10 @@
                class="btn btn-sm {% if current == 'fees' %}btn-primary{% else %}btn-ghost{% endif %}">
                 Взносы
             </a>
+            <a href="{% url 'clubs:payment_settings' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'payments' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Платежи
+            </a>
             <a href="{% url 'clubs:plans_manage' slug=club.slug %}"
                class="btn btn-sm {% if current == 'plans' %}btn-primary{% else %}btn-ghost{% endif %}">
                 Тарифы игроков
@@ -127,6 +131,11 @@
                class="club-bottom-sheet__link">
                 <span class="club-bottom-sheet__link-icon">₽</span>
                 <span>Взносы</span>
+            </a>
+            <a href="{% url 'clubs:payment_settings' slug=club.slug %}"
+               class="club-bottom-sheet__link">
+                <span class="club-bottom-sheet__link-icon">₿</span>
+                <span>Платежи</span>
             </a>
             <a href="{% url 'clubs:plans_manage' slug=club.slug %}"
                class="club-bottom-sheet__link">

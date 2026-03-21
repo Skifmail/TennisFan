@@ -24,6 +24,18 @@ class SavedPaymentMethod(models.Model):
         related_name="saved_payment_methods",
         verbose_name="Пользователь",
     )
+    club = models.ForeignKey(
+        "clubs.Club",
+        on_delete=models.CASCADE,
+        related_name="saved_payment_methods",
+        null=True,
+        blank=True,
+        verbose_name="Клуб",
+        help_text=(
+            "Для клубных автосписаний карта привязывается к конкретному клубу "
+            "и его ЮKassa-мерчанту. Для глобальной подписки поле пустое."
+        ),
+    )
     payment_method_id = models.CharField(
         "ID способа оплаты в ЮKassa",
         max_length=128,
@@ -69,6 +81,20 @@ class SavedPaymentMethod(models.Model):
             "Если включено — этот способ оплаты используется для автосписаний за подписку."
         ),
     )
+    is_default_for_club_plans = models.BooleanField(
+        "Использовать для автопродления клубного тарифа",
+        default=False,
+        help_text=(
+            "Если включено — этот способ оплаты используется для автосписаний за клубные тарифы."
+        ),
+    )
+    is_default_for_club_fees = models.BooleanField(
+        "Использовать для автосписания членского взноса клуба",
+        default=False,
+        help_text=(
+            "Если включено — этот способ оплаты используется для автосписаний за членские взносы клуба."
+        ),
+    )
     created_at = models.DateTimeField("Создано", default=timezone.now)
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
 
@@ -112,14 +138,30 @@ class SavedPaymentMethod(models.Model):
         Returns:
             None: Обновляет флаги активности в базе данных.
         """
-        # В бизнес-логике автоплатежей мы трактуем деактивацию как отзыв
-        # согласия пользователя на автосписания. Поэтому помечаем способ
-        # оплаты как неактивный и выключаем использование для подписок.
-        self.is_active = False
         self.is_default_for_subscriptions = False
-        self.save(
-            update_fields=["is_active", "is_default_for_subscriptions", "updated_at"]
-        )
+        update_fields = ["is_default_for_subscriptions", "updated_at"]
+        if not self.is_default_for_club_plans and not self.is_default_for_club_fees:
+            self.is_active = False
+            update_fields.insert(0, "is_active")
+        self.save(update_fields=update_fields)
+
+    def deactivate_for_club_plans(self) -> None:
+        """Отключить использование способа оплаты для автопродления клубных тарифов."""
+        self.is_default_for_club_plans = False
+        update_fields = ["is_default_for_club_plans", "updated_at"]
+        if not self.is_default_for_subscriptions and not self.is_default_for_club_fees:
+            self.is_active = False
+            update_fields.insert(0, "is_active")
+        self.save(update_fields=update_fields)
+
+    def deactivate_for_club_fees(self) -> None:
+        """Отключить использование способа оплаты для автосписания членских взносов клуба."""
+        self.is_default_for_club_fees = False
+        update_fields = ["is_default_for_club_fees", "updated_at"]
+        if not self.is_default_for_subscriptions and not self.is_default_for_club_plans:
+            self.is_active = False
+            update_fields.insert(0, "is_active")
+        self.save(update_fields=update_fields)
 
 
 class PaymentRecord(models.Model):
@@ -134,6 +176,7 @@ class PaymentRecord(models.Model):
         """Типы оплат, фиксируемые в журнале."""
 
         SUBSCRIPTION = "subscription", "Подписка"
+        CLUB_PLAN = "club_plan", "Тариф клуба"
         TOURNAMENT = "tournament", "Турнир"
         DONATION = "donation", "Донат"
 

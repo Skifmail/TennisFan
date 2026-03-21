@@ -162,7 +162,7 @@
 
     <!-- Messages -->
     {% if messages %}
-    <div class="messages-container">
+    <div class="messages-container"{% if persist_messages %} data-persist-messages="true"{% endif %}>
         <div class="container">
             {% for message in messages %}
             <div class="alert alert-{{ message.tags }}">
@@ -187,7 +187,7 @@
                 <div class="footer-brand">
                     <h3 class="footer-brand-title">
                         <a href="{% url 'home' %}" style="text-decoration: none; color: inherit;">
-                            Tennis<span class="footer-brand-accent">Fan</span>
+                            {{ site_brand_en_base }}<span class="footer-brand-accent">{{ site_brand_en_accent }}</span>
                         </a>
                     </h3>
                     <p class="footer-desc">Всероссийская теннисная платформа для игроков всех уровней</p>
@@ -273,9 +273,14 @@
                                 <span class="footer-club-cta__label">Управляете клубом?</span>
                                 <span class="footer-club-cta__subtitle">Подключите клуб к платформе и проводите свои турниры.</span>
                             </div>
-                            <a href="{% url 'clubs:register_step1' %}" class="footer-club-cta__button">
-                                Зарегистрировать клуб
-                            </a>
+                            <div class="footer-club-cta__actions">
+                                <a href="{% url 'clubs:register_step1' %}" class="footer-club-cta__button">
+                                    Зарегистрировать клуб
+                                </a>
+                                <a href="{% url 'clubs:club_discover' %}" class="footer-club-cta__button footer-club-cta__button--secondary">
+                                    Вступить в клуб
+                                </a>
+                            </div>
                         </div>
                     </div>
                     {% endif %}

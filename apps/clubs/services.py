@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any, cast
 
 from django.db import transaction
+from django.db.models import Count, Q
 from django.utils import timezone
 
 if TYPE_CHECKING:
@@ -17,6 +18,8 @@ if TYPE_CHECKING:
 from .models import (
     Club,
     ClubFeePayment,
+    ClubJoinRequest,
+    ClubJoinRequestStatus,
     ClubMember,
     ClubMemberRole,
     ClubMembershipFee,
@@ -112,6 +115,83 @@ def club_can_add_member(club: Club) -> tuple[bool, str]:
             f"Лимит участников по тарифу «{platform_plan.name}»: {platform_plan.max_members}. Сейчас: {count}.",
         )
     return True, ""
+
+
+def get_joinable_club_catalog(
+    user: AbstractUser,
+    *,
+    search: str = "",
+    city: str = "",
+) -> list[dict[str, Any]]:
+    """Возвращает каталог публичных клубов с состоянием CTA для пользователя."""
+    clubs_qs = Club.objects.filter(is_public=True).annotate(
+        active_members_count=Count(
+            "members",
+            filter=Q(members__status=ClubMemberStatus.ACTIVE),
+            distinct=True,
+        )
+    )
+
+    if search:
+        clubs_qs = clubs_qs.filter(
+            Q(name__icontains=search)
+            | Q(description__icontains=search)
+            | Q(address__icontains=search)
+        )
+    if city:
+        clubs_qs = clubs_qs.filter(city__icontains=city)
+
+    clubs = list(clubs_qs.order_by("name"))
+    if not clubs:
+        return []
+
+    member_states = {
+        item["club_id"]: item["status"]
+        for item in ClubMember.objects.filter(user=user).values("club_id", "status")
+    }
+    pending_request_ids = set(
+        ClubJoinRequest.objects.filter(
+            user=user,
+            status=ClubJoinRequestStatus.PENDING,
+        ).values_list("club_id", flat=True)
+    )
+
+    items: list[dict[str, Any]] = []
+    for club in clubs:
+        if not club_has_public_page_access(club):
+            continue
+
+        can_add, limit_message = club_can_add_member(club)
+        membership_status = member_states.get(club.id)
+        item: dict[str, Any] = {
+            "club": club,
+            "members_count": club.active_members_count,
+            "action": "request",
+            "action_label": "Подать заявку",
+            "action_disabled": False,
+            "action_message": "",
+        }
+
+        if membership_status == ClubMemberStatus.ACTIVE:
+            item["action"] = "member"
+            item["action_label"] = "Вы участник"
+            item["action_disabled"] = True
+        elif membership_status == ClubMemberStatus.INVITED:
+            item["action"] = "invite"
+            item["action_label"] = "Есть приглашение"
+        elif club.id in pending_request_ids:
+            item["action"] = "pending"
+            item["action_label"] = "Заявка отправлена"
+            item["action_disabled"] = True
+        elif not can_add:
+            item["action"] = "closed"
+            item["action_label"] = "Набор закрыт"
+            item["action_disabled"] = True
+            item["action_message"] = limit_message
+
+        items.append(item)
+
+    return items
 
 
 def create_club_with_trial(data: dict[str, Any], user: AbstractUser) -> Club:

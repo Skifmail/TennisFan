@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block title %}Мои платежи — {{ club.name }}{% endblock %}
+
+{% block content %}
+{% include "clubs/_club_player_nav.html" with current="payments" %}
+<div class="page-header">
+    <h1 class="page-title">Мои платежи</h1>
+    <p class="page-subtitle">{{ club.name }}</p>
+</div>
+
+<div class="container" style="max-width: 960px;">
+    <div class="card">
+        <div class="card-body">
+            {% if payments %}
+            <div style="display: grid; gap: var(--spacing-md);">
+                {% for payment in payments %}
+                <article
+                    class="club-payment-row"
+                    role="button"
+                    tabindex="0"
+                    data-payment-open
+                    data-payment-title="{{ payment.title }}"
+                    data-payment-subtitle="{{ payment.subtitle }}"
+                    data-payment-status="{{ payment.status }}"
+                >
+                    <div class="club-payment-row__main">
+                        <div>
+                            <div class="club-payment-row__title">{{ payment.title }}</div>
+                            <div class="club-payment-row__subtitle">{{ payment.subtitle }}</div>
+                        </div>
+                        <div class="club-payment-row__meta">
+                            <div class="club-payment-row__amount">{{ payment.amount }} {{ payment.currency }}</div>
+                            <div class="club-payment-row__date">{{ payment.paid_at|date:"d.m.Y H:i" }}</div>
+                        </div>
+                    </div>
+                    <div class="club-payment-row__footer">
+                        <span class="club-payment-row__chip">{{ payment.method }}</span>
+                        <span class="club-payment-row__link">Открыть детали</span>
+                    </div>
+                    <div class="club-payment-row__payload" hidden>
+                        {% for label, value in payment.details.items %}
+                        <div class="club-payment-row__detail">
+                            <dt>{{ label }}</dt>
+                            <dd>{{ value }}</dd>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="margin: 0; color: var(--color-text-muted);">История платежей пока пуста.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div id="club-payment-detail-modal" class="modal-overlay" style="display:none;" aria-hidden="true">
+    <div class="modal-dialog club-payment-detail-modal" role="dialog" aria-modal="true" aria-labelledby="club-payment-detail-title">
+        <h3 id="club-payment-detail-title" class="modal-dialog__title">Детали платежа</h3>
+        <p class="modal-dialog__text text-secondary" id="club-payment-detail-subtitle"></p>
+        <div class="club-payment-detail-modal__status" id="club-payment-detail-status"></div>
+        <dl class="club-payment-detail-modal__list" id="club-payment-detail-list"></dl>
+        <div class="modal-dialog__actions">
+            <button type="button" class="btn btn-sm btn-outline" data-payment-close>Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.club-payment-row {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.02), rgb(255 255 255 / 0.01));
+    cursor: pointer;
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.club-payment-row:hover,
+.club-payment-row:focus-visible {
+    border-color: var(--color-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 16px 34px rgb(0 0 0 / 0.18);
+    outline: none;
+}
+
+.club-payment-row__main,
+.club-payment-row__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.club-payment-row__title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.club-payment-row__subtitle,
+.club-payment-row__date {
+    color: var(--color-text-muted);
+}
+
+.club-payment-row__meta {
+    text-align: right;
+}
+
+.club-payment-row__amount {
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.club-payment-row__footer {
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-border-light);
+}
+
+.club-payment-row__chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgb(190 149 78 / 0.14);
+    border: 1px solid rgb(190 149 78 / 0.35);
+    color: var(--color-primary);
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.club-payment-row__link {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.club-payment-detail-modal {
+    width: min(560px, calc(100vw - 32px));
+}
+
+.club-payment-detail-modal__status {
+    display: inline-flex;
+    margin-bottom: var(--spacing-md);
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgb(31 140 66 / 0.18);
+    border: 1px solid rgb(31 140 66 / 0.35);
+    color: #85d29f;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.club-payment-detail-modal__list {
+    display: grid;
+    gap: var(--spacing-sm);
+    margin: 0;
+}
+
+.club-payment-detail-modal__list .club-payment-row__detail {
+    display: grid;
+    grid-template-columns: minmax(130px, 160px) 1fr;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.club-payment-detail-modal__list dt {
+    margin: 0;
+    color: var(--color-text-muted);
+}
+
+.club-payment-detail-modal__list dd {
+    margin: 0;
+    color: var(--color-text);
+    word-break: break-word;
+}
+
+@media (max-width: 640px) {
+    .club-payment-row {
+        padding: var(--spacing-md);
+    }
+
+    .club-payment-row__meta {
+        text-align: left;
+    }
+
+    .club-payment-detail-modal__list .club-payment-row__detail {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+}
+</style>
+
+<script>
+(function () {
+    const modal = document.getElementById('club-payment-detail-modal');
+    const titleEl = document.getElementById('club-payment-detail-title');
+    const subtitleEl = document.getElementById('club-payment-detail-subtitle');
+    const statusEl = document.getElementById('club-payment-detail-status');
+    const listEl = document.getElementById('club-payment-detail-list');
+
+    function closeModal() {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        listEl.innerHTML = '';
+    }
+
+    document.querySelectorAll('[data-payment-open]').forEach(function (row) {
+        function openModal() {
+            const payload = row.querySelector('.club-payment-row__payload');
+            titleEl.textContent = row.dataset.paymentTitle || 'Детали платежа';
+            subtitleEl.textContent = row.dataset.paymentSubtitle || '';
+            statusEl.textContent = row.dataset.paymentStatus || 'Успешно';
+            listEl.innerHTML = payload ? payload.innerHTML : '';
+            modal.style.display = 'flex';
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        row.addEventListener('click', openModal);
+        row.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openModal();
+            }
+        });
+    });
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal || event.target.hasAttribute('data-payment-close')) {
+            closeModal();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.style.display !== 'none') {
+            closeModal();
+        }
+    });
+})();
+</script>
+{% endblock %}

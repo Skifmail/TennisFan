@@ -49,3 +49,136 @@
     margin-top: var(--spacing-lg);
     flex-wrap: wrap;
 }
+
+/* --- Club leave modal --- */
+.club-leave-modal {
+    background:
+        radial-gradient(circle at top left, rgb(0 141 92 / 18%), transparent 32%),
+        radial-gradient(circle at bottom right, rgb(212 168 84 / 16%), transparent 28%),
+        rgb(0 0 0 / 62%);
+    backdrop-filter: blur(10px);
+}
+
+.club-leave-modal__dialog {
+    max-width: 520px;
+    padding: clamp(1.25rem, 3vw, 2rem);
+    border: 1px solid rgb(212 168 84 / 22%);
+    background:
+        linear-gradient(180deg, rgb(7 50 38 / 98%), rgb(3 31 23 / 98%));
+    box-shadow:
+        0 30px 80px rgb(0 0 0 / 48%),
+        inset 0 1px 0 rgb(255 255 255 / 5%);
+}
+
+.club-leave-modal__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+    padding: 0.35rem 0.7rem;
+    border: 1px solid rgb(212 168 84 / 28%);
+    border-radius: 999px;
+    color: rgb(233 200 126);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgb(212 168 84 / 10%);
+}
+
+.club-leave-modal__title {
+    margin-bottom: var(--spacing-sm);
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    line-height: 1.1;
+    color: #f4efe6;
+}
+
+.club-leave-modal__text {
+    margin-bottom: var(--spacing-lg);
+    color: rgb(218 225 220 / 92%);
+    font-size: 1rem;
+    line-height: 1.7;
+}
+
+.club-leave-modal__note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid rgb(255 255 255 / 8%);
+    border-radius: 1rem;
+    background: rgb(255 255 255 / 4%);
+    color: rgb(200 214 207 / 88%);
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+
+.club-leave-modal__note-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    flex: 0 0 1.8rem;
+    border-radius: 999px;
+    background: rgb(212 168 84 / 16%);
+    color: rgb(233 200 126);
+    font-weight: 700;
+}
+
+.club-leave-modal__actions {
+    margin-top: var(--spacing-xl);
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.club-leave-modal__btn {
+    min-height: 46px;
+    padding-inline: 1rem;
+    border-radius: 0.95rem;
+}
+
+.club-leave-modal__btn--primary {
+    min-width: 150px;
+}
+
+.club-leave-modal__btn--secondary {
+    background: transparent;
+    border-color: rgb(212 168 84 / 42%);
+    color: rgb(233 200 126);
+}
+
+.club-leave-modal__btn--secondary:hover {
+    background: rgb(212 168 84 / 10%);
+}
+
+@media (max-width: 640px) {
+    .club-leave-modal {
+        padding: 1rem;
+        align-items: flex-end;
+    }
+
+    .club-leave-modal__dialog {
+        max-width: none;
+        border-radius: 1.25rem 1.25rem 0.9rem 0.9rem;
+        padding: 1.15rem 1rem 1rem;
+    }
+
+    .club-leave-modal__title {
+        font-size: 1.35rem;
+    }
+
+    .club-leave-modal__text {
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+
+    .club-leave-modal__actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .club-leave-modal__btn {
+        width: 100%;
+        justify-content: center;
+    }
+}

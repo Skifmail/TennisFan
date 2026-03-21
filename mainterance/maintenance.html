@@ -9,7 +9,6 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      /* Цвета, близкие к основному сайту */
       --bg-main:      #012b1c;
       --bg-card:      #001f14;
       --primary:      #a6824a;
@@ -17,7 +16,6 @@
       --accent:       #83530c;
       --text-main:    silver;
       --text-soft:    #c0b59f;
-      /* Общие переменные (нужны для таймера и прогресс-бара) */
       --yellow:       #f4d03f;
       --lime:         #74c69d;
     }
@@ -53,9 +51,7 @@
       height: 64px;
       z-index: 3;
       pointer-events: none;
-      /* CSS fallback на случай если картинка не загрузится */
-      background-color: #52b788;
-      /* относительные пути, чтобы брать картинки из папки mainterance/images */
+      background-color: transparent;
       background-image: url("images/icons8-tennis-ball-96.png"), url("images/icons8-теннисный-мяч-96.png");
       background-repeat: no-repeat;
       background-position: center;
@@ -63,8 +59,7 @@
       border-radius: 50%;
       box-shadow:
         inset -5px -5px 12px rgba(0,0,0,.3),
-        inset 3px 3px 7px rgba(255,255,255,.15),
-        0 0 18px rgba(82,183,136,.4);
+        inset 3px 3px 7px rgba(255,255,255,.15);
     }
     #ball::before, #ball::after { display: none; }
 
@@ -179,7 +174,7 @@
     }
     @keyframes blink { 50% { opacity: 0; } }
 
-    /* ── Spinning logo coin (как на форме входа) ── */
+    /* ── Spinning logo coin ── */
     .logo-coin-wrap {
       margin-top: 2.5rem;
       animation: fadeUp .8s .7s ease both;
@@ -292,7 +287,6 @@
 
     function pad(n) { return String(n).padStart(2, '0'); }
 
-    // init bar to 0% visually, then let transition run
     fill.style.width = '0%';
 
     const tick = setInterval(() => {
@@ -302,7 +296,6 @@
       mmEl.textContent = pad(Math.floor(remaining / 60));
       ssEl.textContent = pad(remaining % 60);
 
-      // bar fills up as time passes: 0% at start → 100% at end
       const elapsed = TOTAL - remaining;
       const pct = Math.round((elapsed / TOTAL) * 100);
       fill.style.width = pct + '%';
@@ -311,7 +304,7 @@
 
     // ── Bouncing ball ──
     const ball = document.getElementById('ball');
-    const R = 32; // половина от 64px
+    const R = 16; /* радиус для физики оставляем прежним */
 
     let x = window.innerWidth  / 2;
     let y = window.innerHeight / 2;
@@ -342,20 +335,17 @@
       if (y >= maxY) { y = maxY; vy = -Math.abs(vy); bounced = true; }
 
       if (bounced) {
-        // random angle nudge ±15° for chaotic trajectory
         const nudge = (Math.random() - 0.5) * 0.52;
         const spd   = Math.hypot(vx, vy);
         const cur   = Math.atan2(vy, vx) + nudge;
         vx = Math.cos(cur) * spd;
         vy = Math.sin(cur) * spd;
 
-        // keep speed bounded
         const s = Math.hypot(vx, vy);
         if (s < 160) { vx *= 160/s; vy *= 160/s; }
         if (s > 320) { vx *= 320/s; vy *= 320/s; }
       }
 
-      // Spin the ball slightly for realism
       spinAngle += 2;
       ball.style.transform = `translate(${x - R}px, ${y - R}px) rotate(${spinAngle}deg)`;
 

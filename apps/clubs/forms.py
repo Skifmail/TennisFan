@@ -146,14 +146,27 @@ class ClubProfileEditForm(forms.ModelForm):
 
 
 class ClubMembershipFeeSettingsForm(forms.ModelForm):
-    """Настройка взноса клуба (сумма, период, провайдер, реквизиты и блокировки)."""
+    """Настройка параметров клубного взноса без платёжных реквизитов."""
 
-    payment_provider = forms.ChoiceField(
-        label="Платёжный провайдер",
-        required=False,
-        choices=[("", "— не подключён —")]
-        + list(ClubMembershipFee.PaymentProvider.choices),
-    )
+    class Meta:
+        model = ClubMembershipFee
+        fields = [
+            "amount",
+            "currency",
+            "period",
+            "period_start_day",
+            "description",
+            "restrict_tournament_access",
+            "is_active",
+        ]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
+class ClubPaymentSettingsForm(forms.ModelForm):
+    """Настройка подключения клубной YooKassa."""
+
     payment_shop_id = forms.CharField(
         label="ID магазина (ЮKassa)",
         max_length=255,
@@ -173,23 +186,25 @@ class ClubMembershipFeeSettingsForm(forms.ModelForm):
     class Meta:
         model = ClubMembershipFee
         fields = [
-            "amount",
-            "currency",
-            "period",
-            "period_start_day",
-            "description",
-            "restrict_tournament_access",
-            "is_active",
-            "payment_provider",
             "payment_shop_id",
         ]
-        widgets = {
-            "description": forms.Textarea(attrs={"rows": 3}),
-        }
 
     def __init__(self, *args, **kwargs):
         """Инициализация формы с учётом уже сохранённого секрета."""
         super().__init__(*args, **kwargs)
+        self.fields["payment_shop_id"].widget.attrs.update(
+            {
+                "class": "form-control club-payments-form__control",
+                "placeholder": "Например, 123456",
+                "autocomplete": "off",
+            }
+        )
+        self.fields["new_secret_key"].widget.attrs.update(
+            {
+                "class": "form-control club-payments-form__control",
+                "placeholder": "Введите Secret Key",
+            }
+        )
         fee: ClubMembershipFee | None = (
             self.instance if isinstance(self.instance, ClubMembershipFee) else None
         )
@@ -202,19 +217,10 @@ class ClubMembershipFeeSettingsForm(forms.ModelForm):
     def clean(self):
         """Валидация зависимых полей провайдера и реквизитов."""
         cleaned_data = super().clean()
-        provider = cleaned_data.get("payment_provider") or ""
         shop_id = (cleaned_data.get("payment_shop_id") or "").strip()
-        is_active = bool(cleaned_data.get("is_active"))
         new_secret = (cleaned_data.get("new_secret_key") or "").strip()
 
-        # При активированных взносах и выбранном провайдере — shop_id обязателен.
-        if is_active and provider:
-            if not shop_id:
-                self.add_error(
-                    "payment_shop_id", "Укажите ID магазина для выбранного провайдера."
-                )
-
-            # Если это первое сохранение секрета — требуем его.
+        if shop_id:
             fee: ClubMembershipFee | None = (
                 self.instance if isinstance(self.instance, ClubMembershipFee) else None
             )
@@ -223,15 +229,23 @@ class ClubMembershipFeeSettingsForm(forms.ModelForm):
                 self.add_error(
                     "new_secret_key", "Укажите Secret Key для подключения ЮKassa."
                 )
-
-        # При выборе Stripe пока показываем заглушку.
-        if provider == ClubMembershipFee.PaymentProvider.STRIPE:
+        elif new_secret:
             self.add_error(
-                "payment_provider",
-                "Stripe будет доступен в следующих версиях. Сейчас поддерживается только ЮKassa.",
+                "payment_shop_id", "Укажите ID магазина ЮKassa для сохранения ключа."
             )
 
         return cleaned_data
+
+    def save(self, commit: bool = True) -> ClubMembershipFee:
+        """Сохраняет настройки с единственным поддерживаемым провайдером YooKassa."""
+        instance: ClubMembershipFee = super().save(commit=False)
+        if instance.payment_shop_id:
+            instance.payment_provider = ClubMembershipFee.PaymentProvider.YOOKASSA
+        else:
+            instance.payment_provider = ""
+        if commit:
+            instance.save()
+        return instance
 
 
 class MarkFeePaidForm(forms.Form):

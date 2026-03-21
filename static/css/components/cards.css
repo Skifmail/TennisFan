@@ -47,6 +47,7 @@
     flex-direction: column;
     flex: 1;
     min-width: 0;
+    gap: var(--spacing-sm);
     padding-right: clamp(1rem, 2vw, 1.4rem);
 }
 
@@ -56,19 +57,45 @@
 
 .tournament-preview-card .card-title {
     min-width: 0;
+    margin: 0;
     line-height: 1.35;
     overflow-wrap: anywhere;
 }
 
 .tournament-preview-card .card-text {
     min-width: 0;
+    margin: 0;
     overflow-wrap: anywhere;
 }
 
-.tournament-preview-card .player-category {
-    max-width: calc(100% - 130px);
+.tournament-preview-card__categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.tournament-preview-card__category {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    max-width: 100%;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgb(190 149 78 / 0.12);
+    border: 1px solid rgb(190 149 78 / 0.22);
+    color: var(--color-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    line-height: 1.2;
     white-space: normal;
     overflow-wrap: anywhere;
+}
+
+.tournament-preview-card__meta {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
 }
 
 .court-card {

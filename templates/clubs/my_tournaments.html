@@ -11,7 +11,7 @@
     <div class="card" style="border-color: var(--color-warning);">
         <div class="card-body">
             <p style="margin: 0;">Доступ к турнирам клуба возможен после оплаты членского взноса.</p>
-            <a href="{% url 'clubs:my_fees' %}" class="btn btn-primary" style="margin-top: var(--spacing-md);">Оплатить взнос</a>
+            <a href="{% url 'clubs:my_fee_payment_preview' %}?next={{ request.path|urlencode }}" class="btn btn-primary" style="margin-top: var(--spacing-md);">Оплатить взнос</a>
         </div>
     </div>
 </div>

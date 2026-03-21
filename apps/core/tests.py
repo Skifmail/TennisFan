@@ -4,7 +4,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.clubs.models import Club
+from apps.clubs.models import Club, ClubJoinRequest, ClubJoinRequestStatus
 from apps.tournaments.models import Match, Tournament
 from apps.users.models import Player, User
 
@@ -64,3 +64,56 @@ class HomeRecentMatchesWidgetTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["matches"][0]["club_name"], club.name)
+
+
+class ClubDiscoverPageTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="footer-user@test.local",
+            password="testpass123",
+        )
+        self.client.force_login(self.user)
+
+    def test_club_discover_page_supports_filters_and_request_states(self) -> None:
+        open_club = Club.objects.create(
+            name="Открытый клуб",
+            slug="open-club",
+            city="Москва",
+            address="ул. Первая, 1",
+            email="open@test.local",
+            admin_name="Админ клуба",
+            description="Клуб для взрослых любителей",
+        )
+        pending_club = Club.objects.create(
+            name="Клуб с заявкой",
+            slug="pending-club",
+            city="Казань",
+            address="ул. Вторая, 2",
+            email="pending@test.local",
+            admin_name="Админ клуба",
+            description="Клуб для турнирной подготовки",
+        )
+        ClubJoinRequest.objects.create(
+            club=pending_club,
+            user=self.user,
+            status=ClubJoinRequestStatus.PENDING,
+        )
+
+        response = self.client.get(
+            reverse("clubs:club_discover"),
+            {"q": "клуб", "city": "Моск"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, open_club.name)
+        self.assertNotContains(response, pending_club.name)
+        self.assertContains(response, "Подать заявку")
+
+        response = self.client.get(reverse("clubs:club_discover"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, open_club.name)
+        self.assertContains(response, pending_club.name)
+        self.assertContains(response, "Заявка отправлена")

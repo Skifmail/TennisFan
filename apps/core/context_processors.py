@@ -3,7 +3,17 @@ Context processors for core app.
 """
 
 from django.conf import settings
+from django.db.models import Count, Q
 from django.utils.encoding import iri_to_uri
+
+from apps.clubs.models import (
+    Club,
+    ClubJoinRequest,
+    ClubJoinRequestStatus,
+    ClubMember,
+    ClubMemberStatus,
+)
+from apps.clubs.services import club_can_add_member, club_has_public_page_access
 
 from .models import FooterSocialLink
 
@@ -129,3 +139,79 @@ def site_branding(request):
         "site_brand_copyright": "TennisFan",
         "site_brand_footer_ru": "ТеннисФан",
     }
+
+
+def footer_joinable_clubs(request):
+    """Добавляет в контекст список клубов для футерной модалки вступления."""
+    if (
+        not request
+        or not getattr(request, "user", None)
+        or not request.user.is_authenticated
+    ):
+        return {"footer_joinable_clubs": []}
+
+    clubs = list(
+        Club.objects.filter(is_public=True)
+        .annotate(
+            active_members_count=Count(
+                "members",
+                filter=Q(members__status=ClubMemberStatus.ACTIVE),
+                distinct=True,
+            )
+        )
+        .order_by("name")
+    )
+
+    if not clubs:
+        return {"footer_joinable_clubs": []}
+
+    member_states = {
+        item["club_id"]: item["status"]
+        for item in ClubMember.objects.filter(user=request.user).values(
+            "club_id", "status"
+        )
+    }
+    pending_request_ids = set(
+        ClubJoinRequest.objects.filter(
+            user=request.user,
+            status=ClubJoinRequestStatus.PENDING,
+        ).values_list("club_id", flat=True)
+    )
+
+    items: list[dict[str, object]] = []
+    for club in clubs:
+        if not club_has_public_page_access(club):
+            continue
+
+        can_add, limit_message = club_can_add_member(club)
+        membership_status = member_states.get(club.id)
+
+        item = {
+            "club": club,
+            "members_count": club.active_members_count,
+            "action": "request",
+            "action_label": "Подать заявку",
+            "action_disabled": False,
+            "action_message": "",
+        }
+
+        if membership_status == ClubMemberStatus.ACTIVE:
+            item["action"] = "member"
+            item["action_label"] = "Вы участник"
+            item["action_disabled"] = True
+        elif membership_status == ClubMemberStatus.INVITED:
+            item["action"] = "invite"
+            item["action_label"] = "Есть приглашение"
+        elif club.id in pending_request_ids:
+            item["action"] = "pending"
+            item["action_label"] = "Заявка отправлена"
+            item["action_disabled"] = True
+        elif not can_add:
+            item["action"] = "closed"
+            item["action_label"] = "Набор закрыт"
+            item["action_disabled"] = True
+            item["action_message"] = limit_message
+
+        items.append(item)
+
+    return {"footer_joinable_clubs": items}

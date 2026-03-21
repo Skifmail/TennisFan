@@ -1,0 +1,70 @@
+{% load i18n static %}
+<link rel="stylesheet" href="{% static 'admin/css/custom_nav_sidebar.css' %}">
+<script src="{% static 'admin/js/custom_nav_sidebar.js' %}" defer></script>
+
+<button class="sticky toggle-nav-sidebar" id="toggle-nav-sidebar" aria-label="{% translate 'Toggle navigation' %}"></button>
+<nav class="sticky" id="nav-sidebar" aria-label="{% translate 'Sidebar' %}">
+  <button
+    type="button"
+    class="admin-nav-mobile-toggle"
+    id="admin-nav-mobile-toggle"
+    aria-controls="admin-nav-mobile-panel"
+    aria-expanded="false"
+  >
+    <span>Разделы</span>
+    <span class="admin-nav-mobile-toggle__icon">▾</span>
+  </button>
+
+  <div class="admin-nav-mobile-panel" id="admin-nav-mobile-panel">
+    <input
+      type="search"
+      id="nav-filter"
+      placeholder="{% translate 'Start typing to filter…' %}"
+      aria-label="{% translate 'Filter navigation items' %}"
+    >
+
+    {% if available_apps %}
+    <div class="admin-nav-accordion" data-admin-nav-accordion>
+      {% for app in available_apps %}
+      <section class="admin-nav-accordion__section" data-admin-nav-section>
+        <button
+          type="button"
+          class="admin-nav-accordion__trigger"
+          aria-controls="admin-nav-panel-{{ forloop.counter }}"
+          aria-expanded="false"
+          data-admin-nav-trigger
+        >
+          <span>{{ app.name }}</span>
+          <span class="admin-nav-accordion__icon">▾</span>
+        </button>
+
+        <div
+          class="admin-nav-accordion__panel"
+          id="admin-nav-panel-{{ forloop.counter }}"
+          hidden
+          data-admin-nav-panel
+        >
+          <ul class="admin-nav-accordion__models">
+            {% for model in app.models %}
+            <li class="admin-nav-accordion__item{% if model.admin_url in request.path|urlencode %} admin-nav-accordion__item--current{% endif %}">
+              {% if model.admin_url %}
+              <a
+                href="{{ model.admin_url }}"
+                class="admin-nav-accordion__item-link"
+                {% if model.admin_url in request.path|urlencode %}aria-current="page"{% endif %}
+              >
+                {{ model.name }}
+              </a>
+              {% else %}
+              <span class="admin-nav-accordion__item-link">{{ model.name }}</span>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</nav>

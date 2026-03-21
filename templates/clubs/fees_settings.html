@@ -7,12 +7,17 @@
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
 <div class="container" style="max-width: 560px;">
-    <p><a href="{% url 'clubs:fees_payments' slug=club.slug %}">Список оплат</a></p>
+    <p>
+        <a href="{% url 'clubs:fees_payments' slug=club.slug %}">Список оплат</a>
+        ·
+        <a href="{% url 'clubs:payment_settings' slug=club.slug %}">Платежи клуба</a>
+    </p>
     <div class="card">
         <div class="card-body">
             <p style="color: var(--color-text-muted); font-size: 0.9rem;">
-                Укажите сумму, период, а также реквизиты ЮKassa клуба. Secret Key хранится зашифрованно и
-                не отображается в открытом виде.
+                Здесь задаются только правила клубного взноса: сумма, период списания, описание и ограничения
+                доступа к турнирам при задолженности. Подключение YooKassa вынесено в отдельный раздел
+                «Платежи клуба».
             </p>
             <form method="post">
                 {% csrf_token %}

@@ -2,85 +2,164 @@
 {% block title %}Рейтинг клуба — {{ club.name }}{% endblock %}
 {% block content %}
 {% include "clubs/_club_player_nav.html" with current="rating" %}
-<div class="page-header">
-    <h1 class="page-title">Рейтинг клуба</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container club-player-dashboard" style="max-width: 800px;">
-    {% if my_rating %}
-    <div class="card" style="margin-bottom: var(--spacing-lg);">
-        <div class="card-body">
-            <h2 style="font-size: 1.25rem; margin-bottom: var(--spacing-sm);">Ваше место</h2>
-            <p style="font-size: 1.5rem; margin: 0;">
-                <strong>#{{ my_rating.display_rank }}</strong> из {{ ratings|length }} игроков
-                · <strong>{{ my_rating.points }}</strong> очков
-            </p>
-        </div>
-    </div>
-    {% endif %}
-    <div class="card" style="margin-bottom: var(--spacing-lg);">
-        <div class="card-body">
-            <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">Таблица рейтинга</h2>
+<div class="page-header club-dashboard-page-header">
+    <div class="container club-dashboard-shell club-rating-page club-rating-page--player">
+        <section class="club-dashboard-hero club-rating-hero">
+            <div class="club-dashboard-hero__main">
+                <div class="club-dashboard-hero__eyebrow-row">
+                    <span class="club-dashboard-hero__eyebrow">Рейтинг клуба</span>
+                    {% if my_rating %}
+                    <span class="club-dashboard-hero__status-pill">Ваше место: #{{ my_rating.display_rank }}</span>
+                    {% endif %}
+                </div>
+                <div class="club-dashboard-hero__copy">
+                    <h1 class="page-title club-dashboard-page-header__title">Рейтинг</h1>
+                    <p class="club-dashboard-page-header__subtitle">{{ club.name }}</p>
+                    <p class="club-dashboard-hero__summary">
+                        Лаконичная таблица клуба с вашим текущим местом и историей изменений по сыгранным турнирам.
+                    </p>
+                </div>
+            </div>
+
+            <aside class="club-dashboard-hero__side club-rating-hero__side">
+                <div class="club-dashboard-hero__side-card">
+                    <div class="club-dashboard-hero__side-label">Ваш результат</div>
+                    <div class="club-dashboard-hero__side-value">
+                        {% if my_rating %}#{{ my_rating.display_rank }}{% else %}—{% endif %}
+                    </div>
+                    <div class="club-dashboard-hero__side-meta">
+                        {% if my_rating %}
+                        {{ my_rating.points }} очков · {{ ratings|length }} игроков в таблице
+                        {% else %}
+                        Вы пока не попали в клубный рейтинг.
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="club-dashboard-hero__mini-stats">
+                    <div class="club-dashboard-hero__mini-stat">
+                        <span class="club-dashboard-hero__mini-value">{{ ratings|length }}</span>
+                        <span class="club-dashboard-hero__mini-label">игроков</span>
+                    </div>
+                    <div class="club-dashboard-hero__mini-stat">
+                        <span class="club-dashboard-hero__mini-value">{% if my_rating %}{{ my_rating.points }}{% else %}0{% endif %}</span>
+                        <span class="club-dashboard-hero__mini-label">ваши очки</span>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="club-dashboard-panel club-rating-panel">
+            <div class="club-dashboard-panel__header club-rating-panel__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">Таблица</p>
+                    <h2 class="club-dashboard-panel__title">Позиции игроков</h2>
+                </div>
+            </div>
             {% if ratings %}
-            <table class="table" style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Место</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Участник</th>
-                        <th style="text-align: right; padding: var(--spacing-sm);">Очки</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in ratings %}
-                    <tr {% if my_rating and r.member_id == my_rating.member_id %}style="background: var(--color-primary-transparent);"{% endif %}>
-                        <td style="padding: var(--spacing-sm);">{{ r.display_rank }}</td>
-                        <td style="padding: var(--spacing-sm);">
-                            {{ r.member.user.get_full_name|default:r.member.user.email }}
-                        </td>
-                        <td style="padding: var(--spacing-sm); text-align: right;">{{ r.points }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p style="margin: 0; color: var(--color-text-muted);">Рейтинг пока пуст.</p>
-            {% endif %}
-        </div>
-    </div>
-    {% if history %}
-    <div class="card">
-        <div class="card-body">
-            <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">История изменений рейтинга</h2>
-            <table class="table" style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Дата</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Турнир</th>
-                        <th style="text-align: right; padding: var(--spacing-sm);">Было</th>
-                        <th style="text-align: right; padding: var(--spacing-sm);">Δ</th>
-                        <th style="text-align: right; padding: var(--spacing-sm);">Стало</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for h in history %}
-                    <tr>
-                        <td style="padding: var(--spacing-sm);">{{ h.created_at|date:"d.m.Y" }}</td>
-                        <td style="padding: var(--spacing-sm);">
-                            {% if h.tournament %}
-                            <a href="{% url 'tournament_detail' slug=h.tournament.slug %}">{{ h.tournament.name }}</a>
-                            {% else %}
-                            —
+            <div class="club-rating-table" role="table" aria-label="Рейтинг клуба">
+                <div class="club-rating-table__head" role="row">
+                    <span>Место</span>
+                    <span>Участник</span>
+                    <span>Очки</span>
+                </div>
+                {% for r in ratings %}
+                <div class="club-rating-table__row {% if my_rating and r.member_id == my_rating.member_id %}club-rating-table__row--current{% endif %}" role="row">
+                    <div class="club-rating-table__rank">
+                        <span class="club-rating-rank-badge {% if r.display_rank <= 3 %}club-rating-rank-badge--top{% endif %}">
+                            {{ r.display_rank }}
+                        </span>
+                    </div>
+                    <div class="club-rating-table__player">
+                        {% with player=r.member.user.player rating_changes=r.member.user.player.get_rating_changes %}
+                        <div class="club-rating-table__line">
+                            <a href="{% url 'clubs:player_profile' slug=club.slug player_id=player.pk %}" class="club-rating-table__name-link">
+                                <span class="club-rating-table__name">{{ r.member.user.get_full_name|default:r.member.user.email }}</span>
+                            </a>
+                            <div class="club-rating-table__stats">
+                                <span class="club-rating-table__stat">
+                                    <span class="club-rating-table__stat-label">Ур.</span>
+                                    <span class="club-rating-table__stat-value stat-value--rating">
+                                        {% if rating_changes.ntrp.direction == 'up' %}
+                                        <span class="rating-badge__arrow rating-badge__arrow--up">↑</span>
+                                        {% elif rating_changes.ntrp.direction == 'down' %}
+                                        <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
+                                        {% endif %}
+                                        <span class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}">{{ player.ntrp_level }}</span>
+                                    </span>
+                                </span>
+                                <span class="club-rating-table__stat">
+                                    <span class="club-rating-table__stat-label">Рейт.</span>
+                                    <span class="club-rating-table__stat-value stat-value--rating">
+                                        {% if rating_changes.fan.direction == 'up' %}
+                                        <span class="rating-badge__arrow rating-badge__arrow--up">↑</span>
+                                        {% elif rating_changes.fan.direction == 'down' %}
+                                        <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
+                                        {% endif %}
+                                        <span class="rating-badge__value rating-badge__value--{{ rating_changes.fan.direction }}">{{ player.total_points|floatformat:1 }}</span>
+                                    </span>
+                                </span>
+                                {% if my_rating and r.member_id == my_rating.member_id %}
+                                <span class="club-rating-table__self-tag">Вы</span>
+                                {% endif %}
+                            </div>
+                            {% if r.last_club_match %}
+                            <a href="{{ r.last_club_match.url }}" class="club-rating-table__match-link">
+                                <span class="club-rating-table__match-date">{{ r.last_club_match.date|date:"d.m.Y" }}</span>
+                                <span class="club-rating-table__match-score">{{ r.last_club_match.score }}</span>
+                                <span class="club-rating-table__match-opponent">{{ r.last_club_match.opponent }}</span>
+                            </a>
                             {% endif %}
-                        </td>
-                        <td style="padding: var(--spacing-sm); text-align: right;">{{ h.points_before }}</td>
-                        <td style="padding: var(--spacing-sm); text-align: right;">{% if h.delta >= 0 %}+{% endif %}{{ h.delta }}</td>
-                        <td style="padding: var(--spacing-sm); text-align: right;">{{ h.points_after }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                        </div>
+                        {% endwith %}
+                    </div>
+                    <div class="club-rating-table__points">{{ r.points }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="club-dashboard-empty-state club-rating-empty-state">
+                <div class="club-dashboard-empty-state__title">Рейтинг пока пуст</div>
+                <div class="club-dashboard-empty-state__text">Таблица появится после первых начислений по матчам и турнирам.</div>
+            </div>
+            {% endif %}
+        </section>
+
+        {% if history %}
+        <section class="club-dashboard-panel club-rating-panel">
+            <div class="club-dashboard-panel__header club-rating-panel__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">История</p>
+                    <h2 class="club-dashboard-panel__title">Изменения рейтинга</h2>
+                </div>
+            </div>
+            <div class="club-rating-history" role="table" aria-label="История рейтинга">
+                <div class="club-rating-history__head" role="row">
+                    <span>Дата</span>
+                    <span>Турнир</span>
+                    <span>Было</span>
+                    <span>Δ</span>
+                    <span>Стало</span>
+                </div>
+                {% for h in history %}
+                <div class="club-rating-history__row" role="row">
+                    <div>{{ h.created_at|date:"d.m.Y" }}</div>
+                    <div class="club-rating-history__tournament">
+                        {% if h.tournament %}
+                        <a href="{% url 'tournament_detail' slug=h.tournament.slug %}">{{ h.tournament.name }}</a>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </div>
+                    <div class="club-rating-history__number">{{ h.points_before }}</div>
+                    <div class="club-rating-history__number {% if h.delta > 0 %}club-rating-history__number--up{% elif h.delta < 0 %}club-rating-history__number--down{% endif %}">
+                        {% if h.delta >= 0 %}+{% endif %}{{ h.delta }}
+                    </div>
+                    <div class="club-rating-history__number">{{ h.points_after }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 {% endblock %}

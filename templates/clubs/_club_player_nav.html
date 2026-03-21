@@ -10,11 +10,11 @@
             <a href="{% url 'clubs:my_plan' %}" class="btn btn-sm {% if current == 'plan' %}btn-primary{% else %}btn-ghost{% endif %}">
                 Подписка и лимиты
             </a>
+            <a href="{% url 'clubs:my_payments' %}" class="btn btn-sm {% if current == 'payments' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Мои платежи
+            </a>
             <a href="{% url 'clubs:club_rating' %}" class="btn btn-sm {% if current == 'rating' %}btn-primary{% else %}btn-ghost{% endif %}">
                 Рейтинг
-            </a>
-            <a href="{% url 'clubs:my_fees' %}" class="btn btn-sm {% if current == 'fees' %}btn-primary{% else %}btn-ghost{% endif %}">
-                Взносы
             </a>
             <a href="{% url 'clubs:my_notification_settings' %}" class="btn btn-sm {% if current == 'notifications' %}btn-primary{% else %}btn-ghost{% endif %}">
                 Уведомления
@@ -60,7 +60,7 @@
         </span>
         <span class="club-bottom-nav__item-label">Рейтинг</span>
     </a>
-    <button type="button" class="club-bottom-nav__item club-bottom-nav__item--more {% if current == 'plan' or current == 'fees' or current == 'notifications' %}club-bottom-nav__item--active{% endif %}" data-club-bottom-more>
+    <button type="button" class="club-bottom-nav__item club-bottom-nav__item--more {% if current == 'plan' or current == 'payments' or current == 'notifications' %}club-bottom-nav__item--active{% endif %}" data-club-bottom-more>
         <span class="club-bottom-nav__item-icon">
             <svg viewBox="0 0 24 24" fill="none">
                 <circle cx="5" cy="12" r="1.5" fill="currentColor" />
@@ -81,9 +81,9 @@
                 <span class="club-bottom-sheet__link-icon">★</span>
                 <span>Подписка и лимиты</span>
             </a>
-            <a href="{% url 'clubs:my_fees' %}" class="club-bottom-sheet__link">
+            <a href="{% url 'clubs:my_payments' %}" class="club-bottom-sheet__link">
                 <span class="club-bottom-sheet__link-icon">₽</span>
-                <span>Взносы</span>
+                <span>Мои платежи</span>
             </a>
             <a href="{% url 'clubs:my_notification_settings' %}" class="club-bottom-sheet__link">
                 <span class="club-bottom-sheet__link-icon">🔔</span>

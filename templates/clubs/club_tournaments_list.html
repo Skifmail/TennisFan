@@ -1,57 +1,268 @@
 {% extends "base.html" %}
 {% block title %}Турниры — {{ club.name }}{% endblock %}
+
 {% block content %}
 {% if can_manage_club %}
 {% include "clubs/_club_dashboard_nav.html" with current="tournaments" %}
 {% endif %}
-<div class="page-header">
-    <h1 class="page-title">Турниры клуба</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container" style="max-width: 900px;">
-    {% if can_manage_club %}
-    <p><a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary">Создать турнир</a></p>
-    {% endif %}
-    <div class="card">
-        <div class="card-body">
+
+<div class="page-header club-dashboard-page-header">
+    <div class="container club-dashboard-shell club-tournaments-page">
+        <section class="club-tournaments-hero">
+            <div class="club-tournaments-hero__main">
+                <div class="club-tournaments-hero__eyebrow-row">
+                    <span class="club-dashboard-hero__eyebrow">Турниры клуба</span>
+                    <span class="club-tournaments-hero__status-pill">
+                        {% if tournaments %}{{ tournaments|length }} в списке{% else %}Список пуст{% endif %}
+                    </span>
+                </div>
+
+                <div class="club-tournaments-hero__identity">
+                    {% if club.logo %}
+                    <img src="{{ club.logo.url }}" alt="{{ club.name }}" class="club-dashboard-page-header__logo">
+                    {% else %}
+                    <div class="club-dashboard-page-header__logo-fallback">
+                        {{ club.name|first|upper }}
+                    </div>
+                    {% endif %}
+
+                    <div class="club-tournaments-hero__copy">
+                        <h1 class="page-title club-dashboard-page-header__title">Турниры клуба</h1>
+                        <p class="club-dashboard-page-header__subtitle">{{ club.name }}</p>
+                        <p class="club-tournaments-hero__summary">
+                            Здесь собраны все запуски клуба: ближайшие старты, завершённые события и быстрые переходы к настройке, тарифам и управлению.
+                        </p>
+                    </div>
+                </div>
+
+                {% if can_manage_club %}
+                <div class="club-tournaments-hero__actions">
+                    <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary club-dashboard-hero__cta">Создать турнир</a>
+                </div>
+                {% endif %}
+            </div>
+
+            <aside class="club-tournaments-hero__side">
+                <div class="club-tournaments-hero__side-card">
+                    <div class="club-tournaments-hero__side-label">Режим страницы</div>
+                    <div class="club-tournaments-hero__side-value">
+                        {% if can_manage_club %}Управление{% else %}Просмотр{% endif %}
+                    </div>
+                    <div class="club-tournaments-hero__side-meta">
+                        {% if can_manage_club %}
+                        Можно быстро открыть турнир, изменить параметры и перейти к операционному управлению.
+                        {% else %}
+                        Доступен общий список турниров клуба с основной информацией по каждому событию.
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="club-tournaments-hero__mini-stats">
+                    <div class="club-tournaments-hero__mini-stat">
+                        <span class="club-tournaments-hero__mini-label">Всего турниров</span>
+                        <span class="club-tournaments-hero__mini-value">{{ tournaments_total }}</span>
+                    </div>
+                    <div class="club-tournaments-hero__mini-stat">
+                        <span class="club-tournaments-hero__mini-label">Найдено</span>
+                        <span class="club-tournaments-hero__mini-value">{{ tournaments|length }}</span>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="club-dashboard-panel club-tournaments-overview">
+            <div class="club-dashboard-panel__header club-tournaments-overview__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">Каталог турниров</p>
+                    <h2 class="club-dashboard-panel__title">Все старты в одном обзоре</h2>
+                </div>
+                <div class="club-tournaments-overview__result">
+                    {% if search or status_filter or category_filter or gender_filter or variant_filter %}
+                    Найдено {{ tournaments|length }} из {{ tournaments_total }}
+                    {% else %}
+                    Все турниры клуба
+                    {% endif %}
+                </div>
+            </div>
+
+            <form method="get" class="club-tournaments-filters">
+                <label class="club-members-field">
+                    <span class="club-members-field__label">Поиск</span>
+                    <input type="text" name="q" value="{{ search }}" placeholder="Название турнира">
+                </label>
+                <label class="club-members-field">
+                    <span class="club-members-field__label">Статус</span>
+                    <select name="status">
+                        <option value="">Все статусы</option>
+                        <option value="upcoming" {% if status_filter == 'upcoming' %}selected{% endif %}>Предстоящий</option>
+                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Активный</option>
+                        <option value="group_stage" {% if status_filter == 'group_stage' %}selected{% endif %}>Групповой этап</option>
+                        <option value="playoffs" {% if status_filter == 'playoffs' %}selected{% endif %}>Плей-офф</option>
+                        <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Завершён</option>
+                        <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Отменён</option>
+                    </select>
+                </label>
+                <label class="club-members-field">
+                    <span class="club-members-field__label">Категория</span>
+                    <select name="category">
+                        <option value="">Все категории</option>
+                        {% for value, label in category_choices %}
+                        <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="club-members-field">
+                    <span class="club-members-field__label">Пол</span>
+                    <select name="gender">
+                        <option value="">Любой</option>
+                        {% for value, label in gender_choices %}
+                        <option value="{{ value }}" {% if gender_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="club-members-field">
+                    <span class="club-members-field__label">Формат</span>
+                    <select name="variant">
+                        <option value="">Одиночный и парный</option>
+                        {% for value, label in variant_choices %}
+                        <option value="{{ value }}" {% if variant_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <div class="club-tournaments-filters__actions">
+                    <button type="submit" class="btn btn-primary">Найти</button>
+                    {% if search or status_filter or category_filter or gender_filter or variant_filter %}
+                    <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-ghost">Сбросить</a>
+                    {% endif %}
+                </div>
+            </form>
+
             {% if tournaments %}
-            <table class="table" style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Турнир</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Дата</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Статус</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Участники</th>
-                        {% if can_manage_club %}
-                        <th style="text-align: right; padding: var(--spacing-sm);"></th>
+            <div class="club-tournaments-list" role="list">
+                {% for t in tournaments %}
+                <article class="club-tournament-card" role="listitem">
+                    <div class="club-tournament-card__main">
+                        <div class="club-tournament-card__topline">
+                            <div class="club-tournament-card__topline-main">
+                                <span class="club-tournament-card__index">Турнир {{ forloop.counter|stringformat:"02d" }}</span>
+                                <h3 class="club-tournament-card__title">
+                                    <a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a>
+                                </h3>
+                            </div>
+                            <div class="club-tournament-card__topline-side">
+                                <span class="tournament-status-badge tournament-status-badge--inline tournament-status-badge--{{ t.status }}">
+                                    {{ t.get_status_display }}
+                                </span>
+                                <a href="{% url 'tournament_detail' slug=t.slug %}" class="club-tournament-card__open-link">Открыть</a>
+                            </div>
+                        </div>
+
+                        <div class="club-tournament-card__meta-grid">
+                            <div class="club-tournament-card__meta-card">
+                                <span class="club-tournament-card__meta-label">Дата старта</span>
+                                <span class="club-tournament-card__meta-value">
+                                    {% if t.start_date %}{{ t.start_date|date:"d.m.Y" }}{% else %}Не указана{% endif %}
+                                </span>
+                            </div>
+                            <div class="club-tournament-card__meta-card">
+                                <span class="club-tournament-card__meta-label">Участники</span>
+                                {% if t.participants.all %}
+                                <div class="club-tournament-card__participants">
+                                    <div class="club-tournament-card__participants-stack">
+                                        {% for participant in t.participants.all|slice:":6" %}
+                                        <a
+                                            href="{% url 'clubs:player_profile' slug=club.slug player_id=participant.id %}"
+                                            class="club-tournament-card__participant"
+                                            title="{{ participant.user.get_full_name|default:participant.user.email }}"
+                                            aria-label="{{ participant.user.get_full_name|default:participant.user.email }}">
+                                            {% if participant.avatar %}
+                                            <img src="{{ participant.avatar.url }}" alt="{{ participant.user.get_full_name|default:participant.user.email }}" class="club-tournament-card__participant-avatar">
+                                            {% else %}
+                                            <span class="club-tournament-card__participant-avatar club-tournament-card__participant-avatar--fallback">
+                                                {% if participant.user.first_name %}
+                                                {{ participant.user.first_name|slice:":1"|upper }}
+                                                {% else %}
+                                                {{ participant.user.email|slice:":1"|upper }}
+                                                {% endif %}
+                                            </span>
+                                            {% endif %}
+                                        </a>
+                                        {% endfor %}
+                                        {% if t.participants.count > 6 %}
+                                        <span class="club-tournament-card__participant club-tournament-card__participant--more" title="Ещё {{ t.participants.count|add:'-6' }} участников">
+                                            +{{ t.participants.count|add:'-6' }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <span class="club-tournament-card__participants-note">
+                                        {{ t.participants.count }}{% if t.max_participants %} / {{ t.max_participants }}{% endif %}
+                                    </span>
+                                </div>
+                                {% else %}
+                                <span class="club-tournament-card__meta-value">Пока нет регистраций</span>
+                                {% endif %}
+                            </div>
+                            <div class="club-tournament-card__meta-card">
+                                <span class="club-tournament-card__meta-label">Категории</span>
+                                <div class="club-tournament-card__tag-list">
+                                    {% for category in t.allowed_categories.all %}
+                                    <span class="club-tournament-card__tag">{{ category.get_category_display }}</span>
+                                    {% empty %}
+                                    <span class="club-tournament-card__meta-value">Без ограничений</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="club-tournament-card__meta-card">
+                                <span class="club-tournament-card__meta-label">Параметры</span>
+                                <div class="club-tournament-card__tag-list">
+                                    <span class="club-tournament-card__tag">{{ t.get_gender_display }}</span>
+                                    <span class="club-tournament-card__tag">{{ t.get_variant_display }}</span>
+                                    <span class="club-tournament-card__tag">{{ t.get_format_display }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if t.registration_deadline %}
+                        <p class="club-tournament-card__note">
+                            Регистрация до {{ t.registration_deadline|date:"d.m.Y H:i" }}
+                        </p>
                         {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for t in tournaments %}
-                    <tr>
-                        <td style="padding: var(--spacing-sm);"><a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a></td>
-                        <td style="padding: var(--spacing-sm);">{{ t.start_date|date:"d.m.Y" }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ t.get_status_display }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ t.participants.count }}{% if t.max_participants %} / {{ t.max_participants }}{% endif %}</td>
+                    </div>
+
+                    <div class="club-tournament-card__actions">
                         {% if can_manage_club %}
-                        <td style="padding: var(--spacing-sm); text-align: right;">
-                            <a href="{% url 'clubs:tournament_plan_access' slug=club.slug tournament_id=t.id %}" class="btn btn-ghost btn-sm">Доступ тарифов</a>
-                            <a href="{% url 'clubs:tournament_edit' slug=club.slug tournament_id=t.id %}" class="btn btn-ghost btn-sm">Редактировать</a>
-                            <a href="{% url 'tournament_manage' slug=t.slug %}" class="btn btn-primary btn-sm">Управление</a>
-                        </td>
+                        <a href="{% url 'clubs:tournament_plan_access' slug=club.slug tournament_id=t.id %}" class="btn btn-ghost btn-sm">Доступ тарифов</a>
+                        <a href="{% url 'clubs:tournament_edit' slug=club.slug tournament_id=t.id %}" class="btn btn-ghost btn-sm">Редактировать</a>
+                        <a href="{% url 'tournament_manage' slug=t.slug %}" class="btn btn-primary btn-sm">Управление</a>
                         {% endif %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
             {% else %}
-            <p style="margin: 0; color: var(--color-text-muted);">Турниров пока нет.</p>
-            {% if can_manage_club %}
-            <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary" style="margin-top: var(--spacing-md);">Создать турнир</a>
+            <div class="club-dashboard-empty-state club-tournaments-empty__state">
+                <div class="club-dashboard-empty-state__title">
+                    {% if search or status_filter or category_filter or gender_filter or variant_filter %}Турниры не найдены{% else %}Турниров пока нет{% endif %}
+                </div>
+                <div class="club-dashboard-empty-state__text">
+                    {% if search or status_filter or category_filter or gender_filter or variant_filter %}
+                    Попробуйте изменить строку поиска или сбросить фильтр по статусу.
+                    {% else %}
+                    Когда появится первый запуск, здесь сразу будет полный обзор со статусами, участниками и действиями.
+                    {% endif %}
+                </div>
+                {% if can_manage_club %}
+                <div class="club-tournaments-empty__actions">
+                    {% if search or status_filter or category_filter or gender_filter or variant_filter %}
+                    <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-ghost">Сбросить фильтры</a>
+                    {% else %}
+                    <a href="{% url 'clubs:tournament_create' slug=club.slug %}" class="btn btn-primary">Создать турнир</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
             {% endif %}
-            {% endif %}
-        </div>
+        </section>
     </div>
 </div>
 {% endblock %}

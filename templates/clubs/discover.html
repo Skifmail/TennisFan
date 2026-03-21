@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block title %}Вступить в клуб{% endblock %}
+
+{% block content %}
+<section class="page-header club-discover-header">
+    <div class="container">
+        <div class="club-discover-header__eyebrow">Клубы платформы</div>
+        <h1 class="page-title">Вступить в клуб</h1>
+        <p class="page-subtitle">Найдите клуб по названию или городу, изучите условия и сразу отправьте заявку на вступление.</p>
+    </div>
+</section>
+
+<section class="section club-discover-section">
+    <div class="container">
+        <form method="get" class="card club-discover-filters">
+            <div class="card-body club-discover-filters__grid">
+                <div class="form-group">
+                    <label class="form-label" for="club-discover-q">Название клуба</label>
+                    <input id="club-discover-q" type="text" name="q" class="form-control" placeholder="Например, Спартак" value="{{ search }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="club-discover-city">Город</label>
+                    <input id="club-discover-city" type="text" name="city" class="form-control" placeholder="Москва" value="{{ city }}">
+                </div>
+                <div class="form-group form-group-submit">
+                    <label class="form-label">Поиск</label>
+                    <button type="submit" class="btn btn-primary">Найти клубы</button>
+                </div>
+                <div class="form-group form-group-submit">
+                    <label class="form-label">Сброс</label>
+                    <a href="{% url 'clubs:club_discover' %}" class="btn btn-outline">Сбросить</a>
+                </div>
+            </div>
+        </form>
+
+        <div class="club-discover-toolbar">
+            <div class="club-discover-toolbar__count">
+                Найдено клубов: {{ results_count }}
+            </div>
+        </div>
+
+        {% if clubs_catalog %}
+        <div class="club-discover-grid">
+            {% for item in clubs_catalog %}
+            <article class="card club-discover-card">
+                <div class="club-discover-card__media">
+                    {% if item.club.logo %}
+                    <img src="{{ item.club.logo.url }}" alt="{{ item.club.name }}" class="club-discover-card__logo">
+                    {% else %}
+                    <div class="club-discover-card__logo club-discover-card__logo--fallback">{{ item.club.name|first|upper }}</div>
+                    {% endif %}
+                </div>
+                <div class="club-discover-card__body">
+                    <div class="club-discover-card__topline">
+                        <div>
+                            <h2 class="club-discover-card__title">
+                                <a href="{% url 'clubs:club_public_detail' slug=item.club.slug %}">{{ item.club.name }}</a>
+                            </h2>
+                            <div class="club-discover-card__city">{{ item.club.city }}</div>
+                        </div>
+                        <div class="club-discover-card__members">{{ item.members_count }} участников</div>
+                    </div>
+
+                    <div class="club-discover-card__meta">
+                        {% if item.club.address %}
+                        <span>{{ item.club.address }}</span>
+                        {% endif %}
+                        {% if item.club.phone %}
+                        <span>{{ item.club.phone }}</span>
+                        {% endif %}
+                    </div>
+
+                    {% if item.club.description %}
+                    <p class="club-discover-card__description">{{ item.club.description|truncatewords:28 }}</p>
+                    {% else %}
+                    <p class="club-discover-card__description club-discover-card__description--muted">Клуб пока не добавил описание, но вы можете открыть его страницу и посмотреть доступные турниры и информацию.</p>
+                    {% endif %}
+
+                    {% if item.action_message %}
+                    <p class="club-discover-card__hint">{{ item.action_message }}</p>
+                    {% endif %}
+
+                    <div class="club-discover-card__actions">
+                        <a href="{% url 'clubs:club_public_detail' slug=item.club.slug %}" class="btn btn-ghost">Открыть клуб</a>
+                        {% if item.action == 'request' %}
+                        <form method="post" action="{% url 'clubs:join_request_create' slug=item.club.slug %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" class="btn btn-primary">Подать заявку</button>
+                        </form>
+                        {% elif item.action == 'invite' %}
+                        <a href="{% url 'clubs:invitations_list' %}" class="btn btn-primary">Открыть приглашения</a>
+                        {% else %}
+                        <button type="button" class="btn btn-outline" disabled>{{ item.action_label }}</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card club-discover-empty">
+            <div class="card-body">
+                <h2 class="club-discover-empty__title">Клубы не найдены</h2>
+                <p class="club-discover-empty__text">Попробуйте изменить название или город в фильтрах. Если фильтров нет, значит сейчас нет клубов, доступных для вступления.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

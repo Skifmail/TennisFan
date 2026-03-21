@@ -120,9 +120,17 @@ class SavedPaymentMethodAdmin(admin.ModelAdmin):
         "card_exp_year",
         "is_active",
         "is_default_for_subscriptions",
+        "is_default_for_club_plans",
+        "is_default_for_club_fees",
         "created_at",
     )
-    list_filter = ("is_active", "is_default_for_subscriptions", "card_network")
+    list_filter = (
+        "is_active",
+        "is_default_for_subscriptions",
+        "is_default_for_club_plans",
+        "is_default_for_club_fees",
+        "card_network",
+    )
     search_fields = ("user__email", "payment_method_id", "card_last4")
     readonly_fields = (
         "user",
@@ -133,6 +141,8 @@ class SavedPaymentMethodAdmin(admin.ModelAdmin):
         "card_network",
         "is_active",
         "is_default_for_subscriptions",
+        "is_default_for_club_plans",
+        "is_default_for_club_fees",
         "created_at",
         "updated_at",
     )

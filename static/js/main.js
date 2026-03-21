@@ -58,6 +58,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Auto-hide alerts after 5 seconds
     document.querySelectorAll('.alert').forEach(function(el) {
+        var messagesContainer = el.closest('.messages-container');
+        if (messagesContainer && messagesContainer.dataset.persistMessages === 'true') {
+            return;
+        }
         setTimeout(function() {
             el.style.transition = 'opacity 0.3s ease';
             el.style.opacity = '0';

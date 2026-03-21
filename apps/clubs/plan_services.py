@@ -19,12 +19,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, cast
 
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
 from .models import (
@@ -80,6 +80,9 @@ class MemberPlanLimits:
     tournaments_left: int | None
 
 
+CLUB_PLAN_PERIOD_DAYS = 30
+
+
 def get_current_period(today: date | None = None) -> tuple[int, int]:
     """Возвращает текущий учётный период (год, месяц).
 
@@ -109,6 +112,7 @@ def get_member_active_plan(member: ClubMember) -> ClubMemberPlan | None:
             status=ClubMemberPlanStatus.ACTIVE,
             plan__is_active=True,
         )
+        .filter(models.Q(ended_at__isnull=True) | models.Q(ended_at__gt=timezone.now()))
         .order_by("-started_at")
         .first()
     )
@@ -162,6 +166,87 @@ def assign_member_plan(
                 change_reason=change_reason,
             ),
         )
+
+
+def _club_plan_period_end(base=None):
+    """Возвращает дату окончания клубного тарифного периода."""
+    return (base or timezone.now()) + timedelta(days=CLUB_PLAN_PERIOD_DAYS)
+
+
+def purchase_member_plan(
+    member: ClubMember,
+    plan: ClubPlayerPlan,
+    *,
+    assigned_by: AbstractUser | None = None,
+    change_reason: str = "",
+    auto_renew: bool = False,
+) -> ClubMemberPlan:
+    """Активирует или продлевает оплаченный клубный тариф участника."""
+    if plan.club_id != member.club_id:
+        raise ValueError("Нельзя активировать тариф другого клуба.")
+
+    with transaction.atomic():
+        now = timezone.now()
+        current_plan = (
+            ClubMemberPlan.objects.select_for_update()
+            .select_related("plan")
+            .filter(
+                club_member=member,
+                status=ClubMemberPlanStatus.ACTIVE,
+            )
+            .filter(models.Q(ended_at__isnull=True) | models.Q(ended_at__gt=now))
+            .order_by("-started_at")
+            .first()
+        )
+
+        if (
+            current_plan is not None
+            and current_plan.plan_id == plan.id
+            and current_plan.ended_at is not None
+        ):
+            base = current_plan.ended_at if current_plan.ended_at > now else now
+            current_plan.ended_at = _club_plan_period_end(base)
+            current_plan.auto_renew = auto_renew
+            current_plan.assigned_by = assigned_by
+            current_plan.change_reason = change_reason
+            current_plan.save(
+                update_fields=[
+                    "ended_at",
+                    "auto_renew",
+                    "assigned_by",
+                    "change_reason",
+                ]
+            )
+            return cast(ClubMemberPlan, current_plan)
+
+        ClubMemberPlan.objects.filter(
+            club_member=member,
+            status=ClubMemberPlanStatus.ACTIVE,
+        ).update(
+            status=ClubMemberPlanStatus.ENDED,
+            ended_at=now,
+        )
+
+        created_plan = ClubMemberPlan.objects.create(
+            club_member=member,
+            plan=plan,
+            status=ClubMemberPlanStatus.ACTIVE,
+            assigned_by=assigned_by,
+            change_reason=change_reason,
+            ended_at=_club_plan_period_end(now),
+            auto_renew=auto_renew,
+        )
+        return cast(ClubMemberPlan, created_plan)
+
+
+def cancel_member_plan_auto_renew(member: ClubMember) -> ClubMemberPlan | None:
+    """Отключает автопродление активного клубного тарифа участника."""
+    member_plan = get_member_active_plan(member)
+    if member_plan is None or member_plan.ended_at is None:
+        return None
+    member_plan.auto_renew = False
+    member_plan.save(update_fields=["auto_renew"])
+    return member_plan
 
 
 def get_member_plan_limits(

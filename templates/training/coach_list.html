@@ -15,9 +15,9 @@
         <a href="{% url 'coach_application_create' %}" class="btn btn-primary btn--filter-size">Стать тренером</a>
     </div>
     {% endif %}
-    <div class="grid grid-3">
+    <div class="coach-list-grid">
         {% for coach in coaches %}
-        <a href="{% url 'coach_detail' slug=coach.slug %}" class="card" style="text-align: center;">
+        <a href="{% url 'coach_detail' slug=coach.slug %}" class="card coach-list-card" style="text-align: center;">
             <div class="card-body">
                 {% if coach.photo_or_avatar %}
                 <img src="{{ coach.photo_or_avatar.url }}" alt="" class="player-avatar"

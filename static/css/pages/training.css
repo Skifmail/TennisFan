@@ -14,6 +14,58 @@
     gap: var(--spacing-xl);
 }
 
+.training-list-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--spacing-lg);
+    align-items: stretch;
+}
+
+.training-list-grid .training-card,
+.training-list-grid .training-card .card-body {
+    min-width: 0;
+}
+
+.training-list-grid .training-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.training-list-grid .training-card .card-image {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    flex-shrink: 0;
+}
+
+.training-list-grid .training-card .card-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.training-list-grid .training-card .d-flex {
+    align-items: flex-start;
+}
+
+.training-list-grid .training-card .card-title,
+.training-list-grid .training-card .card-text,
+.training-list-grid .training-card .text-secondary,
+.training-list-grid .training-card .text-primary,
+.training-list-grid .training-card .player-category {
+    overflow-wrap: anywhere;
+}
+
+.training-list-grid .training-card .card-title {
+    margin: 0;
+}
+
+.training-list-grid .training-card .card-text {
+    margin-top: 0;
+    margin-bottom: auto;
+}
+
 .training-detail-sidebar-card {
     position: sticky;
     top: 100px;
@@ -27,5 +79,16 @@
     .training-detail-sidebar-card {
         position: static;
         margin-top: var(--spacing-lg);
+    }
+}
+
+@media (width <= 760px) {
+    .training-list-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--spacing-md);
+    }
+
+    .training-list-grid .training-card .card-image {
+        aspect-ratio: 16 / 10;
     }
 }

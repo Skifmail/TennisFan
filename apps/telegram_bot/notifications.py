@@ -608,21 +608,33 @@ def _format_new_tournament_message(tournament) -> str:
         if getattr(tournament, "format", None) == "weekend_day"
         else tournament.get_format_display()
     )
+    club = getattr(tournament, "club", None)
     parts = [
-        "🆕 <b>Новый турнир</b>",
+        "🆕 <b>Новый клубный турнир</b>" if club else "🆕 <b>Новый турнир</b>",
         "",
         f"<b>{html.escape(tournament.name)}</b>",
-        f"📍 {html.escape(tournament.city)}",
-        "",
-        f"Формат: {format_display}",
-        f"Вариант: {tournament.get_variant_display()}",
-        f"Категория: {tournament.get_gender_display()}",
-        f"Продолжительность: {tournament.get_duration_display()}",
-        f"Тип: {tournament.get_tournament_type_display()}",
-        f"Статус: {tournament.get_status_display()}",
-        "",
-        f"📅 Начало: {tournament.start_date.strftime('%d.%m.%Y')}",
     ]
+    if club:
+        parts.extend(
+            [
+                f"Клуб: {html.escape(club.name)}",
+                "",
+            ]
+        )
+    parts.extend(
+        [
+            f"📍 {html.escape(tournament.city)}",
+            "",
+            f"Формат: {format_display}",
+            f"Вариант: {tournament.get_variant_display()}",
+            f"Категория: {tournament.get_gender_display()}",
+            f"Продолжительность: {tournament.get_duration_display()}",
+            f"Тип: {tournament.get_tournament_type_display()}",
+            f"Статус: {tournament.get_status_display()}",
+            "",
+            f"📅 Начало: {tournament.start_date.strftime('%d.%m.%Y')}",
+        ]
+    )
     if tournament.end_date:
         parts.append(f"📅 Окончание: {tournament.end_date.strftime('%d.%m.%Y')}")
     if tournament.registration_deadline:
@@ -662,8 +674,58 @@ def _format_new_tournament_message(tournament) -> str:
     return "\n".join(parts)
 
 
-def _send_new_tournament_to_all(tournament_pk: int) -> None:
-    """В фоне отправить уведомление о новом турнире всем пользователям с привязанным ботом."""
+def _get_new_tournament_recipients(tournament) -> list[UserTelegramLink]:
+    """Возвращает получателей уведомления о новом турнире."""
+    if getattr(tournament, "club_id", None):
+        from apps.clubs.models import (
+            ClubMember,
+            ClubMemberStatus,
+            ClubNotificationConfig,
+            ClubNotificationSettings,
+        )
+
+        config = ClubNotificationConfig.objects.filter(club=tournament.club).first()
+        if not config or not config.notify_by_telegram:
+            return []
+        if not config.tournament_reminders_enabled:
+            return []
+
+        recipient_user_ids: list[int] = []
+        active_members = ClubMember.objects.filter(
+            club=tournament.club,
+            status=ClubMemberStatus.ACTIVE,
+        ).select_related("user")
+
+        for member in active_members:
+            settings_obj, _ = ClubNotificationSettings.objects.get_or_create(
+                user=member.user,
+                club=tournament.club,
+            )
+            if not settings_obj.is_enabled or not settings_obj.telegram_enabled:
+                continue
+            recipient_user_ids.append(member.user_id)
+
+        if not recipient_user_ids:
+            return []
+
+        return list(
+            UserTelegramLink.objects.filter(
+                user_id__in=recipient_user_ids,
+                user_bot_chat_id__isnull=False,
+            )
+            .exclude(user_bot_chat_id=0)
+            .distinct()
+        )
+
+    return list(
+        UserTelegramLink.objects.filter(user_bot_chat_id__isnull=False)
+        .exclude(user_bot_chat_id=0)
+        .distinct()
+    )
+
+
+def _send_new_tournament_notification(tournament_pk: int) -> None:
+    """В фоне отправить уведомление о новом турнире релевантным получателям."""
     from django.db import connection
 
     connection.close()
@@ -686,13 +748,11 @@ def _send_new_tournament_to_all(tournament_pk: int) -> None:
                 tournament_pk,
             )
             return
-        links = UserTelegramLink.objects.filter(user_bot_chat_id__isnull=False).exclude(
-            user_bot_chat_id=0
-        )
-        total = links.count()
+        links = _get_new_tournament_recipients(tournament)
+        total = len(links)
         if total == 0:
             logger.info(
-                "New tournament pk=%s: no users with bot linked, skip send",
+                "New tournament pk=%s: no eligible recipients, skip send",
                 tournament_pk,
             )
             return
@@ -711,7 +771,7 @@ def _send_new_tournament_to_all(tournament_pk: int) -> None:
         )
     except Exception as e:
         logger.exception(
-            "_send_new_tournament_to_all pk=%s failed: %s", tournament_pk, e
+            "_send_new_tournament_notification pk=%s failed: %s", tournament_pk, e
         )
 
 
@@ -789,7 +849,7 @@ def notify_new_tournament_by_pk(tournament_pk: int) -> None:
         return
     logger.info("New tournament pk=%s, starting background notify", tournament_pk)
     thread = threading.Thread(
-        target=_send_new_tournament_to_all,
+        target=_send_new_tournament_notification,
         args=(tournament_pk,),
         daemon=True,
         name=f"notify_tournament_{tournament_pk}",

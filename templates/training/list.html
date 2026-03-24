@@ -34,7 +34,7 @@
         {% if not user_is_coach %}<a href="{% url 'coach_application_create' %}" class="btn btn-primary btn--filter-size">Стать тренером</a>{% endif %}
     </div>
 
-    <div class="grid grid-3 training-grid">
+    <div class="training-list-grid">
         {% for training in trainings %}
         <a href="{% url 'training_detail' slug=training.slug %}" class="card training-card">
             {% if training.image %}

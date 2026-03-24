@@ -14,6 +14,28 @@
     gap: var(--spacing-xl);
 }
 
+.coach-list-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--spacing-lg);
+    align-items: stretch;
+}
+
+.coach-list-card,
+.coach-list-card .card-body {
+    min-width: 0;
+}
+
+.coach-list-card {
+    height: 100%;
+}
+
+.coach-list-card .card-title,
+.coach-list-card .text-secondary,
+.coach-list-card .text-muted {
+    overflow-wrap: anywhere;
+}
+
 .coach-detail-sidebar {
     height: fit-content;
 }
@@ -29,5 +51,12 @@
 
     .coach-detail-main {
         order: 2;
+    }
+}
+
+@media (width <= 760px) {
+    .coach-list-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--spacing-md);
     }
 }

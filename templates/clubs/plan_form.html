@@ -1,22 +1,209 @@
 {% extends "base.html" %}
 {% block title %}{% if is_edit %}Редактирование тарифа{% else %}Создание тарифа{% endif %} — {{ club.name }}{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">{% if is_edit %}Редактирование тарифа{% else %}Создание тарифа{% endif %}</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container" style="max-width: 720px;">
-    <div class="card">
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <div style="display: flex; gap: var(--spacing-sm);">
-                    <button type="submit" class="btn btn-primary">Сохранить</button>
-                    <a href="{% url 'clubs:plans_manage' slug=club.slug %}" class="btn btn-ghost">Отмена</a>
+{% include "clubs/_club_dashboard_nav.html" with current="plans" %}
+
+<section class="club-payments-page club-player-plan-editor">
+    <div class="container club-payments-page__container">
+        <form method="post" class="club-payments-page__form-shell">
+            {% csrf_token %}
+
+            <div class="club-payments-page__hero club-payments-page__hero--split">
+                <div class="club-payments-page__copy">
+                    <div class="club-payments-page__eyebrow">Player Plan Editor</div>
+                    <h1 class="club-payments-page__title">{% if is_edit %}Редактирование тарифа{% else %}Создание тарифа{% endif %}</h1>
+                    <p class="club-payments-page__subtitle">
+                        Настройте стоимость, срок действия, лимиты регистраций и правила доступа для игроков клуба {{ club.name }}.
+                    </p>
+
+                    <div class="club-payments-page__status-row">
+                        <span class="club-payments-status {% if is_edit and plan.is_active %}club-payments-status--connected{% else %}club-payments-status--idle{% endif %}">
+                            <span class="club-payments-status__dot"></span>
+                            {% if is_edit and plan.is_active %}Тариф активен{% elif is_edit %}Тариф в архиве{% else %}Новый тариф{% endif %}
+                        </span>
+                        <span class="club-payments-page__shop">{{ club.name }}</span>
+                    </div>
+
+                    <div class="club-payments-page__note">
+                        <p>
+                            Здесь мы задаём всю операционную логику тарифа: как долго он действует после оплаты, сколько регистраций включает и может ли игрок переключать его сам.
+                        </p>
+                        <p>
+                            Если включить безлимитные регистрации, месячный лимит перестанет применяться автоматически.
+                        </p>
+                    </div>
                 </div>
-            </form>
-        </div>
+
+                <aside class="club-payments-page__help">
+                    <div class="club-payments-page__eyebrow">Подсказка</div>
+                    <h2 class="club-payments-page__help-title">Что важно проверить перед сохранением</h2>
+                    <ul class="club-payments-page__help-list">
+                        <li>Стоимость должна совпадать с тем, что реально оплачивает игрок.</li>
+                        <li>Срок действия тарифа считается в днях и применяется при покупке и продлении.</li>
+                        <li>Либо укажите лимит регистраций, либо включите безлимит.</li>
+                    </ul>
+                </aside>
+            </div>
+
+            <div class="club-payments-grid club-payments-grid--single">
+                <div class="club-payments-card club-payments-card--form">
+                    <div class="club-payments-card__header">
+                        <div>
+                            <div class="club-payments-card__eyebrow">Plan Settings</div>
+                            <h2 class="club-payments-card__title">Параметры тарифа</h2>
+                        </div>
+                        <div class="club-payments-card__state {% if is_edit and plan.is_active %}club-payments-card__state--ok{% endif %}">
+                            {% if is_edit %}Редактирование{% else %}Черновик{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="club-payments-form">
+                        {% if form.non_field_errors %}
+                        <div class="club-payments-check club-payments-check--error">
+                            <span class="club-payments-check__icon">!</span>
+                            <span>{{ form.non_field_errors|join:", " }}</span>
+                        </div>
+                        {% endif %}
+
+                        <div class="club-player-plan-editor__grid">
+                            <div class="club-payments-form__field club-player-plan-editor__field club-player-plan-editor__field--wide">
+                                <label for="{{ form.name.id_for_label }}" class="club-payments-form__label">
+                                    {{ form.name.label }}
+                                </label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                <div class="club-payments-form__error">{{ form.name.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="club-payments-form__field club-player-plan-editor__field club-player-plan-editor__field--wide">
+                                <label for="{{ form.description.id_for_label }}" class="club-payments-form__label">
+                                    {{ form.description.label }}
+                                </label>
+                                {{ form.description }}
+                                <div class="club-payments-form__hint">Описание видно игрокам при выборе и оплате тарифа.</div>
+                                {% if form.description.errors %}
+                                <div class="club-payments-form__error">{{ form.description.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="club-payments-form__field club-player-plan-editor__field">
+                                <label for="{{ form.monthly_fee.id_for_label }}" class="club-payments-form__label">
+                                    {{ form.monthly_fee.label }}
+                                </label>
+                                {{ form.monthly_fee }}
+                                {% if form.monthly_fee.errors %}
+                                <div class="club-payments-form__error">{{ form.monthly_fee.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="club-payments-form__field club-player-plan-editor__field">
+                                <label for="{{ form.duration_days.id_for_label }}" class="club-payments-form__label">
+                                    {{ form.duration_days.label }}
+                                </label>
+                                {{ form.duration_days }}
+                                <div class="club-payments-form__hint">{{ form.duration_days.help_text|default:"Сколько дней действует оплаченный тариф." }}</div>
+                                {% if form.duration_days.errors %}
+                                <div class="club-payments-form__error">{{ form.duration_days.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="club-payments-form__field club-player-plan-editor__field">
+                                <label for="{{ form.max_tournaments_per_month.id_for_label }}" class="club-payments-form__label">
+                                    {{ form.max_tournaments_per_month.label }}
+                                </label>
+                                {{ form.max_tournaments_per_month }}
+                                <div class="club-payments-form__hint">{{ form.max_tournaments_per_month.help_text }}</div>
+                                {% if form.max_tournaments_per_month.errors %}
+                                <div class="club-payments-form__error">{{ form.max_tournaments_per_month.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="club-payments-form__field club-player-plan-editor__field">
+                                <label for="{{ form.sort_order.id_for_label }}" class="club-payments-form__label">
+                                    {{ form.sort_order.label }}
+                                </label>
+                                {{ form.sort_order }}
+                                <div class="club-payments-form__hint">Чем меньше число, тем выше тариф будет в списке.</div>
+                                {% if form.sort_order.errors %}
+                                <div class="club-payments-form__error">{{ form.sort_order.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="club-player-plan-editor__toggles">
+                            <label class="club-tournament-create__toggle-row" for="{{ form.is_active.id_for_label }}">
+                                {{ form.is_active }}
+                                <span>
+                                    <span class="club-tournament-create__toggle-title">{{ form.is_active.label }}</span>
+                                    <span class="club-tournament-create__toggle-help">Активный тариф доступен для выбора, оплаты и ручного назначения.</span>
+                                </span>
+                            </label>
+                            {% if form.is_active.errors %}
+                            <div class="club-payments-form__error">{{ form.is_active.errors|join:", " }}</div>
+                            {% endif %}
+
+                            <label class="club-tournament-create__toggle-row" for="{{ form.has_unlimited_registrations.id_for_label }}">
+                                {{ form.has_unlimited_registrations }}
+                                <span>
+                                    <span class="club-tournament-create__toggle-title">{{ form.has_unlimited_registrations.label }}</span>
+                                    <span class="club-tournament-create__toggle-help">Если опция включена, лимит турниров в месяц не используется.</span>
+                                </span>
+                            </label>
+                            {% if form.has_unlimited_registrations.errors %}
+                            <div class="club-payments-form__error">{{ form.has_unlimited_registrations.errors|join:", " }}</div>
+                            {% endif %}
+
+                            <label class="club-tournament-create__toggle-row" for="{{ form.allow_self_change.id_for_label }}">
+                                {{ form.allow_self_change }}
+                                <span>
+                                    <span class="club-tournament-create__toggle-title">{{ form.allow_self_change.label }}</span>
+                                    <span class="club-tournament-create__toggle-help">Игрок сможет сам выбрать этот тариф в личном кабинете клуба.</span>
+                                </span>
+                            </label>
+                            {% if form.allow_self_change.errors %}
+                            <div class="club-payments-form__error">{{ form.allow_self_change.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="club-payments-form__actions">
+                            <button type="submit" class="btn btn-primary">{% if is_edit %}Сохранить изменения{% else %}Создать тариф{% endif %}</button>
+                            <a href="{% url 'clubs:plans_manage' slug=club.slug %}" class="btn btn-outline">Отмена</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
     </div>
-</div>
+</section>
+
+<style>
+    .club-player-plan-editor__grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--spacing-md);
+    }
+
+    .club-player-plan-editor__field--wide {
+        grid-column: 1 / -1;
+    }
+
+    .club-player-plan-editor__toggles {
+        display: grid;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-md);
+        padding-top: var(--spacing-md);
+        border-top: 1px solid rgba(191, 149, 63, 0.18);
+    }
+
+    .club-player-plan-editor .club-tournament-create__toggle-row {
+        margin: 0;
+    }
+
+    @media (max-width: 768px) {
+        .club-player-plan-editor__grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 {% endblock %}

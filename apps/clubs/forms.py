@@ -2,7 +2,7 @@
 Формы клубного раздела: регистрация клуба, инвайты, приглашения, панель клуба.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -717,6 +717,8 @@ class ClubPlayerPlanForm(forms.ModelForm):
             "description",
             "is_active",
             "monthly_fee",
+            "duration_days",
+            "has_unlimited_registrations",
             "max_tournaments_per_month",
             "allow_self_change",
             "sort_order",
@@ -738,13 +740,18 @@ class ClubPlayerPlanForm(forms.ModelForm):
             "name",
             "description",
             "monthly_fee",
+            "duration_days",
             "max_tournaments_per_month",
             "sort_order",
         ]:
             self.fields[field_name].widget.attrs[
                 "class"
             ] = "form-control club-payments-form__control"
-        for field_name in ["is_active", "allow_self_change"]:
+        for field_name in [
+            "is_active",
+            "allow_self_change",
+            "has_unlimited_registrations",
+        ]:
             self.fields[field_name].widget.attrs["class"] = "form-checkbox"
         self.fields["name"].widget.attrs.setdefault("placeholder", "Например, Базовый")
         self.fields["description"].widget.attrs.setdefault(
@@ -752,11 +759,29 @@ class ClubPlayerPlanForm(forms.ModelForm):
             "Кратко опишите, что входит в тариф и кому он подходит.",
         )
         self.fields["monthly_fee"].widget.attrs.setdefault("placeholder", "1000")
+        self.fields["duration_days"].widget.attrs.setdefault("placeholder", "30")
         self.fields["max_tournaments_per_month"].widget.attrs.setdefault(
             "placeholder",
             "Например, 5",
         )
         self.fields["sort_order"].widget.attrs.setdefault("placeholder", "0")
+        self.fields["duration_days"].widget.attrs.setdefault("min", 1)
+
+    def clean(self) -> dict[str, Any]:
+        """Проверяет согласованность лимита и флага безлимитных регистраций."""
+        cleaned_data = cast(dict[str, Any], super().clean())
+        has_unlimited_registrations = bool(
+            cleaned_data.get("has_unlimited_registrations")
+        )
+        max_tournaments_per_month = cleaned_data.get("max_tournaments_per_month")
+        if has_unlimited_registrations:
+            cleaned_data["max_tournaments_per_month"] = None
+        elif max_tournaments_per_month is None:
+            self.add_error(
+                "max_tournaments_per_month",
+                "Укажите лимит турниров в месяц или включите безлимитные регистрации.",
+            )
+        return cleaned_data
 
 
 class ClubMemberPlanSelectForm(forms.Form):

@@ -25,7 +25,7 @@
 
             <div class="pricing-card__price">
                 <span class="price-amount">{{ plan.monthly_fee|floatformat:0|intcomma }} ₽</span>
-                <span class="price-period">на 30 дней</span>
+                <span class="price-period">на {{ plan.duration_days }} дн.</span>
             </div>
 
             <div class="pricing-card__features">
@@ -41,11 +41,19 @@
                     <span class="pricing-feature__icon pricing-feature__icon--success">&#10003;</span>
                     <div class="pricing-feature__content">
                         <strong>Регистрации на турниры:</strong>
-                        {% if plan.max_tournaments_per_month is None %}
+                        {% if plan.has_unlimited_registrations %}
                         <span class="pricing-feature__value">Безлимит</span>
                         {% else %}
                         <span class="pricing-feature__value">{{ plan.max_tournaments_per_month }} в месяц</span>
                         {% endif %}
+                    </div>
+                </div>
+
+                <div class="pricing-feature">
+                    <span class="pricing-feature__icon pricing-feature__icon--success">&#10003;</span>
+                    <div class="pricing-feature__content">
+                        <strong>Срок действия:</strong>
+                        <span class="pricing-feature__value">{{ plan.duration_days }} дн.</span>
                     </div>
                 </div>
 

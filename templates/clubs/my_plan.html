@@ -35,7 +35,7 @@
                 {% endif %}
                 <div class="subscription-info__row">
                     <span class="subscription-info__label">Стоимость:</span>
-                    <span>{{ member_plan.plan.monthly_fee|floatformat:0 }} ₽ / 30 дней</span>
+                    <span>{{ member_plan.plan.monthly_fee|floatformat:0 }} ₽ / {{ member_plan.plan.duration_days }} дн.</span>
                 </div>
 
                 {% if plan_limits and plan_limits.monthly_tournaments_limit %}
@@ -54,6 +54,10 @@
                     <span>Безлимит</span>
                 </div>
                 {% endif %}
+                <div class="subscription-info__row">
+                    <span class="subscription-info__label">Срок тарифа:</span>
+                    <span>{{ member_plan.plan.duration_days }} дн.</span>
+                </div>
 
                 <div class="subscription-info__actions">
                     <a href="{% url 'clubs:my_plan_change' %}" class="btn btn-sm btn-outline" style="flex: 1;">Сменить тариф</a>

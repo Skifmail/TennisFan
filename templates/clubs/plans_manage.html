@@ -9,7 +9,7 @@
                 <div class="club-payments-page__eyebrow">Player Plans</div>
                 <h1 class="club-payments-page__title">Тарифы игроков</h1>
                 <p class="club-payments-page__subtitle">
-                    Управляйте линейкой клубных тарифов: задавайте стоимость, лимит турниров и вручную назначайте подходящий тариф участнику.
+                    Управляйте линейкой клубных тарифов: задавайте стоимость, срок действия, лимиты регистрации и вручную назначайте подходящий тариф участнику.
                 </p>
 
                 <div class="club-payments-page__status-row">
@@ -68,7 +68,7 @@
                     <div class="club-dashboard-table__head">
                         <div class="club-dashboard-table__cell">Название</div>
                         <div class="club-dashboard-table__cell">Взнос</div>
-                        <div class="club-dashboard-table__cell">Лимит турниров</div>
+                        <div class="club-dashboard-table__cell">Срок и регистрации</div>
                         <div class="club-dashboard-table__cell">Статус</div>
                         <div class="club-dashboard-table__cell">Действие</div>
                     </div>
@@ -86,14 +86,16 @@
                         </div>
                         <div class="club-dashboard-table__cell">
                             <span class="club-player-plans-table__mobile-label">Взнос</span>
-                            {{ plan.monthly_fee }} ₽/мес
+                            {{ plan.monthly_fee }} ₽ / {{ plan.duration_days }} дн.
                         </div>
                         <div class="club-dashboard-table__cell">
-                            <span class="club-player-plans-table__mobile-label">Лимит</span>
-                            {% if plan.max_tournaments_per_month is None %}
-                            Без лимита
+                            <span class="club-player-plans-table__mobile-label">Срок и регистрации</span>
+                            {{ plan.duration_days }} дн.
+                            <br>
+                            {% if plan.has_unlimited_registrations %}
+                            Безлимитные регистрации
                             {% else %}
-                            {{ plan.max_tournaments_per_month }}
+                            {{ plan.max_tournaments_per_month }} в месяц
                             {% endif %}
                         </div>
                         <div class="club-dashboard-table__cell">

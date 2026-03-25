@@ -1,11 +1,15 @@
 import logging
+import secrets
 from decimal import Decimal
 from typing import cast
 from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import get_user_model
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -36,6 +40,34 @@ def _get_request_ip(request: HttpRequest) -> str | None:
         return forwarded_for.split(",")[0].strip() or None
     remote_addr = request.META.get("REMOTE_ADDR", "").strip()
     return remote_addr or None
+
+
+def _get_or_create_donation_guest_user() -> AbstractBaseUser:
+    default_from = (getattr(settings, "DEFAULT_FROM_EMAIL", None) or "").strip()
+    if "@" in default_from:
+        domain = default_from.split("@", 1)[1].strip()
+    else:
+        domain = "tennisfan.ru"
+    guest_email = f"donation-guest@{domain}".strip().lower()
+
+    user_model = get_user_model()
+    try:
+        return cast(AbstractBaseUser, user_model.objects.get(email=guest_email))
+    except user_model.DoesNotExist:
+        pass
+
+    password = secrets.token_urlsafe(32)
+    try:
+        created = user_model.objects.create_user(
+            email=guest_email,
+            password=password,
+            first_name="Гость",
+            last_name="Донат",
+        )
+        return cast(AbstractBaseUser, created)
+    except IntegrityError:
+        # Гонка при одновременной оплате: кто-то успел создать запись раньше.
+        return cast(AbstractBaseUser, user_model.objects.get(email=guest_email))
 
 
 def _get_item_label(payment_type: str, item_id: str) -> str:
@@ -1056,16 +1088,22 @@ def payment_return(request: HttpRequest) -> HttpResponse:
                     payment_method_id=pm_id, defaults=defaults
                 )
 
-    if request.user.is_authenticated and payment_id:
+    if payment_id and (request.user.is_authenticated or payment_type == "donation"):
+        payment_user: AbstractBaseUser
+        if request.user.is_authenticated:
+            payment_user = cast(AbstractBaseUser, request.user)
+        else:
+            payment_user = _get_or_create_donation_guest_user()
+
         _log_offer_acceptance(
             request,
-            user=request.user,
+            user=payment_user,
             payment_type=payment_type,
             item_id=item_id,
             payment_id=payment_id,
         )
         _create_payment_record(
-            user=request.user,
+            user=payment_user,
             payment_type=payment_type,
             item_id=item_id,
             amount_str=str(pending.get("amount", "")),

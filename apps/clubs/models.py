@@ -6,6 +6,7 @@ import decimal
 from typing import cast
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
@@ -345,7 +346,9 @@ class ClubPlayerPlan(models.Model):
         club: Клуб-владелец тарифа.
         name: Название тарифа (например, Юниор/VIP).
         monthly_fee: Ежемесячный взнос по тарифу.
-        max_tournaments_per_month: Лимит турниров в месяц (None — без лимита).
+        duration_days: Срок действия тарифа в днях.
+        max_tournaments_per_month: Лимит турниров в месяц.
+        has_unlimited_registrations: Безлимитные регистрации по тарифу.
 
     Логика лимитов (аналогично глобальной платформе):
         - Однодневные турниры: лимит НЕ расходуется (оплата взноса, если есть)
@@ -368,11 +371,21 @@ class ClubPlayerPlan(models.Model):
         decimal_places=2,
         default=0,
     )
+    duration_days = models.PositiveIntegerField(
+        "Срок действия в днях",
+        default=30,
+        help_text="Сколько дней действует оплаченный тариф.",
+    )
     max_tournaments_per_month = models.PositiveIntegerField(
         "Лимит турниров в месяц",
         null=True,
         blank=True,
-        help_text="Пусто — без лимита. Однодневные турниры не расходуют лимит.",
+        help_text="Обязателен, если безлимитные регистрации выключены.",
+    )
+    has_unlimited_registrations = models.BooleanField(
+        "Безлимитные регистрации",
+        default=False,
+        help_text="Если включено, лимит турниров в месяц не применяется.",
     )
     allow_self_change = models.BooleanField(
         "Разрешить самостоятельную смену тарифа игроком",
@@ -397,11 +410,47 @@ class ClubPlayerPlan(models.Model):
                 name="club_player_plan_monthly_fee_gte_0",
             ),
             models.CheckConstraint(
+                condition=models.Q(duration_days__gte=1),
+                name="club_player_plan_duration_days_gte_1",
+            ),
+            models.CheckConstraint(
                 condition=models.Q(max_tournaments_per_month__gte=0)
                 | models.Q(max_tournaments_per_month__isnull=True),
                 name="club_player_plan_tournaments_gte_0_or_null",
             ),
+            models.CheckConstraint(
+                condition=models.Q(has_unlimited_registrations=True)
+                | models.Q(max_tournaments_per_month__isnull=False),
+                name="club_player_plan_limit_required_without_unlimited",
+            ),
         ]
+
+    def clean(self) -> None:
+        """Проверяет согласованность срока и правил регистраций тарифа."""
+        super().clean()
+        if self.duration_days < 1:
+            raise ValidationError(
+                {"duration_days": "Срок действия тарифа должен быть не меньше 1 дня."}
+            )
+        if self.has_unlimited_registrations:
+            self.max_tournaments_per_month = None
+            return
+        if self.max_tournaments_per_month is None:
+            raise ValidationError(
+                {
+                    "max_tournaments_per_month": (
+                        "Укажите лимит турниров в месяц или включите безлимитные регистрации."
+                    )
+                }
+            )
+
+    @property
+    def registrations_limit(self) -> int | None:
+        """Возвращает лимит регистраций или None для безлимитного тарифа."""
+        if self.has_unlimited_registrations:
+            return None
+        # Тип Django-моделей для null-поля может определяться как Any.
+        return cast(int | None, self.max_tournaments_per_month)
 
     def __str__(self) -> str:
         return f"{self.club.name} — {self.name}"

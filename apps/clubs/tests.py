@@ -11,7 +11,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.clubs.forms import ClubTournamentCreateForm
+from apps.clubs.forms import ClubPlayerPlanForm, ClubTournamentCreateForm
 from apps.clubs.models import (
     Club,
     ClubFeePayment,
@@ -30,7 +30,12 @@ from apps.clubs.models import (
     ClubPlayerPlan,
     FeePaymentMethod,
 )
-from apps.clubs.plan_services import get_member_plan_limits, purchase_member_plan
+from apps.clubs.plan_services import (
+    can_member_register_for_tournament,
+    consume_member_tournament_limit,
+    get_member_plan_limits,
+    purchase_member_plan,
+)
 from apps.clubs.services import get_current_period_label
 from apps.core.models import UserTelegramLink
 from apps.payments.models import PaymentRecord, SavedPaymentMethod
@@ -86,6 +91,42 @@ class ClubTournamentCreateFormTestCase(TestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["slug"], "test-club-tournament")
+
+
+class ClubPlayerPlanFormTestCase(TestCase):
+    def test_unlimited_registrations_clear_limit(self) -> None:
+        form = ClubPlayerPlanForm(
+            data={
+                "name": "Безлимит",
+                "description": "",
+                "is_active": "on",
+                "monthly_fee": "1500",
+                "duration_days": "45",
+                "has_unlimited_registrations": "on",
+                "max_tournaments_per_month": "9",
+                "allow_self_change": "on",
+                "sort_order": "0",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIsNone(form.cleaned_data["max_tournaments_per_month"])
+
+    def test_limited_plan_requires_monthly_limit(self) -> None:
+        form = ClubPlayerPlanForm(
+            data={
+                "name": "Лимитный",
+                "description": "",
+                "is_active": "on",
+                "monthly_fee": "900",
+                "duration_days": "30",
+                "allow_self_change": "on",
+                "sort_order": "0",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("max_tournaments_per_month", form.errors)
 
 
 class ClubNotificationSettingsViewTestCase(TestCase):
@@ -172,6 +213,54 @@ class ClubNotificationSettingsViewTestCase(TestCase):
         self.assertTrue(settings_obj.telegram_enabled)
 
 
+class ClubPlayerPlanManagementViewTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="club-admin@test.local",
+            password="testpass123",
+        )
+        self.club = Club.objects.create(
+            name="Тестовый клуб",
+            slug="test-club-plans",
+            city="Москва",
+            address="ул. Пушкина, 1",
+            email="club@test.local",
+            admin_name="Администратор клуба",
+        )
+        ClubMember.objects.create(
+            club=self.club,
+            user=self.user,
+            role=ClubMemberRole.ADMIN,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        self.client.force_login(self.user)
+
+    def test_admin_can_create_plan_with_duration_and_unlimited_flag(self) -> None:
+        response = self.client.post(
+            reverse("clubs:plan_create", kwargs={"slug": self.club.slug}),
+            data={
+                "name": "Премиум",
+                "description": "Описание",
+                "is_active": "on",
+                "monthly_fee": "2500",
+                "duration_days": "90",
+                "has_unlimited_registrations": "on",
+                "max_tournaments_per_month": "",
+                "allow_self_change": "on",
+                "sort_order": "3",
+            },
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        plan = ClubPlayerPlan.objects.get(club=self.club, name="Премиум")
+        self.assertEqual(plan.duration_days, 90)
+        self.assertTrue(plan.has_unlimited_registrations)
+        self.assertIsNone(plan.max_tournaments_per_month)
+
+
 class ClubPlanPurchaseServiceTestCase(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(
@@ -198,6 +287,7 @@ class ClubPlanPurchaseServiceTestCase(TestCase):
             club=self.club,
             name="Старый",
             monthly_fee=1000,
+            duration_days=30,
             max_tournaments_per_month=5,
             is_active=True,
         )
@@ -205,6 +295,7 @@ class ClubPlanPurchaseServiceTestCase(TestCase):
             club=self.club,
             name="Новый",
             monthly_fee=1500,
+            duration_days=30,
             max_tournaments_per_month=4,
             is_active=True,
         )
@@ -237,6 +328,105 @@ class ClubPlanPurchaseServiceTestCase(TestCase):
         assert limits is not None
         self.assertEqual(limits.monthly_tournaments_limit, 7)
         self.assertEqual(limits.tournaments_left, 7)
+
+    def test_purchase_uses_plan_duration_days(self) -> None:
+        plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="45 дней",
+            monthly_fee=1700,
+            duration_days=45,
+            max_tournaments_per_month=4,
+            is_active=True,
+        )
+
+        assignment = purchase_member_plan(self.member, plan)
+
+        self.assertIsNotNone(assignment.ended_at)
+        assert assignment.ended_at is not None
+        self.assertGreaterEqual(
+            assignment.ended_at.date(),
+            timezone.localdate() + timedelta(days=44),
+        )
+
+    def test_unlimited_plan_returns_unlimited_limits_and_does_not_block_after_usage(
+        self,
+    ) -> None:
+        plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Безлимит",
+            monthly_fee=2200,
+            duration_days=60,
+            has_unlimited_registrations=True,
+            max_tournaments_per_month=None,
+            is_active=True,
+        )
+        self.club.use_player_plans = True
+        self.club.save(update_fields=["use_player_plans"])
+        purchase_member_plan(self.member, plan)
+        tournament = Tournament.objects.create(
+            name="Многодневный клубный",
+            slug="club-unlimited-plan",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.ROUND_ROBIN,
+            status=TournamentStatus.UPCOMING,
+            gender=TournamentGender.OPEN,
+            entry_fee=0,
+            is_one_day=False,
+        )
+        tournament.allowed_categories.create(category="amateur")
+
+        limits = get_member_plan_limits(self.member)
+        self.assertIsNotNone(limits)
+        assert limits is not None
+        self.assertIsNone(limits.monthly_tournaments_limit)
+        self.assertTrue(can_member_register_for_tournament(self.member, tournament)[0])
+
+        for _ in range(3):
+            success, message = consume_member_tournament_limit(self.member, tournament)
+            self.assertTrue(success, message)
+
+        refreshed_limits = get_member_plan_limits(self.member)
+        self.assertIsNotNone(refreshed_limits)
+        assert refreshed_limits is not None
+        self.assertIsNone(refreshed_limits.tournaments_left)
+        self.assertEqual(refreshed_limits.tournaments_used, 3)
+
+    def test_expired_plan_is_not_considered_active(self) -> None:
+        plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Истёкший",
+            monthly_fee=800,
+            duration_days=10,
+            max_tournaments_per_month=2,
+            is_active=True,
+        )
+        assignment = purchase_member_plan(self.member, plan)
+        assignment.ended_at = timezone.now() - timedelta(minutes=1)
+        assignment.save(update_fields=["ended_at"])
+        self.club.use_player_plans = True
+        self.club.save(update_fields=["use_player_plans"])
+        tournament = Tournament.objects.create(
+            name="Проверка срока",
+            slug="club-plan-expired-check",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.ROUND_ROBIN,
+            status=TournamentStatus.UPCOMING,
+            gender=TournamentGender.OPEN,
+            entry_fee=0,
+            is_one_day=False,
+        )
+        tournament.allowed_categories.create(category="amateur")
+
+        can_register, message = can_member_register_for_tournament(
+            self.member, tournament
+        )
+
+        self.assertFalse(can_register)
+        self.assertEqual(message, "Для участия в турнирах клуба нужно выбрать тариф.")
 
 
 class ClubTournamentManagementViewsTestCase(TestCase):

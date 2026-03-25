@@ -176,9 +176,9 @@ def my_plan_payment_preview(request: HttpRequest, plan_id: int) -> HttpResponse:
     details = [
         ("Клуб", member.club.name),
         ("Тариф", plan.name),
-        ("Период", "30 дней"),
+        ("Период", f"{plan.duration_days} дн."),
     ]
-    if plan.max_tournaments_per_month is None:
+    if plan.has_unlimited_registrations:
         details.append(("Регистрации", "Безлимит"))
     else:
         details.append(("Регистрации", f"{plan.max_tournaments_per_month} в месяц"))

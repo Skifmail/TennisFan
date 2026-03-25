@@ -337,6 +337,10 @@ def platform_dashboard(request):
     finance_donation_revenue = finance_payments.filter(
         payment_type=PaymentRecord.PaymentType.DONATION
     ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal("0")
+    finance_donation_revenue_all_time = PaymentRecord.objects.filter(
+        status="succeeded",
+        payment_type=PaymentRecord.PaymentType.DONATION,
+    ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal("0")
     finance_club_revenue = finance_club_subscriptions.aggregate(
         total=Coalesce(Sum("price"), Decimal("0"))
     )["total"] or Decimal("0")
@@ -622,7 +626,7 @@ def platform_dashboard(request):
         },
         {
             "label": "Донаты и всё время",
-            "value": f"{finance_donation_revenue:.0f} ₽",
+            "value": f"{finance_donation_revenue_all_time:.0f} ₽",
             "meta": f"Суммарно платформа обработала {total_platform_revenue:.0f} ₽",
             "tone": "default",
         },

@@ -58,7 +58,11 @@
                         </div>
                         <div class="club-finance-summary__item">
                             <span class="club-finance-summary__label">Стоимость</span>
-                            <strong class="club-finance-summary__value">{{ member_plan.plan.monthly_fee|floatformat:0 }} ₽ / 30 дней</strong>
+                            <strong class="club-finance-summary__value">{{ member_plan.plan.monthly_fee|floatformat:0 }} ₽ / {{ member_plan.plan.duration_days }} дн.</strong>
+                        </div>
+                        <div class="club-finance-summary__item">
+                            <span class="club-finance-summary__label">Срок тарифа</span>
+                            <strong class="club-finance-summary__value">{{ member_plan.plan.duration_days }} дн.</strong>
                         </div>
                         <div class="club-finance-summary__item">
                             <span class="club-finance-summary__label">Действует до</span>

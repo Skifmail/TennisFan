@@ -1387,6 +1387,33 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
         )
         self.assertFalse(tournament.participants.filter(pk=self.player.pk).exists())
 
+    def test_member_with_expired_club_plan_cannot_register_for_free_multiday_club_tournament(
+        self,
+    ) -> None:
+        assignment = ClubMemberPlan.objects.get(
+            club_member=self.member, status="active"
+        )
+        assignment.ended_at = timezone.now() - timedelta(minutes=1)
+        assignment.save(update_fields=["ended_at"])
+        tournament = self._create_club_tournament(
+            slug="club-multiday-free-expired-plan",
+            entry_fee=0,
+            is_one_day=False,
+        )
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Для участия в турнирах клуба нужно выбрать тариф.",
+        )
+        self.assertFalse(tournament.participants.filter(pk=self.player.pk).exists())
+
     def test_member_without_club_plan_is_redirected_to_payment_for_paid_multiday_club_tournament(
         self,
     ) -> None:

@@ -12,6 +12,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.core.consent_utils import record_platform_consent
+from apps.legal.utils import get_legal_document_version
 from apps.tournaments.models import Match, Tournament, TournamentStatus
 from apps.users.models import Notification
 
@@ -233,7 +234,7 @@ def register_step3(request: HttpRequest) -> HttpResponse:
         record_platform_consent(
             request,
             "club_organizer_rules",
-            "1.0",
+            get_legal_document_version("club-organizer-rules"),
         )
         for key in (
             "club_registration_step1",

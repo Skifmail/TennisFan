@@ -1,6 +1,13 @@
-from datetime import date
+import json
+from datetime import date, timedelta
+from decimal import Decimal
+from io import StringIO
+from unittest.mock import patch
 
-from django.test import Client, TestCase
+from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -8,17 +15,26 @@ from apps.clubs.forms import ClubTournamentCreateForm
 from apps.clubs.models import (
     Club,
     ClubFeePayment,
+    ClubFeePaymentPending,
+    ClubInviteLink,
     ClubJoinRequest,
     ClubJoinRequestStatus,
     ClubMember,
+    ClubMemberBalanceTransaction,
     ClubMemberPlan,
     ClubMemberRole,
     ClubMembershipFee,
     ClubMemberStatus,
+    ClubNotificationSettings,
+    ClubPlanSlotUsage,
     ClubPlayerPlan,
     FeePaymentMethod,
 )
+from apps.clubs.plan_services import get_member_plan_limits, purchase_member_plan
+from apps.clubs.services import get_current_period_label
+from apps.core.models import UserTelegramLink
 from apps.payments.models import PaymentRecord, SavedPaymentMethod
+from apps.subscriptions.models import SubscriptionTier, UserSubscription
 from apps.tournaments.models import (
     Match,
     Tournament,
@@ -72,6 +88,157 @@ class ClubTournamentCreateFormTestCase(TestCase):
         self.assertEqual(form.cleaned_data["slug"], "test-club-tournament")
 
 
+class ClubNotificationSettingsViewTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="member@test.local",
+            password="testpass123",
+        )
+        self.club = Club.objects.create(
+            name="Тестовый клуб",
+            slug="test-club-notify",
+            city="Москва",
+            address="ул. Пушкина, 1",
+            email="club@test.local",
+            admin_name="Администратор клуба",
+        )
+        ClubMember.objects.create(
+            club=self.club,
+            user=self.user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["current_club_slug"] = self.club.slug
+        session.save()
+
+    def test_page_shows_actual_delivery_destinations(self) -> None:
+        response = self.client.get(
+            reverse("clubs:my_notification_settings"),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "member@test.local")
+        self.assertContains(response, "Бот не подключён")
+        self.assertContains(response, "Игроку отсюда приходят")
+
+    def test_telegram_channel_requires_connected_bot(self) -> None:
+        response = self.client.post(
+            reverse("clubs:my_notification_settings"),
+            {
+                "is_enabled": "on",
+                "email_enabled": "on",
+                "telegram_enabled": "on",
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        settings_obj = ClubNotificationSettings.objects.get(
+            user=self.user,
+            club=self.club,
+        )
+        self.assertFalse(settings_obj.telegram_enabled)
+        self.assertContains(
+            response,
+            "Сначала подключите Telegram-бота в профиле",
+        )
+
+    def test_telegram_channel_is_saved_after_bot_connection(self) -> None:
+        UserTelegramLink.objects.create(
+            user=self.user,
+            user_bot_chat_id=123456,
+        )
+
+        response = self.client.post(
+            reverse("clubs:my_notification_settings"),
+            {
+                "is_enabled": "on",
+                "email_enabled": "on",
+                "telegram_enabled": "on",
+            },
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        settings_obj = ClubNotificationSettings.objects.get(
+            user=self.user,
+            club=self.club,
+        )
+        self.assertTrue(settings_obj.telegram_enabled)
+
+
+class ClubPlanPurchaseServiceTestCase(TestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            email="player@test.local",
+            password="testpass123",
+        )
+        self.club = Club.objects.create(
+            name="Тестовый клуб",
+            slug="test-club",
+            city="Москва",
+            address="ул. Пушкина, 1",
+            email="club@test.local",
+            admin_name="Администратор клуба",
+        )
+        self.member = ClubMember.objects.create(
+            club=self.club,
+            user=self.user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+
+    def test_switching_plan_before_end_carries_days_and_remaining_slots(self) -> None:
+        old_plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Старый",
+            monthly_fee=1000,
+            max_tournaments_per_month=5,
+            is_active=True,
+        )
+        new_plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Новый",
+            monthly_fee=1500,
+            max_tournaments_per_month=4,
+            is_active=True,
+        )
+
+        active_plan = purchase_member_plan(self.member, old_plan)
+        active_plan.ended_at = timezone.now() + timedelta(days=10)
+        active_plan.save(update_fields=["ended_at"])
+
+        year, month = timezone.localdate().year, timezone.localdate().month
+        ClubPlanSlotUsage.objects.create(
+            club_member=self.member,
+            plan=old_plan,
+            period_year=year,
+            period_month=month,
+            tournaments_used=2,
+        )
+
+        switched_plan = purchase_member_plan(self.member, new_plan)
+        limits = get_member_plan_limits(self.member)
+
+        self.assertEqual(switched_plan.plan, new_plan)
+        self.assertIsNotNone(switched_plan.ended_at)
+        assert switched_plan.ended_at is not None
+        self.assertGreaterEqual(
+            switched_plan.ended_at.date(),
+            (timezone.localdate() + timedelta(days=39)),
+        )
+        self.assertEqual(switched_plan.bonus_tournaments_balance, 3)
+        self.assertIsNotNone(limits)
+        assert limits is not None
+        self.assertEqual(limits.monthly_tournaments_limit, 7)
+        self.assertEqual(limits.tournaments_left, 7)
+
+
 class ClubTournamentManagementViewsTestCase(TestCase):
     def setUp(self) -> None:
         self.client = Client()
@@ -87,7 +254,7 @@ class ClubTournamentManagementViewsTestCase(TestCase):
             email="club@test.local",
             admin_name="Администратор клуба",
         )
-        ClubMember.objects.create(
+        self.member = ClubMember.objects.create(
             club=self.club,
             user=self.user,
             role=ClubMemberRole.ADMIN,
@@ -588,6 +755,55 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         self.assertTrue(method.is_default_for_subscriptions)
         self.assertFalse(method.is_default_for_club_plans)
 
+    def test_member_can_enable_club_plan_auto_renew_when_card_is_saved(self) -> None:
+        plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Авто",
+            monthly_fee=2000,
+            max_tournaments_per_month=4,
+            is_active=True,
+        )
+        assignment = purchase_member_plan(self.member, plan, auto_renew=False)
+        SavedPaymentMethod.objects.create(
+            user=self.user,
+            club=self.club,
+            payment_method_id="club-plan-card-enable-1",
+            card_last4="4477",
+            card_network="Mastercard",
+            is_active=True,
+            is_default_for_club_plans=True,
+        )
+
+        response = self.client.post(
+            reverse("clubs:my_plan_enable_auto_renew"),
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        assignment.refresh_from_db()
+        self.assertTrue(assignment.auto_renew)
+
+    def test_member_cannot_enable_club_plan_auto_renew_without_saved_card(self) -> None:
+        plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Без карты",
+            monthly_fee=2000,
+            max_tournaments_per_month=4,
+            is_active=True,
+        )
+        assignment = purchase_member_plan(self.member, plan, auto_renew=False)
+
+        response = self.client.post(
+            reverse("clubs:my_plan_enable_auto_renew"),
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        assignment.refresh_from_db()
+        self.assertFalse(assignment.auto_renew)
+
     def test_member_can_disable_club_fee_autopay_without_affecting_plan_flag(
         self,
     ) -> None:
@@ -836,6 +1052,228 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         self.assertContains(response, "Москва")
         self.assertContains(response, "+79990000000")
 
+    def test_invites_list_shows_inline_action_forms(self) -> None:
+        response = self.client.get(
+            reverse("clubs:invites_list", kwargs={"slug": self.club.slug}),
+            secure=True,
+        )
+        page = response.content.decode("utf-8")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="invite_action"', count=3, html=False)
+        self.assertContains(response, 'value="create_link"', html=False)
+        self.assertContains(response, 'value="invite_email"', html=False)
+        self.assertContains(response, 'value="import_csv"', html=False)
+        self.assertContains(response, 'name="email"', html=False)
+        self.assertContains(response, 'name="file"', html=False)
+        self.assertContains(response, "Скачать шаблон")
+        self.assertContains(
+            response,
+            reverse("clubs:invite_import_template", kwargs={"slug": self.club.slug}),
+        )
+        self.assertLess(page.index("Инвайт-ссылки"), page.index("Быстрые действия"))
+
+    def test_invite_import_template_download(self) -> None:
+        response = self.client.get(
+            reverse("clubs:invite_import_template", kwargs={"slug": self.club.slug}),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        self.assertIn(
+            f"{self.club.slug}-invite-template.csv",
+            response["Content-Disposition"],
+        )
+        self.assertIn(b"email", response.content)
+
+    def test_invites_list_can_create_link_inline(self) -> None:
+        response = self.client.post(
+            reverse("clubs:invites_list", kwargs={"slug": self.club.slug}),
+            {
+                "invite_action": "create_link",
+                "expires_days": "7",
+                "max_uses": "3",
+            },
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:invites_list", kwargs={"slug": self.club.slug}),
+            fetch_redirect_response=False,
+        )
+        link = ClubInviteLink.objects.get(club=self.club)
+        self.assertEqual(link.max_uses, 3)
+        self.assertTrue(link.is_active)
+        self.assertIsNotNone(link.expires_at)
+
+    def test_invites_list_can_invite_user_by_email_inline(self) -> None:
+        invitee = User.objects.create_user(
+            email="invite-inline@test.local",
+            password="testpass123",
+        )
+
+        response = self.client.post(
+            reverse("clubs:invites_list", kwargs={"slug": self.club.slug}),
+            {
+                "invite_action": "invite_email",
+                "email": invitee.email,
+            },
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:invites_list", kwargs={"slug": self.club.slug}),
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(
+            ClubMember.objects.filter(
+                club=self.club,
+                user=invitee,
+                status=ClubMemberStatus.INVITED,
+            ).exists()
+        )
+
+    def test_invites_list_can_import_csv_inline(self) -> None:
+        first_user = User.objects.create_user(
+            email="import-inline-1@test.local",
+            password="testpass123",
+        )
+        second_user = User.objects.create_user(
+            email="import-inline-2@test.local",
+            password="testpass123",
+        )
+        upload = SimpleUploadedFile(
+            "club-invites.csv",
+            (f"{first_user.email}\n" f"{second_user.email}\n").encode(),
+            content_type="text/csv",
+        )
+
+        response = self.client.post(
+            reverse("clubs:invites_list", kwargs={"slug": self.club.slug}),
+            {
+                "invite_action": "import_csv",
+                "file": upload,
+            },
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:invites_list", kwargs={"slug": self.club.slug}),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            ClubMember.objects.filter(
+                club=self.club,
+                status=ClubMemberStatus.INVITED,
+                user__in=[first_user, second_user],
+            ).count(),
+            2,
+        )
+
+    def test_invites_list_shows_activate_and_delete_actions(self) -> None:
+        inactive_link = ClubInviteLink.objects.create(
+            club=self.club,
+            token="inactive-link-token",
+            created_by=self.user,
+            expires_at=timezone.now() + timedelta(days=3),
+            is_active=False,
+        )
+        expired_link = ClubInviteLink.objects.create(
+            club=self.club,
+            token="expired-link-token",
+            created_by=self.user,
+            expires_at=timezone.now() - timedelta(days=1),
+            is_active=True,
+        )
+
+        response = self.client.get(
+            reverse("clubs:invites_list", kwargs={"slug": self.club.slug}),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse(
+                "clubs:invite_activate",
+                kwargs={"slug": self.club.slug, "pk": inactive_link.pk},
+            ),
+        )
+        self.assertContains(
+            response,
+            reverse(
+                "clubs:invite_delete",
+                kwargs={"slug": self.club.slug, "pk": inactive_link.pk},
+            ),
+        )
+        self.assertContains(
+            response,
+            reverse(
+                "clubs:invite_delete",
+                kwargs={"slug": self.club.slug, "pk": expired_link.pk},
+            ),
+        )
+        self.assertNotContains(
+            response,
+            reverse(
+                "clubs:invite_activate",
+                kwargs={"slug": self.club.slug, "pk": expired_link.pk},
+            ),
+        )
+
+    def test_invite_activate_reactivates_inactive_link(self) -> None:
+        link = ClubInviteLink.objects.create(
+            club=self.club,
+            token="reactivate-link-token",
+            created_by=self.user,
+            expires_at=timezone.now() + timedelta(days=5),
+            is_active=False,
+        )
+
+        response = self.client.post(
+            reverse(
+                "clubs:invite_activate",
+                kwargs={"slug": self.club.slug, "pk": link.pk},
+            ),
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:invites_list", kwargs={"slug": self.club.slug}),
+            fetch_redirect_response=False,
+        )
+        link.refresh_from_db()
+        self.assertTrue(link.is_active)
+
+    def test_invite_delete_removes_expired_link(self) -> None:
+        link = ClubInviteLink.objects.create(
+            club=self.club,
+            token="expired-delete-link-token",
+            created_by=self.user,
+            expires_at=timezone.now() - timedelta(days=2),
+            is_active=True,
+        )
+
+        response = self.client.post(
+            reverse(
+                "clubs:invite_delete",
+                kwargs={"slug": self.club.slug, "pk": link.pk},
+            ),
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:invites_list", kwargs={"slug": self.club.slug}),
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(ClubInviteLink.objects.filter(pk=link.pk).exists())
+
     def test_club_dashboard_season_points_use_tournament_fan_points(self) -> None:
         player = Player.objects.create(user=self.user)
         tournament = Tournament.objects.create(
@@ -976,3 +1414,962 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         self.assertEqual(len(payload["results"]), 1)
         self.assertIn("Иванов", payload["results"][0]["display"])
         self.assertNotIn("Иванченко", payload["results"][0]["display"])
+
+
+class ClubPaymentIsolationTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="club-billing@test.local",
+            password="testpass123",
+        )
+        self.club = Club.objects.create(
+            name="Спартак",
+            slug="spartak-billing",
+            city="Москва",
+            address="ул. Спортивная, 1",
+            email="billing@test.local",
+            admin_name="Администратор клуба",
+        )
+        self.member = ClubMember.objects.create(
+            club=self.club,
+            user=self.user,
+            role=ClubMemberRole.ADMIN,
+            status=ClubMemberStatus.ACTIVE,
+            balance=Decimal("0.00"),
+        )
+        self.payment_settings = ClubMembershipFee.objects.create(
+            club=self.club,
+            amount=Decimal("300.00"),
+            currency="RUB",
+            period="monthly",
+            period_start_day=1,
+            payment_provider=ClubMembershipFee.PaymentProvider.YOOKASSA,
+            payment_shop_id="club-shop-001",
+            payment_api_key="club-secret-key",
+            is_active=True,
+        )
+        self.plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Платина",
+            monthly_fee=Decimal("1200.00"),
+            max_tournaments_per_month=6,
+            is_active=True,
+        )
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["current_club_slug"] = self.club.slug
+        session.save()
+
+    def test_club_plan_payment_process_uses_club_yookassa_credentials(self) -> None:
+        with (
+            patch(
+                "apps.clubs.views.subscription.decrypt_secret",
+                return_value="club-secret-key",
+            ),
+            patch(
+                "apps.clubs.views.subscription.create_payment_with_credentials",
+                return_value=("club-plan-pay-001", "https://pay.example/club-plan"),
+            ) as create_club_payment,
+            patch(
+                "apps.clubs.views.subscription.create_payment"
+            ) as create_global_payment,
+        ):
+            response = self.client.post(
+                reverse("clubs:my_plan_payment_process"),
+                {
+                    "id": str(self.plan.id),
+                    "offer_accepted": "on",
+                },
+                secure=True,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://pay.example/club-plan")
+        create_global_payment.assert_not_called()
+        create_club_payment.assert_called_once()
+        call_kwargs = create_club_payment.call_args.kwargs
+        self.assertEqual(call_kwargs["shop_id"], "club-shop-001")
+        self.assertEqual(call_kwargs["secret_key"], "club-secret-key")
+        self.assertEqual(call_kwargs["amount"], "1200.00")
+        self.assertEqual(call_kwargs["metadata"]["payment_type"], "club_plan")
+        self.assertEqual(call_kwargs["metadata"]["club_id"], self.club.id)
+        self.assertEqual(call_kwargs["metadata"]["club_slug"], self.club.slug)
+        self.assertEqual(call_kwargs["metadata"]["club_plan_id"], self.plan.id)
+        session = self.client.session
+        self.assertEqual(
+            session["club_plan_payment_pending"]["club_slug"], self.club.slug
+        )
+        self.assertEqual(session["club_plan_payment_pending"]["amount"], "1200.00")
+
+    def test_club_plan_payment_return_uses_club_credentials(self) -> None:
+        session = self.client.session
+        session["club_plan_payment_pending"] = {
+            "payment_id": "club-plan-pay-002",
+            "plan_id": self.plan.id,
+            "club_slug": self.club.slug,
+            "enable_autopay": "1",
+            "next": "",
+            "amount": "1200.00",
+            "balance_amount": "0.00",
+            "total_amount": "1200.00",
+            "balance_transaction_id": "",
+        }
+        session.save()
+
+        with (
+            patch(
+                "apps.clubs.views.subscription.decrypt_secret",
+                return_value="club-secret-key",
+            ),
+            patch(
+                "apps.clubs.views.subscription.get_payment_status_with_credentials",
+                return_value="succeeded",
+            ) as get_club_status,
+            patch(
+                "apps.clubs.views.subscription.get_payment_details_with_credentials",
+                return_value={
+                    "payment_method": {
+                        "id": "club-plan-method-1",
+                        "card": {
+                            "last4": "4488",
+                            "expiry_month": "12",
+                            "expiry_year": "2030",
+                            "card_type": "Mastercard",
+                        },
+                    }
+                },
+            ),
+            patch(
+                "apps.clubs.views.subscription.create_payment"
+            ) as create_global_payment,
+        ):
+            response = self.client.get(
+                reverse("clubs:my_plan_payment_return"),
+                secure=True,
+            )
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:my_plan"),
+            fetch_redirect_response=False,
+        )
+        create_global_payment.assert_not_called()
+        get_club_status.assert_called_once_with(
+            "club-plan-pay-002",
+            "club-shop-001",
+            "club-secret-key",
+        )
+        payment_record = PaymentRecord.objects.get(
+            yookassa_payment_id="club-plan-pay-002"
+        )
+        self.assertEqual(
+            payment_record.payment_type, PaymentRecord.PaymentType.CLUB_PLAN
+        )
+        self.assertEqual(str(payment_record.metadata["club_id"]), str(self.club.id))
+        self.assertEqual(payment_record.metadata["club_slug"], self.club.slug)
+        saved_method = SavedPaymentMethod.objects.get(
+            payment_method_id="club-plan-method-1"
+        )
+        self.assertEqual(saved_method.club, self.club)
+        self.assertTrue(saved_method.is_default_for_club_plans)
+        self.assertFalse(saved_method.is_default_for_subscriptions)
+        self.assertTrue(
+            ClubMemberPlan.objects.filter(
+                club_member=self.member,
+                plan=self.plan,
+                status="active",
+            ).exists()
+        )
+
+    def test_club_fee_payment_process_requires_offer_acceptance(self) -> None:
+        with patch(
+            "apps.clubs.views.payments.create_payment_with_credentials"
+        ) as create_club_payment:
+            response = self.client.post(
+                reverse("clubs:my_fees_pay"),
+                {},
+                secure=True,
+            )
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:my_fee_payment_preview"),
+            fetch_redirect_response=False,
+        )
+        create_club_payment.assert_not_called()
+
+    def test_club_fee_payment_process_uses_club_credentials_with_partial_balance(
+        self,
+    ) -> None:
+        self.member.balance = Decimal("100.00")
+        self.member.save(update_fields=["balance"])
+
+        with (
+            patch(
+                "apps.clubs.views.payments.decrypt_secret",
+                return_value="club-secret-key",
+            ),
+            patch(
+                "apps.clubs.views.payments.create_payment_with_credentials",
+                return_value=("club-fee-pay-001", "https://pay.example/club-fee"),
+            ) as create_club_payment,
+        ):
+            response = self.client.post(
+                reverse("clubs:my_fees_pay"),
+                {
+                    "offer_accepted": "on",
+                },
+                secure=True,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://pay.example/club-fee")
+        create_club_payment.assert_called_once()
+        call_kwargs = create_club_payment.call_args.kwargs
+        self.assertEqual(call_kwargs["shop_id"], "club-shop-001")
+        self.assertEqual(call_kwargs["secret_key"], "club-secret-key")
+        self.assertEqual(call_kwargs["amount"], "200.00")
+        self.assertEqual(call_kwargs["metadata"]["payment_type"], "club_fee")
+        self.assertEqual(call_kwargs["metadata"]["club_id"], str(self.club.id))
+        self.assertEqual(
+            call_kwargs["metadata"]["fee_id"], str(self.payment_settings.id)
+        )
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.balance, Decimal("0.00"))
+        balance_tx = ClubMemberBalanceTransaction.objects.get(member=self.member)
+        self.assertEqual(
+            balance_tx.status,
+            ClubMemberBalanceTransaction.Status.PENDING,
+        )
+        self.assertEqual(balance_tx.amount, Decimal("100.00"))
+        session = self.client.session
+        self.assertEqual(
+            session["club_fee_payment_pending"]["balance_amount"], "100.00"
+        )
+        self.assertEqual(session["club_fee_payment_pending"]["total_amount"], "300.00")
+
+    def test_club_fee_payment_process_does_not_reserve_balance_when_already_paid(
+        self,
+    ) -> None:
+        self.member.balance = Decimal("100.00")
+        self.member.save(update_fields=["balance"])
+        ClubFeePayment.objects.create(
+            club=self.club,
+            member=self.member,
+            fee=self.payment_settings,
+            amount=Decimal("300.00"),
+            period_label=get_current_period_label(self.payment_settings),
+            paid_at=timezone.now(),
+            method=FeePaymentMethod.ONLINE,
+            payment_ref="existing-fee-payment",
+        )
+
+        response = self.client.post(
+            reverse("clubs:my_fees_pay"),
+            {
+                "offer_accepted": "on",
+            },
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:my_plan"),
+            fetch_redirect_response=False,
+        )
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.balance, Decimal("100.00"))
+        self.assertFalse(
+            ClubMemberBalanceTransaction.objects.filter(
+                member=self.member,
+                source=ClubMemberBalanceTransaction.Source.CLUB_FEE_PAYMENT,
+            ).exists()
+        )
+        self.assertFalse(ClubFeePaymentPending.objects.exists())
+
+    def test_club_fee_payment_return_uses_club_credentials(self) -> None:
+        pending = ClubFeePaymentPending.objects.create(
+            payment_id="club-fee-pay-002",
+            club=self.club,
+            fee=self.payment_settings,
+            member=self.member,
+            amount=Decimal("300.00"),
+            period_label=get_current_period_label(self.payment_settings),
+        )
+        session = self.client.session
+        session["club_fee_payment_pending"] = {
+            "payment_id": pending.payment_id,
+            "club_slug": self.club.slug,
+            "enable_autopay": "1",
+            "next": "",
+            "balance_transaction_id": "",
+            "balance_amount": "0.00",
+            "total_amount": "300.00",
+        }
+        session.save()
+
+        with (
+            patch(
+                "apps.clubs.views.payments.decrypt_secret",
+                return_value="club-secret-key",
+            ),
+            patch(
+                "apps.clubs.views.payments.get_payment_status_with_credentials",
+                return_value="succeeded",
+            ) as get_club_status,
+            patch(
+                "apps.clubs.views.payments.get_payment_details_with_credentials",
+                return_value={
+                    "payment_method": {
+                        "id": "club-fee-method-1",
+                        "card": {
+                            "last4": "7788",
+                            "expiry_month": "11",
+                            "expiry_year": "2031",
+                            "card_type": "Mir",
+                        },
+                    }
+                },
+            ),
+        ):
+            response = self.client.get(
+                reverse("clubs:my_fees_return"),
+                secure=True,
+            )
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:my_plan"),
+            fetch_redirect_response=False,
+        )
+        get_club_status.assert_called_once_with(
+            "club-fee-pay-002",
+            "club-shop-001",
+            "club-secret-key",
+        )
+        self.assertTrue(
+            ClubFeePayment.objects.filter(payment_ref="club-fee-pay-002").exists()
+        )
+        payment_record = PaymentRecord.objects.get(
+            yookassa_payment_id="club-fee-pay-002"
+        )
+        self.assertEqual(
+            payment_record.payment_type, PaymentRecord.PaymentType.CLUB_FEE
+        )
+        self.assertEqual(str(payment_record.metadata["club_id"]), str(self.club.id))
+        self.assertEqual(payment_record.metadata["club_slug"], self.club.slug)
+        saved_method = SavedPaymentMethod.objects.get(
+            payment_method_id="club-fee-method-1"
+        )
+        self.assertEqual(saved_method.club, self.club)
+        self.assertTrue(saved_method.is_default_for_club_fees)
+
+    def test_my_payments_excludes_global_subscription_records(self) -> None:
+        PaymentRecord.objects.create(
+            user=self.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_PLAN,
+            item_id=str(self.plan.id),
+            item_label=f"{self.club.name}: {self.plan.name}",
+            amount=Decimal("1200.00"),
+            status="succeeded",
+            yookassa_payment_id="club-plan-history-1",
+            metadata={"club_id": self.club.id, "club_slug": self.club.slug},
+        )
+        PaymentRecord.objects.create(
+            user=self.user,
+            payment_type=PaymentRecord.PaymentType.SUBSCRIPTION,
+            item_id="999",
+            item_label="Глобальная подписка PRO",
+            amount=Decimal("5000.00"),
+            status="succeeded",
+            yookassa_payment_id="global-subscription-1",
+            metadata={},
+        )
+
+        response = self.client.get(reverse("clubs:my_payments"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.plan.name)
+        self.assertNotContains(response, "Глобальная подписка PRO")
+
+    def test_club_cashbox_history_excludes_global_and_foreign_records(self) -> None:
+        other_club = Club.objects.create(
+            name="Динамо",
+            slug="dinamo-billing",
+            city="Москва",
+            address="ул. Центральная, 2",
+            email="dinamo@test.local",
+            admin_name="Администратор Динамо",
+        )
+        PaymentRecord.objects.create(
+            user=self.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_PLAN,
+            item_id=str(self.plan.id),
+            item_label=f"{self.club.name}: {self.plan.name}",
+            amount=Decimal("1200.00"),
+            status="succeeded",
+            yookassa_payment_id="cashbox-club-plan-1",
+            metadata={"club_id": self.club.id, "club_slug": self.club.slug},
+        )
+        PaymentRecord.objects.create(
+            user=self.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_FEE,
+            item_id=str(self.payment_settings.id),
+            item_label="Членский взнос клуба",
+            amount=Decimal("300.00"),
+            status="succeeded",
+            yookassa_payment_id="cashbox-club-fee-1",
+            metadata={"club_id": self.club.id, "club_slug": self.club.slug},
+        )
+        PaymentRecord.objects.create(
+            user=self.user,
+            payment_type=PaymentRecord.PaymentType.SUBSCRIPTION,
+            item_id="999",
+            item_label="Глобальная подписка PRO",
+            amount=Decimal("5000.00"),
+            status="succeeded",
+            yookassa_payment_id="cashbox-global-subscription-1",
+            metadata={},
+        )
+        PaymentRecord.objects.create(
+            user=self.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_PLAN,
+            item_id="777",
+            item_label=f"{other_club.name}: Премиум",
+            amount=Decimal("1500.00"),
+            status="succeeded",
+            yookassa_payment_id="cashbox-other-club-plan-1",
+            metadata={"club_id": other_club.id, "club_slug": other_club.slug},
+        )
+
+        response = self.client.get(
+            reverse("clubs:club_cashbox_history", kwargs={"slug": self.club.slug}),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"{self.club.name}: {self.plan.name}")
+        self.assertContains(response, "Членский взнос клуба")
+        self.assertNotContains(response, "Глобальная подписка PRO")
+        self.assertNotContains(response, f"{other_club.name}: Премиум")
+
+    def test_recurring_club_plan_command_uses_club_credentials_and_plan_metadata(
+        self,
+    ) -> None:
+        member_plan = purchase_member_plan(
+            self.member,
+            self.plan,
+            assigned_by=self.user,
+            auto_renew=True,
+        )
+        member_plan.ended_at = timezone.now()
+        member_plan.auto_renew = True
+        member_plan.save(update_fields=["ended_at", "auto_renew"])
+        SavedPaymentMethod.objects.create(
+            user=self.user,
+            club=self.club,
+            payment_method_id="club-plan-recurring-method-1",
+            card_last4="4488",
+            card_network="Mastercard",
+            is_active=True,
+            is_default_for_subscriptions=False,
+            is_default_for_club_plans=True,
+        )
+
+        with (
+            patch(
+                "apps.clubs.management.commands.run_recurring_club_plan_payments.decrypt_secret",
+                return_value="club-secret-key",
+            ),
+            patch(
+                "apps.clubs.management.commands.run_recurring_club_plan_payments.create_recurring_payment_with_credentials",
+                return_value=("club-plan-recurring-pay-1", "pending"),
+            ) as create_club_payment,
+        ):
+            call_command(
+                "run_recurring_club_plan_payments",
+                stdout=StringIO(),
+            )
+
+        create_club_payment.assert_called_once()
+        call_kwargs = create_club_payment.call_args.kwargs
+        self.assertEqual(call_kwargs["shop_id"], "club-shop-001")
+        self.assertEqual(call_kwargs["secret_key"], "club-secret-key")
+        self.assertEqual(call_kwargs["amount"], "1200.00")
+        self.assertEqual(
+            call_kwargs["payment_method_id"],
+            "club-plan-recurring-method-1",
+        )
+        self.assertEqual(
+            call_kwargs["metadata"]["payment_type"],
+            PaymentRecord.PaymentType.CLUB_PLAN,
+        )
+        self.assertEqual(call_kwargs["metadata"]["club_id"], self.club.id)
+        self.assertEqual(call_kwargs["metadata"]["club_plan_id"], self.plan.id)
+        self.assertEqual(call_kwargs["metadata"]["enable_autopay"], "1")
+        self.assertEqual(call_kwargs["metadata"]["autopay"], "1")
+        payment_record = PaymentRecord.objects.get(
+            yookassa_payment_id="club-plan-recurring-pay-1"
+        )
+        self.assertEqual(
+            payment_record.payment_type, PaymentRecord.PaymentType.CLUB_PLAN
+        )
+        self.assertEqual(payment_record.status, "pending")
+        self.assertTrue(payment_record.is_recurring)
+        self.assertTrue(payment_record.autopay_enabled)
+        self.assertEqual(str(payment_record.metadata["club_id"]), str(self.club.id))
+
+    def test_recurring_club_fee_command_uses_club_credentials_and_records_payment(
+        self,
+    ) -> None:
+        SavedPaymentMethod.objects.create(
+            user=self.user,
+            club=self.club,
+            payment_method_id="club-fee-recurring-method-1",
+            card_last4="2211",
+            card_network="Mir",
+            is_active=True,
+            is_default_for_subscriptions=False,
+            is_default_for_club_fees=True,
+        )
+        period_label = get_current_period_label(self.payment_settings)
+
+        with (
+            patch(
+                "apps.clubs.management.commands.run_recurring_club_fee_payments.decrypt_secret",
+                return_value="club-secret-key",
+            ),
+            patch(
+                "apps.clubs.management.commands.run_recurring_club_fee_payments.create_recurring_payment_with_credentials",
+                return_value=("club-fee-recurring-pay-1", "succeeded"),
+            ) as create_club_payment,
+        ):
+            call_command(
+                "run_recurring_club_fee_payments",
+                stdout=StringIO(),
+            )
+
+        create_club_payment.assert_called_once()
+        call_kwargs = create_club_payment.call_args.kwargs
+        self.assertEqual(call_kwargs["shop_id"], "club-shop-001")
+        self.assertEqual(call_kwargs["secret_key"], "club-secret-key")
+        self.assertEqual(call_kwargs["amount"], "300.00")
+        self.assertEqual(
+            call_kwargs["payment_method_id"],
+            "club-fee-recurring-method-1",
+        )
+        self.assertEqual(
+            call_kwargs["metadata"]["payment_type"],
+            PaymentRecord.PaymentType.CLUB_FEE,
+        )
+        self.assertEqual(call_kwargs["metadata"]["club_id"], self.club.id)
+        self.assertEqual(call_kwargs["metadata"]["fee_id"], self.payment_settings.id)
+        self.assertEqual(call_kwargs["metadata"]["member_id"], self.member.id)
+        self.assertEqual(call_kwargs["metadata"]["period_label"], period_label)
+        self.assertEqual(call_kwargs["metadata"]["autopay"], "1")
+        self.assertTrue(
+            ClubFeePayment.objects.filter(
+                payment_ref="club-fee-recurring-pay-1",
+                period_label=period_label,
+            ).exists()
+        )
+        payment_record = PaymentRecord.objects.get(
+            yookassa_payment_id="club-fee-recurring-pay-1"
+        )
+        self.assertEqual(
+            payment_record.payment_type, PaymentRecord.PaymentType.CLUB_FEE
+        )
+        self.assertEqual(payment_record.status, "succeeded")
+        self.assertTrue(payment_record.is_recurring)
+        self.assertTrue(payment_record.autopay_enabled)
+        self.assertEqual(str(payment_record.metadata["club_id"]), str(self.club.id))
+        self.assertEqual(payment_record.metadata["period_label"], period_label)
+
+    def test_club_payment_webhook_updates_recurring_club_plan_payment(self) -> None:
+        payment_record = PaymentRecord.objects.create(
+            user=self.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_PLAN,
+            item_id=str(self.plan.id),
+            item_label=f"{self.club.name}: {self.plan.name}",
+            amount=Decimal("1200.00"),
+            status="pending",
+            yookassa_payment_id="club-plan-webhook-1",
+            is_recurring=True,
+            autopay_enabled=True,
+            metadata={
+                "club_id": self.club.id,
+                "club_member_plan_id": "42",
+                "balance_amount": "200.00",
+            },
+        )
+        payload_metadata = {
+            "payment_type": PaymentRecord.PaymentType.CLUB_PLAN,
+            "club_id": self.club.id,
+            "club_plan_id": self.plan.id,
+            "user_id": self.user.id,
+            "autopay": "1",
+        }
+
+        with (
+            patch(
+                "apps.clubs.views.payments.decrypt_secret",
+                return_value="club-secret-key",
+            ),
+            patch(
+                "apps.clubs.views.payments.get_payment_details_with_credentials",
+                return_value={
+                    "id": "club-plan-webhook-1",
+                    "status": "succeeded",
+                    "metadata": payload_metadata,
+                },
+            ) as get_club_details,
+        ):
+            response = self.client.post(
+                reverse("clubs:club_payment_webhook"),
+                data=json.dumps(
+                    {
+                        "event": "payment.succeeded",
+                        "object": {
+                            "id": "club-plan-webhook-1",
+                            "status": "succeeded",
+                            "metadata": payload_metadata,
+                        },
+                    }
+                ),
+                content_type="application/json",
+                secure=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        get_club_details.assert_called_once_with(
+            "club-plan-webhook-1",
+            "club-shop-001",
+            "club-secret-key",
+        )
+        payment_record.refresh_from_db()
+        self.assertEqual(payment_record.status, "succeeded")
+        self.assertTrue(payment_record.is_recurring)
+        self.assertTrue(payment_record.autopay_enabled)
+        self.assertEqual(str(payment_record.metadata["club_id"]), str(self.club.id))
+        self.assertEqual(payment_record.metadata["club_slug"], self.club.slug)
+        self.assertEqual(payment_record.metadata["balance_amount"], "200.00")
+        active_plan = ClubMemberPlan.objects.get(
+            club_member=self.member,
+            status="active",
+        )
+        self.assertEqual(active_plan.plan, self.plan)
+        self.assertTrue(active_plan.auto_renew)
+
+    def test_club_payment_webhook_updates_recurring_club_fee_payment(self) -> None:
+        period_label = get_current_period_label(self.payment_settings)
+        payment_record = PaymentRecord.objects.create(
+            user=self.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_FEE,
+            item_id=str(self.payment_settings.id),
+            item_label="Членский взнос клуба",
+            amount=Decimal("300.00"),
+            status="pending",
+            yookassa_payment_id="club-fee-webhook-1",
+            is_recurring=True,
+            autopay_enabled=True,
+            metadata={
+                "club_id": self.club.id,
+                "balance_amount": "50.00",
+                "external_amount": "250.00",
+            },
+        )
+        payload_metadata = {
+            "payment_type": PaymentRecord.PaymentType.CLUB_FEE,
+            "club_id": self.club.id,
+            "fee_id": self.payment_settings.id,
+            "member_id": self.member.id,
+            "period_label": period_label,
+            "autopay": "1",
+        }
+
+        with (
+            patch(
+                "apps.clubs.views.payments.decrypt_secret",
+                return_value="club-secret-key",
+            ),
+            patch(
+                "apps.clubs.views.payments.get_payment_details_with_credentials",
+                return_value={
+                    "id": "club-fee-webhook-1",
+                    "status": "succeeded",
+                    "amount": {"value": "300.00"},
+                    "metadata": payload_metadata,
+                },
+            ) as get_club_details,
+            patch(
+                "apps.clubs.views.payments.send_fee_paid_notification"
+            ) as notify_paid,
+        ):
+            response = self.client.post(
+                reverse("clubs:club_payment_webhook"),
+                data=json.dumps(
+                    {
+                        "event": "payment.succeeded",
+                        "object": {
+                            "id": "club-fee-webhook-1",
+                            "status": "succeeded",
+                            "metadata": payload_metadata,
+                        },
+                    }
+                ),
+                content_type="application/json",
+                secure=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        get_club_details.assert_called_once_with(
+            "club-fee-webhook-1",
+            "club-shop-001",
+            "club-secret-key",
+        )
+        payment_record.refresh_from_db()
+        self.assertEqual(payment_record.status, "succeeded")
+        self.assertTrue(payment_record.is_recurring)
+        self.assertTrue(payment_record.autopay_enabled)
+        self.assertEqual(payment_record.metadata["club_slug"], self.club.slug)
+        self.assertEqual(payment_record.metadata["balance_amount"], "50.00")
+        self.assertTrue(
+            ClubFeePayment.objects.filter(
+                payment_ref="club-fee-webhook-1",
+                period_label=period_label,
+            ).exists()
+        )
+        notify_paid.assert_called_once()
+        cashbox_response = self.client.get(
+            reverse("clubs:club_cashbox_history", kwargs={"slug": self.club.slug}),
+            secure=True,
+        )
+        self.assertEqual(cashbox_response.status_code, 200)
+        self.assertContains(cashbox_response, "Членский взнос клуба")
+
+    def test_club_payment_webhook_ignores_unknown_payment_type(self) -> None:
+        period_label = get_current_period_label(self.payment_settings)
+        payload_metadata = {
+            "payment_type": "subscription",
+            "club_id": self.club.id,
+            "fee_id": self.payment_settings.id,
+            "member_id": self.member.id,
+            "period_label": period_label,
+        }
+
+        with (
+            patch(
+                "apps.clubs.views.payments.decrypt_secret",
+                return_value="club-secret-key",
+            ),
+            patch(
+                "apps.clubs.views.payments.get_payment_details_with_credentials",
+                return_value={
+                    "id": "foreign-webhook-1",
+                    "status": "succeeded",
+                    "amount": {"value": "300.00"},
+                    "metadata": payload_metadata,
+                },
+            ),
+        ):
+            response = self.client.post(
+                reverse("clubs:club_payment_webhook"),
+                data=json.dumps(
+                    {
+                        "event": "payment.succeeded",
+                        "object": {
+                            "id": "foreign-webhook-1",
+                            "status": "succeeded",
+                            "metadata": payload_metadata,
+                        },
+                    }
+                ),
+                content_type="application/json",
+                secure=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            PaymentRecord.objects.filter(
+                yookassa_payment_id="foreign-webhook-1"
+            ).exists()
+        )
+        self.assertFalse(
+            ClubFeePayment.objects.filter(payment_ref="foreign-webhook-1").exists()
+        )
+        self.assertFalse(
+            ClubMemberPlan.objects.filter(
+                club_member=self.member,
+                status="active",
+            ).exists()
+        )
+
+
+@override_settings(
+    STORAGES={
+        **settings.STORAGES,
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+        },
+    }
+)
+class ClubTournamentPaymentFlowTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="club-payments@test.local",
+            password="testpass123",
+            first_name="Анна",
+            last_name="Шатайло",
+        )
+        self.player = Player.objects.create(
+            user=self.user,
+            skill_level="amateur",
+            birth_date=date(1992, 1, 1),
+        )
+        self.club = Club.objects.create(
+            name="Спартак",
+            slug="spartak-club-payments",
+            city="Москва",
+            address="ул. Спортивная, 1",
+            email="club-payments@test.local",
+            admin_name="Администратор клуба",
+        )
+        self.member = ClubMember.objects.create(
+            club=self.club,
+            user=self.user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        ClubMembershipFee.objects.create(
+            club=self.club,
+            amount=300,
+            currency="RUB",
+            period="monthly",
+            period_start_day=1,
+            payment_provider=ClubMembershipFee.PaymentProvider.YOOKASSA,
+            payment_shop_id="club-shop-001",
+            payment_api_key="club-secret-key",
+            is_active=False,
+        )
+        self.tournament = Tournament.objects.create(
+            name="Женский тестовый",
+            slug="club-payment-preview",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.ROUND_ROBIN,
+            status=TournamentStatus.UPCOMING,
+            gender=TournamentGender.OPEN,
+            is_one_day=True,
+            entry_fee=800,
+        )
+        tier = SubscriptionTier.objects.create(
+            name="diamond",
+            display_name="ДИАМАНТ",
+            price=5000,
+            max_tournaments=20,
+            duration_days=30,
+            one_day_tournament_discount=25,
+            is_visible=True,
+        )
+        UserSubscription.objects.create(
+            user=self.user,
+            tier=tier,
+            start_date=timezone.now(),
+            end_date=timezone.now() + timedelta(days=30),
+            is_active=True,
+            tournament_registration_balance=20,
+        )
+        self.client.force_login(self.user)
+
+    def test_club_tournament_preview_uses_club_context_without_global_discount(
+        self,
+    ) -> None:
+        response = self.client.get(
+            reverse("payment_preview"),
+            {"type": "tournament", "id": str(self.tournament.id)},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["amount"], Decimal("800"))
+        self.assertEqual(response.context["external_amount_due"], Decimal("800"))
+        self.assertTrue(response.context["is_club_panel"])
+        self.assertEqual(response.context["club"], self.club)
+        details = dict(response.context["details"])
+        self.assertEqual(details["Клуб"], self.club.name)
+        self.assertEqual(details["Получатель"], f"{self.club.name} · YooKassa клуба")
+        self.assertEqual(details["Скидка"], "Нет")
+        self.assertContains(response, "body--club-panel")
+        self.assertContains(response, "Личный кабинет")
+        self.assertContains(response, self.club.name)
+
+    def test_club_tournament_process_uses_club_yookassa_credentials(self) -> None:
+        with (
+            patch(
+                "apps.payments.views.create_payment_with_credentials",
+                return_value=("club-pay-001", "https://pay.example/club"),
+            ) as create_club_payment,
+            patch("apps.payments.views.create_payment") as create_global_payment,
+        ):
+            response = self.client.post(
+                reverse("payment_process"),
+                {
+                    "type": "tournament",
+                    "id": str(self.tournament.id),
+                    "amount": "800.00",
+                    "offer_accepted": "on",
+                },
+                secure=True,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://pay.example/club")
+        create_global_payment.assert_not_called()
+        create_club_payment.assert_called_once()
+        call_kwargs = create_club_payment.call_args.kwargs
+        self.assertEqual(call_kwargs["shop_id"], "club-shop-001")
+        self.assertEqual(call_kwargs["secret_key"], "club-secret-key")
+        self.assertEqual(call_kwargs["amount"], "800.00")
+        self.assertIn(self.club.name, call_kwargs["description"])
+        self.assertEqual(call_kwargs["metadata"]["club_id"], str(self.club.id))
+        self.assertEqual(call_kwargs["metadata"]["club_slug"], self.club.slug)
+        session = self.client.session
+        self.assertEqual(session["yookassa_pending"]["club_id"], str(self.club.id))
+        self.assertEqual(session["yookassa_pending"]["club_slug"], self.club.slug)
+
+    def test_club_tournament_return_checks_status_via_club_credentials(self) -> None:
+        session = self.client.session
+        session["yookassa_pending"] = {
+            "payment_id": "club-pay-002",
+            "payment_type": "tournament",
+            "item_id": str(self.tournament.id),
+            "next": "",
+            "amount": "800.00",
+            "balance_amount": "0.00",
+            "total_amount": "800.00",
+            "club_id": str(self.club.id),
+            "club_slug": self.club.slug,
+        }
+        session.save()
+
+        with (
+            patch(
+                "apps.payments.views.get_payment_status_with_credentials",
+                return_value="succeeded",
+            ) as get_club_status,
+            patch("apps.payments.views.get_payment_status") as get_global_status,
+        ):
+            response = self.client.get(reverse("payment_return"), secure=True)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("payment_success"), response["Location"])
+        get_global_status.assert_not_called()
+        get_club_status.assert_called_once()
+        record = PaymentRecord.objects.get(yookassa_payment_id="club-pay-002")
+        self.assertEqual(record.payment_type, PaymentRecord.PaymentType.TOURNAMENT)
+        self.assertEqual(record.item_label, f"{self.club.name}: {self.tournament.name}")
+        self.assertEqual(str(record.metadata.get("club_id")), str(self.club.id))
+        self.assertEqual(str(record.metadata.get("club_slug")), self.club.slug)

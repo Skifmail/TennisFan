@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from apps.core.models import UserTelegramLink
 from apps.payments.yookassa_client import (
     create_payment,
     create_payment_with_credentials,
@@ -16,11 +17,18 @@ from apps.payments.yookassa_client import (
     get_payment_status_with_credentials,
 )
 
+from ..finance_services import (
+    calculate_balance_payment_breakdown,
+    cancel_reserved_balance,
+    confirm_reserved_balance,
+    reserve_member_balance,
+)
 from ..forms import ClubNotificationConfigForm, ClubNotificationSettingsForm
 from ..models import (
     Club,
     ClubMember,
-    ClubMembershipFee,
+    ClubMemberBalanceTransaction,
+    ClubMemberRole,
     ClubMemberStatus,
     ClubNotificationConfig,
     ClubNotificationSettings,
@@ -34,13 +42,12 @@ from ..models import (
 from ..payment_utils import decrypt_secret
 from ..plan_services import (
     cancel_member_plan_auto_renew,
+    enable_member_plan_auto_renew,
     get_member_active_plan,
-    get_member_plan_limits,
     purchase_member_plan,
 )
 from ..services import (
     get_club_current_subscription,
-    get_fee_status_for_member,
     get_platform_plan,
     user_can_edit_club_settings,
 )
@@ -65,80 +72,35 @@ def _get_plan_prices_for_subscription() -> dict[str, dict[str, Decimal]]:
     return result
 
 
+def _get_user_telegram_bot_state(user) -> tuple[bool, str]:
+    """Возвращает статус подключения Telegram-бота и username бота."""
+    is_connected = False
+    bot_username = ""
+
+    try:
+        link = user.telegram_link
+        is_connected = bool(link.user_bot_chat_id)
+    except UserTelegramLink.DoesNotExist:
+        is_connected = False
+
+    if not is_connected:
+        return False, ""
+
+    try:
+        from apps.telegram_bot import services as bot_services
+
+        bot_username = bot_services.get_bot_username() or ""
+    except Exception:
+        bot_username = ""
+
+    return True, bot_username
+
+
 @login_required
 @require_GET
 def my_plan(request: HttpRequest) -> HttpResponse:
     """Показывает текущий тариф игрока и остатки лимитов."""
-    member = _get_current_club_member(request)
-    if not member:
-        messages.info(request, "Вы не состоите в клубе.")
-        return redirect("clubs:register_choice")
-
-    club = member.club
-    active_plans = ClubPlayerPlan.objects.filter(club=club, is_active=True).order_by(
-        "sort_order",
-        "name",
-    )
-    member_plan = get_member_active_plan(member)
-    plan_limits = get_member_plan_limits(member)
-    fee = (
-        ClubMembershipFee.objects.filter(club=club, is_active=True)
-        .order_by("-id")
-        .first()
-    )
-    fee_status = get_fee_status_for_member(club, member) if fee else None
-    subscription_usage_percent = 0
-    if (
-        plan_limits
-        and plan_limits.monthly_tournaments_limit
-        and plan_limits.monthly_tournaments_limit > 0
-    ):
-        subscription_usage_percent = min(
-            100,
-            int(
-                (plan_limits.tournaments_used / plan_limits.monthly_tournaments_limit)
-                * 100
-            ),
-        )
-
-    from apps.payments.models import SavedPaymentMethod
-
-    club_plan_autopay_card = (
-        SavedPaymentMethod.objects.filter(
-            user=request.user,
-            club=club,
-            is_active=True,
-            is_default_for_club_plans=True,
-        )
-        .order_by("-created_at")
-        .first()
-    )
-    club_fee_autopay_card = (
-        SavedPaymentMethod.objects.filter(
-            user=request.user,
-            club=club,
-            is_active=True,
-            is_default_for_club_fees=True,
-        )
-        .order_by("-created_at")
-        .first()
-    )
-    return render(
-        request,
-        "clubs/my_plan.html",
-        {
-            "club": club,
-            "is_club_panel": True,
-            "member_plan": member_plan,
-            "plan_limits": plan_limits,
-            "active_plans": active_plans,
-            "fee": fee,
-            "fee_status": fee_status,
-            "subscription_usage_percent": subscription_usage_percent,
-            "club_plan_autopay_card": club_plan_autopay_card,
-            "club_fee_autopay_card": club_fee_autopay_card,
-        },
-    )
+    return redirect("clubs:my_finance")
 
 
 @login_required
@@ -150,11 +112,22 @@ def my_plan_change(request: HttpRequest) -> HttpResponse:
         messages.info(request, "Вы не состоите в клубе.")
         return redirect("clubs:register_choice")
 
+    if not member.club.use_player_plans:
+        messages.info(
+            request,
+            "Клуб отключил систему тарифов. Выбор и оплата тарифов сейчас недоступны.",
+        )
+        return redirect("clubs:my_finance")
+
     active_plans = ClubPlayerPlan.objects.filter(
         club=member.club,
         is_active=True,
     ).order_by("sort_order", "name")
     current_member_plan = get_member_active_plan(member)
+    balance_breakdowns = {
+        plan.id: calculate_balance_payment_breakdown(member, plan.monthly_fee)
+        for plan in active_plans
+    }
 
     return render(
         request,
@@ -164,6 +137,7 @@ def my_plan_change(request: HttpRequest) -> HttpResponse:
             "is_club_panel": True,
             "active_plans": active_plans,
             "current_member_plan": current_member_plan,
+            "balance_breakdowns": balance_breakdowns,
         },
     )
 
@@ -177,14 +151,21 @@ def my_plan_payment_preview(request: HttpRequest, plan_id: int) -> HttpResponse:
         messages.info(request, "Вы не состоите в клубе.")
         return redirect("clubs:register_choice")
 
+    if not member.club.use_player_plans:
+        messages.info(
+            request, "Клуб отключил систему тарифов. Оплата тарифов сейчас недоступна."
+        )
+        return redirect("clubs:my_finance")
+
     plan = get_object_or_404(
         ClubPlayerPlan.objects.select_related("club"),
         pk=plan_id,
         club=member.club,
         is_active=True,
     )
+    breakdown = calculate_balance_payment_breakdown(member, plan.monthly_fee)
     payment_settings = _get_club_payment_settings(member.club)
-    if payment_settings is None:
+    if payment_settings is None and breakdown.external_amount_due > 0:
         messages.error(
             request,
             "Клуб ещё не подключил свою YooKassa. Оплата тарифов временно недоступна.",
@@ -201,6 +182,10 @@ def my_plan_payment_preview(request: HttpRequest, plan_id: int) -> HttpResponse:
         details.append(("Регистрации", "Безлимит"))
     else:
         details.append(("Регистрации", f"{plan.max_tournaments_per_month} в месяц"))
+    if breakdown.balance_to_apply > 0:
+        details.append(("Спишется с баланса", f"{breakdown.balance_to_apply} ₽"))
+    if breakdown.external_amount_due > 0 and breakdown.balance_to_apply > 0:
+        details.append(("Доплата онлайн", f"{breakdown.external_amount_due} ₽"))
 
     return render(
         request,
@@ -219,6 +204,9 @@ def my_plan_payment_preview(request: HttpRequest, plan_id: int) -> HttpResponse:
             "details": details,
             "process_url": reverse("clubs:my_plan_payment_process"),
             "payment_type": "club_plan",
+            "balance_available": breakdown.balance_available,
+            "balance_to_apply": breakdown.balance_to_apply,
+            "external_amount_due": breakdown.external_amount_due,
         },
     )
 
@@ -231,6 +219,12 @@ def my_plan_payment_process(request: HttpRequest) -> HttpResponse:
     if not member:
         messages.info(request, "Вы не состоите в клубе.")
         return redirect("clubs:register_choice")
+
+    if not member.club.use_player_plans:
+        messages.info(
+            request, "Клуб отключил систему тарифов. Оплата тарифов сейчас недоступна."
+        )
+        return redirect("clubs:my_finance")
 
     raw_offer = str(request.POST.get("offer_accepted", "")).strip().lower()
     if raw_offer not in {"1", "true", "on", "yes"}:
@@ -255,17 +249,75 @@ def my_plan_payment_process(request: HttpRequest) -> HttpResponse:
         club=member.club,
         is_active=True,
     )
+    breakdown = calculate_balance_payment_breakdown(member, plan.monthly_fee)
     payment_settings = _get_club_payment_settings(member.club)
-    if payment_settings is None:
+    if payment_settings is None and breakdown.external_amount_due > 0:
         messages.error(
             request,
             "Клуб ещё не подключил свою YooKassa. Оплата тарифов временно недоступна.",
         )
         return redirect("clubs:my_plan_change")
 
+    raw_autopay = str(request.POST.get("enable_autopay", "")).strip().lower()
+    enable_autopay = raw_autopay in {"1", "true", "on", "yes"}
+    next_url = (request.POST.get("next") or "").strip()
+    balance_transaction = None
+    if breakdown.balance_to_apply > 0:
+        try:
+            balance_transaction = reserve_member_balance(
+                member,
+                breakdown.balance_to_apply,
+                source=ClubMemberBalanceTransaction.Source.CLUB_PLAN_PAYMENT,
+                description=f"Оплата тарифа клуба «{plan.name}»",
+                reference=f"club-plan:{plan.id}",
+                metadata={"plan_id": plan.id, "club_id": member.club_id},
+            )
+        except ValueError:
+            messages.error(
+                request,
+                "Не удалось зарезервировать средства с баланса. Обновите страницу и попробуйте снова.",
+            )
+            return redirect("clubs:my_plan_payment_preview", plan_id=plan.id)
+
+    if breakdown.external_amount_due <= 0:
+        from apps.payments.models import PaymentRecord
+
+        confirm_reserved_balance(balance_transaction)
+        purchase_member_plan(
+            member,
+            plan,
+            assigned_by=request.user,
+            change_reason="Оплата клубного тарифа с баланса участником",
+            auto_renew=False,
+        )
+        PaymentRecord.objects.create(
+            user=request.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_PLAN,
+            item_id=str(plan.id),
+            item_label=f"{member.club.name}: {plan.name}",
+            amount=plan.monthly_fee,
+            status="succeeded",
+            is_recurring=False,
+            autopay_enabled=False,
+            yookassa_payment_id=(
+                f"balance-club-plan-{member.id}-{int(timezone.now().timestamp())}"
+            ),
+            metadata={
+                "club_id": member.club_id,
+                "club_slug": member.club.slug,
+                "balance_amount": f"{plan.monthly_fee:.2f}",
+                "external_amount": "0.00",
+                "total_amount": f"{plan.monthly_fee:.2f}",
+            },
+        )
+        messages.success(request, f"Клубный тариф «{plan.name}» успешно оформлен.")
+        return redirect("clubs:my_finance")
+
+    assert payment_settings is not None
     try:
         secret = decrypt_secret(payment_settings.payment_api_key)
     except Exception as exc:
+        cancel_reserved_balance(balance_transaction)
         logger.warning(
             "Не удалось расшифровать ключ YooKassa клуба для оплаты тарифа: %s",
             exc,
@@ -273,10 +325,7 @@ def my_plan_payment_process(request: HttpRequest) -> HttpResponse:
         messages.error(request, "Ошибка платёжных настроек клуба.")
         return redirect("clubs:my_plan_change")
 
-    raw_autopay = str(request.POST.get("enable_autopay", "")).strip().lower()
-    enable_autopay = raw_autopay in {"1", "true", "on", "yes"}
-    next_url = (request.POST.get("next") or "").strip()
-    amount_str = f"{plan.monthly_fee:.2f}"
+    amount_str = f"{breakdown.external_amount_due:.2f}"
     description = f"Клубный тариф {member.club.name}: {plan.name}"
     return_url = request.build_absolute_uri(reverse("clubs:my_plan_payment_return"))
 
@@ -307,6 +356,7 @@ def my_plan_payment_process(request: HttpRequest) -> HttpResponse:
             save_payment_method=enable_autopay,
         )
     except (ValueError, RuntimeError) as exc:
+        cancel_reserved_balance(balance_transaction)
         logger.warning("Ошибка создания оплаты клубного тарифа: %s", exc)
         messages.error(
             request,
@@ -321,6 +371,9 @@ def my_plan_payment_process(request: HttpRequest) -> HttpResponse:
         "enable_autopay": "1" if enable_autopay else "",
         "next": next_url,
         "amount": amount_str,
+        "balance_transaction_id": balance_transaction.id if balance_transaction else "",
+        "balance_amount": f"{breakdown.balance_to_apply:.2f}",
+        "total_amount": f"{plan.monthly_fee:.2f}",
     }
     request.session.modified = True
     return redirect(confirmation_url)
@@ -342,6 +395,12 @@ def my_plan_payment_return(request: HttpRequest) -> HttpResponse:
     plan_id = pending.get("plan_id")
     payment_id = str(pending.get("payment_id") or "").strip()
     enable_autopay = str(pending.get("enable_autopay") or "").strip() == "1"
+    balance_transaction_id = int(str(pending.get("balance_transaction_id") or "0") or 0)
+    balance_transaction = (
+        ClubMemberBalanceTransaction.objects.filter(pk=balance_transaction_id).first()
+        if balance_transaction_id
+        else None
+    )
 
     member = (
         ClubMember.objects.select_related("club")
@@ -353,6 +412,7 @@ def my_plan_payment_return(request: HttpRequest) -> HttpResponse:
         .first()
     )
     if member is None:
+        cancel_reserved_balance(balance_transaction)
         del request.session["club_plan_payment_pending"]
         request.session.modified = True
         messages.error(request, "Не удалось определить клуб для оплаченного тарифа.")
@@ -360,6 +420,7 @@ def my_plan_payment_return(request: HttpRequest) -> HttpResponse:
 
     payment_settings = _get_club_payment_settings(member.club)
     if payment_settings is None:
+        cancel_reserved_balance(balance_transaction)
         del request.session["club_plan_payment_pending"]
         request.session.modified = True
         messages.error(request, "Платёжные реквизиты клуба не настроены.")
@@ -372,6 +433,7 @@ def my_plan_payment_return(request: HttpRequest) -> HttpResponse:
             "Не удалось расшифровать ключ YooKassa клуба при возврате оплаты тарифа: %s",
             exc,
         )
+        cancel_reserved_balance(balance_transaction)
         del request.session["club_plan_payment_pending"]
         request.session.modified = True
         messages.error(request, "Ошибка проверки платежа.")
@@ -387,6 +449,7 @@ def my_plan_payment_return(request: HttpRequest) -> HttpResponse:
         else None
     )
     if status != "succeeded":
+        cancel_reserved_balance(balance_transaction)
         del request.session["club_plan_payment_pending"]
         request.session.modified = True
         messages.error(
@@ -400,6 +463,7 @@ def my_plan_payment_return(request: HttpRequest) -> HttpResponse:
         pk=plan_id,
         club=member.club,
     )
+    confirm_reserved_balance(balance_transaction)
 
     if enable_autopay and payment_id:
         from apps.payments.models import SavedPaymentMethod
@@ -478,7 +542,15 @@ def my_plan_payment_return(request: HttpRequest) -> HttpResponse:
             "status": "succeeded",
             "is_recurring": False,
             "autopay_enabled": enable_autopay,
-            "metadata": {"club_id": member.club_id, "club_slug": member.club.slug},
+            "metadata": {
+                "club_id": member.club_id,
+                "club_slug": member.club.slug,
+                "balance_amount": str(pending.get("balance_amount", "") or "0"),
+                "external_amount": str(pending.get("amount", "") or "0"),
+                "total_amount": str(
+                    pending.get("total_amount", "") or f"{plan.monthly_fee:.2f}"
+                ),
+            },
         },
     )
 
@@ -563,6 +635,69 @@ def my_plan_disable_autopay(request: HttpRequest) -> HttpResponse:
             request,
             "Автосписание клубного тарифа отключено, карта отвязана от продления клуба.",
         )
+    return redirect("clubs:my_plan")
+
+
+@login_required
+@require_POST
+def my_plan_enable_auto_renew(request: HttpRequest) -> HttpResponse:
+    """Включает автопродление активного клубного тарифа при наличии карты."""
+    from apps.payments.models import SavedPaymentMethod
+
+    member = _get_current_club_member(request)
+    if not member:
+        messages.info(request, "Вы не состоите в клубе.")
+        return redirect("clubs:register_choice")
+
+    member_plan = get_member_active_plan(member)
+    if member_plan is None or member_plan.ended_at is None:
+        messages.info(
+            request,
+            "Для текущего тарифа автопродление недоступно.",
+        )
+        return redirect("clubs:my_plan")
+
+    payment_method = (
+        SavedPaymentMethod.objects.filter(
+            user=request.user,
+            club=member.club,
+            is_active=True,
+            is_default_for_club_plans=True,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if payment_method is None:
+        messages.error(
+            request,
+            "Чтобы включить автопродление, сначала подключите карту для автосписания тарифа.",
+        )
+        return redirect("clubs:my_plan")
+
+    if member_plan.auto_renew:
+        messages.info(request, "Автопродление клубного тарифа уже включено.")
+        return redirect("clubs:my_plan")
+
+    member_plan = enable_member_plan_auto_renew(member)
+    if member_plan is None:
+        messages.info(
+            request,
+            "Для текущего тарифа автопродление недоступно.",
+        )
+        return redirect("clubs:my_plan")
+
+    until_text = (
+        member_plan.ended_at.strftime("%d.%m.%Y")
+        if member_plan.ended_at
+        else "конца периода"
+    )
+    messages.success(
+        request,
+        (
+            "Автопродление клубного тарифа включено. "
+            f"Следующее автоматическое продление произойдёт после {until_text}."
+        ),
+    )
     return redirect("clubs:my_plan")
 
 
@@ -755,20 +890,69 @@ def my_notification_settings(request: HttpRequest) -> HttpResponse:
         user=request.user,
         club=club,
     )
+    config, _ = ClubNotificationConfig.objects.get_or_create(club=club)
+    telegram_connected, telegram_bot_username = _get_user_telegram_bot_state(
+        request.user
+    )
+    email_destination = (request.user.email or "").strip()
+    active_delivery_channels = 0
+
+    if (
+        obj.is_enabled
+        and obj.email_enabled
+        and config.notify_by_email
+        and email_destination
+    ):
+        active_delivery_channels += 1
+    if (
+        obj.is_enabled
+        and obj.telegram_enabled
+        and config.notify_by_telegram
+        and telegram_connected
+    ):
+        active_delivery_channels += 1
 
     if request.method == "POST":
-        form = ClubNotificationSettingsForm(request.POST, instance=obj)
+        form = ClubNotificationSettingsForm(
+            request.POST,
+            instance=obj,
+            user=request.user,
+        )
         if form.is_valid():
             form.save()
             messages.success(request, "Настройки уведомлений сохранены.")
             return redirect("clubs:my_notification_settings")
     else:
-        form = ClubNotificationSettingsForm(instance=obj)
+        form = ClubNotificationSettingsForm(instance=obj, user=request.user)
 
     return render(
         request,
         "clubs/my_notification_settings.html",
-        {"club": club, "form": form, "is_club_panel": True},
+        {
+            "club": club,
+            "form": form,
+            "is_club_panel": True,
+            "club_notification_config": config,
+            "email_destination": email_destination,
+            "telegram_connected": telegram_connected,
+            "telegram_bot_username": telegram_bot_username,
+            "active_delivery_channels": active_delivery_channels,
+            "player_notification_events": [
+                "напоминания о членском взносе",
+                "уведомления о просрочке взноса",
+                "подтверждение оплаты взноса",
+                "напоминания о клубных турнирах",
+            ],
+            "admin_notification_events": (
+                [
+                    "истечение подписки клуба",
+                    "новый участник клуба",
+                    "сводка должников",
+                ]
+                if member.role == ClubMemberRole.ADMIN
+                else []
+            ),
+        },
     )
 
 

@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Баланс участника — {{ member.user.get_full_name|default:member.user.email }}{% endblock %}
+{% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="balances" %}
+<div class="page-header club-members-page-header">
+    <div class="container club-members-page">
+        <div class="club-members-hero">
+            <div class="club-members-hero__copy">
+                <span class="club-members-hero__eyebrow">Ручное управление</span>
+                <h1 class="page-title club-members-hero__title">Баланс участника</h1>
+                <p class="page-subtitle club-members-hero__subtitle">
+                    {{ member.user.get_full_name|default:member.user.email }} · {{ club.name }}
+                </p>
+            </div>
+            <div class="club-members-hero__stats">
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ member.balance|floatformat:2 }} ₽</span>
+                    <span class="club-members-stat__label">Текущий баланс</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ transactions|length }}</span>
+                    <span class="club-members-stat__label">Последних операций</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ member.get_role_display }}</span>
+                    <span class="club-members-stat__label">Роль в клубе</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ member.joined_at|date:"d.m.Y"|default:"—" }}</span>
+                    <span class="club-members-stat__label">Вступление</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container club-members-page club-balance-page">
+    <section class="club-dashboard-panel club-balance-page__panel">
+        <div class="club-balance-warning club-balance-warning--critical">
+            <strong>Осторожно:</strong> это административная корректировка баланса. Используйте её только для исправления ошибки, возврата по служебной договорённости или ручной компенсации. Любое изменение сохраняется в журнале и показывает причину.
+        </div>
+    </section>
+
+    <div class="club-balance-page__grid">
+        <section class="club-dashboard-panel club-balance-page__panel">
+            <div class="club-dashboard-panel__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">Корректировка</p>
+                    <h2 class="club-dashboard-panel__title">Изменить баланс вручную</h2>
+                </div>
+                <a href="{% url 'clubs:balances_list' slug=club.slug %}" class="club-dashboard-panel__link">Ко всем балансам</a>
+            </div>
+
+            <form method="post" class="club-balance-form">
+                {% csrf_token %}
+                {% for error in form.non_field_errors %}<p class="club-balance-form__error">{{ error }}</p>{% endfor %}
+                <div class="club-balance-form__grid">
+                    <label class="club-members-field">
+                        <span class="club-members-field__label">{{ form.operation.label }}</span>
+                        {{ form.operation }}
+                        {% for error in form.operation.errors %}<p class="club-balance-form__error">{{ error }}</p>{% endfor %}
+                    </label>
+                    <label class="club-members-field">
+                        <span class="club-members-field__label">{{ form.amount.label }}</span>
+                        {{ form.amount }}
+                        {% for error in form.amount.errors %}<p class="club-balance-form__error">{{ error }}</p>{% endfor %}
+                    </label>
+                </div>
+                <label class="club-members-field">
+                    <span class="club-members-field__label">{{ form.reason.label }}</span>
+                    {{ form.reason }}
+                    {% for error in form.reason.errors %}<p class="club-balance-form__error">{{ error }}</p>{% endfor %}
+                </label>
+                <label class="club-balance-form__confirm">
+                    {{ form.confirm_warning }}
+                    <span>{{ form.confirm_warning.label }}</span>
+                </label>
+                {% for error in form.confirm_warning.errors %}<p class="club-balance-form__error">{{ error }}</p>{% endfor %}
+                <div class="club-balance-form__actions">
+                    <button type="submit" class="btn btn-primary">Сохранить корректировку</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="club-dashboard-panel club-balance-page__panel">
+            <div class="club-dashboard-panel__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">Журнал</p>
+                    <h2 class="club-dashboard-panel__title">Последние операции</h2>
+                </div>
+            </div>
+
+            {% if transactions %}
+            <div class="club-balance-ledger">
+                {% for tx in transactions %}
+                <article class="club-balance-ledger__item">
+                    <div class="club-balance-ledger__main">
+                        <div class="club-balance-ledger__title-row">
+                            <div class="club-balance-ledger__title-badges">
+                                <strong>{{ tx.get_source_display }}</strong>
+                                <span class="club-members-badge {% if tx.status == 'completed' %}club-members-badge--success{% elif tx.status == 'pending' %}club-members-badge--warning{% else %}club-members-badge--danger{% endif %}">
+                                    {{ tx.get_status_display }}
+                                </span>
+                            </div>
+                            <span class="club-members-badge {% if tx.direction == 'credit' %}club-members-badge--success{% else %}club-members-badge--warning{% endif %}">
+                                {% if tx.direction == 'credit' %}+{% else %}-{% endif %}{{ tx.amount|floatformat:2 }} ₽
+                            </span>
+                        </div>
+                        <div class="club-balance-ledger__text">{{ tx.description|default:"Без описания" }}</div>
+                        <div class="club-balance-ledger__meta">
+                            <span>{{ tx.completed_at|date:"d.m.Y H:i"|default:tx.created_at|date:"d.m.Y H:i" }}</span>
+                            {% if tx.metadata.adjusted_by_email %}<span>· {{ tx.metadata.adjusted_by_email }}</span>{% endif %}
+                            {% if tx.metadata.previous_balance %}<span>· было {{ tx.metadata.previous_balance }} ₽</span>{% endif %}
+                            {% if tx.metadata.new_balance %}<span>· стало {{ tx.metadata.new_balance }} ₽</span>{% endif %}
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="club-dashboard-empty-state">
+                <div class="club-dashboard-empty-state__title">Операций пока нет</div>
+                <div class="club-dashboard-empty-state__text">После первой ручной корректировки здесь появится подробный журнал изменений баланса.</div>
+            </div>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}

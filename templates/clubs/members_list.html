@@ -81,6 +81,7 @@
                             <th>Участник</th>
                             <th>Роль</th>
                             <th>Статус</th>
+                            <th>Баланс</th>
                             <th>Вступление</th>
                             <th class="club-members-table__actions-head">Действия</th>
                         </tr>
@@ -135,6 +136,9 @@
                                 </span>
                             </td>
                             <td>
+                                <span class="club-balance-amount {% if m.balance > 0 %}club-balance-amount--positive{% endif %}">{{ m.balance|floatformat:0 }} ₽</span>
+                            </td>
+                            <td>
                                 <div class="club-members-date">{{ m.joined_at|date:"d.m.Y"|default:"—" }}</div>
                                 <div class="club-members-date-note">
                                     {% if m.status == 'invited' %}
@@ -148,6 +152,9 @@
                             </td>
                             <td class="club-members-table__actions">
                                 <a href="{% url 'clubs:member_detail' slug=club.slug member_id=m.id %}" class="btn btn-ghost btn-sm">Кабинет</a>
+                                {% if can_edit_settings %}
+                                <a href="{% url 'clubs:balance_detail' slug=club.slug member_id=m.id %}" class="btn btn-ghost btn-sm">Баланс</a>
+                                {% endif %}
                                 {% if m.status == 'active' and m.role != 'admin' and m.user_id != user.id %}
                                 <form method="post" action="{% url 'clubs:member_remove' slug=club.slug member_id=m.id %}" class="club-members-table__remove-form">
                                     {% csrf_token %}
@@ -158,7 +165,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="club-members-table__empty">
+                            <td colspan="6" class="club-members-table__empty">
                                 {% if search or status_filter %}
                                 По текущим фильтрам участники не найдены.
                                 {% else %}
@@ -217,12 +224,19 @@
                             </span>
                         </div>
                         <div>
+                            <span class="club-members-mobile-card__label">Баланс</span>
+                            <span class="club-members-mobile-card__value">{{ m.balance|floatformat:0 }} ₽</span>
+                        </div>
+                        <div>
                             <span class="club-members-mobile-card__label">Вступление</span>
                             <span class="club-members-mobile-card__value">{{ m.joined_at|date:"d.m.Y"|default:"—" }}</span>
                         </div>
                     </div>
                     <div class="club-members-mobile-card__actions">
                         <a href="{% url 'clubs:member_detail' slug=club.slug member_id=m.id %}" class="btn btn-ghost btn-sm">Кабинет</a>
+                        {% if can_edit_settings %}
+                        <a href="{% url 'clubs:balance_detail' slug=club.slug member_id=m.id %}" class="btn btn-ghost btn-sm">Баланс</a>
+                        {% endif %}
                         {% if m.status == 'active' and m.role != 'admin' and m.user_id != user.id %}
                         <form method="post" action="{% url 'clubs:member_remove' slug=club.slug member_id=m.id %}" class="club-members-table__remove-form">
                             {% csrf_token %}

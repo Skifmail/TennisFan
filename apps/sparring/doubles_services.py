@@ -30,6 +30,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _normalize_team_side(target_side: str) -> str:
+    """Нормализует значение стороны команды, включая старые краткие формы."""
+    normalized = (target_side or "").strip().lower()
+    aliases = {
+        TeamSide.AUTHOR: TeamSide.AUTHOR,
+        TeamSide.OPPONENT: TeamSide.OPPONENT,
+        "a": TeamSide.AUTHOR,
+        "o": TeamSide.OPPONENT,
+    }
+    result = aliases.get(normalized)
+    if result is None:
+        raise ValueError("Некорректная целевая команда")
+    return cast(str, result)
+
+
 def create_doubles_request(
     *,
     created_by: "Player",
@@ -99,8 +114,7 @@ def create_join_request(
     """
     if not players or len(players) > 2:
         raise ValueError("Укажите 1 или 2 игроков")
-    if target_side not in (TeamSide.AUTHOR, TeamSide.OPPONENT):
-        raise ValueError("Некорректная целевая команда")
+    target_side = _normalize_team_side(target_side)
 
     with transaction.atomic():
         req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)

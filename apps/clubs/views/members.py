@@ -3,13 +3,20 @@ import csv
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from ..models import Club, ClubMember, ClubMemberRole, ClubMemberStatus
+from ..finance_services import admin_adjust_member_balance
+from ..forms import ClubMemberBalanceAdjustForm
+from ..models import (
+    Club,
+    ClubMember,
+    ClubMemberRole,
+    ClubMemberStatus,
+)
 from ..services import user_can_edit_club_settings, user_can_manage_club
 from .helpers import (
     _build_club_profile_context,
@@ -165,6 +172,125 @@ def members_export(request: HttpRequest, slug: str) -> HttpResponse:
             ]
         )
     return response
+
+
+@login_required
+@require_GET
+def balances_list(request: HttpRequest, slug: str) -> HttpResponse:
+    """Список балансов участников клуба с доступом только для админа."""
+    club_or_res = _resolve_club_manage(_get_club_and_check_manage(request, slug))
+    if isinstance(club_or_res, HttpResponse):
+        return club_or_res
+    club = club_or_res
+    if not user_can_edit_club_settings(request.user, club):
+        messages.error(
+            request,
+            "Ручное управление балансами доступно только администратору клуба.",
+        )
+        return redirect("clubs:members_list", slug=club.slug)
+
+    search = (request.GET.get("q") or "").strip()
+    active_members_qs = ClubMember.objects.filter(
+        club=club,
+        status=ClubMemberStatus.ACTIVE,
+    )
+    members_qs = active_members_qs.select_related("user", "user__player")
+    if search:
+        members_qs = members_qs.filter(
+            Q(user__email__icontains=search)
+            | Q(user__first_name__icontains=search)
+            | Q(user__last_name__icontains=search)
+        )
+
+    members_qs = members_qs.order_by("-balance", "user__last_name", "user__first_name")
+    paginator = Paginator(members_qs, 20)
+    page = paginator.get_page(request.GET.get("page", 1))
+
+    balances_total = active_members_qs.aggregate(total=Sum("balance"))["total"] or 0
+    nonzero_count = active_members_qs.filter(balance__gt=0).count()
+
+    return render(
+        request,
+        "clubs/balances_list.html",
+        {
+            "club": club,
+            "is_club_panel": True,
+            "page": page,
+            "search": search,
+            "members_total": active_members_qs.count(),
+            "members_filtered_count": members_qs.count(),
+            "balances_total": balances_total,
+            "nonzero_count": nonzero_count,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def balance_detail(request: HttpRequest, slug: str, member_id: int) -> HttpResponse:
+    """Карточка баланса участника с ручной корректировкой для админа клуба."""
+    club_or_res = _resolve_club_manage(_get_club_and_check_manage(request, slug))
+    if isinstance(club_or_res, HttpResponse):
+        return club_or_res
+    club = club_or_res
+    if not user_can_edit_club_settings(request.user, club):
+        messages.error(
+            request,
+            "Ручное управление балансами доступно только администратору клуба.",
+        )
+        return redirect("clubs:members_list", slug=club.slug)
+
+    member = get_object_or_404(
+        ClubMember.objects.select_related("user", "user__player"),
+        pk=member_id,
+        club=club,
+    )
+
+    if request.method == "POST":
+        form = ClubMemberBalanceAdjustForm(request.POST)
+        if form.is_valid():
+            try:
+                transaction_obj = admin_adjust_member_balance(
+                    member,
+                    operation=str(form.cleaned_data["operation"]),
+                    amount=form.cleaned_data["amount"],
+                    reason=str(form.cleaned_data["reason"]).strip(),
+                    adjusted_by=request.user,
+                )
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            else:
+                if transaction_obj is None:
+                    messages.info(
+                        request,
+                        "Баланс не изменился: указано текущее значение.",
+                    )
+                else:
+                    messages.success(
+                        request,
+                        "Баланс участника скорректирован и записан в журнал операций.",
+                    )
+            return redirect(
+                "clubs:balance_detail",
+                slug=club.slug,
+                member_id=member.id,
+            )
+    else:
+        form = ClubMemberBalanceAdjustForm()
+
+    transactions = member.balance_transactions.order_by("-created_at")[:30]
+    return render(
+        request,
+        "clubs/balance_detail.html",
+        {
+            "club": club,
+            "member": member,
+            "player": getattr(member.user, "player", None),
+            "form": form,
+            "transactions": transactions,
+            "is_club_panel": True,
+        },
+    )
 
 
 @login_required

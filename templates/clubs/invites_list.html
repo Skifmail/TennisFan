@@ -2,131 +2,578 @@
 {% block title %}Приглашения — {{ club.name }}{% endblock %}
 {% block content %}
 {% include "clubs/_club_dashboard_nav.html" with current="invites" %}
-<div class="page-header">
-    <h1 class="page-title">Инвайт-ссылки</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
+<div class="page-header club-members-page-header">
+    <div class="container club-members-page">
+        <div class="club-members-hero club-invites-hero">
+            <div class="club-members-hero__copy">
+                <span class="club-members-hero__eyebrow">Доступ в клуб</span>
+                <h1 class="page-title club-members-hero__title">Приглашения</h1>
+                <p class="page-subtitle club-members-hero__subtitle">
+                    {{ club.name }}. Управляйте ссылками для вступления и разбирайте заявки игроков.
+                </p>
+            </div>
+            <div class="club-members-hero__stats">
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ active_links_count }}</span>
+                    <span class="club-members-stat__label">Рабочих ссылок</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ total_link_uses }}</span>
+                    <span class="club-members-stat__label">Переходов по ссылкам</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ pending_requests_count }}</span>
+                    <span class="club-members-stat__label">Новых заявок</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ processed_requests_count }}</span>
+                    <span class="club-members-stat__label">Уже обработано</span>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-<div class="container" style="max-width: 900px;">
-    <p><a href="{% url 'clubs:invite_create' slug=club.slug %}" class="btn btn-primary">Создать ссылку</a></p>
-    <div class="card">
-        <div class="card-body">
-            {% if links %}
-            <table class="table" style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Токен</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Создал</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Срок</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Использовано</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Активна</th>
-                        <th style="text-align: right; padding: var(--spacing-sm);">Действия</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for link in links %}
-                    <tr>
-                        <td style="padding: var(--spacing-sm);">{{ link.token|slice:":12" }}…</td>
-                        <td style="padding: var(--spacing-sm);">{{ link.created_by.email }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ link.expires_at|date:"d.m.Y"|default:"—" }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ link.use_count }}{% if link.max_uses %} / {{ link.max_uses }}{% endif %}</td>
-                        <td style="padding: var(--spacing-sm);">{% if link.is_active %}Да{% else %}Нет{% endif %}</td>
-                        <td style="padding: var(--spacing-sm); text-align: right;">
-                            <button type="button" class="btn btn-ghost btn-sm copy-invite-btn" data-url="{{ link.full_join_url }}">Копировать</button>
-                            {% if link.is_active %}
-                            <form method="post" action="{% url 'clubs:invite_deactivate' slug=club.slug pk=link.id %}" style="display: inline;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-ghost btn-sm">Деактивировать</button>
-                            </form>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p style="margin: 0; color: var(--color-text-muted);">Ссылок пока нет.</p>
-            <a href="{% url 'clubs:invite_create' slug=club.slug %}" class="btn btn-primary" style="margin-top: var(--spacing-md);">Создать ссылку</a>
-            {% endif %}
-        </div>
-    </div>
 
-    <div class="card" style="margin-top: var(--spacing-lg);">
-        <div class="card-body">
-            <h2 class="section-title mb-3">Заявки на вступление</h2>
-            {% if join_requests %}
-            <table class="table" style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Игрок</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Статус</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Подана</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Обработал</th>
-                        <th style="text-align: right; padding: var(--spacing-sm);">Действия</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for req in join_requests %}
-                    <tr>
-                        <td style="padding: var(--spacing-sm); min-width: 280px;">
-                            <div style="display: flex; flex-direction: column; gap: 6px;">
-                                <strong>
-                                    {% if req.user.player %}
-                                    <a href="{% url 'profile' pk=req.user.player.pk %}" style="color: var(--color-primary); text-decoration: none;">
-                                        {{ req.user.get_full_name|default:req.user.email }}
-                                    </a>
-                                    {% else %}
-                                    {{ req.user.get_full_name|default:req.user.email }}
-                                    {% endif %}
-                                </strong>
-                                <div style="display: flex; flex-wrap: wrap; gap: 6px; font-size: var(--font-size-xs); color: var(--color-text-secondary);">
-                                    {% if req.user.player %}
-                                    <span>Уровень: {{ req.user.player.get_skill_level_display }}</span>
-                                    <span>NTRP: {{ req.user.player.ntrp_level }}</span>
-                                    <span>FAN: {{ req.user.player.total_points|floatformat:1 }}</span>
-                                    {% if req.user.player.city %}
-                                    <span>Город: {{ req.user.player.city }}</span>
-                                    {% endif %}
-                                    {% endif %}
-                                    {% if req.user.phone %}
-                                    <span>Телефон: {{ req.user.phone }}</span>
-                                    {% endif %}
-                                    <span>Email: {{ req.user.email }}</span>
+<div class="container club-members-page club-invites-page">
+    <section class="card club-members-table-card">
+        <div class="card-body club-members-table-card__body">
+            <div class="club-invites-section__header">
+                <div>
+                    <h2 class="club-members-toolbar__title">Инвайт-ссылки</h2>
+                    <p class="club-members-toolbar__text">Текущие и архивные ссылки для быстрого вступления в клуб.</p>
+                </div>
+                <span class="club-members-badge {% if active_links_count %}club-members-badge--soft{% else %}club-members-badge--role{% endif %}">
+                    {% if links %}
+                    {{ active_links_count }} активных из {{ links|length }}
+                    {% else %}
+                    Ссылок пока нет
+                    {% endif %}
+                </span>
+            </div>
+
+            {% if links %}
+            <div class="club-members-table-wrap">
+                <table class="club-members-table club-invites-table">
+                    <thead>
+                        <tr>
+                            <th>Ссылка</th>
+                            <th>Статус</th>
+                            <th>Использование</th>
+                            <th>Срок</th>
+                            <th class="club-members-table__actions-head">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for link in links %}
+                        <tr>
+                            <td>
+                                <div class="club-invites-link">
+                                    <div class="club-invites-link__token">{{ link.token|slice:":12" }}…</div>
+                                    <div class="club-invites-link__meta">
+                                        <span>Создал: {{ link.created_by_display }}</span>
+                                        <span>{{ link.created_at|date:"d.m.Y H:i" }}</span>
+                                    </div>
                                 </div>
+                            </td>
+                            <td>
+                                <span class="club-members-badge club-members-badge--status {{ link.status_badge_class }}">{{ link.status_label }}</span>
+                                <div class="club-members-date-note">{{ link.status_note }}</div>
+                            </td>
+                            <td>
+                                <div class="club-members-date">
+                                    {{ link.use_count }}{% if link.max_uses %} / {{ link.max_uses }}{% else %} / ∞{% endif %}
+                                </div>
+                                <div class="club-members-date-note">{{ link.remaining_uses_label }}</div>
+                            </td>
+                            <td>
+                                <div class="club-members-date">{{ link.expires_at|date:"d.m.Y"|default:"Без срока" }}</div>
+                                <div class="club-members-date-note">
+                                    {% if link.expires_at %}
+                                        {% if link.is_expired %}
+                                        Срок действия завершён.
+                                        {% else %}
+                                        до {{ link.expires_at|date:"H:i" }}
+                                        {% endif %}
+                                    {% else %}
+                                    Отключается вручную.
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="club-members-table__actions">
+                                <button type="button"
+                                        class="btn btn-ghost btn-sm copy-invite-btn"
+                                        data-default-label="Скопировать"
+                                        data-url="{{ link.full_join_url }}">
+                                    Скопировать
+                                </button>
+                                {% if link.can_activate %}
+                                <form method="post" action="{% url 'clubs:invite_activate' slug=club.slug pk=link.id %}" class="club-members-table__remove-form">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-primary btn-sm">
+                                        Включить
+                                    </button>
+                                </form>
+                                {% elif link.is_active %}
+                                <form method="post" action="{% url 'clubs:invite_deactivate' slug=club.slug pk=link.id %}" class="club-members-table__remove-form">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('Отключить эту ссылку?');">
+                                        Отключить
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% if link.can_delete %}
+                                <form method="post" action="{% url 'clubs:invite_delete' slug=club.slug pk=link.id %}" class="club-members-table__remove-form">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-ghost btn-sm btn-danger-text" onclick="return confirm('Удалить эту ссылку без возможности восстановления?');">
+                                        Удалить
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="club-members-mobile-list club-invites-mobile-list">
+                {% for link in links %}
+                <article class="club-members-mobile-card club-invites-mobile-card">
+                    <div class="club-invites-mobile-card__top">
+                        <div>
+                            <div class="club-invites-link__token">{{ link.token|slice:":12" }}…</div>
+                            <div class="club-invites-link__meta">
+                                <span>Создал: {{ link.created_by_display }}</span>
+                                <span>{{ link.created_at|date:"d.m.Y H:i" }}</span>
                             </div>
-                        </td>
-                        <td style="padding: var(--spacing-sm);">{{ req.get_status_display }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ req.created_at|date:"d.m.Y H:i" }}</td>
-                        <td style="padding: var(--spacing-sm);">{% if req.reviewed_by %}{{ req.reviewed_by.get_full_name|default:req.reviewed_by.email }}{% else %}—{% endif %}</td>
-                        <td style="padding: var(--spacing-sm); text-align: right;">
-                            {% if req.status == 'pending' %}
-                            <form method="post" action="{% url 'clubs:join_request_approve' slug=club.slug pk=req.id %}" style="display: inline;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-primary btn-sm">Одобрить</button>
-                            </form>
-                            <form method="post" action="{% url 'clubs:join_request_reject' slug=club.slug pk=req.id %}" style="display: inline;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-ghost btn-sm">Отклонить</button>
-                            </form>
-                            {% else %}
-                            <span class="text-secondary">Обработана</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </div>
+                        <span class="club-members-badge {{ link.status_badge_class }}">{{ link.status_label }}</span>
+                    </div>
+
+                    <div class="club-members-mobile-card__grid">
+                        <div>
+                            <span class="club-members-mobile-card__label">Использование</span>
+                            <span class="club-members-mobile-card__value">
+                                {{ link.use_count }}{% if link.max_uses %} / {{ link.max_uses }}{% else %} / ∞{% endif %}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="club-members-mobile-card__label">Срок</span>
+                            <span class="club-members-mobile-card__value">{{ link.expires_at|date:"d.m.Y"|default:"Без срока" }}</span>
+                        </div>
+                        <div>
+                            <span class="club-members-mobile-card__label">Комментарий</span>
+                            <span class="club-members-mobile-card__value">{{ link.status_note }}</span>
+                        </div>
+                    </div>
+
+                    <div class="club-members-mobile-card__actions">
+                        <button type="button"
+                                class="btn btn-ghost btn-sm copy-invite-btn"
+                                data-default-label="Скопировать"
+                                data-url="{{ link.full_join_url }}">
+                            Скопировать
+                        </button>
+                        {% if link.can_activate %}
+                        <form method="post" action="{% url 'clubs:invite_activate' slug=club.slug pk=link.id %}" class="club-members-table__remove-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                Включить
+                            </button>
+                        </form>
+                        {% elif link.is_active %}
+                        <form method="post" action="{% url 'clubs:invite_deactivate' slug=club.slug pk=link.id %}" class="club-members-table__remove-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('Отключить эту ссылку?');">
+                                Отключить
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% if link.can_delete %}
+                        <form method="post" action="{% url 'clubs:invite_delete' slug=club.slug pk=link.id %}" class="club-members-table__remove-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-ghost btn-sm btn-danger-text" onclick="return confirm('Удалить эту ссылку без возможности восстановления?');">
+                                Удалить
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
             {% else %}
-            <p style="margin: 0; color: var(--color-text-muted);">Новых заявок пока нет.</p>
+            <div class="club-invites-empty">
+                <h3 class="club-invites-empty__title">Ссылок пока нет</h3>
+                <p class="club-invites-empty__text">
+                    Создайте первую ссылку, чтобы быстро приглашать игроков через чат, почту или личные сообщения.
+                </p>
+                <a href="#invite-actions" class="btn btn-primary">Открыть быстрые действия</a>
+            </div>
             {% endif %}
         </div>
-    </div>
+    </section>
+
+    <section id="invite-actions" class="card club-members-toolbar">
+        <div class="card-body club-members-toolbar__body">
+            <div class="club-members-toolbar__intro">
+                <div>
+                    <h2 class="club-members-toolbar__title">Быстрые действия</h2>
+                    <p class="club-members-toolbar__text">
+                        Все основные сценарии приглашения собраны здесь: ссылка, персональный email и массовая загрузка.
+                    </p>
+                </div>
+                <span class="club-members-badge club-members-badge--soft">Все действия на месте</span>
+            </div>
+            <p class="club-invites-toolbar__note">
+                Ссылка удобна для чатов и соцсетей, email подходит для персонального приглашения, CSV полезен для массового добавления. Ниже можно сразу скачать шаблон: для файла нужна только колонка email уже зарегистрированного игрока.
+            </p>
+            <div class="club-invites-inline-actions">
+                <article id="invite-action-create" class="club-invites-inline-card {% if active_invite_action == 'create_link' %}club-invites-inline-card--active{% endif %}">
+                    <div class="club-invites-inline-card__copy">
+                        <h3 class="club-invites-inline-card__title">Создать ссылку</h3>
+                        <p class="club-invites-inline-card__text">
+                            Для чатов, рассылок и быстрых приглашений. Оба поля необязательны.
+                        </p>
+                    </div>
+                    <form method="post" class="club-invites-inline-card__form club-invites-inline-card__form--create">
+                        {% csrf_token %}
+                        <input type="hidden" name="invite_action" value="create_link">
+                        {% if invite_link_form.non_field_errors %}
+                        <div class="club-invites-inline-card__errors">
+                            {% for error in invite_link_form.non_field_errors %}
+                            <p class="club-balance-form__error">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <label class="club-members-field">
+                            <span class="club-members-field__label">{{ invite_link_form.expires_days.label }}</span>
+                            {{ invite_link_form.expires_days }}
+                            {% for error in invite_link_form.expires_days.errors %}
+                            <p class="club-balance-form__error">{{ error }}</p>
+                            {% endfor %}
+                        </label>
+                        <label class="club-members-field">
+                            <span class="club-members-field__label">{{ invite_link_form.max_uses.label }}</span>
+                            {{ invite_link_form.max_uses }}
+                            {% for error in invite_link_form.max_uses.errors %}
+                            <p class="club-balance-form__error">{{ error }}</p>
+                            {% endfor %}
+                        </label>
+                        <button type="submit" class="btn btn-primary club-invites-inline-card__submit">Создать</button>
+                    </form>
+                </article>
+
+                <article id="invite-action-email" class="club-invites-inline-card {% if active_invite_action == 'invite_email' %}club-invites-inline-card--active{% endif %}">
+                    <div class="club-invites-inline-card__copy">
+                        <h3 class="club-invites-inline-card__title">Пригласить по email</h3>
+                        <p class="club-invites-inline-card__text">
+                            Подходит, когда знаете конкретного игрока и хотите отправить ему персональное приглашение.
+                        </p>
+                    </div>
+                    <form method="post" class="club-invites-inline-card__form club-invites-inline-card__form--email">
+                        {% csrf_token %}
+                        <input type="hidden" name="invite_action" value="invite_email">
+                        {% if invite_email_form.non_field_errors %}
+                        <div class="club-invites-inline-card__errors">
+                            {% for error in invite_email_form.non_field_errors %}
+                            <p class="club-balance-form__error">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <label class="club-members-field">
+                            <span class="club-members-field__label">{{ invite_email_form.email.label }}</span>
+                            {{ invite_email_form.email }}
+                            {% for error in invite_email_form.email.errors %}
+                            <p class="club-balance-form__error">{{ error }}</p>
+                            {% endfor %}
+                        </label>
+                        <button type="submit" class="btn btn-primary club-invites-inline-card__submit">Отправить</button>
+                    </form>
+                </article>
+
+                <article id="invite-action-import" class="club-invites-inline-card {% if active_invite_action == 'import_csv' %}club-invites-inline-card--active{% endif %}">
+                    <div class="club-invites-inline-card__copy">
+                        <h3 class="club-invites-inline-card__title">Импорт CSV</h3>
+                        <p class="club-invites-inline-card__text">
+                            Скачайте шаблон, заполните колонку email и загрузите файл обратно. Поддерживаются файлы .csv и .txt.
+                        </p>
+                    </div>
+                    <form method="post" enctype="multipart/form-data" class="club-invites-inline-card__form club-invites-inline-card__form--import">
+                        {% csrf_token %}
+                        <input type="hidden" name="invite_action" value="import_csv">
+                        {% if invite_import_form.non_field_errors %}
+                        <div class="club-invites-inline-card__errors">
+                            {% for error in invite_import_form.non_field_errors %}
+                            <p class="club-balance-form__error">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <label class="club-members-field">
+                            <span class="club-members-field__label">{{ invite_import_form.file.label }}</span>
+                            {{ invite_import_form.file }}
+                            {% for error in invite_import_form.file.errors %}
+                            <p class="club-balance-form__error">{{ error }}</p>
+                            {% endfor %}
+                        </label>
+                        <div class="club-invites-inline-card__button-group">
+                            <a href="{% url 'clubs:invite_import_template' slug=club.slug %}" class="btn btn-ghost club-invites-inline-card__submit">
+                                Скачать шаблон
+                            </a>
+                            <button type="submit" class="btn btn-primary club-invites-inline-card__submit">Загрузить</button>
+                        </div>
+                    </form>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section class="card club-members-table-card">
+        <div class="card-body club-members-table-card__body">
+            <div class="club-invites-section__header">
+                <div>
+                    <h2 class="club-members-toolbar__title">Заявки на вступление</h2>
+                    <p class="club-members-toolbar__text">Показываем игрока, контакты и текущее решение прямо в списке.</p>
+                </div>
+                <span class="club-members-badge {% if pending_requests_count %}club-members-badge--warning{% else %}club-members-badge--soft{% endif %}">
+                    {% if pending_requests_count %}
+                    {{ pending_requests_count }} ждут решения
+                    {% else %}
+                    Новых заявок нет
+                    {% endif %}
+                </span>
+            </div>
+
+            {% if join_requests %}
+            <div class="club-members-table-wrap">
+                <table class="club-members-table club-invites-table">
+                    <thead>
+                        <tr>
+                            <th>Игрок</th>
+                            <th>Статус</th>
+                            <th>Подана</th>
+                            <th>Обработал</th>
+                            <th class="club-members-table__actions-head">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in join_requests %}
+                        <tr>
+                            <td>
+                                {% if req.user.player %}
+                                <a href="{% url 'profile' pk=req.user.player.pk %}" class="club-members-person club-members-person--link">
+                                {% else %}
+                                <div class="club-members-person">
+                                {% endif %}
+                                    {% if req.user.player and req.user.player.avatar %}
+                                    <img src="{{ req.user.player.avatar.url }}" alt="{{ req.user_display_name }}" class="club-members-person__avatar">
+                                    {% else %}
+                                    <span class="club-members-person__avatar club-members-person__avatar--fallback">
+                                        {% if req.user.first_name %}
+                                        {{ req.user.first_name|slice:":1"|upper }}
+                                        {% else %}
+                                        {{ req.user.email|slice:":1"|upper }}
+                                        {% endif %}
+                                    </span>
+                                    {% endif %}
+                                    <div class="club-members-person__content">
+                                        <div class="club-members-person__name-row">
+                                            <span class="club-members-person__name">{{ req.user_display_name }}</span>
+                                        </div>
+                                        {% if req.user.player %}
+                                        <div class="club-members-person__stats">
+                                            <span class="club-members-inline-stat">
+                                                <span class="club-members-inline-stat__label">Уровень</span>
+                                                <span class="club-members-inline-stat__value">{{ req.user.player.get_skill_level_display }}</span>
+                                            </span>
+                                            {% if req.user.player.ntrp_level %}
+                                            <span class="club-members-inline-stat">
+                                                <span class="club-members-inline-stat__label">NTRP</span>
+                                                <span class="club-members-inline-stat__value">{{ req.user.player.ntrp_level }}</span>
+                                            </span>
+                                            {% endif %}
+                                            {% if req.user.player.total_points %}
+                                            <span class="club-members-inline-stat">
+                                                <span class="club-members-inline-stat__label">FAN</span>
+                                                <span class="club-members-inline-stat__value">{{ req.user.player.total_points|floatformat:1 }}</span>
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="club-invites-link__meta">
+                                            {% if req.user.player and req.user.player.city %}
+                                            <span>{{ req.user.player.city }}</span>
+                                            {% endif %}
+                                            {% if req.user.phone %}
+                                            <span>{{ req.user.phone }}</span>
+                                            {% endif %}
+                                            <span>{{ req.user.email }}</span>
+                                        </div>
+                                        {% if req.message %}
+                                        <div class="club-invites-request-note">{{ req.message }}</div>
+                                        {% endif %}
+                                    </div>
+                                {% if req.user.player %}
+                                </a>
+                                {% else %}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="club-members-badge club-members-badge--status {{ req.status_badge_class }}">{{ req.get_status_display }}</span>
+                                <div class="club-members-date-note">{{ req.status_note }}</div>
+                            </td>
+                            <td>
+                                <div class="club-members-date">{{ req.created_at|date:"d.m.Y" }}</div>
+                                <div class="club-members-date-note">{{ req.created_at|date:"H:i" }}</div>
+                            </td>
+                            <td>
+                                {% if req.reviewed_by_display %}
+                                <div class="club-members-date">{{ req.reviewed_by_display }}</div>
+                                {% if req.reviewed_at %}
+                                <div class="club-members-date-note">{{ req.reviewed_at|date:"d.m.Y H:i" }}</div>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-secondary">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="club-members-table__actions">
+                                {% if req.status == 'pending' %}
+                                <form method="post" action="{% url 'clubs:join_request_approve' slug=club.slug pk=req.id %}" class="club-members-table__remove-form">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-primary btn-sm">Одобрить</button>
+                                </form>
+                                <form method="post" action="{% url 'clubs:join_request_reject' slug=club.slug pk=req.id %}" class="club-members-table__remove-form">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-ghost btn-sm btn-danger-text" onclick="return confirm('Отклонить заявку?');">
+                                        Отклонить
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="club-members-date-note">Решение принято</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="club-members-mobile-list club-invites-mobile-list">
+                {% for req in join_requests %}
+                <article class="club-members-mobile-card club-invites-mobile-card club-invites-request-card">
+                    {% if req.user.player %}
+                    <a href="{% url 'profile' pk=req.user.player.pk %}" class="club-members-person club-members-person--link">
+                    {% else %}
+                    <div class="club-members-person">
+                    {% endif %}
+                        {% if req.user.player and req.user.player.avatar %}
+                        <img src="{{ req.user.player.avatar.url }}" alt="{{ req.user_display_name }}" class="club-members-person__avatar">
+                        {% else %}
+                        <span class="club-members-person__avatar club-members-person__avatar--fallback">
+                            {% if req.user.first_name %}
+                            {{ req.user.first_name|slice:":1"|upper }}
+                            {% else %}
+                            {{ req.user.email|slice:":1"|upper }}
+                            {% endif %}
+                        </span>
+                        {% endif %}
+                        <div class="club-members-person__content">
+                            <div class="club-members-person__name-row">
+                                <span class="club-members-person__name">{{ req.user_display_name }}</span>
+                            </div>
+                            {% if req.user.player %}
+                            <div class="club-members-person__stats">
+                                <span class="club-members-inline-stat">
+                                    <span class="club-members-inline-stat__label">Уровень</span>
+                                    <span class="club-members-inline-stat__value">{{ req.user.player.get_skill_level_display }}</span>
+                                </span>
+                                {% if req.user.player.ntrp_level %}
+                                <span class="club-members-inline-stat">
+                                    <span class="club-members-inline-stat__label">NTRP</span>
+                                    <span class="club-members-inline-stat__value">{{ req.user.player.ntrp_level }}</span>
+                                </span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            <div class="club-invites-link__meta">
+                                {% if req.user.phone %}
+                                <span>{{ req.user.phone }}</span>
+                                {% endif %}
+                                <span>{{ req.user.email }}</span>
+                            </div>
+                        </div>
+                    {% if req.user.player %}
+                    </a>
+                    {% else %}
+                    </div>
+                    {% endif %}
+
+                    <div class="club-members-mobile-card__grid">
+                        <div>
+                            <span class="club-members-mobile-card__label">Статус</span>
+                            <span class="club-members-badge {{ req.status_badge_class }}">{{ req.get_status_display }}</span>
+                        </div>
+                        <div>
+                            <span class="club-members-mobile-card__label">Подана</span>
+                            <span class="club-members-mobile-card__value">{{ req.created_at|date:"d.m.Y H:i" }}</span>
+                        </div>
+                        <div>
+                            <span class="club-members-mobile-card__label">Обработал</span>
+                            <span class="club-members-mobile-card__value">{{ req.reviewed_by_display|default:"—" }}</span>
+                        </div>
+                    </div>
+
+                    {% if req.message %}
+                    <div class="club-invites-request-note">{{ req.message }}</div>
+                    {% endif %}
+
+                    {% if req.status == 'pending' %}
+                    <div class="club-members-mobile-card__actions">
+                        <form method="post" action="{% url 'clubs:join_request_approve' slug=club.slug pk=req.id %}" class="club-members-table__remove-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary btn-sm">Одобрить</button>
+                        </form>
+                        <form method="post" action="{% url 'clubs:join_request_reject' slug=club.slug pk=req.id %}" class="club-members-table__remove-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-ghost btn-sm btn-danger-text" onclick="return confirm('Отклонить заявку?');">
+                                Отклонить
+                            </button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <div class="club-members-date-note">{{ req.status_note }}</div>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="club-invites-empty">
+                <h3 class="club-invites-empty__title">Заявок пока нет</h3>
+                <p class="club-invites-empty__text">
+                    Когда игроки отправят запрос на вступление, они появятся здесь со всеми нужными данными для быстрого решения.
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </section>
 </div>
 <script>
 document.querySelectorAll('.copy-invite-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
+        var defaultLabel = this.getAttribute('data-default-label') || 'Скопировать';
         var path = this.getAttribute('data-url');
         var full = path.startsWith('http') ? path : (window.location.origin + path);
-        navigator.clipboard.writeText(full).then(function() { btn.textContent = 'Скопировано'; });
+        navigator.clipboard.writeText(full).then(function() {
+            btn.textContent = 'Скопировано';
+            window.setTimeout(function() {
+                btn.textContent = defaultLabel;
+            }, 1600);
+        }).catch(function() {
+            btn.textContent = 'Не удалось';
+            window.setTimeout(function() {
+                btn.textContent = defaultLabel;
+            }, 1600);
+        });
     });
 });
 </script>

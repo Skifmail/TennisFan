@@ -21,9 +21,15 @@
                         <span style="font-weight: 500;">{{ value }}</span>
                     </li>
                     {% endfor %}
+                    {% if balance_available and balance_available > 0 %}
+                    <li style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-md); border-bottom: 1px solid var(--color-border-light); padding-bottom: var(--spacing-md);">
+                        <span class="text-secondary">Баланс клуба</span>
+                        <span style="font-weight: 500;">{{ balance_available }} ₽</span>
+                    </li>
+                    {% endif %}
                     <li style="display: flex; justify-content: space-between; margin-top: var(--spacing-lg); padding-top: var(--spacing-md); border-top: 2px solid var(--color-border); font-size: 1.1em; font-weight: bold;">
-                        <span>Итого к оплате</span>
-                        <span style="color: var(--color-primary);">{% if payment_type == 'tournament' %}{{ amount|floatformat:0 }}{% else %}{{ amount }}{% endif %} ₽</span>
+                        <span>К доплате онлайн</span>
+                        <span style="color: var(--color-primary);">{% if payment_type == 'tournament' %}{{ external_amount_due|default:amount|floatformat:0 }}{% else %}{{ external_amount_due|default:amount }}{% endif %} ₽</span>
                     </li>
                 </ul>
             </div>
@@ -72,7 +78,9 @@
                 <div style="margin-bottom: var(--spacing-xl);">
                     {% include 'includes/offer_consent.html' %}
                 </div>
-                <button type="submit" class="btn btn-primary btn-pay w-100" style="margin-bottom: var(--spacing-md);" data-loading-text="Переход к оплате...">Оплатить</button>
+                <button type="submit" class="btn btn-primary btn-pay w-100" style="margin-bottom: var(--spacing-md);" data-loading-text="Переход к оплате...">
+                    {% if external_amount_due <= 0 %}Оплатить с баланса{% else %}Оплатить{% endif %}
+                </button>
                 <div class="text-center">
                     <a href="javascript:history.back()" class="text-secondary" style="font-size: 0.9em;">Назад</a>
                 </div>

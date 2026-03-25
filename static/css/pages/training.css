@@ -16,7 +16,7 @@
 
 .training-list-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--spacing-lg);
     align-items: stretch;
 }
@@ -72,6 +72,10 @@
 }
 
 @media (width <= 900px) {
+    .training-list-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .training-detail-grid {
         grid-template-columns: 1fr;
     }

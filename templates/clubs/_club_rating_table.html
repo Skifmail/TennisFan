@@ -1,0 +1,135 @@
+{% if ratings %}
+<div class="club-rating-table" role="table" aria-label="Рейтинг клуба">
+    <div class="club-rating-table__head" role="row">
+        <span>Место</span>
+        <span>Игрок и форма</span>
+        <span>Уровень и рейтинг</span>
+        <span>Очки клуба</span>
+    </div>
+    {% for r in ratings %}
+    <div class="club-rating-table__row {% if my_rating and r.member_id == my_rating.member_id %}club-rating-table__row--current{% endif %}" role="row">
+        <div class="club-rating-table__rank">
+            <span class="club-rating-rank-badge {% if r.display_rank <= 3 %}club-rating-rank-badge--top{% endif %}">
+                {{ r.display_rank }}
+            </span>
+        </div>
+        <div class="club-rating-table__player">
+            {% with player=r.member.user.player rating_changes=r.member.user.player.get_rating_changes %}
+            <div class="club-rating-table__player-top">
+                <div class="club-rating-table__player-main">
+                    <a href="{% url 'clubs:player_profile' slug=club.slug player_id=player.pk %}" class="club-rating-table__name-link">
+                        <span class="club-rating-table__name">{{ r.member.user.get_full_name|default:r.member.user.email }}</span>
+                    </a>
+                    <div class="club-rating-table__signals">
+                        <span class="club-rating-table__signal">
+                            <span class="club-rating-table__signal-label">Матчи</span>
+                            <span class="club-rating-table__signal-value">{{ r.matches_played }}</span>
+                        </span>
+                        <span class="club-rating-table__signal">
+                            <span class="club-rating-table__signal-label">Win rate</span>
+                            <span class="club-rating-table__signal-value">{{ r.win_rate|floatformat:0 }}%</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="club-rating-table__badges">
+                    {% if my_rating and r.member_id == my_rating.member_id %}
+                    <span class="club-rating-table__self-tag">Вы</span>
+                    {% endif %}
+                    {% if r.has_leader_reference %}
+                    <span class="club-rating-table__gap-pill {% if r.points_gap == 0 %}club-rating-table__gap-pill--lead{% endif %}">
+                        {% if r.is_leader %}Лидер{% else %}-{{ r.points_gap }} до лидера{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if r.last_club_match %}
+                {% if r.last_club_match.url %}
+                <a href="{{ r.last_club_match.url }}" class="club-rating-table__match-card">
+                {% else %}
+                <div class="club-rating-table__match-card">
+                {% endif %}
+                    <div class="club-rating-table__match-card-top">
+                        <span class="club-rating-table__result-badge club-rating-table__result-badge--{{ r.last_club_match.result_kind }}">
+                            {{ r.last_club_match.result_code }}
+                        </span>
+                        <span class="club-rating-table__match-caption">
+                            {% if r.last_club_match.tournament_name %}
+                            {{ r.last_club_match.tournament_name }}
+                            {% else %}
+                            Последний матч клуба
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="club-rating-table__match-main">
+                        <span class="club-rating-table__match-score">{{ r.last_club_match.score }}</span>
+                        <span class="club-rating-table__match-opponent">против {{ r.last_club_match.opponent }}</span>
+                    </div>
+                    <div class="club-rating-table__match-meta">
+                        <span>{{ r.last_club_match.result_text }}</span>
+                        <span class="club-rating-table__match-separator">•</span>
+                        <span class="club-rating-table__match-date">{{ r.last_club_match.date|date:"d.m.Y" }}</span>
+                    </div>
+                {% if r.last_club_match.url %}
+                </a>
+                {% else %}
+                </div>
+                {% endif %}
+            {% else %}
+            <div class="club-rating-table__match-card club-rating-table__match-card--empty">
+                <span class="club-rating-table__match-empty">Пока нет завершённых матчей клуба</span>
+            </div>
+            {% endif %}
+        </div>
+        <div class="club-rating-table__metrics">
+            <div class="club-rating-table__meter-card">
+                <div class="club-rating-table__meter-head">
+                    <span>Уровень</span>
+                    <span class="club-rating-table__meter-value">{{ r.member.user.player.ntrp_level|default:"—" }}</span>
+                </div>
+                <progress class="club-rating-table__meter club-rating-table__meter--level" max="100" value="{{ r.level_percent }}"></progress>
+                <div class="club-rating-table__meter-foot">
+                    <span class="club-rating-table__trend club-rating-table__trend--{{ rating_changes.ntrp.direction }}">
+                        {% if rating_changes.ntrp.direction == 'up' %}↑ {% elif rating_changes.ntrp.direction == 'down' %}↓ {% else %}→ {% endif %}
+                        {% if rating_changes.ntrp.delta > 0 %}+{% endif %}{{ rating_changes.ntrp.delta|floatformat:1 }}
+                    </span>
+                    <span class="club-rating-table__meter-note">шкала NTRP</span>
+                </div>
+            </div>
+            <div class="club-rating-table__meter-card">
+                <div class="club-rating-table__meter-head">
+                    <span>FAN рейтинг</span>
+                    <span class="club-rating-table__meter-value">{{ r.member.user.player.total_points|floatformat:1 }}</span>
+                </div>
+                <progress class="club-rating-table__meter club-rating-table__meter--rating" max="100" value="{{ r.fan_rating_percent }}"></progress>
+                <div class="club-rating-table__meter-foot">
+                    <span class="club-rating-table__trend club-rating-table__trend--{{ rating_changes.fan.direction }}">
+                        {% if rating_changes.fan.direction == 'up' %}↑ {% elif rating_changes.fan.direction == 'down' %}↓ {% else %}→ {% endif %}
+                        {% if rating_changes.fan.delta > 0 %}+{% endif %}{{ rating_changes.fan.delta|floatformat:1 }}
+                    </span>
+                    <span class="club-rating-table__meter-note">от лидера клуба</span>
+                </div>
+            </div>
+            {% endwith %}
+        </div>
+        <div class="club-rating-table__points">
+            <div class="club-rating-table__points-value">{{ r.points }}</div>
+            <div class="club-rating-table__points-label">очки клуба</div>
+            <progress class="club-rating-table__points-bar" max="100" value="{{ r.club_points_percent }}"></progress>
+            <div class="club-rating-table__points-gap">
+                {% if r.has_leader_reference %}
+                    {% if r.is_leader %}100% от лидера{% else %}{{ r.club_points_percent }}% от лидера{% endif %}
+                {% else %}
+                    очки ещё не начислены
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="club-dashboard-empty-state club-rating-empty-state">
+    <div class="club-dashboard-empty-state__title">{{ empty_title }}</div>
+    <div class="club-dashboard-empty-state__text">{{ empty_text }}</div>
+</div>
+{% endif %}

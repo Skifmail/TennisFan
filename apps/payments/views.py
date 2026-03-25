@@ -21,8 +21,10 @@ from .forms import DonateForm
 from .models import PaymentRecord, SavedPaymentMethod
 from .yookassa_client import (
     create_payment,
+    create_payment_with_credentials,
     get_payment_details,
     get_payment_status,
+    get_payment_status_with_credentials,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,19 +63,78 @@ def _get_item_label(payment_type: str, item_id: str) -> str:
             return "Тариф клуба"
         return cast(str, f"{plan.club.name}: {plan.name}")
 
+    if payment_type == "club_fee":
+        return "Членский взнос клуба"
+
     if payment_type == "tournament":
         try:
-            tournament = Tournament.objects.filter(pk=int(item_id)).first()
+            tournament = (
+                Tournament.objects.select_related("club")
+                .filter(pk=int(item_id))
+                .first()
+            )
         except (TypeError, ValueError):
             tournament = None
         if tournament is None:
             return "Турнир"
+        if tournament.club_id:
+            return cast(str, f"{tournament.club.name}: {tournament.name}")
         return cast(str, tournament.title)
 
     if payment_type == "donation":
         return "Поддержка проекта"
 
     return "Оплата"
+
+
+def _get_tournament_club_member(user, tournament: Tournament):
+    if not getattr(user, "is_authenticated", False) or not tournament.club_id:
+        return None
+
+    from apps.clubs.models import ClubMember, ClubMemberStatus
+
+    return (
+        ClubMember.objects.select_related("club")
+        .filter(
+            user=user,
+            club_id=tournament.club_id,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        .first()
+    )
+
+
+def _get_discounted_tournament_entry_fee(
+    request: HttpRequest,
+    tournament: Tournament,
+) -> Decimal:
+    entry_fee: Decimal = tournament.entry_fee or Decimal("0")
+    if tournament.club_id:
+        return entry_fee
+    if (
+        request.user.is_authenticated
+        and hasattr(request.user, "subscription")
+        and request.user.subscription.is_valid()
+    ):
+        discount_percent = request.user.subscription.tier.one_day_tournament_discount
+        if discount_percent > 0:
+            discount = entry_fee * (Decimal(discount_percent) / 100)
+            entry_fee = entry_fee - discount
+    return entry_fee
+
+
+def _get_balance_transaction_by_id(transaction_id_raw: str):
+    try:
+        transaction_id = int(str(transaction_id_raw or "").strip())
+    except (TypeError, ValueError):
+        return None
+
+    if transaction_id <= 0:
+        return None
+
+    from apps.clubs.models import ClubMemberBalanceTransaction
+
+    return ClubMemberBalanceTransaction.objects.filter(pk=transaction_id).first()
 
 
 def _log_offer_acceptance(
@@ -107,6 +168,9 @@ def _create_payment_record(
     amount_str: str,
     payment_id: str,
     autopay_enabled: bool,
+    status: str = "succeeded",
+    is_recurring: bool = False,
+    metadata: dict | None = None,
 ) -> None:
     try:
         amount = Decimal(amount_str)
@@ -121,10 +185,10 @@ def _create_payment_record(
             "item_id": item_id,
             "item_label": _get_item_label(payment_type, item_id),
             "amount": amount,
-            "status": "succeeded",
-            "is_recurring": False,
+            "status": status,
+            "is_recurring": is_recurring,
             "autopay_enabled": autopay_enabled,
-            "metadata": {},
+            "metadata": metadata or {},
         },
     )
 
@@ -311,8 +375,26 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
 
     elif payment_type == "tournament":
         tournament_id = request.GET.get("id")
-        tournament = get_object_or_404(Tournament, pk=tournament_id)
+        tournament = get_object_or_404(
+            Tournament.objects.select_related("club"),
+            pk=tournament_id,
+        )
         next_url = request.GET.get("next", "").strip()
+        tournament_member = _get_tournament_club_member(request.user, tournament)
+
+        if (
+            tournament.club_id
+            and not (
+                getattr(request.user, "is_staff", False)
+                or getattr(request.user, "is_superuser", False)
+            )
+            and tournament_member is None
+        ):
+            messages.error(
+                request,
+                "Оплата клубного турнира доступна только активным участникам клуба.",
+            )
+            return redirect("tournament_detail", slug=tournament.slug)
 
         # Админ не платит за турниры — сразу считаем участие подтверждённым
         if request.user.is_authenticated and (
@@ -330,10 +412,12 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
             return redirect(success_url)
 
         # Calculate price (handle discount if user has subscription)
-        entry_fee: Decimal = tournament.entry_fee or Decimal("0")
+        raw_entry_fee: Decimal = tournament.entry_fee or Decimal("0")
+        entry_fee = _get_discounted_tournament_entry_fee(request, tournament)
         discount: Decimal = Decimal("0")
         if (
-            request.user.is_authenticated
+            not tournament.club_id
+            and request.user.is_authenticated
             and hasattr(request.user, "subscription")
             and request.user.subscription.is_valid()
         ):
@@ -341,23 +425,75 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
                 request.user.subscription.tier.one_day_tournament_discount
             )
             if discount_percent > 0:
-                discount = entry_fee * (Decimal(discount_percent) / 100)
-                entry_fee = entry_fee - discount
+                discount = raw_entry_fee * (Decimal(discount_percent) / 100)
 
         discount_int = int(discount) if discount else 0
+        balance_available = Decimal("0.00")
+        balance_to_apply = Decimal("0.00")
+        external_amount_due = entry_fee
+        if tournament_member is not None:
+            from apps.clubs.finance_services import calculate_balance_payment_breakdown
+
+            breakdown = calculate_balance_payment_breakdown(
+                tournament_member, entry_fee
+            )
+            balance_available = breakdown.balance_available
+            balance_to_apply = breakdown.balance_to_apply
+            external_amount_due = breakdown.external_amount_due
+
+        if tournament.club_id and external_amount_due > 0:
+            from apps.clubs.views.helpers import _get_club_payment_settings
+
+            payment_settings = _get_club_payment_settings(tournament.club)
+            if payment_settings is None:
+                messages.error(
+                    request,
+                    "Клуб ещё не подключил свою YooKassa. Онлайн-оплата турнира временно недоступна.",
+                )
+                return redirect("tournament_detail", slug=tournament.slug)
+
         context = {
-            "title": f"Турнир: {tournament.name}",
-            "description": f"Взнос за участие в турнире {tournament.get_city_display() if hasattr(tournament, 'get_city_display') else tournament.city}",
+            "title": (
+                f"Турнир клуба: {tournament.name}"
+                if tournament.club_id
+                else f"Турнир: {tournament.name}"
+            ),
+            "description": (
+                f"Вступительный взнос за участие в турнире клуба «{tournament.club.name}»."
+                if tournament.club_id
+                else (
+                    "Взнос за участие в турнире "
+                    f"{tournament.get_city_display() if hasattr(tournament, 'get_city_display') else tournament.city}"
+                )
+            ),
             "amount": entry_fee,
             "amount_value": f"{entry_fee:.2f}",
             "item_id": tournament.id,
             "payment_next_url": next_url,
             "details": [
+                *([("Клуб", tournament.club.name)] if tournament.club_id else []),
                 ("Турнир", tournament.name),
                 ("Дата", tournament.start_date),
                 ("Город", tournament.city),
+                *(
+                    [("Получатель", f"{tournament.club.name} · YooKassa клуба")]
+                    if tournament.club_id
+                    else []
+                ),
                 ("Скидка", f"{discount_int} ₽" if discount_int else "Нет"),
+                (
+                    "Спишется с баланса",
+                    f"{balance_to_apply} ₽" if balance_to_apply > 0 else "0 ₽",
+                ),
             ],
+            "balance_available": balance_available,
+            "balance_to_apply": balance_to_apply,
+            "external_amount_due": external_amount_due,
+            **(
+                {"is_club_panel": True, "club": tournament.club}
+                if tournament_member is not None
+                else {}
+            ),
         }
 
     elif payment_type == "donation":
@@ -397,6 +533,7 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
 
     context["payment_type"] = payment_type
     context["process_url"] = reverse("payment_process")
+    context.setdefault("external_amount_due", context.get("amount"))
 
     return render(request, "payments/preview.html", context)
 
@@ -448,12 +585,119 @@ def payment_process(request: HttpRequest) -> HttpResponse:
     if request.method != "POST":
         return _build_preview_redirect(request, payment_type)
 
+    tournament = None
+    tournament_member = None
+    balance_transaction = None
+    club_payment_settings = None
+    club_payment_secret = ""
+
     # Сумма и описание для ЮKassa (нормализуем запятую в точку — форма может отдать "100,00" в русской локали)
     amount_raw = (request.POST.get("amount") or "").strip().replace(",", ".")
     try:
         amount_decimal = Decimal(amount_raw or "0")
     except Exception:
         amount_decimal = Decimal("0")
+
+    if payment_type == "tournament":
+        tournament = get_object_or_404(
+            Tournament.objects.select_related("club"),
+            pk=request.POST.get("id"),
+        )
+        tournament_member = _get_tournament_club_member(request.user, tournament)
+        if (
+            tournament.club_id
+            and not (
+                getattr(request.user, "is_staff", False)
+                or getattr(request.user, "is_superuser", False)
+            )
+            and tournament_member is None
+        ):
+            messages.error(
+                request,
+                "Оплата клубного турнира доступна только активным участникам клуба.",
+            )
+            return redirect("tournament_detail", slug=tournament.slug)
+
+        amount_decimal = _get_discounted_tournament_entry_fee(request, tournament)
+        balance_to_apply = Decimal("0.00")
+        if tournament_member is not None:
+            from apps.clubs.finance_services import (
+                calculate_balance_payment_breakdown,
+                reserve_member_balance,
+                spend_member_balance,
+            )
+            from apps.clubs.models import ClubMemberBalanceTransaction
+
+            breakdown = calculate_balance_payment_breakdown(
+                tournament_member,
+                amount_decimal,
+            )
+            balance_to_apply = breakdown.balance_to_apply
+            if breakdown.balance_to_apply > 0 and breakdown.external_amount_due > 0:
+                try:
+                    balance_transaction = reserve_member_balance(
+                        tournament_member,
+                        breakdown.balance_to_apply,
+                        source=ClubMemberBalanceTransaction.Source.TOURNAMENT_PAYMENT,
+                        description=f"Оплата турнира «{tournament.name}»",
+                        reference=f"tournament:{tournament.id}",
+                        metadata={"tournament_id": tournament.id},
+                    )
+                except ValueError:
+                    messages.error(
+                        request,
+                        "Не удалось зарезервировать средства с баланса. Обновите страницу и попробуйте снова.",
+                    )
+                    return _build_preview_redirect(request, payment_type)
+
+            if breakdown.external_amount_due <= 0:
+                spend_member_balance(
+                    tournament_member,
+                    breakdown.balance_to_apply,
+                    source=ClubMemberBalanceTransaction.Source.TOURNAMENT_PAYMENT,
+                    description=f"Оплата турнира «{tournament.name}»",
+                    reference=f"tournament:{tournament.id}",
+                    metadata={"tournament_id": tournament.id},
+                )
+                success_url = reverse("payment_success")
+                success_url += "?" + urlencode(
+                    {
+                        "type": "tournament",
+                        "id": tournament.id,
+                        "next": request.POST.get("next", "").strip(),
+                        "amount": f"{amount_decimal:.2f}",
+                    }
+                )
+                return redirect(success_url)
+
+            amount_decimal = breakdown.external_amount_due
+        if tournament.club_id and amount_decimal > 0:
+            from apps.clubs.payment_utils import decrypt_secret
+            from apps.clubs.views.helpers import _get_club_payment_settings
+
+            club_payment_settings = _get_club_payment_settings(tournament.club)
+            if club_payment_settings is None:
+                messages.error(
+                    request,
+                    "Клуб ещё не подключил свою YooKassa. Онлайн-оплата турнира временно недоступна.",
+                )
+                return _build_preview_redirect(request, payment_type)
+            try:
+                club_payment_secret = decrypt_secret(
+                    club_payment_settings.payment_api_key
+                )
+            except Exception as exc:
+                if balance_transaction is not None:
+                    from apps.clubs.finance_services import cancel_reserved_balance
+
+                    cancel_reserved_balance(balance_transaction)
+                logger.warning(
+                    "Не удалось расшифровать ключ YooKassa клуба для оплаты турнира: %s",
+                    exc,
+                )
+                messages.error(request, "Ошибка платёжных настроек клуба.")
+                return _build_preview_redirect(request, payment_type)
+
     if amount_decimal <= 0:
         messages.error(request, "Укажите корректную сумму оплаты.")
         return _build_preview_redirect(request, payment_type)
@@ -495,24 +739,12 @@ def payment_process(request: HttpRequest) -> HttpResponse:
             except (ValueError, TypeError):
                 pass
     elif payment_type == "tournament":
-        description = "Взнос за участие в турнире TennisFan"
+        if tournament is not None and tournament.club_id:
+            description = f"Вступительный взнос за турнир клуба {tournament.club.name}: {tournament.name}"
+        else:
+            description = "Взнос за участие в турнире TennisFan"
     else:
         description = "Оплата на TennisFan"
-
-    shop_id = (getattr(settings, "YOOKASSA_SHOP_ID", None) or "").strip()
-    secret_key = (getattr(settings, "YOOKASSA_SECRET_KEY", None) or "").strip()
-    if not shop_id or not secret_key:
-        logger.warning(
-            "YooKassa: ключи не заданы. SHOP_ID=%s, SECRET_KEY=%s. "
-            "В Environment не должно быть комментариев (#) и пустых строк; задайте переменные отдельными строками.",
-            "пусто" if not shop_id else "задан",
-            "пусто" if not secret_key else "задан",
-        )
-        messages.error(
-            request,
-            "Платёжный шлюз временно недоступен. Попробуйте позже или свяжитесь с нами.",
-        )
-        return _build_preview_redirect(request, payment_type)
 
     return_url_absolute = request.build_absolute_uri(reverse("payment_return"))
     metadata = {
@@ -522,6 +754,9 @@ def payment_process(request: HttpRequest) -> HttpResponse:
     }
     if request.user.is_authenticated:
         metadata["user_id"] = str(request.user.pk)
+    if tournament is not None and tournament.club_id:
+        metadata["club_id"] = str(tournament.club_id)
+        metadata["club_slug"] = tournament.club.slug
     if payment_type in ("subscription", "club_plan") and enable_autopay:
         # Маркер в metadata — в логах и ЛК ЮKassa будет видно, что платёж
         # используется для включения автопродления подписки.
@@ -541,19 +776,50 @@ def payment_process(request: HttpRequest) -> HttpResponse:
         )
 
     try:
-        payment_id, confirmation_url = create_payment(
-            amount=amount_str,
-            return_url=return_url_absolute,
-            description=description[:128],
-            metadata=metadata,
-            customer_email=receipt_email,
-            save_payment_method=(
-                enable_autopay
-                if payment_type in ("subscription", "club_plan")
-                else None
-            ),
-        )
+        if tournament is not None and tournament.club_id:
+            if club_payment_settings is None:
+                raise RuntimeError("Отсутствуют платёжные реквизиты клуба.")
+            payment_id, confirmation_url = create_payment_with_credentials(
+                shop_id=club_payment_settings.payment_shop_id,
+                secret_key=club_payment_secret,
+                amount=amount_str,
+                return_url=return_url_absolute,
+                description=description[:128],
+                metadata=metadata,
+                customer_email=receipt_email,
+            )
+        else:
+            shop_id = (getattr(settings, "YOOKASSA_SHOP_ID", None) or "").strip()
+            secret_key = (getattr(settings, "YOOKASSA_SECRET_KEY", None) or "").strip()
+            if not shop_id or not secret_key:
+                logger.warning(
+                    "YooKassa: ключи не заданы. SHOP_ID=%s, SECRET_KEY=%s. "
+                    "В Environment не должно быть комментариев (#) и пустых строк; задайте переменные отдельными строками.",
+                    "пусто" if not shop_id else "задан",
+                    "пусто" if not secret_key else "задан",
+                )
+                messages.error(
+                    request,
+                    "Платёжный шлюз временно недоступен. Попробуйте позже или свяжитесь с нами.",
+                )
+                return _build_preview_redirect(request, payment_type)
+            payment_id, confirmation_url = create_payment(
+                amount=amount_str,
+                return_url=return_url_absolute,
+                description=description[:128],
+                metadata=metadata,
+                customer_email=receipt_email,
+                save_payment_method=(
+                    enable_autopay
+                    if payment_type in ("subscription", "club_plan")
+                    else None
+                ),
+            )
     except (ValueError, RuntimeError) as e:
+        if balance_transaction is not None:
+            from apps.clubs.finance_services import cancel_reserved_balance
+
+            cancel_reserved_balance(balance_transaction)
         logger.exception("YooKassa create_payment failed: %s", e)
         messages.error(
             request,
@@ -579,6 +845,16 @@ def payment_process(request: HttpRequest) -> HttpResponse:
     else:
         # Подписка и турнир: сохраняем фактическую сумму (региональная цена, акция 1 ₽ и т.д.)
         pending_data["amount"] = amount_str
+    if payment_type == "tournament" and tournament is not None:
+        pending_data["balance_amount"] = f"{balance_to_apply:.2f}"
+        pending_data["total_amount"] = (
+            f"{_get_discounted_tournament_entry_fee(request, tournament):.2f}"
+        )
+        if tournament.club_id:
+            pending_data["club_id"] = str(tournament.club_id)
+            pending_data["club_slug"] = tournament.club.slug
+    if balance_transaction is not None:
+        pending_data["balance_transaction_id"] = str(balance_transaction.id)
     request.session["yookassa_pending"] = pending_data
     request.session.modified = True
     return redirect(confirmation_url)
@@ -610,9 +886,71 @@ def payment_return(request: HttpRequest) -> HttpResponse:
     item_id = pending.get("item_id", "")
     next_url = pending.get("next", "")
     enable_autopay = str(pending.get("enable_autopay", "")).strip() == "1"
+    balance_transaction = _get_balance_transaction_by_id(
+        str(pending.get("balance_transaction_id") or "")
+    )
+    club_id = str(pending.get("club_id") or "").strip()
+    status = None
+    tournament = None
+    if payment_type == "tournament" and item_id:
+        try:
+            tournament = (
+                Tournament.objects.select_related("club")
+                .filter(pk=int(item_id))
+                .first()
+            )
+        except (TypeError, ValueError):
+            tournament = None
+        if tournament and tournament.club_id and club_id:
+            from apps.clubs.payment_utils import decrypt_secret
+            from apps.clubs.views.helpers import _get_club_payment_settings
 
-    status = get_payment_status(payment_id) if payment_id else None
+            club_payment_settings = _get_club_payment_settings(tournament.club)
+            if club_payment_settings is None:
+                if balance_transaction is not None:
+                    from apps.clubs.finance_services import cancel_reserved_balance
+
+                    cancel_reserved_balance(balance_transaction)
+                messages.error(
+                    request,
+                    "Клуб отключил YooKassa или не настроил платёжные реквизиты. Оплата турнира не подтверждена.",
+                )
+                del request.session["yookassa_pending"]
+                request.session.modified = True
+                return redirect("tournament_detail", slug=tournament.slug)
+            try:
+                club_secret = decrypt_secret(club_payment_settings.payment_api_key)
+            except Exception as exc:
+                if balance_transaction is not None:
+                    from apps.clubs.finance_services import cancel_reserved_balance
+
+                    cancel_reserved_balance(balance_transaction)
+                logger.warning(
+                    "Не удалось расшифровать ключ YooKassa клуба при проверке оплаты турнира: %s",
+                    exc,
+                )
+                messages.error(request, "Ошибка проверки клубного платежа.")
+                del request.session["yookassa_pending"]
+                request.session.modified = True
+                return redirect("tournament_detail", slug=tournament.slug)
+            status = (
+                get_payment_status_with_credentials(
+                    payment_id,
+                    club_payment_settings.payment_shop_id,
+                    club_secret,
+                )
+                if payment_id
+                else None
+            )
+        else:
+            status = get_payment_status(payment_id) if payment_id else None
+    else:
+        status = get_payment_status(payment_id) if payment_id else None
     if status != "succeeded":
+        if balance_transaction is not None:
+            from apps.clubs.finance_services import cancel_reserved_balance
+
+            cancel_reserved_balance(balance_transaction)
         messages.error(
             request,
             "Оплата не была завершена или отменена. Попробуйте снова или выберите другой способ.",
@@ -629,6 +967,11 @@ def payment_return(request: HttpRequest) -> HttpResponse:
                 reverse("payment_preview") + "?" + urlencode(preview_params)
             )
         return redirect("donate")
+
+    if balance_transaction is not None:
+        from apps.clubs.finance_services import confirm_reserved_balance
+
+        confirm_reserved_balance(balance_transaction)
 
     # Уведомление админу о донате до очистки сессии
     if payment_type == "donation":
@@ -728,6 +1071,15 @@ def payment_return(request: HttpRequest) -> HttpResponse:
             amount_str=str(pending.get("amount", "")),
             payment_id=payment_id,
             autopay_enabled=enable_autopay,
+            metadata={
+                "club_id": str(pending.get("club_id", "") or ""),
+                "club_slug": str(pending.get("club_slug", "") or ""),
+                "balance_amount": str(pending.get("balance_amount", "") or "0"),
+                "external_amount": str(pending.get("amount", "") or "0"),
+                "total_amount": str(
+                    pending.get("total_amount", "") or pending.get("amount", "") or "0"
+                ),
+            },
         )
 
     del request.session["yookassa_pending"]
@@ -913,6 +1265,16 @@ def payment_success(request: HttpRequest) -> HttpResponse:
 
             tournament = Tournament.objects.filter(pk=tid).first()
             if tournament:
+                club_member = _get_tournament_club_member(request.user, tournament)
+                if tournament.club_id:
+                    if club_member is None:
+                        messages.error(
+                            request,
+                            "Вы больше не состоите в клубе и не можете завершить регистрацию на его турнир.",
+                        )
+                        return redirect("tournament_detail", slug=tournament.slug)
+                    request.session["current_club_slug"] = tournament.club.slug
+                    request.session.modified = True
                 try:
                     from apps.core.telegram_notify import (
                         notify_tournament_entry_payment,

@@ -7,11 +7,11 @@
             <a href="{% url 'clubs:my_tournaments' %}" class="btn btn-sm {% if current == 'tournaments' %}btn-primary{% else %}btn-ghost{% endif %}">
                 Турниры
             </a>
-            <a href="{% url 'clubs:my_plan' %}" class="btn btn-sm {% if current == 'plan' %}btn-primary{% else %}btn-ghost{% endif %}">
-                Подписка и лимиты
+            <a href="{% url 'clubs:my_matches' %}" class="btn btn-sm {% if current == 'matches' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Матчи
             </a>
-            <a href="{% url 'clubs:my_payments' %}" class="btn btn-sm {% if current == 'payments' %}btn-primary{% else %}btn-ghost{% endif %}">
-                Мои платежи
+            <a href="{% url 'clubs:my_finance' %}" class="btn btn-sm {% if current == 'finance' or current == 'plan' or current == 'payments' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Финансы
             </a>
             <a href="{% url 'clubs:club_rating' %}" class="btn btn-sm {% if current == 'rating' %}btn-primary{% else %}btn-ghost{% endif %}">
                 Рейтинг
@@ -47,6 +47,18 @@
         </span>
         <span class="club-bottom-nav__item-label">Турниры</span>
     </a>
+    <a href="{% url 'clubs:my_matches' %}"
+       class="club-bottom-nav__item {% if current == 'matches' %}club-bottom-nav__item--active{% endif %}"
+       data-club-tab="matches">
+        <span class="club-bottom-nav__item-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+                <path d="M7 7H17" stroke="currentColor" stroke-linecap="round" />
+                <path d="M7 12H17" stroke="currentColor" stroke-linecap="round" />
+                <path d="M7 17H13" stroke="currentColor" stroke-linecap="round" />
+            </svg>
+        </span>
+        <span class="club-bottom-nav__item-label">Матчи</span>
+    </a>
     <a href="{% url 'clubs:club_rating' %}"
        class="club-bottom-nav__item {% if current == 'rating' %}club-bottom-nav__item--active{% endif %}"
        data-club-tab="rating">
@@ -60,7 +72,7 @@
         </span>
         <span class="club-bottom-nav__item-label">Рейтинг</span>
     </a>
-    <button type="button" class="club-bottom-nav__item club-bottom-nav__item--more {% if current == 'plan' or current == 'payments' or current == 'notifications' %}club-bottom-nav__item--active{% endif %}" data-club-bottom-more>
+    <button type="button" class="club-bottom-nav__item club-bottom-nav__item--more {% if current == 'finance' or current == 'plan' or current == 'payments' or current == 'notifications' %}club-bottom-nav__item--active{% endif %}" data-club-bottom-more>
         <span class="club-bottom-nav__item-icon">
             <svg viewBox="0 0 24 24" fill="none">
                 <circle cx="5" cy="12" r="1.5" fill="currentColor" />
@@ -77,13 +89,9 @@
     <div class="club-bottom-sheet__panel">
         <div class="club-bottom-sheet__handle"></div>
         <nav class="club-bottom-sheet__list">
-            <a href="{% url 'clubs:my_plan' %}" class="club-bottom-sheet__link">
-                <span class="club-bottom-sheet__link-icon">★</span>
-                <span>Подписка и лимиты</span>
-            </a>
-            <a href="{% url 'clubs:my_payments' %}" class="club-bottom-sheet__link">
+            <a href="{% url 'clubs:my_finance' %}" class="club-bottom-sheet__link">
                 <span class="club-bottom-sheet__link-icon">₽</span>
-                <span>Мои платежи</span>
+                <span>Финансы</span>
             </a>
             <a href="{% url 'clubs:my_notification_settings' %}" class="club-bottom-sheet__link">
                 <span class="club-bottom-sheet__link-icon">🔔</span>

@@ -2,56 +2,174 @@
 {% block title %}Тарифы игроков — {{ club.name }}{% endblock %}
 {% block content %}
 {% include "clubs/_club_dashboard_nav.html" with current="plans" %}
-<div class="page-header">
-    <h1 class="page-title">Тарифы игроков</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container" style="max-width: 980px;">
-    <div style="margin-bottom: var(--spacing-lg);">
-        <a href="{% url 'clubs:plan_create' slug=club.slug %}" class="btn btn-primary">Создать тариф</a>
-    </div>
+<section class="club-payments-page club-player-plans-page">
+    <div class="container club-payments-page__container">
+        <div class="club-payments-page__hero">
+            <div class="club-payments-page__copy">
+                <div class="club-payments-page__eyebrow">Player Plans</div>
+                <h1 class="club-payments-page__title">Тарифы игроков</h1>
+                <p class="club-payments-page__subtitle">
+                    Управляйте линейкой клубных тарифов: задавайте стоимость, лимит турниров и вручную назначайте подходящий тариф участнику.
+                </p>
 
-    <div class="card" style="margin-bottom: var(--spacing-xl);">
-        <div class="card-body">
-            <h2 style="margin-top: 0;">Список тарифов</h2>
-            {% if plans %}
-            <table class="table" style="width: 100%;">
-                <thead>
-                    <tr>
-                        <th>Название</th>
-                        <th>Взнос</th>
-                        <th>Лимит турниров</th>
-                        <th>Статус</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
+                <div class="club-payments-page__status-row">
+                    <span class="club-payments-status {% if club.use_player_plans %}club-payments-status--connected{% else %}club-payments-status--idle{% endif %}">
+                        <span class="club-payments-status__dot"></span>
+                        {% if club.use_player_plans %}Система тарифов включена{% else %}Система тарифов выключена{% endif %}
+                    </span>
+                    <form method="post" action="{% url 'clubs:plan_toggle_usage' slug=club.slug %}" class="club-player-plans-page__toggle-form">
+                        {% csrf_token %}
+                        <label class="club-payments-switch" for="club-use-player-plans">
+                            <span class="club-payments-switch__label">Использовать тарифы</span>
+                            <input type="hidden" name="enabled" value="{% if club.use_player_plans %}1{% else %}0{% endif %}">
+                            <input
+                                id="club-use-player-plans"
+                                type="checkbox"
+                                {% if club.use_player_plans %}checked{% endif %}
+                                onchange="this.form.querySelector('input[name=enabled]').value = this.checked ? '1' : '0'; this.form.submit();"
+                            >
+                            <span class="club-payments-switch__track" aria-hidden="true">
+                                <span class="club-payments-switch__thumb"></span>
+                            </span>
+                        </label>
+                    </form>
+                    <span class="club-payments-status club-payments-status--connected">
+                        <span class="club-payments-status__dot"></span>
+                        Активных: {{ active_plans_count }}
+                    </span>
+                </div>
+
+                <div class="club-payments-page__note">
+                    <p>
+                        Если переключатель включён, в клубе работают все ограничения и условия тарифов: лимиты турниров, доступ к бесплатной регистрации по тарифу и ручные назначения участникам.
+                    </p>
+                    <p>
+                        Если переключатель выключён, тарифные ограничения полностью отключаются. Игроки могут свободно регистрироваться на турниры клуба, а вступительный взнос турнира, если он задан, оплачивается как обычно.
+                    </p>
+                </div>
+
+                <div class="club-payments-page__links">
+                    <a href="{% url 'clubs:plan_create' slug=club.slug %}" class="btn btn-primary btn-sm">Создать тариф</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="club-player-plans-page__grid">
+            <section class="club-payments-card club-payments-card--ledger">
+                <div class="club-payments-card__header">
+                    <div>
+                        <div class="club-payments-card__eyebrow">Catalogue</div>
+                        <h2 class="club-payments-card__title">Список тарифов</h2>
+                    </div>
+                </div>
+
+                {% if plans %}
+                <div class="club-dashboard-table club-player-plans-table">
+                    <div class="club-dashboard-table__head">
+                        <div class="club-dashboard-table__cell">Название</div>
+                        <div class="club-dashboard-table__cell">Взнос</div>
+                        <div class="club-dashboard-table__cell">Лимит турниров</div>
+                        <div class="club-dashboard-table__cell">Статус</div>
+                        <div class="club-dashboard-table__cell">Действие</div>
+                    </div>
                     {% for plan in plans %}
-                    <tr>
-                        <td>{{ plan.name }}</td>
-                        <td>{{ plan.monthly_fee }} ₽/мес</td>
-                        <td>{% if plan.max_tournaments_per_month is None %}Без лимита{% else %}{{ plan.max_tournaments_per_month }}{% endif %}</td>
-                        <td>{% if plan.is_active %}Активен{% else %}Архив{% endif %}</td>
-                        <td><a href="{% url 'clubs:plan_edit' slug=club.slug plan_id=plan.id %}" class="btn btn-ghost btn-sm">Изменить</a></td>
-                    </tr>
+                    <div class="club-dashboard-table__row club-player-plans-table__row">
+                        <div class="club-dashboard-table__cell club-dashboard-table__cell--title">
+                            <strong>{{ plan.name }}</strong>
+                            <span class="club-dashboard-table__hint">
+                                {% if plan.description %}
+                                {{ plan.description|truncatechars:110 }}
+                                {% else %}
+                                Без описания
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="club-dashboard-table__cell">
+                            <span class="club-player-plans-table__mobile-label">Взнос</span>
+                            {{ plan.monthly_fee }} ₽/мес
+                        </div>
+                        <div class="club-dashboard-table__cell">
+                            <span class="club-player-plans-table__mobile-label">Лимит</span>
+                            {% if plan.max_tournaments_per_month is None %}
+                            Без лимита
+                            {% else %}
+                            {{ plan.max_tournaments_per_month }}
+                            {% endif %}
+                        </div>
+                        <div class="club-dashboard-table__cell">
+                            <span class="club-player-plans-table__mobile-label">Статус</span>
+                            {% if plan.is_active %}
+                            <span class="club-dashboard-status-badge club-dashboard-status-badge--active">Активен</span>
+                            {% else %}
+                            <span class="club-dashboard-status-badge club-dashboard-status-badge--completed">Архив</span>
+                            {% endif %}
+                        </div>
+                        <div class="club-dashboard-table__cell club-dashboard-table__cell--actions">
+                            <a href="{% url 'clubs:plan_edit' slug=club.slug plan_id=plan.id %}" class="btn btn-sm btn-outline">Изменить</a>
+                        </div>
+                    </div>
                     {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p style="margin: 0;">Тарифы пока не созданы.</p>
-            {% endif %}
-        </div>
-    </div>
+                </div>
+                {% else %}
+                <div class="club-player-plans-empty">
+                    Тарифы пока не созданы. Добавьте первый тариф, чтобы назначать его участникам клуба.
+                </div>
+                {% endif %}
+            </section>
 
-    <div class="card">
-        <div class="card-body">
-            <h2 style="margin-top: 0;">Назначить тариф участнику</h2>
-            <form method="post" action="{% url 'clubs:plan_assign_member' slug=club.slug %}">
-                {% csrf_token %}
-                {{ assign_form.as_p }}
-                <button type="submit" class="btn btn-primary">Назначить</button>
-            </form>
+            <section class="club-payments-card club-payments-card--form">
+                <div class="club-payments-card__header">
+                    <div>
+                        <div class="club-payments-card__eyebrow">Assignment</div>
+                        <h2 class="club-payments-card__title">Назначить тариф участнику</h2>
+                    </div>
+                </div>
+
+                {% if club.use_player_plans %}
+                <form method="post" action="{% url 'clubs:plan_assign_member' slug=club.slug %}" class="club-payments-form">
+                    {% csrf_token %}
+                    <div class="club-payments-form__field">
+                        <label for="{{ assign_form.member.id_for_label }}" class="club-payments-form__label">
+                            {{ assign_form.member.label }}
+                        </label>
+                        {{ assign_form.member }}
+                        {% if assign_form.member.errors %}
+                        <div class="club-payments-form__error">{{ assign_form.member.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="club-payments-form__field">
+                        <label for="{{ assign_form.plan.id_for_label }}" class="club-payments-form__label">
+                            {{ assign_form.plan.label }}
+                        </label>
+                        {{ assign_form.plan }}
+                        {% if assign_form.plan.errors %}
+                        <div class="club-payments-form__error">{{ assign_form.plan.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="club-payments-form__field">
+                        <label for="{{ assign_form.reason.id_for_label }}" class="club-payments-form__label">
+                            {{ assign_form.reason.label }}
+                        </label>
+                        {{ assign_form.reason }}
+                        <div class="club-payments-form__hint">Необязательно, но полезно для истории ручных назначений.</div>
+                        {% if assign_form.reason.errors %}
+                        <div class="club-payments-form__error">{{ assign_form.reason.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="club-payments-form__actions">
+                        <button type="submit" class="btn btn-primary">Назначить тариф</button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="club-player-plans-empty">
+                    Система тарифов сейчас выключена. Назначения сохранены в истории, но не влияют на доступ к турнирам, пока вы снова не включите тарифы.
+                </div>
+                {% endif %}
+            </section>
         </div>
     </div>
-</div>
+</section>
 {% endblock %}

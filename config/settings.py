@@ -6,6 +6,7 @@ Production-ready configuration.
 import base64
 import hashlib
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -23,6 +24,7 @@ if os.environ.get("DEBUG", "False").strip().lower() == "true":
 # ------------------------------------------------------------------------------
 
 DEBUG = os.environ.get("DEBUG", "False") == "True"
+TESTING = "test" in sys.argv
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
@@ -226,7 +228,11 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STORAGES = {
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if TESTING
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
     }
 }
 

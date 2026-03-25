@@ -1,47 +1,188 @@
 {% extends "base.html" %}
+
 {% block title %}Уведомления — {{ club.name }}{% endblock %}
+
 {% block content %}
 {% include "clubs/_club_player_nav.html" with current="notifications" %}
-<div class="page-header">
-    <h1 class="page-title">Настройки уведомлений</h1>
-    <p class="page-subtitle">Клуб «{{ club.name }}»</p>
-</div>
-<div class="container club-player-dashboard" style="max-width: 640px;">
-    <div class="card">
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-                <div style="margin-bottom: var(--spacing-lg);">
-                    <label style="display: flex; align-items: center; gap: var(--spacing-sm); cursor: pointer;">
-                        <input type="checkbox" name="is_enabled" {% if form.instance.is_enabled %}checked{% endif %}>
-                        <span><b>Уведомления включены</b></span>
-                    </label>
-                    <p style="margin: var(--spacing-xs) 0 0; color: var(--color-text-muted); font-size: 0.9rem;">
-                        Отключите, чтобы не получать любые уведомления от этого клуба.
-                    </p>
+<section class="club-payments-page club-notification-settings-page">
+    <div class="container club-payments-page__container">
+        <div class="club-payments-page__hero club-payments-page__hero--split">
+            <div class="club-payments-page__copy">
+                <div class="club-payments-page__eyebrow">Club Alerts</div>
+                <h1 class="club-payments-page__title">Уведомления</h1>
+                <p class="club-payments-page__subtitle">
+                    Здесь настраиваются только Email и Telegram-уведомления от текущего клуба.
+                    Внутренние уведомления платформы эта страница не переключает.
+                </p>
+
+                <div class="club-payments-page__status-row">
+                    <span class="club-payments-status {% if form.instance.is_enabled %}club-payments-status--connected{% else %}club-payments-status--idle{% endif %}">
+                        <span class="club-payments-status__dot"></span>
+                        {% if form.instance.is_enabled %}Уведомления включены{% else %}Уведомления выключены{% endif %}
+                    </span>
+                    <span class="club-payments-page__shop">Активных каналов: {{ active_delivery_channels }}</span>
+                    <span class="club-payments-page__shop">{{ club.name }}</span>
                 </div>
-                <h3 style="font-size: 1rem; margin-bottom: var(--spacing-md);">Каналы доставки</h3>
-                <div style="margin-bottom: var(--spacing-md);">
-                    <label style="display: flex; align-items: center; gap: var(--spacing-sm); cursor: pointer;">
-                        <input type="checkbox" name="email_enabled" {% if form.instance.email_enabled %}checked{% endif %}>
-                        <span>Email</span>
-                    </label>
+            </div>
+
+            <aside class="club-payments-page__help">
+                <h2 class="club-payments-page__help-title">Куда придут уведомления</h2>
+
+                <div class="club-finance-summary club-notification-settings__destinations">
+                    <div class="club-finance-summary__item">
+                        <span class="club-finance-summary__label">Email</span>
+                        <strong class="club-finance-summary__value">
+                            {% if email_destination %}{{ email_destination }}{% else %}Email не указан{% endif %}
+                        </strong>
+                        <span class="club-payments-form__hint">
+                            {% if club_notification_config.notify_by_email %}
+                                Клуб разрешает email-уведомления.
+                            {% else %}
+                                Клуб отключил email-уведомления на своей стороне.
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    <div class="club-finance-summary__item">
+                        <span class="club-finance-summary__label">Telegram</span>
+                        <strong class="club-finance-summary__value">
+                            {% if telegram_connected %}
+                                {% if telegram_bot_username %}@{{ telegram_bot_username }}{% else %}Бот подключён{% endif %}
+                            {% else %}
+                                Бот не подключён
+                            {% endif %}
+                        </strong>
+                        <span class="club-payments-form__hint">
+                            {% if club_notification_config.notify_by_telegram %}
+                                {% if telegram_connected %}
+                                    Сообщения придут в чат с подключённым ботом.
+                                {% else %}
+                                    Для доставки нужно подключить бота в профиле.
+                                {% endif %}
+                            {% else %}
+                                Клуб отключил Telegram-уведомления на своей стороне.
+                            {% endif %}
+                        </span>
+                    </div>
                 </div>
-                <div style="margin-bottom: var(--spacing-lg);">
-                    <label style="display: flex; align-items: center; gap: var(--spacing-sm); cursor: pointer;">
-                        <input type="checkbox" name="telegram_enabled" {% if form.instance.telegram_enabled %}checked{% endif %}>
-                        <span>Telegram</span>
-                    </label>
-                    <p style="margin: var(--spacing-xs) 0 0; color: var(--color-text-muted); font-size: 0.85rem;">
-                        Для получения уведомлений в Telegram необходимо привязать бота в профиле.
-                    </p>
+
+                <ul class="club-payments-page__help-list">
+                    <li>Ваши галочки реально сохраняются в настройках клуба для этого пользователя.</li>
+                    <li>Игроку отсюда приходят: {{ player_notification_events|join:", " }}.</li>
+                    {% if admin_notification_events %}
+                    <li>Как администратору клуба вам дополнительно приходят: {{ admin_notification_events|join:", " }}.</li>
+                    {% endif %}
+                </ul>
+            </aside>
+        </div>
+
+        <div class="club-payments-grid club-payments-grid--single">
+            <section class="club-payments-card club-payments-card--form">
+                <div class="club-payments-card__header">
+                    <div>
+                        <div class="club-payments-card__eyebrow">Preferences</div>
+                        <h2 class="club-payments-card__title">Каналы доставки</h2>
+                    </div>
+                    <div class="club-payments-card__state {% if form.instance.is_enabled %}club-payments-card__state--ok{% endif %}">
+                        {% if form.instance.is_enabled %}Настроены{% else %}Выключены{% endif %}
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary">Сохранить</button>
-            </form>
+
+                {% if not club_notification_config.notify_by_email or not club_notification_config.notify_by_telegram %}
+                <div class="club-payments-check club-payments-check--error">
+                    <span class="club-payments-check__icon">!</span>
+                    <span>Часть каналов ограничена самим клубом. Даже при включённой галочке сообщения по выключенному каналу не отправятся.</span>
+                </div>
+                {% endif %}
+
+                {% if not telegram_connected %}
+                <div class="club-payments-check club-payments-check--error club-notification-settings-page__check">
+                    <span class="club-payments-check__icon">!</span>
+                    <span>Telegram сейчас недоступен: сначала подключите бота в <a href="{% url 'profile_edit' %}" class="club-notification-settings__inline-link">профиле</a>, затем включите этот канал здесь.</span>
+                </div>
+                {% endif %}
+
+                <form method="post" class="club-notification-settings__form">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                        {% for error in form.non_field_errors %}
+                        <p class="club-payments-form__error">{{ error }}</p>
+                        {% endfor %}
+                    {% endif %}
+
+                    <div class="club-notification-settings__options">
+                        <div class="club-notification-settings__option">
+                            <div class="club-notification-settings__option-copy">
+                                <div class="club-notification-settings__option-title">Все уведомления клуба</div>
+                                <p class="club-payments-form__hint">Полностью отключает для вас email и Telegram по текущему клубу.</p>
+                                {% for error in form.is_enabled.errors %}
+                                <p class="club-payments-form__error">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                            <label class="club-payments-switch">
+                                <span class="club-payments-switch__label">Вкл</span>
+                                {{ form.is_enabled }}
+                                <span class="club-payments-switch__track">
+                                    <span class="club-payments-switch__thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="club-notification-settings__option">
+                            <div class="club-notification-settings__option-copy">
+                                <div class="club-notification-settings__option-title">Email</div>
+                                <p class="club-payments-form__hint">
+                                    Уведомления уходят на
+                                    {% if email_destination %}<strong>{{ email_destination }}</strong>{% else %}<strong>email из профиля</strong>{% endif %}.
+                                    {% if not club_notification_config.notify_by_email %}Клубный канал email сейчас выключен.{% endif %}
+                                </p>
+                                {% for error in form.email_enabled.errors %}
+                                <p class="club-payments-form__error">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                            <label class="club-payments-switch">
+                                <span class="club-payments-switch__label">Вкл</span>
+                                {{ form.email_enabled }}
+                                <span class="club-payments-switch__track">
+                                    <span class="club-payments-switch__thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="club-notification-settings__option">
+                            <div class="club-notification-settings__option-copy">
+                                <div class="club-notification-settings__option-title">Telegram</div>
+                                <p class="club-payments-form__hint">
+                                    {% if telegram_connected %}
+                                        Уведомления придут в чат с подключённым ботом{% if telegram_bot_username %} <strong>@{{ telegram_bot_username }}</strong>{% endif %}.
+                                        {% if not club_notification_config.notify_by_telegram %}Клубный Telegram-канал сейчас выключен.{% endif %}
+                                    {% else %}
+                                        Канал станет рабочим только после подключения Telegram-бота в <a href="{% url 'profile_edit' %}" class="club-notification-settings__inline-link">профиле</a>.
+                                    {% endif %}
+                                </p>
+                                {% for error in form.telegram_enabled.errors %}
+                                <p class="club-payments-form__error">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                            <label class="club-payments-switch">
+                                <span class="club-payments-switch__label">Вкл</span>
+                                {{ form.telegram_enabled }}
+                                <span class="club-payments-switch__track">
+                                    <span class="club-payments-switch__thumb"></span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="club-payments-form__actions">
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                        <a href="{% url 'clubs:my_dashboard' %}" class="btn btn-outline">В кабинет клуба</a>
+                        <a href="{% url 'profile_edit' %}" class="btn btn-ghost">Профиль</a>
+                    </div>
+                </form>
+            </section>
         </div>
     </div>
-    <div style="margin-top: var(--spacing-lg);">
-        <a href="{% url 'clubs:my_dashboard' %}">&larr; В кабинет клуба</a>
-    </div>
-</div>
+</section>
 {% endblock %}

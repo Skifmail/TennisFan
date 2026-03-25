@@ -96,6 +96,62 @@ def get_current_period(today: date | None = None) -> tuple[int, int]:
     return current.year, current.month
 
 
+def _get_or_create_period_usage(
+    member: ClubMember,
+    plan: ClubPlayerPlan,
+    *,
+    year: int,
+    month: int,
+    select_for_update: bool = False,
+) -> ClubPlanSlotUsage:
+    """Возвращает usage за период и синхронизирует его с текущим тарифом.
+
+    В БД запись usage уникальна по участнику и месяцу. Если участник сменил тариф
+    внутри месяца, старый usage уже должен быть конвертирован в переносимый остаток,
+    а базовый счётчик нового тарифа начинается заново.
+    """
+    queryset = ClubPlanSlotUsage.objects
+    if select_for_update:
+        queryset = queryset.select_for_update()
+
+    usage, _ = queryset.get_or_create(
+        club_member=member,
+        period_year=year,
+        period_month=month,
+        defaults={
+            "plan": plan,
+            "tournaments_used": 0,
+        },
+    )
+    if usage.plan_id != plan.id:
+        usage.plan = plan
+        usage.tournaments_used = 0
+        usage.save(update_fields=["plan", "tournaments_used", "updated_at"])
+    return cast(ClubPlanSlotUsage, usage)
+
+
+def _rebind_current_period_usage_to_plan(
+    member: ClubMember,
+    plan: ClubPlayerPlan,
+) -> None:
+    """Перепривязывает usage текущего месяца к новому тарифу и сбрасывает счётчик."""
+    year, month = get_current_period()
+    usage = (
+        ClubPlanSlotUsage.objects.select_for_update()
+        .filter(
+            club_member=member,
+            period_year=year,
+            period_month=month,
+        )
+        .first()
+    )
+    if usage is None or usage.plan_id == plan.id:
+        return
+    usage.plan = plan
+    usage.tournaments_used = 0
+    usage.save(update_fields=["plan", "tournaments_used", "updated_at"])
+
+
 def get_member_active_plan(member: ClubMember) -> ClubMemberPlan | None:
     """Возвращает активный тариф участника клуба.
 
@@ -117,6 +173,41 @@ def get_member_active_plan(member: ClubMember) -> ClubMemberPlan | None:
         .first()
     )
     return cast(ClubMemberPlan | None, plan)
+
+
+def _get_plan_period_extension_base(
+    now,
+    current_plan: ClubMemberPlan | None,
+):
+    """Возвращает базовую дату для продления периода тарифа."""
+    if current_plan and current_plan.ended_at and current_plan.ended_at > now:
+        return current_plan.ended_at
+    return now
+
+
+def _get_transferable_tournaments_balance(
+    member_plan: ClubMemberPlan,
+) -> int:
+    """Возвращает переносимый остаток слотов активного тарифа."""
+    base_limit = member_plan.plan.max_tournaments_per_month
+    if base_limit is None:
+        return 0
+    normalized_base_limit = int(base_limit)
+
+    year, month = get_current_period()
+    usage = (
+        ClubPlanSlotUsage.objects.select_for_update()
+        .filter(
+            club_member=member_plan.club_member,
+            plan=member_plan.plan,
+            period_year=year,
+            period_month=month,
+        )
+        .first()
+    )
+    tournaments_used = int(usage.tournaments_used) if usage else 0
+    base_remaining = max(normalized_base_limit - tournaments_used, 0)
+    return base_remaining + int(member_plan.bonus_tournaments_balance)
 
 
 def assign_member_plan(
@@ -145,27 +236,43 @@ def assign_member_plan(
 
     with transaction.atomic():
         now = timezone.now()
-        (
+        current_plan = (
             ClubMemberPlan.objects.select_for_update()
+            .select_related("plan")
             .filter(
                 club_member=member,
                 status=ClubMemberPlanStatus.ACTIVE,
             )
-            .update(
-                status=ClubMemberPlanStatus.ENDED,
-                ended_at=now,
-            )
+            .filter(models.Q(ended_at__isnull=True) | models.Q(ended_at__gt=now))
+            .order_by("-started_at")
+            .first()
         )
-        return cast(
-            ClubMemberPlan,
-            ClubMemberPlan.objects.create(
-                club_member=member,
-                plan=plan,
-                status=ClubMemberPlanStatus.ACTIVE,
-                assigned_by=assigned_by,
-                change_reason=change_reason,
-            ),
+        carried_balance = (
+            _get_transferable_tournaments_balance(current_plan)
+            if current_plan is not None
+            else 0
         )
+        end_base = _get_plan_period_extension_base(now, current_plan)
+
+        ClubMemberPlan.objects.select_for_update().filter(
+            club_member=member,
+            status=ClubMemberPlanStatus.ACTIVE,
+        ).update(
+            status=ClubMemberPlanStatus.ENDED,
+            ended_at=now,
+        )
+        created_plan = ClubMemberPlan.objects.create(
+            club_member=member,
+            plan=plan,
+            status=ClubMemberPlanStatus.ACTIVE,
+            ended_at=_club_plan_period_end(end_base),
+            bonus_tournaments_balance=carried_balance,
+            auto_renew=False,
+            assigned_by=assigned_by,
+            change_reason=change_reason,
+        )
+        _rebind_current_period_usage_to_plan(member, plan)
+        return cast(ClubMemberPlan, created_plan)
 
 
 def _club_plan_period_end(base=None):
@@ -199,25 +306,31 @@ def purchase_member_plan(
             .first()
         )
 
-        if (
-            current_plan is not None
-            and current_plan.plan_id == plan.id
-            and current_plan.ended_at is not None
-        ):
-            base = current_plan.ended_at if current_plan.ended_at > now else now
+        if current_plan is not None and current_plan.plan_id == plan.id:
+            base = _get_plan_period_extension_base(now, current_plan)
             current_plan.ended_at = _club_plan_period_end(base)
+            if plan.max_tournaments_per_month is not None:
+                current_plan.bonus_tournaments_balance += plan.max_tournaments_per_month
             current_plan.auto_renew = auto_renew
             current_plan.assigned_by = assigned_by
             current_plan.change_reason = change_reason
             current_plan.save(
                 update_fields=[
                     "ended_at",
+                    "bonus_tournaments_balance",
                     "auto_renew",
                     "assigned_by",
                     "change_reason",
                 ]
             )
             return cast(ClubMemberPlan, current_plan)
+
+        carried_balance = (
+            _get_transferable_tournaments_balance(current_plan)
+            if current_plan is not None
+            else 0
+        )
+        end_base = _get_plan_period_extension_base(now, current_plan)
 
         ClubMemberPlan.objects.filter(
             club_member=member,
@@ -233,9 +346,11 @@ def purchase_member_plan(
             status=ClubMemberPlanStatus.ACTIVE,
             assigned_by=assigned_by,
             change_reason=change_reason,
-            ended_at=_club_plan_period_end(now),
+            ended_at=_club_plan_period_end(end_base),
+            bonus_tournaments_balance=carried_balance,
             auto_renew=auto_renew,
         )
+        _rebind_current_period_usage_to_plan(member, plan)
         return cast(ClubMemberPlan, created_plan)
 
 
@@ -245,6 +360,16 @@ def cancel_member_plan_auto_renew(member: ClubMember) -> ClubMemberPlan | None:
     if member_plan is None or member_plan.ended_at is None:
         return None
     member_plan.auto_renew = False
+    member_plan.save(update_fields=["auto_renew"])
+    return member_plan
+
+
+def enable_member_plan_auto_renew(member: ClubMember) -> ClubMemberPlan | None:
+    """Включает автопродление активного клубного тарифа участника."""
+    member_plan = get_member_active_plan(member)
+    if member_plan is None or member_plan.ended_at is None:
+        return None
+    member_plan.auto_renew = True
     member_plan.save(update_fields=["auto_renew"])
     return member_plan
 
@@ -263,30 +388,41 @@ def get_member_plan_limits(
     Returns:
         MemberPlanLimits | None: Снимок лимитов или None, если тариф не назначен.
     """
+    if not member.club.use_player_plans:
+        return None
+
     member_plan = get_member_active_plan(member)
     if not member_plan:
         return None
 
     plan = member_plan.plan
     year, month = get_current_period(today=today)
-    usage, _ = ClubPlanSlotUsage.objects.get_or_create(
-        club_member=member,
-        plan=plan,
-        period_year=year,
-        period_month=month,
-        defaults={"tournaments_used": 0},
+    usage = _get_or_create_period_usage(
+        member,
+        plan,
+        year=year,
+        month=month,
     )
 
     monthly_tournaments_limit = plan.max_tournaments_per_month
-    tournaments_used = usage.tournaments_used
+    bonus_balance = int(member_plan.bonus_tournaments_balance)
+    effective_limit: int | None
     tournaments_left: int | None
     if monthly_tournaments_limit is None:
+        effective_limit = None
         tournaments_left = None
+        tournaments_used = usage.tournaments_used
     else:
-        tournaments_left = max(monthly_tournaments_limit - tournaments_used, 0)
+        effective_limit_int = monthly_tournaments_limit + bonus_balance
+        tournaments_left_int = (
+            max(monthly_tournaments_limit - usage.tournaments_used, 0) + bonus_balance
+        )
+        effective_limit = effective_limit_int
+        tournaments_left = tournaments_left_int
+        tournaments_used = max(effective_limit_int - tournaments_left_int, 0)
 
     return MemberPlanLimits(
-        monthly_tournaments_limit=monthly_tournaments_limit,
+        monthly_tournaments_limit=effective_limit,
         tournaments_used=tournaments_used,
         tournaments_left=tournaments_left,
     )
@@ -346,6 +482,19 @@ def check_tournament_registration_eligibility(
             consumes_limit=False,
         )
 
+    has_entry_fee = _tournament_has_entry_fee(tournament)
+
+    if not member.club.use_player_plans:
+        return RegistrationEligibility(
+            mode=(RegistrationMode.PAID if has_entry_fee else RegistrationMode.FREE),
+            message=(
+                "Для участия необходимо оплатить вступительный взнос."
+                if has_entry_fee
+                else ""
+            ),
+            consumes_limit=False,
+        )
+
     # Проверяем, использует ли клуб систему тарифов
     active_plans_qs = ClubPlayerPlan.objects.filter(
         club_id=member.club_id,
@@ -358,9 +507,7 @@ def check_tournament_registration_eligibility(
             message="",
             consumes_limit=False,
         )
-
     member_plan = get_member_active_plan(member)
-    has_entry_fee = _tournament_has_entry_fee(tournament)
 
     # Проверка доступа по тарифу (если настроены правила доступа)
     if member_plan:
@@ -504,20 +651,73 @@ def consume_member_tournament_limit(
 
         plan = member_plan.plan
         year, month = get_current_period()
-        usage, _ = ClubPlanSlotUsage.objects.select_for_update().get_or_create(
-            club_member=member,
-            plan=plan,
-            period_year=year,
-            period_month=month,
-            defaults={"tournaments_used": 0},
+        usage = _get_or_create_period_usage(
+            member,
+            plan,
+            year=year,
+            month=month,
+            select_for_update=True,
         )
 
         # Повторная проверка лимита внутри транзакции
-        if plan.max_tournaments_per_month is not None:
-            if usage.tournaments_used >= plan.max_tournaments_per_month:
-                return False, "Лимит турниров по вашему тарифу на этот месяц исчерпан."
+        if plan.max_tournaments_per_month is None:
+            usage.tournaments_used += 1
+            usage.save(update_fields=["tournaments_used", "updated_at"])
+            return True, ""
 
-        usage.tournaments_used += 1
-        usage.save(update_fields=["tournaments_used", "updated_at"])
+        if usage.tournaments_used < plan.max_tournaments_per_month:
+            usage.tournaments_used += 1
+            usage.save(update_fields=["tournaments_used", "updated_at"])
+            return True, ""
+
+        if member_plan.bonus_tournaments_balance > 0:
+            member_plan.bonus_tournaments_balance -= 1
+            member_plan.save(
+                update_fields=["bonus_tournaments_balance"],
+            )
+            return True, ""
+
+        return False, "Лимит турниров по вашему тарифу на этот месяц исчерпан."
 
     return True, ""
+
+
+def restore_member_tournament_limit(member: ClubMember) -> bool:
+    """Возвращает один слот клубного тарифа в текущем периоде, если он был списан."""
+    with transaction.atomic():
+        member_plan = (
+            ClubMemberPlan.objects.select_for_update()
+            .select_related("plan")
+            .filter(
+                club_member=member,
+                status=ClubMemberPlanStatus.ACTIVE,
+                plan__is_active=True,
+            )
+            .first()
+        )
+        if not member_plan:
+            return False
+
+        year, month = get_current_period()
+        usage = _get_or_create_period_usage(
+            member,
+            member_plan.plan,
+            year=year,
+            month=month,
+            select_for_update=True,
+        )
+        if member_plan.plan.max_tournaments_per_month is None:
+            if usage.tournaments_used <= 0:
+                return False
+            usage.tournaments_used -= 1
+            usage.save(update_fields=["tournaments_used", "updated_at"])
+            return True
+
+        if usage.tournaments_used > 0:
+            usage.tournaments_used -= 1
+            usage.save(update_fields=["tournaments_used", "updated_at"])
+            return True
+
+        member_plan.bonus_tournaments_balance += 1
+        member_plan.save(update_fields=["bonus_tournaments_balance"])
+        return True

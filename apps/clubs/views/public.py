@@ -502,14 +502,15 @@ def club_join(request: HttpRequest, slug: str) -> HttpResponse:
         "sort_order",
         "name",
     )
+    use_player_plans = club.use_player_plans and active_plans.exists()
     plan_form = ClubMemberPlanSelectForm(
         request.POST or None,
-        club=club if active_plans.exists() else None,
+        club=club if use_player_plans else None,
     )
 
     if request.method == "POST":
         selected_plan = None
-        if active_plans.exists():
+        if use_player_plans:
             if not plan_form.is_valid():
                 return render(
                     request,
@@ -578,7 +579,7 @@ def club_join(request: HttpRequest, slug: str) -> HttpResponse:
             "club": club,
             "token": token_value,
             "plan_form": plan_form,
-            "has_plans": active_plans.exists(),
+            "has_plans": use_player_plans,
         },
     )
 

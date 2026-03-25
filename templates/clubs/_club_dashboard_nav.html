@@ -18,17 +18,9 @@
                class="btn btn-sm {% if current == 'rating' %}btn-primary{% else %}btn-ghost{% endif %}">
                 Рейтинг
             </a>
-            <a href="{% url 'clubs:fees_settings' slug=club.slug %}"
-               class="btn btn-sm {% if current == 'fees' %}btn-primary{% else %}btn-ghost{% endif %}">
-                Взносы
-            </a>
-            <a href="{% url 'clubs:payment_settings' slug=club.slug %}"
-               class="btn btn-sm {% if current == 'payments' %}btn-primary{% else %}btn-ghost{% endif %}">
-                Платежи
-            </a>
-            <a href="{% url 'clubs:plans_manage' slug=club.slug %}"
-               class="btn btn-sm {% if current == 'plans' %}btn-primary{% else %}btn-ghost{% endif %}">
-                Тарифы игроков
+            <a href="{% url 'clubs:balances_list' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'balances' or current == 'fees' or current == 'payments' or current == 'plans' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Финансы
             </a>
             <a href="{% url 'clubs:invites_list' slug=club.slug %}"
                class="btn btn-sm {% if current == 'invites' %}btn-primary{% else %}btn-ghost{% endif %}">
@@ -55,6 +47,26 @@
                 Уведомления
             </a>
         </nav>
+        {% if current == 'balances' or current == 'fees' or current == 'payments' or current == 'plans' %}
+        <nav class="club-dashboard-subnav">
+            <a href="{% url 'clubs:balances_list' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'balances' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Балансы
+            </a>
+            <a href="{% url 'clubs:fees_settings' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'fees' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Взносы
+            </a>
+            <a href="{% url 'clubs:payment_settings' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'payments' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Моя касса
+            </a>
+            <a href="{% url 'clubs:plans_manage' slug=club.slug %}"
+               class="btn btn-sm {% if current == 'plans' %}btn-primary{% else %}btn-ghost{% endif %}">
+                Тарифы игроков
+            </a>
+        </nav>
+        {% endif %}
     </div>
 </div>
 
@@ -127,21 +139,29 @@
     <div class="club-bottom-sheet__panel">
         <div class="club-bottom-sheet__handle"></div>
         <nav class="club-bottom-sheet__list">
-            <a href="{% url 'clubs:fees_settings' slug=club.slug %}"
-               class="club-bottom-sheet__link">
-                <span class="club-bottom-sheet__link-icon">₽</span>
-                <span>Взносы</span>
-            </a>
-            <a href="{% url 'clubs:payment_settings' slug=club.slug %}"
-               class="club-bottom-sheet__link">
-                <span class="club-bottom-sheet__link-icon">₿</span>
-                <span>Платежи</span>
-            </a>
-            <a href="{% url 'clubs:plans_manage' slug=club.slug %}"
-               class="club-bottom-sheet__link">
-                <span class="club-bottom-sheet__link-icon">★</span>
-                <span>Тарифы игроков</span>
-            </a>
+            <div class="club-bottom-sheet__group">
+                <div class="club-bottom-sheet__group-title">Финансы</div>
+                <a href="{% url 'clubs:balances_list' slug=club.slug %}"
+                   class="club-bottom-sheet__link">
+                    <span class="club-bottom-sheet__link-icon">¤</span>
+                    <span>Балансы</span>
+                </a>
+                <a href="{% url 'clubs:fees_settings' slug=club.slug %}"
+                   class="club-bottom-sheet__link">
+                    <span class="club-bottom-sheet__link-icon">₽</span>
+                    <span>Взносы</span>
+                </a>
+                <a href="{% url 'clubs:payment_settings' slug=club.slug %}"
+                   class="club-bottom-sheet__link">
+                    <span class="club-bottom-sheet__link-icon">₿</span>
+                    <span>Моя касса</span>
+                </a>
+                <a href="{% url 'clubs:plans_manage' slug=club.slug %}"
+                   class="club-bottom-sheet__link">
+                    <span class="club-bottom-sheet__link-icon">★</span>
+                    <span>Тарифы игроков</span>
+                </a>
+            </div>
             <a href="{% url 'clubs:invites_list' slug=club.slug %}"
                class="club-bottom-sheet__link">
                 <span class="club-bottom-sheet__link-icon">✉</span>

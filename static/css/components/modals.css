@@ -51,7 +51,8 @@
 }
 
 /* --- Club leave modal --- */
-.club-leave-modal {
+.club-leave-modal,
+.club-confirm-modal {
     background:
         radial-gradient(circle at top left, rgb(0 141 92 / 18%), transparent 32%),
         radial-gradient(circle at bottom right, rgb(212 168 84 / 16%), transparent 28%),
@@ -59,7 +60,8 @@
     backdrop-filter: blur(10px);
 }
 
-.club-leave-modal__dialog {
+.club-leave-modal__dialog,
+.club-confirm-modal__dialog {
     max-width: 520px;
     padding: clamp(1.25rem, 3vw, 2rem);
     border: 1px solid rgb(212 168 84 / 22%);
@@ -70,7 +72,8 @@
         inset 0 1px 0 rgb(255 255 255 / 5%);
 }
 
-.club-leave-modal__eyebrow {
+.club-leave-modal__eyebrow,
+.club-confirm-modal__eyebrow {
     display: inline-flex;
     align-items: center;
     margin-bottom: var(--spacing-md);
@@ -85,21 +88,24 @@
     background: rgb(212 168 84 / 10%);
 }
 
-.club-leave-modal__title {
+.club-leave-modal__title,
+.club-confirm-modal__title {
     margin-bottom: var(--spacing-sm);
     font-size: clamp(1.4rem, 3vw, 2rem);
     line-height: 1.1;
     color: #f4efe6;
 }
 
-.club-leave-modal__text {
+.club-leave-modal__text,
+.club-confirm-modal__text {
     margin-bottom: var(--spacing-lg);
     color: rgb(218 225 220 / 92%);
     font-size: 1rem;
     line-height: 1.7;
 }
 
-.club-leave-modal__note {
+.club-leave-modal__note,
+.club-confirm-modal__note {
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
@@ -112,7 +118,8 @@
     line-height: 1.55;
 }
 
-.club-leave-modal__note-icon {
+.club-leave-modal__note-icon,
+.club-confirm-modal__note-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -125,59 +132,70 @@
     font-weight: 700;
 }
 
-.club-leave-modal__actions {
+.club-leave-modal__actions,
+.club-confirm-modal__actions {
     margin-top: var(--spacing-xl);
     justify-content: flex-end;
     gap: 0.75rem;
 }
 
-.club-leave-modal__btn {
+.club-leave-modal__btn,
+.club-confirm-modal__btn {
     min-height: 46px;
     padding-inline: 1rem;
     border-radius: 0.95rem;
 }
 
-.club-leave-modal__btn--primary {
+.club-leave-modal__btn--primary,
+.club-confirm-modal__btn--primary {
     min-width: 150px;
 }
 
-.club-leave-modal__btn--secondary {
+.club-leave-modal__btn--secondary,
+.club-confirm-modal__btn--secondary {
     background: transparent;
     border-color: rgb(212 168 84 / 42%);
     color: rgb(233 200 126);
 }
 
-.club-leave-modal__btn--secondary:hover {
+.club-leave-modal__btn--secondary:hover,
+.club-confirm-modal__btn--secondary:hover {
     background: rgb(212 168 84 / 10%);
 }
 
 @media (max-width: 640px) {
-    .club-leave-modal {
+    .club-leave-modal,
+    .club-confirm-modal {
         padding: 1rem;
         align-items: flex-end;
     }
 
-    .club-leave-modal__dialog {
+    .club-leave-modal__dialog,
+    .club-confirm-modal__dialog {
         max-width: none;
         border-radius: 1.25rem 1.25rem 0.9rem 0.9rem;
         padding: 1.15rem 1rem 1rem;
     }
 
-    .club-leave-modal__title {
+    .club-leave-modal__title,
+    .club-confirm-modal__title {
         font-size: 1.35rem;
     }
 
-    .club-leave-modal__text {
+    .club-leave-modal__text,
+    .club-confirm-modal__text {
         font-size: 0.95rem;
         line-height: 1.6;
     }
 
-    .club-leave-modal__actions {
+    .club-leave-modal__actions,
+    .club-confirm-modal__actions {
         flex-direction: column-reverse;
         align-items: stretch;
     }
 
-    .club-leave-modal__btn {
+    .club-leave-modal__btn,
+    .club-confirm-modal__btn {
         width: 100%;
         justify-content: center;
     }

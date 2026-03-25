@@ -2,94 +2,97 @@
 {% block title %}Мои турниры — {{ club.name }}{% endblock %}
 {% block content %}
 {% include "clubs/_club_player_nav.html" with current="tournaments" %}
-<div class="page-header">
-    <h1 class="page-title">Мои турниры</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-{% if fee_restrict %}
-<div class="container" style="max-width: 800px; margin-bottom: var(--spacing-lg);">
-    <div class="card" style="border-color: var(--color-warning);">
-        <div class="card-body">
-            <p style="margin: 0;">Доступ к турнирам клуба возможен после оплаты членского взноса.</p>
-            <a href="{% url 'clubs:my_fee_payment_preview' %}?next={{ request.path|urlencode }}" class="btn btn-primary" style="margin-top: var(--spacing-md);">Оплатить взнос</a>
-        </div>
-    </div>
-</div>
-{% endif %}
-{% if member_plan %}
-<div class="container" style="max-width: 800px; margin-bottom: var(--spacing-lg);">
-    <div class="card">
-        <div class="card-body">
-            <div style="display: flex; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap;">
-                <div>
-                    <div style="font-size: var(--font-size-sm); color: var(--color-text-muted);">Мой тариф</div>
-                    <div style="font-weight: 700;">{{ member_plan.plan.name }}</div>
-                    <div style="font-size: var(--font-size-sm); color: var(--color-text-muted);">
-                        Взнос: {{ member_plan.plan.monthly_fee }} ₽/мес
-                    </div>
-                    {% if plan_limits %}
-                    <div style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: 4px;">
-                        Турниры:
-                        {% if plan_limits.tournaments_left is None %}
-                            безлимит
-                        {% else %}
-                            {{ plan_limits.tournaments_left }} из {{ plan_limits.monthly_tournaments_limit }}
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                </div>
-                <div>
-                    <a href="{% url 'clubs:my_plan' %}" class="btn btn-ghost btn-sm">Подробнее</a>
+<section class="club-payments-page club-my-tournaments-page">
+    <div class="container club-payments-page__container club-my-tournaments-page__container">
+        <div class="club-payments-page__hero">
+            <div class="club-payments-page__copy">
+                <div class="club-payments-page__eyebrow">Club Tournaments</div>
+                <h1 class="club-payments-page__title">Мои турниры</h1>
+                <p class="club-payments-page__subtitle">
+                    Здесь собраны все турниры клуба {{ club.name }}, в которых вы уже участвуете.
+                    До старта и до формирования сетки вы можете самостоятельно отменить запись.
+                </p>
+
+                <div class="club-payments-page__status-row">
+                    <a href="?status=upcoming" class="club-payments-status {% if status_filter == 'upcoming' %}club-payments-status--connected{% endif %}">
+                        <span class="club-payments-status__dot"></span>
+                        Турниров: {{ tournaments|length }}
+                    </a>
+                    <a href="?status=upcoming" class="club-payments-page__shop {% if status_filter == 'upcoming' %}club-payments-page__shop--active{% endif %}">Предстоящие</a>
+                    <a href="?status=active" class="club-payments-page__shop {% if status_filter == 'active' %}club-payments-page__shop--active{% endif %}">Идут</a>
+                    <a href="?status=completed" class="club-payments-page__shop {% if status_filter == 'completed' %}club-payments-page__shop--active{% endif %}">Завершённые</a>
                 </div>
             </div>
         </div>
-    </div>
-</div>
-{% endif %}
-<div class="container" style="max-width: 800px;">
-    <ul class="nav-tabs-inline" style="display: flex; gap: var(--spacing-md); margin-bottom: var(--spacing-lg); list-style: none; padding: 0;">
-        <li><a href="?status=upcoming" class="{% if status_filter == 'upcoming' %}active{% endif %}">Предстоящие</a></li>
-        <li><a href="?status=active" class="{% if status_filter == 'active' %}active{% endif %}">Идут</a></li>
-        <li><a href="?status=completed" class="{% if status_filter == 'completed' %}active{% endif %}">Завершённые</a></li>
-    </ul>
-    <div class="card">
-        <div class="card-body">
+
+        {% if fee_restrict %}
+        <div class="club-payments-check club-payments-check--error club-my-tournaments-page__alert">
+            <span class="club-payments-check__icon">!</span>
+            <div class="club-my-tournaments-page__alert-copy">
+                <span>Доступ к турнирам клуба возможен только после оплаты членского взноса.</span>
+                <a href="{% url 'clubs:my_fee_payment_preview' %}?next={{ request.path|urlencode }}" class="btn btn-primary btn-sm">Оплатить взнос</a>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="club-payments-card club-payments-card--form">
+            <div class="club-payments-card__header">
+                <div>
+                    <div class="club-payments-card__eyebrow">Tournament List</div>
+                    <h2 class="club-payments-card__title">Список турниров</h2>
+                </div>
+            </div>
+
             {% if tournaments %}
-            <table class="table" style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Турнир</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Дата</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Статус</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Участники</th>
-                        <th style="text-align: right; padding: var(--spacing-sm);"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for t in tournaments %}
-                    <tr>
-                        <td style="padding: var(--spacing-sm);">
-                            <a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a>
-                        </td>
-                        <td style="padding: var(--spacing-sm);">{{ t.start_date }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ t.get_status_display }}</td>
-                        <td style="padding: var(--spacing-sm);">
+            <div class="club-dashboard-table club-my-tournaments-page__table">
+                <div class="club-dashboard-table__head club-my-tournaments-page__head">
+                    <div>Турнир</div>
+                    <div>Дата</div>
+                    <div>Статус</div>
+                    <div>Участники</div>
+                    <div>Действия</div>
+                </div>
+                {% for t in tournaments %}
+                <div class="club-dashboard-table__row club-my-tournaments-page__row">
+                    <div class="club-dashboard-table__cell club-dashboard-table__cell--title">
+                        <a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a>
+                        {% if t.registration_deadline %}
+                        <span class="club-dashboard-table__hint">Регистрация до {{ t.registration_deadline|date:"d.m.Y H:i" }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="club-dashboard-table__cell club-my-tournaments-page__meta-cell">
+                        <span class="club-my-tournaments-page__mobile-label">Дата</span>
+                        <span>{{ t.start_date|date:"d.m.Y" }}</span>
+                    </div>
+                    <div class="club-dashboard-table__cell club-my-tournaments-page__meta-cell">
+                        <span class="club-my-tournaments-page__mobile-label">Статус</span>
+                        <span>{{ t.get_status_display }}</span>
+                    </div>
+                    <div class="club-dashboard-table__cell">
+                        <span class="club-my-tournaments-page__mobile-label">Участники</span>
+                        {% if t.is_doubles %}
+                            {{ t.full_teams_count }}{% if t.max_teams %} / {{ t.max_teams }}{% endif %} команд
+                        {% else %}
                             {{ t.participants.count }}{% if t.max_participants %} / {{ t.max_participants }}{% endif %}
-                        </td>
-                        <td style="padding: var(--spacing-sm); text-align: right;">
-                            <a href="{% url 'tournament_detail' slug=t.slug %}" class="btn btn-ghost btn-sm">Подробнее</a>
-                            {% if t.status == 'upcoming' and t.registration_deadline and not fee_restrict %}
-                            <a href="{% url 'tournament_register' slug=t.slug %}" class="btn btn-primary btn-sm">Записаться</a>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        {% endif %}
+                    </div>
+                    <div class="club-dashboard-table__cell club-dashboard-table__cell--actions">
+                        <a href="{% url 'tournament_detail' slug=t.slug %}" class="btn btn-ghost btn-sm">Подробнее</a>
+                        {% if t.status == 'upcoming' and not t.bracket_generated %}
+                        <form method="post" action="{% url 'clubs:my_tournament_cancel' tournament_slug=t.slug %}" class="club-my-tournaments-page__cancel-form" data-cancel-tournament-form data-tournament-name="{{ t.name }}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm">Отменить запись</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
             {% else %}
-            <p style="margin: 0; color: var(--color-text-muted);">В выбранной категории турниров пока нет.</p>
+            <p class="club-fees-ledger__empty">В выбранной категории турниров пока нет.</p>
             {% endif %}
         </div>
     </div>
-</div>
+</section>
+{% include "clubs/_cancel_tournament_modal.html" %}
 {% endblock %}

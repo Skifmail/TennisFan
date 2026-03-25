@@ -78,6 +78,7 @@ class FeePaymentMethod(models.TextChoices):
     """Способ оплаты взноса."""
 
     ONLINE = "online", "Онлайн"
+    BALANCE = "balance", "Баланс клуба"
     MANUAL = "manual", "Вручную"
 
 
@@ -201,6 +202,11 @@ class Club(CompressImageFieldsMixin, models.Model):
     admin_name = models.CharField("ФИО ответственного", max_length=255)
     description = models.TextField("Описание", blank=True)
     is_public = models.BooleanField("Публичная страница", default=True)
+    use_player_plans = models.BooleanField(
+        "Использовать клубные тарифы",
+        default=True,
+        help_text="Если выключено, тарифы не ограничивают регистрацию на турниры и не обязательны для участников клуба.",
+    )
     status = models.CharField(
         "Статус",
         max_length=20,
@@ -313,6 +319,12 @@ class ClubMember(models.Model):
         verbose_name="Кто пригласил",
     )
     joined_at = models.DateTimeField("Дата вступления", null=True, blank=True)
+    balance = models.DecimalField(
+        "Баланс игрока",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
     created_at = models.DateTimeField("Дата создания", auto_now_add=True)
 
     class Meta:
@@ -405,6 +417,7 @@ class ClubMemberPlan(models.Model):
         status: Статус назначения (active/pending/ended).
         started_at: Дата начала действия.
         ended_at: Дата окончания действия.
+        bonus_tournaments_balance: Перенесённый остаток регистраций сверх базового лимита.
         auto_renew: Автопродление на следующий период.
     """
 
@@ -428,6 +441,10 @@ class ClubMemberPlan(models.Model):
     )
     started_at = models.DateTimeField("Дата начала", auto_now_add=True)
     ended_at = models.DateTimeField("Дата окончания", null=True, blank=True)
+    bonus_tournaments_balance = models.PositiveIntegerField(
+        "Перенесённый остаток регистраций",
+        default=0,
+    )
     auto_renew = models.BooleanField("Автопродление", default=True)
     assigned_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -726,6 +743,75 @@ class ClubFeePayment(models.Model):
 
     def __str__(self) -> str:
         return f"{self.member.user.email} — {self.period_label}"
+
+
+class ClubMemberBalanceTransaction(models.Model):
+    """Операция по балансу участника клуба."""
+
+    class Direction(models.TextChoices):
+        """Направление движения средств."""
+
+        CREDIT = "credit", "Пополнение"
+        DEBIT = "debit", "Списание"
+
+    class Source(models.TextChoices):
+        """Источник или назначение операции."""
+
+        TOURNAMENT_PAYMENT = "tournament_payment", "Оплата турнира"
+        TOURNAMENT_REFUND = "tournament_refund", "Возврат за турнир"
+        CLUB_PLAN_PAYMENT = "club_plan_payment", "Оплата тарифа клуба"
+        CLUB_FEE_PAYMENT = "club_fee_payment", "Оплата членского взноса"
+        MANUAL = "manual", "Ручная корректировка"
+
+    class Status(models.TextChoices):
+        """Статус операции."""
+
+        PENDING = "pending", "Ожидает"
+        COMPLETED = "completed", "Завершена"
+        CANCELLED = "cancelled", "Отменена"
+
+    club = models.ForeignKey(
+        Club,
+        on_delete=models.CASCADE,
+        related_name="member_balance_transactions",
+        verbose_name="Клуб",
+    )
+    member = models.ForeignKey(
+        ClubMember,
+        on_delete=models.CASCADE,
+        related_name="balance_transactions",
+        verbose_name="Участник",
+    )
+    direction = models.CharField(
+        "Направление",
+        max_length=12,
+        choices=Direction.choices,
+    )
+    source = models.CharField(
+        "Источник",
+        max_length=32,
+        choices=Source.choices,
+    )
+    status = models.CharField(
+        "Статус",
+        max_length=16,
+        choices=Status.choices,
+        default=Status.COMPLETED,
+    )
+    amount = models.DecimalField("Сумма", max_digits=10, decimal_places=2)
+    description = models.CharField("Описание", max_length=255, blank=True)
+    reference = models.CharField("Внешний идентификатор", max_length=128, blank=True)
+    metadata = models.JSONField("Дополнительные данные", default=dict, blank=True)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    completed_at = models.DateTimeField("Завершено", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Операция по балансу участника клуба"
+        verbose_name_plural = "Операции по балансу участников клуба"
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"{self.member} — {self.get_direction_display()} {self.amount}"
 
 
 class ClubRating(models.Model):

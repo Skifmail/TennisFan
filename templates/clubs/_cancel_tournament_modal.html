@@ -1,0 +1,90 @@
+<div id="club-tournament-cancel-modal" class="modal-overlay club-confirm-modal" style="display:none;" aria-hidden="true">
+    <div class="modal-dialog club-confirm-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="club-tournament-cancel-title" aria-describedby="club-tournament-cancel-text">
+        <div class="club-confirm-modal__eyebrow">Подтверждение</div>
+        <h3 id="club-tournament-cancel-title" class="modal-dialog__title club-confirm-modal__title">Отменить запись?</h3>
+        <p id="club-tournament-cancel-text" class="modal-dialog__text club-confirm-modal__text">Вы уверены, что хотите отменить запись на турнир?</p>
+        <div class="club-confirm-modal__note">
+            <span class="club-confirm-modal__note-icon">!</span>
+            <span>Если турнир ещё не начался и сетка не сформирована, запись будет отменена, место освободится, а использованный лимит или возврат денег обработаются по правилам клуба.</span>
+        </div>
+        <div class="modal-dialog__actions club-confirm-modal__actions">
+            <button type="button" class="btn btn-sm club-confirm-modal__btn club-confirm-modal__btn--secondary" data-cancel-modal-close>Остаться</button>
+            <button type="button" class="btn btn-sm btn-danger club-confirm-modal__btn club-confirm-modal__btn--primary" data-cancel-modal-confirm>Отменить запись</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const modal = document.getElementById('club-tournament-cancel-modal');
+    if (!modal || modal.dataset.bound === '1') {
+        return;
+    }
+
+    modal.dataset.bound = '1';
+
+    const textEl = document.getElementById('club-tournament-cancel-text');
+    const confirmBtn = modal.querySelector('[data-cancel-modal-confirm]');
+    let pendingForm = null;
+
+    function closeModal() {
+        pendingForm = null;
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function openModal(form) {
+        pendingForm = form;
+        const tournamentName = form.dataset.tournamentName || '';
+        textEl.textContent = tournamentName
+            ? `Вы уверены, что хотите отменить запись на турнир «${tournamentName}»?`
+            : 'Вы уверены, что хотите отменить запись на турнир?';
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        confirmBtn.focus();
+    }
+
+    document.querySelectorAll('[data-cancel-tournament-form]').forEach(function (form) {
+        if (form.dataset.cancelBound === '1') {
+            return;
+        }
+
+        form.dataset.cancelBound = '1';
+        form.addEventListener('submit', function (event) {
+            if (form.dataset.cancelConfirmed === '1') {
+                form.dataset.cancelConfirmed = '0';
+                return;
+            }
+            event.preventDefault();
+            openModal(form);
+        });
+    });
+
+    confirmBtn.addEventListener('click', function () {
+        if (!pendingForm) {
+            return;
+        }
+
+        const form = pendingForm;
+        closeModal();
+        form.dataset.cancelConfirmed = '1';
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+            return;
+        }
+        form.submit();
+    });
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal || event.target.hasAttribute('data-cancel-modal-close')) {
+            closeModal();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (modal.style.display !== 'none' && event.key === 'Escape') {
+            closeModal();
+        }
+    });
+})();
+</script>

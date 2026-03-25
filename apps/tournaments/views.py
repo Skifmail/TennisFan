@@ -8,6 +8,7 @@ from collections import defaultdict
 from functools import wraps
 from itertools import groupby
 from typing import cast
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -17,12 +18,16 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from apps.clubs.models import ClubMember, ClubMemberStatus
+from apps.clubs.models import ClubMember, ClubMembershipFee, ClubMemberStatus
 from apps.clubs.plan_services import (
+    RegistrationMode,
     can_member_register_for_tournament,
     consume_member_tournament_limit,
 )
-from apps.clubs.services import user_can_manage_club
+from apps.clubs.plan_services import (
+    check_tournament_registration_eligibility as check_club_tournament_registration_eligibility,
+)
+from apps.clubs.services import get_fee_status_for_member, user_can_manage_club
 from apps.core.decorators import require_filled_profile
 from apps.users.models import Notification, Player, SkillLevel
 
@@ -2512,6 +2517,12 @@ def match_detail(request, pk):
             season_points_p2 = r2.fan_points if r2 else 0
 
     player = getattr(request.user, "player", None)
+    fallback_url = reverse("my_matches")
+    if match.tournament_id:
+        fallback_url = reverse(
+            "tournament_detail", kwargs={"slug": match.tournament.slug}
+        )
+    next_url = _get_safe_next_url(request, fallback_url)
     pending_proposals = list(
         match.result_proposals.filter(
             status=Match.ProposalStatus.PENDING
@@ -2534,7 +2545,7 @@ def match_detail(request, pk):
             "pending_proposals": pending_proposals,
             "can_view_match_actions": can_view_match_actions,
             "can_submit_result": can_submit_result,
-            "next_url": reverse("match_detail", kwargs={"pk": match.pk}),
+            "next_url": next_url,
             "is_fan": _is_fan(match.tournament),
             "is_olympic": _is_olympic(match.tournament),
             "season_points_player1": season_points_p1,
@@ -2898,6 +2909,9 @@ def _tournament_requires_entry_payment(tournament) -> bool:
 REGISTER_PAY_OR_SUBSCRIBE_MSG = (
     "Для регистрации оплатите вступительный взнос или оформите подписку."
 )
+REGISTER_PAY_CLUB_ENTRY_FEE_MSG = (
+    "Для регистрации на турнир клуба нужно оплатить вступительный взнос."
+)
 
 
 def _tournament_does_not_consume_subscription_limit(tournament) -> bool:
@@ -2906,6 +2920,42 @@ def _tournament_does_not_consume_subscription_limit(tournament) -> bool:
         tournament.club_id
         or tournament.is_one_day
         or _tournament_requires_entry_payment(tournament)
+    )
+
+
+def _build_tournament_payment_redirect(tournament, *, next_url: str = ""):
+    """Формирует redirect на оплату вступительного взноса турнира."""
+    params = {"type": "tournament", "id": tournament.id}
+    if next_url:
+        params["next"] = next_url
+    return redirect(f"{reverse('payment_preview')}?{urlencode(params)}")
+
+
+def _check_club_fee_access(user, tournament):
+    """Проверяет, не заблокирован ли доступ к турниру из-за неоплаченного взноса."""
+    tournament_member = _get_tournament_club_member(user, tournament)
+    if not tournament_member:
+        return True, None
+
+    fee = (
+        ClubMembershipFee.objects.filter(
+            club_id=tournament.club_id,
+            is_active=True,
+            restrict_tournament_access=True,
+        )
+        .order_by("-id")
+        .first()
+    )
+    if not fee:
+        return True, None
+
+    fee_status = get_fee_status_for_member(tournament_member.club, tournament_member)
+    if fee_status == "paid" or fee_status is None:
+        return True, None
+
+    return (
+        False,
+        "Регистрация на турниры клуба недоступна до оплаты членского взноса за текущий период.",
     )
 
 
@@ -2947,9 +2997,20 @@ def _check_tournament_registration_eligibility(request, tournament, player):
     if is_admin:
         return True, None
 
-    # Для участников клубных турниров глобальная подписка не требуется:
-    # доступ и лимиты управляются клубным тарифом и проверяются отдельно.
-    if _get_tournament_club_member(user, tournament):
+    can_access_by_fee, fee_error = _check_club_fee_access(user, tournament)
+    if not can_access_by_fee:
+        return False, fee_error
+
+    tournament_member = _get_tournament_club_member(user, tournament)
+    if tournament_member:
+        club_eligibility = check_club_tournament_registration_eligibility(
+            tournament_member,
+            tournament,
+        )
+        if club_eligibility.mode == RegistrationMode.BLOCKED:
+            return False, club_eligibility.message
+        if club_eligibility.mode == RegistrationMode.PAID:
+            return False, REGISTER_PAY_CLUB_ENTRY_FEE_MSG
         return True, None
 
     # Однодневные: подписка не обязательна (взнос оплачивается отдельно)
@@ -3121,16 +3182,7 @@ def tournament_register(request, slug):
         messages.info(request, "Вы уже зарегистрированы на этот турнир.")
         return redirect("tournament_detail", slug=tournament.slug)
 
-    # Проверка клубных тарифов участников (Phase 8), если турнир клубный.
     tournament_member = _get_tournament_club_member(request.user, tournament)
-    if tournament_member:
-        can_register_by_plan, plan_error = can_member_register_for_tournament(
-            tournament_member,
-            tournament,
-        )
-        if not can_register_by_plan:
-            messages.error(request, plan_error)
-            return redirect("tournament_detail", slug=tournament.slug)
 
     # SUBSCRIPTION CHECK
     try:
@@ -3142,6 +3194,8 @@ def tournament_register(request, slug):
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         messages.error(request, err)
+        if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
+            return _build_tournament_payment_redirect(tournament)
         if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
             return redirect("tournament_register_required", slug=tournament.slug)
         if "подписк" in (err or ""):
@@ -3152,14 +3206,7 @@ def tournament_register(request, slug):
 
     # Однодневный с взносом: все переходят на страницу оплаты
     if _tournament_requires_entry_payment(tournament) and tournament.is_one_day:
-        from urllib.parse import urlencode
-
-        from django.urls import reverse
-
-        params = {"type": "tournament", "id": tournament.id}
-        base_url = reverse("payment_preview")
-        query_string = urlencode(params)
-        return redirect(f"{base_url}?{query_string}")
+        return _build_tournament_payment_redirect(tournament)
     else:
         # Без взноса: регистрация сразу; лимит подписки не тратим для однодневных
         if is_admin:
@@ -3271,18 +3318,17 @@ def tournament_register_doubles(request, slug):
         return redirect("tournament_detail", slug=slug)
 
     tournament_member = _get_tournament_club_member(request.user, tournament)
-    if tournament_member:
-        can_register_by_plan, plan_error = can_member_register_for_tournament(
-            tournament_member,
-            tournament,
-        )
-        if not can_register_by_plan:
-            messages.error(request, plan_error)
-            return redirect("tournament_detail", slug=tournament.slug)
 
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         messages.error(request, err)
+        if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
+            return _build_tournament_payment_redirect(
+                tournament,
+                next_url=request.build_absolute_uri(
+                    reverse("tournament_register_doubles", kwargs={"slug": slug})
+                ),
+            )
         if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
             return redirect("tournament_register_required", slug=slug)
         if err and "подписк" in err:
@@ -3293,20 +3339,12 @@ def tournament_register_doubles(request, slug):
     if _tournament_requires_entry_payment(tournament) and tournament.is_one_day:
         paid_ids = request.session.get("tournament_entry_paid") or []
         if tournament.id not in paid_ids:
-            from urllib.parse import urlencode
-
-            from django.urls import reverse
-
-            params = {
-                "type": "tournament",
-                "id": tournament.id,
-                "next": request.build_absolute_uri(
+            return _build_tournament_payment_redirect(
+                tournament,
+                next_url=request.build_absolute_uri(
                     reverse("tournament_register_doubles", kwargs={"slug": slug})
                 ),
-            }
-            base_url = reverse("payment_preview")
-            query_string = urlencode(params)
-            return redirect(f"{base_url}?{query_string}")
+            )
 
     solo_teams = list(
         tournament.teams.filter(player2__isnull=True).select_related("player1__user")
@@ -3452,6 +3490,15 @@ def _do_join_team(request, tournament, player, team):
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         messages.error(request, err)
+        if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
+            return _build_tournament_payment_redirect(
+                tournament,
+                next_url=request.build_absolute_uri(
+                    reverse(
+                        "tournament_register_doubles", kwargs={"slug": tournament.slug}
+                    )
+                ),
+            )
         if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
             return redirect("tournament_register_required", slug=tournament.slug)
         return redirect("tournament_detail", slug=tournament.slug)
@@ -3561,6 +3608,15 @@ def _do_add_partner(request, tournament, player, partner_id):
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         messages.error(request, err)
+        if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
+            return _build_tournament_payment_redirect(
+                tournament,
+                next_url=request.build_absolute_uri(
+                    reverse(
+                        "tournament_register_doubles", kwargs={"slug": tournament.slug}
+                    )
+                ),
+            )
         if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
             return redirect("tournament_register_required", slug=tournament.slug)
         return redirect("tournament_detail", slug=tournament.slug)

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Мои матчи — {{ club.name }}{% endblock %}
+{% block content %}
+{% include "clubs/_club_player_nav.html" with current="matches" %}
+<section class="club-payments-page club-my-matches-page">
+    <div class="container club-payments-page__container club-my-matches-page__container">
+        <div class="club-payments-page__hero">
+            <div class="club-payments-page__copy">
+                <div class="club-payments-page__eyebrow">Club Matches</div>
+                <h1 class="club-payments-page__title">Мои матчи</h1>
+                <p class="club-payments-page__subtitle">
+                    Здесь собраны будущие и завершённые матчи клуба {{ club.name }} с вашим участием.
+                    Если счёт ещё не внесён, вы можете открыть матч и отправить результат на подтверждение сопернику.
+                </p>
+
+                <div class="club-payments-page__status-row">
+                    <a href="?status=upcoming" class="club-payments-status {% if status_filter == 'upcoming' %}club-payments-status--connected{% endif %}">
+                        <span class="club-payments-status__dot"></span>
+                        Ближайших: {{ upcoming_count }}
+                    </a>
+                    <a href="?status=action" class="club-payments-page__shop {% if status_filter == 'action' %}club-payments-page__shop--active{% endif %}">Требуют действия: {{ action_count }}</a>
+                    <a href="?status=completed" class="club-payments-page__shop {% if status_filter == 'completed' %}club-payments-page__shop--active{% endif %}">Завершённых: {{ completed_count }}</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="club-payments-card club-payments-card--form">
+            <div class="club-payments-card__header">
+                <div>
+                    <div class="club-payments-card__eyebrow">Match Centre</div>
+                    <h2 class="club-payments-card__title">Список матчей</h2>
+                </div>
+            </div>
+
+            {% if matches %}
+            <div class="club-dashboard-table club-my-matches-page__table">
+                <div class="club-dashboard-table__head club-my-matches-page__head">
+                    <div>Матч</div>
+                    <div>Турнир</div>
+                    <div>Дата</div>
+                    <div>Статус</div>
+                    <div>Действия</div>
+                </div>
+                {% for match in matches %}
+                <div class="club-dashboard-table__row club-my-matches-page__row">
+                    <div class="club-dashboard-table__cell club-dashboard-table__cell--title">
+                        <a href="{{ match.next_url }}">{{ match.get_player1_display }} vs {{ match.get_player2_display }}</a>
+                        <span class="club-dashboard-table__hint">
+                            {% if match.is_consolation %}Подвал · {% endif %}
+                            {% if match.round_name %}{{ match.round_name }}{% else %}Матч турнира{% endif %}
+                            {% if match.score_display != "—" %} · Счёт {{ match.score_display }}{% endif %}
+                        </span>
+                    </div>
+                    <div class="club-dashboard-table__cell">
+                        <span class="club-my-matches-page__mobile-label">Турнир</span>
+                        <div class="club-my-matches-page__meta-stack">
+                            <span>{{ match.tournament.name }}</span>
+                            {% if match.tournament.start_date %}
+                            <span class="club-dashboard-table__hint">{{ match.tournament.start_date|date:"d.m.Y" }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="club-dashboard-table__cell club-my-matches-page__meta-cell">
+                        <span class="club-my-matches-page__mobile-label">{{ match.display_date_label }}</span>
+                        {% if match.display_date %}
+                        <span>{{ match.display_date|date:"d.m.Y H:i" }}</span>
+                        {% else %}
+                        <span>Дата не задана</span>
+                        {% endif %}
+                    </div>
+                    <div class="club-dashboard-table__cell club-my-matches-page__meta-cell">
+                        <span class="club-my-matches-page__mobile-label">Статус</span>
+                        <div class="club-my-matches-page__status">
+                            <span>{{ match.club_action_label }}</span>
+                            <span class="club-dashboard-table__hint">{{ match.club_action_hint }}</span>
+                        </div>
+                    </div>
+                    <div class="club-dashboard-table__cell club-dashboard-table__cell--actions">
+                        <a href="{{ match.next_url }}" class="btn btn-ghost btn-sm">Подробнее</a>
+                        {% if match.requires_response %}
+                        <a href="{{ match.next_url }}" class="btn btn-primary btn-sm">Подтвердить</a>
+                        {% elif match.can_submit_result %}
+                        <a href="{{ match.next_url }}" class="btn btn-primary btn-sm">Внести результат</a>
+                        {% elif match.awaiting_confirmation %}
+                        <span class="club-members-badge club-members-badge--warning">Ожидание</span>
+                        {% else %}
+                        <span class="club-members-badge club-members-badge--soft">Без действий</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="club-fees-ledger__empty">В выбранной категории матчей пока нет.</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

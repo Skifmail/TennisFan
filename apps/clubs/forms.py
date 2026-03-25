@@ -2,11 +2,14 @@
 Формы клубного раздела: регистрация клуба, инвайты, приглашения, панель клуба.
 """
 
+from typing import Any
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.text import slugify
 
+from apps.core.models import UserTelegramLink
 from apps.courts.models import Court
 from apps.tournaments.models import (
     MatchFormat,
@@ -106,21 +109,65 @@ class ClubInviteLinkForm(forms.Form):
         required=False,
         min_value=1,
         max_value=365,
-        widget=forms.NumberInput(attrs={"placeholder": "Пусто — без срока"}),
+        widget=forms.NumberInput(
+            attrs={
+                "placeholder": "Пусто — без срока",
+                "class": "club-members-input",
+                "inputmode": "numeric",
+            }
+        ),
     )
     max_uses = forms.IntegerField(
         label="Лимит использований",
         required=False,
         min_value=1,
         max_value=10000,
-        widget=forms.NumberInput(attrs={"placeholder": "Пусто — без лимита"}),
+        widget=forms.NumberInput(
+            attrs={
+                "placeholder": "Пусто — без лимита",
+                "class": "club-members-input",
+                "inputmode": "numeric",
+            }
+        ),
     )
 
 
 class InviteByEmailForm(forms.Form):
     """Приглашение игрока по email."""
 
-    email = forms.EmailField(label="Email пользователя")
+    email = forms.EmailField(
+        label="Email пользователя",
+        widget=forms.EmailInput(
+            attrs={
+                "placeholder": "player@example.com",
+                "class": "club-members-input",
+                "autocomplete": "email",
+            }
+        ),
+    )
+
+
+class ClubInviteImportForm(forms.Form):
+    """Импорт приглашений из CSV или TXT файла."""
+
+    file = forms.FileField(
+        label="Файл CSV или TXT",
+        widget=forms.FileInput(
+            attrs={
+                "accept": ".csv,.txt",
+                "class": "club-members-input club-invites-file-input",
+            }
+        ),
+    )
+
+    def clean_file(self):
+        """Проверяет формат файла для импорта приглашений."""
+        file = self.cleaned_data["file"]
+        if not file.name.lower().endswith((".csv", ".txt")):
+            raise forms.ValidationError(
+                "Загрузите CSV или TXT с email в каждой строке."
+            )
+        return file
 
 
 class ClubProfileEditForm(forms.ModelForm):
@@ -162,6 +209,32 @@ class ClubMembershipFeeSettingsForm(forms.ModelForm):
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        """Добавляет единое оформление полям формы настройки взносов."""
+        super().__init__(*args, **kwargs)
+        for field_name in [
+            "amount",
+            "currency",
+            "period",
+            "period_start_day",
+            "description",
+        ]:
+            self.fields[field_name].widget.attrs[
+                "class"
+            ] = "form-control club-payments-form__control"
+
+        self.fields["amount"].widget.attrs.setdefault("placeholder", "Например, 4000")
+        self.fields["currency"].widget.attrs.setdefault("placeholder", "RUB")
+        self.fields["period_start_day"].widget.attrs.setdefault("min", 1)
+        self.fields["period_start_day"].widget.attrs.setdefault("max", 28)
+        self.fields["description"].widget.attrs.setdefault(
+            "placeholder",
+            "Коротко опишите правила и назначение клубного взноса для участников.",
+        )
+
+        for field_name in ["restrict_tournament_access", "is_active"]:
+            self.fields[field_name].widget.attrs["class"] = "form-checkbox"
 
 
 class ClubPaymentSettingsForm(forms.ModelForm):
@@ -275,6 +348,64 @@ class MarkFeePaidForm(forms.Form):
             )
         if fee:
             self.fields["amount"].initial = fee.amount
+
+
+class ClubMemberBalanceAdjustForm(forms.Form):
+    """Ручная корректировка баланса участника клуба."""
+
+    OPERATION_CHOICES = (
+        ("credit", "Начислить сумму"),
+        ("debit", "Списать сумму"),
+        ("set", "Установить точный баланс"),
+    )
+
+    operation = forms.ChoiceField(
+        label="Операция",
+        choices=OPERATION_CHOICES,
+    )
+    amount = forms.DecimalField(
+        label="Сумма",
+        max_digits=10,
+        decimal_places=2,
+        min_value=0,
+    )
+    reason = forms.CharField(
+        label="Причина корректировки",
+        max_length=255,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+    confirm_warning = forms.BooleanField(
+        label="Подтверждаю, что меняю баланс вручную только для исправления ошибки или служебной корректировки.",
+        required=True,
+    )
+
+    def __init__(self, *args, **kwargs):
+        """Подключает единые CSS-классы для админской формы баланса."""
+        super().__init__(*args, **kwargs)
+        self.fields["operation"].widget.attrs.update({"class": "club-members-select"})
+        self.fields["amount"].widget.attrs.update({"class": "club-members-input"})
+        self.fields["reason"].widget.attrs.update({"class": "club-members-textarea"})
+        self.fields["confirm_warning"].widget.attrs.update(
+            {"class": "club-balance-form__checkbox"}
+        )
+
+    def clean(self):
+        """Проверяет, что причина указана, а сумма корректна для выбранной операции."""
+        cleaned_data = super().clean()
+        operation = cleaned_data.get("operation")
+        amount = cleaned_data.get("amount")
+        reason = (cleaned_data.get("reason") or "").strip()
+
+        if not reason:
+            self.add_error("reason", "Укажите причину корректировки.")
+
+        if amount is None:
+            return cleaned_data
+
+        if operation in {"credit", "debit"} and amount <= 0:
+            self.add_error("amount", "Сумма изменения должна быть больше нуля.")
+
+        return cleaned_data
 
 
 class ClubTournamentCreateForm(forms.ModelForm):
@@ -524,6 +655,35 @@ class ClubTournamentCreateForm(forms.ModelForm):
 class ClubNotificationSettingsForm(forms.ModelForm):
     """Настройки уведомлений участника клуба (ЛК игрока)."""
 
+    def __init__(self, *args, user: Any | None = None, **kwargs) -> None:
+        """Сохраняет пользователя формы для проверки Telegram-бота."""
+        self._user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_telegram_enabled(self) -> bool:
+        """Запрещает включать Telegram без привязанного пользовательского бота."""
+        telegram_enabled = bool(self.cleaned_data.get("telegram_enabled"))
+        if not telegram_enabled:
+            return False
+
+        user = self._user or getattr(self.instance, "user", None)
+        if user is None:
+            return telegram_enabled
+
+        is_connected = (
+            UserTelegramLink.objects.filter(
+                user=user,
+                user_bot_chat_id__isnull=False,
+            )
+            .exclude(user_bot_chat_id=0)
+            .exists()
+        )
+        if not is_connected:
+            raise ValidationError(
+                "Сначала подключите Telegram-бота в профиле, затем включите этот канал."
+            )
+        return True
+
     class Meta:
         model = ClubNotificationSettings
         fields = ["is_enabled", "email_enabled", "telegram_enabled"]
@@ -570,6 +730,33 @@ class ClubPlayerPlanForm(forms.ModelForm):
                 "Однодневные турниры не расходуют лимит."
             ),
         }
+
+    def __init__(self, *args, **kwargs):
+        """Добавляет единое клубное оформление полям тарифа."""
+        super().__init__(*args, **kwargs)
+        for field_name in [
+            "name",
+            "description",
+            "monthly_fee",
+            "max_tournaments_per_month",
+            "sort_order",
+        ]:
+            self.fields[field_name].widget.attrs[
+                "class"
+            ] = "form-control club-payments-form__control"
+        for field_name in ["is_active", "allow_self_change"]:
+            self.fields[field_name].widget.attrs["class"] = "form-checkbox"
+        self.fields["name"].widget.attrs.setdefault("placeholder", "Например, Базовый")
+        self.fields["description"].widget.attrs.setdefault(
+            "placeholder",
+            "Кратко опишите, что входит в тариф и кому он подходит.",
+        )
+        self.fields["monthly_fee"].widget.attrs.setdefault("placeholder", "1000")
+        self.fields["max_tournaments_per_month"].widget.attrs.setdefault(
+            "placeholder",
+            "Например, 5",
+        )
+        self.fields["sort_order"].widget.attrs.setdefault("placeholder", "0")
 
 
 class ClubMemberPlanSelectForm(forms.Form):
@@ -619,6 +806,18 @@ class ClubMemberPlanAssignForm(forms.Form):
             club: Клуб, в рамках которого назначается тариф.
         """
         super().__init__(*args, **kwargs)
+        self.fields["member"].widget.attrs[
+            "class"
+        ] = "form-control club-payments-form__control"
+        self.fields["plan"].widget.attrs[
+            "class"
+        ] = "form-control club-payments-form__control"
+        self.fields["reason"].widget.attrs.update(
+            {
+                "class": "form-control club-payments-form__control",
+                "placeholder": "Например, приветственный тариф или ручная корректировка",
+            }
+        )
         if club is not None:
             self.fields["member"].queryset = (
                 ClubMember.objects.filter(club=club, status=ClubMemberStatus.ACTIVE)

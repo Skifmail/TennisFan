@@ -2,26 +2,127 @@
 {% block title %}Редактировать {{ club.name }}{% endblock %}
 {% block content %}
 {% include "clubs/_club_dashboard_nav.html" with current="settings" %}
-<div class="page-header">
-    <h1 class="page-title">Редактировать профиль клуба</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container" style="max-width: 560px;">
-    <div class="card">
-        <div class="card-body" style="padding: var(--spacing-2xl);">
-            <form method="post" enctype="multipart/form-data">
-                {% csrf_token %}
-                {% for field in form %}
-                <div class="form-group">
-                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% for err in field.errors %}<p class="text-error">{{ err }}</p>{% endfor %}
+<div class="page-header club-dashboard-page-header">
+    <div class="container club-dashboard-shell club-edit-page">
+        <section class="club-dashboard-hero club-edit-hero">
+            <div class="club-dashboard-hero__main">
+                <div class="club-dashboard-hero__eyebrow-row">
+                    <span class="club-dashboard-hero__eyebrow">Настройки клуба</span>
+                    <span class="club-dashboard-hero__status-pill">Профиль и контакты</span>
                 </div>
-                {% endfor %}
-                <button type="submit" class="btn btn-primary">Сохранить</button>
-                <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="btn btn-ghost">Отмена</a>
+
+                <div class="club-dashboard-hero__copy">
+                    <h1 class="page-title club-dashboard-page-header__title">Редактировать профиль клуба</h1>
+                    <p class="club-dashboard-page-header__subtitle">{{ club.name }}</p>
+                    <p class="club-edit-hero__summary">
+                        Соберите публичную карточку клуба в профиле: название, контакты, баннер и описание.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="club-dashboard-panel club-edit-panel">
+            <div class="club-dashboard-panel__header club-edit-panel__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">Параметры</p>
+                    <h2 class="club-dashboard-panel__title">Карточка клуба</h2>
+                </div>
+            </div>
+
+            <form method="post" enctype="multipart/form-data" class="club-edit-form">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                <div class="club-edit-form__errors">
+                    {% for err in form.non_field_errors %}
+                    <p class="text-error">{{ err }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="club-edit-grid">
+                    {% for field in form %}
+                    <div class="club-edit-field {% if field.name == 'name' or field.name == 'address' or field.name == 'description' or field.name == 'logo' or field.name == 'hero_image' or field.name == 'is_public' %}club-edit-field--full{% endif %}{% if field.name == 'address' or field.name == 'description' %} club-edit-field--textarea{% endif %}{% if field.name == 'logo' or field.name == 'hero_image' %} club-edit-field--file{% endif %}{% if field.name == 'is_public' %} club-edit-field--toggle{% endif %}">
+                        {% if field.name == 'is_public' %}
+                        <label class="club-edit-toggle" for="{{ field.id_for_label }}">
+                            <span class="club-edit-toggle__copy">
+                                <span class="club-edit-field__label">{{ field.label }}</span>
+                                {% if field.help_text %}
+                                <span class="club-edit-field__help">{{ field.help_text }}</span>
+                                {% else %}
+                                <span class="club-edit-field__help">Показывать клуб на публичной витрине платформы.</span>
+                                {% endif %}
+                            </span>
+                            <span class="club-edit-toggle__control">{{ field }}</span>
+                        </label>
+                        {% elif field.name == 'logo' or field.name == 'hero_image' %}
+                        <label class="club-edit-field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {% if field.help_text %}
+                        <p class="club-edit-field__help">{{ field.help_text }}</p>
+                        {% endif %}
+                        <div class="club-edit-file {% if field.name == 'hero_image' %}club-edit-file--banner{% endif %}">
+                            {% if field.name == 'logo' and club.logo %}
+                            <div class="club-edit-file__current">
+                                <img src="{{ club.logo.url }}" alt="{{ club.name }}" class="club-edit-file__preview">
+                                <div class="club-edit-file__meta">
+                                    <span class="club-edit-file__eyebrow">Текущее изображение</span>
+                                    <span class="club-edit-file__name">{{ club.logo.name }}</span>
+                                </div>
+                            </div>
+                            {% elif field.name == 'hero_image' and club.hero_image %}
+                            <div class="club-edit-file__current">
+                                <img src="{{ club.hero_image.url }}" alt="{{ club.name }}" class="club-edit-file__preview club-edit-file__preview--banner">
+                                <div class="club-edit-file__meta">
+                                    <span class="club-edit-file__eyebrow">Текущий баннер</span>
+                                    <span class="club-edit-file__name">{{ club.hero_image.name }}</span>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <div class="club-edit-file__input-wrap">
+                                <input
+                                    type="file"
+                                    name="{{ field.html_name }}"
+                                    id="{{ field.id_for_label }}"
+                                    class="club-edit-input club-edit-input--file"
+                                    accept="image/*"
+                                >
+                            </div>
+
+                            {% if field.value %}
+                            <label class="club-edit-file__clear" for="{{ field.id_for_label }}-clear">
+                                <input
+                                    type="checkbox"
+                                    name="{{ field.html_name }}-clear"
+                                    id="{{ field.id_for_label }}-clear"
+                                    class="club-edit-checkbox"
+                                >
+                                <span>Удалить текущее изображение</span>
+                            </label>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <label class="club-edit-field__label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {% if field.help_text %}
+                        <p class="club-edit-field__help">{{ field.help_text }}</p>
+                        {% endif %}
+                        <div class="club-edit-field__control">
+                            {{ field }}
+                        </div>
+                        {% endif %}
+                        
+                        {% for err in field.errors %}
+                        <p class="text-error">{{ err }}</p>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="club-edit-form__actions">
+                    <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                    <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="btn btn-ghost">Отмена</a>
+                </div>
             </form>
-        </div>
+        </section>
     </div>
 </div>
 {% endblock %}

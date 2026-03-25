@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Балансы игроков — {{ club.name }}{% endblock %}
+{% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="balances" %}
+<div class="page-header club-members-page-header">
+    <div class="container club-members-page">
+        <div class="club-members-hero">
+            <div class="club-members-hero__copy">
+                <span class="club-members-hero__eyebrow">Финансовый контроль</span>
+                <h1 class="page-title club-members-hero__title">Балансы игроков</h1>
+                <p class="page-subtitle club-members-hero__subtitle">
+                    Раздел для ручных корректировок баланса участников клуба. Используйте только для исправления ошибок и нестандартных служебных кейсов.
+                </p>
+            </div>
+            <div class="club-members-hero__stats">
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ members_total }}</span>
+                    <span class="club-members-stat__label">Активных участников</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ balances_total|floatformat:2 }} ₽</span>
+                    <span class="club-members-stat__label">Сумма на балансах</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ nonzero_count }}</span>
+                    <span class="club-members-stat__label">С ненулевым балансом</span>
+                </div>
+                <div class="club-members-stat">
+                    <span class="club-members-stat__value">{{ members_filtered_count }}</span>
+                    <span class="club-members-stat__label">В текущем списке</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container club-members-page">
+    <section class="card club-members-toolbar">
+        <div class="card-body club-members-toolbar__body">
+            <div class="club-balance-warning">
+                <strong>Внимание:</strong> каждое ручное изменение баланса фиксируется в журнале операций. Перед корректировкой обязательно указывайте понятную причину.
+            </div>
+
+            <form method="get" class="club-members-filters">
+                <label class="club-members-field">
+                    <span class="club-members-field__label">Поиск</span>
+                    <input type="text" name="q" value="{{ search }}" placeholder="Email, имя или фамилия">
+                </label>
+                <div class="club-members-filters__actions">
+                    <button type="submit" class="btn btn-primary">Найти</button>
+                    {% if search %}
+                    <a href="{% url 'clubs:balances_list' slug=club.slug %}" class="btn btn-ghost">Сбросить</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="card club-members-table-card">
+        <div class="card-body club-members-table-card__body">
+            <div class="club-members-table-wrap">
+                <table class="club-members-table">
+                    <thead>
+                        <tr>
+                            <th>Участник</th>
+                            <th>Статус</th>
+                            <th>Баланс</th>
+                            <th class="club-members-table__actions-head">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in page %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'clubs:balance_detail' slug=club.slug member_id=m.id %}" class="club-members-person club-members-person--link">
+                                    {% if m.user.player and m.user.player.avatar %}
+                                    <img src="{{ m.user.player.avatar.url }}" alt="{{ m.user.get_full_name|default:m.user.email }}" class="club-members-person__avatar">
+                                    {% else %}
+                                    <span class="club-members-person__avatar club-members-person__avatar--fallback">
+                                        {% if m.user.first_name %}{{ m.user.first_name|slice:":1"|upper }}{% else %}{{ m.user.email|slice:":1"|upper }}{% endif %}
+                                    </span>
+                                    {% endif %}
+                                    <div class="club-members-person__content">
+                                        <div class="club-members-person__name-row">
+                                            <span class="club-members-person__name">{{ m.user.get_full_name|default:"Без имени" }}</span>
+                                        </div>
+                                        <div class="club-members-person__meta">{{ m.user.email }}</div>
+                                    </div>
+                                </a>
+                            </td>
+                            <td>
+                                <span class="club-members-badge club-members-badge--status club-members-badge--success">{{ m.get_status_display }}</span>
+                            </td>
+                            <td>
+                                <span class="club-balance-amount {% if m.balance > 0 %}club-balance-amount--positive{% endif %}">{{ m.balance|floatformat:2 }} ₽</span>
+                            </td>
+                            <td class="club-members-table__actions">
+                                <a href="{% url 'clubs:balance_detail' slug=club.slug member_id=m.id %}" class="btn btn-ghost btn-sm">Управлять</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="club-members-table__empty">Участники не найдены.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="club-members-mobile-list">
+                {% for m in page %}
+                <article class="club-members-mobile-card">
+                    <a href="{% url 'clubs:balance_detail' slug=club.slug member_id=m.id %}" class="club-members-person club-members-person--link">
+                        {% if m.user.player and m.user.player.avatar %}
+                        <img src="{{ m.user.player.avatar.url }}" alt="{{ m.user.get_full_name|default:m.user.email }}" class="club-members-person__avatar">
+                        {% else %}
+                        <span class="club-members-person__avatar club-members-person__avatar--fallback">
+                            {% if m.user.first_name %}{{ m.user.first_name|slice:":1"|upper }}{% else %}{{ m.user.email|slice:":1"|upper }}{% endif %}
+                        </span>
+                        {% endif %}
+                        <div class="club-members-person__content">
+                            <div class="club-members-person__name-row">
+                                <span class="club-members-person__name">{{ m.user.get_full_name|default:"Без имени" }}</span>
+                            </div>
+                            <div class="club-members-person__meta">{{ m.user.email }}</div>
+                        </div>
+                    </a>
+                    <div class="club-members-mobile-card__grid">
+                        <div>
+                            <span class="club-members-mobile-card__label">Статус</span>
+                            <span class="club-members-badge club-members-badge--status club-members-badge--success">{{ m.get_status_display }}</span>
+                        </div>
+                        <div>
+                            <span class="club-members-mobile-card__label">Баланс</span>
+                            <span class="club-balance-amount {% if m.balance > 0 %}club-balance-amount--positive{% endif %}">{{ m.balance|floatformat:2 }} ₽</span>
+                        </div>
+                    </div>
+                    <div class="club-members-mobile-card__actions">
+                        <a href="{% url 'clubs:balance_detail' slug=club.slug member_id=m.id %}" class="btn btn-ghost btn-sm">Управлять</a>
+                    </div>
+                </article>
+                {% empty %}
+                <div class="club-members-mobile-list__empty">Участники не найдены.</div>
+                {% endfor %}
+            </div>
+
+            {% if page.has_other_pages %}
+            <div class="club-members-pagination">
+                {% if page.has_previous %}
+                <a href="?page={{ page.previous_page_number }}{% if search %}&q={{ search }}{% endif %}" class="club-members-pagination__link">← Назад</a>
+                {% else %}
+                <span class="club-members-pagination__link club-members-pagination__link--disabled">← Назад</span>
+                {% endif %}
+
+                <span class="club-members-pagination__current">Страница {{ page.number }} из {{ page.paginator.num_pages }}</span>
+
+                {% if page.has_next %}
+                <a href="?page={{ page.next_page_number }}{% if search %}&q={{ search }}{% endif %}" class="club-members-pagination__link">Вперёд →</a>
+                {% else %}
+                <span class="club-members-pagination__link club-members-pagination__link--disabled">Вперёд →</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}

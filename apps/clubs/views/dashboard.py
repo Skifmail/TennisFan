@@ -15,14 +15,18 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from apps.tournaments.models import (
     Match,
+    MatchResultProposal,
     Tournament,
     TournamentDuration,
+    TournamentEntryPayment,
     TournamentGender,
     TournamentStatus,
+    TournamentTeam,
     TournamentVariant,
 )
 from apps.users.models import SkillLevel
 
+from ..finance_services import credit_member_balance
 from ..forms import (
     ClubMemberPlanAssignForm,
     ClubPlayerPlanForm,
@@ -35,6 +39,7 @@ from ..models import (
     ClubFeePayment,
     ClubJoinRequestStatus,
     ClubMember,
+    ClubMemberBalanceTransaction,
     ClubMemberRole,
     ClubMembershipFee,
     ClubMemberStatus,
@@ -46,6 +51,7 @@ from ..plan_services import (
     assign_member_plan,
     get_member_active_plan,
     get_member_plan_limits,
+    restore_member_tournament_limit,
 )
 from ..services import (
     club_can_create_tournament_this_month,
@@ -680,12 +686,39 @@ def plans_manage(request: HttpRequest, slug: str) -> HttpResponse:
             "is_club_panel": True,
             "club": club,
             "plans": plans,
+            "active_plans_count": plans.filter(is_active=True).count(),
             "assign_form": assign_form,
             "can_edit_settings": user_can_edit_club_settings(request.user, club),
             "can_manage_fees": user_can_manage_fees(request.user, club),
             "can_manage_managers": user_can_manage_managers(request.user, club),
         },
     )
+
+
+@login_required
+@require_POST
+def plan_toggle_usage(request: HttpRequest, slug: str) -> HttpResponse:
+    """Включает или выключает использование клубных тарифов."""
+    club_or_res = _resolve_club_manage(_get_club_and_check_manage(request, slug))
+    if isinstance(club_or_res, HttpResponse):
+        return club_or_res
+    club = club_or_res
+
+    target_state = str(request.POST.get("enabled") or "").strip().lower()
+    club.use_player_plans = target_state in {"1", "true", "on", "yes"}
+    club.save(update_fields=["use_player_plans"])
+
+    if club.use_player_plans:
+        messages.success(
+            request,
+            "Система тарифов включена. Ограничения и условия тарифов снова применяются.",
+        )
+    else:
+        messages.success(
+            request,
+            "Система тарифов выключена. Тарифные ограничения больше не влияют на регистрацию игроков в турниры клуба.",
+        )
+    return redirect("clubs:plans_manage", slug=slug)
 
 
 @login_required
@@ -873,11 +906,8 @@ def my_tournaments(request: HttpRequest) -> HttpResponse:
         qs = qs.filter(status="completed")
 
     fee = ClubMembershipFee.objects.filter(club=club, is_active=True).first()
-    fee_restrict = (
-        fee
-        and fee.restrict_tournament_access
-        and get_fee_status_for_member(club, member) == "unpaid"
-    )
+    fee_status = get_fee_status_for_member(club, member) if fee else None
+    fee_restrict = fee and fee.restrict_tournament_access and fee_status != "paid"
     member_plan = get_member_active_plan(member)
     plan_limits = get_member_plan_limits(member)
 
@@ -894,6 +924,300 @@ def my_tournaments(request: HttpRequest) -> HttpResponse:
             "plan_limits": plan_limits,
         },
     )
+
+
+@login_required
+@require_GET
+def my_matches(request: HttpRequest) -> HttpResponse:
+    """Раздел «Мои матчи» для текущего клуба."""
+    member = _get_current_club_member(request)
+    if not member:
+        messages.info(
+            request,
+            "Вы не состоите в клубе. Вступите по приглашению или создайте клуб.",
+        )
+        return redirect("clubs:register_choice")
+
+    club = member.club
+    player = getattr(request.user, "player", None)
+    if player is None:
+        messages.error(request, "Профиль игрока не найден.")
+        return redirect("clubs:register_choice")
+
+    status_filter = request.GET.get("status", "upcoming")
+    base_q = (
+        Q(player1=player)
+        | Q(player2=player)
+        | Q(team1__player1=player)
+        | Q(team1__player2=player)
+        | Q(team2__player1=player)
+        | Q(team2__player2=player)
+    )
+    all_matches = list(
+        Match.objects.filter(
+            base_q,
+            tournament__club=club,
+            match_type=Match.MatchType.TOURNAMENT,
+        )
+        .select_related(
+            "tournament",
+            "player1__user",
+            "player2__user",
+            "winner__user",
+            "team1__player1__user",
+            "team1__player2__user",
+            "team2__player1__user",
+            "team2__player2__user",
+            "winner_team__player1__user",
+            "winner_team__player2__user",
+        )
+        .order_by("deadline", "scheduled_datetime", "pk")
+        .distinct()
+    )
+    pending_proposals = MatchResultProposal.objects.filter(
+        match__in=all_matches,
+        status=Match.ProposalStatus.PENDING,
+    ).select_related("proposer", "proposer__user", "match")
+    pending_by_match: dict[int, list[MatchResultProposal]] = {}
+    for proposal in pending_proposals:
+        pending_by_match.setdefault(proposal.match_id, []).append(proposal)
+
+    enriched_matches: list[Match] = []
+    for match in all_matches:
+        proposals = pending_by_match.get(match.pk, [])
+        match.pending_proposals = proposals
+        match.has_pending = bool(proposals)
+        match.requires_response = any(
+            proposal.proposer_id != player.pk for proposal in proposals
+        )
+        match.awaiting_confirmation = any(
+            proposal.proposer_id == player.pk for proposal in proposals
+        )
+        match.can_submit_result = (
+            match.status
+            not in (
+                Match.MatchStatus.COMPLETED,
+                Match.MatchStatus.WALKOVER,
+                Match.MatchStatus.CANCELLED,
+            )
+            and not match.has_pending
+        )
+        match.next_url = (
+            f"{reverse('match_detail', kwargs={'pk': match.pk})}"
+            f"?next={reverse('clubs:my_matches')}?status={status_filter}"
+        )
+        if match.deadline:
+            match.display_date = match.deadline
+            match.display_date_label = "Дедлайн"
+        elif match.scheduled_datetime:
+            match.display_date = match.scheduled_datetime
+            match.display_date_label = "Матч"
+        else:
+            match.display_date = None
+            match.display_date_label = "Дата"
+        if match.requires_response:
+            match.club_action_label = "Подтвердить результат"
+            match.club_action_hint = "Соперник ждёт вашего ответа"
+        elif match.awaiting_confirmation:
+            match.club_action_label = "Результат отправлен"
+            match.club_action_hint = "Ожидание подтверждения соперником"
+        elif match.can_submit_result:
+            match.club_action_label = "Внести результат"
+            match.club_action_hint = "Матч сыгран, результат ещё не внесён"
+        elif match.status in (
+            Match.MatchStatus.COMPLETED,
+            Match.MatchStatus.WALKOVER,
+        ):
+            match.club_action_label = "Матч завершён"
+            match.club_action_hint = (
+                f"Счёт: {match.score_display}"
+                if match.score_display != "—"
+                else "Результат зафиксирован"
+            )
+        else:
+            match.club_action_label = "Ожидает матча"
+            match.club_action_hint = "Следите за дедлайном и временем игры"
+        enriched_matches.append(match)
+
+    def _sort_key_upcoming(item: Match) -> tuple[datetime, int]:
+        return (
+            item.display_date or timezone.now(),
+            item.pk,
+        )
+
+    def _sort_key_completed(item: Match) -> tuple[datetime, int]:
+        return (
+            item.display_date or timezone.now(),
+            item.pk,
+        )
+
+    upcoming_matches = sorted(
+        [
+            item
+            for item in enriched_matches
+            if item.status
+            not in (
+                Match.MatchStatus.COMPLETED,
+                Match.MatchStatus.WALKOVER,
+                Match.MatchStatus.CANCELLED,
+            )
+        ],
+        key=_sort_key_upcoming,
+    )
+    actionable_matches = sorted(
+        [
+            item
+            for item in enriched_matches
+            if item.can_submit_result
+            or item.requires_response
+            or item.awaiting_confirmation
+        ],
+        key=_sort_key_upcoming,
+    )
+    completed_matches = sorted(
+        [
+            item
+            for item in enriched_matches
+            if item.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
+        ],
+        key=_sort_key_completed,
+        reverse=True,
+    )
+
+    if status_filter == "action":
+        matches = actionable_matches
+    elif status_filter == "completed":
+        matches = completed_matches
+    else:
+        matches = upcoming_matches
+
+    return render(
+        request,
+        "clubs/my_matches.html",
+        {
+            "club": club,
+            "is_club_panel": True,
+            "matches": matches[:50],
+            "status_filter": status_filter,
+            "upcoming_count": len(upcoming_matches),
+            "action_count": len(actionable_matches),
+            "completed_count": len(completed_matches),
+        },
+    )
+
+
+@login_required
+@require_POST
+def my_tournament_cancel(request: HttpRequest, tournament_slug: str) -> HttpResponse:
+    """Отменяет запись текущего участника клуба на турнир до старта или формирования сетки."""
+    member = _get_current_club_member(request)
+    if not member:
+        messages.info(request, "Вы не состоите в клубе.")
+        return redirect("clubs:register_choice")
+
+    player = getattr(request.user, "player", None)
+    if player is None:
+        messages.error(request, "Профиль игрока не найден.")
+        return redirect("clubs:my_tournaments")
+
+    tournament = get_object_or_404(
+        Tournament,
+        slug=tournament_slug,
+        club=member.club,
+    )
+    if tournament.status != TournamentStatus.UPCOMING:
+        messages.error(request, "Отменить запись можно только до начала турнира.")
+        return redirect("clubs:my_tournaments")
+    if getattr(tournament, "bracket_generated", False):
+        messages.error(
+            request,
+            "После формирования групп или сетки отмена записи недоступна.",
+        )
+        return redirect("clubs:my_tournaments")
+
+    registration_removed = False
+    if tournament.is_doubles():
+        team = (
+            TournamentTeam.objects.filter(tournament=tournament)
+            .filter(Q(player1=player) | Q(player2=player))
+            .select_related("player1__user", "player2__user")
+            .first()
+        )
+        if not team:
+            messages.error(request, "Запись на турнир не найдена.")
+            return redirect("clubs:my_tournaments")
+
+        if team.player1_id == player.id and team.player2_id:
+            team.player1 = team.player2
+            team.player2 = None
+            team.save(update_fields=["player1", "player2"])
+        elif team.player2_id == player.id:
+            team.player2 = None
+            team.save(update_fields=["player2"])
+        else:
+            team.delete()
+        registration_removed = True
+    else:
+        if not tournament.participants.filter(pk=player.pk).exists():
+            messages.error(request, "Запись на турнир не найдена.")
+            return redirect("clubs:my_tournaments")
+        tournament.participants.remove(player)
+        registration_removed = True
+
+    restored_limit = False
+    paid_entry_qs = TournamentEntryPayment.objects.filter(
+        tournament=tournament,
+        user=request.user,
+    )
+    had_paid_entry = paid_entry_qs.exists()
+    tournament_has_entry_fee = bool(
+        getattr(tournament, "entry_fee", None)
+        and float(getattr(tournament, "entry_fee", 0)) > 0
+    )
+    if (
+        registration_removed
+        and not tournament.is_one_day
+        and (not tournament_has_entry_fee or not had_paid_entry)
+    ):
+        restored_limit = restore_member_tournament_limit(member)
+
+    refunded_to_balance = False
+    if registration_removed and tournament_has_entry_fee and had_paid_entry:
+        credit_member_balance(
+            member,
+            tournament.entry_fee or Decimal("0"),
+            source=ClubMemberBalanceTransaction.Source.TOURNAMENT_REFUND,
+            description=f"Возврат за отмену турнира «{tournament.name}»",
+            reference=f"tournament:{tournament.id}",
+            metadata={"tournament_id": tournament.id},
+        )
+        paid_entry_qs.delete()
+        paid_ids = request.session.get("tournament_entry_paid") or []
+        if tournament.id in paid_ids:
+            request.session["tournament_entry_paid"] = [
+                item for item in paid_ids if item != tournament.id
+            ]
+            request.session.modified = True
+        refunded_to_balance = True
+
+    if refunded_to_balance and restored_limit:
+        messages.success(
+            request,
+            "Запись на турнир отменена. Оплаченная сумма возвращена на баланс, лимит регистраций восстановлен.",
+        )
+    elif refunded_to_balance:
+        messages.success(
+            request,
+            "Запись на турнир отменена. Оплаченная сумма возвращена на баланс клуба.",
+        )
+    elif restored_limit:
+        messages.success(
+            request,
+            "Запись на турнир отменена. Лимит регистраций по вашему тарифу восстановлен.",
+        )
+    else:
+        messages.success(request, "Запись на турнир отменена.")
+    return redirect("clubs:my_tournaments")
 
 
 @login_required

@@ -2,29 +2,250 @@
 {% block title %}Настройка взносов — {{ club.name }}{% endblock %}
 {% block content %}
 {% include "clubs/_club_dashboard_nav.html" with current="fees" %}
-<div class="page-header">
-    <h1 class="page-title">Настройка взносов</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container" style="max-width: 560px;">
-    <p>
-        <a href="{% url 'clubs:fees_payments' slug=club.slug %}">Список оплат</a>
-        ·
-        <a href="{% url 'clubs:payment_settings' slug=club.slug %}">Платежи клуба</a>
-    </p>
-    <div class="card">
-        <div class="card-body">
-            <p style="color: var(--color-text-muted); font-size: 0.9rem;">
-                Здесь задаются только правила клубного взноса: сумма, период списания, описание и ограничения
-                доступа к турнирам при задолженности. Подключение YooKassa вынесено в отдельный раздел
-                «Платежи клуба».
-            </p>
-            <form method="post">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit" class="btn btn-primary">Сохранить</button>
-            </form>
+<section class="club-payments-page">
+    <div class="container club-payments-page__container">
+        <form method="post" class="club-payments-page__form-shell">
+            {% csrf_token %}
+            <div class="club-payments-page__hero">
+                <div class="club-payments-page__copy">
+                    <div class="club-payments-page__eyebrow">Club Fee Settings</div>
+                    <h1 class="club-payments-page__title">Настройка взносов</h1>
+                    <p class="club-payments-page__subtitle">
+                        Настройте сумму, период списания, описание для игроков и ограничения доступа к турнирам
+                        при задолженности по членскому взносу клуба {{ club.name }}.
+                    </p>
+
+                    <div class="club-payments-page__status-row">
+                        <span class="club-payments-status {% if fee and fee.is_active %}club-payments-status--connected{% else %}club-payments-status--idle{% endif %}">
+                            <span class="club-payments-status__dot"></span>
+                            {% if fee and fee.is_active %}Система взносов включена{% else %}Система взносов выключена{% endif %}
+                        </span>
+                        <label class="club-payments-switch" for="{{ form.is_active.id_for_label }}">
+                            <span class="club-payments-switch__label">Взносы активны</span>
+                            {{ form.is_active }}
+                            <span class="club-payments-switch__track" aria-hidden="true">
+                                <span class="club-payments-switch__thumb"></span>
+                            </span>
+                        </label>
+                        {% if fee %}
+                        <span class="club-payments-page__shop">{{ fee.amount }} {{ fee.currency }} / {{ fee.get_period_display }}</span>
+                        {% endif %}
+                    </div>
+                    <input type="hidden" name="source" value="fees_settings">
+                    {% if form.is_active.errors %}
+                    <div class="club-payments-form__error">{{ form.is_active.errors|join:", " }}</div>
+                    {% endif %}
+                    <div class="club-payments-page__note">
+                        <p>
+                            Членские взносы в клубе используются как добровольные пожертвования клубу. Вы можете в любой момент включить или выключить эту систему.
+                        </p>
+                        <p>
+                            Сам по себе взнос не меняет тариф игрока, рейтинг или статус участия в клубе. Единственное возможное ограничение — запретить игрокам с задолженностью регистрацию на турниры клуба, если включить эту опцию ниже.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="club-payments-grid">
+                <div class="club-payments-card club-payments-card--form">
+                    <div class="club-payments-card__header">
+                        <div>
+                            <div class="club-payments-card__eyebrow">Fee Rules</div>
+                            <h2 class="club-payments-card__title">Параметры членского взноса</h2>
+                        </div>
+                        <div class="club-payments-card__state {% if fee and fee.is_active %}club-payments-card__state--ok{% endif %}">
+                            {% if fee and fee.is_active %}Активно{% else %}Черновик{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="club-payments-form">
+
+                        {% if form.non_field_errors %}
+                        <div class="club-payments-check club-payments-check--error">
+                            <span class="club-payments-check__icon">!</span>
+                            <span>{{ form.non_field_errors|join:", " }}</span>
+                        </div>
+                        {% endif %}
+
+                        <div class="club-payments-form__field">
+                            <label for="{{ form.amount.id_for_label }}" class="club-payments-form__label">
+                                {{ form.amount.label }}
+                            </label>
+                            {{ form.amount }}
+                            {% if form.amount.errors %}
+                            <div class="club-payments-form__error">{{ form.amount.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="club-payments-form__field">
+                            <label for="{{ form.currency.id_for_label }}" class="club-payments-form__label">
+                                {{ form.currency.label }}
+                            </label>
+                            {{ form.currency }}
+                            {% if form.currency.errors %}
+                            <div class="club-payments-form__error">{{ form.currency.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="club-payments-form__field">
+                            <label for="{{ form.period.id_for_label }}" class="club-payments-form__label">
+                                {{ form.period.label }}
+                            </label>
+                            {{ form.period }}
+                            {% if form.period.errors %}
+                            <div class="club-payments-form__error">{{ form.period.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="club-payments-form__field">
+                            <label for="{{ form.period_start_day.id_for_label }}" class="club-payments-form__label">
+                                {{ form.period_start_day.label }}
+                            </label>
+                            {{ form.period_start_day }}
+                            <div class="club-payments-form__hint">Укажите день месяца, в который начинается новый период списания.</div>
+                            {% if form.period_start_day.errors %}
+                            <div class="club-payments-form__error">{{ form.period_start_day.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="club-payments-form__field">
+                            <label for="{{ form.description.id_for_label }}" class="club-payments-form__label">
+                                {{ form.description.label }}
+                            </label>
+                            {{ form.description }}
+                            <div class="club-payments-form__hint">Этот текст увидят игроки в личном кабинете и сценариях оплаты.</div>
+                            {% if form.description.errors %}
+                            <div class="club-payments-form__error">{{ form.description.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+
+                        <label class="club-tournament-create__toggle-row" for="{{ form.restrict_tournament_access.id_for_label }}">
+                            {{ form.restrict_tournament_access }}
+                            <span>
+                                <span class="club-tournament-create__toggle-title">{{ form.restrict_tournament_access.label }}</span>
+                                <span class="club-tournament-create__toggle-help">Игроки с задолженностью не смогут регистрироваться на турниры клуба.</span>
+                            </span>
+                        </label>
+                        {% if form.restrict_tournament_access.errors %}
+                        <div class="club-payments-form__error">{{ form.restrict_tournament_access.errors|join:", " }}</div>
+                        {% endif %}
+
+                        <div class="club-payments-form__actions">
+                            <button type="submit" class="btn btn-primary">Сохранить настройки</button>
+                        </div>
+                    </div>
+                </div>
+
+                <aside class="club-payments-card club-payments-card--ledger">
+                    <div class="club-payments-card__header">
+                        <div>
+                            <div class="club-payments-card__eyebrow">Payments</div>
+                            <h2 class="club-payments-card__title">Список оплат</h2>
+                        </div>
+                        <a href="{% url 'clubs:fees_payments' slug=club.slug %}" class="btn btn-ghost btn-sm">Вся история</a>
+                    </div>
+
+                    {% if recent_payments %}
+                    <div class="club-fees-ledger">
+                        {% for payment in recent_payments %}
+                        <div class="club-fees-ledger__item">
+                            <div class="club-fees-ledger__main">
+                                <div class="club-fees-ledger__name">{{ payment.member.user.get_full_name|default:payment.member.user.email }}</div>
+                                <div class="club-fees-ledger__meta">
+                                    {{ payment.period_label }} · {{ payment.get_method_display }}
+                                </div>
+                            </div>
+                            <div class="club-fees-ledger__side">
+                                <div class="club-fees-ledger__amount">{{ payment.amount }} {{ payment.fee.currency }}</div>
+                                <div class="club-fees-ledger__date">{{ payment.paid_at|date:"d.m.Y" }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="club-fees-ledger__empty">Оплат пока нет.</p>
+                    {% endif %}
+                </aside>
+            </div>
+        </form>
+    </div>
+</section>
+<div id="club-fee-toggle-modal" class="modal-overlay club-confirm-modal" style="display:none;" aria-hidden="true">
+    <div class="modal-dialog club-confirm-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="club-fee-toggle-title" aria-describedby="club-fee-toggle-text">
+        <div class="club-confirm-modal__eyebrow">Подтверждение</div>
+        <h3 id="club-fee-toggle-title" class="modal-dialog__title club-confirm-modal__title">Изменить статус взносов?</h3>
+        <p id="club-fee-toggle-text" class="modal-dialog__text club-confirm-modal__text">Вы собираетесь изменить состояние системы клубных взносов.</p>
+        <div class="club-confirm-modal__note">
+            <span class="club-confirm-modal__note-icon">!</span>
+            <span id="club-fee-toggle-note">Настройки сохранятся сразу после подтверждения.</span>
+        </div>
+        <div class="modal-dialog__actions club-confirm-modal__actions">
+            <button type="button" class="btn btn-sm club-confirm-modal__btn club-confirm-modal__btn--secondary" data-fee-toggle-close>Отмена</button>
+            <button type="button" class="btn btn-sm btn-primary club-confirm-modal__btn club-confirm-modal__btn--primary" data-fee-toggle-confirm>Подтвердить</button>
         </div>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.querySelector('.club-payments-page__form-shell');
+    const toggle = document.getElementById('{{ form.is_active.id_for_label }}');
+    const modal = document.getElementById('club-fee-toggle-modal');
+    if (!form || !toggle || !modal || modal.dataset.bound === '1') {
+        return;
+    }
+
+    modal.dataset.bound = '1';
+    const title = modal.querySelector('#club-fee-toggle-title');
+    const text = modal.querySelector('#club-fee-toggle-text');
+    const note = modal.querySelector('#club-fee-toggle-note');
+    const confirmBtn = modal.querySelector('[data-fee-toggle-confirm]');
+    let previousState = toggle.checked;
+
+    function closeModal() {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function openModal() {
+        const turningOn = toggle.checked;
+        title.textContent = turningOn ? 'Включить систему взносов?' : 'Отключить систему взносов?';
+        text.textContent = turningOn
+            ? 'После подтверждения система клубных взносов будет включена и станет доступна игрокам клуба.'
+            : 'После подтверждения система клубных взносов будет отключена. Существующие настройки сохранятся.';
+        note.textContent = turningOn
+            ? 'Функция ограничения доступа к турнирам начнёт работать только при активной системе взносов.'
+            : 'После отключения взносы не будут применяться, пока вы не включите систему снова.';
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        confirmBtn.focus();
+    }
+
+    toggle.addEventListener('change', function () {
+        openModal();
+    });
+
+    confirmBtn.addEventListener('click', function () {
+        closeModal();
+        form.submit();
+    });
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal || event.target.hasAttribute('data-fee-toggle-close')) {
+            toggle.checked = previousState;
+            closeModal();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.style.display !== 'none') {
+            toggle.checked = previousState;
+            closeModal();
+        }
+    });
+
+    form.addEventListener('submit', function () {
+        previousState = toggle.checked;
+    });
+});
+</script>
 {% endblock %}

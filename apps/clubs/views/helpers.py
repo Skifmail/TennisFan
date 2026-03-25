@@ -15,6 +15,7 @@ from ..plan_services import get_member_active_plan, get_member_plan_limits
 from ..services import (
     club_is_operational,
     get_club_current_subscription,
+    get_fee_expiring_soon_text,
     get_fee_status_for_member,
     user_can_manage_club,
 )
@@ -85,6 +86,9 @@ def _build_club_profile_context(
         .first()
     )
     fee_status = get_fee_status_for_member(club, member) if fee else None
+    fee_expiring_text = (
+        get_fee_expiring_soon_text(fee) if fee and fee_status == "expiring_soon" else ""
+    )
     member_plan = get_member_active_plan(member)
     plan_limits = get_member_plan_limits(member)
     club_subscription = get_club_current_subscription(club)
@@ -434,6 +438,7 @@ def _build_club_profile_context(
         "plan_limits": plan_limits,
         "fee": fee,
         "fee_status": fee_status,
+        "fee_expiring_text": fee_expiring_text,
         "recent_matches": recent_matches,
         "profile_progress_data": progress_data,
         "subscription_usage_percent": subscription_usage_percent,

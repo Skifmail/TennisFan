@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}История оплат клуба — {{ club.name }}{% endblock %}
+{% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="payments" %}
+<section class="club-payments-page club-finance-page">
+    <div class="container club-payments-page__container">
+        <div class="club-payments-page__hero">
+            <div class="club-payments-page__copy">
+                <div class="club-payments-page__eyebrow">Club Cashbox</div>
+                <h1 class="club-payments-page__title">История оплат клуба</h1>
+                <p class="club-payments-page__subtitle">
+                    Все поступления в кассу клуба: тарифы игроков, членские взносы, турнирные оплаты и ручные пополнения баланса.
+                </p>
+
+                <div class="club-payments-page__status-row">
+                    <span class="club-payments-status club-payments-status--connected">
+                        <span class="club-payments-status__dot"></span>
+                        Найдено: {{ filtered_total }}
+                    </span>
+                    <span class="club-payments-status club-payments-status--connected">
+                        <span class="club-payments-status__dot"></span>
+                        Всего в кассе: {{ payments_total }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="club-payments-card club-payments-card--ledger">
+            <div class="club-payments-card__header">
+                <div>
+                    <div class="club-payments-card__eyebrow">Cash Flow</div>
+                    <h2 class="club-payments-card__title">Все поступления</h2>
+                </div>
+                <a href="{% url 'clubs:payment_settings' slug=club.slug %}" class="club-dashboard-panel__link">Назад в кассу</a>
+            </div>
+
+            <form method="get" class="club-cashbox-filters">
+                <div class="club-cashbox-filters__grid">
+                    <label class="club-cashbox-filters__field club-cashbox-filters__field--search">
+                        <span>Игрок</span>
+                        <input type="text" name="q" value="{{ filters.q }}" placeholder="Поиск по имени или фамилии">
+                    </label>
+                    <label class="club-cashbox-filters__field">
+                        <span>Канал</span>
+                        <select name="source">
+                            <option value="">Все операции</option>
+                            <option value="online"{% if filters.source == "online" %} selected{% endif %}>Онлайн</option>
+                            <option value="manual"{% if filters.source == "manual" %} selected{% endif %}>Ручная корректировка баланса</option>
+                        </select>
+                    </label>
+                    <label class="club-cashbox-filters__field">
+                        <span>Категория</span>
+                        <select name="operation">
+                            <option value="">Все категории</option>
+                            <option value="tournament"{% if filters.operation == "tournament" %} selected{% endif %}>Оплата турниров</option>
+                            <option value="club_plan"{% if filters.operation == "club_plan" %} selected{% endif %}>Оплата тарифов</option>
+                            <option value="club_fee"{% if filters.operation == "club_fee" %} selected{% endif %}>Оплата взносов</option>
+                            <option value="balance_adjustment"{% if filters.operation == "balance_adjustment" %} selected{% endif %}>Ручное редактирование баланса</option>
+                        </select>
+                    </label>
+                    <label class="club-cashbox-filters__field">
+                        <span>Месяц</span>
+                        <select name="month">
+                            <option value="">Любой месяц</option>
+                            {% for month_number in available_months %}
+                            <option value="{{ month_number }}"{% if filters.month == month_number|stringformat:"s" %} selected{% endif %}>
+                                {{ month_number|stringformat:"02d" }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="club-cashbox-filters__field">
+                        <span>Год</span>
+                        <select name="year">
+                            <option value="">Любой год</option>
+                            {% for year_number in available_years %}
+                            <option value="{{ year_number }}"{% if filters.year == year_number|stringformat:"s" %} selected{% endif %}>
+                                {{ year_number }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+                <div class="club-cashbox-filters__actions">
+                    <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+                    <button type="submit" name="export" value="csv" class="btn btn-sm btn-outline">Выгрузить CSV</button>
+                    <a href="{% url 'clubs:club_cashbox_history' slug=club.slug %}" class="btn btn-sm btn-ghost">Сбросить</a>
+                </div>
+            </form>
+
+            {% if payments %}
+            <div class="club-finance-payments">
+                {% for payment in payments %}
+                <article
+                    class="club-payment-row"
+                    role="button"
+                    tabindex="0"
+                    data-payment-open
+                    data-payment-title="{{ payment.title }}"
+                    data-payment-subtitle="{{ payment.member_name }} · {{ payment.subtitle }}"
+                    data-payment-status="{{ payment.status }}"
+                >
+                    <div class="club-payment-row__main">
+                        <div>
+                            <div class="club-payment-row__title">{{ payment.title }}</div>
+                            <div class="club-payment-row__subtitle">{{ payment.member_name }} · {{ payment.subtitle }}</div>
+                        </div>
+                        <div class="club-payment-row__meta">
+                            <div class="club-payment-row__amount">{{ payment.amount }} {{ payment.currency }}</div>
+                            <div class="club-payment-row__date">{{ payment.paid_at|date:"d.m.Y H:i" }}</div>
+                        </div>
+                    </div>
+                    <div class="club-payment-row__footer">
+                        <div class="club-payment-row__chips">
+                            <span class="club-payment-row__chip">{{ payment.method }}</span>
+                            {% if payment.operation_kind == "tournament" %}
+                            <span class="club-payment-row__chip club-payment-row__chip--subtle">Турнир</span>
+                            {% elif payment.operation_kind == "club_plan" %}
+                            <span class="club-payment-row__chip club-payment-row__chip--subtle">Тариф</span>
+                            {% elif payment.operation_kind == "club_fee" %}
+                            <span class="club-payment-row__chip club-payment-row__chip--subtle">Взнос</span>
+                            {% elif payment.operation_kind == "balance_adjustment" %}
+                            <span class="club-payment-row__chip club-payment-row__chip--subtle">Баланс</span>
+                            {% endif %}
+                        </div>
+                        <span class="club-payment-row__link">Открыть детали</span>
+                    </div>
+                    <div class="club-payment-row__payload" hidden>
+                        {% for label, value in payment.details.items %}
+                        <div class="club-payment-row__detail">
+                            <dt>{{ label }}</dt>
+                            <dd>{{ value }}</dd>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="margin: 0; color: var(--color-text-muted);">Поступлений пока нет.</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<div id="club-payment-detail-modal" class="modal-overlay" style="display:none;" aria-hidden="true">
+    <div class="modal-dialog club-payment-detail-modal" role="dialog" aria-modal="true" aria-labelledby="club-payment-detail-title">
+        <h3 id="club-payment-detail-title" class="modal-dialog__title">Детали платежа</h3>
+        <p class="modal-dialog__text text-secondary" id="club-payment-detail-subtitle"></p>
+        <div class="club-payment-detail-modal__status" id="club-payment-detail-status"></div>
+        <dl class="club-payment-detail-modal__list" id="club-payment-detail-list"></dl>
+        <div class="modal-dialog__actions">
+            <button type="button" class="btn btn-sm btn-outline" data-payment-close>Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('club-payment-detail-modal');
+    if (!modal) {
+        return;
+    }
+
+    const title = document.getElementById('club-payment-detail-title');
+    const subtitle = document.getElementById('club-payment-detail-subtitle');
+    const status = document.getElementById('club-payment-detail-status');
+    const list = document.getElementById('club-payment-detail-list');
+
+    function closeModal() {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    document.querySelectorAll('[data-payment-open]').forEach(function (card) {
+        card.addEventListener('click', function () {
+            title.textContent = card.dataset.paymentTitle || 'Детали платежа';
+            subtitle.textContent = card.dataset.paymentSubtitle || '';
+            status.textContent = card.dataset.paymentStatus || '';
+            list.innerHTML = '';
+            card.querySelectorAll('.club-payment-row__payload .club-payment-row__detail').forEach(function (detail) {
+                list.appendChild(detail.cloneNode(true));
+            });
+            modal.style.display = 'flex';
+            modal.setAttribute('aria-hidden', 'false');
+        });
+
+        card.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                card.click();
+            }
+        });
+    });
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal || event.target.hasAttribute('data-payment-close')) {
+            closeModal();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.style.display !== 'none') {
+            closeModal();
+        }
+    });
+});
+</script>
+{% endblock %}

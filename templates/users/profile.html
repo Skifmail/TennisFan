@@ -226,7 +226,7 @@
                                 {% if fee_status == 'paid' %}
                                 <span class="badge badge-success">Оплачен</span>
                                 {% elif fee_status == 'expiring_soon' %}
-                                <span class="badge badge-warning">Скоро истекает</span>
+                                <span class="badge badge-danger">Не оплачен</span>
                                 {% elif fee_status == 'unpaid' %}
                                 <span class="badge badge-danger">Не оплачен</span>
                                 {% else %}
@@ -236,6 +236,9 @@
                         </div>
                         {% if fee.description %}
                         <p class="subscription-info__section-note">{{ fee.description }}</p>
+                        {% endif %}
+                        {% if fee_status == 'expiring_soon' and fee_expiring_text %}
+                        <p class="subscription-info__section-note">Взнос за текущий период не оплачен. Оплатите до {{ fee_expiring_text|cut:"До " }} включительно.</p>
                         {% endif %}
                         {% if fee_status != 'paid' %}
                         <div class="subscription-info__actions subscription-info__actions--separated">

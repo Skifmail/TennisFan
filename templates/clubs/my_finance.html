@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Финансы — {{ club.name }}{% endblock %}
+
+{% block content %}
+{% include "clubs/_club_player_nav.html" with current="finance" %}
+<section class="club-payments-page club-finance-page">
+    <div class="container club-payments-page__container">
+        <div class="club-payments-page__hero">
+            <div class="club-payments-page__copy">
+                <div class="club-payments-page__eyebrow">Club Finance</div>
+                <h1 class="club-payments-page__title">Финансы</h1>
+                <p class="club-payments-page__subtitle">
+                    Единая страница для клубного тарифа, членского взноса, автосписаний и истории всех платежей по клубу.
+                </p>
+
+                <div class="club-payments-page__status-row">
+                    <span class="club-payments-status {% if member_plan %}club-payments-status--connected{% else %}club-payments-status--idle{% endif %}">
+                        <span class="club-payments-status__dot"></span>
+                        {% if member_plan %}Тариф подключён{% else %}Тариф не подключён{% endif %}
+                    </span>
+                    <span class="club-payments-page__shop">Платежей: {{ payments_total }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="club-payments-grid">
+            <div class="club-finance-stack">
+                <section class="club-payments-card club-payments-card--form">
+                    <div class="club-payments-card__header">
+                        <div>
+                            <div class="club-payments-card__eyebrow">Balance</div>
+                            <h2 class="club-payments-card__title">Баланс игрока</h2>
+                        </div>
+                        <div class="club-payments-card__state club-payments-card__state--ok">{{ member_balance|floatformat:0 }} ₽</div>
+                    </div>
+                </section>
+
+                <section class="club-payments-card club-payments-card--form">
+                    <div class="club-payments-card__header">
+                        <div>
+                            <div class="club-payments-card__eyebrow">Subscription</div>
+                            <h2 class="club-payments-card__title">Тариф клуба</h2>
+                        </div>
+                        {% if member_plan %}
+                        <div class="club-payments-card__state club-payments-card__state--ok">Активен</div>
+                        {% else %}
+                        <div class="club-payments-card__state">Не подключён</div>
+                        {% endif %}
+                    </div>
+
+                    {% if member_plan %}
+                    <div class="club-finance-summary">
+                        <div class="club-finance-summary__item">
+                            <span class="club-finance-summary__label">Тариф</span>
+                            <strong class="club-finance-summary__value">{{ member_plan.plan.name }}</strong>
+                        </div>
+                        <div class="club-finance-summary__item">
+                            <span class="club-finance-summary__label">Стоимость</span>
+                            <strong class="club-finance-summary__value">{{ member_plan.plan.monthly_fee|floatformat:0 }} ₽ / 30 дней</strong>
+                        </div>
+                        <div class="club-finance-summary__item">
+                            <span class="club-finance-summary__label">Действует до</span>
+                            <strong class="club-finance-summary__value">{% if member_plan.ended_at %}{{ member_plan.ended_at|date:"d.m.Y" }}{% else %}Без даты{% endif %}</strong>
+                        </div>
+                        <div class="club-finance-summary__item">
+                            <span class="club-finance-summary__label">Остаток регистраций</span>
+                            <strong class="club-finance-summary__value">
+                                {% if plan_limits %}
+                                    {% if plan_limits.monthly_tournaments_limit %}
+                                        {{ plan_limits.tournaments_left }} из {{ plan_limits.monthly_tournaments_limit }}
+                                    {% else %}
+                                        Безлимит
+                                    {% endif %}
+                                {% else %}
+                                    Не задано
+                                {% endif %}
+                            </strong>
+                        </div>
+                    </div>
+
+                    {% if plan_limits and plan_limits.monthly_tournaments_limit %}
+                    <div class="club-finance-meter">
+                        <div class="club-finance-meter__row">
+                            <span>Использование лимита</span>
+                            <span>{{ plan_limits.tournaments_used }} из {{ plan_limits.monthly_tournaments_limit }}</span>
+                        </div>
+                        <div class="subscription-info__bar">
+                            <div class="subscription-info__bar-fill" data-width-pct="{{ subscription_usage_percent }}"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="club-payments-form__actions">
+                        <a href="{% url 'clubs:my_plan_change' %}" class="btn btn-primary">Сменить тариф</a>
+                        {% if member_plan.ended_at and member_plan.auto_renew %}
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('cancel-club-plan-modal').style.display='flex'">Отключить автопродление</button>
+                        {% elif member_plan.ended_at and club_plan_autopay_card %}
+                        <form method="post" action="{% url 'clubs:my_plan_enable_auto_renew' %}" class="club-payments-form__inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline">Включить автопродление</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="club-payments-check club-payments-check--error">
+                        <span class="club-payments-check__icon">!</span>
+                        <span>У вас нет активного клубного тарифа. Подключите тариф, чтобы использовать лимиты и автопродление.</span>
+                    </div>
+                    <div class="club-payments-form__actions">
+                        <a href="{% url 'clubs:my_plan_change' %}" class="btn btn-primary">Выбрать тариф</a>
+                    </div>
+                    {% endif %}
+                    <div class="club-finance-section">
+                        <div class="club-finance-section__header">
+                            <div>
+                                <div class="club-payments-card__eyebrow">Autopay</div>
+                                <h3 class="club-finance-section__title">Автосписание тарифа</h3>
+                            </div>
+                            <div class="club-payments-card__state {% if club_payment_connected and member_plan and member_plan.auto_renew and club_plan_autopay_card %}club-payments-card__state--ok{% endif %}">
+                                {% if not club_payment_connected and club_plan_autopay_card %}
+                                    YooKassa клуба отключена
+                                {% elif member_plan and member_plan.auto_renew and club_plan_autopay_card %}
+                                    Автопродление включено
+                                {% elif club_plan_autopay_card %}
+                                    Карта сохранена
+                                {% else %}
+                                    Отключено
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        {% if club_plan_autopay_card %}
+                        <div class="subscription-autopay__card">
+                            <div class="subscription-autopay__card-main">
+                                <span class="subscription-autopay__card-brand">{{ club_plan_autopay_card.card_network|default:"Банковская карта" }}</span>
+                                <span class="subscription-autopay__card-pan">**** {{ club_plan_autopay_card.card_last4 }}</span>
+                            </div>
+                            {% if club_plan_autopay_card.card_exp_month and club_plan_autopay_card.card_exp_year %}
+                            <div class="subscription-autopay__card-expiry">Действует до {{ club_plan_autopay_card.card_exp_month }}/{{ club_plan_autopay_card.card_exp_year }}</div>
+                            {% endif %}
+                        </div>
+                        {% if not club_payment_connected %}
+                        <p class="club-payments-form__hint">Карта сохранена, но YooKassa клуба отключена. Автопродление недоступно, пока клуб снова не подключит платёжный мерчант.</p>
+                        {% elif member_plan and member_plan.auto_renew %}
+                        <p class="club-payments-form__hint">Автопродление включено. В день продления клубного тарифа система сначала попробует списать средства с баланса, а затем с сохранённой карты.</p>
+                        {% else %}
+                        <p class="club-payments-form__hint">Карта сохранена, но автопродление сейчас выключено. Автоматическое списание не произойдёт, пока вы снова не включите автопродление.</p>
+                        {% endif %}
+                        <div class="club-payments-form__actions">
+                            <form method="post" action="{% url 'clubs:my_plan_disable_autopay' %}" class="subscription-autopay__form">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger">Отключить автосписание</button>
+                            </form>
+                        </div>
+                        {% else %}
+                        <p class="club-payments-form__hint">Автосписание отключено. Подключите его при следующей оплате тарифа.</p>
+                        {% endif %}
+                    </div>
+                </section>
+
+                {% if fee %}
+                <section class="club-payments-card club-payments-card--form">
+                    <div class="club-payments-card__header">
+                        <div>
+                            <div class="club-payments-card__eyebrow">Membership Fee</div>
+                            <h2 class="club-payments-card__title">Членский взнос</h2>
+                        </div>
+                        <div class="club-payments-card__state {% if fee_status == 'paid' %}club-payments-card__state--ok{% endif %}">
+                            {% if fee_status == 'paid' %}Оплачен{% else %}Не оплачен{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="club-finance-summary club-finance-summary--fee">
+                        <div class="club-finance-summary__item">
+                            <span class="club-finance-summary__label">Сумма</span>
+                            <strong class="club-finance-summary__value">{{ fee.amount|floatformat:0 }} ₽ / {{ fee.get_period_display|lower }}</strong>
+                        </div>
+                    </div>
+                    {% if fee.description %}
+                    <p class="club-payments-form__hint">{{ fee.description }}</p>
+                    {% endif %}
+                    {% if fee_status == 'expiring_soon' and fee_expiring_text %}
+                    <p class="club-payments-form__hint">Взнос за текущий период не оплачен. Оплатите до {{ fee_expiring_text|cut:"До " }} включительно.</p>
+                    {% endif %}
+                    {% if fee_status != 'paid' %}
+                    <div class="club-payments-form__actions">
+                        <a href="{% url 'clubs:my_fee_payment_preview' %}?next={{ request.path|urlencode }}" class="btn btn-primary">Оплатить взнос</a>
+                    </div>
+                    {% endif %}
+                    <div class="club-finance-section">
+                        <div class="club-finance-section__header">
+                            <div>
+                                <div class="club-payments-card__eyebrow">Autopay</div>
+                                <h3 class="club-finance-section__title">Автосписание взноса</h3>
+                            </div>
+                            <div class="club-payments-card__state {% if club_payment_connected and club_fee_autopay_card %}club-payments-card__state--ok{% endif %}">
+                                {% if not club_payment_connected and club_fee_autopay_card %}
+                                    YooKassa клуба отключена
+                                {% elif club_fee_autopay_card %}
+                                    Подключено
+                                {% else %}
+                                    Отключено
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        {% if club_fee_autopay_card %}
+                        <div class="subscription-autopay__card">
+                            <div class="subscription-autopay__card-main">
+                                <span class="subscription-autopay__card-brand">{{ club_fee_autopay_card.card_network|default:"Банковская карта" }}</span>
+                                <span class="subscription-autopay__card-pan">**** {{ club_fee_autopay_card.card_last4 }}</span>
+                            </div>
+                            {% if club_fee_autopay_card.card_exp_month and club_fee_autopay_card.card_exp_year %}
+                            <div class="subscription-autopay__card-expiry">Действует до {{ club_fee_autopay_card.card_exp_month }}/{{ club_fee_autopay_card.card_exp_year }}</div>
+                            {% endif %}
+                        </div>
+                        {% if not club_payment_connected %}
+                        <p class="club-payments-form__hint">Карта сохранена, но YooKassa клуба отключена. Автосписание взноса недоступно, пока клуб не подключит YooKassa снова.</p>
+                        {% else %}
+                        <p class="club-payments-form__hint">Членский взнос будет списываться автоматически в начале нового периода клуба.</p>
+                        {% endif %}
+                        <div class="club-payments-form__actions">
+                            <form method="post" action="{% url 'clubs:my_fee_disable_autopay' %}" class="subscription-autopay__form">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.path }}">
+                                <button type="submit" class="btn btn-danger">Отключить автосписание</button>
+                            </form>
+                        </div>
+                        {% else %}
+                        <p class="club-payments-form__hint">Автосписание взноса отключено. Подключите его при следующей оплате.</p>
+                        {% endif %}
+                    </div>
+                </section>
+                {% endif %}
+            </div>
+
+            <aside class="club-payments-card club-payments-card--ledger">
+                <div class="club-payments-card__header">
+                    <div>
+                        <div class="club-payments-card__eyebrow">Payments</div>
+                        <h2 class="club-payments-card__title">История платежей</h2>
+                    </div>
+                    <a href="{% url 'clubs:my_payments' %}" class="club-dashboard-panel__link">Вся история</a>
+                </div>
+
+                {% if payments %}
+                <div class="club-finance-payments">
+                    {% for payment in payments %}
+                    <article class="club-payment-row" role="button" tabindex="0" data-payment-open data-payment-title="{{ payment.title }}" data-payment-subtitle="{{ payment.subtitle }}" data-payment-status="{{ payment.status }}">
+                        <div class="club-payment-row__main">
+                            <div>
+                                <div class="club-payment-row__title">{{ payment.title }}</div>
+                                <div class="club-payment-row__subtitle">{{ payment.subtitle }}</div>
+                            </div>
+                            <div class="club-payment-row__meta">
+                                <div class="club-payment-row__amount">{{ payment.amount }} {{ payment.currency }}</div>
+                                <div class="club-payment-row__date">{{ payment.paid_at|date:"d.m.Y H:i" }}</div>
+                            </div>
+                        </div>
+                        <div class="club-payment-row__footer">
+                            <span class="club-payment-row__chip">{{ payment.method }}</span>
+                            <span class="club-payment-row__link">Открыть детали</span>
+                        </div>
+                        <div class="club-payment-row__payload" hidden>
+                            {% for label, value in payment.details.items %}
+                            <div class="club-payment-row__detail">
+                                <dt>{{ label }}</dt>
+                                <dd>{{ value }}</dd>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="club-fees-ledger__empty">История платежей пока пуста.</p>
+                {% endif %}
+            </aside>
+        </div>
+    </div>
+</section>
+
+{% if member_plan and member_plan.ended_at and member_plan.auto_renew %}
+<div id="cancel-club-plan-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-dialog">
+        <h3 class="modal-dialog__title">Отменить клубный тариф?</h3>
+        <p class="modal-dialog__text">Вы уверены, что хотите отключить автопродление тарифа «{{ member_plan.plan.name }}»?</p>
+        <p class="modal-dialog__text text-secondary">Доступ сохранится до <strong>{{ member_plan.ended_at|date:"d.m.Y" }}</strong>, после этой даты продление автоматически не произойдёт.</p>
+        <p class="modal-dialog__text text-secondary">Сохранённая карта при этом не удаляется. Её можно использовать позже, если вы снова включите автопродление, либо отключить отдельно в блоке автосписания.</p>
+        <div class="modal-dialog__actions">
+            <form method="post" action="{% url 'clubs:my_plan_cancel' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger">Да, отключить</button>
+            </form>
+            <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('cancel-club-plan-modal').style.display='none'">Не отключать</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div id="club-payment-detail-modal" class="modal-overlay" style="display:none;" aria-hidden="true">
+    <div class="modal-dialog club-payment-detail-modal" role="dialog" aria-modal="true" aria-labelledby="club-payment-detail-title">
+        <h3 id="club-payment-detail-title" class="modal-dialog__title">Детали платежа</h3>
+        <p class="modal-dialog__text text-secondary" id="club-payment-detail-subtitle"></p>
+        <div class="club-payment-detail-modal__status" id="club-payment-detail-status"></div>
+        <dl class="club-payment-detail-modal__list" id="club-payment-detail-list"></dl>
+        <div class="modal-dialog__actions">
+            <button type="button" class="btn btn-sm btn-outline" data-payment-close>Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    document.querySelectorAll('.subscription-info__bar-fill').forEach(function (el) {
+        const pct = parseInt(el.dataset.widthPct || '0', 10);
+        el.style.width = Math.max(0, Math.min(100, pct)) + '%';
+    });
+
+    const modal = document.getElementById('club-payment-detail-modal');
+    const titleEl = document.getElementById('club-payment-detail-title');
+    const subtitleEl = document.getElementById('club-payment-detail-subtitle');
+    const statusEl = document.getElementById('club-payment-detail-status');
+    const listEl = document.getElementById('club-payment-detail-list');
+    if (!modal) {
+        return;
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        listEl.innerHTML = '';
+    }
+
+    document.querySelectorAll('[data-payment-open]').forEach(function (row) {
+        function openModal() {
+            const payload = row.querySelector('.club-payment-row__payload');
+            titleEl.textContent = row.dataset.paymentTitle || 'Детали платежа';
+            subtitleEl.textContent = row.dataset.paymentSubtitle || '';
+            statusEl.textContent = row.dataset.paymentStatus || 'Успешно';
+            listEl.innerHTML = payload ? payload.innerHTML : '';
+            modal.style.display = 'flex';
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        row.addEventListener('click', openModal);
+        row.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openModal();
+            }
+        });
+    });
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal || event.target.hasAttribute('data-payment-close')) {
+            closeModal();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.style.display !== 'none') {
+            closeModal();
+        }
+    });
+})();
+</script>
+{% endblock %}

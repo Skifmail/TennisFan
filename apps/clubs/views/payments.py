@@ -1,3 +1,4 @@
+import csv
 import json
 from decimal import Decimal
 from typing import Any
@@ -5,6 +6,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -13,6 +15,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from apps.payments.models import PaymentRecord, SavedPaymentMethod
 from apps.payments.yookassa_client import (
     create_payment_with_credentials,
     get_payment_details_with_credentials,
@@ -20,6 +23,13 @@ from apps.payments.yookassa_client import (
     test_yookassa_credentials,
 )
 
+from ..finance_services import (
+    calculate_balance_payment_breakdown,
+    cancel_reserved_balance,
+    confirm_reserved_balance,
+    get_member_balance,
+    reserve_member_balance,
+)
 from ..forms import (
     ClubMembershipFeeSettingsForm,
     ClubPaymentSettingsForm,
@@ -30,6 +40,9 @@ from ..models import (
     ClubFeePayment,
     ClubFeePaymentPending,
     ClubMember,
+    ClubMemberBalanceTransaction,
+    ClubMemberPlan,
+    ClubMemberPlanStatus,
     ClubMembershipFee,
     ClubMemberStatus,
     ClubPlayerPlan,
@@ -38,10 +51,16 @@ from ..models import (
 )
 from ..notifications import send_fee_paid_notification
 from ..payment_utils import decrypt_secret, encrypt_secret
-from ..plan_services import purchase_member_plan
+from ..plan_services import (
+    get_member_active_plan,
+    get_member_plan_limits,
+    purchase_member_plan,
+)
 from ..services import (
     club_is_operational,
     get_current_period_label,
+    get_fee_expiring_soon_text,
+    get_fee_status_for_member,
     user_can_manage_fees,
 )
 from .helpers import (
@@ -66,36 +85,58 @@ def my_fees(request: HttpRequest) -> HttpResponse:
             slug=member.club.slug,
             player_id=player.pk,
         )
-    return redirect("clubs:my_plan")
+    return redirect("clubs:my_finance")
 
 
-@login_required
-@require_GET
-def my_payments(request: HttpRequest) -> HttpResponse:
-    """История клубных платежей игрока с деталями по каждому платежу."""
-    member = _get_current_club_member(request)
-    if not member:
-        messages.info(request, "Вы не состоите в клубе.")
-        return redirect("clubs:register_choice")
-
-    from apps.payments.models import PaymentRecord
-
+def _get_member_payment_rows(member: ClubMember) -> list[dict[str, Any]]:
+    """Собирает объединённую историю платежей участника клуба."""
     club_plan_payments = list(
         PaymentRecord.objects.filter(
-            user=request.user,
+            user=member.user,
             payment_type=PaymentRecord.PaymentType.CLUB_PLAN,
             metadata__club_id=member.club_id,
-            status="succeeded",
         ).order_by("-paid_at")
     )
+    club_fee_payment_records = list(
+        PaymentRecord.objects.filter(
+            user=member.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_FEE,
+            metadata__club_id=member.club_id,
+        ).order_by("-paid_at")
+    )
+    recorded_fee_refs = {
+        str(payment.metadata.get("fee_payment_ref") or "").strip()
+        for payment in club_fee_payment_records
+    }
     fee_payments = list(
         ClubFeePayment.objects.filter(member=member)
         .select_related("fee")
+        .exclude(payment_ref__in=recorded_fee_refs)
         .order_by("-paid_at")
     )
+    balance_transactions = list(
+        ClubMemberBalanceTransaction.objects.filter(
+            member=member,
+            status=ClubMemberBalanceTransaction.Status.COMPLETED,
+        ).order_by("-created_at")
+    )
+
+    failure_reason_labels = {
+        "no_club_payment_settings": "Клуб отключил YooKassa или не настроил платёжные реквизиты.",
+        "club_yookassa_disabled": "Клуб отключил YooKassa, поэтому автосписание было выключено.",
+        "secret_decrypt_failed": "Не удалось использовать сохранённые платёжные реквизиты клуба.",
+        "balance_reserve_failed": "Не удалось зарезервировать средства на балансе.",
+    }
 
     payment_rows: list[dict[str, Any]] = []
     for payment in club_plan_payments:
+        balance_amount = str(payment.metadata.get("balance_amount") or "0")
+        external_amount = str(payment.metadata.get("external_amount") or payment.amount)
+        total_amount = str(payment.metadata.get("total_amount") or payment.amount)
+        failure_reason = failure_reason_labels.get(
+            str(payment.metadata.get("failure_reason") or ""),
+            str(payment.metadata.get("failure_reason") or ""),
+        )
         payment_rows.append(
             {
                 "kind": "club_plan",
@@ -106,20 +147,73 @@ def my_payments(request: HttpRequest) -> HttpResponse:
                 "currency": payment.currency or "RUB",
                 "method": ("Автосписание" if payment.is_recurring else "Онлайн-оплата"),
                 "reference": payment.yookassa_payment_id or "Не указан",
-                "status": "Успешно",
+                "status": "Успешно" if payment.status == "succeeded" else "Неуспешно",
                 "details": {
                     "Тип платежа": "Клубный тариф",
                     "Наименование": payment.item_label or "Клубный тариф",
                     "Дата": payment.paid_at.strftime("%d.%m.%Y %H:%M"),
-                    "Сумма": f"{payment.amount} {payment.currency or 'RUB'}",
+                    "Сумма всего": f"{total_amount} {payment.currency or 'RUB'}",
+                    "Списано с баланса": f"{balance_amount} {payment.currency or 'RUB'}",
+                    "Списано с карты": f"{external_amount} {payment.currency or 'RUB'}",
                     "Способ": (
                         "Автосписание" if payment.is_recurring else "Онлайн-оплата"
                     ),
                     "Автосписание включено": (
                         "Да" if payment.autopay_enabled else "Нет"
                     ),
-                    "Статус": "Успешно",
+                    "Статус": (
+                        "Успешно" if payment.status == "succeeded" else "Неуспешно"
+                    ),
                     "ID платежа": payment.yookassa_payment_id or "Не указан",
+                    **(
+                        {"Причина": failure_reason}
+                        if payment.status != "succeeded" and failure_reason
+                        else {}
+                    ),
+                },
+            }
+        )
+
+    for payment in club_fee_payment_records:
+        balance_amount = str(payment.metadata.get("balance_amount") or "0")
+        external_amount = str(payment.metadata.get("external_amount") or payment.amount)
+        total_amount = str(payment.metadata.get("total_amount") or payment.amount)
+        failure_reason = failure_reason_labels.get(
+            str(payment.metadata.get("failure_reason") or ""),
+            str(payment.metadata.get("failure_reason") or ""),
+        )
+        payment_rows.append(
+            {
+                "kind": "club_fee",
+                "paid_at": payment.paid_at,
+                "title": "Членский взнос",
+                "subtitle": str(
+                    payment.metadata.get("period_label") or "Оплата взноса"
+                ),
+                "amount": payment.amount,
+                "currency": payment.currency or "RUB",
+                "method": ("Автосписание" if payment.is_recurring else "Онлайн-оплата"),
+                "reference": payment.yookassa_payment_id or "Не указан",
+                "status": "Успешно" if payment.status == "succeeded" else "Неуспешно",
+                "details": {
+                    "Тип платежа": "Членский взнос",
+                    "Период": str(payment.metadata.get("period_label") or "Не указан"),
+                    "Дата": payment.paid_at.strftime("%d.%m.%Y %H:%M"),
+                    "Сумма всего": f"{total_amount} {payment.currency or 'RUB'}",
+                    "Списано с баланса": f"{balance_amount} {payment.currency or 'RUB'}",
+                    "Списано с карты": f"{external_amount} {payment.currency or 'RUB'}",
+                    "Способ": (
+                        "Автосписание" if payment.is_recurring else "Онлайн-оплата"
+                    ),
+                    "Статус": (
+                        "Успешно" if payment.status == "succeeded" else "Неуспешно"
+                    ),
+                    "ID платежа": payment.yookassa_payment_id or "Не указан",
+                    **(
+                        {"Причина": failure_reason}
+                        if payment.status != "succeeded" and failure_reason
+                        else {}
+                    ),
                 },
             }
         )
@@ -157,15 +251,459 @@ def my_payments(request: HttpRequest) -> HttpResponse:
             }
         )
 
-    payment_rows.sort(key=lambda item: item["paid_at"], reverse=True)
+    for transaction_obj in balance_transactions:
+        is_credit = (
+            transaction_obj.direction == ClubMemberBalanceTransaction.Direction.CREDIT
+        )
+        amount_prefix = "+" if is_credit else "-"
+        payment_rows.append(
+            {
+                "kind": "club_balance",
+                "paid_at": transaction_obj.completed_at or transaction_obj.created_at,
+                "title": "Баланс клуба",
+                "subtitle": transaction_obj.description or "Операция по балансу",
+                "amount": f"{amount_prefix}{transaction_obj.amount}",
+                "currency": "RUB",
+                "method": transaction_obj.get_source_display(),
+                "reference": transaction_obj.reference or "Не указан",
+                "status": ("Зачислено" if is_credit else "Списано"),
+                "details": {
+                    "Тип операции": transaction_obj.get_source_display(),
+                    "Направление": transaction_obj.get_direction_display(),
+                    "Дата": (
+                        (
+                            transaction_obj.completed_at or transaction_obj.created_at
+                        ).strftime("%d.%m.%Y %H:%M")
+                    ),
+                    "Сумма": f"{amount_prefix}{transaction_obj.amount} RUB",
+                    "Описание": transaction_obj.description or "Без описания",
+                    "Статус": transaction_obj.get_status_display(),
+                    "Ссылка": transaction_obj.reference or "Не указана",
+                },
+            }
+        )
 
+    payment_rows.sort(key=lambda item: item["paid_at"], reverse=True)
+    return payment_rows
+
+
+def _get_club_cashbox_rows(club: Club) -> list[dict[str, Any]]:
+    """Собирает общую историю поступлений клуба."""
+    from apps.tournaments.models import Tournament
+
+    tournament_ids = list(
+        Tournament.objects.filter(club=club).values_list("id", flat=True)
+    )
+    records = list(
+        PaymentRecord.objects.filter(
+            status="succeeded",
+            payment_type__in=[
+                PaymentRecord.PaymentType.CLUB_PLAN,
+                PaymentRecord.PaymentType.CLUB_FEE,
+            ],
+            metadata__club_id=club.id,
+        ).order_by("-paid_at")
+    )
+    if tournament_ids:
+        records.extend(
+            list(
+                PaymentRecord.objects.filter(
+                    status="succeeded",
+                    payment_type=PaymentRecord.PaymentType.TOURNAMENT,
+                    item_id__in=[str(item_id) for item_id in tournament_ids],
+                ).order_by("-paid_at")
+            )
+        )
+
+    balance_topups = list(
+        ClubMemberBalanceTransaction.objects.filter(
+            club=club,
+            status=ClubMemberBalanceTransaction.Status.COMPLETED,
+            direction=ClubMemberBalanceTransaction.Direction.CREDIT,
+            source=ClubMemberBalanceTransaction.Source.MANUAL,
+        )
+        .select_related("member__user")
+        .order_by("-completed_at", "-created_at")
+    )
+
+    rows: list[dict[str, Any]] = []
+    for record in records:
+        member_name = getattr(record.user, "get_full_name", lambda: "")() or getattr(
+            record.user, "email", "Не указан"
+        )
+        if record.payment_type == PaymentRecord.PaymentType.CLUB_PLAN:
+            subtitle = "Оплата тарифа клуба"
+            method = "Автосписание" if record.is_recurring else "Онлайн-оплата"
+            details = {
+                "Плательщик": member_name,
+                "Тип": "Тариф клуба",
+                "Основание": record.item_label or record.get_payment_type_display(),
+                "Детали": subtitle,
+                "Сумма": f"{record.amount} {record.currency or 'RUB'}",
+                "Дата": record.paid_at.strftime("%d.%m.%Y %H:%M"),
+                "Способ": method,
+                "ID платежа": record.yookassa_payment_id or "Не указан",
+            }
+        elif record.payment_type == PaymentRecord.PaymentType.CLUB_FEE:
+            subtitle = str(record.metadata.get("period_label") or "Оплата взноса")
+            method = "Автосписание" if record.is_recurring else "Онлайн-оплата"
+            details = {
+                "Плательщик": member_name,
+                "Тип": "Членский взнос",
+                "Основание": record.item_label or record.get_payment_type_display(),
+                "Период": subtitle,
+                "Сумма": f"{record.amount} {record.currency or 'RUB'}",
+                "Дата": record.paid_at.strftime("%d.%m.%Y %H:%M"),
+                "Способ": method,
+                "ID платежа": record.yookassa_payment_id or "Не указан",
+            }
+        else:
+            subtitle = "Оплата турнира"
+            method = "Онлайн-оплата"
+            details = {
+                "Плательщик": member_name,
+                "Тип": "Турнир",
+                "Основание": record.item_label or record.get_payment_type_display(),
+                "Детали": subtitle,
+                "Сумма": f"{record.amount} {record.currency or 'RUB'}",
+                "Дата": record.paid_at.strftime("%d.%m.%Y %H:%M"),
+                "Способ": method,
+                "ID платежа": record.yookassa_payment_id or "Не указан",
+            }
+
+        rows.append(
+            {
+                "paid_at": record.paid_at,
+                "member_name": member_name,
+                "title": record.item_label or record.get_payment_type_display(),
+                "subtitle": subtitle,
+                "amount": record.amount,
+                "currency": record.currency or "RUB",
+                "method": method,
+                "payment_channel": "online",
+                "operation_kind": (
+                    "club_plan"
+                    if record.payment_type == PaymentRecord.PaymentType.CLUB_PLAN
+                    else (
+                        "club_fee"
+                        if record.payment_type == PaymentRecord.PaymentType.CLUB_FEE
+                        else "tournament"
+                    )
+                ),
+                "reference": record.yookassa_payment_id or "Не указан",
+                "status": "Успешно",
+                "details": details,
+            }
+        )
+
+    for transaction in balance_topups:
+        rows.append(
+            {
+                "paid_at": transaction.completed_at or transaction.created_at,
+                "member_name": transaction.member.user.get_full_name()
+                or transaction.member.user.email,
+                "title": "Пополнение баланса клуба",
+                "subtitle": transaction.description or "Ручное пополнение",
+                "amount": transaction.amount,
+                "currency": "RUB",
+                "method": "Ручная операция",
+                "payment_channel": "manual",
+                "operation_kind": "balance_adjustment",
+                "reference": transaction.reference or "Не указана",
+                "status": "Зачислено",
+                "details": {
+                    "Плательщик": transaction.member.user.get_full_name()
+                    or transaction.member.user.email,
+                    "Тип": "Пополнение баланса",
+                    "Основание": "Ручная корректировка",
+                    "Детали": transaction.description or "Ручное пополнение",
+                    "Сумма": f"{transaction.amount} RUB",
+                    "Дата": (
+                        transaction.completed_at or transaction.created_at
+                    ).strftime("%d.%m.%Y %H:%M"),
+                    "Способ": "Ручная операция",
+                    "Ссылка": transaction.reference or "Не указана",
+                },
+            }
+        )
+
+    rows.sort(key=lambda item: item["paid_at"], reverse=True)
+    return rows
+
+
+def _filter_club_cashbox_rows(
+    rows: list[dict[str, Any]],
+    *,
+    source_filter: str,
+    operation_filter: str,
+    month_filter: str,
+    year_filter: str,
+    search_query: str,
+) -> list[dict[str, Any]]:
+    """Фильтрует строки кассы клуба по выбранным параметрам."""
+    filtered_rows = rows
+
+    normalized_query = search_query.strip().casefold()
+    if normalized_query:
+        filtered_rows = [
+            row
+            for row in filtered_rows
+            if normalized_query in str(row.get("member_name") or "").casefold()
+        ]
+
+    if source_filter in {"online", "manual"}:
+        filtered_rows = [
+            row for row in filtered_rows if row.get("payment_channel") == source_filter
+        ]
+
+    if operation_filter in {
+        "balance_adjustment",
+        "club_fee",
+        "club_plan",
+        "tournament",
+    }:
+        filtered_rows = [
+            row
+            for row in filtered_rows
+            if row.get("operation_kind") == operation_filter
+        ]
+
+    if month_filter.isdigit():
+        month_number = int(month_filter)
+        if 1 <= month_number <= 12:
+            filtered_rows = [
+                row for row in filtered_rows if row["paid_at"].month == month_number
+            ]
+
+    if year_filter.isdigit():
+        year_number = int(year_filter)
+        filtered_rows = [
+            row for row in filtered_rows if row["paid_at"].year == year_number
+        ]
+
+    return filtered_rows
+
+
+def _export_club_cashbox_csv(
+    club: Club,
+    rows: list[dict[str, Any]],
+    *,
+    source_filter: str,
+    operation_filter: str,
+    month_filter: str,
+    year_filter: str,
+) -> HttpResponse:
+    """Выгружает отфильтрованную историю кассы клуба в CSV."""
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = (
+        f'attachment; filename="club-cashbox-{club.slug}-{timezone.now():%Y%m%d-%H%M}.csv"'
+    )
+    response.write("\ufeff")
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "Дата",
+            "Игрок",
+            "Категория",
+            "Канал",
+            "Название",
+            "Описание",
+            "Сумма",
+            "Валюта",
+            "Способ",
+            "Статус",
+            "Ссылка",
+        ]
+    )
+
+    operation_labels = {
+        "balance_adjustment": "Ручная корректировка баланса",
+        "club_fee": "Членский взнос",
+        "club_plan": "Тариф клуба",
+        "tournament": "Турнир",
+    }
+    channel_labels = {
+        "manual": "Ручная операция",
+        "online": "Онлайн",
+    }
+
+    for row in rows:
+        writer.writerow(
+            [
+                row["paid_at"].strftime("%d.%m.%Y %H:%M"),
+                row["member_name"],
+                operation_labels.get(str(row.get("operation_kind") or ""), "Операция"),
+                channel_labels.get(str(row.get("payment_channel") or ""), "Не указан"),
+                row["title"],
+                row["subtitle"],
+                row["amount"],
+                row["currency"],
+                row["method"],
+                row["status"],
+                row["reference"],
+            ]
+        )
+
+    return response
+
+
+@login_required
+@require_GET
+def my_finance(request: HttpRequest) -> HttpResponse:
+    """Объединённая страница финансов клуба: тариф, взносы и платежи игрока."""
+    member = _get_current_club_member(request)
+    if not member:
+        messages.info(request, "Вы не состоите в клубе.")
+        return redirect("clubs:register_choice")
+
+    club = member.club
+    payment_connected = _get_club_payment_settings(club) is not None
+    member_plan = get_member_active_plan(member)
+    plan_limits = get_member_plan_limits(member)
+    fee = ClubMembershipFee.objects.filter(club=club).order_by("-id").first()
+    fee_status = get_fee_status_for_member(club, member) if fee else None
+    fee_expiring_text = (
+        get_fee_expiring_soon_text(fee) if fee and fee_status == "expiring_soon" else ""
+    )
+
+    subscription_usage_percent = 0
+    if (
+        plan_limits
+        and plan_limits.monthly_tournaments_limit
+        and plan_limits.monthly_tournaments_limit > 0
+    ):
+        subscription_usage_percent = min(
+            100,
+            int(
+                (plan_limits.tournaments_used / plan_limits.monthly_tournaments_limit)
+                * 100
+            ),
+        )
+
+    club_plan_autopay_card = (
+        SavedPaymentMethod.objects.filter(
+            user=request.user,
+            club=club,
+            is_active=True,
+            is_default_for_club_plans=True,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    club_fee_autopay_card = (
+        SavedPaymentMethod.objects.filter(
+            user=request.user,
+            club=club,
+            is_active=True,
+            is_default_for_club_fees=True,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    payments_all = _get_member_payment_rows(member)
+    member_balance = get_member_balance(member)
+
+    return render(
+        request,
+        "clubs/my_finance.html",
+        {
+            "club": club,
+            "is_club_panel": True,
+            "member_plan": member_plan,
+            "plan_limits": plan_limits,
+            "fee": fee,
+            "fee_status": fee_status,
+            "fee_expiring_text": fee_expiring_text,
+            "subscription_usage_percent": subscription_usage_percent,
+            "club_plan_autopay_card": club_plan_autopay_card,
+            "club_fee_autopay_card": club_fee_autopay_card,
+            "club_payment_connected": payment_connected,
+            "payments": payments_all[:10],
+            "payments_total": len(payments_all),
+            "member_balance": member_balance,
+        },
+    )
+
+
+@login_required
+@require_GET
+def my_payments(request: HttpRequest) -> HttpResponse:
+    """Полная история клубных платежей игрока с пагинацией и деталями."""
+    member = _get_current_club_member(request)
+    if not member:
+        messages.info(request, "Вы не состоите в клубе.")
+        return redirect("clubs:register_choice")
+
+    payments_all = _get_member_payment_rows(member)
+    paginator = Paginator(payments_all, 20)
+    payments_page = paginator.get_page(request.GET.get("page", 1))
     return render(
         request,
         "clubs/my_payments.html",
         {
             "club": member.club,
+            "payments_page": payments_page,
+            "payments_total": len(payments_all),
             "is_club_panel": True,
-            "payments": payment_rows,
+        },
+    )
+
+
+@login_required
+@require_GET
+def club_cashbox_history(request: HttpRequest, slug: str) -> HttpResponse:
+    """Общая история поступлений клуба для раздела «Моя касса»."""
+    club = get_object_or_404(Club, slug=slug)
+    if not user_can_manage_fees(request.user, club):
+        return redirect("clubs:dashboard", slug=slug)
+
+    rows = _get_club_cashbox_rows(club)
+    source_filter = str(request.GET.get("source") or "").strip().lower()
+    operation_filter = str(request.GET.get("operation") or "").strip().lower()
+    month_filter = str(request.GET.get("month") or "").strip()
+    year_filter = str(request.GET.get("year") or "").strip()
+    search_query = str(request.GET.get("q") or "").strip()
+
+    filtered_rows = _filter_club_cashbox_rows(
+        rows,
+        source_filter=source_filter,
+        operation_filter=operation_filter,
+        month_filter=month_filter,
+        year_filter=year_filter,
+        search_query=search_query,
+    )
+
+    if str(request.GET.get("export") or "").strip().lower() == "csv":
+        return _export_club_cashbox_csv(
+            club,
+            filtered_rows,
+            source_filter=source_filter,
+            operation_filter=operation_filter,
+            month_filter=month_filter,
+            year_filter=year_filter,
+        )
+
+    available_years = sorted({row["paid_at"].year for row in rows}, reverse=True)
+    available_months = sorted({row["paid_at"].month for row in rows})
+    return render(
+        request,
+        "clubs/club_cashbox_history.html",
+        {
+            "club": club,
+            "payments": filtered_rows,
+            "payments_total": len(rows),
+            "filtered_total": len(filtered_rows),
+            "filters": {
+                "source": source_filter,
+                "operation": operation_filter,
+                "month": month_filter,
+                "year": year_filter,
+                "q": search_query,
+            },
+            "available_years": available_years,
+            "available_months": available_months,
+            "is_club_panel": True,
         },
     )
 
@@ -184,11 +722,7 @@ def fees_settings(request: HttpRequest, slug: str) -> HttpResponse:
             "Клуб приостановлен. Продлите подписку для возобновления доступа.",
         )
         return redirect("clubs:club_public_detail", slug=slug)
-    fee = (
-        ClubMembershipFee.objects.filter(club=club, is_active=True)
-        .order_by("-id")
-        .first()
-    )
+    fee = ClubMembershipFee.objects.filter(club=club).order_by("-id").first()
     if request.method == "POST":
         form = ClubMembershipFeeSettingsForm(request.POST, instance=fee)
         if form.is_valid():
@@ -202,10 +736,21 @@ def fees_settings(request: HttpRequest, slug: str) -> HttpResponse:
             return redirect("clubs:fees_settings", slug=slug)
     else:
         form = ClubMembershipFeeSettingsForm(instance=fee)
+    recent_payments = (
+        ClubFeePayment.objects.filter(club=club)
+        .select_related("member", "member__user", "fee")
+        .order_by("-paid_at")[:8]
+    )
     return render(
         request,
         "clubs/fees_settings.html",
-        {"club": club, "form": form, "fee": fee, "is_club_panel": True},
+        {
+            "club": club,
+            "form": form,
+            "fee": fee,
+            "recent_payments": recent_payments,
+            "is_club_panel": True,
+        },
     )
 
 
@@ -224,18 +769,123 @@ def payment_settings(request: HttpRequest, slug: str) -> HttpResponse:
         )
         return redirect("clubs:club_public_detail", slug=slug)
 
-    fee = (
-        ClubMembershipFee.objects.filter(club=club, is_active=True)
-        .order_by("-id")
-        .first()
-    ) or ClubMembershipFee.objects.filter(club=club).order_by("-id").first()
+    latest_fee = ClubMembershipFee.objects.filter(club=club).order_by("-id").first()
+    payment_fee = _get_club_payment_settings(club)
+    fee = payment_fee or latest_fee
     connection_test_ok: bool | None = None
     connection_test_message = ""
     if request.method == "POST":
+        action = (request.POST.get("action") or "save").strip()
+        if action == "disconnect":
+            if payment_fee:
+                timestamp = int(timezone.now().timestamp())
+                affected_member_plans = list(
+                    ClubMemberPlan.objects.filter(
+                        club_member__club=club,
+                        status=ClubMemberPlanStatus.ACTIVE,
+                        auto_renew=True,
+                    ).select_related("club_member__user", "club_member__club", "plan")
+                )
+                affected_methods = list(
+                    SavedPaymentMethod.objects.filter(
+                        club=club,
+                        is_active=True,
+                    ).filter(is_default_for_club_plans=True)
+                )
+                affected_methods.extend(
+                    list(
+                        SavedPaymentMethod.objects.filter(
+                            club=club,
+                            is_active=True,
+                            is_default_for_club_fees=True,
+                        ).exclude(pk__in=[method.pk for method in affected_methods])
+                    )
+                )
+
+                for member_plan in affected_member_plans:
+                    PaymentRecord.objects.update_or_create(
+                        user=member_plan.club_member.user,
+                        yookassa_payment_id=(
+                            f"disabled-club-plan-{member_plan.pk}-{timestamp}"
+                        ),
+                        defaults={
+                            "payment_type": PaymentRecord.PaymentType.CLUB_PLAN,
+                            "item_id": str(member_plan.plan_id),
+                            "item_label": (
+                                f"{member_plan.club_member.club.name}: {member_plan.plan.name}"
+                            ),
+                            "amount": member_plan.plan.monthly_fee,
+                            "status": "failed",
+                            "is_recurring": True,
+                            "autopay_enabled": False,
+                            "metadata": {
+                                "club_id": member_plan.club_member.club_id,
+                                "club_member_plan_id": member_plan.pk,
+                                "balance_amount": "0.00",
+                                "external_amount": f"{member_plan.plan.monthly_fee:.2f}",
+                                "total_amount": f"{member_plan.plan.monthly_fee:.2f}",
+                                "failure_reason": "club_yookassa_disabled",
+                            },
+                        },
+                    )
+
+                for method in affected_methods:
+                    had_plan_autopay = method.is_default_for_club_plans
+                    had_fee_autopay = method.is_default_for_club_fees
+                    if had_plan_autopay:
+                        method.deactivate_for_club_plans()
+                    if had_fee_autopay:
+                        method.deactivate_for_club_fees()
+                        PaymentRecord.objects.update_or_create(
+                            user=method.user,
+                            yookassa_payment_id=(
+                                f"disabled-club-fee-{method.user_id}-{method.pk}-{timestamp}"
+                            ),
+                            defaults={
+                                "payment_type": PaymentRecord.PaymentType.CLUB_FEE,
+                                "item_id": str(payment_fee.id),
+                                "item_label": "Членский взнос клуба",
+                                "amount": payment_fee.amount,
+                                "status": "failed",
+                                "is_recurring": True,
+                                "autopay_enabled": False,
+                                "metadata": {
+                                    "club_id": club.id,
+                                    "period_label": "",
+                                    "balance_amount": "0.00",
+                                    "external_amount": f"{payment_fee.amount:.2f}",
+                                    "total_amount": f"{payment_fee.amount:.2f}",
+                                    "failure_reason": "club_yookassa_disabled",
+                                },
+                            },
+                        )
+
+                if affected_member_plans:
+                    ClubMemberPlan.objects.filter(
+                        pk__in=[member_plan.pk for member_plan in affected_member_plans]
+                    ).update(auto_renew=False)
+
+                payment_fee.payment_provider = ""
+                payment_fee.payment_shop_id = ""
+                payment_fee.payment_api_key = ""
+                payment_fee.save(
+                    update_fields=[
+                        "payment_provider",
+                        "payment_shop_id",
+                        "payment_api_key",
+                    ]
+                )
+                messages.success(
+                    request,
+                    "Подключение YooKassa отключено. Ключи удалены, клубные автосписания выключены.",
+                )
+            else:
+                messages.info(request, "У клуба нет сохранённых реквизитов YooKassa.")
+            return redirect("clubs:payment_settings", slug=slug)
+
         form = ClubPaymentSettingsForm(request.POST, instance=fee)
         if form.is_valid():
             new_secret = (form.cleaned_data.get("new_secret_key") or "").strip()
-            action = (request.POST.get("action") or "save").strip()
             target_fee = form.save(commit=False)
             target_fee.club = club
             target_fee.amount = target_fee.amount or Decimal("0")
@@ -244,6 +894,10 @@ def payment_settings(request: HttpRequest, slug: str) -> HttpResponse:
             target_fee.period_start_day = target_fee.period_start_day or 1
 
             if action == "test":
+                shop_id = (
+                    (target_fee.payment_shop_id or "")
+                    or (fee.payment_shop_id if fee else "")
+                ).strip()
                 secret = ""
                 if new_secret:
                     secret = new_secret
@@ -257,16 +911,17 @@ def payment_settings(request: HttpRequest, slug: str) -> HttpResponse:
                         )
                         secret = ""
 
-                if not target_fee.payment_shop_id or not secret:
+                if not shop_id or not secret:
                     connection_test_ok = False
                     connection_test_message = (
                         "Для теста связи укажите Shop ID и Secret Key YooKassa."
                     )
                     messages.error(request, connection_test_message)
                 else:
+                    target_fee.payment_shop_id = shop_id
                     connection_test_ok, connection_test_message = (
                         test_yookassa_credentials(
-                            target_fee.payment_shop_id,
+                            shop_id,
                             secret,
                         )
                     )
@@ -275,6 +930,7 @@ def payment_settings(request: HttpRequest, slug: str) -> HttpResponse:
                     else:
                         messages.error(request, connection_test_message)
                 fee = target_fee
+                form = ClubPaymentSettingsForm(instance=target_fee)
             else:
                 fee = target_fee
                 fee.save()
@@ -286,6 +942,9 @@ def payment_settings(request: HttpRequest, slug: str) -> HttpResponse:
     else:
         form = ClubPaymentSettingsForm(instance=fee)
 
+    persisted_payment_settings = _get_club_payment_settings(club)
+    display_fee = persisted_payment_settings or fee
+
     return render(
         request,
         "clubs/payment_settings.html",
@@ -294,16 +953,17 @@ def payment_settings(request: HttpRequest, slug: str) -> HttpResponse:
             "form": form,
             "fee": fee,
             "is_club_panel": True,
-            "payment_connected": bool(
-                fee
-                and fee.payment_provider == ClubMembershipFee.PaymentProvider.YOOKASSA
-                and fee.payment_shop_id
-                and fee.payment_api_key
-            ),
+            "payment_connected": bool(persisted_payment_settings),
             "masked_shop_id": (
-                f"{fee.payment_shop_id[:3]}***{fee.payment_shop_id[-2:]}"
-                if fee and fee.payment_shop_id and len(fee.payment_shop_id) >= 5
-                else (fee.payment_shop_id if fee and fee.payment_shop_id else "")
+                f"{display_fee.payment_shop_id[:3]}***{display_fee.payment_shop_id[-2:]}"
+                if display_fee
+                and display_fee.payment_shop_id
+                and len(display_fee.payment_shop_id) >= 5
+                else (
+                    display_fee.payment_shop_id
+                    if display_fee and display_fee.payment_shop_id
+                    else ""
+                )
             ),
             "connection_test_ok": connection_test_ok,
             "connection_test_message": connection_test_message,
@@ -392,15 +1052,26 @@ def my_fees_pay(request: HttpRequest) -> HttpResponse:
         .order_by("-id")
         .first()
     )
+    if fee is None:
+        messages.error(request, "Онлайн-оплата взносов не настроена в этом клубе.")
+        return redirect("clubs:my_plan")
+
+    breakdown = calculate_balance_payment_breakdown(member, fee.amount)
     payment_settings = _get_club_payment_settings(club)
-    if not fee or payment_settings is None:
+    if payment_settings is None and breakdown.external_amount_due > 0:
         messages.error(request, "Онлайн-оплата взносов не настроена в этом клубе.")
         return redirect("clubs:my_plan")
 
     next_url = (request.POST.get("next") or "").strip()
+    raw_offer = str(request.POST.get("offer_accepted", "")).strip().lower()
+    if raw_offer not in {"1", "true", "on", "yes"}:
+        messages.error(
+            request,
+            "Для продолжения оплаты необходимо подтвердить согласие с условиями Публичной оферты.",
+        )
+        return redirect("clubs:my_fee_payment_preview")
     raw_autopay = str(request.POST.get("enable_autopay", "")).strip().lower()
     enable_autopay = raw_autopay in {"1", "true", "on", "yes"}
-
     period_label = get_current_period_label(fee)
     if ClubFeePayment.objects.filter(
         member=member,
@@ -416,9 +1087,74 @@ def my_fees_pay(request: HttpRequest) -> HttpResponse:
             return redirect(next_url)
         return redirect("clubs:my_plan")
 
+    balance_transaction = None
+    if breakdown.balance_to_apply > 0:
+        try:
+            balance_transaction = reserve_member_balance(
+                member,
+                breakdown.balance_to_apply,
+                source=ClubMemberBalanceTransaction.Source.CLUB_FEE_PAYMENT,
+                description=f"Оплата членского взноса за период {period_label}",
+                reference=f"club-fee:{fee.id}:{period_label}",
+                metadata={"fee_id": fee.id, "period_label": period_label},
+            )
+        except ValueError:
+            messages.error(
+                request,
+                "Не удалось зарезервировать средства с баланса. Обновите страницу и попробуйте снова.",
+            )
+            return redirect("clubs:my_fee_payment_preview")
+
+    if breakdown.external_amount_due <= 0:
+        from apps.payments.models import PaymentRecord
+
+        confirm_reserved_balance(balance_transaction)
+        ClubFeePayment.objects.create(
+            club=club,
+            member=member,
+            fee=fee,
+            amount=fee.amount,
+            period_label=period_label,
+            paid_at=timezone.now(),
+            method=FeePaymentMethod.BALANCE,
+            payment_ref=f"balance:{fee.id}:{period_label}",
+        )
+        PaymentRecord.objects.create(
+            user=request.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_FEE,
+            item_id=str(fee.id),
+            item_label="Членский взнос клуба",
+            amount=fee.amount,
+            status="succeeded",
+            is_recurring=False,
+            autopay_enabled=False,
+            yookassa_payment_id=(
+                f"balance-club-fee-{member.id}-{int(timezone.now().timestamp())}"
+            ),
+            metadata={
+                "club_id": club.id,
+                "club_slug": club.slug,
+                "period_label": period_label,
+                "balance_amount": f"{fee.amount:.2f}",
+                "external_amount": "0.00",
+                "total_amount": f"{fee.amount:.2f}",
+                "fee_payment_ref": f"balance:{fee.id}:{period_label}",
+            },
+        )
+        messages.success(request, "Членский взнос успешно оплачен с баланса!")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(next_url)
+        return redirect("clubs:my_finance")
+
+    assert payment_settings is not None
     try:
         secret = decrypt_secret(payment_settings.payment_api_key)
     except Exception as exc:
+        cancel_reserved_balance(balance_transaction)
         logger.warning("Не удалось расшифровать секретный ключ клуба: %s", exc)
         messages.error(
             request,
@@ -426,7 +1162,7 @@ def my_fees_pay(request: HttpRequest) -> HttpResponse:
         )
         return redirect("clubs:my_plan")
 
-    amount_str = f"{fee.amount:.2f}"
+    amount_str = f"{breakdown.external_amount_due:.2f}"
     description = f"Членский взнос {club.name}, {period_label}"
     return_url = request.build_absolute_uri(reverse("clubs:my_fees_return"))
     metadata = {
@@ -451,6 +1187,7 @@ def my_fees_pay(request: HttpRequest) -> HttpResponse:
             save_payment_method=enable_autopay,
         )
     except (ValueError, RuntimeError) as exc:
+        cancel_reserved_balance(balance_transaction)
         logger.warning("Ошибка создания платежа взноса: %s", exc)
         messages.error(request, "Не удалось создать платёж. Проверьте настройки клуба.")
         if next_url and url_has_allowed_host_and_scheme(
@@ -474,6 +1211,9 @@ def my_fees_pay(request: HttpRequest) -> HttpResponse:
         "club_slug": club.slug,
         "enable_autopay": "1" if enable_autopay else "",
         "next": next_url,
+        "balance_transaction_id": balance_transaction.id if balance_transaction else "",
+        "balance_amount": f"{breakdown.balance_to_apply:.2f}",
+        "total_amount": f"{fee.amount:.2f}",
     }
     request.session.modified = True
     return redirect(confirmation_url)
@@ -493,8 +1233,13 @@ def my_fee_payment_preview(request: HttpRequest) -> HttpResponse:
         .order_by("-id")
         .first()
     )
+    if fee is None:
+        messages.error(request, "Онлайн-оплата взносов не настроена в этом клубе.")
+        return redirect("clubs:my_plan")
+
+    breakdown = calculate_balance_payment_breakdown(member, fee.amount)
     payment_settings = _get_club_payment_settings(member.club)
-    if not fee or payment_settings is None:
+    if payment_settings is None and breakdown.external_amount_due > 0:
         messages.error(request, "Онлайн-оплата взносов не настроена в этом клубе.")
         return redirect("clubs:my_plan")
 
@@ -522,6 +1267,10 @@ def my_fee_payment_preview(request: HttpRequest) -> HttpResponse:
     ]
     if fee.description:
         details.append(("Комментарий клуба", fee.description))
+    if breakdown.balance_to_apply > 0:
+        details.append(("Спишется с баланса", f"{breakdown.balance_to_apply} ₽"))
+    if breakdown.external_amount_due > 0 and breakdown.balance_to_apply > 0:
+        details.append(("Доплата онлайн", f"{breakdown.external_amount_due} ₽"))
 
     return render(
         request,
@@ -540,6 +1289,9 @@ def my_fee_payment_preview(request: HttpRequest) -> HttpResponse:
             "details": details,
             "process_url": reverse("clubs:my_fees_pay"),
             "payment_type": "club_fee",
+            "balance_available": breakdown.balance_available,
+            "balance_to_apply": breakdown.balance_to_apply,
+            "external_amount_due": breakdown.external_amount_due,
         },
     )
 
@@ -549,6 +1301,14 @@ def my_fee_payment_preview(request: HttpRequest) -> HttpResponse:
 def my_fees_return(request: HttpRequest) -> HttpResponse:
     """Return URL после оплаты членского взноса игроком."""
     session_pending = request.session.get("club_fee_payment_pending") or {}
+    balance_transaction_id = int(
+        str(session_pending.get("balance_transaction_id") or "0") or 0
+    )
+    balance_transaction = (
+        ClubMemberBalanceTransaction.objects.filter(pk=balance_transaction_id).first()
+        if balance_transaction_id
+        else None
+    )
     payment_id = str(
         session_pending.get("payment_id")
         or request.GET.get("payment_id")
@@ -563,6 +1323,7 @@ def my_fees_return(request: HttpRequest) -> HttpResponse:
     pending = ClubFeePaymentPending.objects.filter(payment_id=payment_id).first()
     if not pending:
         messages.warning(request, "Платёж не найден или уже обработан.")
+        cancel_reserved_balance(balance_transaction)
         request.session.pop("club_fee_payment_pending", None)
         request.session.modified = True
         return redirect("clubs:my_plan")
@@ -570,6 +1331,7 @@ def my_fees_return(request: HttpRequest) -> HttpResponse:
     member = _get_current_club_member(request)
     if not member or member.id != pending.member_id:
         messages.error(request, "Клуб не найден.")
+        cancel_reserved_balance(balance_transaction)
         request.session.pop("club_fee_payment_pending", None)
         request.session.modified = True
         return redirect("clubs:register_choice")
@@ -577,6 +1339,7 @@ def my_fees_return(request: HttpRequest) -> HttpResponse:
     payment_settings = _get_club_payment_settings(pending.club)
     if payment_settings is None:
         messages.error(request, "Платёжные реквизиты клуба не настроены.")
+        cancel_reserved_balance(balance_transaction)
         request.session.pop("club_fee_payment_pending", None)
         request.session.modified = True
         return redirect("clubs:my_plan")
@@ -586,6 +1349,7 @@ def my_fees_return(request: HttpRequest) -> HttpResponse:
     except Exception as exc:
         logger.warning("Не удалось расшифровать секретный ключ при return: %s", exc)
         messages.error(request, "Ошибка проверки платежа.")
+        cancel_reserved_balance(balance_transaction)
         request.session.pop("club_fee_payment_pending", None)
         request.session.modified = True
         return redirect("clubs:my_plan")
@@ -596,12 +1360,14 @@ def my_fees_return(request: HttpRequest) -> HttpResponse:
         secret,
     )
     if status != "succeeded":
+        cancel_reserved_balance(balance_transaction)
         messages.error(request, "Оплата не прошла. Попробуйте снова.")
         pending.delete()
         request.session.pop("club_fee_payment_pending", None)
         request.session.modified = True
         return redirect("clubs:my_plan")
 
+    confirm_reserved_balance(balance_transaction)
     if not ClubFeePayment.objects.filter(payment_ref=payment_id).exists():
         ClubFeePayment.objects.create(
             club=pending.club,
@@ -667,6 +1433,36 @@ def my_fees_return(request: HttpRequest) -> HttpResponse:
                         "is_default_for_club_fees": True,
                     },
                 )
+
+    from apps.payments.models import PaymentRecord
+
+    PaymentRecord.objects.update_or_create(
+        user=request.user,
+        yookassa_payment_id=payment_id,
+        defaults={
+            "payment_type": PaymentRecord.PaymentType.CLUB_FEE,
+            "item_id": str(pending.fee_id),
+            "item_label": "Членский взнос клуба",
+            "amount": pending.amount,
+            "status": "succeeded",
+            "is_recurring": False,
+            "autopay_enabled": enable_autopay,
+            "metadata": {
+                "club_id": pending.club_id,
+                "club_slug": pending.club.slug,
+                "period_label": pending.period_label,
+                "balance_amount": str(session_pending.get("balance_amount", "") or "0"),
+                "external_amount": str(
+                    pending.amount
+                    - Decimal(str(session_pending.get("balance_amount", "0") or "0"))
+                ),
+                "total_amount": str(
+                    session_pending.get("total_amount", "") or pending.amount
+                ),
+                "fee_payment_ref": payment_id,
+            },
+        },
+    )
 
     pending.delete()
     request.session.pop("club_fee_payment_pending", None)
@@ -743,9 +1539,6 @@ def _process_club_fee_webhook(
         )
         return
 
-    if ClubFeePayment.objects.filter(payment_ref=payment_id).exists():
-        return
-
     try:
         fee = ClubMembershipFee.objects.get(id=int(str(fee_id)), club=club)
         member = ClubMember.objects.get(id=int(str(member_id)), club=club)
@@ -759,27 +1552,58 @@ def _process_club_fee_webhook(
 
     amount_obj = payment_obj.get("amount") or {}
     amount_value = amount_obj.get("value", "0")
+    is_recurring = str(metadata.get("autopay") or "").strip() == "1"
     enable_autopay = str(metadata.get("enable_autopay") or "").strip() == "1"
+    autopay_enabled = enable_autopay or is_recurring
     try:
         amount = Decimal(str(amount_value))
     except Exception:
         amount = fee.amount
 
-    ClubFeePayment.objects.create(
-        club=club,
-        member=member,
-        fee=fee,
-        amount=amount,
-        period_label=str(period_label),
-        paid_at=timezone.now(),
-        method=FeePaymentMethod.ONLINE,
-        payment_ref=payment_id,
+    fee_payment_created = False
+    if not ClubFeePayment.objects.filter(payment_ref=payment_id).exists():
+        ClubFeePayment.objects.create(
+            club=club,
+            member=member,
+            fee=fee,
+            amount=amount,
+            period_label=str(period_label),
+            paid_at=timezone.now(),
+            method=FeePaymentMethod.ONLINE,
+            payment_ref=payment_id,
+        )
+        fee_payment_created = True
+        logger.info("Webhook: создан ClubFeePayment для payment_id=%s", payment_id)
+
+    existing_record = PaymentRecord.objects.filter(
+        user=member.user,
+        yookassa_payment_id=payment_id,
+    ).first()
+    record_metadata = dict(existing_record.metadata if existing_record else {})
+    record_metadata.update(
+        {
+            "club_id": club.id,
+            "club_slug": club.slug,
+            "period_label": str(period_label),
+            "fee_payment_ref": payment_id,
+        }
     )
-    logger.info("Webhook: создан ClubFeePayment для payment_id=%s", payment_id)
+    PaymentRecord.objects.update_or_create(
+        user=member.user,
+        yookassa_payment_id=payment_id,
+        defaults={
+            "payment_type": PaymentRecord.PaymentType.CLUB_FEE,
+            "item_id": str(fee.id),
+            "item_label": "Членский взнос клуба",
+            "amount": amount,
+            "status": "succeeded",
+            "is_recurring": is_recurring,
+            "autopay_enabled": autopay_enabled,
+            "metadata": record_metadata,
+        },
+    )
 
     if enable_autopay:
-        from apps.payments.models import SavedPaymentMethod
-
         payment_method = payment_obj.get("payment_method") or {}
         payment_method_id = payment_method.get("id")
         if isinstance(payment_method_id, str) and payment_method_id:
@@ -814,13 +1638,14 @@ def _process_club_fee_webhook(
                 },
             )
 
-    try:
-        send_fee_paid_notification(club, member, amount, str(period_label))
-    except Exception:
-        logger.exception(
-            "Webhook: ошибка уведомления об оплате взноса payment_id=%s",
-            payment_id,
-        )
+    if fee_payment_created:
+        try:
+            send_fee_paid_notification(club, member, amount, str(period_label))
+        except Exception:
+            logger.exception(
+                "Webhook: ошибка уведомления об оплате взноса payment_id=%s",
+                payment_id,
+            )
 
 
 def _process_club_plan_webhook(
@@ -832,7 +1657,9 @@ def _process_club_plan_webhook(
     """Обрабатывает успешную оплату клубного тарифа игрока."""
     plan_id = metadata.get("club_plan_id")
     user_id = metadata.get("user_id")
+    is_recurring = str(metadata.get("autopay") or "").strip() == "1"
     enable_autopay = str(metadata.get("enable_autopay") or "").strip() == "1"
+    autopay_enabled = enable_autopay or is_recurring
 
     if not all([plan_id, user_id]):
         logger.warning(
@@ -846,7 +1673,14 @@ def _process_club_plan_webhook(
     from apps.payments.models import PaymentRecord, SavedPaymentMethod
     from apps.users.models import User
 
-    if PaymentRecord.objects.filter(yookassa_payment_id=payment_id).exists():
+    existing_payment_record = PaymentRecord.objects.filter(
+        user_id=user_id,
+        yookassa_payment_id=payment_id,
+    ).first()
+    if (
+        existing_payment_record is not None
+        and existing_payment_record.status == "succeeded"
+    ):
         return
 
     try:
@@ -907,14 +1741,18 @@ def _process_club_plan_webhook(
         user=user,
         yookassa_payment_id=payment_id,
         defaults={
-            "payment_type": "club_plan",
+            "payment_type": PaymentRecord.PaymentType.CLUB_PLAN,
             "item_id": str(plan.id),
             "item_label": f"{club.name}: {plan.name}",
             "amount": plan.monthly_fee,
             "status": "succeeded",
-            "is_recurring": False,
-            "autopay_enabled": enable_autopay,
-            "metadata": {"club_id": club.id, "club_slug": club.slug},
+            "is_recurring": is_recurring,
+            "autopay_enabled": autopay_enabled,
+            "metadata": {
+                **(existing_payment_record.metadata if existing_payment_record else {}),
+                "club_id": club.id,
+                "club_slug": club.slug,
+            },
         },
     )
 
@@ -940,7 +1778,7 @@ def _process_club_plan_webhook(
         plan,
         assigned_by=user,
         change_reason="Оплата клубного тарифа участником (webhook)",
-        auto_renew=enable_autopay,
+        auto_renew=autopay_enabled,
     )
     logger.info("Webhook: активирован клубный тариф для payment_id=%s", payment_id)
 
@@ -1009,19 +1847,25 @@ def club_payment_webhook(request: HttpRequest) -> HttpResponse:
         resolved_metadata.get("payment_type") or payment_type or ""
     ).strip()
 
-    if resolved_type == "club_plan":
+    if resolved_type == PaymentRecord.PaymentType.CLUB_PLAN:
         _process_club_plan_webhook(
             payment_id,
             payment_details,
             club,
             resolved_metadata,
         )
-    else:
+    elif resolved_type == PaymentRecord.PaymentType.CLUB_FEE:
         _process_club_fee_webhook(
             payment_id,
             payment_details,
             club,
             resolved_metadata,
+        )
+    else:
+        logger.warning(
+            "Webhook: неподдерживаемый тип клубного платежа %s для payment_id=%s",
+            resolved_type,
+            payment_id,
         )
 
     return JsonResponse({"status": "ok"}, status=200)

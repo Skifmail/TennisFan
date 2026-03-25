@@ -177,6 +177,7 @@ class PaymentRecord(models.Model):
 
         SUBSCRIPTION = "subscription", "Подписка"
         CLUB_PLAN = "club_plan", "Тариф клуба"
+        CLUB_FEE = "club_fee", "Членский взнос клуба"
         TOURNAMENT = "tournament", "Турнир"
         DONATION = "donation", "Донат"
 

@@ -6,6 +6,7 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
@@ -24,6 +25,13 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _visible_coaches():
+    """Возвращает тренеров, доступных в публичном разделе."""
+    return Coach.objects.filter(
+        Q(is_active=True) | Q(trainings__is_active=True)
+    ).distinct()
 
 
 def training_list(request):
@@ -111,7 +119,7 @@ def coach_list(request):
     """List of coaches. Только для авторизованных пользователей."""
     city = request.GET.get("city", "")
 
-    coaches = Coach.objects.filter(is_active=True)
+    coaches = _visible_coaches()
     if city:
         coaches = coaches.filter(city__icontains=city)
 
@@ -167,7 +175,7 @@ def coach_application_success(request):
 )
 def coach_detail(request, slug):
     """Coach detail page. Только для авторизованных пользователей."""
-    coach = get_object_or_404(Coach, slug=slug, is_active=True)
+    coach = get_object_or_404(_visible_coaches(), slug=slug)
     trainings = coach.trainings.filter(is_active=True)
     return render(
         request, "training/coach_detail.html", {"coach": coach, "trainings": trainings}

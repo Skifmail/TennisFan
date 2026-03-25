@@ -378,6 +378,28 @@ def get_current_period_label(fee: ClubMembershipFee) -> str:
     return cast(str, label)
 
 
+def get_fee_period_end_date(fee: ClubMembershipFee) -> date:
+    """Возвращает дату окончания текущего календарного периода взноса."""
+    today = timezone.now().date()
+    if fee.period == FeePeriod.MONTHLY:
+        _, last_day = monthrange(today.year, today.month)
+        return date(today.year, today.month, last_day)
+    if fee.period == FeePeriod.QUARTERLY:
+        quarter_last_month = ((today.month - 1) // 3 + 1) * 3
+        _, last_day = monthrange(today.year, quarter_last_month)
+        return date(today.year, quarter_last_month, last_day)
+    if fee.period == FeePeriod.YEARLY:
+        return date(today.year, 12, 31)
+    _, last_day = monthrange(today.year, today.month)
+    return date(today.year, today.month, last_day)
+
+
+def get_fee_expiring_soon_text(fee: ClubMembershipFee) -> str:
+    """Возвращает понятную подпись о сроке окончания текущего периода взноса."""
+    end_date = get_fee_period_end_date(fee)
+    return f"До {end_date.strftime('%d.%m.%Y')}"
+
+
 def get_fee_status_for_member(club: Club, member: ClubMember) -> str | None:
     """
     Статус взноса для участника: 'paid' | 'unpaid' | 'expiring_soon' | None.
@@ -396,16 +418,10 @@ def get_fee_status_for_member(club: Club, member: ClubMember) -> str | None:
     ).exists():
         return "paid"
     today = timezone.now().date()
-    if fee.period == FeePeriod.MONTHLY:
-        _, last_day = monthrange(today.year, today.month)
-        days_left = last_day - today.day
-        if 0 <= days_left <= FEE_EXPIRING_DAYS:
-            return "expiring_soon"
-    if fee.period == FeePeriod.YEARLY:
-        ye = date(today.year, 12, 31)
-        days_left = (ye - today).days
-        if 0 <= days_left <= FEE_EXPIRING_DAYS:
-            return "expiring_soon"
+    end_date = get_fee_period_end_date(fee)
+    days_left = (end_date - today).days
+    if 0 <= days_left <= FEE_EXPIRING_DAYS:
+        return "expiring_soon"
     return "unpaid"
 
 

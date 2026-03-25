@@ -5,14 +5,10 @@
 
 <section class="club-payments-page">
     <div class="container club-payments-page__container">
-        <div class="club-payments-page__hero">
+        <div class="club-payments-page__hero club-payments-page__hero--split">
             <div class="club-payments-page__copy">
                 <div class="club-payments-page__eyebrow">YooKassa Integration</div>
                 <h1 class="club-payments-page__title">Платежи клуба</h1>
-                <p class="club-payments-page__subtitle">
-                    {{ club.name }} принимает оплату клубных тарифов и членских взносов
-                    напрямую на свой расчётный счёт через собственную YooKassa.
-                </p>
 
                 <div class="club-payments-page__status-row">
                     <span class="club-payments-status {% if payment_connected %}club-payments-status--connected{% else %}club-payments-status--idle{% endif %}">
@@ -25,10 +21,18 @@
                 </div>
 
                 <div class="club-payments-page__links">
-                    <a href="{% url 'clubs:fees_settings' slug=club.slug %}" class="btn btn-ghost btn-sm">Настройка взносов</a>
-                    <a href="{% url 'clubs:fees_payments' slug=club.slug %}" class="btn btn-ghost btn-sm">История оплат</a>
+                    <a href="{% url 'clubs:club_cashbox_history' slug=club.slug %}" class="btn btn-outline btn-sm">История оплат</a>
                 </div>
             </div>
+            <aside class="club-payments-page__help">
+                <div class="club-payments-page__eyebrow">Как подключить</div>
+                <h2 class="club-payments-page__help-title">Подключение YooKassa за 3 шага</h2>
+                <ol class="club-payments-page__help-list">
+                    <li>Скопируйте URL уведомлений ниже и добавьте его в кабинете YooKassa клуба.</li>
+                    <li>Вставьте Shop ID и Secret Key в форму подключения.</li>
+                    <li>Нажмите <strong>Проверить связь с YooKassa</strong>, затем сохраните подключение.</li>
+                </ol>
+            </aside>
         </div>
 
         <div class="club-payments-grid club-payments-grid--single">
@@ -91,10 +95,39 @@
                         <button type="submit" name="action" value="save" class="btn btn-primary">
                             Сохранить подключение
                         </button>
+                        {% if payment_connected %}
+                        <button type="button" class="btn btn-outline btn-danger-text" onclick="document.getElementById('club-yookassa-disconnect-modal').style.display='flex'">
+                            Отключить YooKassa
+                        </button>
+                        {% endif %}
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </section>
+{% if payment_connected %}
+<div id="club-yookassa-disconnect-modal" class="modal-overlay club-confirm-modal" style="display:none;" aria-hidden="true">
+    <div class="modal-dialog club-confirm-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="club-yookassa-disconnect-title" aria-describedby="club-yookassa-disconnect-text">
+        <div class="club-confirm-modal__eyebrow">Подтверждение</div>
+        <h3 id="club-yookassa-disconnect-title" class="modal-dialog__title club-confirm-modal__title">Отключить YooKassa?</h3>
+        <p id="club-yookassa-disconnect-text" class="modal-dialog__text club-confirm-modal__text">
+            Подключение YooKassa клуба будет удалено: Shop ID и Secret Key очистятся, а онлайн-оплата тарифов и взносов перестанет работать.
+        </p>
+        <div class="club-confirm-modal__note">
+            <span class="club-confirm-modal__note-icon">!</span>
+            <span>Это действие можно отменить только повторным вводом реквизитов и новым сохранением подключения.</span>
+        </div>
+        <div class="modal-dialog__actions club-confirm-modal__actions">
+            <button type="button" class="btn btn-sm club-confirm-modal__btn club-confirm-modal__btn--secondary" onclick="document.getElementById('club-yookassa-disconnect-modal').style.display='none'">Не отключать</button>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" name="action" value="disconnect" class="btn btn-sm btn-danger club-confirm-modal__btn club-confirm-modal__btn--primary">
+                    Отключить YooKassa
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

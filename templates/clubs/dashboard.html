@@ -87,7 +87,7 @@
                     <h2 class="club-dashboard-panel__title">Доходы и взносы</h2>
                 </div>
                 {% if can_manage_fees %}
-                <a href="{% url 'clubs:fees_payments' slug=club.slug %}" class="club-dashboard-panel__link">Все платежи</a>
+                <a href="{% url 'clubs:club_cashbox_history' slug=club.slug %}" class="club-dashboard-panel__link">Все платежи</a>
                 {% endif %}
             </div>
             <p class="club-dashboard-finance__summary">{{ finance_summary }}</p>

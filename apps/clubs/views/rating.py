@@ -21,6 +21,30 @@ from .helpers import (
 )
 
 
+def _to_float(value: Any) -> float:
+    """Безопасно приводит значение к float."""
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _to_percent(value: float, total: float) -> int:
+    """Возвращает долю в процентах в диапазоне от 0 до 100."""
+    if total <= 0:
+        return 0
+    percent = round((value / total) * 100)
+    return max(0, min(100, percent))
+
+
+def _level_to_percent(level: Any) -> int:
+    """Преобразует уровень NTRP в процент заполнения шкалы."""
+    level_value = _to_float(level)
+    if level_value <= 0:
+        return 0
+    return max(0, min(100, round(((level_value - 1.5) / 5.5) * 100)))
+
+
 def _build_last_club_match_map(
     club: Club,
     player_ids: set[int],
@@ -101,13 +125,40 @@ def _enrich_club_ratings(
         if player is not None:
             player_ids.add(player.pk)
     last_match_by_player = _build_last_club_match_map(club, player_ids)
+    leader_points = max((rating.points for rating in ratings), default=0)
+    max_fan_rating = max(
+        (
+            _to_float(
+                getattr(getattr(rating.member.user, "player", None), "total_points", 0)
+            )
+            for rating in ratings
+        ),
+        default=0.0,
+    )
 
     for index, rating in enumerate(ratings, 1):
         rating.display_rank = index
         player = getattr(rating.member.user, "player", None)
         rating.last_club_match = None
+        rating.points_gap = max(leader_points - rating.points, 0)
+        rating.club_points_percent = _to_percent(
+            float(rating.points), float(leader_points)
+        )
+        rating.has_leader_reference = leader_points > 0
+        rating.is_leader = leader_points > 0 and rating.points == leader_points
+        rating.level_percent = 0
+        rating.fan_rating_percent = 0
+        rating.matches_played = 0
+        rating.win_rate = 0.0
         if player is None:
             continue
+        rating.level_percent = _level_to_percent(getattr(player, "ntrp_level", None))
+        rating.fan_rating_percent = _to_percent(
+            _to_float(getattr(player, "total_points", 0)),
+            max_fan_rating,
+        )
+        rating.matches_played = getattr(player, "matches_played", 0) or 0
+        rating.win_rate = getattr(player, "win_rate", 0.0) or 0.0
         match = last_match_by_player.get(player.pk)
         if match is None:
             continue
@@ -125,11 +176,35 @@ def _enrich_club_ratings(
         opponent = (
             match.get_player2_display() if on_side1 else match.get_player1_display()
         )
+        result_code = "—"
+        result_text = "Без результата"
+        result_kind = "neutral"
+        if match.winner_team_id and match.team1_id and match.team2_id:
+            player_won = match.winner_team_id == (
+                match.team1_id if on_side1 else match.team2_id
+            )
+        elif match.winner_id and match.player1_id and match.player2_id:
+            player_won = match.winner_id == (
+                match.player1_id if on_side1 else match.player2_id
+            )
+        else:
+            player_won = None
+        if player_won is True:
+            result_code = "W"
+            result_text = "Победа"
+            result_kind = "up"
+        elif player_won is False:
+            result_code = "L"
+            result_text = "Поражение"
+            result_kind = "down"
         rating.last_club_match = {
             "date": getattr(match, "effective_date", None),
             "opponent": opponent,
             "tournament_name": match.tournament.name if match.tournament_id else "",
             "score": match.score_display,
+            "result_code": result_code,
+            "result_text": result_text,
+            "result_kind": result_kind,
             "url": (
                 reverse("tournament_detail", kwargs={"slug": match.tournament.slug})
                 if match.tournament_id

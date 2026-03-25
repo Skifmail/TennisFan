@@ -2,19 +2,25 @@
 Тесты для FAN- и олимпийской систем (продвижение победителей, bye).
 """
 
-from datetime import date
+from datetime import date, timedelta
+from typing import cast
+from urllib.parse import urlencode
 
-from django.test import Client, TestCase
+from django.conf import settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.clubs.models import (
     Club,
     ClubMember,
+    ClubMemberPlan,
     ClubMemberRole,
     ClubMemberStatus,
     ClubPlayerPlan,
 )
 from apps.clubs.plan_services import assign_member_plan
+from apps.subscriptions.models import SubscriptionTier, UserSubscription
 from apps.tournaments.fan import _bracket_r1_count, _expected_final_round
 from apps.tournaments.fan import generate_bracket as fan_generate_bracket
 from apps.tournaments.models import Match, Tournament, TournamentStatus
@@ -1070,6 +1076,14 @@ class MatchDetailPlayerActionsTestCase(TestCase):
         self.assertContains(response, "Отправить на подтверждение")
 
 
+@override_settings(
+    STORAGES={
+        **settings.STORAGES,
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+        },
+    }
+)
 class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
     def setUp(self) -> None:
         self.client = Client()
@@ -1109,22 +1123,79 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
         assign_member_plan(self.member, self.plan)
         self.client.force_login(self.user)
 
-    def test_member_can_register_for_multiday_club_tournament_without_global_subscription(
+    def _create_club_tournament(
         self,
-    ) -> None:
+        *,
+        slug: str,
+        entry_fee: int = 0,
+        is_one_day: bool = False,
+        variant: str = "singles",
+    ) -> Tournament:
         tournament = Tournament.objects.create(
-            name="Клубный многодневный",
-            slug="club-multiday-no-global-sub",
+            name=f"Турнир {slug}",
+            slug=slug,
             city="Москва",
             club=self.club,
             start_date=date.today(),
             format="round_robin",
             status=TournamentStatus.UPCOMING,
             gender="open",
-            is_one_day=False,
-            entry_fee=0,
+            is_one_day=is_one_day,
+            entry_fee=entry_fee,
+            variant=variant,
         )
         tournament.allowed_categories.create(category="amateur")
+        return cast(Tournament, tournament)
+
+    def _clear_member_plan(self) -> None:
+        ClubMemberPlan.objects.filter(club_member=self.member).delete()
+
+    def _create_global_subscription(self, *, slots: int = 5) -> None:
+        tier = SubscriptionTier.objects.create(
+            name="club-test-tier",
+            display_name="Club Test Tier",
+            price=990,
+            max_tournaments=slots,
+            duration_days=30,
+            is_visible=True,
+        )
+        UserSubscription.objects.create(
+            user=self.user,
+            tier=tier,
+            start_date=timezone.now(),
+            end_date=timezone.now() + timedelta(days=30),
+            is_active=True,
+            tournament_registration_balance=slots,
+        )
+
+    def _assert_tournament_payment_redirect(
+        self,
+        response,
+        tournament: Tournament,
+        *,
+        next_url: str = "",
+    ) -> None:
+        params: dict[str, str | int] = {
+            "type": "tournament",
+            "id": tournament.id,
+        }
+        if next_url:
+            params["next"] = next_url
+        expected_url = f"{reverse('payment_preview')}?{urlencode(params)}"
+        self.assertRedirects(
+            response,
+            expected_url,
+            fetch_redirect_response=False,
+        )
+
+    def test_member_can_register_for_multiday_club_tournament_without_global_subscription(
+        self,
+    ) -> None:
+        tournament = self._create_club_tournament(
+            slug="club-multiday-no-global-sub",
+            entry_fee=0,
+            is_one_day=False,
+        )
 
         response = self.client.post(
             reverse("tournament_register", kwargs={"slug": tournament.slug}),
@@ -1161,20 +1232,12 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
         )
         assign_member_plan(partner_member, self.plan)
 
-        tournament = Tournament.objects.create(
-            name="Клубный парный",
+        tournament = self._create_club_tournament(
             slug="club-doubles-no-global-sub",
-            city="Москва",
-            club=self.club,
-            start_date=date.today(),
-            format="round_robin",
-            status=TournamentStatus.UPCOMING,
-            gender="open",
-            is_one_day=False,
             entry_fee=0,
+            is_one_day=False,
             variant="doubles",
         )
-        tournament.allowed_categories.create(category="amateur")
 
         response = self.client.post(
             reverse("tournament_register_doubles", kwargs={"slug": tournament.slug}),
@@ -1194,20 +1257,12 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
     def test_club_doubles_registration_uses_club_shell_without_global_footer(
         self,
     ) -> None:
-        tournament = Tournament.objects.create(
-            name="Клубный парный интерфейс",
+        tournament = self._create_club_tournament(
             slug="club-doubles-shell",
-            city="Москва",
-            club=self.club,
-            start_date=date.today(),
-            format="round_robin",
-            status=TournamentStatus.UPCOMING,
-            gender="open",
-            is_one_day=False,
             entry_fee=0,
+            is_one_day=False,
             variant="doubles",
         )
-        tournament.allowed_categories.create(category="amateur")
 
         response = self.client.get(
             reverse("tournament_register_doubles", kwargs={"slug": tournament.slug}),
@@ -1216,8 +1271,8 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.club.name)
-        self.assertContains(response, "ЛИЧНЫЙ КАБИНЕТ")
-        self.assertNotContains(response, "Всероссийская теннисная платформа")
+        self.assertContains(response, "Личный кабинет")
+        self.assertContains(response, "body--club-panel")
         self.assertNotContains(response, "РЕЙТИНГ")
 
     def test_club_doubles_partner_search_is_limited_to_active_club_members(
@@ -1255,20 +1310,12 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
             birth_date=date(1992, 1, 1),
         )
 
-        tournament = Tournament.objects.create(
-            name="Клубный поиск пары",
+        tournament = self._create_club_tournament(
             slug="club-doubles-search",
-            city="Москва",
-            club=self.club,
-            start_date=date.today(),
-            format="round_robin",
-            status=TournamentStatus.UPCOMING,
-            gender="open",
-            is_one_day=False,
             entry_fee=0,
+            is_one_day=False,
             variant="doubles",
         )
-        tournament.allowed_categories.create(category="amateur")
 
         response = self.client.get(
             reverse("tournament_register_doubles", kwargs={"slug": tournament.slug}),
@@ -1294,20 +1341,12 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
             birth_date=date(1992, 1, 1),
         )
 
-        tournament = Tournament.objects.create(
-            name="Клубный POST поиск",
+        tournament = self._create_club_tournament(
             slug="club-doubles-post-check",
-            city="Москва",
-            club=self.club,
-            start_date=date.today(),
-            format="round_robin",
-            status=TournamentStatus.UPCOMING,
-            gender="open",
-            is_one_day=False,
             entry_fee=0,
+            is_one_day=False,
             variant="doubles",
         )
-        tournament.allowed_categories.create(category="amateur")
 
         response = self.client.post(
             reverse("tournament_register_doubles", kwargs={"slug": tournament.slug}),
@@ -1323,6 +1362,218 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
         )
         self.assertFalse(
             tournament.teams.filter(player1=self.player, player2=outsider).exists()
+        )
+
+    def test_member_without_club_plan_cannot_register_for_free_multiday_club_tournament(
+        self,
+    ) -> None:
+        self._clear_member_plan()
+        tournament = self._create_club_tournament(
+            slug="club-multiday-free-no-plan",
+            entry_fee=0,
+            is_one_day=False,
+        )
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Для участия в турнирах клуба нужно выбрать тариф.",
+        )
+        self.assertFalse(tournament.participants.filter(pk=self.player.pk).exists())
+
+    def test_member_without_club_plan_is_redirected_to_payment_for_paid_multiday_club_tournament(
+        self,
+    ) -> None:
+        self._clear_member_plan()
+        tournament = self._create_club_tournament(
+            slug="club-multiday-paid-no-plan",
+            entry_fee=700,
+            is_one_day=False,
+        )
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+
+        self._assert_tournament_payment_redirect(response, tournament)
+        self.assertFalse(tournament.participants.filter(pk=self.player.pk).exists())
+
+    def test_member_without_club_plan_can_register_for_free_one_day_club_tournament(
+        self,
+    ) -> None:
+        self._clear_member_plan()
+        tournament = self._create_club_tournament(
+            slug="club-one-day-free-no-plan",
+            entry_fee=0,
+            is_one_day=True,
+        )
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("tournament_detail", kwargs={"slug": tournament.slug}),
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(tournament.participants.filter(pk=self.player.pk).exists())
+
+    def test_member_without_club_plan_is_redirected_to_payment_for_paid_one_day_club_tournament(
+        self,
+    ) -> None:
+        self._clear_member_plan()
+        tournament = self._create_club_tournament(
+            slug="club-one-day-paid-no-plan",
+            entry_fee=500,
+            is_one_day=True,
+        )
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+
+        self._assert_tournament_payment_redirect(response, tournament)
+        self.assertFalse(tournament.participants.filter(pk=self.player.pk).exists())
+
+    def test_global_subscription_does_not_replace_club_plan_for_free_multiday_club_tournament(
+        self,
+    ) -> None:
+        self._clear_member_plan()
+        self._create_global_subscription(slots=10)
+        tournament = self._create_club_tournament(
+            slug="club-multiday-free-global-sub",
+            entry_fee=0,
+            is_one_day=False,
+        )
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Для участия в турнирах клуба нужно выбрать тариф.",
+        )
+        self.assertFalse(tournament.participants.filter(pk=self.player.pk).exists())
+
+    def test_global_subscription_does_not_replace_club_plan_for_paid_multiday_club_tournament(
+        self,
+    ) -> None:
+        self._clear_member_plan()
+        self._create_global_subscription(slots=10)
+        tournament = self._create_club_tournament(
+            slug="club-multiday-paid-global-sub",
+            entry_fee=900,
+            is_one_day=False,
+        )
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+
+        self._assert_tournament_payment_redirect(response, tournament)
+        self.assertFalse(tournament.participants.filter(pk=self.player.pk).exists())
+
+    def test_club_member_with_plan_can_register_for_paid_multiday_club_tournament_without_global_subscription(
+        self,
+    ) -> None:
+        tournament = self._create_club_tournament(
+            slug="club-multiday-paid-with-plan",
+            entry_fee=850,
+            is_one_day=False,
+        )
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("tournament_detail", kwargs={"slug": tournament.slug}),
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(tournament.participants.filter(pk=self.player.pk).exists())
+
+    def test_member_without_club_plan_can_register_when_club_player_plans_disabled(
+        self,
+    ) -> None:
+        self._clear_member_plan()
+        self.club.use_player_plans = False
+        self.club.save(update_fields=["use_player_plans"])
+        tournament = self._create_club_tournament(
+            slug="club-multiday-free-plans-disabled",
+            entry_fee=0,
+            is_one_day=False,
+        )
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("tournament_detail", kwargs={"slug": tournament.slug}),
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(tournament.participants.filter(pk=self.player.pk).exists())
+
+    def test_paid_club_tournament_redirects_to_payment_when_club_player_plans_disabled(
+        self,
+    ) -> None:
+        self._clear_member_plan()
+        self.club.use_player_plans = False
+        self.club.save(update_fields=["use_player_plans"])
+        tournament = self._create_club_tournament(
+            slug="club-multiday-paid-plans-disabled",
+            entry_fee=950,
+            is_one_day=False,
+        )
+
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+
+        self._assert_tournament_payment_redirect(response, tournament)
+        self.assertFalse(tournament.participants.filter(pk=self.player.pk).exists())
+
+    def test_member_without_club_plan_is_redirected_to_payment_for_paid_doubles_club_tournament(
+        self,
+    ) -> None:
+        self._clear_member_plan()
+        tournament = self._create_club_tournament(
+            slug="club-doubles-paid-no-plan",
+            entry_fee=650,
+            is_one_day=False,
+            variant="doubles",
+        )
+        next_url = f"https://testserver{reverse('tournament_register_doubles', kwargs={'slug': tournament.slug})}"
+
+        response = self.client.get(
+            reverse("tournament_register_doubles", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+
+        self._assert_tournament_payment_redirect(
+            response,
+            tournament,
+            next_url=next_url,
         )
 
 

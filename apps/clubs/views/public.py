@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from apps.core.consent_utils import record_platform_consent
 from apps.tournaments.models import Match, Tournament, TournamentStatus
 from apps.users.models import Notification
 
@@ -214,12 +215,26 @@ def register_step3(request: HttpRequest) -> HttpResponse:
         return redirect("clubs:register_step1")
 
     if request.method == "POST":
+        accept_rules = (
+            str(request.POST.get("accept_organizer_rules") or "").strip().lower()
+        )
+        if accept_rules not in {"1", "true", "on", "yes"}:
+            messages.error(
+                request,
+                "Для создания клуба необходимо принять правила для организаторов клубов.",
+            )
+            return redirect("clubs:register_step3")
         data = {**step1, "plan": ClubPlan.START, "period": period}
         try:
             club = create_club_with_trial(data, request.user)
         except ValueError as error:
             messages.error(request, str(error))
             return redirect("clubs:register_step1")
+        record_platform_consent(
+            request,
+            "club_organizer_rules",
+            "1.0",
+        )
         for key in (
             "club_registration_step1",
             "club_registration_plan",

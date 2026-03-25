@@ -207,6 +207,80 @@ class LegalAcceptanceLog(models.Model):
         )
 
 
+class UserConsent(models.Model):
+    """Запись о согласии пользователя с юридическим документом (платформа или клуб)."""
+
+    class ConsentType(models.TextChoices):
+        """Тип согласия для учёта и отчётности."""
+
+        PLATFORM_OFFER = "platform_offer", "Публичная оферта платформы"
+        PRIVACY_POLICY = "privacy_policy", "Политика конфиденциальности"
+        CLUB_ORGANIZER_RULES = (
+            "club_organizer_rules",
+            "Правила для организаторов клубов",
+        )
+        CLUB_OFFER = "club_offer", "Оферта клуба"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_consents",
+        verbose_name="Пользователь",
+    )
+    consent_type = models.CharField(
+        "Тип согласия",
+        max_length=64,
+        choices=ConsentType.choices,
+        db_index=True,
+    )
+    club = models.ForeignKey(
+        "clubs.Club",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="user_consents",
+        verbose_name="Клуб",
+        help_text="Только для согласия с офертой клуба",
+    )
+    document_version = models.CharField("Версия документа", max_length=64)
+    accepted_at = models.DateTimeField("Принято", auto_now_add=True)
+    ip_address = models.GenericIPAddressField(
+        "IP-адрес",
+        null=True,
+        blank=True,
+    )
+    user_agent = models.CharField(
+        "User-Agent",
+        max_length=500,
+        blank=True,
+        default="",
+    )
+
+    class Meta:
+        verbose_name = "согласие пользователя"
+        verbose_name_plural = "согласия пользователей"
+        ordering = ["-accepted_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "consent_type", "document_version"],
+                condition=models.Q(club__isnull=True),
+                name="uniq_userconsent_platform",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "consent_type", "club", "document_version"],
+                condition=models.Q(club__isnull=False),
+                name="uniq_userconsent_club",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        club_part = f" / {self.club_id}" if self.club_id else ""
+        return (
+            f"{self.user_id} / {self.consent_type}{club_part} / "
+            f"v{self.document_version}"
+        )
+
+
 class SupportMessage(models.Model):
     """
     Сообщение в системе поддержки: от пользователя (с сайта или из Telegram)

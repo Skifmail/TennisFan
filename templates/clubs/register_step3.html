@@ -19,6 +19,15 @@
 
             <form method="post">
                 {% csrf_token %}
+                <div class="form-group" style="margin-bottom: var(--spacing-xl);">
+                    <label class="offer-consent__label" style="display: flex; gap: var(--spacing-sm); align-items: flex-start;">
+                        <input type="checkbox" name="accept_organizer_rules" value="1" required class="offer-consent__checkbox">
+                        <span class="offer-consent__text">
+                            Я принимаю
+                            <a href="{% url 'legal_club_organizer_rules' %}" target="_blank" rel="noopener">Правила для организаторов клубов</a>
+                        </span>
+                    </label>
+                </div>
                 <div style="margin-bottom: var(--spacing-xl); padding: var(--spacing-lg) var(--spacing-xl); border-radius: var(--radius-md); background: rgb(5 43 31 / 0.9); border: 1px solid rgb(166 130 74 / 0.35);">
                     {% if plan == "start" %}
                     <p style="margin-bottom: var(--spacing-sm);">

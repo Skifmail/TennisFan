@@ -36,6 +36,10 @@ DOCS: dict[str, _DocMeta] = {
         "file": DOCS_ROOT / "user_agreement.txt",
         "title": "Пользовательское соглашение",
     },
+    "club-organizer-rules": {
+        "file": DOCS_ROOT / "club_organizer_rules.txt",
+        "title": "Правила для организаторов клубов",
+    },
 }
 
 
@@ -80,6 +84,7 @@ def legal_index(request):
         "privacy": "legal_privacy",
         "offer": "legal_offer",
         "terms": "legal_terms",
+        "club-organizer-rules": "legal_club_organizer_rules",
     }
     items = [
         {"slug": k, "title": v["title"], "url_name": url_names[k]}

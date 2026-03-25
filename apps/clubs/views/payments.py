@@ -15,6 +15,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from apps.core.consent_utils import record_club_consent
 from apps.payments.models import PaymentRecord, SavedPaymentMethod
 from apps.payments.yookassa_client import (
     create_payment_with_credentials,
@@ -39,6 +40,7 @@ from ..models import (
     Club,
     ClubFeePayment,
     ClubFeePaymentPending,
+    ClubLegalDocument,
     ClubMember,
     ClubMemberBalanceTransaction,
     ClubMemberPlan,
@@ -57,6 +59,7 @@ from ..plan_services import (
     purchase_member_plan,
 )
 from ..services import (
+    club_has_published_offer,
     club_is_operational,
     get_current_period_label,
     get_fee_expiring_soon_text,
@@ -89,7 +92,11 @@ def my_fees(request: HttpRequest) -> HttpResponse:
 
 
 def _get_member_payment_rows(member: ClubMember) -> list[dict[str, Any]]:
-    """Собирает объединённую историю платежей участника клуба."""
+    """Собирает объединённую историю платежей участника клуба.
+
+    Включает отменённые резервы баланса (статус ``cancelled``): неуспешная
+    попытка оплаты с частичным покрытием балансом, средства возвращены.
+    """
     club_plan_payments = list(
         PaymentRecord.objects.filter(
             user=member.user,
@@ -117,7 +124,10 @@ def _get_member_payment_rows(member: ClubMember) -> list[dict[str, Any]]:
     balance_transactions = list(
         ClubMemberBalanceTransaction.objects.filter(
             member=member,
-            status=ClubMemberBalanceTransaction.Status.COMPLETED,
+            status__in=[
+                ClubMemberBalanceTransaction.Status.COMPLETED,
+                ClubMemberBalanceTransaction.Status.CANCELLED,
+            ],
         ).order_by("-created_at")
     )
 
@@ -255,6 +265,37 @@ def _get_member_payment_rows(member: ClubMember) -> list[dict[str, Any]]:
         is_credit = (
             transaction_obj.direction == ClubMemberBalanceTransaction.Direction.CREDIT
         )
+        if transaction_obj.status == ClubMemberBalanceTransaction.Status.CANCELLED:
+            paid_at = transaction_obj.completed_at or transaction_obj.created_at
+            payment_rows.append(
+                {
+                    "kind": "club_balance",
+                    "paid_at": paid_at,
+                    "title": "Неуспешная попытка оплаты",
+                    "subtitle": transaction_obj.description
+                    or "Резерв под оплату отменён",
+                    "amount": Decimal("0.00"),
+                    "currency": "RUB",
+                    "method": transaction_obj.get_source_display(),
+                    "reference": transaction_obj.reference or "Не указан",
+                    "status": "Отменено · средства возвращены на баланс",
+                    "details": {
+                        "Тип операции": transaction_obj.get_source_display(),
+                        "Суть": (
+                            "Онлайн-оплата не создана или не завершена; "
+                            "зарезервированная сумма возвращена на баланс."
+                        ),
+                        "Дата": paid_at.strftime("%d.%m.%Y %H:%M"),
+                        "Резервировалось": f"{transaction_obj.amount} RUB",
+                        "Итог по балансу": "0 ₽ (возврат)",
+                        "Описание": transaction_obj.description or "Без описания",
+                        "Статус в журнале": transaction_obj.get_status_display(),
+                        "Ссылка": transaction_obj.reference or "Не указана",
+                    },
+                }
+            )
+            continue
+
         amount_prefix = "+" if is_credit else "-"
         payment_rows.append(
             {
@@ -285,6 +326,51 @@ def _get_member_payment_rows(member: ClubMember) -> list[dict[str, Any]]:
 
     payment_rows.sort(key=lambda item: item["paid_at"], reverse=True)
     return payment_rows
+
+
+def _club_payment_split_from_metadata(
+    record: PaymentRecord,
+) -> dict[str, Decimal] | None:
+    """Возвращает части смешанной оплаты (баланс + ЮKassa) из metadata записи.
+
+    Args:
+        record: Запись журнала с полем ``metadata`` (ключи ``balance_amount`` и т.д.).
+
+    Returns:
+        Словарь с ключами ``balance``, ``external``, ``total`` или ``None``,
+        если оплата целиком прошла через ЮKassa без списания баланса.
+    """
+    meta: dict[str, Any] = dict(record.metadata or {})
+
+    def _parse_money(value: Any) -> Decimal:
+        if value is None:
+            return Decimal("0.00")
+        try:
+            return Decimal(str(value).replace(",", ".").strip() or "0").quantize(
+                Decimal("0.01")
+            )
+        except Exception:
+            return Decimal("0.00")
+
+    balance_part = _parse_money(meta.get("balance_amount"))
+    if balance_part <= Decimal("0"):
+        return None
+
+    total_part = _parse_money(meta.get("total_amount"))
+    if total_part <= Decimal("0"):
+        total_part = _parse_money(record.amount)
+
+    external_part = _parse_money(meta.get("external_amount"))
+    if external_part <= Decimal("0") and total_part > balance_part:
+        external_part = (total_part - balance_part).quantize(Decimal("0.01"))
+    if external_part < Decimal("0"):
+        external_part = Decimal("0.00")
+
+    return {
+        "balance": balance_part,
+        "external": external_part,
+        "total": total_part,
+    }
 
 
 def _get_club_cashbox_rows(club: Club) -> list[dict[str, Any]]:
@@ -331,32 +417,71 @@ def _get_club_cashbox_rows(club: Club) -> list[dict[str, Any]]:
         member_name = getattr(record.user, "get_full_name", lambda: "")() or getattr(
             record.user, "email", "Не указан"
         )
+        payment_split = _club_payment_split_from_metadata(record)
         if record.payment_type == PaymentRecord.PaymentType.CLUB_PLAN:
             subtitle = "Оплата тарифа клуба"
-            method = "Автосписание" if record.is_recurring else "Онлайн-оплата"
-            details = {
-                "Плательщик": member_name,
-                "Тип": "Тариф клуба",
-                "Основание": record.item_label or record.get_payment_type_display(),
-                "Детали": subtitle,
-                "Сумма": f"{record.amount} {record.currency or 'RUB'}",
-                "Дата": record.paid_at.strftime("%d.%m.%Y %H:%M"),
-                "Способ": method,
-                "ID платежа": record.yookassa_payment_id or "Не указан",
-            }
+            if payment_split:
+                method = "Баланс + ЮKassa"
+                details = {
+                    "Плательщик": member_name,
+                    "Тип": "Тариф клуба",
+                    "Основание": record.item_label or record.get_payment_type_display(),
+                    "Детали": subtitle,
+                    "Сумма всего": f"{payment_split['total']} {record.currency or 'RUB'}",
+                    "ЮKassa (поступило на счёт)": (
+                        f"{payment_split['external']} {record.currency or 'RUB'}"
+                    ),
+                    "С баланса игрока (внутренний зачёт)": (
+                        f"{payment_split['balance']} {record.currency or 'RUB'}"
+                    ),
+                    "Дата": record.paid_at.strftime("%d.%m.%Y %H:%M"),
+                    "Способ": method,
+                    "ID платежа ЮKassa": record.yookassa_payment_id or "Не указан",
+                }
+            else:
+                method = "Автосписание" if record.is_recurring else "Онлайн-оплата"
+                details = {
+                    "Плательщик": member_name,
+                    "Тип": "Тариф клуба",
+                    "Основание": record.item_label or record.get_payment_type_display(),
+                    "Детали": subtitle,
+                    "Сумма": f"{record.amount} {record.currency or 'RUB'}",
+                    "Дата": record.paid_at.strftime("%d.%m.%Y %H:%M"),
+                    "Способ": method,
+                    "ID платежа": record.yookassa_payment_id or "Не указан",
+                }
         elif record.payment_type == PaymentRecord.PaymentType.CLUB_FEE:
             subtitle = str(record.metadata.get("period_label") or "Оплата взноса")
-            method = "Автосписание" if record.is_recurring else "Онлайн-оплата"
-            details = {
-                "Плательщик": member_name,
-                "Тип": "Членский взнос",
-                "Основание": record.item_label or record.get_payment_type_display(),
-                "Период": subtitle,
-                "Сумма": f"{record.amount} {record.currency or 'RUB'}",
-                "Дата": record.paid_at.strftime("%d.%m.%Y %H:%M"),
-                "Способ": method,
-                "ID платежа": record.yookassa_payment_id or "Не указан",
-            }
+            if payment_split:
+                method = "Баланс + ЮKassa"
+                details = {
+                    "Плательщик": member_name,
+                    "Тип": "Членский взнос",
+                    "Основание": record.item_label or record.get_payment_type_display(),
+                    "Период": subtitle,
+                    "Сумма всего": f"{payment_split['total']} {record.currency or 'RUB'}",
+                    "ЮKassa (поступило на счёт)": (
+                        f"{payment_split['external']} {record.currency or 'RUB'}"
+                    ),
+                    "С баланса игрока (внутренний зачёт)": (
+                        f"{payment_split['balance']} {record.currency or 'RUB'}"
+                    ),
+                    "Дата": record.paid_at.strftime("%d.%m.%Y %H:%M"),
+                    "Способ": method,
+                    "ID платежа ЮKassa": record.yookassa_payment_id or "Не указан",
+                }
+            else:
+                method = "Автосписание" if record.is_recurring else "Онлайн-оплата"
+                details = {
+                    "Плательщик": member_name,
+                    "Тип": "Членский взнос",
+                    "Основание": record.item_label or record.get_payment_type_display(),
+                    "Период": subtitle,
+                    "Сумма": f"{record.amount} {record.currency or 'RUB'}",
+                    "Дата": record.paid_at.strftime("%d.%m.%Y %H:%M"),
+                    "Способ": method,
+                    "ID платежа": record.yookassa_payment_id or "Не указан",
+                }
         else:
             subtitle = "Оплата турнира"
             method = "Онлайн-оплата"
@@ -393,6 +518,7 @@ def _get_club_cashbox_rows(club: Club) -> list[dict[str, Any]]:
                 "reference": record.yookassa_payment_id or "Не указан",
                 "status": "Успешно",
                 "details": details,
+                "cashbox_split": payment_split,
             }
         )
 
@@ -411,6 +537,7 @@ def _get_club_cashbox_rows(club: Club) -> list[dict[str, Any]]:
                 "operation_kind": "balance_adjustment",
                 "reference": transaction.reference or "Не указана",
                 "status": "Зачислено",
+                "cashbox_split": None,
                 "details": {
                     "Плательщик": transaction.member.user.get_full_name()
                     or transaction.member.user.email,
@@ -509,8 +636,10 @@ def _export_club_cashbox_csv(
             "Канал",
             "Название",
             "Описание",
-            "Сумма",
+            "Сумма всего",
             "Валюта",
+            "ЮKassa",
+            "С баланса",
             "Способ",
             "Статус",
             "Ссылка",
@@ -529,6 +658,7 @@ def _export_club_cashbox_csv(
     }
 
     for row in rows:
+        split = row.get("cashbox_split")
         writer.writerow(
             [
                 row["paid_at"].strftime("%d.%m.%Y %H:%M"),
@@ -539,6 +669,8 @@ def _export_club_cashbox_csv(
                 row["subtitle"],
                 row["amount"],
                 row["currency"],
+                split["external"] if split else "",
+                split["balance"] if split else "",
                 row["method"],
                 row["status"],
                 row["reference"],
@@ -932,6 +1064,13 @@ def payment_settings(request: HttpRequest, slug: str) -> HttpResponse:
                 fee = target_fee
                 form = ClubPaymentSettingsForm(instance=target_fee)
             else:
+                ld = ClubLegalDocument.objects.filter(club=club).first()
+                if not ld or not ld.is_published:
+                    messages.error(
+                        request,
+                        "Для подключения платежей необходимо опубликовать оферту клуба.",
+                    )
+                    return redirect("clubs:payment_settings", slug=slug)
                 fee = target_fee
                 fee.save()
                 if new_secret:
@@ -1070,6 +1209,19 @@ def my_fees_pay(request: HttpRequest) -> HttpResponse:
             "Для продолжения оплаты необходимо подтвердить согласие с условиями Публичной оферты.",
         )
         return redirect("clubs:my_fee_payment_preview")
+    if not club_has_published_offer(club):
+        messages.error(
+            request,
+            "Оплата недоступна: клуб не опубликовал оферту. Обратитесь к администратору клуба.",
+        )
+        return redirect("clubs:my_fee_payment_preview")
+    raw_club_offer = str(request.POST.get("club_offer_accepted", "")).strip().lower()
+    if raw_club_offer not in {"1", "true", "on", "yes"}:
+        messages.error(
+            request,
+            "Для оплаты необходимо принять оферту этого клуба.",
+        )
+        return redirect("clubs:my_fee_payment_preview")
     raw_autopay = str(request.POST.get("enable_autopay", "")).strip().lower()
     enable_autopay = raw_autopay in {"1", "true", "on", "yes"}
     period_label = get_current_period_label(fee)
@@ -1141,6 +1293,7 @@ def my_fees_pay(request: HttpRequest) -> HttpResponse:
                 "fee_payment_ref": f"balance:{fee.id}:{period_label}",
             },
         )
+        record_club_consent(request, club)
         messages.success(request, "Членский взнос успешно оплачен с баланса!")
         if next_url and url_has_allowed_host_and_scheme(
             next_url,
@@ -1190,6 +1343,20 @@ def my_fees_pay(request: HttpRequest) -> HttpResponse:
         cancel_reserved_balance(balance_transaction)
         logger.warning("Ошибка создания платежа взноса: %s", exc)
         messages.error(request, "Не удалось создать платёж. Проверьте настройки клуба.")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            return redirect(next_url)
+        return redirect("clubs:my_plan")
+    except Exception as exc:
+        cancel_reserved_balance(balance_transaction)
+        logger.exception("Неожиданная ошибка при создании платежа взноса: %s", exc)
+        messages.error(
+            request,
+            "Не удалось связаться с платёжным шлюзом. Средства с баланса возвращены — попробуйте снова.",
+        )
         if next_url and url_has_allowed_host_and_scheme(
             next_url,
             allowed_hosts={request.get_host()},
@@ -1277,10 +1444,11 @@ def my_fee_payment_preview(request: HttpRequest) -> HttpResponse:
         "clubs/my_plan_payment_preview.html",
         {
             "club": member.club,
+            "club_offer_published": club_has_published_offer(member.club),
             "is_club_panel": True,
             "title": "Членский взнос клуба",
             "description": (
-                f"Оплата членского взноса через YooKassa клуба {member.club.name}."
+                f"Онлайн-оплата членского взноса. Получатель платежа — {member.club.name}."
             ),
             "amount": fee.amount,
             "amount_value": f"{fee.amount:.2f}",
@@ -1467,6 +1635,7 @@ def my_fees_return(request: HttpRequest) -> HttpResponse:
     pending.delete()
     request.session.pop("club_fee_payment_pending", None)
     request.session.modified = True
+    record_club_consent(request, pending.club)
     messages.success(request, "Оплата членского взноса прошла успешно!")
     next_url = str(session_pending.get("next") or "").strip()
     if next_url and url_has_allowed_host_and_scheme(

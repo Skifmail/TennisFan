@@ -42,6 +42,7 @@ from .views.invites import (
     join_request_approve,
     join_request_reject,
 )
+from .views.legal import club_legal_edit, club_legal_public
 from .views.members import (
     api_search_user,
     balance_detail,
@@ -108,6 +109,8 @@ urlpatterns = [
     path("register/step-1/", register_step1, name="register_step1"),
     path("register/step-2/", register_step2, name="register_step2"),
     path("register/step-3/", register_step3, name="register_step3"),
+    path("<int:club_id>/legal/", club_legal_public, name="club_legal_public"),
+    path("<int:club_id>/legal/edit/", club_legal_edit, name="club_legal_edit"),
     path("invitations/", invitations_list, name="invitations_list"),
     path(
         "invitations/<int:pk>/accept/",

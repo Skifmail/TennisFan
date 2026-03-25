@@ -4,6 +4,17 @@
 {% block content %}
 {% include "clubs/_club_dashboard_nav.html" with current="dashboard" %}
 
+{% if show_club_legal_banner and can_edit_settings %}
+<div class="container club-dashboard-shell" style="padding-top: var(--spacing-md);">
+    <div style="padding: var(--spacing-lg) var(--spacing-xl); border-radius: var(--radius-md); background: rgb(80 40 20 / 0.25); border: 1px solid rgb(200 120 60 / 0.4); margin-bottom: var(--spacing-lg);">
+        <p style="margin: 0; font-size: var(--font-size-sm);">
+            Опубликуйте <strong>оферту клуба</strong>, чтобы подключить приём платежей на счёт клуба и чтобы игроки могли оплачивать взносы и тарифы онлайн.
+            <a href="{% url 'clubs:club_legal_edit' club_id=club.id %}">Редактировать оферту</a>
+        </p>
+    </div>
+</div>
+{% endif %}
+
 <div class="page-header club-dashboard-page-header">
     <div class="container club-dashboard-shell">
         <section class="club-dashboard-hero">

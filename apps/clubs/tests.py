@@ -4,6 +4,7 @@ from decimal import Decimal
 from io import StringIO
 from unittest.mock import patch
 
+import requests
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
@@ -19,6 +20,7 @@ from apps.clubs.models import (
     ClubInviteLink,
     ClubJoinRequest,
     ClubJoinRequestStatus,
+    ClubLegalDocument,
     ClubMember,
     ClubMemberBalanceTransaction,
     ClubMemberPlan,
@@ -1075,6 +1077,27 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         self.assertContains(response, "Членский взнос")
         self.assertContains(response, "fee-payment-1")
 
+    def test_my_payments_shows_cancelled_balance_reserve_as_failed_payment(
+        self,
+    ) -> None:
+        """Отменённый резерв баланса виден в истории как неуспешная попытка оплаты."""
+        member = ClubMember.objects.get(club=self.club, user=self.user)
+        ClubMemberBalanceTransaction.objects.create(
+            club=self.club,
+            member=member,
+            direction=ClubMemberBalanceTransaction.Direction.DEBIT,
+            source=ClubMemberBalanceTransaction.Source.CLUB_PLAN_PAYMENT,
+            status=ClubMemberBalanceTransaction.Status.CANCELLED,
+            amount=Decimal("500.00"),
+            description="Оплата тарифа клуба «Платина»",
+            reference="club-plan:99",
+            completed_at=timezone.now(),
+        )
+        response = self.client.get(reverse("clubs:my_payments"), secure=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Неуспешная попытка оплаты")
+        self.assertContains(response, "Отменено · средства возвращены на баланс")
+
     def test_club_public_detail_shows_in_game_badge_when_bracket_generated(
         self,
     ) -> None:
@@ -1646,6 +1669,13 @@ class ClubPaymentIsolationTestCase(TestCase):
             max_tournaments_per_month=6,
             is_active=True,
         )
+        ClubLegalDocument.objects.create(
+            club=self.club,
+            title="Оферта тестового клуба",
+            content="Текст оферты",
+            version="1.0",
+            is_published=True,
+        )
         self.client.force_login(self.user)
         session = self.client.session
         session["current_club_slug"] = self.club.slug
@@ -1670,6 +1700,7 @@ class ClubPaymentIsolationTestCase(TestCase):
                 {
                     "id": str(self.plan.id),
                     "offer_accepted": "on",
+                    "club_offer_accepted": "on",
                 },
                 secure=True,
             )
@@ -1691,6 +1722,47 @@ class ClubPaymentIsolationTestCase(TestCase):
             session["club_plan_payment_pending"]["club_slug"], self.club.slug
         )
         self.assertEqual(session["club_plan_payment_pending"]["amount"], "1200.00")
+
+    def test_club_plan_payment_process_restores_balance_on_requests_error(self) -> None:
+        """При сбое HTTP-клиента резерв баланса снимается (регрессия SSL/необработанное исключение)."""
+        self.member.balance = Decimal("500.00")
+        self.member.save(update_fields=["balance"])
+        self.plan.monthly_fee = Decimal("2000.00")
+        self.plan.save(update_fields=["monthly_fee"])
+
+        with (
+            patch(
+                "apps.clubs.views.subscription.decrypt_secret",
+                return_value="club-secret-key",
+            ),
+            patch(
+                "apps.clubs.views.subscription.create_payment_with_credentials",
+                side_effect=requests.exceptions.SSLError("SSL EOF"),
+            ),
+        ):
+            response = self.client.post(
+                reverse("clubs:my_plan_payment_process"),
+                {
+                    "id": str(self.plan.id),
+                    "offer_accepted": "on",
+                    "club_offer_accepted": "on",
+                },
+                secure=True,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            reverse("clubs:my_plan_payment_preview", kwargs={"plan_id": self.plan.id}),
+        )
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.balance, Decimal("500.00"))
+        self.assertFalse(
+            ClubMemberBalanceTransaction.objects.filter(
+                member=self.member,
+                status=ClubMemberBalanceTransaction.Status.PENDING,
+            ).exists()
+        )
 
     def test_club_plan_payment_return_uses_club_credentials(self) -> None:
         session = self.client.session
@@ -1809,6 +1881,7 @@ class ClubPaymentIsolationTestCase(TestCase):
                 reverse("clubs:my_fees_pay"),
                 {
                     "offer_accepted": "on",
+                    "club_offer_accepted": "on",
                 },
                 secure=True,
             )
@@ -1859,6 +1932,7 @@ class ClubPaymentIsolationTestCase(TestCase):
             reverse("clubs:my_fees_pay"),
             {
                 "offer_accepted": "on",
+                "club_offer_accepted": "on",
             },
             secure=True,
         )
@@ -2043,6 +2117,37 @@ class ClubPaymentIsolationTestCase(TestCase):
         self.assertContains(response, "Членский взнос клуба")
         self.assertNotContains(response, "Глобальная подписка PRO")
         self.assertNotContains(response, f"{other_club.name}: Премиум")
+
+    def test_club_cashbox_shows_yookassa_and_balance_split_for_mixed_payment(
+        self,
+    ) -> None:
+        """В кассе клуба видна разбивка: ЮKassa и внутренний баланс игрока."""
+        PaymentRecord.objects.create(
+            user=self.user,
+            payment_type=PaymentRecord.PaymentType.CLUB_PLAN,
+            item_id=str(self.plan.id),
+            item_label=f"{self.club.name}: {self.plan.name}",
+            amount=Decimal("2000.00"),
+            status="succeeded",
+            yookassa_payment_id="split-cashbox-1",
+            metadata={
+                "club_id": self.club.id,
+                "club_slug": self.club.slug,
+                "balance_amount": "500.00",
+                "external_amount": "1500.00",
+                "total_amount": "2000.00",
+            },
+            paid_at=timezone.now(),
+        )
+        response = self.client.get(
+            reverse("clubs:club_cashbox_history", kwargs={"slug": self.club.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Баланс + ЮKassa")
+        self.assertContains(response, "ЮKassa (поступило на счёт)")
+        self.assertContains(response, "1500.00")
+        self.assertContains(response, "500.00")
 
     def test_recurring_club_plan_command_uses_club_credentials_and_plan_metadata(
         self,

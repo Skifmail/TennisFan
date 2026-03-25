@@ -21,8 +21,9 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from apps.core.consent_utils import record_platform_consent
 from apps.core.decorators import login_required_with_message
-from apps.core.models import LegalAcceptanceLog, UserTelegramLink
+from apps.core.models import LegalAcceptanceLog, UserConsent, UserTelegramLink
 from apps.legal.utils import get_legal_document_version
 
 from .forms import PlayerProfileForm, UserRegistrationForm
@@ -403,6 +404,16 @@ def auth(request):
                     request,
                     user,
                     backend="django.contrib.auth.backends.ModelBackend",
+                )
+                record_platform_consent(
+                    request,
+                    UserConsent.ConsentType.PLATFORM_OFFER,
+                    get_legal_document_version("offer"),
+                )
+                record_platform_consent(
+                    request,
+                    UserConsent.ConsentType.PRIVACY_POLICY,
+                    get_legal_document_version("privacy"),
                 )
                 messages.success(request, "Регистрация успешна! Добро пожаловать.")
                 return redirect("home")

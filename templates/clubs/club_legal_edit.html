@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Оферта клуба — {{ club.name }}{% endblock %}
+
+{% block content %}
+{% include "clubs/_club_dashboard_nav.html" with current="legal" %}
+
+<div class="container" style="max-width: 880px; padding-top: var(--spacing-xl);">
+    <div class="page-header">
+        <h1 class="page-title">Оферта клуба</h1>
+        <p class="page-subtitle">{{ club.name }}</p>
+    </div>
+
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <p class="text-secondary" style="margin-bottom: var(--spacing-lg);">
+                Текст отображается на публичной странице оферты в формате Markdown.
+                До публикации приём платежей на счёт клуба в настройках кассы будет недоступен.
+            </p>
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="form-group" style="margin-bottom: var(--spacing-lg);">
+                    <label for="{{ field.id_for_label }}" style="display: block; margin-bottom: var(--spacing-xs); font-weight: 600;">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--spacing-xs);">{{ field.help_text }}</p>{% endif %}
+                    {% for err in field.errors %}<p class="text-error">{{ err }}</p>{% endfor %}
+                </div>
+                {% endfor %}
+                <div style="display: flex; gap: var(--spacing-md); flex-wrap: wrap;">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <a href="{% url 'clubs:dashboard' slug=club.slug %}" class="btn btn-ghost">К панели клуба</a>
+                    {% if form.instance.is_published %}
+                    <a href="{% url 'clubs:club_legal_public' club_id=club.id %}" class="btn btn-ghost" target="_blank" rel="noopener">Предпросмотр</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

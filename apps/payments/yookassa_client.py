@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from typing import Any
 
@@ -16,6 +17,51 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.yookassa.ru/v3/payments"
+# Повторы при обрыве TLS/соединения (часто транзиентно). Idempotence-Key не меняем между попытками.
+_YOOKASSA_POST_ATTEMPTS = 4
+_YOOKASSA_POST_RETRY_BACKOFF_SEC = 0.6
+
+
+def _post_yookassa_payment(
+    *,
+    auth: tuple[str, str],
+    headers: dict[str, str],
+    json_body: dict[str, Any],
+    timeout: float = 15,
+) -> requests.Response:
+    """POST /v3/payments с повторами при сетевых сбоях (в т.ч. SSL EOF).
+
+    ``Idempotence-Key`` в ``headers`` должен быть одинаковым для всех попыток одной операции.
+    """
+    last_exc: BaseException | None = None
+    for attempt in range(_YOOKASSA_POST_ATTEMPTS):
+        try:
+            return requests.post(
+                API_URL,
+                auth=auth,
+                headers=headers,
+                json=json_body,
+                timeout=timeout,
+            )
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as exc:
+            last_exc = exc
+            logger.warning(
+                "YooKassa POST: попытка %s/%s не удалась (%s): %s",
+                attempt + 1,
+                _YOOKASSA_POST_ATTEMPTS,
+                type(exc).__name__,
+                exc,
+            )
+            if attempt < _YOOKASSA_POST_ATTEMPTS - 1:
+                time.sleep(_YOOKASSA_POST_RETRY_BACKOFF_SEC * (2**attempt))
+    assert last_exc is not None
+    raise RuntimeError(
+        "Не удалось связаться с платёжным шлюзом (сеть или TLS). "
+        "Повторите попытку через минуту."
+    ) from last_exc
 
 
 def _create_auth(
@@ -112,14 +158,13 @@ def create_payment(
         }
 
     idempotence_key = str(uuid.uuid4())
-    response = requests.post(
-        API_URL,
+    response = _post_yookassa_payment(
         auth=(shop_id, secret_key),
         headers={
             "Idempotence-Key": idempotence_key,
             "Content-Type": "application/json",
         },
-        json=payload,
+        json_body=payload,
         timeout=15,
     )
 
@@ -260,14 +305,13 @@ def create_recurring_payment(
         }
 
     idempotence_key = str(uuid.uuid4())
-    response = requests.post(
-        API_URL,
+    response = _post_yookassa_payment(
         auth=(shop_id, secret_key),
         headers={
             "Idempotence-Key": idempotence_key,
             "Content-Type": "application/json",
         },
-        json=payload,
+        json_body=payload,
         timeout=15,
     )
 
@@ -350,14 +394,13 @@ def create_payment_with_credentials(
         }
 
     idempotence_key = str(uuid.uuid4())
-    response = requests.post(
-        API_URL,
+    response = _post_yookassa_payment(
         auth=(sid, skey),
         headers={
             "Idempotence-Key": idempotence_key,
             "Content-Type": "application/json",
         },
-        json=payload,
+        json_body=payload,
         timeout=15,
     )
 
@@ -448,14 +491,13 @@ def create_recurring_payment_with_credentials(
         }
 
     idempotence_key = str(uuid.uuid4())
-    response = requests.post(
-        API_URL,
+    response = _post_yookassa_payment(
         auth=(sid, skey),
         headers={
             "Idempotence-Key": idempotence_key,
             "Content-Type": "application/json",
         },
-        json=payload,
+        json_body=payload,
         timeout=15,
     )
 

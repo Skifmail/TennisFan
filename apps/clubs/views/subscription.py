@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from apps.core.consent_utils import record_club_consent
 from apps.core.models import UserTelegramLink
 from apps.payments.yookassa_client import (
     create_payment,
@@ -47,6 +48,7 @@ from ..plan_services import (
     purchase_member_plan,
 )
 from ..services import (
+    club_has_published_offer,
     get_club_current_subscription,
     get_platform_plan,
     get_platform_plans,
@@ -193,10 +195,12 @@ def my_plan_payment_preview(request: HttpRequest, plan_id: int) -> HttpResponse:
         "clubs/my_plan_payment_preview.html",
         {
             "club": member.club,
+            "club_offer_published": club_has_published_offer(member.club),
             "is_club_panel": True,
             "title": f"Тариф клуба: {plan.name}",
             "description": (
-                f"Оплата клубного тарифа через YooKassa клуба {member.club.name}."
+                f"Онлайн-оплата тарифа «{plan.name}». "
+                f"Получатель платежа — {member.club.name}."
             ),
             "amount": plan.monthly_fee,
             "amount_value": f"{plan.monthly_fee:.2f}",
@@ -232,6 +236,26 @@ def my_plan_payment_process(request: HttpRequest) -> HttpResponse:
         messages.error(
             request,
             "Для продолжения оплаты необходимо подтвердить согласие с условиями Публичной оферты.",
+        )
+        return redirect(
+            "clubs:my_plan_payment_preview",
+            plan_id=request.POST.get("id") or 0,
+        )
+
+    if not club_has_published_offer(member.club):
+        messages.error(
+            request,
+            "Оплата недоступна: клуб не опубликовал оферту. Обратитесь к администратору клуба.",
+        )
+        return redirect(
+            "clubs:my_plan_payment_preview",
+            plan_id=request.POST.get("id") or 0,
+        )
+    raw_club_offer = str(request.POST.get("club_offer_accepted", "")).strip().lower()
+    if raw_club_offer not in {"1", "true", "on", "yes"}:
+        messages.error(
+            request,
+            "Для оплаты необходимо принять оферту этого клуба.",
         )
         return redirect(
             "clubs:my_plan_payment_preview",
@@ -311,6 +335,7 @@ def my_plan_payment_process(request: HttpRequest) -> HttpResponse:
                 "total_amount": f"{plan.monthly_fee:.2f}",
             },
         )
+        record_club_consent(request, member.club)
         messages.success(request, f"Клубный тариф «{plan.name}» успешно оформлен.")
         return redirect("clubs:my_finance")
 
@@ -362,6 +387,17 @@ def my_plan_payment_process(request: HttpRequest) -> HttpResponse:
         messages.error(
             request,
             "Не удалось создать платёж клубного тарифа. Проверьте настройки клуба и попробуйте снова.",
+        )
+        return redirect("clubs:my_plan_payment_preview", plan_id=plan.id)
+    except Exception as exc:
+        # Сетевые/TLS сбои requests и прочие ошибки — иначе резерв баланса не снимается.
+        cancel_reserved_balance(balance_transaction)
+        logger.exception(
+            "Неожиданная ошибка при создании оплаты клубного тарифа: %s", exc
+        )
+        messages.error(
+            request,
+            "Не удалось связаться с платёжным шлюзом. Средства с баланса возвращены — попробуйте снова.",
         )
         return redirect("clubs:my_plan_payment_preview", plan_id=plan.id)
 
@@ -562,6 +598,7 @@ def my_plan_payment_return(request: HttpRequest) -> HttpResponse:
         change_reason="Оплата клубного тарифа участником",
         auto_renew=enable_autopay,
     )
+    record_club_consent(request, member.club)
     request.session["current_club_slug"] = member.club.slug
     del request.session["club_plan_payment_pending"]
     request.session.modified = True
@@ -712,7 +749,7 @@ def subscription_view(request: HttpRequest, slug: str) -> HttpResponse:
         return redirect("clubs:dashboard", slug=slug)
     subscription = get_club_current_subscription(club)
     history = club.subscriptions.order_by("-ends_at")[:10]
-    current_plan_slug = subscription.plan if subscription else ClubPlan.START
+    current_plan_slug: str = subscription.plan if subscription else "start"
     current_platform_plan = get_platform_plan(current_plan_slug)
     return render(
         request,

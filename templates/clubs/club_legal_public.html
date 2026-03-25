@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="legal-page">
+    <div class="container container--legal">
+        <header class="legal-header">
+            <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="btn btn-ghost mb-3">← {{ club.name }}</a>
+            <h1 class="page-title page-title--legal">{{ title }}</h1>
+            {% if document_version %}
+            <p class="text-secondary" style="margin-top: var(--spacing-sm); font-size: var(--font-size-sm);">Версия: {{ document_version }}</p>
+            {% endif %}
+        </header>
+        <article class="legal-doc card">
+            <div class="card-body legal-doc__body">
+                {{ content|safe }}
+            </div>
+        </article>
+    </div>
+</div>
+{% endblock %}

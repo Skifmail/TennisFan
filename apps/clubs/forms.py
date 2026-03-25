@@ -23,6 +23,7 @@ from apps.users.models import SkillLevel
 
 from .models import (
     Club,
+    ClubLegalDocument,
     ClubMember,
     ClubMembershipFee,
     ClubMemberStatus,
@@ -31,6 +32,30 @@ from .models import (
     ClubPlayerPlan,
 )
 from .payment_utils import get_secret_mask
+
+
+class ClubLegalDocumentForm(forms.ModelForm):
+    """Редактирование оферты клуба владельцем."""
+
+    class Meta:
+        model = ClubLegalDocument
+        fields = ("title", "content", "version", "is_published")
+        widgets = {
+            "title": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Заголовок документа"}
+            ),
+            "content": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 22,
+                    "placeholder": "Текст в формате Markdown",
+                }
+            ),
+            "version": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Например: 1.0"}
+            ),
+            "is_published": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
 
 
 class ClubRegistrationStep1Form(forms.Form):

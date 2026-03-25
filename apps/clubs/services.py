@@ -20,6 +20,7 @@ from .models import (
     ClubFeePayment,
     ClubJoinRequest,
     ClubJoinRequestStatus,
+    ClubLegalDocument,
     ClubMember,
     ClubMemberRole,
     ClubMembershipFee,
@@ -271,7 +272,23 @@ def create_club_with_trial(data: dict[str, Any], user: AbstractUser) -> Club:
 
         ClubRating.objects.create(club=club, member=member, points=0)
 
+        ClubLegalDocument.objects.get_or_create(
+            club=club,
+            defaults={
+                "title": f"Публичная оферта клуба «{club.name}»",
+                "content": "",
+                "version": "1.0",
+                "is_published": False,
+            },
+        )
+
     return club
+
+
+def club_has_published_offer(club: Club) -> bool:
+    """Проверяет, опубликована ли оферта клуба (необходимо для приёма платежей на счёт клуба)."""
+    doc = ClubLegalDocument.objects.filter(club=club).first()
+    return doc is not None and bool(doc.is_published)
 
 
 def get_club_current_subscription(club: Club) -> ClubSubscription | None:

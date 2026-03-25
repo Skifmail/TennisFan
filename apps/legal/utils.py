@@ -14,6 +14,7 @@ LEGAL_DOCUMENT_PATHS: dict[str, Path] = {
     "privacy": DOCS_ROOT / "privacy.txt",
     "offer": DOCS_ROOT / "public_offer.txt",
     "terms": DOCS_ROOT / "user_agreement.txt",
+    "club-organizer-rules": DOCS_ROOT / "club_organizer_rules.txt",
 }
 
 

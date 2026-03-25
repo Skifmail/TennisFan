@@ -15,6 +15,7 @@ from .models import (
     SupportConversation,
     SupportMessage,
     TelegramTransferConsentLog,
+    UserConsent,
 )
 
 
@@ -124,6 +125,46 @@ class TelegramTransferConsentLogAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(UserConsent)
+class UserConsentAdmin(admin.ModelAdmin):
+    """Журнал согласий пользователей (только просмотр)."""
+
+    list_display = (
+        "user",
+        "consent_type",
+        "club",
+        "document_version",
+        "accepted_at",
+        "ip_address",
+    )
+    list_filter = ("consent_type", "accepted_at")
+    search_fields = (
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+        "ip_address",
+        "document_version",
+    )
+    readonly_fields = (
+        "user",
+        "consent_type",
+        "club",
+        "document_version",
+        "accepted_at",
+        "ip_address",
+        "user_agent",
+    )
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
+        return True
+
+    def has_delete_permission(self, request: HttpRequest, obj=None) -> bool:
         return False
 
 

@@ -228,6 +228,33 @@ class Club(CompressImageFieldsMixin, models.Model):
         return str(self.name)
 
 
+class ClubLegalDocument(models.Model):
+    """
+    Юридический документ клуба (публичная оферта клуба).
+
+    Хранится в БД; публикация обязательна для приёма платежей на счёт клуба.
+    """
+
+    club = models.OneToOneField(
+        Club,
+        on_delete=models.CASCADE,
+        related_name="legal_document",
+        verbose_name="Клуб",
+    )
+    title = models.CharField("Заголовок", max_length=255)
+    content = models.TextField("Текст (HTML/Markdown)")
+    version = models.CharField("Версия", max_length=32, default="1.0")
+    is_published = models.BooleanField("Опубликовано", default=False)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Оферта клуба"
+        verbose_name_plural = "Оферты клубов"
+
+    def __str__(self) -> str:
+        return f"{self.club.name} — {self.title} (v{self.version})"
+
+
 class ClubSubscription(models.Model):
     """
     Подписка клуба на платформу (тариф Старт/Базовый/Про, период, срок действия).

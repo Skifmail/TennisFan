@@ -22,12 +22,6 @@
                         <span style="font-weight: 500;">{{ value }}</span>
                     </li>
                     {% endfor %}
-                    {% if balance_available and balance_available > 0 %}
-                    <li style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-md); border-bottom: 1px solid var(--color-border-light); padding-bottom: var(--spacing-md);">
-                        <span class="text-secondary">Баланс клуба</span>
-                        <span style="font-weight: 500;">{{ balance_available }} ₽</span>
-                    </li>
-                    {% endif %}
                     <li style="display: flex; justify-content: space-between; margin-top: var(--spacing-lg); padding-top: var(--spacing-md); border-top: 2px solid var(--color-border); font-size: 1.1em; font-weight: bold;">
                         <span>К доплате онлайн</span>
                         <span style="color: var(--color-primary);">{{ external_amount_due|default:amount }} ₽</span>
@@ -50,7 +44,7 @@
                         <input type="checkbox" name="enable_autopay" class="offer-consent__checkbox">
                         <span class="offer-consent__text">
                             Сохранить карту и включить автоматическое продление клубного тарифа.
-                            Автосписание будет выполняться через YooKassa этого клуба.
+                            Автосписание выполняется по платёжным реквизитам клуба.
                         </span>
                     </label>
                 </div>
@@ -60,16 +54,35 @@
                         <input type="checkbox" name="enable_autopay" class="offer-consent__checkbox">
                         <span class="offer-consent__text">
                             Сохранить карту и включить автоматическую оплату членского взноса в следующих периодах.
-                            Автосписание будет выполняться через YooKassa этого клуба.
+                            Автосписание выполняется по платёжным реквизитам клуба.
                         </span>
                     </label>
                 </div>
                 {% endif %}
 
+                {% if payment_type == "club_plan" or payment_type == "club_fee" %}
+                    {% if club_offer_published %}
+                    <div class="offer-consent">
+                        <label class="offer-consent__label">
+                            <input type="checkbox" name="club_offer_accepted" value="1" required class="offer-consent__checkbox">
+                            <span class="offer-consent__text">
+                                Я принимаю условия
+                                <a href="{% url 'clubs:club_legal_public' club_id=club.id %}" target="_blank" rel="noopener">«Оферты клуба»</a>
+                                в отношении «{{ club.name }}». Оплата поступает на счёт клуба.
+                            </span>
+                        </label>
+                    </div>
+                    {% else %}
+                    <div style="margin-bottom: var(--spacing-xl); padding: var(--spacing-lg); border-radius: var(--radius-md); background: rgb(80 40 20 / 0.25); border: 1px solid rgb(200 120 60 / 0.4);">
+                        <p style="margin: 0; font-size: var(--font-size-sm);">Клуб ещё не опубликовал оферту. Онлайн-оплата недоступна. Обратитесь к администратору клуба.</p>
+                    </div>
+                    {% endif %}
+                {% endif %}
+
                 <div style="margin-bottom: var(--spacing-xl);">
                     {% include "includes/offer_consent.html" %}
                 </div>
-                <button type="submit" class="btn btn-primary btn-pay w-100" style="margin-bottom: var(--spacing-md);" data-loading-text="Переход к оплате...">
+                <button type="submit" class="btn btn-primary btn-pay w-100" style="margin-bottom: var(--spacing-md);" data-loading-text="Переход к оплате..."{% if payment_type == "club_plan" or payment_type == "club_fee" %}{% if not club_offer_published %} disabled{% endif %}{% endif %}>
                     {% if external_amount_due <= 0 %}
                         {% if payment_type == "club_fee" %}Оплатить взнос с баланса{% else %}Оплатить с баланса{% endif %}
                     {% else %}

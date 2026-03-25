@@ -858,6 +858,17 @@ def payment_process(request: HttpRequest) -> HttpResponse:
             "Не удалось создать платёж. Проверьте сумму и попробуйте снова.",
         )
         return _build_preview_redirect(request, payment_type)
+    except Exception as e:
+        if balance_transaction is not None:
+            from apps.clubs.finance_services import cancel_reserved_balance
+
+            cancel_reserved_balance(balance_transaction)
+        logger.exception("YooKassa create_payment unexpected error: %s", e)
+        messages.error(
+            request,
+            "Не удалось создать платёж. Средства с баланса возвращены — попробуйте снова.",
+        )
+        return _build_preview_redirect(request, payment_type)
 
     pending_data = {
         "payment_id": payment_id,

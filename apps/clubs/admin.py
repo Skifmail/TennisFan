@@ -19,6 +19,7 @@ from .models import (
     Club,
     ClubFeePayment,
     ClubInviteLink,
+    ClubLegalDocument,
     ClubMember,
     ClubMemberPlan,
     ClubMembershipFee,
@@ -87,6 +88,17 @@ class ClubNotificationConfigInline(admin.StackedInline):
     can_delete = False
 
 
+class ClubLegalDocumentInline(admin.StackedInline):
+    """Оферта клуба (одна запись на клуб)."""
+
+    model = ClubLegalDocument
+    extra = 0
+    max_num = 1
+    can_delete = False
+    fields = ("title", "content", "version", "is_published", "updated_at")
+    readonly_fields = ("updated_at",)
+
+
 # ---------------------------------------------------------------------------
 # Фильтры
 # ---------------------------------------------------------------------------
@@ -153,6 +165,7 @@ class ClubAdmin(admin.ModelAdmin):
         ClubMemberInline,
         ClubMembershipFeeInline,
         ClubNotificationConfigInline,
+        ClubLegalDocumentInline,
     ]
     actions = ["block_clubs", "unblock_clubs", "reset_trial"]
 

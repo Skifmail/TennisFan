@@ -38,6 +38,7 @@ from ..models import (
     ClubApplicationStatus,
     ClubFeePayment,
     ClubJoinRequestStatus,
+    ClubLegalDocument,
     ClubMember,
     ClubMemberBalanceTransaction,
     ClubMemberRole,
@@ -78,6 +79,8 @@ from .helpers import (
 def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
     """Дашборд клуба: статистика и навигация по разделам панели."""
     club = get_object_or_404(Club, slug=slug)
+    legal_doc = ClubLegalDocument.objects.filter(club=club).first()
+    show_club_legal_banner = legal_doc is None or not legal_doc.is_published
     if not user_can_manage_club(request.user, club):
         messages.error(request, "У вас нет доступа к управлению этим клубом.")
         return redirect("clubs:club_public_detail", slug=slug)
@@ -665,6 +668,7 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
             "can_edit_settings": user_can_edit_club_settings(request.user, club),
             "can_manage_fees": user_can_manage_fees(request.user, club),
             "can_manage_managers": user_can_manage_managers(request.user, club),
+            "show_club_legal_banner": show_club_legal_banner,
         },
     )
 

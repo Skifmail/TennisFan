@@ -1,93 +1,148 @@
 {% extends "base.html" %}
 {% block title %}Оплата подписки — {{ club.name }}{% endblock %}
+
 {% block content %}
 {% include "clubs/_club_dashboard_nav.html" with current="subscription" %}
-<div class="page-header">
-    <h1 class="page-title">Оплата подписки клуба</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container" style="max-width: 640px;">
-    <p><a href="{% url 'clubs:subscription' slug=club.slug %}">← Назад к подписке</a></p>
-    <div class="card">
-        <div class="card-body">
-            {% if initial_plan and initial_period %}
-            <h2 style="font-size: 1.25rem; margin-bottom: var(--spacing-md);">Подтвердите оплату тарифа</h2>
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="plan" value="{{ initial_plan }}">
-                <input type="hidden" name="period" value="{{ initial_period }}">
-                <div style="margin-bottom: var(--spacing-md);">
-                    <p style="margin-bottom: var(--spacing-xs);">
-                        <strong>Тариф:</strong>
-                        {% for plan in plans %}
-                            {% if plan.value == initial_plan %}
-                                {{ plan.label }}
-                            {% endif %}
-                        {% endfor %}
-                    </p>
-                    <p style="margin: 0;">
-                        <strong>Период:</strong>
-                        {% if initial_period == "monthly" %}Ежемесячно{% else %}Ежегодно (скидка){% endif %}
-                    </p>
+
+<div class="page-header club-dashboard-page-header">
+    <div class="container club-dashboard-shell club-subscription-pay-page">
+        {% if initial_plan and initial_period %}
+        <section class="club-subscription-pay-single">
+            <article class="club-dashboard-panel club-subscription-pay-summary">
+                <div class="club-dashboard-panel__header">
+                    <div>
+                        <p class="club-dashboard-panel__eyebrow">Подтверждение</p>
+                        <h2 class="club-dashboard-panel__title">Подтвердите оплату тарифа</h2>
+                    </div>
                 </div>
-                <div style="margin-bottom: var(--spacing-md); color: var(--color-text-muted); font-size: 0.9rem;">
-                    {% for plan, prices in plan_prices.items %}
-                        {% if plan.value == initial_plan %}
-                        <p style="margin: 0;">
-                            <strong>Стоимость:</strong>
-                            {% if initial_period == "monthly" %}
-                                {{ prices.monthly }} ₽ в месяц
-                            {% else %}
-                                {{ prices.yearly }} ₽ в год
-                            {% endif %}
-                        </p>
-                        {% endif %}
-                    {% endfor %}
+
+                <form method="post" class="club-subscription-pay-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="plan" value="{{ initial_plan }}">
+                    <input type="hidden" name="period" value="{{ initial_period }}">
+
+                    <div class="club-subscription-pay-total">
+                        <div class="club-subscription-pay-total__label">Итого к оплате</div>
+                        <div class="club-subscription-pay-total__value">
+                            {% if initial_plan == 'start' and initial_period == 'monthly' %}{{ plan_prices.start.monthly }} ₽{% endif %}
+                            {% if initial_plan == 'start' and initial_period == 'yearly' %}{{ plan_prices.start.yearly }} ₽{% endif %}
+                            {% if initial_plan == 'basic' and initial_period == 'monthly' %}{{ plan_prices.basic.monthly }} ₽{% endif %}
+                            {% if initial_plan == 'basic' and initial_period == 'yearly' %}{{ plan_prices.basic.yearly }} ₽{% endif %}
+                            {% if initial_plan == 'pro' and initial_period == 'monthly' %}{{ plan_prices.pro.monthly }} ₽{% endif %}
+                            {% if initial_plan == 'pro' and initial_period == 'yearly' %}{{ plan_prices.pro.yearly }} ₽{% endif %}
+                        </div>
+                        <div class="club-subscription-pay-total__meta">
+                            {% if initial_period == "monthly" %}Ежемесячный период оплаты{% else %}Ежегодный период оплаты{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="club-subscription-pay-details">
+                        <div class="club-subscription-pay-details__row">
+                            <span class="club-subscription-pay-details__label">Тариф</span>
+                            <span class="club-subscription-pay-details__value">
+                                {% if initial_plan == 'start' %}Старт{% elif initial_plan == 'basic' %}Базовый{% else %}Про{% endif %}
+                            </span>
+                        </div>
+                        <div class="club-subscription-pay-details__row">
+                            <span class="club-subscription-pay-details__label">Период</span>
+                            <span class="club-subscription-pay-details__value">
+                                {% if initial_period == "monthly" %}Помесячно{% else %}Ежегодно{% endif %}
+                            </span>
+                        </div>
+                        <div class="club-subscription-pay-details__row">
+                            <span class="club-subscription-pay-details__label">Клуб</span>
+                            <span class="club-subscription-pay-details__value">{{ club.name }}</span>
+                        </div>
+                        <div class="club-subscription-pay-details__row">
+                            <span class="club-subscription-pay-details__label">Email для чека</span>
+                            <span class="club-subscription-pay-details__value">{{ club.email }}</span>
+                        </div>
+                    </div>
+
+                    <div class="club-subscription-pay-note">
+                        После нажатия кнопки вы будете перенаправлены в YooKassa для завершения оплаты. Подписка активируется после успешного подтверждения платежа.
+                    </div>
+
+                    {% include "includes/offer_consent.html" %}
+
+                    <div class="club-subscription-pay-form__actions">
+                        <button type="submit" class="btn btn-primary">Перейти к оплате</button>
+                        <a href="{% url 'clubs:subscription_pay' slug=club.slug %}" class="btn btn-ghost">Изменить параметры</a>
+                    </div>
+                </form>
+            </article>
+        </section>
+        {% else %}
+        <section class="club-subscription-pay-single">
+            <article class="club-dashboard-panel club-subscription-pay-summary">
+                <div class="club-dashboard-panel__header">
+                    <div>
+                        <p class="club-dashboard-panel__eyebrow">Шаг 1</p>
+                        <h2 class="club-dashboard-panel__title">Выберите тариф и период</h2>
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary">Перейти к оплате</button>
-            </form>
-            {% else %}
-            <h2 style="font-size: 1.25rem; margin-bottom: var(--spacing-md);">Выберите тариф и период</h2>
-            <form method="post">
-                {% csrf_token %}
-                <div style="margin-bottom: var(--spacing-md);">
-                    <label style="display: block; margin-bottom: var(--spacing-sm); font-weight: bold;">Тариф:</label>
-                    {% for plan in plans %}
-                    <label style="display: block; margin-bottom: var(--spacing-xs);">
-                        <input
-                            type="radio"
-                            name="plan"
-                            value="{{ plan.value }}"
-                            {% if forloop.first %}checked{% endif %}
-                            required
-                        >
-                        {{ plan.label }}
-                    </label>
-                    {% endfor %}
-                </div>
-                <div style="margin-bottom: var(--spacing-md);">
-                    <label style="display: block; margin-bottom: var(--spacing-sm); font-weight: bold;">Период:</label>
-                    <label style="display: block; margin-bottom: var(--spacing-xs);">
-                        <input type="radio" name="period" value="monthly" required>
-                        Ежемесячно
-                    </label>
-                    <label style="display: block; margin-bottom: var(--spacing-xs);">
-                        <input type="radio" name="period" value="yearly" checked required>
-                        Ежегодно (скидка)
-                    </label>
-                </div>
-                <div style="margin-bottom: var(--spacing-md); color: var(--color-text-muted); font-size: 0.9rem;">
-                    <p style="margin: 0;">Цены:</p>
-                    <ul style="margin-top: var(--spacing-xs); padding-left: var(--spacing-lg);">
-                        {% for plan, prices in plan_prices.items %}
-                        <li>{{ plan.label }}: {{ prices.monthly }} ₽/мес, {{ prices.yearly }} ₽/год</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                <button type="submit" class="btn btn-primary">Перейти к оплате</button>
-            </form>
-            {% endif %}
-        </div>
+
+                <form method="get" class="club-subscription-pay-select-form">
+                    <section class="club-subscription-pay-group club-subscription-pay-group--plans">
+                        <div class="club-subscription-pay-group__header">
+                            <span class="club-subscription-pay-group__eyebrow">Тариф</span>
+                            <h3 class="club-subscription-pay-group__title">Выберите план клуба</h3>
+                        </div>
+                        <div class="club-subscription-pay-choice-grid">
+                            <label class="club-subscription-pay-choice">
+                                <input type="radio" name="plan" value="start" {% if not initial_plan or initial_plan == 'start' %}checked{% endif %} required>
+                                <span class="club-subscription-pay-choice__content">
+                                    <span class="club-subscription-pay-choice__title">Старт</span>
+                                    <span class="club-subscription-pay-choice__text">{{ plan_prices.start.monthly }} ₽ / мес · {{ plan_prices.start.yearly }} ₽ / год</span>
+                                </span>
+                            </label>
+                            <label class="club-subscription-pay-choice">
+                                <input type="radio" name="plan" value="basic" {% if initial_plan == 'basic' %}checked{% endif %} required>
+                                <span class="club-subscription-pay-choice__content">
+                                    <span class="club-subscription-pay-choice__title">Базовый</span>
+                                    <span class="club-subscription-pay-choice__text">{{ plan_prices.basic.monthly }} ₽ / мес · {{ plan_prices.basic.yearly }} ₽ / год</span>
+                                </span>
+                            </label>
+                            <label class="club-subscription-pay-choice">
+                                <input type="radio" name="plan" value="pro" {% if initial_plan == 'pro' %}checked{% endif %} required>
+                                <span class="club-subscription-pay-choice__content">
+                                    <span class="club-subscription-pay-choice__title">Про</span>
+                                    <span class="club-subscription-pay-choice__text">{{ plan_prices.pro.monthly }} ₽ / мес · {{ plan_prices.pro.yearly }} ₽ / год</span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="club-subscription-pay-group club-subscription-pay-group--periods">
+                        <div class="club-subscription-pay-group__header">
+                            <span class="club-subscription-pay-group__eyebrow">Срок</span>
+                            <h3 class="club-subscription-pay-group__title">Выберите период оплаты</h3>
+                        </div>
+                        <div class="club-subscription-pay-period-grid">
+                            <label class="club-subscription-pay-period">
+                                <input type="radio" name="period" value="monthly" {% if initial_period == 'monthly' %}checked{% endif %} required>
+                                <span class="club-subscription-pay-period__content">
+                                    <span class="club-subscription-pay-period__title">Помесячно</span>
+                                    <span class="club-subscription-pay-period__text">Гибкий вариант продления</span>
+                                </span>
+                            </label>
+                            <label class="club-subscription-pay-period">
+                                <input type="radio" name="period" value="yearly" {% if not initial_period or initial_period == 'yearly' %}checked{% endif %} required>
+                                <span class="club-subscription-pay-period__content">
+                                    <span class="club-subscription-pay-period__title">Ежегодно</span>
+                                    <span class="club-subscription-pay-period__text">Один платёж за весь период</span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
+
+                    <div class="club-subscription-pay-form__actions">
+                        <button type="submit" class="btn btn-primary">Продолжить</button>
+                    </div>
+                </form>
+            </article>
+        </section>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

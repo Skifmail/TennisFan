@@ -49,6 +49,7 @@ from ..plan_services import (
 from ..services import (
     get_club_current_subscription,
     get_platform_plan,
+    get_platform_plans,
     user_can_edit_club_settings,
 )
 from .helpers import _get_club_payment_settings, _get_current_club_member, logger
@@ -711,6 +712,8 @@ def subscription_view(request: HttpRequest, slug: str) -> HttpResponse:
         return redirect("clubs:dashboard", slug=slug)
     subscription = get_club_current_subscription(club)
     history = club.subscriptions.order_by("-ends_at")[:10]
+    current_plan_slug = subscription.plan if subscription else ClubPlan.START
+    current_platform_plan = get_platform_plan(current_plan_slug)
     return render(
         request,
         "clubs/subscription.html",
@@ -719,6 +722,8 @@ def subscription_view(request: HttpRequest, slug: str) -> HttpResponse:
             "subscription": subscription,
             "history": history,
             "plan_prices": _get_plan_prices_for_subscription(),
+            "platform_plans": get_platform_plans(),
+            "current_platform_plan": current_platform_plan,
             "is_club_panel": True,
         },
     )

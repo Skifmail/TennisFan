@@ -173,6 +173,39 @@ class ClubInviteImportForm(forms.Form):
 class ClubProfileEditForm(forms.ModelForm):
     """Редактирование профиля клуба (название, контакты, описание, публичность)."""
 
+    def __init__(self, *args, **kwargs):
+        """Добавляет компактное оформление и подсказки полям формы клуба."""
+        super().__init__(*args, **kwargs)
+
+        placeholders = {
+            "name": "Например: Теннисный клуб «Спартак»",
+            "city": "Москва",
+            "address": "Улица, дом, корпус",
+            "email": "club@example.com",
+            "phone": "+7 (999) 123-45-67",
+            "admin_name": "Имя ответственного",
+            "description": "Коротко опишите клуб, атмосферу, кортовую базу и формат тренировок.",
+        }
+
+        textarea_rows = {
+            "address": 3,
+            "description": 4,
+        }
+
+        for name, field in self.fields.items():
+            widget = field.widget
+            widget.attrs["class"] = "club-edit-input"
+            if name in placeholders:
+                widget.attrs.setdefault("placeholder", placeholders[name])
+            if name in textarea_rows:
+                widget.attrs["rows"] = textarea_rows[name]
+
+        self.fields["logo"].help_text = "JPG, PNG или WebP до 5 МБ"
+        self.fields["hero_image"].help_text = (
+            "Широкий баннер для публичной страницы клуба. JPG, PNG или WebP."
+        )
+        self.fields["is_public"].widget.attrs["class"] = "club-edit-checkbox"
+
     class Meta:
         model = Club
         fields = [

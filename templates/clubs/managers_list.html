@@ -2,53 +2,303 @@
 {% block title %}Менеджеры — {{ club.name }}{% endblock %}
 {% block content %}
 {% include "clubs/_club_dashboard_nav.html" with current="managers" %}
-<div class="page-header">
-    <h1 class="page-title">Менеджеры</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container" style="max-width: 700px;">
-    <div class="card">
-        <div class="card-body">
-            <p style="color: var(--color-text-muted); margin-bottom: var(--spacing-md);">Назначьте участников менеджерами — они смогут управлять игроками, турнирами и приглашениями (без доступа к настройкам и финансам).</p>
-            <table class="table" style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Участник</th>
-                        <th style="text-align: left; padding: var(--spacing-sm);">Роль</th>
-                        <th style="text-align: right; padding: var(--spacing-sm);">Действие</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for m in members %}
-                    <tr>
-                        <td style="padding: var(--spacing-sm);">{{ m.user.get_full_name|default:m.user.email }}</td>
-                        <td style="padding: var(--spacing-sm);">{{ m.get_role_display }}</td>
-                        <td style="padding: var(--spacing-sm); text-align: right;">
-                            {% if m.role == 'admin' %}
-                            — 
-                            {% elif m.role == 'manager' %}
-                            <form method="post" action="{% url 'clubs:manager_set_role' slug=club.slug %}" style="display: inline;">
-                                {% csrf_token %}
-                                <input type="hidden" name="member_id" value="{{ m.id }}">
-                                <input type="hidden" name="action" value="remove_manager">
-                                <button type="submit" class="btn btn-ghost btn-sm">Убрать права</button>
-                            </form>
+<div class="page-header club-dashboard-page-header">
+    <div class="container club-dashboard-shell club-managers-page">
+        <section class="club-dashboard-hero club-managers-hero">
+            <div class="club-dashboard-hero__main">
+                <div class="club-dashboard-hero__eyebrow-row">
+                    <span class="club-dashboard-hero__eyebrow">Штаб клуба</span>
+                    <span class="club-dashboard-hero__status-pill">{{ managers_count }} менеджеров в системе</span>
+                </div>
+
+                <div class="club-dashboard-hero__identity">
+                    {% if club.logo %}
+                    <img src="{{ club.logo.url }}" alt="{{ club.name }}" class="club-dashboard-page-header__logo">
+                    {% else %}
+                    <div class="club-dashboard-page-header__logo-fallback">
+                        {{ club.name|first|upper }}
+                    </div>
+                    {% endif %}
+
+                    <div class="club-dashboard-hero__copy">
+                        <h1 class="page-title club-dashboard-page-header__title">Менеджеры</h1>
+                        <p class="club-dashboard-page-header__subtitle">{{ club.name }}</p>
+                        <p class="club-dashboard-hero__summary">
+                            Назначайте ответственных за игроков, турниры и приглашения. Финансы и настройки клуба остаются у администратора.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="club-dashboard-hero__actions">
+                    <a href="{% url 'clubs:members_list' slug=club.slug %}" class="btn btn-primary club-dashboard-hero__cta">Открыть состав клуба</a>
+                    <a href="{% url 'clubs:invites_list' slug=club.slug %}" class="btn btn-ghost">Проверить приглашения</a>
+                </div>
+            </div>
+
+            <aside class="club-dashboard-hero__side club-managers-hero__side">
+                <div class="club-dashboard-hero__side-card">
+                    <div class="club-dashboard-hero__side-label">Контур доступа</div>
+                    <div class="club-dashboard-hero__side-value">{{ admins_count|add:managers_count }}</div>
+                    <div class="club-dashboard-hero__side-meta">
+                        Администраторы и менеджеры формируют управляющий состав клуба и отвечают за ежедневные операции.
+                    </div>
+                </div>
+                <div class="club-dashboard-hero__mini-stats">
+                    <div class="club-dashboard-hero__mini-stat">
+                        <span class="club-dashboard-hero__mini-value">{{ admins_count }}</span>
+                        <span class="club-dashboard-hero__mini-label">админов</span>
+                    </div>
+                    <div class="club-dashboard-hero__mini-stat">
+                        <span class="club-dashboard-hero__mini-value">{{ managers_count }}</span>
+                        <span class="club-dashboard-hero__mini-label">менеджеров</span>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="club-dashboard-kpi-grid club-managers-kpi-grid">
+            <article class="club-dashboard-kpi-card club-dashboard-kpi-card--accent">
+                <div class="club-dashboard-kpi-card__label">Управляющий состав</div>
+                <div class="club-dashboard-kpi-card__value">{{ managers_total }}</div>
+                <div class="club-dashboard-kpi-card__delta">Все ответственные по клубу</div>
+                <div class="club-dashboard-kpi-card__meta">Здесь только администраторы и действующие менеджеры.</div>
+            </article>
+            <article class="club-dashboard-kpi-card">
+                <div class="club-dashboard-kpi-card__label">Менеджеры</div>
+                <div class="club-dashboard-kpi-card__value">{{ managers_count }}</div>
+                <div class="club-dashboard-kpi-card__delta">Могут вести операционку</div>
+                <div class="club-dashboard-kpi-card__meta">Игроки, турниры и приглашения без доступа к финансам.</div>
+            </article>
+            <article class="club-dashboard-kpi-card club-dashboard-kpi-card--warning">
+                <div class="club-dashboard-kpi-card__label">Администраторы</div>
+                <div class="club-dashboard-kpi-card__value">{{ admins_count }}</div>
+                <div class="club-dashboard-kpi-card__delta">Полный контроль</div>
+                <div class="club-dashboard-kpi-card__meta">Настройки, финансы, доступы и назначение менеджеров.</div>
+            </article>
+        </section>
+
+        <section class="club-dashboard-panel club-managers-panel">
+            <div class="club-dashboard-panel__header club-managers-panel__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">Роли и доступ</p>
+                    <h2 class="club-dashboard-panel__title">Управляющий состав клуба</h2>
+                </div>
+                <p class="club-managers-panel__meta">Обычные участники не показываются здесь. Добавление новых менеджеров идёт через поиск ниже.</p>
+            </div>
+
+            <div class="club-managers-board">
+                <div class="club-managers-board__head" role="row">
+                    <span>Участник</span>
+                    <span>Текущая роль</span>
+                    <span>Права</span>
+                    <span class="club-managers-board__actions-head">Действие</span>
+                </div>
+                {% for m in managers %}
+                <article class="club-managers-row" role="row">
+                    <div class="club-managers-person">
+                        {% if m.user.player and m.user.player.avatar %}
+                        <img src="{{ m.user.player.avatar.url }}" alt="{{ m.user.get_full_name|default:m.user.email }}" class="club-members-person__avatar">
+                        {% else %}
+                        <span class="club-members-person__avatar club-members-person__avatar--fallback">
+                            {% if m.user.first_name %}
+                            {{ m.user.first_name|slice:":1"|upper }}
                             {% else %}
-                            <form method="post" action="{% url 'clubs:manager_set_role' slug=club.slug %}" style="display: inline;">
-                                {% csrf_token %}
-                                <input type="hidden" name="member_id" value="{{ m.id }}">
-                                <input type="hidden" name="action" value="set_manager">
-                                <button type="submit" class="btn btn-primary btn-sm">Сделать менеджером</button>
-                            </form>
+                            {{ m.user.email|slice:":1"|upper }}
                             {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="3" style="padding: var(--spacing-md); color: var(--color-text-muted);">Нет участников.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                        </span>
+                        {% endif %}
+                        <div class="club-managers-person__content">
+                            <div class="club-managers-person__name">{{ m.user.get_full_name|default:"Без имени" }}</div>
+                            <div class="club-managers-person__email">{{ m.user.email }}</div>
+                        </div>
+                    </div>
+
+                    <div class="club-managers-cell">
+                        <span class="club-members-badge club-managers-role-badge {% if m.role == 'admin' %}club-managers-role-badge--admin{% elif m.role == 'manager' %}club-managers-role-badge--manager{% else %}club-managers-role-badge--player{% endif %}">
+                            {{ m.get_role_display }}
+                        </span>
+                    </div>
+
+                    <div class="club-managers-cell club-managers-permission">
+                        {% if m.role == 'admin' %}
+                        Полный доступ ко всем разделам клуба
+                        {% elif m.role == 'manager' %}
+                        Управление составом, турнирами и приглашениями
+                        {% else %}
+                        Игровой кабинет без управленческих прав
+                        {% endif %}
+                    </div>
+
+                    <div class="club-managers-actions">
+                        {% if m.role == 'admin' %}
+                        <span class="club-managers-actions__locked">Роль администратора защищена</span>
+                        {% else %}
+                        <form method="post" action="{% url 'clubs:manager_set_role' slug=club.slug %}" class="club-managers-actions__form">
+                            {% csrf_token %}
+                            <input type="hidden" name="member_id" value="{{ m.id }}">
+                            <input type="hidden" name="action" value="remove_manager">
+                            <button type="submit" class="btn btn-ghost btn-sm">Убрать права</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </article>
+                {% empty %}
+                <div class="club-dashboard-empty-state club-managers-empty-state">
+                    <div class="club-dashboard-empty-state__title">Управляющий состав пока не собран</div>
+                    <div class="club-dashboard-empty-state__text">В клубе должен быть хотя бы один администратор. Добавить менеджеров можно через поиск по участникам ниже.</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="club-members-mobile-list club-managers-mobile-list">
+                {% for m in managers %}
+                <article class="club-members-mobile-card club-managers-mobile-card">
+                    <div class="club-managers-person">
+                        {% if m.user.player and m.user.player.avatar %}
+                        <img src="{{ m.user.player.avatar.url }}" alt="{{ m.user.get_full_name|default:m.user.email }}" class="club-members-person__avatar">
+                        {% else %}
+                        <span class="club-members-person__avatar club-members-person__avatar--fallback">
+                            {% if m.user.first_name %}
+                            {{ m.user.first_name|slice:":1"|upper }}
+                            {% else %}
+                            {{ m.user.email|slice:":1"|upper }}
+                            {% endif %}
+                        </span>
+                        {% endif %}
+                        <div class="club-managers-person__content">
+                            <div class="club-managers-person__name">{{ m.user.get_full_name|default:"Без имени" }}</div>
+                            <div class="club-managers-person__email">{{ m.user.email }}</div>
+                        </div>
+                    </div>
+
+                    <div class="club-members-mobile-card__grid club-managers-mobile-card__grid">
+                        <div>
+                            <span class="club-members-mobile-card__label">Роль</span>
+                            <span class="club-members-badge club-managers-role-badge {% if m.role == 'admin' %}club-managers-role-badge--admin{% elif m.role == 'manager' %}club-managers-role-badge--manager{% else %}club-managers-role-badge--player{% endif %}">
+                                {{ m.get_role_display }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="club-members-mobile-card__label">Доступ</span>
+                            <span class="club-members-mobile-card__value">
+                                {% if m.role == 'admin' %}
+                                Полный
+                                {% elif m.role == 'manager' %}
+                                Операционный
+                                {% else %}
+                                Базовый
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="club-managers-mobile-card__note">
+                        {% if m.role == 'admin' %}
+                        Администратор управляет всеми разделами клуба, включая финансы и настройки.
+                        {% elif m.role == 'manager' %}
+                        Менеджер может вести состав, турниры и приглашения без доступа к финансам.
+                        {% else %}
+                        Игрок участвует в жизни клуба без управленческих полномочий.
+                        {% endif %}
+                    </div>
+
+                    <div class="club-members-mobile-card__actions club-managers-mobile-card__actions">
+                        {% if m.role == 'admin' %}
+                        <span class="club-managers-actions__locked">Роль администратора защищена</span>
+                        {% else %}
+                        <form method="post" action="{% url 'clubs:manager_set_role' slug=club.slug %}" class="club-managers-actions__form">
+                            {% csrf_token %}
+                            <input type="hidden" name="member_id" value="{{ m.id }}">
+                            <input type="hidden" name="action" value="remove_manager">
+                            <button type="submit" class="btn btn-ghost btn-sm">Убрать права</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </article>
+                {% empty %}
+                <div class="club-members-mobile-list__empty">
+                    Управляющий состав пока не собран.
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="club-dashboard-panel club-managers-panel club-managers-search-panel">
+            <div class="club-managers-search-intro">
+                <div class="club-managers-search-intro__copy">
+                    <p class="club-dashboard-panel__eyebrow">Добавление менеджеров</p>
+                    <h2 class="club-dashboard-panel__title">Найти участника по имени</h2>
+                    <p class="club-managers-search-intro__text">Ищите по имени, фамилии или email среди активных игроков клуба без управленческой роли.</p>
+                </div>
+            </div>
+
+            <form method="get" class="club-managers-search-form">
+                <label class="club-managers-search-field">
+                    <span class="club-managers-search-field__label">Имя, фамилия или email</span>
+                </label>
+                <div class="club-managers-search-controls">
+                    <input type="text" name="q" value="{{ search }}" placeholder="Например, Иван Иванов">
+                    <div class="club-managers-search-form__actions">
+                        <button type="submit" class="btn btn-primary">Найти участника</button>
+                        {% if search %}
+                        <a href="{% url 'clubs:managers_list' slug=club.slug %}" class="btn btn-ghost">Сбросить</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </form>
+
+            {% if search %}
+            <div class="club-managers-search-summary">
+                Найдено {{ candidate_count }} участников{% if candidate_count > 12 %}, показаны первые 12{% endif %}.
+            </div>
+
+            <div class="club-managers-search-results">
+                {% for m in candidate_members %}
+                <article class="club-managers-search-card">
+                    <div class="club-managers-person">
+                        {% if m.user.player and m.user.player.avatar %}
+                        <img src="{{ m.user.player.avatar.url }}" alt="{{ m.user.get_full_name|default:m.user.email }}" class="club-members-person__avatar">
+                        {% else %}
+                        <span class="club-members-person__avatar club-members-person__avatar--fallback">
+                            {% if m.user.first_name %}
+                            {{ m.user.first_name|slice:":1"|upper }}
+                            {% else %}
+                            {{ m.user.email|slice:":1"|upper }}
+                            {% endif %}
+                        </span>
+                        {% endif %}
+                        <div class="club-managers-person__content">
+                            <div class="club-managers-person__name">{{ m.user.get_full_name|default:"Без имени" }}</div>
+                            <div class="club-managers-person__email">{{ m.user.email }}</div>
+                        </div>
+                    </div>
+
+                    <div class="club-managers-search-card__meta">
+                        <span class="club-members-badge club-managers-role-badge club-managers-role-badge--player">Игрок</span>
+                        <span class="club-managers-search-card__hint">Будет назначен менеджером клуба</span>
+                    </div>
+
+                    <form method="post" action="{% url 'clubs:manager_set_role' slug=club.slug %}" class="club-managers-actions__form">
+                        {% csrf_token %}
+                        <input type="hidden" name="member_id" value="{{ m.id }}">
+                        <input type="hidden" name="action" value="set_manager">
+                        <button type="submit" class="btn btn-primary btn-sm">Сделать менеджером</button>
+                    </form>
+                </article>
+                {% empty %}
+                <div class="club-dashboard-empty-state">
+                    <div class="club-dashboard-empty-state__title">Подходящих участников не найдено</div>
+                    <div class="club-dashboard-empty-state__text">Проверьте запрос. Поиск идёт по имени, фамилии и email среди активных игроков клуба без управленческой роли.</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="club-dashboard-empty-state club-managers-search-empty">
+                <div class="club-dashboard-empty-state__title">Начните с поиска</div>
+                <div class="club-dashboard-empty-state__text">Введите имя или фамилию участника, чтобы быстро выдать ему права менеджера без показа всего состава клуба.</div>
+            </div>
+            {% endif %}
+        </section>
     </div>
 </div>
 {% endblock %}

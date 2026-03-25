@@ -1,66 +1,349 @@
 {% extends "base.html" %}
 {% block title %}Подписка — {{ club.name }}{% endblock %}
+
 {% block content %}
 {% include "clubs/_club_dashboard_nav.html" with current="subscription" %}
-<div class="page-header">
-    <h1 class="page-title">Подписка клуба</h1>
-    <p class="page-subtitle">{{ club.name }}</p>
-</div>
-<div class="container" style="max-width: 640px;">
-    {% if subscription %}
-        <div class="card" style="margin-bottom: var(--spacing-lg);">
-            <div class="card-body">
-                <h2 style="font-size: 1.25rem; margin-bottom: var(--spacing-sm);">Текущий тариф</h2>
-                <p style="margin: 0;">
-                    <strong>{{ subscription.get_plan_display }}</strong>
-                    · до {{ subscription.ends_at|date:"d.m.Y" }}
-                </p>
-                <p style="margin-top: var(--spacing-md);">
-                    <a href="{% url 'clubs:subscription_pay' slug=club.slug %}" class="btn btn-primary">Продлить</a>
-                </p>
-            </div>
-        </div>
-    {% else %}
-        <div class="card" style="margin-bottom: var(--spacing-lg);">
-            <div class="card-body">
-                <p style="margin: 0; color: var(--color-text-muted);">Подписка не активна.</p>
-                <p style="margin-top: var(--spacing-md);">
-                    <a href="{% url 'clubs:subscription_pay' slug=club.slug %}" class="btn btn-primary">Оформить подписку</a>
-                </p>
-            </div>
-        </div>
-    {% endif %}
 
-    <div class="card">
-        <div class="card-body">
-            <h2 style="font-size: 1.1rem; margin-bottom: var(--spacing-md);">История подписок</h2>
-            {% if history %}
-                <table class="table" style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr>
-                            <th style="text-align: left; padding: var(--spacing-sm);">Тариф</th>
-                            <th style="text-align: left; padding: var(--spacing-sm);">Период</th>
-                            <th style="text-align: left; padding: var(--spacing-sm);">Начало</th>
-                            <th style="text-align: left; padding: var(--spacing-sm);">Окончание</th>
-                            <th style="text-align: left; padding: var(--spacing-sm);">Статус</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+<div class="page-header club-dashboard-page-header">
+    <div class="container club-dashboard-shell club-subscription-page">
+        <section class="club-dashboard-hero club-subscription-hero">
+            <div class="club-dashboard-hero__main">
+                <div class="club-dashboard-hero__eyebrow-row">
+                    <span class="club-dashboard-hero__eyebrow">Платформа и доступы</span>
+                    {% if subscription %}
+                    <span class="club-dashboard-hero__status-pill">
+                        {{ subscription.get_plan_display }} до {{ subscription.ends_at|date:"d.m.Y" }}
+                    </span>
+                    {% else %}
+                    <span class="club-dashboard-hero__status-pill">Подписка не активна</span>
+                    {% endif %}
+                </div>
+
+                <div class="club-dashboard-hero__identity">
+                    {% if club.logo %}
+                    <img src="{{ club.logo.url }}" alt="{{ club.name }}" class="club-dashboard-page-header__logo">
+                    {% else %}
+                    <div class="club-dashboard-page-header__logo-fallback">
+                        {{ club.name|first|upper }}
+                    </div>
+                    {% endif %}
+
+                    <div class="club-dashboard-hero__copy">
+                        <h1 class="page-title club-dashboard-page-header__title">Подписка клуба</h1>
+                        <p class="club-dashboard-page-header__subtitle">{{ club.name }}</p>
+                        <p class="club-dashboard-hero__summary">
+                            Управляйте тарифом платформы, сроками продления и историей подписок в том же клубном интерфейсе, без выбивающихся по стилю карточек.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="club-dashboard-hero__actions">
+                    {% if subscription %}
+                    <a href="{% url 'clubs:subscription_pay' slug=club.slug %}" class="btn btn-primary club-dashboard-hero__cta">Продлить подписку</a>
+                    {% else %}
+                    <a href="{% url 'clubs:subscription_pay' slug=club.slug %}" class="btn btn-primary club-dashboard-hero__cta">Подключить тариф</a>
+                    {% endif %}
+                    <a href="{% url 'clubs:dashboard' slug=club.slug %}" class="btn btn-ghost">Вернуться в дашборд</a>
+                </div>
+            </div>
+
+            <aside class="club-dashboard-hero__side club-subscription-hero__side">
+                <div class="club-dashboard-hero__side-card">
+                    <div class="club-dashboard-hero__side-label">Состояние доступа</div>
+                    <div class="club-dashboard-hero__side-value">
+                        {% if subscription %}активен{% else %}пауза{% endif %}
+                    </div>
+                    <div class="club-dashboard-hero__side-meta">
+                        {% if subscription %}
+                        Тариф платформы действует до {{ subscription.ends_at|date:"d.m.Y" }} и сохраняет доступ к управлению клубом.
+                        {% else %}
+                        Без активной подписки клубный кабинет может быть ограничен. Продлите тариф, чтобы сохранить рабочий режим.
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="club-dashboard-hero__mini-stats">
+                    <div class="club-dashboard-hero__mini-stat">
+                        <span class="club-dashboard-hero__mini-value">{% if subscription %}{{ subscription.get_plan_display }}{% else %}нет{% endif %}</span>
+                        <span class="club-dashboard-hero__mini-label">текущий тариф</span>
+                    </div>
+                    <div class="club-dashboard-hero__mini-stat">
+                        <span class="club-dashboard-hero__mini-value">{{ history|length }}</span>
+                        <span class="club-dashboard-hero__mini-label">записей в истории</span>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="club-dashboard-kpi-grid club-subscription-kpi-grid">
+            <article class="club-dashboard-kpi-card club-dashboard-kpi-card--accent">
+                <div class="club-dashboard-kpi-card__label">Текущий план</div>
+                <div class="club-dashboard-kpi-card__value">{% if subscription %}{{ subscription.get_plan_display }}{% else %}Нет{% endif %}</div>
+                <div class="club-dashboard-kpi-card__delta">Платформенный тариф клуба</div>
+                <div class="club-dashboard-kpi-card__meta">
+                    {% if subscription %}
+                    Активный период: {{ subscription.get_period_display|lower }}.
+                    {% else %}
+                    Подписка ещё не оформлена или уже завершена.
+                    {% endif %}
+                </div>
+            </article>
+            <article class="club-dashboard-kpi-card">
+                <div class="club-dashboard-kpi-card__label">Срок действия</div>
+                <div class="club-dashboard-kpi-card__value">{% if subscription %}{{ subscription.ends_at|date:"d.m.Y" }}{% else %}--{% endif %}</div>
+                <div class="club-dashboard-kpi-card__delta">Ближайшая контрольная дата</div>
+                <div class="club-dashboard-kpi-card__meta">
+                    {% if subscription %}
+                    Продление лучше запускать заранее, чтобы не останавливать кабинет клуба.
+                    {% else %}
+                    После активации здесь появится дата окончания периода.
+                    {% endif %}
+                </div>
+            </article>
+            <article class="club-dashboard-kpi-card club-dashboard-kpi-card--warning">
+                <div class="club-dashboard-kpi-card__label">Период оплаты</div>
+                <div class="club-dashboard-kpi-card__value">{% if subscription %}{{ subscription.get_period_display }}{% else %}Не выбран{% endif %}</div>
+                <div class="club-dashboard-kpi-card__delta">Формат текущего продления</div>
+                <div class="club-dashboard-kpi-card__meta">
+                    {% if subscription %}
+                    Текущая подписка работает в режиме {{ subscription.get_period_display|lower }}. Период можно сменить на странице оплаты.
+                    {% else %}
+                    После подключения подписки здесь будет показан выбранный формат оплаты: помесячно или ежегодно.
+                    {% endif %}
+                </div>
+            </article>
+        </section>
+
+        <section class="club-dashboard-main-grid club-subscription-main-grid">
+            <div class="club-subscription-main-grid__primary">
+                <article class="club-dashboard-panel club-subscription-current">
+                    <div class="club-dashboard-panel__header">
+                        <div>
+                            <p class="club-dashboard-panel__eyebrow">Текущий статус</p>
+                            <h2 class="club-dashboard-panel__title">Карточка подписки</h2>
+                        </div>
+                    </div>
+
+                    {% if subscription %}
+                    <div class="club-subscription-current__status">
+                        <span class="club-subscription-badge club-subscription-badge--active">{{ subscription.get_status_display }}</span>
+                        <span class="club-subscription-current__text">
+                            {{ subscription.get_plan_display }} · {{ subscription.get_period_display|lower }} · до {{ subscription.ends_at|date:"d.m.Y" }}
+                        </span>
+                    </div>
+
+                    <div class="club-subscription-current__rows">
+                        <div class="club-subscription-current__row">
+                            <span class="club-subscription-current__label">Тариф</span>
+                            <span class="club-subscription-current__value">{{ subscription.get_plan_display }}</span>
+                        </div>
+                        <div class="club-subscription-current__row">
+                            <span class="club-subscription-current__label">Период</span>
+                            <span class="club-subscription-current__value">{{ subscription.get_period_display }}</span>
+                        </div>
+                        <div class="club-subscription-current__row">
+                            <span class="club-subscription-current__label">Начало</span>
+                            <span class="club-subscription-current__value">{{ subscription.started_at|date:"d.m.Y" }}</span>
+                        </div>
+                        <div class="club-subscription-current__row">
+                            <span class="club-subscription-current__label">Окончание</span>
+                            <span class="club-subscription-current__value">{{ subscription.ends_at|date:"d.m.Y" }}</span>
+                        </div>
+                    </div>
+
+                    {% if current_platform_plan %}
+                    <div class="club-subscription-features">
+                        <div class="club-subscription-features__title">Что входит в тариф</div>
+                        {% if current_platform_plan.description %}
+                        <p class="club-subscription-features__description">{{ current_platform_plan.description }}</p>
+                        {% endif %}
+                        <div class="club-subscription-features__grid">
+                            <div class="club-subscription-feature">
+                                <span class="club-subscription-feature__label">Участники клуба</span>
+                                <span class="club-subscription-feature__value">
+                                    {% if current_platform_plan.max_members %}
+                                    До {{ current_platform_plan.max_members }}
+                                    {% else %}
+                                    Без лимита
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="club-subscription-feature">
+                                <span class="club-subscription-feature__label">Турниры в месяц</span>
+                                <span class="club-subscription-feature__value">
+                                    {% if current_platform_plan.max_tournaments_per_month %}
+                                    До {{ current_platform_plan.max_tournaments_per_month }}
+                                    {% else %}
+                                    Без лимита
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="club-subscription-feature">
+                                <span class="club-subscription-feature__label">Публичная страница</span>
+                                <span class="club-subscription-feature__value">
+                                    {% if current_platform_plan.is_public_page %}Доступна{% else %}Недоступна{% endif %}
+                                </span>
+                            </div>
+                            <div class="club-subscription-feature">
+                                <span class="club-subscription-feature__label">Межклубные турниры</span>
+                                <span class="club-subscription-feature__value">
+                                    {% if current_platform_plan.is_open_interclub %}Включены{% else %}Не входят{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="club-subscription-current__actions">
+                        <a href="{% url 'clubs:subscription_pay' slug=club.slug %}" class="btn btn-primary">Продлить текущий тариф</a>
+                        <a href="{% url 'clubs:subscription_pay' slug=club.slug %}?plan=pro&period=yearly" class="btn btn-ghost">Перейти на Про</a>
+                    </div>
+                    {% else %}
+                    <div class="club-dashboard-empty-state club-subscription-empty-state">
+                        <div class="club-dashboard-empty-state__title">Активной подписки сейчас нет</div>
+                        <div class="club-dashboard-empty-state__text">
+                            Подключите тариф платформы, чтобы сохранить доступ к управлению клубом, турнирам, рейтингам и финансовым разделам.
+                        </div>
+                    </div>
+
+                    <div class="club-subscription-current__actions">
+                        <a href="{% url 'clubs:subscription_pay' slug=club.slug %}" class="btn btn-primary">Оформить подписку</a>
+                    </div>
+                    {% endif %}
+                </article>
+
+                <section class="club-dashboard-panel club-subscription-history-panel">
+                    <div class="club-dashboard-panel__header club-subscription-history-panel__header">
+                        <div>
+                            <p class="club-dashboard-panel__eyebrow">Архив платежных периодов</p>
+                            <h2 class="club-dashboard-panel__title">История подписок</h2>
+                        </div>
+                        <p class="club-subscription-history-panel__meta">Последние 10 периодов по клубу, чтобы быстро проверить продления и завершённые тарифы.</p>
+                    </div>
+
+                    {% if history %}
+                    <div class="club-subscription-history-table">
+                        <div class="club-subscription-history-table__head" role="row">
+                            <span>Тариф</span>
+                            <span>Период</span>
+                            <span>Начало</span>
+                            <span>Окончание</span>
+                            <span class="club-subscription-history-table__status-head">Статус</span>
+                        </div>
                         {% for s in history %}
-                        <tr>
-                            <td style="padding: var(--spacing-sm);">{{ s.get_plan_display }}</td>
-                            <td style="padding: var(--spacing-sm);">{{ s.get_period_display }}</td>
-                            <td style="padding: var(--spacing-sm);">{{ s.started_at|date:"d.m.Y" }}</td>
-                            <td style="padding: var(--spacing-sm);">{{ s.ends_at|date:"d.m.Y" }}</td>
-                            <td style="padding: var(--spacing-sm);">{{ s.get_status_display }}</td>
-                        </tr>
+                        <article class="club-subscription-history-row" role="row">
+                            <div class="club-subscription-history-row__plan">{{ s.get_plan_display }}</div>
+                            <div class="club-subscription-history-row__period">{{ s.get_period_display }}</div>
+                            <div class="club-subscription-history-row__date">{{ s.started_at|date:"d.m.Y" }}</div>
+                            <div class="club-subscription-history-row__date">{{ s.ends_at|date:"d.m.Y" }}</div>
+                            <div class="club-subscription-history-row__status">
+                                <span class="club-subscription-badge {% if s.status == 'active' %}club-subscription-badge--active{% else %}club-subscription-badge--inactive{% endif %}">
+                                    {{ s.get_status_display }}
+                                </span>
+                            </div>
+                        </article>
                         {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p style="margin: 0; color: var(--color-text-muted);">Истории нет.</p>
-            {% endif %}
-        </div>
+                    </div>
+
+                    <div class="club-subscription-history-mobile">
+                        {% for s in history %}
+                        <article class="club-members-mobile-card club-subscription-history-mobile__card">
+                            <div class="club-subscription-history-mobile__top">
+                                <div class="club-subscription-history-mobile__plan">{{ s.get_plan_display }}</div>
+                                <span class="club-subscription-badge {% if s.status == 'active' %}club-subscription-badge--active{% else %}club-subscription-badge--inactive{% endif %}">
+                                    {{ s.get_status_display }}
+                                </span>
+                            </div>
+
+                            <div class="club-members-mobile-card__grid">
+                                <div>
+                                    <span class="club-members-mobile-card__label">Период</span>
+                                    <span class="club-members-mobile-card__value">{{ s.get_period_display }}</span>
+                                </div>
+                                <div>
+                                    <span class="club-members-mobile-card__label">Начало</span>
+                                    <span class="club-members-mobile-card__value">{{ s.started_at|date:"d.m.Y" }}</span>
+                                </div>
+                                <div>
+                                    <span class="club-members-mobile-card__label">Окончание</span>
+                                    <span class="club-members-mobile-card__value">{{ s.ends_at|date:"d.m.Y" }}</span>
+                                </div>
+                            </div>
+                        </article>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="club-dashboard-empty-state">
+                        <div class="club-dashboard-empty-state__title">История подписок пока пуста</div>
+                        <div class="club-dashboard-empty-state__text">После первого оплаченного периода здесь появится журнал продлений и завершённых тарифов.</div>
+                    </div>
+                    {% endif %}
+                </section>
+            </div>
+
+            <article class="club-dashboard-panel club-subscription-offers">
+                <div class="club-dashboard-panel__header">
+                    <div>
+                        <p class="club-dashboard-panel__eyebrow">Тарифы платформы</p>
+                        <h2 class="club-dashboard-panel__title">Быстрый выбор плана</h2>
+                    </div>
+                </div>
+
+                <div class="club-subscription-offers__grid">
+                    {% for plan in platform_plans %}
+                    <article class="club-subscription-offer {% if plan.slug == 'basic' %}club-subscription-offer--featured{% endif %}{% if current_platform_plan and plan.slug == current_platform_plan.slug %} club-subscription-offer--current{% endif %}">
+                        <div class="club-subscription-offer__top">
+                            <div class="club-subscription-offer__heading">
+                                <span class="club-subscription-offer__name">{{ plan.name }}</span>
+                                <span class="club-subscription-offer__slug">{{ plan.slug|upper }}</span>
+                            </div>
+                            <span class="club-subscription-offer__badge">
+                                {% if current_platform_plan and plan.slug == current_platform_plan.slug %}
+                                Текущий план
+                                {% elif plan.slug == 'start' %}
+                                Для запуска
+                                {% elif plan.slug == 'basic' %}
+                                Оптимальный
+                                {% else %}
+                                Максимум
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% if plan.description %}
+                        <p class="club-subscription-offer__description">{{ plan.description }}</p>
+                        {% endif %}
+                        <div class="club-subscription-offer__price-panel">
+                            <div class="club-subscription-offer__price">
+                                <span class="club-subscription-offer__price-value">{{ plan.price_monthly }}</span>
+                                <span class="club-subscription-offer__price-unit">₽ / мес</span>
+                            </div>
+                            <div class="club-subscription-offer__price club-subscription-offer__price--secondary">
+                                <span class="club-subscription-offer__price-value">{{ plan.price_yearly }}</span>
+                                <span class="club-subscription-offer__price-unit">₽ / год</span>
+                            </div>
+                        </div>
+                        <div class="club-subscription-offer__features">
+                            <span class="club-subscription-offer__feature">
+                                {% if plan.max_members %}До {{ plan.max_members }} участников{% else %}Без лимита участников{% endif %}
+                            </span>
+                            <span class="club-subscription-offer__feature">
+                                {% if plan.max_tournaments_per_month %}До {{ plan.max_tournaments_per_month }} турниров в месяц{% else %}Без лимита турниров{% endif %}
+                            </span>
+                            <span class="club-subscription-offer__feature">
+                                {% if plan.is_public_page %}Публичная страница клуба{% else %}Без публичной страницы{% endif %}
+                            </span>
+                            <span class="club-subscription-offer__feature">
+                                {% if plan.is_open_interclub %}Межклубные турниры включены{% else %}Межклубный режим не входит{% endif %}
+                            </span>
+                        </div>
+                        <div class="club-subscription-offer__actions">
+                            <a href="{% url 'clubs:subscription_pay' slug=club.slug %}?plan={{ plan.slug }}&period=monthly" class="btn btn-ghost btn-sm">Месяц</a>
+                            <a href="{% url 'clubs:subscription_pay' slug=club.slug %}?plan={{ plan.slug }}&period=yearly" class="btn btn-primary btn-sm">Год</a>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
     </div>
 </div>
 {% endblock %}

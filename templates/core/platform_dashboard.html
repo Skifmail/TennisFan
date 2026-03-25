@@ -90,9 +90,15 @@
                                 {% endfor %}
                             </select>
                         </label>
-                        <button type="submit" class="btn btn-ghost">Применить</button>
+                        <button
+                            type="submit"
+                            class="btn btn-outline club-dashboard-finance-action-btn"
+                        >Применить</button>
                     </form>
-                    <a href="{% url 'admin:payments_paymentrecord_changelist' %}" class="club-dashboard-panel__link">Все платежи</a>
+                    <a
+                        href="{% url 'admin:payments_paymentrecord_changelist' %}"
+                        class="btn btn-outline club-dashboard-finance-action-btn"
+                    >Все платежи</a>
                 </div>
             </div>
             <p class="club-dashboard-finance__summary">{{ finance_summary }}</p>

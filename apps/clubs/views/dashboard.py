@@ -1598,15 +1598,56 @@ def managers_view(request: HttpRequest, slug: str) -> HttpResponse:
             "Клуб приостановлен. Продлите подписку для возобновления доступа.",
         )
         return redirect("clubs:club_public_detail", slug=slug)
-    members = (
+    search = (request.GET.get("q") or "").strip()
+    active_members = (
         club.members.filter(status=ClubMemberStatus.ACTIVE)
-        .select_related("user")
+        .select_related("user", "user__player")
         .order_by("user__email")
     )
+    managers = active_members.filter(
+        role__in=(ClubMemberRole.ADMIN, ClubMemberRole.MANAGER)
+    ).order_by("role", "user__first_name", "user__last_name", "user__email")
+    candidate_members_qs = active_members.filter(role=ClubMemberRole.PLAYER).order_by(
+        "user__first_name", "user__last_name", "user__email"
+    )
+    candidate_members: list[ClubMember] = []
+    candidate_count = 0
+    if search:
+        search_normalized = search.casefold()
+        for member in candidate_members_qs:
+            first_name = (member.user.first_name or "").casefold()
+            last_name = (member.user.last_name or "").casefold()
+            full_name = (
+                (f"{member.user.first_name or ''} {member.user.last_name or ''}")
+                .strip()
+                .casefold()
+            )
+            email = (member.user.email or "").casefold()
+            if (
+                search_normalized in first_name
+                or search_normalized in last_name
+                or search_normalized in full_name
+                or search_normalized in email
+            ):
+                candidate_members.append(member)
+    managers_count = managers.filter(role=ClubMemberRole.MANAGER).count()
+    admins_count = managers.filter(role=ClubMemberRole.ADMIN).count()
+    if search:
+        candidate_count = len(candidate_members)
     return render(
         request,
         "clubs/managers_list.html",
-        {"club": club, "members": members, "is_club_panel": True},
+        {
+            "club": club,
+            "managers": managers,
+            "candidate_members": candidate_members[:12] if search else [],
+            "is_club_panel": True,
+            "search": search,
+            "managers_total": managers.count(),
+            "managers_count": managers_count,
+            "admins_count": admins_count,
+            "candidate_count": candidate_count,
+        },
     )
 
 

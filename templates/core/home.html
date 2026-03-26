@@ -66,7 +66,7 @@
             <div class="live-results__header">
                 <span class="live-results__title">Результаты матчей</span>
                 <div class="live-results__tabs" role="tablist">
-                    <button type="button" class="live-results__tab live-results__tab--active" data-tab="played">
+                    <button type="button" class="live-results__tab live-results__tab--active" data-tab="played" id="live-results-tab-played">
                         Сыгранные матчи
                     </button>
                     <button type="button" class="live-results__tab" data-tab="upcoming">
@@ -104,7 +104,7 @@
                 </a>
                 </div>
                 {% empty %}
-                <div class="live-results__empty">Нет сыгранных матчей</div>
+                <div class="live-results__empty live-results__empty--hint">Ищем последние матчи...</div>
                 {% endfor %}
             </div>
         </div>
@@ -340,6 +340,7 @@
 
 <script id="live-results-data" type="application/json">{{ recent_matches_json|safe }}</script>
 <script id="live-upcoming-data" type="application/json">{{ upcoming_matches_json|safe }}</script>
+<script id="live-fallback-data" type="application/json">{{ live_results_fallback_cards_json|safe }}</script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     var listEl = document.getElementById('live-results-list');
@@ -347,8 +348,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var dataEl = document.getElementById('live-results-data');
     var dataUpcomingEl = document.getElementById('live-upcoming-data');
+    var playedTabEl = document.getElementById('live-results-tab-played');
     var matchesPlayed = [];
     var matchesUpcoming = [];
+    var fallbackCards = [];
     var matches = [];
     var currentTab = 'played';
     try {
@@ -359,27 +362,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (dataUpcomingEl && dataUpcomingEl.textContent) {
             matchesUpcoming = JSON.parse(dataUpcomingEl.textContent);
         }
+        var fallbackDataEl = document.getElementById('live-fallback-data');
+        if (fallbackDataEl && fallbackDataEl.textContent) {
+            fallbackCards = JSON.parse(fallbackDataEl.textContent);
+        }
     } catch (e) {}
 
     function cls(v) { return v > 0 ? 'up' : (v < 0 ? 'down' : 'none'); }
-    function renderSkeletonRows(count) {
-        var rows = [];
-        for (var i = 0; i < count; i++) {
-            rows.push(
-                '<div class="live-results__row-wrap">' +
-                '<div class="live-results__row skeleton-card" style="padding:12px; min-height:72px;">' +
-                '<div style="display:flex; align-items:center; gap:10px; width:100%;">' +
-                '<span class="skeleton-avatar"></span>' +
-                '<span class="skeleton-text" style="width:34%;"></span>' +
-                '<span class="skeleton-text" style="width:16%; margin-left:auto;"></span>' +
-                '<span class="skeleton-text" style="width:22%;"></span>' +
-                '<span class="skeleton-avatar"></span>' +
-                '</div>' +
-                '</div>' +
-                '</div>'
-            );
-        }
-        listEl.innerHTML = rows.join('');
+    function syncPlayedTabLabel() {
+        if (!playedTabEl) return;
+        playedTabEl.textContent = matchesPlayed.length > 0 ? 'Сыгранные матчи' : 'Новости';
     }
     function avatarHtml(url) {
         var placeholder = (listEl.closest('.live-results') && listEl.closest('.live-results').getAttribute('data-avatar-placeholder')) || '/static/images/avatar_placeholder.jpg';
@@ -404,12 +396,41 @@ document.addEventListener('DOMContentLoaded', function() {
         var wrapClass = 'live-results__row-wrap' + (isEntering ? ' live-results__row-wrap--entering' : '');
         return '<div class="' + wrapClass + '">' + rowHtml + '</div>';
     }
+    function renderFallbackCards(animateFirst) {
+        if (fallbackCards.length === 0) {
+            listEl.innerHTML = '<div class="live-results__empty">Нет сыгранных матчей за последние 5 дней</div>';
+            return;
+        }
+        listEl.innerHTML = fallbackCards.map(function(card, i) {
+            var wrapClass = 'live-results__row-wrap' + (animateFirst && i === 0 ? ' live-results__row-wrap--entering' : '');
+            var cta = card.cta_url
+                ? '<a href="' + card.cta_url + '" class="live-results__fallback-link">' + (card.cta_label || 'Подробнее') + '</a>'
+                : '';
+            return '<div class="' + wrapClass + '"><div class="live-results__fallback-card">' +
+                '<div class="live-results__fallback-title">' + (card.title || '') + '</div>' +
+                '<div class="live-results__fallback-description">' + (card.description || '') + '</div>' +
+                cta +
+                '</div></div>';
+        }).join('');
+        if (animateFirst) {
+            var firstWrap = listEl.querySelector('.live-results__row-wrap--entering');
+            if (firstWrap) {
+                firstWrap.addEventListener('animationend', function onEnd() {
+                    firstWrap.classList.remove('live-results__row-wrap--entering');
+                    firstWrap.style.maxHeight = '';
+                    firstWrap.removeEventListener('animationend', onEnd);
+                });
+            }
+        }
+    }
     function renderAll(animateFirst) {
+        syncPlayedTabLabel();
         if (matches.length === 0) {
-            var emptyText = currentTab === 'upcoming'
-                ? 'Нет предстоящих матчей'
-                : 'Нет сыгранных матчей';
-            listEl.innerHTML = '<div class="live-results__empty">' + emptyText + '</div>';
+            if (currentTab === 'played') {
+                renderFallbackCards(animateFirst);
+                return;
+            }
+            listEl.innerHTML = '<div class="live-results__empty">Нет предстоящих матчей</div>';
             return;
         }
         listEl.innerHTML = matches.map(function(m, i) { return renderRow(m, animateFirst && i === 0); }).join('');
@@ -425,22 +446,54 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     function rotateTicker() {
-        if (matches.length < 2) return;
-        matches.unshift(matches.pop());
-        renderAll(true);
-    }
-    var rotStarted = false;
-    function startRotation() {
-        if (!rotStarted && matches.length > 1) {
-            rotStarted = true;
-            setInterval(rotateTicker, 3000);
+        if (currentTab === 'played') {
+            if (matchesPlayed.length > 1) {
+                matchesPlayed.unshift(matchesPlayed.pop());
+                matches = matchesPlayed.slice();
+                renderAll(true);
+                return;
+            }
+            if (matchesPlayed.length === 0 && fallbackCards.length > 1) {
+                fallbackCards.unshift(fallbackCards.pop());
+                renderAll(true);
+            }
+            return;
         }
+        if (matchesUpcoming.length > 1) {
+            matchesUpcoming.unshift(matchesUpcoming.pop());
+            matches = matchesUpcoming.slice();
+            renderAll(true);
+        }
+    }
+    var rotationTimer = null;
+    function startRotation() {
+        if (rotationTimer !== null) return;
+        rotationTimer = setInterval(rotateTicker, 3000);
+    }
+    function stopRotation() {
+        if (rotationTimer === null) return;
+        clearInterval(rotationTimer);
+        rotationTimer = null;
+    }
+    function syncRotation() {
+        var shouldRotate = false;
+        if (currentTab === 'played') {
+            shouldRotate = matchesPlayed.length > 1 || (matchesPlayed.length === 0 && fallbackCards.length > 1);
+        } else {
+            shouldRotate = matchesUpcoming.length > 1;
+        }
+        if (shouldRotate) {
+            startRotation();
+            return;
+        }
+        stopRotation();
     }
     if (matches.length > 0) {
         renderAll();
-        startRotation();
+        syncRotation();
     } else {
-        renderSkeletonRows(3);
+        renderFallbackCards(false);
+        syncRotation();
     }
     fetch('{% url "api_recent_matches" %}').then(function(r) { return r.json(); }).then(function(data) {
         var ms = data.matches || [];
@@ -450,8 +503,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 matches = matchesPlayed.slice();
             }
             renderAll();
-            startRotation();
+            syncRotation();
+            return;
         }
+        syncPlayedTabLabel();
+        syncRotation();
     }).catch(function(){});
 
     fetch('{% url "api_upcoming_matches" %}').then(function(r) { return r.json(); }).then(function(data) {
@@ -462,6 +518,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 matches = matchesUpcoming.slice();
                 renderAll(false);
             }
+            syncRotation();
         }
     }).catch(function(){});
 
@@ -479,11 +536,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tab === 'played') {
             matches = matchesPlayed.slice();
             renderAll(false);
-            startRotation();
         } else {
             matches = matchesUpcoming.slice();
             renderAll(false);
         }
+        syncRotation();
     }
 
     document.querySelectorAll('.live-results__tab').forEach(function(btn) {

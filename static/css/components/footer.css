@@ -277,12 +277,6 @@
     transition: transform 0.2s ease;
 }
 
-@media (min-width: 769px) {
-    .footer-section__icon {
-        display: none;
-    }
-}
-
 .footer-section.is-open .footer-section__icon {
     transform: rotate(-135deg);
     margin-bottom: -3px;
@@ -293,6 +287,56 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+}
+
+@media (min-width: 769px) {
+    .footer-section__toggle {
+        width: auto;
+        justify-content: flex-start;
+        gap: 8px;
+    }
+
+    .footer-section__icon {
+        width: 8px;
+        height: 8px;
+        margin-bottom: 1px;
+    }
+
+    .footer .footer-section .footer-section__content {
+        display: flex;
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        transform: translateY(-4px);
+        pointer-events: none;
+        padding-bottom: var(--spacing-sm);
+        transition:
+            max-height 0.32s ease,
+            opacity 0.24s ease,
+            transform 0.24s ease;
+    }
+
+    .footer .footer-section.is-open .footer-section__content {
+        max-height: 420px;
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    /* Для длинных списков в футере — компактная двухколоночная раскладка */
+    .footer-grid > .footer-section:nth-child(2) .footer-section__content,
+    .footer-grid > .footer-section:nth-child(3) .footer-section__content {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: var(--spacing-md);
+        row-gap: 2px;
+        align-content: start;
+    }
+
+    .footer-grid > .footer-section:nth-child(2) .footer-section__content li,
+    .footer-grid > .footer-section:nth-child(3) .footer-section__content li {
+        min-width: 0;
+    }
 }
 
 .footer-links a {

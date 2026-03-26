@@ -223,7 +223,7 @@
 /* Hero Premium - минималистичный дизайн */
 .hero.hero--premium {
     min-height: auto;
-    padding: var(--spacing-3xl) 0;
+    padding: var(--spacing-3xl) 0 var(--spacing-lg);
     margin-top: 0;
     position: relative;
     background: transparent;
@@ -266,12 +266,16 @@
 .hero-grid .hero-video-wrapper {
     grid-row: 2;
     grid-column: 1;
+    align-self: start;
 }
 
 .hero-grid .hero-subscription {
     grid-row: 2;
     grid-column: 2;
-    align-self: end;
+    align-self: start;
+    width: 100%;
+    max-width: none;
+    margin: 0;
 }
 
 .hero-subscription {
@@ -311,8 +315,85 @@
 }
 
 .hero-subscription__btn {
-    width: 100%;
+    width: auto;
+    min-width: 220px;
+    display: inline-flex;
+    justify-content: center;
     text-align: center;
+}
+
+.hero-subscription__layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+    align-items: stretch;
+}
+
+.hero-subscription__layout--single {
+    grid-template-columns: 1fr;
+}
+
+.hero-subscription__col--benefits {
+    min-width: 0;
+}
+
+.hero-subscription__col--club {
+    display: flex;
+    align-items: stretch;
+}
+
+.hero-subscription__col--club .footer-club-cta {
+    height: 100%;
+}
+
+.hero-subscription__col--club .footer-club-cta__inner {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.hero-subscription .footer-club-cta {
+    justify-content: stretch;
+    width: 100%;
+}
+
+.hero-subscription .footer-club-cta__inner {
+    max-width: 100%;
+    width: 100%;
+}
+
+.hero-club-cta {
+    margin-top: 0;
+}
+
+.hero-subscription .footer-club-cta__text {
+    align-items: center;
+    text-align: center;
+}
+
+.hero-club-cta__image {
+    display: block;
+    width: min(180px, 60%);
+    height: auto;
+    margin: var(--spacing-xs) auto;
+    object-fit: contain;
+    opacity: 0.95;
+}
+
+@media (width <= 1200px) {
+    .hero-subscription__layout {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-subscription__col--club {
+        align-items: stretch;
+    }
+
+    .hero-subscription__btn {
+        min-width: 0;
+        width: 100%;
+    }
 }
 
 .hero-content--premium {
@@ -436,7 +517,10 @@
     .hero-grid .hero-subscription {
         grid-row: auto;
         grid-column: 1;
-        align-self: auto;
+        align-self: start;
+        width: 100%;
+        max-width: none;
+        margin: 0;
     }
 
     .hero-video-wrapper {
@@ -979,6 +1063,16 @@
 /* ==========================================================================
    Home Bottom Sections
    ========================================================================== */
+.section-tournaments-spaced {
+    padding-top: var(--spacing-xl);
+}
+
+@media (width <= 768px) {
+    .section-tournaments-spaced {
+        padding-top: var(--spacing-lg);
+    }
+}
+
 @media (width <= 768px) {
     .home-section--upcoming .section-header,
     .home-section--news .section-header {

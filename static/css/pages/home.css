@@ -771,6 +771,43 @@
     color: rgb(255 255 255 / 60%);
 }
 
+.live-results__empty--hint {
+    padding: var(--spacing-md);
+}
+
+.live-results__fallback-card {
+    padding: var(--spacing-md);
+    border: 1px solid rgb(255 255 255 / 12%);
+    border-radius: var(--radius-md);
+    background: rgb(255 255 255 / 4%);
+}
+
+.live-results__fallback-title {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+}
+
+.live-results__fallback-description {
+    font-size: var(--font-size-xs);
+    color: rgb(255 255 255 / 72%);
+    line-height: 1.45;
+}
+
+.live-results__fallback-link {
+    display: inline-block;
+    margin-top: var(--spacing-xs);
+    color: var(--color-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.live-results__fallback-link:hover {
+    text-decoration: underline;
+}
+
 @media (width <= 900px) {
     .hero-banner--full {
         padding: var(--spacing-sm) var(--spacing-md);

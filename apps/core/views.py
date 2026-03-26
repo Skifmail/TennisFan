@@ -920,6 +920,108 @@ def _build_upcoming_matches(limit: int = 10, days: int = 5):
     return result
 
 
+def _build_live_results_fallback_cards() -> list[dict[str, str]]:
+    """Формирует информационные карточки для виджета, когда нет сыгранных матчей."""
+    cards: list[dict[str, str]] = []
+
+    best_player = (
+        Player.objects.filter(is_verified=True, is_bye=False)
+        .select_related("user")
+        .order_by("-total_points")
+        .first()
+    )
+    if best_player:
+        cards.append(
+            {
+                "title": "Лучший игрок платформы",
+                "description": f"{best_player} — {best_player.total_points:.1f} рейтинговых очков.",
+                "cta_label": "Открыть рейтинг",
+                "cta_url": reverse("rating"),
+            }
+        )
+
+    best_club_player = (
+        Player.objects.filter(
+            is_verified=True,
+            is_bye=False,
+            user__club_memberships__status=ClubMemberStatus.ACTIVE,
+        )
+        .select_related("user")
+        .order_by("-total_points")
+        .first()
+    )
+    if best_club_player:
+        cards.append(
+            {
+                "title": "Лидер среди игроков клубов",
+                "description": f"{best_club_player} — {best_club_player.total_points:.1f} очков.",
+                "cta_label": "Смотреть профиль",
+                "cta_url": reverse("profile", kwargs={"pk": best_club_player.pk}),
+            }
+        )
+
+    newest_court = Court.objects.filter(is_active=True).order_by("-created_at").first()
+    if newest_court:
+        cards.append(
+            {
+                "title": "Новый корт на платформе",
+                "description": f"{newest_court.name}, {newest_court.city}.",
+                "cta_label": "Все корты",
+                "cta_url": reverse("court_list"),
+            }
+        )
+
+    nearest_tournament = (
+        Tournament.objects.filter(
+            status=TournamentStatus.UPCOMING,
+            start_date__gte=timezone.localdate(),
+        )
+        .filter(models.Q(club__isnull=True) | models.Q(is_open_interclub=True))
+        .order_by("start_date")
+        .first()
+    )
+    if nearest_tournament:
+        cards.append(
+            {
+                "title": "Ближайший турнир",
+                "description": (
+                    f"{nearest_tournament.name} — старт "
+                    f"{nearest_tournament.start_date:%d.%m.%Y}."
+                ),
+                "cta_label": "Перейти к турниру",
+                "cta_url": reverse(
+                    "tournament_detail", kwargs={"slug": nearest_tournament.slug}
+                ),
+            }
+        )
+
+    latest_news = News.objects.filter(is_published=True).order_by("-created_at").first()
+    if latest_news:
+        cards.append(
+            {
+                "title": "Свежая новость",
+                "description": latest_news.title,
+                "cta_label": "Читать новость",
+                "cta_url": reverse("news_detail", kwargs={"slug": latest_news.slug}),
+            }
+        )
+
+    if not cards:
+        cards.append(
+            {
+                "title": "Матчи скоро появятся",
+                "description": (
+                    "Сейчас нет завершённых матчей за последние 5 дней. "
+                    "Проверьте турниры и запланируйте игру."
+                ),
+                "cta_label": "Перейти к турнирам",
+                "cta_url": reverse("tournament_list"),
+            }
+        )
+
+    return cards[:4]
+
+
 def home(request):
     """Home page view. Формирование сеток по дедлайну выполняется по cron (generate_brackets_past_deadlines)."""
     tournaments = (
@@ -989,6 +1091,7 @@ def home(request):
 
     recent_matches = _build_recent_matches(limit=10, days=5)
     upcoming_matches = _build_upcoming_matches(limit=10, days=5)
+    live_results_fallback_cards = _build_live_results_fallback_cards()
 
     # Метрики для Hero-блока
     def format_number(num):
@@ -1026,6 +1129,9 @@ def home(request):
         "recent_matches": recent_matches,
         "recent_matches_json": json.dumps(recent_matches, default=str),
         "upcoming_matches_json": json.dumps(upcoming_matches, default=str),
+        "live_results_fallback_cards_json": json.dumps(
+            live_results_fallback_cards, default=str
+        ),
         "latest_news": News.objects.filter(is_published=True)[:4],
         "hero_stats": hero_stats,
         "current_filters": {

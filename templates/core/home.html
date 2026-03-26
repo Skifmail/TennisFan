@@ -116,40 +116,64 @@
         </div>
 
         <div class="hero-subscription">
-            <h3 class="hero-subscription__title">Преимущества подписки</h3>
-            <ul class="hero-subscription__list">
-                <li class="hero-subscription__item">
-                    <span class="hero-subscription__icon">✓</span>
-                    Доступ к закрытому Telegram-каналу
-                </li>
-                <li class="hero-subscription__item">
-                    <span class="hero-subscription__icon">✓</span>
-                    Скидка на однодневные турниры
-                </li>
-                <li class="hero-subscription__item">
-                    <span class="hero-subscription__icon">✓</span>
-                    Поиск спарринг партнеров
-                </li>
-                <li class="hero-subscription__item">
-                    <span class="hero-subscription__icon">✓</span>
-                    Приоритетная регистрация на турниры
-                </li>
-                <li class="hero-subscription__item">
-                    <span class="hero-subscription__icon">✓</span>
-                    Особый статус в профиле
-                </li>
-                </li>
-                <li class="hero-subscription__item">
-                    <span class="hero-subscription__icon">✓</span>
-                    Приоритетная поддержка администратора
-                </li>
-                </li>
-                <li class="hero-subscription__item">
-                    <span class="hero-subscription__icon">✓</span>
-                    Написание комментариев
-                </li>
-            </ul>
-            <a href="{% url 'pricing' %}" class="btn btn-primary hero-subscription__btn">Смотреть тарифы</a>
+            <div class="hero-subscription__layout{% if not user.is_authenticated %} hero-subscription__layout--single{% endif %}">
+                <div class="hero-subscription__col hero-subscription__col--benefits">
+                    <h3 class="hero-subscription__title">Преимущества подписки</h3>
+                    <ul class="hero-subscription__list">
+                        <li class="hero-subscription__item">
+                            <span class="hero-subscription__icon">✓</span>
+                            Доступ к закрытому Telegram-каналу
+                        </li>
+                        <li class="hero-subscription__item">
+                            <span class="hero-subscription__icon">✓</span>
+                            Скидка на однодневные турниры
+                        </li>
+                        <li class="hero-subscription__item">
+                            <span class="hero-subscription__icon">✓</span>
+                            Поиск спарринг партнеров
+                        </li>
+                        <li class="hero-subscription__item">
+                            <span class="hero-subscription__icon">✓</span>
+                            Приоритетная регистрация на турниры
+                        </li>
+                        <li class="hero-subscription__item">
+                            <span class="hero-subscription__icon">✓</span>
+                            Особый статус в профиле
+                        </li>
+                        </li>
+                        <li class="hero-subscription__item">
+                            <span class="hero-subscription__icon">✓</span>
+                            Приоритетная поддержка администратора
+                        </li>
+                        </li>
+                        <li class="hero-subscription__item">
+                            <span class="hero-subscription__icon">✓</span>
+                            Написание комментариев
+                        </li>
+                    </ul>
+                    <a href="{% url 'pricing' %}" class="btn btn-primary hero-subscription__btn">Смотреть тарифы</a>
+                </div>
+                {% if user.is_authenticated %}
+                <div class="hero-subscription__col hero-subscription__col--club">
+                    <div class="footer-club-cta hero-club-cta">
+                        <div class="footer-club-cta__inner">
+                            <div class="footer-club-cta__text">
+                                <span class="footer-club-cta__subtitle">Подключите клуб к платформе и проводите свои турниры.</span>
+                            </div>
+                            <img src="{% static 'images/abstract_club.png' %}" alt="" class="hero-club-cta__image">
+                            <div class="footer-club-cta__actions">
+                                <a href="{% url 'clubs:register_step1' %}" class="footer-club-cta__button">
+                                    Зарегистрировать клуб
+                                </a>
+                                <a href="{% url 'clubs:club_discover' %}" class="footer-club-cta__button footer-club-cta__button--secondary">
+                                    Вступить в клуб
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 </section>

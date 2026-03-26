@@ -267,32 +267,16 @@
                         </a>
                         {% endfor %}
                     </div>
-                    {% if user.is_authenticated %}
-                    <div class="footer-club-cta">
-                        <div class="footer-club-cta__inner">
-                            <div class="footer-club-cta__text">
-                                <span class="footer-club-cta__label">Управляете клубом?</span>
-                                <span class="footer-club-cta__subtitle">Подключите клуб к платформе и проводите свои турниры.</span>
-                            </div>
-                            <div class="footer-club-cta__actions">
-                                <a href="{% url 'clubs:register_step1' %}" class="footer-club-cta__button">
-                                    Зарегистрировать клуб
-                                </a>
-                                <a href="{% url 'clubs:club_discover' %}" class="footer-club-cta__button footer-club-cta__button--secondary">
-                                    Вступить в клуб
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
-
             <div class="footer-bottom">
                 <div class="footer-copy">
                     <p>&copy; 2026 {{ site_brand_copyright }} / {{ site_brand_footer_ru }}. Все права защищены.</p>
                     <p>ИП Ермолаев Леонид · ИНН 561417897115</p>
                     <p>ОГРНИП 325508100579372</p>
+                </div>
+                <div class="footer-credit">
+                    <a href="mailto:tennis@tennisfan.ru" class="skifmail">email: tennis@tennisfan.ru</a>
                 </div>
             </div>
         </div>

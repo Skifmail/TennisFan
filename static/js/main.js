@@ -144,16 +144,49 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Footer accordion (mobile): сворачиваемые секции
-    document.querySelectorAll('.footer-section [data-footer-toggle]').forEach(function(btn) {
+    // Footer accordion: на desktop открыт только один раздел, на mobile поведение прежнее
+    var footerSections = Array.from(document.querySelectorAll('.footer-section'));
+    function isDesktopFooter() {
+        return window.matchMedia('(min-width: 769px)').matches;
+    }
+    function setFooterSectionState(section, isOpen) {
+        var sectionBtn = section.querySelector('[data-footer-toggle]');
+        section.classList.toggle('is-open', isOpen);
+        if (sectionBtn) sectionBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
+    function initDesktopFooterState() {
+        if (!footerSections.length) return;
+        if (isDesktopFooter()) {
+            footerSections.forEach(function(section) {
+                setFooterSectionState(section, false);
+            });
+            return;
+        }
+        footerSections.forEach(function(section) {
+            setFooterSectionState(section, false);
+        });
+    }
+    footerSections.forEach(function(section) {
+        var btn = section.querySelector('[data-footer-toggle]');
+        if (!btn) return;
         btn.addEventListener('click', function(e) {
             e.preventDefault();
-            var section = this.closest('.footer-section');
-            if (!section) return;
+            var willOpen = !section.classList.contains('is-open');
+            if (isDesktopFooter()) {
+                footerSections.forEach(function(otherSection) {
+                    setFooterSectionState(otherSection, false);
+                });
+                if (willOpen) {
+                    setFooterSectionState(section, true);
+                }
+                return;
+            }
             var isOpen = section.classList.toggle('is-open');
-            this.setAttribute('aria-expanded', isOpen === true ? 'true' : 'false');
+            btn.setAttribute('aria-expanded', isOpen === true ? 'true' : 'false');
         });
     });
+    initDesktopFooterState();
+    window.addEventListener('resize', initDesktopFooterState);
 
     // Home tournaments: AJAX фильтры и пагинация
     var tournamentsForm = document.getElementById('home-tournaments-filter');

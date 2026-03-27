@@ -41,7 +41,7 @@
                 {% if plan_limits and plan_limits.monthly_tournaments_limit %}
                 <div class="subscription-info__limit">
                     <div class="subscription-info__row">
-                        <span class="subscription-info__label">Остаток регистраций:</span>
+                        <span class="subscription-info__label">Остаток регистраций ({{ member_plan.plan.get_registration_limit_period_display|lower }}):</span>
                         <span>{{ plan_limits.tournaments_left }} из {{ plan_limits.monthly_tournaments_limit }}</span>
                     </div>
                     <div class="subscription-info__bar">

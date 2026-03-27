@@ -109,6 +109,17 @@
                             </div>
 
                             <div class="club-payments-form__field club-player-plan-editor__field">
+                                <label for="{{ form.registration_limit_period.id_for_label }}" class="club-payments-form__label">
+                                    {{ form.registration_limit_period.label }}
+                                </label>
+                                {{ form.registration_limit_period }}
+                                <div class="club-payments-form__hint">{{ form.registration_limit_period.help_text }}</div>
+                                {% if form.registration_limit_period.errors %}
+                                <div class="club-payments-form__error">{{ form.registration_limit_period.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="club-payments-form__field club-player-plan-editor__field">
                                 <label for="{{ form.max_tournaments_per_month.id_for_label }}" class="club-payments-form__label">
                                     {{ form.max_tournaments_per_month.label }}
                                 </label>

@@ -449,10 +449,11 @@ class ClubPlayerPlanAdmin(admin.ModelAdmin):
         "is_active",
         "monthly_fee",
         "duration_days",
+        "registration_limit_period",
         "has_unlimited_registrations",
         "max_tournaments_per_month",
     )
-    list_filter = ("is_active", "club")
+    list_filter = ("is_active", "club", "registration_limit_period")
     search_fields = ("name", "club__name")
     ordering = ("club", "sort_order", "name")
 

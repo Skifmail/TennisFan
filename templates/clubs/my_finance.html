@@ -82,6 +82,12 @@
                                 {% endif %}
                             </strong>
                         </div>
+                        {% if member_plan and not member_plan.plan.has_unlimited_registrations %}
+                        <div class="club-finance-summary__item">
+                            <span class="club-finance-summary__label">Период лимита</span>
+                            <strong class="club-finance-summary__value">{{ member_plan.plan.get_registration_limit_period_display }}</strong>
+                        </div>
+                        {% endif %}
                     </div>
 
                     {% if plan_limits and plan_limits.monthly_tournaments_limit %}

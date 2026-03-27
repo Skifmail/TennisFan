@@ -2,14 +2,15 @@
 Core views - main pages.
 """
 
+import csv
 import json
 import logging
 import re
 import secrets
 from calendar import monthrange
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from django.contrib import messages
@@ -18,7 +19,7 @@ from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -58,8 +59,24 @@ from .models import City, SupportMessage, SupportMessageAdminDelivery, UserTeleg
 logger = logging.getLogger(__name__)
 
 
+def _make_aware_datetime(
+    year: int,
+    month: int,
+    day: int,
+    hour: int = 0,
+    minute: int = 0,
+    second: int = 0,
+) -> datetime:
+    """Создаёт timezone-aware datetime в текущем часовом поясе."""
+    naive_value = datetime(year, month, day, hour, minute, second)
+    return cast(
+        datetime,
+        timezone.make_aware(naive_value, timezone.get_current_timezone()),
+    )
+
+
 @login_required
-def platform_dashboard(request):
+def platform_dashboard(request: HttpRequest) -> HttpResponse:
     """Глобальный дашборд платформы для staff/superuser."""
     if not (request.user.is_staff or request.user.is_superuser):
         messages.error(
@@ -251,17 +268,18 @@ def platform_dashboard(request):
 
     if selected_month:
         finance_period_label = f"{month_names_ru[selected_month - 1]} {selected_year}"
-        finance_period_start = timezone.datetime(
-            selected_year, selected_month, 1, tzinfo=timezone.get_current_timezone()
+        finance_period_start = _make_aware_datetime(
+            selected_year,
+            selected_month,
+            1,
         )
-        finance_period_end = timezone.datetime(
+        finance_period_end = _make_aware_datetime(
             selected_year,
             selected_month,
             monthrange(selected_year, selected_month)[1],
             23,
             59,
             59,
-            tzinfo=timezone.get_current_timezone(),
         )
         previous_month = 12 if selected_month == 1 else selected_month - 1
         previous_month_year = (
@@ -270,41 +288,27 @@ def platform_dashboard(request):
         previous_period_label = (
             f"{month_names_ru[previous_month - 1]} {previous_month_year}"
         )
-        previous_period_start = timezone.datetime(
+        previous_period_start = _make_aware_datetime(
             previous_month_year,
             previous_month,
             1,
-            tzinfo=timezone.get_current_timezone(),
         )
-        previous_period_end = timezone.datetime(
+        previous_period_end = _make_aware_datetime(
             previous_month_year,
             previous_month,
             monthrange(previous_month_year, previous_month)[1],
             23,
             59,
             59,
-            tzinfo=timezone.get_current_timezone(),
         )
     else:
         finance_period_label = f"{selected_year} год"
-        finance_period_start = timezone.datetime(
-            selected_year, 1, 1, tzinfo=timezone.get_current_timezone()
-        )
-        finance_period_end = timezone.datetime(
-            selected_year, 12, 31, 23, 59, 59, tzinfo=timezone.get_current_timezone()
-        )
+        finance_period_start = _make_aware_datetime(selected_year, 1, 1)
+        finance_period_end = _make_aware_datetime(selected_year, 12, 31, 23, 59, 59)
         previous_period_label = f"{selected_year - 1} год"
-        previous_period_start = timezone.datetime(
-            selected_year - 1, 1, 1, tzinfo=timezone.get_current_timezone()
-        )
-        previous_period_end = timezone.datetime(
-            selected_year - 1,
-            12,
-            31,
-            23,
-            59,
-            59,
-            tzinfo=timezone.get_current_timezone(),
+        previous_period_start = _make_aware_datetime(selected_year - 1, 1, 1)
+        previous_period_end = _make_aware_datetime(
+            selected_year - 1, 12, 31, 23, 59, 59
         )
 
     finance_payments = PaymentRecord.objects.filter(
@@ -636,12 +640,7 @@ def platform_dashboard(request):
     if selected_month:
         days_in_month = monthrange(selected_year, selected_month)[1]
         for day in range(1, days_in_month + 1):
-            point_date = timezone.datetime(
-                selected_year,
-                selected_month,
-                day,
-                tzinfo=timezone.get_current_timezone(),
-            ).date()
+            point_date = _make_aware_datetime(selected_year, selected_month, day).date()
             payment_total = PaymentRecord.objects.filter(
                 status="succeeded",
                 paid_at__date=point_date,
@@ -664,17 +663,14 @@ def platform_dashboard(request):
             )
     else:
         for month_number in range(1, 13):
-            month_start = timezone.datetime(
-                selected_year, month_number, 1, tzinfo=timezone.get_current_timezone()
-            )
-            month_end = timezone.datetime(
+            month_start = _make_aware_datetime(selected_year, month_number, 1)
+            month_end = _make_aware_datetime(
                 selected_year,
                 month_number,
                 monthrange(selected_year, month_number)[1],
                 23,
                 59,
                 59,
-                tzinfo=timezone.get_current_timezone(),
             )
             payment_total = PaymentRecord.objects.filter(
                 status="succeeded",
@@ -731,6 +727,66 @@ def platform_dashboard(request):
         "active_user_subscriptions": active_user_subscriptions,
     }
     return render(request, "core/platform_dashboard.html", context)
+
+
+@login_required
+@require_safe
+def platform_players_export(request: HttpRequest) -> HttpResponse:
+    """Выгружает список игроков платформы в CSV для staff/superuser."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(
+            request, "Доступ к панели платформы есть только у администратора."
+        )
+        return redirect("home")
+
+    players = (
+        Player.objects.filter(is_bye=False)
+        .select_related("user")
+        .order_by("user__email")
+    )
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="platform_players.csv"'
+    response.write("\ufeff")
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "email",
+            "first_name",
+            "last_name",
+            "phone",
+            "city",
+            "gender",
+            "ntrp_level",
+            "skill_level",
+            "total_points",
+            "matches_played",
+            "matches_won",
+            "created_at",
+        ]
+    )
+    for player in players:
+        writer.writerow(
+            [
+                player.user.email,
+                player.user.first_name or "",
+                player.user.last_name or "",
+                player.user.phone or "",
+                player.city or "",
+                player.get_gender_display() if player.gender else "",
+                player.ntrp_level,
+                player.get_skill_level_display(),
+                player.total_points,
+                player.matches_played,
+                player.matches_won,
+                (
+                    timezone.localtime(player.created_at).strftime("%Y-%m-%d %H:%M")
+                    if player.created_at
+                    else ""
+                ),
+            ]
+        )
+    return response
 
 
 @require_safe

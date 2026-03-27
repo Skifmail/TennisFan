@@ -152,23 +152,55 @@ def members_export(request: HttpRequest, slug: str) -> HttpResponse:
     club = club_or_res
     members = (
         ClubMember.objects.filter(club=club)
-        .select_related("user")
+        .select_related("user", "user__player")
         .order_by("user__email")
     )
     response = HttpResponse(content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="members_{club.slug}.csv"'
     response.write("\ufeff")
     writer = csv.writer(response)
-    writer.writerow(["email", "first_name", "last_name", "role", "status", "joined_at"])
+    writer.writerow(
+        [
+            "email",
+            "first_name",
+            "last_name",
+            "phone",
+            "city",
+            "gender",
+            "ntrp_level",
+            "skill_level",
+            "total_points",
+            "matches_played",
+            "matches_won",
+            "role",
+            "status",
+            "joined_at",
+            "created_at",
+        ]
+    )
     for member in members:
+        player = getattr(member.user, "player", None)
         writer.writerow(
             [
                 member.user.email,
                 member.user.first_name or "",
                 member.user.last_name or "",
+                member.user.phone or "",
+                player.city if player else "",
+                player.get_gender_display() if player and player.gender else "",
+                player.ntrp_level if player else "",
+                player.get_skill_level_display() if player else "",
+                player.total_points if player else "",
+                player.matches_played if player else "",
+                player.matches_won if player else "",
                 member.get_role_display(),
                 member.get_status_display(),
                 member.joined_at.strftime("%Y-%m-%d %H:%M") if member.joined_at else "",
+                (
+                    player.created_at.strftime("%Y-%m-%d %H:%M")
+                    if player and player.created_at
+                    else ""
+                ),
             ]
         )
     return response

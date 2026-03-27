@@ -410,7 +410,7 @@ def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
 
     if request.user.is_authenticated and is_member and member_role:
         if member_role in (ClubMemberRole.ADMIN, ClubMemberRole.MANAGER):
-            cta_label = "Панель управления →"
+            cta_label = "Панель управления"
             cta_url = reverse("clubs:dashboard", kwargs={"slug": club.slug})
             cta_variant = "manage"
         else:

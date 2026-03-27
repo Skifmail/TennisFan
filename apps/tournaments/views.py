@@ -900,6 +900,27 @@ def tournament_detail(request, slug):
 
     context = {
         "tournament": tournament,
+        "allowed_categories_sorted": sorted(
+            list(tournament.allowed_categories.all()),
+            key=lambda ac: (
+                [
+                    SkillLevel.NOVICE,
+                    SkillLevel.AMATEUR,
+                    SkillLevel.EXPERIENCED,
+                    SkillLevel.ADVANCED,
+                    SkillLevel.PROFESSIONAL,
+                ].index(ac.category)
+                if ac.category
+                in [
+                    SkillLevel.NOVICE,
+                    SkillLevel.AMATEUR,
+                    SkillLevel.EXPERIENCED,
+                    SkillLevel.ADVANCED,
+                    SkillLevel.PROFESSIONAL,
+                ]
+                else 999
+            ),
+        ),
         "matches": matches,
         "matches_by_round": matches_by_round,
         "matrix_participants": matrix_participants,

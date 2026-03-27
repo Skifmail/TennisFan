@@ -5168,10 +5168,13 @@
 
 .club-invites-file-input {
     padding: 10px 12px;
+    color: transparent;
+    text-shadow: none;
+    font-size: 0;
 }
 
 .club-invites-file-input::file-selector-button {
-    margin-right: 12px;
+    margin-right: 0;
     padding: 10px 14px;
     border: 1px solid rgba(201, 168, 76, 0.22);
     border-radius: 10px;
@@ -5179,7 +5182,71 @@
     color: #f9e7b0;
     font: inherit;
     font-weight: 700;
+    font-size: 14px;
     cursor: pointer;
+}
+
+.club-invites-file-input::-webkit-file-upload-button {
+    margin-right: 0;
+    padding: 10px 14px;
+    border: 1px solid rgba(201, 168, 76, 0.22);
+    border-radius: 10px;
+    background: rgba(201, 168, 76, 0.12);
+    color: #f9e7b0;
+    font: inherit;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.club-invites-file-picker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 50px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    background: transparent;
+}
+
+.club-invites-file-picker__input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.club-invites-file-picker__button {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid rgba(201, 168, 76, 0.35);
+    border-radius: 10px;
+    background: transparent;
+    color: #f9e7b0;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.club-invites-file-picker__name {
+    min-width: 0;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .club-invites-section__header {
@@ -5737,6 +5804,19 @@
         justify-content: center;
     }
 
+    .club-invites-file-picker {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .club-invites-file-picker__button {
+        width: 100%;
+    }
+
+    .club-invites-file-picker__name {
+        text-align: left;
+    }
+
     .club-invites-link__meta {
         margin-top: 8px;
         gap: 6px 10px;
@@ -5802,6 +5882,10 @@
 
     .club-invites-inline-card__button-group {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .club-invites-file-picker {
+        gap: 8px;
     }
 }
 

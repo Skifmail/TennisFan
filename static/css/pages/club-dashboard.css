@@ -5763,9 +5763,24 @@
 }
 
 @media (max-width: 520px) {
-    .club-members-hero__stats,
+    .club-members-hero__stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .club-members-stat {
+        padding: 14px 12px;
+        border-radius: 16px;
+    }
+
+    .club-members-stat__label {
+        font-size: 0.8rem;
+        line-height: 1.35;
+        overflow-wrap: break-word;
+    }
+
     .club-members-mobile-card__grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .club-members-filters__actions > * {
@@ -5774,7 +5789,9 @@
 
     .club-members-mobile-card__label,
     .club-members-mobile-card__value {
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
+        word-break: normal;
+        hyphens: manual;
     }
 
     .club-balance-ledger__title-row,

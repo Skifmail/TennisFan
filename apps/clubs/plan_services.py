@@ -34,6 +34,7 @@ from .models import (
     ClubPlanSlotUsage,
     ClubPlanTournamentAccess,
     ClubPlayerPlan,
+    ClubRegistrationLimitPeriod,
 )
 
 if TYPE_CHECKING:
@@ -213,7 +214,7 @@ def _get_transferable_tournaments_balance(
         return 0
     normalized_base_limit = int(base_limit)
 
-    year, month = get_current_period()
+    year, month = _get_usage_period_for_member_plan(member_plan)
     usage = (
         ClubPlanSlotUsage.objects.select_for_update()
         .filter(
@@ -227,6 +228,21 @@ def _get_transferable_tournaments_balance(
     tournaments_used = int(usage.tournaments_used) if usage else 0
     base_remaining = max(normalized_base_limit - tournaments_used, 0)
     return base_remaining + int(member_plan.bonus_tournaments_balance)
+
+
+def _get_usage_period_for_member_plan(
+    member_plan: ClubMemberPlan,
+    *,
+    today: date | None = None,
+) -> tuple[int, int]:
+    """Возвращает период учёта usage в зависимости от режима лимита тарифа."""
+    if (
+        member_plan.plan.registration_limit_period
+        == ClubRegistrationLimitPeriod.PLAN_PERIOD
+    ):
+        started_local = timezone.localtime(member_plan.started_at).date()
+        return started_local.year, started_local.month
+    return get_current_period(today=today)
 
 
 def assign_member_plan(
@@ -416,7 +432,7 @@ def get_member_plan_limits(
         return None
 
     plan = member_plan.plan
-    year, month = get_current_period(today=today)
+    year, month = _get_usage_period_for_member_plan(member_plan, today=today)
     usage = _get_or_create_period_usage(
         member,
         plan,
@@ -670,7 +686,7 @@ def consume_member_tournament_limit(
             return False, "Тариф не найден."
 
         plan = member_plan.plan
-        year, month = get_current_period()
+        year, month = _get_usage_period_for_member_plan(member_plan)
         usage = _get_or_create_period_usage(
             member,
             plan,
@@ -719,7 +735,7 @@ def restore_member_tournament_limit(member: ClubMember) -> bool:
         if not member_plan:
             return False
 
-        year, month = get_current_period()
+        year, month = _get_usage_period_for_member_plan(member_plan)
         usage = _get_or_create_period_usage(
             member,
             member_plan.plan,

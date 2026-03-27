@@ -95,7 +95,7 @@
                             {% if plan.has_unlimited_registrations %}
                             Безлимитные регистрации
                             {% else %}
-                            {{ plan.max_tournaments_per_month }} в месяц
+                            {{ plan.registrations_limit_display }}
                             {% endif %}
                         </div>
                         <div class="club-dashboard-table__cell">

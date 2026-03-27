@@ -30,6 +30,7 @@ from apps.clubs.models import (
     ClubNotificationSettings,
     ClubPlanSlotUsage,
     ClubPlayerPlan,
+    ClubRegistrationLimitPeriod,
     FeePaymentMethod,
 )
 from apps.clubs.plan_services import (
@@ -394,6 +395,72 @@ class ClubPlanPurchaseServiceTestCase(TestCase):
         assert refreshed_limits is not None
         self.assertIsNone(refreshed_limits.tournaments_left)
         self.assertEqual(refreshed_limits.tournaments_used, 3)
+
+    def test_monthly_limit_resets_in_next_calendar_month(self) -> None:
+        plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Годовой 2/месяц",
+            monthly_fee=5000,
+            duration_days=365,
+            registration_limit_period=ClubRegistrationLimitPeriod.MONTHLY,
+            max_tournaments_per_month=2,
+            is_active=True,
+        )
+        self.club.use_player_plans = True
+        self.club.save(update_fields=["use_player_plans"])
+        purchase_member_plan(self.member, plan)
+
+        current_date = timezone.localdate()
+        current_limits = get_member_plan_limits(self.member, today=current_date)
+        self.assertIsNotNone(current_limits)
+        assert current_limits is not None
+        self.assertEqual(current_limits.tournaments_left, 2)
+
+        month_start = current_date.replace(day=1)
+        current_year = month_start.year
+        current_month = month_start.month
+        next_month_start = (month_start + timedelta(days=32)).replace(day=1)
+        ClubPlanSlotUsage.objects.filter(
+            club_member=self.member,
+            period_year=current_year,
+            period_month=current_month,
+        ).update(plan=plan, tournaments_used=2)
+
+        next_month_limits = get_member_plan_limits(self.member, today=next_month_start)
+        self.assertIsNotNone(next_month_limits)
+        assert next_month_limits is not None
+        self.assertEqual(next_month_limits.tournaments_left, 2)
+
+    def test_plan_period_limit_shared_for_entire_tariff_period(self) -> None:
+        plan = ClubPlayerPlan.objects.create(
+            club=self.club,
+            name="Годовой общий лимит",
+            monthly_fee=5000,
+            duration_days=365,
+            registration_limit_period=ClubRegistrationLimitPeriod.PLAN_PERIOD,
+            max_tournaments_per_month=2,
+            is_active=True,
+        )
+        self.club.use_player_plans = True
+        self.club.save(update_fields=["use_player_plans"])
+        assignment = purchase_member_plan(self.member, plan)
+
+        started_date = timezone.localtime(assignment.started_at).date()
+        ClubPlanSlotUsage.objects.create(
+            club_member=self.member,
+            plan=plan,
+            period_year=started_date.year,
+            period_month=started_date.month,
+            tournaments_used=2,
+        )
+
+        next_month_date = (started_date.replace(day=1) + timedelta(days=32)).replace(
+            day=1
+        )
+        limits = get_member_plan_limits(self.member, today=next_month_date)
+        self.assertIsNotNone(limits)
+        assert limits is not None
+        self.assertEqual(limits.tournaments_left, 0)
 
     def test_expired_plan_is_not_considered_active(self) -> None:
         plan = ClubPlayerPlan.objects.create(

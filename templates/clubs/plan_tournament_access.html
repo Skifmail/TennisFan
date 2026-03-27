@@ -35,7 +35,11 @@
                                 </div>
                                 {% endif %}
                             </td>
-                            <td style="padding: var(--spacing-sm);">{{ row.plan.monthly_fee }} ₽ / {{ row.plan.duration_days }} дн.</td>
+                            <td style="padding: var(--spacing-sm);">
+                                {{ row.plan.monthly_fee }} ₽ / {{ row.plan.duration_days }} дн.
+                                <br>
+                                <span style="opacity: .8; font-size: var(--font-size-xs);">{{ row.plan.registrations_limit_display }}</span>
+                            </td>
                             <td style="padding: var(--spacing-sm);">
                                 Лимит турниров:
                                 {% if row.plan.has_unlimited_registrations %}

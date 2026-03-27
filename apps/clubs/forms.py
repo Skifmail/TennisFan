@@ -30,6 +30,7 @@ from .models import (
     ClubNotificationConfig,
     ClubNotificationSettings,
     ClubPlayerPlan,
+    ClubRegistrationLimitPeriod,
 )
 from .payment_utils import get_secret_mask
 
@@ -776,6 +777,7 @@ class ClubPlayerPlanForm(forms.ModelForm):
             "is_active",
             "monthly_fee",
             "duration_days",
+            "registration_limit_period",
             "has_unlimited_registrations",
             "max_tournaments_per_month",
             "allow_self_change",
@@ -785,6 +787,9 @@ class ClubPlayerPlanForm(forms.ModelForm):
             "description": forms.Textarea(attrs={"rows": 3}),
         }
         help_texts = {
+            "registration_limit_period": (
+                "Определяет, когда лимит регистраций обновляется: ежемесячно или один раз на весь срок тарифа."
+            ),
             "max_tournaments_per_month": (
                 "Оставьте пустым для безлимитного участия. "
                 "Однодневные турниры не расходуют лимит."
@@ -799,6 +804,7 @@ class ClubPlayerPlanForm(forms.ModelForm):
             "description",
             "monthly_fee",
             "duration_days",
+            "registration_limit_period",
             "max_tournaments_per_month",
             "sort_order",
         ]:
@@ -818,6 +824,11 @@ class ClubPlayerPlanForm(forms.ModelForm):
         )
         self.fields["monthly_fee"].widget.attrs.setdefault("placeholder", "1000")
         self.fields["duration_days"].widget.attrs.setdefault("placeholder", "30")
+        self.fields["registration_limit_period"].initial = (
+            self.instance.registration_limit_period
+            if self.instance and self.instance.pk
+            else ClubRegistrationLimitPeriod.MONTHLY
+        )
         self.fields["max_tournaments_per_month"].widget.attrs.setdefault(
             "placeholder",
             "Например, 5",
@@ -832,12 +843,16 @@ class ClubPlayerPlanForm(forms.ModelForm):
             cleaned_data.get("has_unlimited_registrations")
         )
         max_tournaments_per_month = cleaned_data.get("max_tournaments_per_month")
+        registration_limit_period = cleaned_data.get("registration_limit_period")
         if has_unlimited_registrations:
             cleaned_data["max_tournaments_per_month"] = None
+            cleaned_data["registration_limit_period"] = (
+                registration_limit_period or ClubRegistrationLimitPeriod.MONTHLY
+            )
         elif max_tournaments_per_month is None:
             self.add_error(
                 "max_tournaments_per_month",
-                "Укажите лимит турниров в месяц или включите безлимитные регистрации.",
+                "Укажите лимит турниров или включите безлимитные регистрации.",
             )
         return cleaned_data
 

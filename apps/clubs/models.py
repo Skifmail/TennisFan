@@ -67,6 +67,13 @@ class ClubMemberPlanStatus(models.TextChoices):
     ENDED = "ended", "Завершён"
 
 
+class ClubRegistrationLimitPeriod(models.TextChoices):
+    """Период обновления лимита регистраций клубного тарифа."""
+
+    MONTHLY = "monthly", "В месяц"
+    PLAN_PERIOD = "plan_period", "За весь срок тарифа"
+
+
 class FeePeriod(models.TextChoices):
     """Период членского взноса."""
 
@@ -404,10 +411,20 @@ class ClubPlayerPlan(models.Model):
         help_text="Сколько дней действует оплаченный тариф.",
     )
     max_tournaments_per_month = models.PositiveIntegerField(
-        "Лимит турниров в месяц",
+        "Лимит турниров",
         null=True,
         blank=True,
         help_text="Обязателен, если безлимитные регистрации выключены.",
+    )
+    registration_limit_period = models.CharField(
+        "Период лимита регистраций",
+        max_length=20,
+        choices=ClubRegistrationLimitPeriod.choices,
+        default=ClubRegistrationLimitPeriod.MONTHLY,
+        help_text=(
+            "В месяц — лимит обновляется каждый календарный месяц. "
+            "За весь срок тарифа — общий лимит на весь оплаченный период."
+        ),
     )
     has_unlimited_registrations = models.BooleanField(
         "Безлимитные регистрации",
@@ -478,6 +495,16 @@ class ClubPlayerPlan(models.Model):
             return None
         # Тип Django-моделей для null-поля может определяться как Any.
         return cast(int | None, self.max_tournaments_per_month)
+
+    @property
+    def registrations_limit_display(self) -> str:
+        """Возвращает человекочитаемое описание лимита регистраций."""
+        if self.has_unlimited_registrations:
+            return "Безлимит"
+        limit = self.registrations_limit or 0
+        if self.registration_limit_period == ClubRegistrationLimitPeriod.PLAN_PERIOD:
+            return f"{limit} за срок тарифа"
+        return f"{limit} в месяц"
 
     def __str__(self) -> str:
         return f"{self.club.name} — {self.name}"

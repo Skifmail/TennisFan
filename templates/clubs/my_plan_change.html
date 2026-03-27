@@ -5,20 +5,20 @@
 
 {% block content %}
 {% include "clubs/_club_player_nav.html" with current="plan" %}
-<div class="page-header">
+<div class="page-header club-plan-change-page">
     <h1 class="page-title">Выбор тарифа</h1>
     <p class="page-subtitle">{{ club.name }}</p>
 </div>
 
-<div class="container" style="max-width: 1180px;">
-    <div class="pricing-intro">
+<div class="container club-plan-change-page__container" style="max-width: 1180px;">
+    <div class="pricing-intro club-plan-change-page__intro">
         <p class="pricing-intro__text">
             Выберите тариф клуба и оплатите его онлайн.
             После оплаты тариф активируется сразу, а при желании можно включить автоматическое продление.
         </p>
     </div>
 
-    <div class="pricing-grid">
+    <div class="pricing-grid club-plan-change-page__grid">
         {% for plan in active_plans %}
         <div class="pricing-card {% if current_member_plan and current_member_plan.plan_id == plan.id %}pricing-card-current{% endif %}">
             <h3 class="pricing-card__title">{{ plan.name }}</h3>

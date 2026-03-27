@@ -31,6 +31,16 @@
     line-height: 1.6;
 }
 
+.club-plan-change-page .page-subtitle,
+.club-plan-change-page__intro .pricing-intro__text {
+    color: silver;
+}
+
+.club-plan-change-page__grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 420px));
+    justify-content: center;
+}
+
 .pricing-faq {
     margin-top: var(--spacing-3xl);
     padding-top: var(--spacing-3xl);
@@ -67,6 +77,10 @@
 
 @media (width <= 768px) {
     .pricing-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .club-plan-change-page__grid {
         grid-template-columns: 1fr;
     }
 

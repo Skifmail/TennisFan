@@ -1,4 +1,6 @@
+import csv
 from datetime import timedelta
+from io import StringIO
 
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -117,3 +119,73 @@ class ClubDiscoverPageTestCase(TestCase):
         self.assertContains(response, open_club.name)
         self.assertContains(response, pending_club.name)
         self.assertContains(response, "Заявка отправлена")
+
+
+class PlatformPlayersExportTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.staff_user = User.objects.create_user(
+            email="staff@test.local",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_login(self.staff_user)
+
+    def test_platform_players_export_returns_csv_without_bye_players(self) -> None:
+        user = User.objects.create_user(
+            email="player-export@test.local",
+            password="testpass123",
+            first_name="Иван",
+            last_name="Петров",
+            phone="+79990000000",
+        )
+        Player.objects.create(
+            user=user,
+            city="Москва",
+            gender="male",
+            ntrp_level="3.5",
+            skill_level="amateur",
+            total_points=128.5,
+            matches_played=14,
+            matches_won=9,
+        )
+        bye_user = User.objects.create_user(
+            email="bye-export@test.local",
+            password="testpass123",
+        )
+        Player.objects.create(user=bye_user, is_bye=True)
+
+        response = self.client.get(reverse("platform_players_export"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        self.assertEqual(
+            response["Content-Disposition"],
+            'attachment; filename="platform_players.csv"',
+        )
+
+        rows = list(csv.reader(StringIO(response.content.decode("utf-8-sig"))))
+        self.assertEqual(
+            rows[0],
+            [
+                "email",
+                "first_name",
+                "last_name",
+                "phone",
+                "city",
+                "gender",
+                "ntrp_level",
+                "skill_level",
+                "total_points",
+                "matches_played",
+                "matches_won",
+                "created_at",
+            ],
+        )
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[1][0], "player-export@test.local")
+        self.assertEqual(rows[1][1], "Иван")
+        self.assertEqual(rows[1][2], "Петров")
+        self.assertEqual(rows[1][3], "+79990000000")
+        self.assertEqual(rows[1][4], "Москва")
+        self.assertEqual(rows[1][5], "Мужской")

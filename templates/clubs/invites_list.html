@@ -310,7 +310,19 @@
                         {% endif %}
                         <label class="club-members-field">
                             <span class="club-members-field__label">{{ invite_import_form.file.label }}</span>
-                            {{ invite_import_form.file }}
+                            <div class="club-invites-file-picker">
+                                <input
+                                    id="{{ invite_import_form.file.id_for_label }}"
+                                    type="file"
+                                    name="{{ invite_import_form.file.name }}"
+                                    accept=".csv,.txt"
+                                    required
+                                    class="club-invites-file-picker__input">
+                                <label for="{{ invite_import_form.file.id_for_label }}" class="club-invites-file-picker__button">
+                                    Выберите файл
+                                </label>
+                                <span class="club-invites-file-picker__name" data-file-name>Файл не выбран</span>
+                            </div>
                             {% for error in invite_import_form.file.errors %}
                             <p class="club-balance-form__error">{{ error }}</p>
                             {% endfor %}

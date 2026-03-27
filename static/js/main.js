@@ -188,6 +188,19 @@ document.addEventListener('DOMContentLoaded', function() {
     initDesktopFooterState();
     window.addEventListener('resize', initDesktopFooterState);
 
+    // Club invites: показываем имя выбранного файла рядом с кнопкой
+    document.querySelectorAll('.club-invites-file-picker').forEach(function(picker) {
+        var input = picker.querySelector('.club-invites-file-picker__input');
+        var nameEl = picker.querySelector('[data-file-name]');
+        if (!input || !nameEl) return;
+        var fallbackName = nameEl.textContent || 'Файл не выбран';
+        input.addEventListener('change', function() {
+            var fileName = (input.files && input.files.length > 0) ? input.files[0].name : '';
+            nameEl.textContent = fileName || fallbackName;
+            nameEl.title = fileName || '';
+        });
+    });
+
     // Home tournaments: AJAX фильтры и пагинация
     var tournamentsForm = document.getElementById('home-tournaments-filter');
     var tournamentsBlock = document.getElementById('home-tournaments-block');

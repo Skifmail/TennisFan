@@ -32,12 +32,13 @@
 }
 
 .club-plan-change-page .page-subtitle,
+.club-plan-change-page__intro,
 .club-plan-change-page__intro .pricing-intro__text {
     color: silver;
 }
 
-.club-plan-change-page__grid {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 420px));
+.club-plan-change-page__grid.pricing-grid {
+    grid-template-columns: minmax(300px, 420px);
     justify-content: center;
 }
 
@@ -80,7 +81,7 @@
         grid-template-columns: 1fr;
     }
 
-    .club-plan-change-page__grid {
+    .club-plan-change-page__grid.pricing-grid {
         grid-template-columns: 1fr;
     }
 

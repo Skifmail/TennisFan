@@ -73,6 +73,24 @@ class SparringRequestForm(forms.ModelForm):
         return cleaned_data
 
 
+class SparringInviteForm(forms.Form):
+    """Форма отправки приглашения на спарринг выбранному игроку."""
+
+    invitee_id = forms.IntegerField(min_value=1, label="Игрок")
+    is_friendly = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Дружеская игра (без влияния на рейтинг и силу)",
+    )
+    proposed_date = forms.DateField(
+        required=False,
+        label="Предполагаемая дата игры",
+        widget=forms.DateInput(
+            attrs={"type": "date", "class": "form-control"},
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Парный спарринг 2×2
 # ---------------------------------------------------------------------------

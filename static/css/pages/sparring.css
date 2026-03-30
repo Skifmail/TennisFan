@@ -3,7 +3,7 @@
  * 
  * Описание: Структура и элементы страницы спаррингов (табы, флаги, карточки, тулбар).
  * Компоненты: .sparring-tabs, .sparring-tab, .sparring-toolbar, .sparring-flag, .sparring-card__*
- * Используется на: страницы спаррингов и связанные списки заявок
+ * Используется на: страницы спаррингов, приглашений и связанные списки заявок
  * 
  * Последнее обновление: 2026-03
  */
@@ -58,6 +58,30 @@
     justify-content: space-between;
 }
 
+/* Одна панель: фильтры и действия в едином стиле с селектами */
+.sparring-toolbar__panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+}
+
+.sparring-toolbar__panel .sparring-toolbar__filters.filter-bar {
+    flex: 1;
+    min-width: min(100%, 220px);
+    margin-bottom: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    gap: var(--spacing-md);
+}
+
 .sparring-filters {
     flex: 1;
     margin-bottom: 0;
@@ -67,25 +91,59 @@
 .sparring-toolbar__actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--spacing-sm);
     flex-shrink: 0;
+    padding-left: var(--spacing-md);
+    margin-left: var(--spacing-xs);
+    border-left: 1px solid var(--color-border);
+}
+
+.sparring-toolbar__actions .sparring-toolbar__btn {
+    text-decoration: none;
+    min-height: 40px;
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
+}
+
+/* Главное действие: чуть заметнее остальных outline, без «кислотной» заливки */
+.sparring-toolbar__btn--cta {
+    background: rgb(166 130 74 / 0.2);
+    border-color: var(--color-primary);
+    color: var(--color-text);
+}
+
+.sparring-toolbar__btn--cta:hover {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-bg);
+}
+
+.sparring-card > .card-body.sparring-card__inner {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
 }
 
 .sparring-card__flags {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--spacing-xs);
-    margin-bottom: var(--spacing-xs);
+    margin: 0;
 }
 
 .sparring-flag {
     display: inline-flex;
     align-items: center;
-    padding: 2px var(--spacing-sm);
+    padding: 0.2rem 0.45rem;
     font-size: var(--font-size-xs);
     font-weight: 600;
+    line-height: 1.2;
     border-radius: var(--radius-sm);
     text-transform: uppercase;
+    border: 1px solid transparent;
 }
 
 .sparring-flag--recruiting {
@@ -124,19 +182,79 @@
     border: 1px solid rgb(168 85 247 / 30%);
 }
 
-.sparring-card__avatar {
-    width: 56px;
-    height: 56px;
-    flex-shrink: 0;
-}
-
-.sparring-card__content {
-    flex: 1;
+/* Сетка: аватар | текст | действия — заполняет ширину карточки */
+.sparring-card__layout {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    gap: var(--spacing-sm) var(--spacing-md);
+    align-items: start;
     min-width: 0;
 }
 
+/* «Мои заявки»: без колонки аватара — текст и действия */
+.sparring-card__layout--my-request {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.sparring-card__col--main {
+    min-width: 0;
+}
+
+.sparring-card__col--cta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    align-self: stretch;
+    min-width: min(8.5rem, 100%);
+}
+
+.sparring-card__headline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.sparring-card__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+}
+
+.sparring-card__chip--muted {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-secondary);
+}
+
+.sparring-card__avatar {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+}
+
 .sparring-card__desc {
+    margin: 0 0 var(--spacing-sm);
     font-size: var(--font-size-sm);
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.sparring-card__details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.sparring-card__detail-line {
+    display: block;
+    line-height: 1.35;
 }
 
 .sparring-desired-category {
@@ -151,9 +269,90 @@
 
 .sparring-card__actions {
     display: flex;
+    flex-direction: column;
     flex-wrap: wrap;
-    gap: var(--spacing-sm);
-    align-items: center;
+    gap: var(--spacing-xs);
+    align-items: flex-end;
+    justify-content: center;
+    width: 100%;
+}
+
+.sparring-card__actions .sparring-card__btn {
+    white-space: nowrap;
+    text-align: center;
+    justify-content: center;
+}
+
+/* Блок откликов под основной сеткой карточки «Мои заявки» */
+.sparring-card__responses {
+    margin-top: var(--spacing-xs);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border-light);
+}
+
+.sparring-card__responses-title {
+    margin: 0 0 var(--spacing-xs);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--color-text-secondary);
+}
+
+.sparring-card__responses .sparring-response-row {
+    margin-bottom: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.sparring-card__responses .sparring-response-row:last-child {
+    margin-bottom: 0;
+}
+
+/* Тулбар «Мои заявки»: только ссылки без фильтров */
+.sparring-toolbar__panel--my-requests {
+    justify-content: flex-end;
+}
+
+.sparring-toolbar__panel--my-requests .sparring-toolbar__actions {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+}
+
+@media (width >= 480px) {
+    .sparring-card__actions {
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-end;
+        width: auto;
+    }
+}
+
+@media (width <= 640px) {
+    .sparring-card__layout {
+        grid-template-columns: 40px minmax(0, 1fr);
+    }
+
+    .sparring-card__layout--my-request {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sparring-card__col--cta {
+        grid-column: 1 / -1;
+        justify-content: stretch;
+        min-width: 0;
+    }
+
+    .sparring-card__actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
+        align-items: stretch;
+    }
+
+    .sparring-card__actions .sparring-card__btn {
+        flex: 1 1 auto;
+        min-width: 8rem;
+    }
 }
 
 @media (width <= 768px) {
@@ -162,8 +361,32 @@
         align-items: stretch;
     }
 
+    .sparring-toolbar__panel {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .sparring-toolbar__actions {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
         justify-content: flex-start;
+        padding-left: 0;
+        margin-left: 0;
+        border-left: none;
+        border-top: 1px solid var(--color-border);
+        padding-top: var(--spacing-md);
+    }
+
+    .sparring-toolbar__actions .sparring-toolbar__btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Только кнопки без фильтров — без лишней линии сверху */
+    .sparring-toolbar__panel--my-requests .sparring-toolbar__actions {
+        border-top: none;
+        padding-top: 0;
     }
 
     /* Mobile layout for sparring request form: stack 2-col rows */
@@ -178,5 +401,456 @@
         width: 100%;
         max-width: none;
         min-width: 0;
+    }
+}
+
+/* ==========================================================================
+   Страница «Пригласить на спарринг» — ровная сетка, единая высота контролов
+   ========================================================================== */
+
+.sparring-invite {
+    max-width: 720px;
+}
+
+.sparring-invite__section-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-md);
+}
+
+.sparring-invite__nav {
+    margin-bottom: var(--spacing-lg);
+    font-size: var(--font-size-sm);
+}
+
+.sparring-invite__nav a {
+    text-decoration: none;
+}
+
+.sparring-invite__nav a:hover {
+    text-decoration: underline;
+}
+
+.sparring-invite__hint {
+    margin-top: var(--spacing-md);
+    margin-bottom: 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+}
+
+/* Поиск: подпись сверху, поле и кнопка одной высоты в одном ряду */
+.sparring-invite__search-label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-weight: 500;
+    font-size: var(--font-size-sm);
+}
+
+.sparring-invite__search-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    align-items: stretch;
+}
+
+.sparring-invite__search-row .form-control {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.25;
+}
+
+.sparring-invite__search-row .btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 7.5rem;
+    min-height: 44px;
+    height: 44px;
+    padding-left: var(--spacing-xl);
+    padding-right: var(--spacing-xl);
+}
+
+/* Карточка найденного игрока */
+.sparring-invite__result .card-body {
+    padding: var(--spacing-xl);
+}
+
+.sparring-invite__profile {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    align-items: flex-start;
+}
+
+.sparring-invite__avatar {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+}
+
+.sparring-invite__avatar--placeholder {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+}
+
+.sparring-invite__profile-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.sparring-invite__profile-name {
+    font-weight: 600;
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--spacing-xs);
+}
+
+.sparring-invite__profile-meta {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.sparring-invite__profile-stats {
+    margin-top: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+}
+
+/* Действия: чекбокс | дата | кнопка — выравнивание по нижнему краю полей ввода */
+.sparring-invite__actions-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(170px, 220px) auto;
+    gap: var(--spacing-md);
+    align-items: end;
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+}
+
+.sparring-invite__cell--check .form-check {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin: 0;
+    min-height: 44px;
+}
+
+.sparring-invite__cell--check .form-check-input {
+    margin-top: 0;
+    flex-shrink: 0;
+}
+
+.sparring-invite__cell--date .form-group {
+    margin-bottom: 0;
+}
+
+.sparring-invite__cell--date .form-label {
+    margin-bottom: var(--spacing-xs);
+}
+
+.sparring-invite__cell--date .form-control {
+    min-height: 44px;
+    height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.25;
+}
+
+.sparring-invite__cell--submit {
+    display: flex;
+    align-items: flex-end;
+}
+
+.sparring-invite__cell--submit .btn {
+    min-height: 44px;
+    height: 44px;
+    padding-left: var(--spacing-xl);
+    padding-right: var(--spacing-xl);
+    min-width: 7.5rem;
+}
+
+@media (width <= 640px) {
+    .sparring-invite__actions-grid {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .sparring-invite__cell--submit {
+        justify-content: stretch;
+    }
+
+    .sparring-invite__cell--submit .btn {
+        width: 100%;
+    }
+
+    .sparring-invite__search-row .btn {
+        width: 100%;
+    }
+}
+
+/* ==========================================================================
+   «Мои приглашения» — компактные строки (сетка), бейджи статуса
+   ========================================================================== */
+
+.sparring-invitations {
+    max-width: 960px;
+}
+
+.sparring-invitations__nav {
+    margin-bottom: var(--spacing-lg);
+    font-size: var(--font-size-sm);
+}
+
+.sparring-invitations__nav a {
+    text-decoration: none;
+}
+
+.sparring-invitations__nav a:hover {
+    text-decoration: underline;
+}
+
+.sparring-invitations__card-body {
+    padding: var(--spacing-lg) var(--spacing-xl);
+}
+
+.sparring-invitations__section-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-md);
+}
+
+/* Общая таблица: заголовок + строки в одной рамке */
+.sparring-invitations__table {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-bg-secondary);
+}
+
+.sparring-invitations__thead {
+    display: none;
+}
+
+@media (width >= 720px) {
+    .sparring-invitations__thead {
+        display: grid;
+        grid-template-columns: 5.25rem minmax(0, 1.35fr) minmax(0, 1fr) auto minmax(0, 11rem);
+        gap: var(--spacing-sm) var(--spacing-md);
+        align-items: center;
+        padding: var(--spacing-xs) var(--spacing-md);
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--color-text-secondary);
+        background: var(--color-bg-elevated);
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .sparring-invitations__thead-actions {
+        justify-self: end;
+        min-width: 0;
+    }
+}
+
+.sparring-invitations__list {
+    display: flex;
+    flex-direction: column;
+}
+
+.sparring-invitations__row {
+    display: grid;
+    grid-template-columns: 5.25rem minmax(0, 1.35fr) minmax(0, 1fr) auto minmax(0, 11rem);
+    gap: var(--spacing-xs) var(--spacing-md);
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--font-size-sm);
+}
+
+.sparring-invitations__row:last-child {
+    border-bottom: none;
+}
+
+.sparring-invitations__date {
+    margin: 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.sparring-invitations__person {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-width: 0;
+}
+
+.sparring-invitations__person-line {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--spacing-xs);
+    min-width: 0;
+}
+
+.sparring-invitations__role {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+.sparring-invitations__avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.sparring-invitations__avatar--placeholder {
+    background: var(--color-bg-elevated);
+}
+
+.sparring-invitations__person-name {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.sparring-invitations__person-name:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.sparring-invitations__meta {
+    margin: 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sparring-invitations__status {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.sparring-invitations__status--pending {
+    background: rgb(234 179 8 / 15%);
+    color: #ca8a04;
+    border: 1px solid rgb(234 179 8 / 35%);
+}
+
+.sparring-invitations__status--accepted {
+    background: rgb(34 197 94 / 15%);
+    color: #16a34a;
+    border: 1px solid rgb(34 197 94 / 35%);
+}
+
+.sparring-invitations__status--rejected {
+    background: rgb(239 68 68 / 12%);
+    color: #dc2626;
+    border: 1px solid rgb(239 68 68 / 30%);
+}
+
+.sparring-invitations__status--cancelled {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border-light);
+}
+
+.sparring-invitations__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    align-items: center;
+    justify-content: flex-end;
+    justify-self: end;
+}
+
+.sparring-invitations__actions .btn-sm {
+    min-height: 30px;
+}
+
+.sparring-invitations__form {
+    margin: 0;
+    display: inline-flex;
+}
+
+.sparring-invitations__link-sub {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sparring-invitations__empty {
+    margin: 0;
+}
+
+.sparring-invitations__footer-note {
+    margin-top: var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+/* Узкий экран: блоки столбцом, без «простыни» */
+@media (width < 720px) {
+    .sparring-invitations__row {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-sm);
+        padding: var(--spacing-md);
+    }
+
+    .sparring-invitations__date {
+        font-size: var(--font-size-sm);
+    }
+
+    .sparring-invitations__meta {
+        white-space: normal;
+    }
+
+    .sparring-invitations__actions {
+        justify-content: flex-start;
+    }
+
+    .sparring-invitations__actions .btn-sm {
+        flex: 1 1 auto;
+        min-width: 6rem;
     }
 }

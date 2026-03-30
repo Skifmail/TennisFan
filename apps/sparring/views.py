@@ -45,6 +45,7 @@ from .doubles_services import (
 from .forms import (
     DoublesAddPartnerForm,
     DoublesMatchRequestForm,
+    SparringInviteForm,
     SparringRequestForm,
 )
 from .models import (
@@ -53,18 +54,31 @@ from .models import (
     DoublesMatchKind,
     DoublesMatchRequest,
     DoublesMatchRequestStatus,
+    SparringInvitation,
     SparringMatchType,
     SparringRequest,
     SparringResponse,
     TeamSide,
 )
+from .player_search import search_players_for_sparring_invite
+from .services import (
+    accept_sparring_invitation,
+    cancel_sparring_invitation,
+    reject_sparring_invitation,
+)
 from .utils import user_has_sparring_access
 
 # Импорт для Telegram уведомлений
 try:
-    from apps.telegram_bot.notifications import notify_sparring_response
+    from apps.telegram_bot.notifications import (
+        notify_sparring_invitation_accepted_inviter,
+        notify_sparring_invitation_created,
+        notify_sparring_response,
+    )
 except ImportError:
     notify_sparring_response = None  # type: ignore[assignment]
+    notify_sparring_invitation_created = None  # type: ignore[assignment]
+    notify_sparring_invitation_accepted_inviter = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -933,3 +947,174 @@ def doubles_cancel_request(request, pk):
     except (PermissionError, ValueError) as e:
         messages.error(request, str(e))
     return redirect("doubles_my_requests")
+
+
+# ---------------------------------------------------------------------------
+# Приглашения на спарринг по поиску игрока
+# ---------------------------------------------------------------------------
+
+
+@login_required
+@require_filled_profile
+def sparring_invite(request):
+    """Поиск игрока по ФИО или email и отправка приглашения на спарринг."""
+    if not user_has_sparring_access(request.user):
+        messages.error(
+            request,
+            "Доступ к спаррингам предоставляется по подписке. Оформите подписку Silver, Gold или Diamond.",
+        )
+        return redirect("pricing")
+
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        messages.error(request, "Заполните профиль игрока.")
+        return redirect("profile_edit")
+
+    search_query = (request.GET.get("q") or request.POST.get("return_q") or "").strip()
+    search_results: list[Player] = []
+    if search_query and len(search_query) >= 2:
+        search_results = list(
+            search_players_for_sparring_invite(
+                search_query,
+                exclude_player_id=player.pk,
+            )
+        )
+
+    if request.method == "POST":
+        form = SparringInviteForm(request.POST)
+        if form.is_valid():
+            invitee_id = form.cleaned_data["invitee_id"]
+            try:
+                invitee = Player.objects.select_related("user").get(pk=invitee_id)
+            except Player.DoesNotExist:
+                messages.error(request, "Игрок не найден.")
+                return redirect("sparring_invite")
+
+            if invitee.pk == player.pk:
+                messages.error(request, "Нельзя пригласить самого себя.")
+                return redirect("sparring_invite")
+
+            if SparringInvitation.objects.filter(
+                inviter=player,
+                invitee=invitee,
+                status=SparringInvitation.Status.PENDING,
+            ).exists():
+                messages.error(
+                    request,
+                    "У вас уже есть активное приглашение этому игроку.",
+                )
+                return redirect("sparring_my_invitations")
+
+            inv = SparringInvitation.objects.create(
+                inviter=player,
+                invitee=invitee,
+                is_friendly=form.cleaned_data["is_friendly"],
+                proposed_date=form.cleaned_data.get("proposed_date"),
+            )
+            if notify_sparring_invitation_created is not None:
+                try:
+                    notify_sparring_invitation_created(inv)
+                except Exception as e:
+                    logger.warning(
+                        "notify_sparring_invitation_created failed: %s",
+                        e,
+                    )
+            messages.success(
+                request,
+                f"Приглашение отправлено игроку {invitee}.",
+            )
+            return redirect("sparring_my_invitations")
+        messages.error(request, form.errors.as_text() or "Проверьте данные формы.")
+
+    return render(
+        request,
+        "sparring/invite.html",
+        {
+            "search_query": search_query,
+            "search_results": search_results,
+        },
+    )
+
+
+@login_required
+@require_filled_profile
+def sparring_my_invitations(request):
+    """История приглашений на спарринг: исходящие и входящие."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        messages.error(request, "Заполните профиль игрока.")
+        return redirect("profile_edit")
+
+    sent = (
+        SparringInvitation.objects.filter(inviter=player)
+        .select_related("invitee__user", "match")
+        .order_by("-created_at")
+    )
+    received = (
+        SparringInvitation.objects.filter(invitee=player)
+        .select_related("inviter__user", "match")
+        .order_by("-created_at")
+    )
+    return render(
+        request,
+        "sparring/my_invitations.html",
+        {
+            "sent_invitations": sent,
+            "received_invitations": received,
+            "has_sparring_access": user_has_sparring_access(request.user),
+        },
+    )
+
+
+@require_POST
+@login_required
+def sparring_invitation_accept(request, pk):
+    """Принять приглашение на спарринг (приглашённый игрок)."""
+    if not user_has_sparring_access(request.user):
+        messages.error(request, "Нужна подписка с доступом к спаррингам.")
+        return redirect("pricing")
+    try:
+        match = accept_sparring_invitation(pk, request.user.id)
+    except ValueError as e:
+        messages.error(request, str(e))
+        return redirect("sparring_my_invitations")
+
+    inv = get_object_or_404(
+        SparringInvitation.objects.select_related("inviter__user"), pk=pk
+    )
+    if notify_sparring_invitation_accepted_inviter is not None:
+        try:
+            notify_sparring_invitation_accepted_inviter(inv, match)
+        except Exception as e:
+            logger.warning("notify_sparring_invitation_accepted_inviter failed: %s", e)
+
+    messages.success(request, "Приглашение принято, матч создан.")
+    return redirect("match_detail", pk=match.pk)
+
+
+@require_POST
+@login_required
+def sparring_invitation_reject(request, pk):
+    """Отклонить приглашение на спарринг."""
+    try:
+        reject_sparring_invitation(pk, request.user.id)
+    except ValueError as e:
+        messages.error(request, str(e))
+        return redirect("sparring_my_invitations")
+    messages.success(request, "Приглашение отклонено.")
+    return redirect("sparring_my_invitations")
+
+
+@require_POST
+@login_required
+def sparring_invitation_cancel(request, pk):
+    """Отменить исходящее приглашение."""
+    try:
+        cancel_sparring_invitation(pk, request.user.id)
+    except ValueError as e:
+        messages.error(request, str(e))
+        return redirect("sparring_my_invitations")
+    messages.success(request, "Приглашение отменено.")
+    return redirect("sparring_my_invitations")

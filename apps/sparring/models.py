@@ -167,6 +167,68 @@ class SparringResponse(models.Model):
         return f"{self.respondent} → {self.sparring_request}"
 
 
+class SparringInvitation(models.Model):
+    """Прямое приглашение на спарринг по поиску игрока (ФИО или email)."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Ожидает ответа"
+        ACCEPTED = "accepted", "Принято"
+        REJECTED = "rejected", "Отклонено"
+        CANCELLED = "cancelled", "Отменено"
+
+    inviter = models.ForeignKey(
+        Player,
+        on_delete=models.CASCADE,
+        related_name="sparring_invitations_sent",
+        verbose_name="Кто пригласил",
+    )
+    invitee = models.ForeignKey(
+        Player,
+        on_delete=models.CASCADE,
+        related_name="sparring_invitations_received",
+        verbose_name="Кого пригласили",
+    )
+    is_friendly = models.BooleanField(
+        "Дружеская игра",
+        default=False,
+        help_text="Без влияния на рейтинг и силу",
+    )
+    proposed_date = models.DateField(
+        "Предполагаемая дата игры",
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        "Статус",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    match = models.ForeignKey(
+        "tournaments.Match",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sparring_invitation_records",
+        verbose_name="Матч",
+    )
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Приглашение на спарринг"
+        verbose_name_plural = "Приглашения на спарринг"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["inviter", "status"]),
+            models.Index(fields=["invitee", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.inviter} → {self.invitee} ({self.get_status_display()})"
+
+
 # ---------------------------------------------------------------------------
 # Парный спарринг 2×2: формирование команд через MatchRequest / Team / JoinRequest
 # ---------------------------------------------------------------------------

@@ -29,6 +29,7 @@
 @import url('./pages/training.css');
 @import url('./pages/shop.css');
 @import url('./pages/rules.css');
+@import url('./pages/results.css');
 @import url('./pages/applications.css');
 @import url('./pages/calculator.css');
 @import url('./pages/legal.css');
@@ -175,6 +176,14 @@
 
 .grid-4 {
     grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 768px) {
+    .grid-2,
+    .grid-3,
+    .grid-4 {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ==========================================================================

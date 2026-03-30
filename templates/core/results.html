@@ -3,13 +3,13 @@
 {% block title %}Результаты матчей{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header results-page">
     <h1 class="page-title">Результаты</h1>
     <p class="page-subtitle">История завершённых матчей</p>
 </div>
 
-<div class="container">
-    <div class="grid grid-2">
+<div class="container results-page">
+    <div class="grid grid-2 results-grid">
         {% for match in matches %}
         <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
             <div class="match-header">
@@ -19,12 +19,10 @@
             <div class="match-players">
                 <div class="match-player {% if match.winner == match.player1 %}winner{% endif %}">
                     {% include 'includes/avatar.html' with avatar=match.player1.avatar %}
-                    <div class="player-name" style="display:flex;align-items:center;gap:5px;">
+                    <div class="player-name">
                         {{ match.player1 }}
                         {% with tier=match.player1.active_subscription_tier %}
-                            {% if tier and tier.has_badge %}
-                                <img src="/static/images/{{ tier.name }}.png" alt="{{ tier.name }}" title="{{ tier.get_name_display }}" style="width: 14px; height: 14px;">
-                            {% endif %}
+                            {% include 'includes/subscription_badge_icon.html' with tier=tier %}
                         {% endwith %}
                     </div>
                     {% if match.winner == match.player1 %}
@@ -48,12 +46,10 @@
                 </div>
                 <div class="match-player {% if match.winner == match.player2 %}winner{% endif %}">
                     {% include 'includes/avatar.html' with avatar=match.player2.avatar %}
-                    <div class="player-name" style="display:flex;align-items:center;gap:5px;">
+                    <div class="player-name">
                         {{ match.player2 }}
                         {% with tier=match.player2.active_subscription_tier %}
-                            {% if tier and tier.has_badge %}
-                                <img src="/static/images/{{ tier.name }}.png" alt="{{ tier.name }}" title="{{ tier.get_name_display }}" style="width: 14px; height: 14px;">
-                            {% endif %}
+                            {% include 'includes/subscription_badge_icon.html' with tier=tier %}
                         {% endwith %}
                     </div>
                     {% if match.winner == match.player2 %}

@@ -188,7 +188,7 @@
                     {% for point in player_growth_points %}
                     <div class="club-dashboard-chart__item">
                         <div class="club-dashboard-chart__bar-wrap">
-                            <div class="club-dashboard-chart__bar" style="height: {{ point.height }}%;"></div>
+                            <div class="club-dashboard-chart__bar" data-height="{{ point.height }}"></div>
                         </div>
                         <div class="club-dashboard-chart__value">{{ point.value }}</div>
                         <div class="club-dashboard-chart__label">{{ point.label }}</div>
@@ -208,7 +208,7 @@
                     {% for point in activity_points %}
                     <div class="club-dashboard-chart__item">
                         <div class="club-dashboard-chart__bar-wrap">
-                            <div class="club-dashboard-chart__bar club-dashboard-chart__bar--soft" style="height: {{ point.height }}%;"></div>
+                            <div class="club-dashboard-chart__bar club-dashboard-chart__bar--soft" data-height="{{ point.height }}"></div>
                         </div>
                         <div class="club-dashboard-chart__value">{{ point.value }}</div>
                         <div class="club-dashboard-chart__label">{{ point.label }}</div>

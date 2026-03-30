@@ -165,4 +165,18 @@
     .sparring-toolbar__actions {
         justify-content: flex-start;
     }
+
+    /* Mobile layout for sparring request form: stack 2-col rows */
+    .sparring-create__form .sparring-create__row--top,
+    .sparring-create__form .sparring-create__row--age {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .sparring-create__form .sparring-create__row--top > *,
+    .sparring-create__form .sparring-create__row--age > * {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+    }
 }

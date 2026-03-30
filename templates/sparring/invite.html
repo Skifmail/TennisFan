@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Пригласить на спарринг{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Пригласить на спарринг</h1>
+    <p class="page-subtitle">
+        Найдите игрока по ФИО или email, отметьте дружескую игру при необходимости и укажите предполагаемую дату.
+        Приглашённый получит уведомление в личном кабинете и в Telegram-боте.
+    </p>
+</div>
+
+<div class="container sparring-invite">
+    <p class="sparring-invite__nav">
+        <a href="{% url 'sparring_list' %}" class="text-primary">← К спаррингу</a>
+        <span class="text-secondary"> · </span>
+        <a href="{% url 'sparring_my_invitations' %}" class="text-primary">Мои приглашения</a>
+    </p>
+
+    <div class="card mb-4">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <h2 class="sparring-invite__section-title">Поиск игрока</h2>
+            <form method="get" class="sparring-invite__search">
+                <label class="sparring-invite__search-label" for="id_q">ФИО или email</label>
+                <div class="sparring-invite__search-row">
+                    <input
+                        type="search"
+                        name="q"
+                        id="id_q"
+                        class="form-control"
+                        value="{{ search_query }}"
+                        placeholder="Например: Иванов или user@mail.ru"
+                        minlength="2"
+                    >
+                    <button type="submit" class="btn btn-primary">Найти</button>
+                </div>
+            </form>
+            <p class="sparring-invite__hint text-secondary">
+                Минимум 2 символа. Для email можно ввести полный адрес — будет точное совпадение.
+            </p>
+        </div>
+    </div>
+
+    {% if search_query and search_query|length >= 2 %}
+        {% if search_results %}
+        <h2 class="sparring-invite__section-title mt-4">Результаты</h2>
+        <div class="d-flex flex-column gap-3">
+            {% for p in search_results %}
+            <div class="card sparring-invite__result">
+                <div class="card-body">
+                    <div class="sparring-invite__profile">
+                        {% if p.avatar %}
+                        <img class="sparring-invite__avatar" src="{{ p.avatar.url }}" alt="">
+                        {% else %}
+                        <div class="sparring-invite__avatar--placeholder" aria-hidden="true"></div>
+                        {% endif %}
+                        <div class="sparring-invite__profile-text">
+                            <div class="sparring-invite__profile-name">{{ p }}</div>
+                            <div class="sparring-invite__profile-meta">{{ p.user.email }}</div>
+                            <div class="sparring-invite__profile-stats">
+                                Сила: {{ p.get_skill_level_display }} · NTRP: {{ p.ntrp_level }} ·
+                                Рейтинг FAN: {{ p.total_points|default:0|floatformat:0 }}
+                            </div>
+                        </div>
+                    </div>
+                    <form method="post" class="sparring-invite__invite-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="return_q" value="{{ search_query }}">
+                        <input type="hidden" name="invitee_id" value="{{ p.pk }}">
+                        <div class="sparring-invite__actions-grid">
+                            <div class="sparring-invite__cell sparring-invite__cell--check">
+                                <div class="form-check">
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        name="is_friendly"
+                                        id="friendly_{{ p.pk }}"
+                                    >
+                                    <label class="form-check-label" for="friendly_{{ p.pk }}">
+                                        Дружеская игра (без рейтинга)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="sparring-invite__cell sparring-invite__cell--date">
+                                <div class="form-group">
+                                    <label class="form-label" for="date_{{ p.pk }}">Дата игры</label>
+                                    <input
+                                        type="date"
+                                        name="proposed_date"
+                                        id="date_{{ p.pk }}"
+                                        class="form-control"
+                                    >
+                                </div>
+                            </div>
+                            <div class="sparring-invite__cell sparring-invite__cell--submit">
+                                <button type="submit" class="btn btn-primary">Пригласить</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-secondary">Никого не нашли. Попробуйте другой запрос или email.</p>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

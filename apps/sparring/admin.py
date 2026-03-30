@@ -10,6 +10,7 @@ from .models import (
     DoublesMatchRequest,
     DoublesTeam,
     DoublesTeamMember,
+    SparringInvitation,
     SparringRequest,
     SparringResponse,
 )
@@ -115,6 +116,34 @@ class SparringResponseAdmin(admin.ModelAdmin):
 
     has_match.boolean = True
     has_match.short_description = "Матч создан"
+
+
+@admin.register(SparringInvitation)
+class SparringInvitationAdmin(admin.ModelAdmin):
+    """Админка приглашений на спарринг по поиску игрока."""
+
+    list_display = (
+        "id",
+        "inviter",
+        "invitee",
+        "is_friendly",
+        "proposed_date",
+        "status",
+        "match",
+        "created_at",
+    )
+    list_filter = ("status", "is_friendly", "created_at")
+    search_fields = (
+        "inviter__user__email",
+        "inviter__user__first_name",
+        "inviter__user__last_name",
+        "invitee__user__email",
+        "invitee__user__first_name",
+        "invitee__user__last_name",
+    )
+    raw_id_fields = ("inviter", "invitee", "match")
+    readonly_fields = ("created_at", "updated_at")
+    date_hierarchy = "created_at"
 
 
 # ---------------------------------------------------------------------------

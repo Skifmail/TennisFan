@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block title %}Мои приглашения на спарринг{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Мои приглашения</h1>
+    <p class="page-subtitle">История входящих и исходящих приглашений на спарринг по поиску игрока.</p>
+</div>
+
+<div class="container sparring-invitations">
+    <p class="sparring-invitations__nav">
+        <a href="{% url 'sparring_list' %}" class="text-primary">← К спаррингу</a>
+        <span class="text-secondary"> · </span>
+        {% if has_sparring_access %}
+        <a href="{% url 'sparring_invite' %}" class="text-primary">Пригласить игрока</a>
+        {% endif %}
+    </p>
+
+    <section class="card mb-4" aria-labelledby="inv-in-heading">
+        <div class="card-body sparring-invitations__card-body">
+            <h2 id="inv-in-heading" class="sparring-invitations__section-title">Входящие</h2>
+            {% if received_invitations %}
+            <div class="sparring-invitations__table">
+                <div class="sparring-invitations__thead" aria-hidden="true">
+                    <span>Дата</span>
+                    <span>От кого</span>
+                    <span>Условия</span>
+                    <span>Статус</span>
+                    <span class="sparring-invitations__thead-actions"></span>
+                </div>
+                <div class="sparring-invitations__list">
+                    {% for inv in received_invitations %}
+                    <article class="sparring-invitations__row">
+                        <time class="sparring-invitations__date" datetime="{{ inv.created_at|date:'c' }}">
+                            {{ inv.created_at|date:"d.m.y H:i" }}
+                        </time>
+                        <div class="sparring-invitations__person">
+                            {% if inv.inviter.avatar %}
+                            <img
+                                class="sparring-invitations__avatar"
+                                src="{{ inv.inviter.avatar.url }}"
+                                alt=""
+                                width="32"
+                                height="32"
+                            >
+                            {% else %}
+                            <div class="sparring-invitations__avatar sparring-invitations__avatar--placeholder" aria-hidden="true"></div>
+                            {% endif %}
+                            <span class="sparring-invitations__person-line">
+                                <span class="sparring-invitations__role">От</span>
+                                <a href="{% url 'profile' pk=inv.inviter.pk %}" class="sparring-invitations__person-name">{{ inv.inviter }}</a>
+                            </span>
+                        </div>
+                        <p class="sparring-invitations__meta">
+                            {% if inv.is_friendly %}Дружеский{% else %}Рейтинговый{% endif %}
+                            {% if inv.proposed_date %}· {{ inv.proposed_date|date:"d.m.y" }}{% else %}· дата не указана{% endif %}
+                        </p>
+                        <span class="sparring-invitations__status sparring-invitations__status--{{ inv.status }}">
+                            {{ inv.get_status_display }}
+                        </span>
+                        <div class="sparring-invitations__actions">
+                            {% if inv.status == 'pending' and has_sparring_access %}
+                            <form action="{% url 'sparring_invitation_accept' pk=inv.pk %}" method="post" class="sparring-invitations__form">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary btn-sm">Принять</button>
+                            </form>
+                            <form action="{% url 'sparring_invitation_reject' pk=inv.pk %}" method="post" class="sparring-invitations__form" onsubmit="return confirm('Отклонить приглашение?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline btn-sm">Отклонить</button>
+                            </form>
+                            {% elif inv.status == 'pending' and not has_sparring_access %}
+                            <a href="{% url 'pricing' %}" class="sparring-invitations__link-sub">Подписка</a>
+                            {% elif inv.match_id %}
+                            <a href="{% url 'match_detail' pk=inv.match_id %}" class="btn btn-primary btn-sm">Матч</a>
+                            {% endif %}
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <p class="sparring-invitations__empty text-secondary">Нет входящих приглашений.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="card" aria-labelledby="inv-out-heading">
+        <div class="card-body sparring-invitations__card-body">
+            <h2 id="inv-out-heading" class="sparring-invitations__section-title">Исходящие</h2>
+            {% if sent_invitations %}
+            <div class="sparring-invitations__table">
+                <div class="sparring-invitations__thead" aria-hidden="true">
+                    <span>Дата</span>
+                    <span>Кому</span>
+                    <span>Условия</span>
+                    <span>Статус</span>
+                    <span class="sparring-invitations__thead-actions"></span>
+                </div>
+                <div class="sparring-invitations__list">
+                    {% for inv in sent_invitations %}
+                    <article class="sparring-invitations__row">
+                        <time class="sparring-invitations__date" datetime="{{ inv.created_at|date:'c' }}">
+                            {{ inv.created_at|date:"d.m.y H:i" }}
+                        </time>
+                        <div class="sparring-invitations__person">
+                            {% if inv.invitee.avatar %}
+                            <img
+                                class="sparring-invitations__avatar"
+                                src="{{ inv.invitee.avatar.url }}"
+                                alt=""
+                                width="32"
+                                height="32"
+                            >
+                            {% else %}
+                            <div class="sparring-invitations__avatar sparring-invitations__avatar--placeholder" aria-hidden="true"></div>
+                            {% endif %}
+                            <span class="sparring-invitations__person-line">
+                                <span class="sparring-invitations__role">Кому</span>
+                                <a href="{% url 'profile' pk=inv.invitee.pk %}" class="sparring-invitations__person-name">{{ inv.invitee }}</a>
+                            </span>
+                        </div>
+                        <p class="sparring-invitations__meta">
+                            {% if inv.is_friendly %}Дружеский{% else %}Рейтинговый{% endif %}
+                            {% if inv.proposed_date %}· {{ inv.proposed_date|date:"d.m.y" }}{% else %}· дата не указана{% endif %}
+                        </p>
+                        <span class="sparring-invitations__status sparring-invitations__status--{{ inv.status }}">
+                            {{ inv.get_status_display }}
+                        </span>
+                        <div class="sparring-invitations__actions">
+                            {% if inv.status == 'pending' %}
+                            <form action="{% url 'sparring_invitation_cancel' pk=inv.pk %}" method="post" class="sparring-invitations__form" onsubmit="return confirm('Отменить приглашение?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline btn-sm">Отменить</button>
+                            </form>
+                            {% elif inv.match_id %}
+                            <a href="{% url 'match_detail' pk=inv.match_id %}" class="btn btn-primary btn-sm">Матч</a>
+                            {% endif %}
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <p class="sparring-invitations__empty text-secondary">Вы ещё никого не приглашали.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    {% if not has_sparring_access %}
+    <p class="sparring-invitations__footer-note text-secondary">
+        Чтобы принимать приглашения и создавать матчи по ним, нужна подписка с доступом к спаррингам.
+        <a href="{% url 'pricing' %}">Оформить подписку</a>
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

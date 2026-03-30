@@ -36,18 +36,20 @@
     </p>
     {% endif %}
 
-    <div class="d-flex flex-wrap gap-2 mb-4" style="align-items: center;">
-        <a href="{% url 'sparring_list' %}?type={{ sparring_type }}" class="btn btn-ghost">← Все заявки</a>
-        {% if has_sparring_access %}
-        <a href="{% url 'sparring_create' %}?type={{ sparring_type }}" class="btn btn-primary">Создать заявку</a>
-        {% endif %}
+    <div class="sparring-toolbar sparring-toolbar__panel sparring-toolbar__panel--my-requests mb-4">
+        <div class="sparring-toolbar__actions" role="toolbar" aria-label="Навигация по заявкам">
+            <a href="{% url 'sparring_list' %}?type={{ sparring_type }}" class="btn btn-outline sparring-toolbar__btn">← Все заявки</a>
+            {% if has_sparring_access %}
+            <a href="{% url 'sparring_create' %}?type={{ sparring_type }}" class="btn btn-outline sparring-toolbar__btn sparring-toolbar__btn--cta">Создать заявку</a>
+            {% endif %}
+        </div>
     </div>
 
     {% if sparring_type == 'singles' %}
     <div class="grid grid-2">
         {% for req in sparring_requests %}
         <div class="card sparring-card {% if req.status == 'closed' %}sparring-card--closed{% endif %}">
-            <div class="card-body">
+            <div class="card-body sparring-card__inner">
                 <div class="sparring-card__flags">
                     <span class="sparring-flag sparring-flag--type">Одиночный 1×1</span>
                     {% if req.status == 'active' %}
@@ -64,102 +66,107 @@
                     <span class="sparring-flag sparring-flag--closed">Закрыта</span>
                     {% endif %}
                 </div>
-                <div class="d-flex gap-3 mt-2" style="align-items: flex-start;">
-                    <div style="flex: 1;">
-                        <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-xs);">
-                            {{ req.city }}{% if req.desired_category %} • {{ req.get_desired_category_display }}{% endif %}
-                        </p>
-                        <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ req.description|truncatewords:30 }}</p>
-                        <div class="mt-2" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                <div class="sparring-card__layout sparring-card__layout--my-request">
+                    <div class="sparring-card__col sparring-card__col--main">
+                        <div class="sparring-card__chips">
+                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city }}</span>
+                            {% if req.desired_category %}
+                            <span class="sparring-desired-category">{{ req.get_desired_category_display }}</span>
+                            {% endif %}
+                        </div>
+                        <p class="sparring-card__desc text-secondary">{{ req.description|truncatewords:30 }}</p>
+                        <div class="sparring-card__details">
                             {% if req.preferred_days or req.preferred_time %}
-                            <p>
+                            <span class="sparring-card__detail-line">
                                 {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
-                                {% if req.preferred_time %} • {{ req.preferred_time }}{% endif %}
-                            </p>
+                                {% if req.preferred_time %} · {{ req.preferred_time }}{% endif %}
+                            </span>
                             {% endif %}
                             {% if req.preferred_location %}
-                            <p>📍 {{ req.preferred_location }}</p>
+                            <span class="sparring-card__detail-line">📍 {{ req.preferred_location }}</span>
                             {% endif %}
                             {% if req.desired_partner_age_min or req.desired_partner_age_max %}
-                            <p>
-                                👤 Возраст партнёра:
+                            <span class="sparring-card__detail-line">
+                                Возраст партнёра:
                                 {% if req.desired_partner_age_min and req.desired_partner_age_max %}
-                                    {{ req.desired_partner_age_min }}-{{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
+                                    {{ req.desired_partner_age_min }}–{{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
                                 {% elif req.desired_partner_age_min %}
                                     от {{ req.desired_partner_age_min }} {{ req.desired_partner_age_min|years_suffix }}
                                 {% elif req.desired_partner_age_max %}
                                     до {{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
                                 {% endif %}
-                            </p>
+                            </span>
                             {% endif %}
                         </div>
-                        {% if req.responses.exists %}
-                        <div class="mt-3 pt-3" style="border-top: 1px solid var(--color-border-light);">
-                            <p class="text-secondary mb-2" style="font-size: var(--font-size-sm); font-weight: 600;">Отклики ({{ req.responses.count }}):</p>
-                            {% for response in req.responses.all %}
-                            <div class="sparring-response-row">
-                                <a href="{% url 'profile' pk=response.respondent.pk %}" class="sparring-response-row__avatar">
-                                    {% include 'includes/avatar.html' with avatar=response.respondent.avatar %}
-                                </a>
-                                <div class="sparring-response-row__info">
-                                    <a href="{% url 'profile' pk=response.respondent.pk %}" class="text-primary" style="font-weight: 600;">{{ response.respondent }}</a>
-                                    <span class="text-muted" style="font-size: var(--font-size-xs);">
-                                        • {{ response.get_contact_method_display }}
-                                        {% if response.status == 'pending' %}
-                                            <span class="badge sparring-response-badge sparring-response-badge--pending">Ожидает</span>
-                                        {% elif response.status == 'accepted' %}
-                                            <span class="badge sparring-response-badge sparring-response-badge--accepted">Принят</span>
-                                        {% elif response.status == 'rejected' %}
-                                            <span class="badge sparring-response-badge sparring-response-badge--rejected">Отклонён</span>
-                                        {% endif %}
-                                    </span>
-                                </div>
-                                <div class="sparring-response-row__rating">
-                                    <span class="sparring-response-rating__ntrp" title="Сила">Сила {{ response.respondent.ntrp_level|floatformat:1 }}</span>
-                                    <span class="sparring-response-rating__fan" title="Рейтинг FAN">{{ response.respondent.total_points|floatformat:0 }}</span>
-                                </div>
+                    </div>
+                    <div class="sparring-card__col sparring-card__col--cta">
+                        <div class="sparring-card__actions">
+                            {% if req.status == 'active' %}
+                            <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline btn-sm sparring-card__btn">Редактировать</a>
+                            <form action="{% url 'sparring_cancel' req.pk %}" method="post" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline btn-sm sparring-card__btn">Отменить</button>
+                            </form>
+                            {% endif %}
+                            <form action="{% url 'sparring_delete' req.pk %}" method="post" class="d-inline" onsubmit="return confirm('Удалить заявку?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline btn-sm sparring-card__btn text-error">Удалить</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% if req.responses.exists %}
+                <div class="sparring-card__responses">
+                    <p class="sparring-card__responses-title">Отклики ({{ req.responses.count }})</p>
+                    {% for response in req.responses.all %}
+                    <div class="sparring-response-row">
+                        <a href="{% url 'profile' pk=response.respondent.pk %}" class="sparring-response-row__avatar">
+                            {% include 'includes/avatar.html' with avatar=response.respondent.avatar %}
+                        </a>
+                        <div class="sparring-response-row__info">
+                            <a href="{% url 'profile' pk=response.respondent.pk %}" class="text-primary" style="font-weight: 600;">{{ response.respondent }}</a>
+                            <span class="text-muted" style="font-size: var(--font-size-xs);">
+                                • {{ response.get_contact_method_display }}
                                 {% if response.status == 'pending' %}
-                                <div class="sparring-response-row__actions">
-                                    {% if req.status == 'active' %}
-                                    <form action="{% url 'sparring_confirm_response' response_id=response.pk %}" method="post" class="sparring-response-form" onsubmit="return confirm('Подтвердить отклик и создать матч? Заявка будет закрыта.');">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-sm btn-primary">Подтвердить</button>
-                                    </form>
-                                    {% else %}
-                                    <span class="text-muted" style="font-size: var(--font-size-xs);">Заявка закрыта</span>
-                                    {% endif %}
-                                    <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-sm btn-outline">Профиль</a>
-                                    {% if response.respondent.telegram or response.respondent.whatsapp or response.respondent.max_url %}
-                                    <a href="#" class="btn btn-sm btn-outline contact-btn" data-telegram="{% if response.respondent.telegram %}https://t.me/{{ response.respondent.telegram|cut:'@' }}{% endif %}" data-whatsapp="{% if response.respondent.whatsapp %}{{ response.respondent.whatsapp }}{% endif %}" data-max="{% if response.respondent.max_url %}{{ response.respondent.max_url }}{% endif %}">Контакт</a>
-                                    {% else %}
-                                    <span class="btn btn-sm btn-outline contact-btn--disabled" title="Контакт не указан">Контакт</span>
-                                    {% endif %}
-                                </div>
+                                    <span class="badge sparring-response-badge sparring-response-badge--pending">Ожидает</span>
                                 {% elif response.status == 'accepted' %}
-                                <div class="sparring-response-row__actions">
-                                    <span class="text-success" style="font-size: var(--font-size-xs); font-weight: 600;">✓ Матч создан</span>
-                                    <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-sm btn-outline">Профиль</a>
-                                </div>
+                                    <span class="badge sparring-response-badge sparring-response-badge--accepted">Принят</span>
+                                {% elif response.status == 'rejected' %}
+                                    <span class="badge sparring-response-badge sparring-response-badge--rejected">Отклонён</span>
                                 {% endif %}
-                            </div>
-                            {% endfor %}
+                            </span>
+                        </div>
+                        <div class="sparring-response-row__rating">
+                            <span class="sparring-response-rating__ntrp" title="Сила">Сила {{ response.respondent.ntrp_level|floatformat:1 }}</span>
+                            <span class="sparring-response-rating__fan" title="Рейтинг FAN">{{ response.respondent.total_points|floatformat:0 }}</span>
+                        </div>
+                        {% if response.status == 'pending' %}
+                        <div class="sparring-response-row__actions">
+                            {% if req.status == 'active' %}
+                            <form action="{% url 'sparring_confirm_response' response_id=response.pk %}" method="post" class="sparring-response-form" onsubmit="return confirm('Подтвердить отклик и создать матч? Заявка будет закрыта.');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary btn-sm">Подтвердить</button>
+                            </form>
+                            {% else %}
+                            <span class="text-muted" style="font-size: var(--font-size-xs);">Заявка закрыта</span>
+                            {% endif %}
+                            <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-outline btn-sm">Профиль</a>
+                            {% if response.respondent.telegram or response.respondent.whatsapp or response.respondent.max_url %}
+                            <a href="#" class="btn btn-outline btn-sm contact-btn" data-telegram="{% if response.respondent.telegram %}https://t.me/{{ response.respondent.telegram|cut:'@' }}{% endif %}" data-whatsapp="{% if response.respondent.whatsapp %}{{ response.respondent.whatsapp }}{% endif %}" data-max="{% if response.respondent.max_url %}{{ response.respondent.max_url }}{% endif %}">Контакт</a>
+                            {% else %}
+                            <span class="btn btn-outline btn-sm contact-btn--disabled" title="Контакт не указан">Контакт</span>
+                            {% endif %}
+                        </div>
+                        {% elif response.status == 'accepted' %}
+                        <div class="sparring-response-row__actions">
+                            <span class="text-success" style="font-size: var(--font-size-xs); font-weight: 600;">✓ Матч создан</span>
+                            <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-outline btn-sm">Профиль</a>
                         </div>
                         {% endif %}
                     </div>
+                    {% endfor %}
                 </div>
-                <div class="sparring-card__actions mt-3">
-                    {% if req.status == 'active' %}
-                    <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline">Редактировать</a>
-                    <form action="{% url 'sparring_cancel' req.pk %}" method="post" class="d-inline">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-ghost">Отменить</button>
-                    </form>
-                    {% endif %}
-                    <form action="{% url 'sparring_delete' req.pk %}" method="post" class="d-inline" onsubmit="return confirm('Удалить заявку?');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-ghost text-error">Удалить</button>
-                    </form>
-                </div>
+                {% endif %}
             </div>
         </div>
         {% empty %}
@@ -170,7 +177,7 @@
     <div class="grid grid-2">
         {% for req in doubles_requests %}
         <div class="card sparring-card">
-            <div class="card-body">
+            <div class="card-body sparring-card__inner">
                 <div class="sparring-card__flags">
                     <span class="sparring-flag sparring-flag--type">
                         {% if sparring_type == 'team' %}Командный спарринг{% else %}Парный 2×2{% endif %}
@@ -180,24 +187,34 @@
                     <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
                     {% endif %}
                 </div>
-                <p class="text-secondary mb-1">{{ req.city|default:"Город не указан" }}</p>
-                {% if req.description %}
-                <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ req.description|truncatewords:15 }}</p>
-                {% endif %}
-                <div class="mt-2" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
-                    Создано {{ req.created_at|date:"d.m.Y H:i" }}
-                    {% if req.match and sparring_type == 'doubles' %}
-                    · <a href="{% url 'match_detail' pk=req.match_id %}">Матч создан</a>
-                    {% endif %}
-                </div>
-                <div class="sparring-card__actions mt-3">
-                    <a href="{% url 'doubles_detail' pk=req.pk %}" class="btn btn-outline">Подробнее</a>
-                    {% if req.status != 'completed' and req.status != 'cancelled' %}
-                    <form action="{% url 'doubles_cancel_request' pk=req.pk %}" method="post" class="d-inline" onsubmit="return confirm('Отменить заявку?');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-ghost text-error">Отменить</button>
-                    </form>
-                    {% endif %}
+                <div class="sparring-card__layout sparring-card__layout--my-request">
+                    <div class="sparring-card__col sparring-card__col--main">
+                        <div class="sparring-card__chips">
+                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city|default:"Город не указан" }}</span>
+                        </div>
+                        {% if req.description %}
+                        <p class="sparring-card__desc text-secondary">{{ req.description|truncatewords:15 }}</p>
+                        {% endif %}
+                        <div class="sparring-card__details">
+                            <span class="sparring-card__detail-line">
+                                Создано {{ req.created_at|date:"d.m.Y H:i" }}
+                                {% if req.match and sparring_type == 'doubles' %}
+                                · <a href="{% url 'match_detail' pk=req.match_id %}">Матч создан</a>
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="sparring-card__col sparring-card__col--cta">
+                        <div class="sparring-card__actions">
+                            <a href="{% url 'doubles_detail' pk=req.pk %}" class="btn btn-outline btn-sm sparring-card__btn">Подробнее</a>
+                            {% if req.status != 'completed' and req.status != 'cancelled' %}
+                            <form action="{% url 'doubles_cancel_request' pk=req.pk %}" method="post" class="d-inline" onsubmit="return confirm('Отменить заявку?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline btn-sm sparring-card__btn text-error">Отменить</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

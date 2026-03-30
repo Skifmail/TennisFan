@@ -785,6 +785,7 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
     is_sparring = (
         callback_data.startswith("contact_")
         or callback_data.startswith("confirm_match_")
+        or callback_data.startswith("sparring_invite_accept_")
         or callback_data.startswith("sparring_")
         or callback_data.startswith("team_sparring_generate_")
     )
@@ -806,6 +807,54 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
     player = getattr(user, "player", None)
     if not player:
         _answer_callback(cq_id, "Создайте профиль игрока на сайте.", show_alert=True)
+        return True
+
+    # ——— Подтверждение приглашения на спарринг (приглашённый) ———
+    if callback_data.startswith("sparring_invite_accept_"):
+        from apps.sparring.models import SparringInvitation
+        from apps.sparring.services import accept_sparring_invitation
+        from apps.sparring.utils import user_has_sparring_access
+        from apps.telegram_bot.notifications import (
+            notify_sparring_invitation_accepted_inviter,
+        )
+
+        try:
+            inv_id = int(callback_data[len("sparring_invite_accept_") :])
+        except (ValueError, TypeError):
+            _answer_callback(cq_id, "Неверные данные.", show_alert=True)
+            return True
+
+        if not user_has_sparring_access(user):
+            _answer_callback(
+                cq_id,
+                "Оформите подписку с доступом к спаррингам на сайте.",
+                show_alert=True,
+            )
+            return True
+
+        try:
+            match = accept_sparring_invitation(inv_id, user.id)
+        except ValueError as e:
+            _answer_callback(cq_id, str(e), show_alert=True)
+            return True
+
+        inv = (
+            SparringInvitation.objects.select_related("inviter__user", "invitee__user")
+            .filter(pk=inv_id)
+            .first()
+        )
+        if inv:
+            try:
+                notify_sparring_invitation_accepted_inviter(inv, match)
+            except Exception as exc:
+                logger.warning(
+                    "notify_sparring_invitation_accepted_inviter failed: %s", exc
+                )
+
+        if message_id:
+            _edit_message_remove_reply_markup(chat_id, message_id)
+
+        _answer_callback(cq_id, "Матч создан! Проверьте «Мои матчи».")
         return True
 
     # ——— Командный спарринг: сформировать матчи ———

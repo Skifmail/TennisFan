@@ -9,6 +9,23 @@ from . import views
 
 urlpatterns = [
     path("", views.sparring_list, name="sparring_list"),
+    path("invite/", views.sparring_invite, name="sparring_invite"),
+    path("invitations/", views.sparring_my_invitations, name="sparring_my_invitations"),
+    path(
+        "invitations/<int:pk>/accept/",
+        views.sparring_invitation_accept,
+        name="sparring_invitation_accept",
+    ),
+    path(
+        "invitations/<int:pk>/reject/",
+        views.sparring_invitation_reject,
+        name="sparring_invitation_reject",
+    ),
+    path(
+        "invitations/<int:pk>/cancel/",
+        views.sparring_invitation_cancel,
+        name="sparring_invitation_cancel",
+    ),
     path("my/", views.sparring_my_requests, name="sparring_my_requests"),
     path("create/", views.sparring_create, name="sparring_create"),
     path("<int:pk>/edit/", views.sparring_edit, name="sparring_edit"),

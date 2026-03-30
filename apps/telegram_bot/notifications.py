@@ -1161,3 +1161,139 @@ def notify_team_sparring_ready(match_request) -> None:
         getattr(author_user, "pk", None),
         ok,
     )
+
+
+def _sparring_inviter_card_lines(inviter) -> list[str]:
+    """Строки HTML-описания пригласившего для Telegram."""
+    lines: list[str] = [
+        f"<b>{html.escape(str(inviter))}</b>",
+    ]
+    if inviter.skill_level:
+        skill_display = dict(SkillLevel.choices).get(
+            inviter.skill_level, inviter.skill_level
+        )
+        lines.append(f"<b>Сила:</b> {html.escape(str(skill_display))}")
+    if inviter.ntrp_level is not None:
+        lines.append(f"<b>NTRP:</b> {inviter.ntrp_level}")
+    if inviter.total_points:
+        lines.append(f"<b>Рейтинг (FAN):</b> {int(inviter.total_points)}")
+    return lines
+
+
+def notify_sparring_invitation_created(invitation) -> None:
+    """
+    Уведомление приглашённому: приглашение на спарринг (ЛК и Telegram с кнопкой «Подтвердить»).
+    """
+    from django.urls import reverse
+
+    invitee_user = invitation.invitee.user
+    inviter = invitation.inviter
+    friendly = "да" if invitation.is_friendly else "нет"
+    date_str = (
+        invitation.proposed_date.strftime("%d.%m.%Y")
+        if invitation.proposed_date
+        else "не указана"
+    )
+    url = reverse("sparring_my_invitations")
+    msg_lk = (
+        f"{inviter} пригласил вас на спарринг. Дружеская игра: {friendly}. "
+        f"Дата: {date_str}. Откройте «Мои приглашения», чтобы подтвердить."
+    )
+    if len(msg_lk) > 255:
+        msg_lk = msg_lk[:252] + "..."
+    try:
+        Notification.objects.create(user=invitee_user, message=msg_lk, url=url)
+    except Exception as e:
+        logger.warning(
+            "notify_sparring_invitation_created LK failed user=%s: %s",
+            getattr(invitee_user, "pk", None),
+            e,
+        )
+
+    if not bot.is_configured():
+        return
+
+    lines = [
+        "🎾 <b>Приглашение на спарринг</b>",
+        "",
+        *_sparring_inviter_card_lines(inviter),
+        "",
+        f"<b>Дружеская игра:</b> {friendly}",
+        f"<b>Предполагаемая дата:</b> {date_str}",
+        "",
+        "Подтвердите приглашение — будет создан матч в «Мои матчи».",
+    ]
+    text = "\n".join(lines)
+    site_base = _get_site_base_url().rstrip("/")
+    invitations_url = f"{site_base}{url}"
+    reply_markup = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "✅ Подтвердить",
+                    "callback_data": f"sparring_invite_accept_{invitation.pk}",
+                }
+            ],
+            [{"text": "📋 Мои приглашения", "url": invitations_url}],
+        ],
+    }
+    ok = send_to_user_by_user(invitee_user, text, reply_markup=reply_markup)
+    logger.info(
+        "notify_sparring_invitation_created: invitation=%s invitee=%s sent=%s",
+        invitation.pk,
+        getattr(invitee_user, "pk", None),
+        ok,
+    )
+
+
+def notify_sparring_invitation_accepted_inviter(invitation, match) -> None:
+    """
+    Уведомление пригласившему: приглашение принято, матч создан (ЛК и Telegram).
+    """
+    from django.urls import reverse
+
+    inviter_user = invitation.inviter.user
+    invitee = invitation.invitee
+    deadline_str = (
+        match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else "не указан"
+    )
+    match_url = reverse("match_detail", args=[match.pk])
+    msg_lk = f"{invitee} принял(а) ваше приглашение на спарринг. Матч создан. Дедлайн: {deadline_str}."
+    if len(msg_lk) > 255:
+        msg_lk = msg_lk[:252] + "..."
+    try:
+        Notification.objects.create(user=inviter_user, message=msg_lk, url=match_url)
+    except Exception as e:
+        logger.warning(
+            "notify_sparring_invitation_accepted_inviter LK failed user=%s: %s",
+            getattr(inviter_user, "pk", None),
+            e,
+        )
+
+    if not bot.is_configured():
+        return
+    text = (
+        f"✅ <b>Приглашение принято</b>\n\n"
+        f"{invitee} согласился на спарринг.\n"
+        f"Матч: {html.escape(match.get_player1_display())} — "
+        f"{html.escape(match.get_player2_display())}\n"
+        f"Дедлайн: {deadline_str}"
+    )
+    reply_markup = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "📝 Внести результат",
+                    "callback_data": f"result_enter_{match.pk}",
+                }
+            ],
+            [{"text": "📅 Мои матчи", "callback_data": "menu_my_matches"}],
+        ],
+    }
+    ok = send_to_user_by_user(inviter_user, text, reply_markup=reply_markup)
+    logger.info(
+        "notify_sparring_invitation_accepted_inviter: invitation=%s inviter=%s sent=%s",
+        invitation.pk,
+        getattr(inviter_user, "pk", None),
+        ok,
+    )

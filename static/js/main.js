@@ -324,4 +324,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     })();
+
+    // Club dashboard: chart bars height from data-height (avoids template in style attrs)
+    document.querySelectorAll('.club-dashboard-chart__bar[data-height]').forEach(function(el) {
+        var raw = el.getAttribute('data-height') || '';
+        var n = parseFloat(raw);
+        if (Number.isFinite(n)) {
+            el.style.height = n + '%';
+        }
+    });
 });

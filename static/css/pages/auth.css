@@ -197,7 +197,7 @@
 }
 
 /* Адаптивность для мобильных устройств */
-@media (width <= 480px) {
+@media (max-width: 480px) {
     .password-field-wrapper .form-control {
         padding-right: 40px;
     }
@@ -268,6 +268,27 @@
     transform: translateZ(4px);
 }
 
+@media (max-width: 768px) {
+    .auth-page {
+        min-height: auto;
+        align-items: flex-start;
+    }
+
+    .auth-card {
+        min-height: 0;
+        height: auto;
+    }
+
+    .auth-hero,
+    .auth-form {
+        position: relative;
+        height: auto;
+        min-height: 0;
+        justify-content: flex-start;
+        align-items: stretch;
+    }
+}
+
 /* ==========================================================================
    Club registration choice: выбор типа аккаунта (игрок / клуб)
    ========================================================================== */
@@ -315,7 +336,7 @@
     color: var(--color-text-muted);
 }
 
-@media (width <= 900px) {
+@media (max-width: 900px) {
     .register-choice__grid {
         padding: var(--spacing-xl);
         gap: var(--spacing-lg);
@@ -327,7 +348,7 @@
     }
 }
 
-@media (width <= 640px) {
+@media (max-width: 640px) {
     .register-choice {
         max-width: 100%;
     }
@@ -472,7 +493,7 @@
     color: rgb(166 130 74 / 0.7);
 }
 
-@media (width <= 768px) {
+@media (max-width: 768px) {
     .club-register {
         max-width: 100%;
     }
@@ -491,7 +512,7 @@
     }
 }
 
-@media (width <= 480px) {
+@media (max-width: 480px) {
     .club-register__body {
         padding: var(--spacing-lg);
     }

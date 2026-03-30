@@ -1,0 +1,51 @@
+/*
+ * results.css
+ *
+ * Описание: Стили страницы результатов матчей.
+ * Компоненты: .results-page, .results-grid, .subscription-badge-icon
+ * Используется на: /results/
+ *
+ * Последнее обновление: 2026-03
+ */
+
+.results-page .results-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.results-page .player-name {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.results-page .subscription-badge-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.results-page .subscription-badge-icon__image {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+    display: block;
+}
+
+.results-page .subscription-badge-icon__glyph--platinum {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    line-height: 1;
+    color: #f8fbff;
+    text-shadow: 0 0 8px rgb(184 196 214 / 65%);
+}
+
+@media (max-width: 768px) {
+    .results-page .results-grid {
+        grid-template-columns: 1fr;
+    }
+}

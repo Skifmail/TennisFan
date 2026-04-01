@@ -35,6 +35,7 @@ from ..models import (
     ClubNotificationSettings,
     ClubPlan,
     ClubPlayerPlan,
+    ClubStatus,
     ClubSubscription,
     ClubSubscriptionPaymentPending,
     ClubSubscriptionPeriod,
@@ -913,6 +914,10 @@ def subscription_return(request: HttpRequest, slug: str) -> HttpResponse:
         payment_ref=payment_id,
         status=ClubSubscriptionStatus.ACTIVE,
     )
+    if club.status != ClubStatus.ACTIVE or club.trial_ends_at is not None:
+        club.status = ClubStatus.ACTIVE
+        club.trial_ends_at = None
+        club.save(update_fields=["status", "trial_ends_at"])
     pending.delete()
     messages.success(request, "Подписка успешно оплачена и активирована!")
     return redirect("clubs:subscription", slug=slug)

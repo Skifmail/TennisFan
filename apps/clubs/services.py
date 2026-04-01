@@ -74,8 +74,13 @@ def club_is_operational(club: Club) -> bool:
     if club.status == ClubStatus.SUSPENDED:
         return False
     if club.status == ClubStatus.TRIAL and club.trial_ends_at:
-        if club.trial_ends_at <= timezone.now():
-            return False
+        now = timezone.now()
+        if club.trial_ends_at <= now:
+            has_active_sub = club.subscriptions.filter(
+                status=ClubSubscriptionStatus.ACTIVE,
+                ends_at__gt=now,
+            ).exists()
+            return bool(has_active_sub)
     return True
 
 

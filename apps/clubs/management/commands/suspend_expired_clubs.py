@@ -55,6 +55,18 @@ class Command(BaseCommand):
             trial_ends_at__lt=now,
         )
         for club in trial_clubs:
+            has_active_sub = club.subscriptions.filter(
+                status=ClubSubscriptionStatus.ACTIVE,
+                ends_at__gt=now,
+            ).exists()
+            if has_active_sub:
+                club.status = ClubStatus.ACTIVE
+                club.save(update_fields=["status"])
+                logger.info(
+                    "Клуб '%s' переведён в active (trial истёк, но активная подписка действует).",
+                    club.name,
+                )
+                continue
             club.status = ClubStatus.SUSPENDED
             club.save(update_fields=["status"])
             log_platform_action(

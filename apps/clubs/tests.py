@@ -28,9 +28,15 @@ from apps.clubs.models import (
     ClubMembershipFee,
     ClubMemberStatus,
     ClubNotificationSettings,
+    ClubPlan,
     ClubPlanSlotUsage,
     ClubPlayerPlan,
     ClubRegistrationLimitPeriod,
+    ClubStatus,
+    ClubSubscription,
+    ClubSubscriptionPaymentPending,
+    ClubSubscriptionPeriod,
+    ClubSubscriptionStatus,
     FeePaymentMethod,
 )
 from apps.clubs.plan_services import (
@@ -39,7 +45,7 @@ from apps.clubs.plan_services import (
     get_member_plan_limits,
     purchase_member_plan,
 )
-from apps.clubs.services import get_current_period_label
+from apps.clubs.services import club_is_operational, get_current_period_label
 from apps.core.models import UserTelegramLink
 from apps.payments.models import PaymentRecord, SavedPaymentMethod
 from apps.subscriptions.models import SubscriptionTier, UserSubscription
@@ -262,6 +268,90 @@ class ClubPlayerPlanManagementViewTestCase(TestCase):
         self.assertEqual(plan.duration_days, 90)
         self.assertTrue(plan.has_unlimited_registrations)
         self.assertIsNone(plan.max_tournaments_per_month)
+
+
+class ClubSubscriptionStatusSyncTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="club-owner@test.local",
+            password="testpass123",
+        )
+        self.club = Club.objects.create(
+            name="Клуб со статусом trial",
+            slug="club-trial-sync",
+            city="Москва",
+            address="ул. Пушкина, 1",
+            email="club@test.local",
+            admin_name="Администратор клуба",
+            status=ClubStatus.TRIAL,
+            trial_ends_at=timezone.now() - timedelta(days=1),
+        )
+        ClubMember.objects.create(
+            club=self.club,
+            user=self.user,
+            role=ClubMemberRole.ADMIN,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        self.client.force_login(self.user)
+
+    def test_subscription_return_activates_trial_club_after_success_payment(
+        self,
+    ) -> None:
+        pending = ClubSubscriptionPaymentPending.objects.create(
+            payment_id="club-sub-pay-001",
+            club=self.club,
+            plan=ClubPlan.BASIC,
+            period="yearly",
+            amount=Decimal("19900.00"),
+        )
+
+        with patch(
+            "apps.payments.yookassa_client.get_payment_status",
+            return_value="succeeded",
+        ):
+            response = self.client.get(
+                reverse("clubs:subscription_return", kwargs={"slug": self.club.slug}),
+                {"payment_id": pending.payment_id},
+                secure=True,
+            )
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:subscription", kwargs={"slug": self.club.slug}),
+            fetch_redirect_response=False,
+        )
+        self.club.refresh_from_db()
+        self.assertEqual(self.club.status, ClubStatus.ACTIVE)
+        self.assertIsNone(self.club.trial_ends_at)
+        self.assertTrue(
+            ClubSubscription.objects.filter(
+                club=self.club,
+                plan=ClubPlan.BASIC,
+                period=ClubSubscriptionPeriod.YEARLY,
+                status=ClubSubscriptionStatus.ACTIVE,
+            ).exists()
+        )
+        self.assertFalse(
+            ClubSubscriptionPaymentPending.objects.filter(pk=pending.pk).exists()
+        )
+
+    def test_trial_expired_with_active_subscription_remains_operational(self) -> None:
+        ClubSubscription.objects.create(
+            club=self.club,
+            plan=ClubPlan.BASIC,
+            period=ClubSubscriptionPeriod.YEARLY,
+            price=Decimal("19900.00"),
+            started_at=timezone.now() - timedelta(days=1),
+            ends_at=timezone.now() + timedelta(days=365),
+            status=ClubSubscriptionStatus.ACTIVE,
+        )
+
+        self.assertTrue(club_is_operational(self.club))
+
+        call_command("suspend_expired_clubs")
+        self.club.refresh_from_db()
+        self.assertEqual(self.club.status, ClubStatus.ACTIVE)
 
 
 class ClubPlanPurchaseServiceTestCase(TestCase):

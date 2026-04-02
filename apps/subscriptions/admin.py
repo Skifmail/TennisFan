@@ -1,6 +1,7 @@
 from typing import Any, cast
 
 from django.contrib import admin
+from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 
 from .models import RegionalTierPrice, SubscriptionTier, UserSubscription
@@ -92,7 +93,9 @@ class SubscriptionTierAdmin(admin.ModelAdmin):
 @admin.register(UserSubscription)
 class UserSubscriptionAdmin(admin.ModelAdmin):
     list_display = (
-        "user",
+        "user_email",
+        "user_last_name",
+        "user_first_name",
         "tier",
         "purchase_city",
         "status_display",
@@ -102,13 +105,160 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
         "cancelled_at",
     )
     list_filter = ("tier", "is_active", "end_date")
-    search_fields = ("user__username", "user__email", "user__last_name")
+    # В кастомной модели User поля `username` нет (username = None),
+    # поэтому поиск по нему приводит к FieldError.
+    search_fields = ("user__email", "user__last_name", "user__first_name")
     readonly_fields = (
         "tournament_registration_balance",
         "cancelled_at",
         "purchase_city",
     )
     autocomplete_fields = ("user",)
+
+    @admin.display(description="Email", ordering="user__email")
+    def user_email(self, obj: UserSubscription) -> str:
+        """Отобразить email пользователя подписки."""
+        return cast(str, obj.user.email)
+
+    @admin.display(description="Фамилия", ordering="user__last_name")
+    def user_last_name(self, obj: UserSubscription) -> str:
+        """Отобразить фамилию пользователя подписки."""
+        return cast(str, obj.user.last_name)
+
+    @admin.display(description="Имя", ordering="user__first_name")
+    def user_first_name(self, obj: UserSubscription) -> str:
+        """Отобразить имя пользователя подписки."""
+        return cast(str, obj.user.first_name)
+
+    @staticmethod
+    def _case_variants_for_cyrillic(value: str) -> list[str]:
+        """
+        Сгенерировать варианты регистра для поиска по кириллице.
+
+        Args:
+            value: Исходная строка запроса.
+
+        Returns:
+            Список уникальных вариантов регистра, пригодных для `__contains`.
+        """
+
+        variants = [value, value.lower(), value.upper(), value.title()]
+        # Убираем дубликаты с сохранением порядка.
+        return list(dict.fromkeys(v for v in variants if v))
+
+    @staticmethod
+    def _phone_variants_for_search(token: str) -> list[str]:
+        """
+        Нормализовать телефонный токен для поиска в `user.phone`.
+
+        Учитывает варианты ввода:
+        - `+79381138222`
+        - `79381138222`
+        - `9381138222`
+
+        В базе телефон, как правило, хранится в нормализованном виде `+7XXXXXXXXXX`,
+        но поиск делаем по `__contains`, поэтому добавляем варианты:
+        - с `+`
+        - без `+`
+        - и альтернативную версию с ведущей `8` (на случай если где-то
+          сохранялись номера без полной нормализации).
+
+        Args:
+            token: Строка из поля поиска админки.
+
+        Returns:
+            Список уникальных вариантов, которые можно подставлять в `__contains`.
+        """
+
+        digits = "".join(ch for ch in token if ch.isdigit())
+        if not digits:
+            return []
+
+        normalized_digits: str | None = None
+        if len(digits) == 11:
+            if digits.startswith("8"):
+                normalized_digits = "7" + digits[1:]
+            elif digits.startswith("7"):
+                normalized_digits = digits
+        elif len(digits) == 10:
+            # Для РФ: 10 цифр обычно начинаются с 9 (9XXXXXXXXX), приводим к 7XXXXXXXXXX.
+            normalized_digits = "7" + digits
+
+        if not normalized_digits:
+            return []
+
+        alt8_digits = "8" + normalized_digits[1:]
+
+        variants = [
+            f"+{normalized_digits}",
+            normalized_digits,
+            f"+{alt8_digits}",
+            alt8_digits,
+        ]
+        return list(dict.fromkeys(variants))
+
+    def get_search_results(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[UserSubscription],
+        search_term: str,
+    ) -> tuple[QuerySet[UserSubscription], bool]:
+        """
+        Выполнить поиск по email, ФИО и телефону с учетом регистра кириллицы.
+
+        На SQLite в некоторых ситуациях `icontains` для кириллицы ломается
+        из-за SQL-преобразований вроде `LOWER()`, поэтому здесь делаем:
+        - разбиение запроса на токены;
+        - для каждого токена ищем:
+          - по `email` через `icontains`;
+          - по `last_name`/`first_name` через case-sensitive `contains` для
+            вариантов регистра (`lower/upper/title`);
+          - по `phone` через `contains` для нормализованных вариантов
+            (поддерживаются вводы с `+`, без `+`, с ведущей `8` и без `7`).
+
+        Args:
+            request: Текущий HTTP-запрос администратора.
+            queryset: Исходный queryset для фильтрации.
+            search_term: Строка поиска из формы админки.
+
+        Returns:
+            Кортеж (queryset, may_have_duplicates).
+
+        Raises:
+            None: Метод полагается на ORM и может выбросить FieldError, если
+                схема БД не соответствует ожидаемым полям.
+        """
+
+        if not search_term:
+            return queryset, False
+
+        tokens = [t for t in search_term.split() if t]
+        if not tokens:
+            return queryset, False
+
+        # Django admin обычно делает AND между токенами и OR по полям.
+        combined_q = Q()
+        for token in tokens:
+            email_q = Q(user__email__icontains=token)
+
+            # Сравнение `contains` case-sensitive, но с набором регистров.
+            name_q = Q()
+            for variant in self._case_variants_for_cyrillic(token):
+                name_q |= Q(user__last_name__contains=variant)
+                name_q |= Q(user__first_name__contains=variant)
+
+            token_q = email_q | name_q
+
+            phone_variants = self._phone_variants_for_search(token)
+            if phone_variants:
+                phone_q = Q()
+                for variant in phone_variants:
+                    phone_q |= Q(user__phone__contains=variant)
+                token_q |= phone_q
+
+            combined_q &= token_q
+
+        return queryset.filter(combined_q), False
 
     def registrations_limit_display(self, obj: UserSubscription) -> str:
         """Отображение лимита регистраций."""

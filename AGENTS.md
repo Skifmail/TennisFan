@@ -1,4 +1,3 @@
-cat > ~/Projects/Tennison/AGENTS.md << 'EOF'
 # Tennison — Project Context
 
 ## Stack
@@ -13,4 +12,6 @@ cat > ~/Projects/Tennison/AGENTS.md << 'EOF'
 - All docstrings in Russian
 - No print(), use loguru
 - Strict typing everywhere
-EOF
+- For tests, always use one of:
+  - `venv/bin/python manage.py test`
+  - `source venv/bin/activate && pytest`

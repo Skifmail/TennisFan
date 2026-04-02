@@ -7,9 +7,10 @@
 
 from datetime import timedelta
 from decimal import Decimal
+from typing import cast
 
 from django.contrib import admin, messages
-from django.db.models import Count, QuerySet, Sum
+from django.db.models import Count, Q, QuerySet, Sum
 from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.urls import path
@@ -39,6 +40,68 @@ from .models import (
     PlatformSettings,
 )
 from .services import log_platform_action
+
+# ---------------------------------------------------------------------------
+# Search helpers (регистронезависимый поиск по кириллице + телефоны)
+# ---------------------------------------------------------------------------
+
+
+def _case_variants_for_cyrillic(value: str) -> list[str]:
+    """
+    Сгенерировать варианты регистра для поиска по кириллице.
+
+    Args:
+        value: Токен запроса.
+
+    Returns:
+        Список вариантов регистра, подходящих для `__contains`.
+    """
+
+    variants = [value, value.lower(), value.upper(), value.title()]
+    return list(dict.fromkeys(v for v in variants if v))
+
+
+def _phone_variants_for_search(token: str) -> list[str]:
+    """
+    Подготовить варианты телефона для поиска по `User.phone`.
+
+    Поддерживаются вводы:
+    - `+79381138222`
+    - `79381138222`
+    - `9381138222`
+
+    Args:
+        token: Токен запроса.
+
+    Returns:
+        Список вариантов для `__contains` по нормализованным строкам.
+    """
+
+    digits = "".join(ch for ch in token if ch.isdigit())
+    if not digits:
+        return []
+
+    normalized_digits: str | None = None
+    if len(digits) == 11:
+        if digits.startswith("8"):
+            normalized_digits = "7" + digits[1:]
+        elif digits.startswith("7"):
+            normalized_digits = digits
+    elif len(digits) == 10:
+        normalized_digits = "7" + digits
+
+    if not normalized_digits:
+        return []
+
+    alt8_digits = "8" + normalized_digits[1:]
+    variants = [
+        f"+{normalized_digits}",
+        normalized_digits,
+        f"+{alt8_digits}",
+        alt8_digits,
+    ]
+    return list(dict.fromkeys(variants))
+
 
 # ---------------------------------------------------------------------------
 # Inlines
@@ -345,11 +408,122 @@ class ClubSubscriptionAdmin(admin.ModelAdmin):
 class ClubMemberAdmin(admin.ModelAdmin):
     """Админка участника клуба."""
 
-    list_display = ("user", "club", "role", "status", "joined_at", "created_at")
+    list_display = (
+        "user_email",
+        "user_last_name",
+        "user_first_name",
+        "club",
+        "role",
+        "status",
+        "joined_at",
+        "created_at",
+    )
     list_filter = ("role", "status", "club")
-    search_fields = ("user__email", "club__name")
+    search_fields = (
+        "user__email",
+        "user__last_name",
+        "user__first_name",
+        "user__phone",
+        "club__name",
+    )
     raw_id_fields = ("user", "invited_by")
     readonly_fields = ("created_at",)
+
+    @admin.display(description="Email", ordering="user__email")
+    def user_email(self, obj: ClubMember) -> str:
+        """Вернуть email пользователя участника клуба.
+
+        Args:
+            obj: Запись `ClubMember`.
+
+        Returns:
+            Email пользователя.
+        """
+
+        return cast(str, obj.user.email)
+
+    @admin.display(description="Фамилия", ordering="user__last_name")
+    def user_last_name(self, obj: ClubMember) -> str:
+        """Вернуть фамилию пользователя участника клуба.
+
+        Args:
+            obj: Запись `ClubMember`.
+
+        Returns:
+            Фамилия пользователя.
+        """
+
+        return cast(str, obj.user.last_name)
+
+    @admin.display(description="Имя", ordering="user__first_name")
+    def user_first_name(self, obj: ClubMember) -> str:
+        """Вернуть имя пользователя участника клуба.
+
+        Args:
+            obj: Запись `ClubMember`.
+
+        Returns:
+            Имя пользователя.
+        """
+
+        return cast(str, obj.user.first_name)
+
+    def get_search_results(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[ClubMember],
+        search_term: str,
+    ) -> tuple[QuerySet[ClubMember], bool]:
+        """
+        Выполнить поиск по email/ФИО/телефону и названию клуба.
+
+        Поиск по ФИО и названию клуба устойчив к регистру кириллицы,
+        так как делаем поиск через `__contains` по нескольким вариантам
+        регистра (`lower/upper/title`), избегая проблемных преобразований
+        вроде `LOWER()` на SQLite.
+
+        По телефону поддерживаются вводы:
+        `+79381138222`, `79381138222`, `9381138222`.
+
+        Args:
+            request: Текущий HTTP-запрос админки.
+            queryset: Базовый queryset для фильтрации.
+            search_term: Строка поиска из формы админки.
+
+        Returns:
+            Кортеж (queryset, may_have_duplicates).
+        """
+
+        if not search_term:
+            return queryset, False
+
+        tokens = [t for t in search_term.split() if t]
+        if not tokens:
+            return queryset, False
+
+        combined_q = Q()
+        for token in tokens:
+            email_q = Q(user__email__icontains=token)
+
+            name_q = Q()
+            club_name_q = Q()
+            for variant in _case_variants_for_cyrillic(token):
+                name_q |= Q(user__last_name__contains=variant)
+                name_q |= Q(user__first_name__contains=variant)
+                club_name_q |= Q(club__name__contains=variant)
+
+            token_q = email_q | name_q | club_name_q
+
+            phone_variants = _phone_variants_for_search(token)
+            if phone_variants:
+                phone_q = Q()
+                for variant in phone_variants:
+                    phone_q |= Q(user__phone__contains=variant)
+                token_q |= phone_q
+
+            combined_q &= token_q
+
+        return queryset.filter(combined_q), False
 
 
 @admin.register(ClubInviteLink)
@@ -463,7 +637,9 @@ class ClubMemberPlanAdmin(admin.ModelAdmin):
     """Админка назначений тарифов участникам клуба."""
 
     list_display = (
-        "club_member",
+        "user_email",
+        "user_last_name",
+        "user_first_name",
         "plan",
         "status",
         "started_at",
@@ -471,8 +647,105 @@ class ClubMemberPlanAdmin(admin.ModelAdmin):
         "auto_renew",
     )
     list_filter = ("status", "auto_renew", "plan__club")
-    search_fields = ("club_member__user__email", "plan__name", "plan__club__name")
+    search_fields = (
+        "club_member__user__email",
+        "club_member__user__last_name",
+        "club_member__user__first_name",
+        "club_member__user__phone",
+        "plan__name",
+        "plan__club__name",
+    )
     raw_id_fields = ("club_member", "assigned_by")
+
+    @admin.display(description="Email", ordering="club_member__user__email")
+    def user_email(self, obj: ClubMemberPlan) -> str:
+        """Вернуть email пользователя участника клуба.
+
+        Args:
+            obj: Запись `ClubMemberPlan`.
+
+        Returns:
+            Email пользователя.
+        """
+
+        return cast(str, obj.club_member.user.email)
+
+    @admin.display(description="Фамилия", ordering="club_member__user__last_name")
+    def user_last_name(self, obj: ClubMemberPlan) -> str:
+        """Вернуть фамилию пользователя участника клуба.
+
+        Args:
+            obj: Запись `ClubMemberPlan`.
+
+        Returns:
+            Фамилия пользователя.
+        """
+
+        return cast(str, obj.club_member.user.last_name)
+
+    @admin.display(description="Имя", ordering="club_member__user__first_name")
+    def user_first_name(self, obj: ClubMemberPlan) -> str:
+        """Вернуть имя пользователя участника клуба.
+
+        Args:
+            obj: Запись `ClubMemberPlan`.
+
+        Returns:
+            Имя пользователя.
+        """
+
+        return cast(str, obj.club_member.user.first_name)
+
+    def get_search_results(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[ClubMemberPlan],
+        search_term: str,
+    ) -> tuple[QuerySet[ClubMemberPlan], bool]:
+        """
+        Выполнить поиск по email/ФИО/телефону, названию тарифа и клуба.
+
+        Args:
+            request: Текущий HTTP-запрос админки.
+            queryset: Базовый queryset для фильтрации.
+            search_term: Строка поиска из формы админки.
+
+        Returns:
+            Кортеж (queryset, may_have_duplicates).
+        """
+
+        if not search_term:
+            return queryset, False
+
+        tokens = [t for t in search_term.split() if t]
+        if not tokens:
+            return queryset, False
+
+        combined_q = Q()
+        for token in tokens:
+            email_q = Q(club_member__user__email__icontains=token)
+
+            name_q = Q()
+            plan_name_q = Q()
+            club_name_q = Q()
+            for variant in _case_variants_for_cyrillic(token):
+                name_q |= Q(club_member__user__last_name__contains=variant)
+                name_q |= Q(club_member__user__first_name__contains=variant)
+                plan_name_q |= Q(plan__name__contains=variant)
+                club_name_q |= Q(plan__club__name__contains=variant)
+
+            token_q = email_q | name_q | plan_name_q | club_name_q
+
+            phone_variants = _phone_variants_for_search(token)
+            if phone_variants:
+                phone_q = Q()
+                for variant in phone_variants:
+                    phone_q |= Q(club_member__user__phone__contains=variant)
+                token_q |= phone_q
+
+            combined_q &= token_q
+
+        return queryset.filter(combined_q), False
 
 
 @admin.register(ClubPlanTournamentAccess)

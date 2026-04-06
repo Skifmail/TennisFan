@@ -804,7 +804,7 @@ def payment_process(request: HttpRequest) -> HttpResponse:
             receipt_email = name_or_email
     if not receipt_email or "@" not in receipt_email:
         receipt_email = (
-            getattr(settings, "DEFAULT_FROM_EMAIL", "") or "info@tennisfan.ru"
+            getattr(settings, "DEFAULT_FROM_EMAIL", "") or "tennis@tennisfan.ru"
         )
 
     try:

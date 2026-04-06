@@ -12,14 +12,38 @@
     var API_URL = "/api/cities/";
 
     /**
+     * Тип input, пригодный для текстового ввода города (без type поле в HTML = text).
+     */
+    function isTextLikeCityInput(el) {
+        var t = (el.getAttribute("type") || "text").toLowerCase();
+        return t === "text" || t === "search";
+    }
+
+    /**
      * Находит все input-поля, относящиеся к городу.
-     * @returns {NodeListOf<HTMLInputElement>}
+     * @returns {HTMLInputElement[]}
      */
     function findCityInputs() {
-        var inputs = document.querySelectorAll('input[type="text"], input[type="search"]');
+        var seen = {};
         var result = [];
-        for (var i = 0; i < inputs.length; i++) {
-            var el = inputs[i];
+
+        function add(el) {
+            if (!el || seen[el]) return;
+            seen[el] = true;
+            result.push(el);
+        }
+
+        /* name="city" без атрибута type не матчится на input[type="text"] в querySelector */
+        var byName = document.querySelectorAll('input[name="city"]');
+        for (var i = 0; i < byName.length; i++) {
+            if (isTextLikeCityInput(byName[i])) {
+                add(byName[i]);
+            }
+        }
+
+        var inputs = document.querySelectorAll('input[type="text"], input[type="search"]');
+        for (var j = 0; j < inputs.length; j++) {
+            var el = inputs[j];
             var name = (el.getAttribute("name") || "").toLowerCase();
             var id = (el.getAttribute("id") || "").toLowerCase();
             var cls = (el.getAttribute("class") || "").toLowerCase();
@@ -28,7 +52,7 @@
                 (id && id.indexOf("city") !== -1) ||
                 (cls && cls.indexOf("city") !== -1)
             ) {
-                result.push(el);
+                add(el);
             }
         }
         return result;
@@ -58,14 +82,7 @@
         wrap.setAttribute("role", "listbox");
         wrap.setAttribute("aria-hidden", "true");
         wrap.style.display = "none";
-        // Базовые стили по умолчанию (на случай, если CSS не подключен, как в админке)
-        wrap.style.background = "#fff";
-        wrap.style.border = "1px solid #ccc";
-        wrap.style.borderRadius = "4px";
-        wrap.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-        wrap.style.maxHeight = "240px";
-        wrap.style.overflowY = "auto";
-        wrap.style.padding = "2px 0";
+        /* Оформление — в autocomplete.css (тема сайта); позиция задаётся в positionDropdown */
         return wrap;
     }
 
@@ -97,11 +114,6 @@
             item.setAttribute("role", "option");
             item.setAttribute("data-index", index);
             item.textContent = name;
-            // Базовые стили по умолчанию для элемента
-            item.style.padding = "4px 10px";
-            item.style.cursor = "pointer";
-            item.style.background = "#fff";
-            item.style.color = "#000";
 
             // Используем mousedown, чтобы успеть выбрать до blur/focus смены (особенно в админке)
             function handleSelect(event) {
@@ -124,15 +136,7 @@
     function setHighlight(dropdown, index) {
         var items = dropdown.querySelectorAll(".city-autocomplete__item");
         items.forEach(function (el, i) {
-            var active = i === index;
-            el.classList.toggle("city-autocomplete__item--active", active);
-            if (active) {
-                el.style.background = "#1e90ff";
-                el.style.color = "#fff";
-            } else {
-                el.style.background = "#fff";
-                el.style.color = "#000";
-            }
+            el.classList.toggle("city-autocomplete__item--active", i === index);
         });
     }
 

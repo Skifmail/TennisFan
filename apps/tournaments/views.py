@@ -14,6 +14,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import models
 from django.db.models import Count, Min, Prefetch, Q
+from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -29,6 +30,7 @@ from apps.clubs.plan_services import (
 )
 from apps.clubs.services import get_fee_status_for_member, user_can_manage_club
 from apps.core.decorators import require_filled_profile
+from apps.core.text_search import filter_field_contains_ci
 from apps.users.models import Notification, Player, SkillLevel
 
 from .cancel import cancel_tournament
@@ -296,7 +298,7 @@ def tournament_list(request):
 
     check_and_generate_past_deadline_brackets()
 
-    city = request.GET.get("city", "")
+    city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
     status = request.GET.get("status", "")
 
@@ -315,7 +317,9 @@ def tournament_list(request):
     )
 
     if city:
-        tournaments = tournaments.filter(city__icontains=city)
+        tournaments = filter_field_contains_ci(
+            tournaments, "city", city, annotation="_tlist_city_l"
+        )
     if category:
         tournaments = tournaments.filter(
             allowed_categories__category=category
@@ -2683,9 +2687,12 @@ def my_matches(request):
         .order_by("-start_date")
     )
     if search_query:
-        tournaments_qs = tournaments_qs.filter(
-            Q(name__icontains=search_query) | Q(city__icontains=search_query)
-        )
+        sq = (search_query or "").strip()
+        if sq:
+            sq_l = sq.lower()
+            tournaments_qs = tournaments_qs.annotate(_mm_city_l=Lower("city")).filter(
+                Q(name__icontains=search_query) | Q(_mm_city_l__contains=sq_l)
+            )
 
     tournaments = list(tournaments_qs)
     sparring_count = (

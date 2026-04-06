@@ -1073,6 +1073,37 @@
     }
 }
 
+/* Блок «Турниры»: две кнопки в один ряд на мобильных, «Сбросить» как outline */
+.section-header--home-tournaments .home-tournaments-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    align-items: center;
+}
+
+@media (width <= 768px) {
+    .section-header--home-tournaments {
+        align-items: stretch;
+    }
+
+    .section-header--home-tournaments .home-tournaments-header__actions {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        width: 100%;
+        align-items: stretch;
+    }
+
+    .section-header--home-tournaments .home-tournaments-header__actions .btn {
+        flex: 1 1 0;
+        min-width: 0;
+        width: auto;
+        white-space: normal;
+        line-height: 1.25;
+        justify-content: center;
+        text-align: center;
+    }
+}
+
 @media (width <= 768px) {
     .home-section--upcoming .section-header,
     .home-section--news .section-header {
@@ -1096,7 +1127,7 @@
         min-width: 0;
     }
 
-    .home-grid--tournaments .card-image,
+    .home-grid--tournaments .tournament-preview-card__media,
     .home-grid--news .card-image {
         aspect-ratio: 16 / 9;
     }
@@ -1167,10 +1198,6 @@
         align-self: flex-end;
         margin: var(--spacing-md) var(--spacing-md) 0;
         max-width: none;
-    }
-
-    .home-section--upcoming .tournament-preview-card--no-image .card-body {
-        padding-top: var(--spacing-md);
     }
 
     .home-section--upcoming .tournament-preview-card__categories {

@@ -458,7 +458,8 @@
 
 .tournament-participants-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    /* Не фиксируем 5 колонок: на узкой ширине ячейки сжимаются до «полбуквы» у имени */
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
     gap: var(--spacing-xs);
 }
 
@@ -470,6 +471,7 @@
     padding: var(--spacing-xs) var(--spacing-sm);
     border-radius: var(--radius-md);
     min-width: 0;
+    overflow: hidden;
 }
 
 .participant-badge .player-avatar {
@@ -479,6 +481,8 @@
 }
 
 .participant-badge .participant-name {
+    flex: 1 1 0;
+    min-width: 0;
     font-size: var(--font-size-sm);
     font-weight: 500;
     overflow: hidden;
@@ -653,7 +657,6 @@
     cursor: pointer;
     background: var(--color-bg-elevated);
     min-height: 80px;
-    height: 80px;
     transition: background 0.15s ease;
 }
 
@@ -689,27 +692,17 @@
 }
 
 .tournament-table__participants {
-    margin-top: 4px;
+    margin-top: 6px;
     display: flex;
-    flex-wrap: nowrap;
-    gap: 4px;
-    overflow: hidden;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    min-width: 0;
+    max-width: 100%;
 }
 
-.tournament-participant-avatar .player-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
-}
-
-.tournament-participant-avatar {
-    position: relative;
-}
-
-.tournament-participant-more {
-    font-size: 11px;
-    color: #e2e8f0;
-    align-self: center;
+.tournament-table__participants .tournament-participants-grid {
+    min-width: 0;
+    width: 100%;
 }
 
 .tournament-table__action {
@@ -724,6 +717,7 @@
 
 .tournament-table__cell--title {
     width: auto;
+    min-width: 0;
 }
 
 .tournament-table__cell--city {

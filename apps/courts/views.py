@@ -9,6 +9,7 @@ from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.comments.models import Comment
+from apps.core.text_search import filter_field_contains_ci
 from apps.subscriptions.utils import user_can_read_comments, user_can_write_comments
 from apps.users.models import Player
 
@@ -18,7 +19,7 @@ from .models import Court, CourtRating
 
 def court_list(request):
     """List of courts with average rating."""
-    city = request.GET.get("city", "")
+    city = (request.GET.get("city") or "").strip()
     surface = request.GET.get("surface", "")
 
     courts = Court.objects.filter(is_active=True).annotate(
@@ -27,7 +28,9 @@ def court_list(request):
     )
 
     if city:
-        courts = courts.filter(city__icontains=city)
+        courts = filter_field_contains_ci(
+            courts, "city", city, annotation="_court_list_city_l"
+        )
     if surface:
         courts = courts.filter(surface=surface)
 

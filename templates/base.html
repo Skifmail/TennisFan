@@ -80,9 +80,9 @@
 
                 <!-- Logo (centered on mobile) -->
                 <a href="{% url 'home' %}" class="logo">
-                    <span class="logo-text">{{ site_brand_en_base }}<span class="logo-accent">{{ site_brand_en_accent }}</span></span>
-                    <img src="{% static site_logo_path %}" class="coin-logo" alt="{{ site_logo_alt }} логотип">
                     <span class="logo-text logo-text-ru">{{ site_brand_ru_base }}<span class="logo-accent">{{ site_brand_ru_accent }}</span></span>
+                    <img src="{% static site_logo_path %}" class="coin-logo" alt="{{ site_logo_alt }} логотип">
+                    <span class="logo-text">{{ site_brand_en_base }}<span class="logo-accent">{{ site_brand_en_accent }}</span></span>
                 </a>
 
                 <!-- Desktop Navigation Links (управляются в админке: Навигация → Пункты меню) -->
@@ -186,8 +186,10 @@
             <div class="footer-grid">
                 <div class="footer-brand">
                     <h3 class="footer-brand-title">
-                        <a href="{% url 'home' %}" style="text-decoration: none; color: inherit;">
-                            {{ site_brand_en_base }}<span class="footer-brand-accent">{{ site_brand_en_accent }}</span>
+                        <a href="{% url 'home' %}" class="footer-brand-title-link">
+                            <span class="footer-brand-title__primary">{{ site_brand_ru_base }}<span class="footer-brand-accent">{{ site_brand_ru_accent }}</span></span>
+                            <span class="footer-brand-title__sep" aria-hidden="true">·</span>
+                            <span class="footer-brand-title__secondary">{{ site_brand_en_base }}<span class="footer-brand-accent">{{ site_brand_en_accent }}</span></span>
                         </a>
                     </h3>
                     <p class="footer-desc">Всероссийская теннисная платформа для игроков всех уровней</p>
@@ -271,7 +273,7 @@
             </div>
             <div class="footer-bottom">
                 <div class="footer-copy">
-                    <p>&copy; 2026 {{ site_brand_copyright }} / {{ site_brand_footer_ru }}. Все права защищены.</p>
+                    <p>&copy; 2026 {{ site_brand_footer_ru }} / {{ site_brand_copyright }}. Все права защищены.</p>
                     <p>ИП Ермолаев Леонид · ИНН 561417897115</p>
                     <p>ОГРНИП 325508100579372</p>
                 </div>

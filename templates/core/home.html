@@ -181,11 +181,11 @@
 <!-- Tournaments with filters -->
 <section class="section section-tournaments-spaced">
     <div class="container">
-        <div class="section-header">
+        <div class="section-header section-header--home-tournaments">
             <h2 class="section-title">Турниры</h2>
-            <div class="d-flex gap-2" style="flex-wrap: wrap;">
+            <div class="section-header__actions home-tournaments-header__actions">
                 <a href="{% url 'tournament_list' %}" class="btn btn-outline">Все турниры</a>
-                <a href="?" class="btn btn-ghost" data-home-tournaments-reset="1">Сбросить фильтры</a>
+                <a href="?" class="btn btn-outline" data-home-tournaments-reset="1">Сбросить фильтры</a>
             </div>
         </div>
 
@@ -193,7 +193,7 @@
             <div class="card-body filter-grid">
                 <div class="form-group">
                     <label class="form-label">Город</label>
-                    <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_filters.city }}">
+                    <input type="text" name="city" class="form-control" placeholder="Начните вводить город…" value="{{ current_filters.city }}" autocomplete="off" aria-autocomplete="list" aria-label="Город для фильтра турниров">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Уровень</label>
@@ -302,13 +302,26 @@
 
         <div class="grid grid-3 home-grid home-grid--tournaments">
             {% for tournament in upcoming_tournaments %}
-            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card tournament-preview-card{% if not tournament.image %} tournament-preview-card--no-image{% endif %}">
+            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card tournament-preview-card">
                 <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}">
                     {% if tournament.status == 'upcoming' %}Идет набор{% elif tournament.status == 'active' %}В ИГРЕ{% elif tournament.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
                 </span>
-                {% if tournament.image %}
-                <img src="{{ tournament.image.url }}" alt="" class="card-image">
-                {% endif %}
+                <div class="tournament-preview-card__media">
+                    {% if tournament.image %}
+                    <img src="{{ tournament.image.url }}" alt="" class="tournament-preview-card__cover-img">
+                    {% else %}
+                    <video
+                        class="tournament-preview-card__fallback-video"
+                        autoplay
+                        muted
+                        loop
+                        playsinline
+                        preload="metadata"
+                    >
+                        <source src="{% static 'video/logotip.MP4' %}" type="video/mp4">
+                    </video>
+                    {% endif %}
+                </div>
                 <div class="card-body">
                     <h3 class="card-title">{{ tournament.name }}</h3>
                     {% if tournament.allowed_categories.all %}

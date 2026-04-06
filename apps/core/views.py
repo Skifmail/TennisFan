@@ -8,6 +8,7 @@ import logging
 import re
 import secrets
 from calendar import monthrange
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
@@ -55,6 +56,7 @@ from apps.users.rating_utils import rating_to_ntrp_level
 from . import telegram_support as tg_support
 from .forms import FeedbackForm
 from .models import City, SupportMessage, SupportMessageAdminDelivery, UserTelegramLink
+from .text_search import filter_field_contains_ci
 
 logger = logging.getLogger(__name__)
 
@@ -793,27 +795,62 @@ def platform_players_export(request: HttpRequest) -> HttpResponse:
 def api_cities(request: Any) -> JsonResponse:
     """
     API автодополнения городов: GET /api/cities/?q=<query>.
-    Возвращает JSON-список названий городов (макс. 10).
-    Для PostgreSQL используется TrigramSimilarity; иначе — поиск по вхождению.
+
+    Возвращает JSON-список названий (макс. 10). Подсказки собираются из:
+    фактических значений ``Tournament.city`` (платформа и межклубные турниры) и
+    справочника ``City``. Поиск без учёта регистра, по подстроке (короткие префиксы
+    вроде «Мос»), без триграмм с порогом — они отсекали нормальные совпадения.
     """
     q = (request.GET.get("q") or "").strip()
     if len(q) < 2:
         return JsonResponse([], safe=True)
 
-    from django.db import connection
+    q_cf = q.casefold()
+    seen_keys: set[str] = set()
+    names: list[str] = []
 
-    if connection.vendor == "postgresql":
-        from django.contrib.postgres.search import TrigramSimilarity
+    def add_from_values(values: Iterable[str | None]) -> None:
+        for raw in values:
+            if raw is None:
+                continue
+            n = str(raw).strip()
+            if not n or q_cf not in n.casefold():
+                continue
+            key = n.casefold()
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            names.append(n)
 
-        cities = (
-            City.objects.annotate(similarity=TrigramSimilarity("name", q))
-            .filter(similarity__gt=0.2)
-            .order_by("-similarity")[:10]
+    visible = Q(club__isnull=True) | Q(is_open_interclub=True)
+    tournament_cities = (
+        filter_field_contains_ci(
+            Tournament.objects.filter(visible).exclude(city__exact=""),
+            "city",
+            q,
+            annotation="_api_t_city_l",
         )
-    else:
-        cities = City.objects.filter(name__icontains=q).order_by("name")[:10]
+        .values_list("city", flat=True)
+        .distinct()[:40]
+    )
+    add_from_values(tournament_cities)
 
-    return JsonResponse([c.name for c in cities], safe=False)
+    ref_cities = filter_field_contains_ci(
+        City.objects.all(),
+        "name",
+        q,
+        annotation="_api_ref_city_l",
+    ).values_list("name", flat=True)[:40]
+    add_from_values(ref_cities)
+
+    names.sort(
+        key=lambda n: (
+            0 if n.casefold().startswith(q_cf) else 1,
+            len(n),
+            n.casefold(),
+        )
+    )
+    return JsonResponse(names[:10], safe=False)
 
 
 @require_safe
@@ -1086,7 +1123,12 @@ def home(request):
         )
         .filter(models.Q(club__isnull=True) | models.Q(is_open_interclub=True))
         .select_related("court")
-        .prefetch_related("participants__user", "allowed_categories")
+        .prefetch_related(
+            "participants__user",
+            "allowed_categories",
+            "teams__player1__user",
+            "teams__player2__user",
+        )
     )
 
     upcoming_tournaments = Tournament.objects.filter(
@@ -1098,13 +1140,15 @@ def home(request):
         .order_by("start_date")[:6]
     )
 
-    city = request.GET.get("city", "")
+    city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
     gender = request.GET.get("gender", "")
     duration = request.GET.get("duration", "")
 
     if city:
-        tournaments = tournaments.filter(city__icontains=city)
+        tournaments = filter_field_contains_ci(
+            tournaments, "city", city, annotation="_home_tm_city_l"
+        )
     if category:
         tournaments = tournaments.filter(
             allowed_categories__category=category
@@ -1244,7 +1288,9 @@ def rating(request):
     )
 
     if city:
-        players = players.filter(city__icontains=city)
+        players = filter_field_contains_ci(
+            players, "city", city, annotation="_rating_pl_city_l"
+        )
     if skill_level:
         players = players.filter(skill_level=skill_level)
     if search:

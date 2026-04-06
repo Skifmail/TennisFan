@@ -12,6 +12,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.decorators import login_required_with_message
+from apps.core.text_search import filter_field_contains_ci
 
 from .forms import (
     CoachApplicationForm,
@@ -38,7 +39,7 @@ def training_list(request):
     """Список тренировок. Доступен всем пользователям."""
     skill_level = request.GET.get("level", "")
     training_type = request.GET.get("type", "")
-    city = request.GET.get("city", "")
+    city = (request.GET.get("city") or "").strip()
 
     trainings = Training.objects.filter(is_active=True).select_related("coach")
 
@@ -48,7 +49,9 @@ def training_list(request):
         # type_prices — словарь {type: price}, фильтруем по наличию ключа
         trainings = trainings.filter(type_prices__has_key=training_type)
     if city:
-        trainings = trainings.filter(city__icontains=city)
+        trainings = filter_field_contains_ci(
+            trainings, "city", city, annotation="_trn_list_city_l"
+        )
 
     context = {
         "trainings": trainings,
@@ -117,11 +120,13 @@ def training_enroll(request, slug):
 )
 def coach_list(request):
     """List of coaches. Только для авторизованных пользователей."""
-    city = request.GET.get("city", "")
+    city = (request.GET.get("city") or "").strip()
 
     coaches = _visible_coaches()
     if city:
-        coaches = coaches.filter(city__icontains=city)
+        coaches = filter_field_contains_ci(
+            coaches, "city", city, annotation="_coach_list_city_l"
+        )
 
     context = {"coaches": coaches, "current_city": city}
     return render(request, "training/coach_list.html", context)

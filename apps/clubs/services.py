@@ -12,6 +12,8 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 
+from apps.core.text_search import filter_field_contains_ci
+
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
 
@@ -144,8 +146,11 @@ def get_joinable_club_catalog(
             | Q(description__icontains=search)
             | Q(address__icontains=search)
         )
+    city = (city or "").strip()
     if city:
-        clubs_qs = clubs_qs.filter(city__icontains=city)
+        clubs_qs = filter_field_contains_ci(
+            clubs_qs, "city", city, annotation="_join_club_city_l"
+        )
 
     clubs = list(clubs_qs.order_by("name"))
     if not clubs:

@@ -28,6 +28,7 @@ from django.views.decorators.http import (
 )
 
 from apps.core.decorators import require_filled_profile
+from apps.core.text_search import filter_field_contains_ci
 from apps.users.models import Notification, Player
 
 from .doubles_services import (
@@ -143,7 +144,9 @@ def sparring_list(request):
             .prefetch_related("responses")
         )
         if city:
-            requests_qs = requests_qs.filter(city__icontains=city)
+            requests_qs = filter_field_contains_ci(
+                requests_qs, "city", city, annotation="_spr_req_city_l"
+            )
         if category:
             requests_qs = requests_qs.filter(desired_category=category)
         if preferred_gender:
@@ -171,7 +174,9 @@ def sparring_list(request):
         else:
             doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.TEAM)
         if city:
-            doubles_qs = doubles_qs.filter(city__icontains=city)
+            doubles_qs = filter_field_contains_ci(
+                doubles_qs, "city", city, annotation="_spr_dbl_city_l"
+            )
         if level:
             doubles_qs = doubles_qs.filter(desired_level=level)
         if preferred_gender:

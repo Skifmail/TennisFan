@@ -29,34 +29,45 @@
                     </div>
                     <div class="tournament-table__participants">
                         {% if tournament.variant == 'doubles' %}
-                            {% with total=tournament.teams.count|add:tournament.teams.count %}
-                            {% for team in tournament.teams.all|slice:":4" %}
-                                {% if team.player1 %}
-                                <span class="tournament-participant-avatar" title="{{ team.player1 }}">
-                                    {% include 'includes/avatar.html' with avatar=team.player1.avatar size='sm' %}
-                                </span>
+                        <div class="tournament-participants-section">
+                            <span class="text-secondary section-label">Команды: {{ tournament.full_teams_count }}{% if tournament.max_teams %}/{{ tournament.max_teams }}{% endif %}</span>
+                            {% if tournament.teams.all %}
+                            <div class="tournament-participants-grid">
+                                {% for team in tournament.teams.all|slice:":5" %}
+                                <div class="participant-badge">
+                                    {% include 'includes/avatar.html' with avatar=team.player1.avatar %}
+                                    <span class="participant-name">{% if team.player2 %}{{ team.player1.user.last_name|slice:":1" }}./{{ team.player2.user.last_name|slice:":1" }}.{% else %}{{ team.player1.user.last_name }} (ищет пару){% endif %}</span>
+                                </div>
+                                {% endfor %}
+                                {% if tournament.teams.count > 5 %}
+                                <div class="participant-more">
+                                    <span class="text-secondary">+{{ tournament.teams.count|add:"-5" }}</span>
+                                </div>
                                 {% endif %}
-                                {% if team.player2 %}
-                                <span class="tournament-participant-avatar" title="{{ team.player2 }}">
-                                    {% include 'includes/avatar.html' with avatar=team.player2.avatar size='sm' %}
-                                </span>
-                                {% endif %}
-                            {% endfor %}
-                            {% if tournament.teams.count > 4 %}
-                            <span class="tournament-participant-more">+{{ tournament.teams.count|add:"-4" }}</span>
+                            </div>
+                            {% else %}
+                            <span class="text-secondary">Пока нет команд</span>
                             {% endif %}
-                            {% endwith %}
+                        </div>
+                        {% elif tournament.participants.all %}
+                        <div class="tournament-participants-section">
+                            <span class="text-secondary section-label">Участники:</span>
+                            <div class="tournament-participants-grid">
+                                {% for participant in tournament.participants.all|slice:":10" %}
+                                <div class="participant-badge">
+                                    {% include 'includes/avatar.html' with avatar=participant.avatar %}
+                                    <span class="participant-name">{{ participant.user.first_name }} {{ participant.user.last_name }}</span>
+                                </div>
+                                {% endfor %}
+                                {% if tournament.participants.count > 10 %}
+                                <div class="participant-more">
+                                    <span class="text-secondary">+{{ tournament.participants.count|add:"-10" }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
                         {% else %}
-                            {% with total=tournament.participants.count %}
-                            {% for participant in tournament.participants.all|slice:":8" %}
-                            <span class="tournament-participant-avatar" title="{{ participant }}">
-                                {% include 'includes/avatar.html' with avatar=participant.avatar size='sm' %}
-                            </span>
-                            {% endfor %}
-                            {% if total > 8 %}
-                            <span class="tournament-participant-more">+{{ total|add:"-8" }}</span>
-                            {% endif %}
-                            {% endwith %}
+                        <span class="text-secondary section-label">Пока нет участников</span>
                         {% endif %}
                     </div>
                 </td>

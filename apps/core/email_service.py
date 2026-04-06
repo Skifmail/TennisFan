@@ -71,7 +71,7 @@ def send_welcome_email(user: User) -> bool:
         "tournaments_url": base_url + reverse("tournament_list"),
         "telegram_bot_url": getattr(settings, "TELEGRAM_PUBLIC_COMMUNITY_URL", "")
         or "https://t.me/TennisFanu",
-        "support_email": getattr(settings, "DEFAULT_FROM_EMAIL", "info@tennisfan.ru"),
+        "support_email": getattr(settings, "DEFAULT_FROM_EMAIL", "tennis@tennisfan.ru"),
     }
 
     subject = "Добро пожаловать в TennisFan!"

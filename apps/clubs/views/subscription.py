@@ -369,7 +369,7 @@ def my_plan_payment_process(request: HttpRequest) -> HttpResponse:
 
     receipt_email = (request.user.email or "").strip()
     if not receipt_email or "@" not in receipt_email:
-        receipt_email = "info@tennisfan.ru"
+        receipt_email = "tennis@tennisfan.ru"
 
     try:
         payment_id, confirmation_url = create_payment_with_credentials(

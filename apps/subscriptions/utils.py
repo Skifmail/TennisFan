@@ -201,7 +201,7 @@ def send_subscription_purchase_email(
     # Фильтруем пустые строки, чтобы избежать двойных переносов из-за пустых полей.
     message = "\n".join(line for line in message_lines if line is not None)
 
-    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "") or "info@tennisfan.ru"
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "") or "tennis@tennisfan.ru"
     try:
         send_mail(
             subject=subject,

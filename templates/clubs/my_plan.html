@@ -22,9 +22,9 @@
                 <div class="subscription-info__row">
                     <span class="subscription-info__label">Статус:</span>
                     {% if member_plan.ended_at and not member_plan.auto_renew %}
-                    <span class="badge badge-warning">Активна</span>
+                    <span class="badge badge-warning">Активен</span>
                     {% else %}
-                    <span class="badge badge-success">Активна</span>
+                    <span class="badge badge-success">Активен</span>
                     {% endif %}
                 </div>
                 {% if member_plan.ended_at %}

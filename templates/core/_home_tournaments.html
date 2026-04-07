@@ -29,45 +29,49 @@
                     </div>
                     <div class="tournament-table__participants">
                         {% if tournament.variant == 'doubles' %}
-                        <div class="tournament-participants-section">
+                        <div class="tournament-participants-section tournament-participants-section--table">
                             <span class="text-secondary section-label">Команды: {{ tournament.full_teams_count }}{% if tournament.max_teams %}/{{ tournament.max_teams }}{% endif %}</span>
                             {% if tournament.teams.all %}
-                            <div class="tournament-participants-grid">
-                                {% for team in tournament.teams.all|slice:":5" %}
-                                <div class="participant-badge">
-                                    {% include 'includes/avatar.html' with avatar=team.player1.avatar %}
-                                    <span class="participant-name">{% if team.player2 %}{{ team.player1.user.last_name|slice:":1" }}./{{ team.player2.user.last_name|slice:":1" }}.{% else %}{{ team.player1.user.last_name }} (ищет пару){% endif %}</span>
+                            <div class="tournament-participants-inline">
+                                <div class="tournament-participants-grid tournament-participants-grid--table-row">
+                                    {% for team in tournament.teams.all|slice:":4" %}
+                                    <div class="participant-badge participant-badge--avatar-only" title="{% if team.player2 %}{{ team.player1.user.first_name }} {{ team.player1.user.last_name }} / {{ team.player2.user.first_name }} {{ team.player2.user.last_name }}{% else %}{{ team.player1.user.first_name }} {{ team.player1.user.last_name }} (ищет пару){% endif %}" aria-label="{% if team.player2 %}Команда: {{ team.player1.user.first_name }} {{ team.player1.user.last_name }} и {{ team.player2.user.first_name }} {{ team.player2.user.last_name }}{% else %}{{ team.player1.user.first_name }} {{ team.player1.user.last_name }}, ищет пару{% endif %}">
+                                        {% include 'includes/avatar.html' with avatar=team.player1.avatar %}
+                                    </div>
+                                    {% endfor %}
                                 </div>
-                                {% endfor %}
-                                {% if tournament.teams.count > 5 %}
-                                <div class="participant-more">
-                                    <span class="text-secondary">+{{ tournament.teams.count|add:"-5" }}</span>
+                                {% if tournament.teams.count > 4 %}
+                                <div class="participant-more participant-more--table-tail" title="Ещё команд: {{ tournament.teams.count|add:"-4" }}" aria-label="Ещё команд: {{ tournament.teams.count|add:"-4" }}">
+                                    <span class="text-secondary">+{{ tournament.teams.count|add:"-4" }}</span>
                                 </div>
                                 {% endif %}
                             </div>
                             {% else %}
-                            <span class="text-secondary">Пока нет команд</span>
+                            <span class="text-secondary tournament-participants-section__empty">Пока нет команд</span>
                             {% endif %}
                         </div>
                         {% elif tournament.participants.all %}
-                        <div class="tournament-participants-section">
+                        <div class="tournament-participants-section tournament-participants-section--table">
                             <span class="text-secondary section-label">Участники:</span>
-                            <div class="tournament-participants-grid">
-                                {% for participant in tournament.participants.all|slice:":10" %}
-                                <div class="participant-badge">
-                                    {% include 'includes/avatar.html' with avatar=participant.avatar %}
-                                    <span class="participant-name">{{ participant.user.first_name }} {{ participant.user.last_name }}</span>
+                            <div class="tournament-participants-inline">
+                                <div class="tournament-participants-grid tournament-participants-grid--table-row">
+                                    {% for participant in tournament.participants.all|slice:":4" %}
+                                    <div class="participant-badge participant-badge--avatar-only" title="{{ participant.user.first_name }} {{ participant.user.last_name }}" aria-label="Участник: {{ participant.user.first_name }} {{ participant.user.last_name }}">
+                                        {% include 'includes/avatar.html' with avatar=participant.avatar %}
+                                    </div>
+                                    {% endfor %}
                                 </div>
-                                {% endfor %}
-                                {% if tournament.participants.count > 10 %}
-                                <div class="participant-more">
-                                    <span class="text-secondary">+{{ tournament.participants.count|add:"-10" }}</span>
+                                {% if tournament.participants.count > 4 %}
+                                <div class="participant-more participant-more--table-tail" title="Ещё участников: {{ tournament.participants.count|add:"-4" }}" aria-label="Ещё участников: {{ tournament.participants.count|add:"-4" }}">
+                                    <span class="text-secondary">+{{ tournament.participants.count|add:"-4" }}</span>
                                 </div>
                                 {% endif %}
                             </div>
                         </div>
                         {% else %}
-                        <span class="text-secondary section-label">Пока нет участников</span>
+                        <div class="tournament-participants-section tournament-participants-section--table">
+                            <span class="text-secondary section-label tournament-participants-section__empty">Пока нет участников</span>
+                        </div>
                         {% endif %}
                     </div>
                 </td>

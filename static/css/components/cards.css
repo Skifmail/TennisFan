@@ -531,8 +531,15 @@
 
 .tournament-card__chip--brand .tournament-brand-badge {
     margin: 0;
-    transform: scale(0.92);
-    transform-origin: left center;
+    transform: none;
+    font-size: 9px;
+    padding: 2px 7px 2px 6px;
+    gap: 4px;
+}
+
+.tournament-card__chip--brand .tournament-brand-badge__dot {
+    width: 5px;
+    height: 5px;
 }
 
 .tournament-card__chip--muted {

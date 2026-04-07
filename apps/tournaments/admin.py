@@ -288,6 +288,19 @@ class TournamentAdmin(admin.ModelAdmin):
 
     allowed_skill_levels.short_description = "Уровень участников"
 
+    def get_queryset(self, request):
+        """
+        Исключить турниры клубов из списка платформенных.
+
+        Args:
+            request: HTTP-запрос админки.
+
+        Returns:
+            QuerySet с ``club`` равным NULL.
+        """
+        qs = super().get_queryset(request)
+        return qs.filter(club__isnull=True)
+
     fieldsets = (
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
         ("Формат турнира", {"fields": ("format", "variant")}),
@@ -500,7 +513,20 @@ class TVDTournamentAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        return super().get_queryset(request).filter(format="weekend_day")
+        """
+        Только однодневные (ТВД) турниры платформы без клуба-организатора.
+
+        Args:
+            request: HTTP-запрос админки.
+
+        Returns:
+            QuerySet с ``format=weekend_day`` и ``club`` равным NULL.
+        """
+        return (
+            super()
+            .get_queryset(request)
+            .filter(format="weekend_day", club__isnull=True)
+        )
 
     def save_model(self, request, obj, form, change):
         from .models import TournamentDuration, TournamentFormat

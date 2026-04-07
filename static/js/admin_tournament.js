@@ -163,7 +163,7 @@
             mixedOption.style.display = "none";
             mixedOption.setAttribute("hidden", "hidden");
             
-            // Если выбран "Микст", переключаем на "Смешанный" (open)
+            // Если выбран "Микст", переключаем на "Любой" (open)
             if (currentValue === "mixed") {
                 genderSelect.value = "open";
                 // Триггерим событие change для обновления формы

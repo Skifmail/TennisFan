@@ -192,7 +192,7 @@ class TournamentAdminForm(forms.ModelForm):
         if variant == "singles" and gender == "mixed":
             raise ValidationError(
                 "Категория «Микст» доступна только для парных турниров. "
-                "Для одиночных используйте «Смешанный» (любой пол)."
+                "Для одиночных используйте «Любой» (любой пол)."
             )
         # Многодневный турнир: обязателен вступительный взнос (для регистрации по подписке или по оплате)
         is_one_day = cleaned_data.get("is_one_day")

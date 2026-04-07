@@ -19,7 +19,7 @@ class SparringPreferredGender(models.TextChoices):
 
     MALE = "male", "Мужчины"
     FEMALE = "female", "Женщины"
-    OPEN = "open", "Смешанный"
+    OPEN = "open", "Любой"
     MIXED = "mixed", "Микст"  # для парных: мужчина + женщина в паре
 
 
@@ -90,7 +90,7 @@ class SparringRequest(models.Model):
         max_length=20,
         choices=SparringPreferredGender.choices,
         default=SparringPreferredGender.OPEN,
-        help_text="Для одиночных: пол соперника. Для парных: мужской/женский парный, смешанный или микст.",
+        help_text="Для одиночных: пол соперника. Для парных: мужской/женский парный, любой или микст.",
     )
 
     status = models.CharField(

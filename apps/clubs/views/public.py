@@ -418,7 +418,7 @@ def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
             set_current_url = reverse(
                 "clubs:set_current_club", kwargs={"slug": club.slug}
             )
-            cta_label = "Личный кабинет клуба →"
+            cta_label = "Личный кабинет клуба"
             cta_url = f"{set_current_url}?next={next_url}"
             cta_variant = "player"
     elif request.user.is_authenticated and not is_pending_invite:

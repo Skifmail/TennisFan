@@ -15,19 +15,19 @@
     <div class="container">
         <form method="get" class="card club-discover-filters">
             <div class="card-body club-discover-filters__grid">
-                <div class="form-group">
+                <div class="form-group club-discover-filters__group club-discover-filters__group--q">
                     <label class="form-label" for="club-discover-q">Название клуба</label>
                     <input id="club-discover-q" type="text" name="q" class="form-control" placeholder="Например, Спартак" value="{{ search }}">
                 </div>
-                <div class="form-group">
+                <div class="form-group club-discover-filters__group club-discover-filters__group--city">
                     <label class="form-label" for="club-discover-city">Город</label>
                     <input id="club-discover-city" type="text" name="city" class="form-control" placeholder="Москва" value="{{ city }}">
                 </div>
-                <div class="form-group form-group-submit">
+                <div class="form-group form-group-submit club-discover-filters__group club-discover-filters__group--search">
                     <label class="form-label">Поиск</label>
                     <button type="submit" class="btn btn-primary">Найти клубы</button>
                 </div>
-                <div class="form-group form-group-submit">
+                <div class="form-group form-group-submit club-discover-filters__group club-discover-filters__group--reset">
                     <label class="form-label">Сброс</label>
                     <a href="{% url 'clubs:club_discover' %}" class="btn btn-outline">Сбросить</a>
                 </div>

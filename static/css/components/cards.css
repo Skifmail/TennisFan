@@ -998,7 +998,7 @@
 
     .tournament-card__title-col {
         min-width: 0;
-        padding-right: 6.5rem;
+        padding-right: 8.25rem;
     }
 
     .tournament-card__line--title {
@@ -1148,6 +1148,7 @@
         font-weight: 600;
         line-height: 24px;
         letter-spacing: 0.02em;
+        white-space: nowrap;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
@@ -1182,6 +1183,22 @@
     .tournament-card__chip--host {
         width: fit-content;
         max-width: min(100%, 16rem);
+    }
+}
+
+@media (width <= 420px) {
+    .tournament-card__title-col {
+        padding-right: 7.75rem;
+    }
+
+    .tournament-card__aside-statuses .tournament-status-badge {
+        top: 10px;
+        right: 10px;
+        min-height: 22px;
+        height: 22px;
+        padding: 0 8px;
+        font-size: 11px;
+        line-height: 22px;
     }
 }
 

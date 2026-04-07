@@ -965,6 +965,7 @@ def my_matches(request: HttpRequest) -> HttpResponse:
         )
         .select_related(
             "tournament",
+            "tournament__club",
             "player1__user",
             "player2__user",
             "winner__user",

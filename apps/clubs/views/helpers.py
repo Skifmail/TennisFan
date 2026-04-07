@@ -105,6 +105,7 @@ def _build_club_profile_context(
         )
         .select_related(
             "tournament",
+            "tournament__club",
             "player1",
             "player2",
             "winner",

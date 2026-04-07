@@ -207,6 +207,27 @@
                 <p class="mb-0" style="color: var(--color-error);">Турнир отменён. Регистрация недоступна.</p>
             </div>
         </div>
+        {% elif show_club_join_pending %}
+        <div class="card mb-4" style="background: rgba(255, 255, 255, 0.04); border-left: 3px solid var(--color-primary);">
+            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <p class="mb-0 text-secondary">Заявка на вступление в клуб отправлена. После одобрения администратором вы сможете записаться на турнир.</p>
+                <button type="button" class="btn btn-outline" disabled>Заявка на вступление отправлена</button>
+            </div>
+        </div>
+        {% elif show_club_join_cta %}
+        <div class="card mb-4" style="background: rgba(255, 255, 255, 0.04); border-left: 3px solid var(--color-primary);">
+            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h3 class="mb-1" style="font-size: var(--font-size-lg);">Турнир клуба</h3>
+                    <p class="text-secondary mb-0">Чтобы записаться, вступите в клуб «{{ tournament.club.name }}». После одобрения заявки кнопка записи станет доступна.</p>
+                </div>
+                <form method="post" action="{% url 'clubs:join_request_create' slug=tournament.club.slug %}" class="d-flex flex-shrink-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ tournament_join_next }}">
+                    <button type="submit" class="btn btn-primary">Вступить в клуб</button>
+                </form>
+            </div>
+        </div>
         {% elif can_register %}
         <div class="card mb-4">
             <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -672,28 +693,27 @@
     <div class="tvd-tab-content" id="results" role="tabpanel" style="display: none;">
             <h2 class="section-title mb-3">Итоги</h2>
             {% if tvd_standings %}
-            <style>.standings-row-top-3 { background: rgba(166, 130, 74, 0.08); }</style>
             <div class="card mb-4">
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="standings-table round-robin-standings" style="width: 100%; border-collapse: collapse;">
+                        <table class="standings-table round-robin-standings">
                             <thead>
                                 <tr>
-                                    <th style="padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); font-weight: 600;">Место</th>
-                                    <th style="padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); font-weight: 600;">Участник</th>
-                                    <th style="padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); font-weight: 600;">Очки</th>
+                                    <th>Место</th>
+                                    <th>Участник</th>
+                                    <th>Очки</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for r in tvd_standings %}
-                                <tr class="{% if r.place <= 3 %}standings-row-top-3{% endif %}" style="border-bottom: 1px solid var(--color-border-light);">
-                                    <td style="padding: var(--spacing-sm) var(--spacing-md); font-weight: 600;">
+                                <tr class="{% if r.place <= 3 %}standings-row-top-3{% endif %}">
+                                    <td class="standings-table__place-cell">
                                         {% if r.place == 1 %}🥇{% elif r.place == 2 %}🥈{% elif r.place == 3 %}🥉{% else %}{{ r.place }}{% endif %}
                                     </td>
-                                    <td style="padding: var(--spacing-sm) var(--spacing-md);">
+                                    <td>
                                         <a href="{% player_profile_url r.player %}">{{ r.player.user.last_name }} {{ r.player.user.first_name }}</a>
                                     </td>
-                                    <td style="padding: var(--spacing-sm) var(--spacing-md); font-weight: 600; color: var(--color-primary);">{{ r.fan_points }}</td>
+                                    <td class="standings-table__points-cell">{{ r.fan_points }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -710,11 +730,6 @@
             {% endif %}
     </div>
 
-    <style>
-        .tvd-tab { padding: var(--spacing-sm) var(--spacing-md); border: none; background: transparent; color: var(--color-text-secondary); cursor: pointer; border-radius: var(--radius-md); font-size: var(--font-size-sm); }
-        .tvd-tab:hover { color: var(--color-text); background: var(--color-bg-elevated); }
-        .tvd-tab--active { color: var(--color-primary); font-weight: 600; background: var(--color-bg-elevated); }
-    </style>
     <script>
         (function() {
             var tabs = document.querySelectorAll('.tvd-tab');

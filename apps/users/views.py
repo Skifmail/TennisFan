@@ -502,6 +502,7 @@ def profile(request, pk):
         )
         .select_related(
             "tournament",
+            "tournament__club",
             "player1",
             "player2",
             "winner",

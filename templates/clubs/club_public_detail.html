@@ -46,6 +46,7 @@
                     {% else %}
                     <a href="{{ cta_url }}" class="btn btn-primary club-public__btn--join">{{ cta_label }}</a>
                     {% endif %}
+                    <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-outline club-public__btn--all-tournaments">Все турниры клуба</a>
                     {% if not is_member and not is_pending_invite and not user.is_authenticated %}
                     <a href="{{ join_url }}" class="btn btn-outline">Узнать подробнее</a>
                     {% elif is_pending_invite %}

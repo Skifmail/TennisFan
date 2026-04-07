@@ -1035,6 +1035,99 @@ class TournamentListCardStateTestCase(TestCase):
             reverse("tournament_register", kwargs={"slug": open_tournament.slug}),
         )
 
+    def test_tournament_list_club_filter_limits_results(self) -> None:
+        club = Club.objects.create(
+            name="Фильтр-клуб",
+            slug="list-filter-club",
+            city="Москва",
+            address="ул. 1",
+            email="c@test.local",
+            admin_name="Админ",
+        )
+        club_tm = Tournament.objects.create(
+            name="Клубный для фильтра",
+            slug="list-club-filtered",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.UPCOMING,
+            club=club,
+        )
+        club_tm.allowed_categories.create(category="amateur")
+        platform_tm = Tournament.objects.create(
+            name="Платформенный для фильтра",
+            slug="list-platform-filtered",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.UPCOMING,
+        )
+        platform_tm.allowed_categories.create(category="amateur")
+
+        r_platform = self.client.get(
+            reverse("tournament_list"),
+            {"club": "__platform__"},
+            secure=True,
+        )
+        self.assertEqual(r_platform.status_code, 200)
+        self.assertContains(r_platform, platform_tm.name)
+        self.assertNotContains(r_platform, club_tm.name)
+
+        r_club = self.client.get(
+            reverse("tournament_list"),
+            {"club": club.slug},
+            secure=True,
+        )
+        self.assertEqual(r_club.status_code, 200)
+        self.assertContains(r_club, club_tm.name)
+        self.assertNotContains(r_club, platform_tm.name)
+
+
+class TournamentTablesListFiltersTestCase(TestCase):
+    """Фильтры на странице «Турнирные таблицы»."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.club = Club.objects.create(
+            name="Клуб таблиц",
+            slug="tables-filter-club",
+            city="Москва",
+            address="ул. 1",
+            email="t@test.local",
+            admin_name="Админ",
+        )
+        self.club_tournament = Tournament.objects.create(
+            name="Клубный турнир таблиц",
+            slug="tables-club-tm",
+            city="Москва",
+            start_date=date.today(),
+            format="round_robin",
+            status=TournamentStatus.UPCOMING,
+            club=self.club,
+        )
+        self.platform_tournament = Tournament.objects.create(
+            name="Платформенный турнир таблиц",
+            slug="tables-platform-tm",
+            city="Сочи",
+            start_date=date.today(),
+            format="round_robin",
+            status=TournamentStatus.UPCOMING,
+        )
+
+    def test_tables_list_platform_filter_excludes_club_tournaments(self) -> None:
+        url = reverse("tournament_tables_list")
+        response = self.client.get(url, {"club": "__platform__"}, secure=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.platform_tournament.name)
+        self.assertNotContains(response, self.club_tournament.name)
+
+    def test_tables_list_city_filter(self) -> None:
+        url = reverse("tournament_tables_list")
+        response = self.client.get(url, {"city": "Сочи"}, secure=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.platform_tournament.name)
+        self.assertNotContains(response, self.club_tournament.name)
+
 
 class MatchDetailPlayerActionsTestCase(TestCase):
     def setUp(self) -> None:

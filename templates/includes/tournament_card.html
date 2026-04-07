@@ -1,154 +1,153 @@
 {% load humanize %}
 {% load skill_tags %}
 {% load static %}
-<div class="card tournament-card" data-url="{% url 'tournament_detail' slug=tournament.slug %}" onclick="window.location.href=this.dataset.url;">
-    <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}">
-        {% if tournament.status == 'upcoming' %}Идет набор{% elif tournament.status == 'active' %}В ИГРЕ{% elif tournament.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
-    </span>
+<div class="card tournament-card{% if tournament.status == 'cancelled' %} tournament-card--cancelled{% endif %}" data-url="{% url 'tournament_detail' slug=tournament.slug %}" onclick="window.location.href=this.dataset.url;">
     <div class="card-body tournament-card-body">
-        {% if tournament.image %}
-        <div class="tournament-card-photos">
-            <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img">
-            {% for photo in tournament.photos.all|slice:":2" %}
-            <img src="{{ photo.image.url }}" alt="{{ tournament.name }}" class="tournament-img">
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="tournament-card-photos">
-            <video class="tournament-img" autoplay muted loop playsinline preload="metadata">
-                <source src="{% static 'video/logotip.MP4' %}" type="video/mp4">
-            </video>
-        </div>
-        {% endif %}
-
-        <div class="tournament-content-wrapper">
-            <div class="tournament-info">
-                <div class="tournament-card-badges{% if tournament.court %} tournament-card-badges--with-court{% endif %}">
-                    <div class="tournament-card-badge-slot tournament-card-badge-slot--variant">
-                    <span class="badge" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ tournament.get_variant_display }}</span>
+        <div class="tournament-card__center">
+            <div class="tournament-card__center-top">
+                {% if tournament.image %}
+                <div class="tournament-card-photos tournament-card__media">
+                    <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img" loading="lazy">
+                    {% for photo in tournament.photos.all|slice:":2" %}
+                    <img src="{{ photo.image.url }}" alt="" class="tournament-img" loading="lazy">
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="tournament-card-photos tournament-card__media">
+                    <video class="tournament-img" autoplay muted loop playsinline preload="metadata">
+                        <source src="{% static 'video/logotip.MP4' %}" type="video/mp4">
+                    </video>
+                </div>
+                {% endif %}
+                <div class="tournament-card__title-col">
+                    <div class="tournament-card__line tournament-card__line--title">
+                        <h3 class="tournament-card__title">{{ tournament.name }}</h3>
+                        <span class="tournament-card__dates-muted">{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}</span>
                     </div>
-                    <div class="tournament-card-badge-slot tournament-card-badge-slot--format">
+                </div>
+            </div>
+
+            <div class="tournament-card__line tournament-card__line--chips" aria-label="Кратко о турнире">
+                <div class="tournament-card__chip-track">
+                    <span class="tournament-card__chip tournament-card__chip--type tournament-card__chip--mobile-only">{{ tournament.get_tournament_type_display }}</span>
+                    {% if tournament.club %}
+                    <span class="tournament-card__chip tournament-card__chip--host" title="Турнир клуба">{{ tournament.club.name }}</span>
+                    {% else %}
+                    <span class="tournament-card__chip tournament-card__chip--brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                    {% endif %}
+                    <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_variant_display }}</span>
                     {% if tournament.format == 'single_elimination' %}
-                    <span class="badge" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;" title="Турнир на выбывание с подвалом для проигравших в 1-м круге">{{ tournament.get_format_display }}</span>
+                    <span class="tournament-card__chip tournament-card__chip--format" title="Турнир на выбывание с подвалом для проигравших в 1-м круге">{{ tournament.get_format_display }}</span>
                     {% elif tournament.format == 'olympic_consolation' %}
-                    <span class="badge" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">Олимпийская</span>
+                    <span class="tournament-card__chip tournament-card__chip--format">Олимпийская</span>
                     {% elif tournament.format == 'round_robin' %}
-                    <span class="badge" style="background: rgba(100, 149, 237, 0.2); color: #6495ed;">Круговой</span>
+                    <span class="tournament-card__chip tournament-card__chip--format">Круговой</span>
                     {% if tournament.match_format %}
-                    <span class="badge badge-muted">{{ tournament.get_match_format_display }}</span>
+                    <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_match_format_display }}</span>
                     {% endif %}
                     {% elif tournament.format == 'weekend_day' %}
-                    <span class="badge" style="background: rgba(72, 61, 139, 0.25); color: #483d8b;">OneDay</span>
+                    <span class="tournament-card__chip tournament-card__chip--format">OneDay</span>
                     {% endif %}
-                    </div>
-                    <div class="tournament-card-badge-slot tournament-card-badge-slot--city">
-                    <span class="badge">{{ tournament.city }}</span>
-                    </div>
-                    {% if tournament.court %}
-                    <div class="tournament-card-badge-slot tournament-card-badge-slot--court">
-                    <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="badge" style="text-decoration: none;" onclick="event.stopPropagation();" title="{{ tournament.court.address }}">{{ tournament.court.name }}</a>
-                    </div>
-                    {% endif %}
-                    <div class="tournament-card-badge-slot tournament-card-badge-slot--level">
-                    {% for ac in tournament.allowed_categories.all %}
-                    <span class="badge">{{ ac.category|skill_with_ntrp }}</span>
-                    {% endfor %}
-                    </div>
-                    <div class="tournament-card-badge-slot tournament-card-badge-slot--gender">
-                    <span class="badge">{{ tournament.get_gender_display }}</span>
-                    </div>
-                    <div class="tournament-card-badge-slot tournament-card-badge-slot--duration">
-                    <span class="badge">{{ tournament.get_duration_display }}</span>
-                    </div>
-                    <div class="tournament-card-badge-slot tournament-card-badge-slot--capacity">
-                    {% if tournament.variant == 'doubles' and tournament.max_teams %}
-                        {% if tournament.is_full %}
-                        <span class="badge badge-full">Команд: {{ tournament.full_teams_count }}/{{ tournament.max_teams }}</span>
-                        {% else %}
-                        <span class="badge badge-muted">Команд: {{ tournament.full_teams_count }}/{{ tournament.max_teams }}</span>
-                        {% endif %}
-                    {% elif tournament.max_participants %}
-                        {% if tournament.is_full %}
-                        <span class="badge badge-full">Мест: {{ tournament.participants.count }}/{{ tournament.max_participants }}</span>
-                        {% else %}
-                        <span class="badge badge-muted">Мест: {{ tournament.participants.count }}/{{ tournament.max_participants }}</span>
-                        {% endif %}
-                    {% endif %}
-                    </div>
-                </div>
-
-                <h3 class="card-title">{{ tournament.name }}</h3>
-                <p class="card-text text-secondary">{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}</p>
-                <div class="d-flex gap-2 flex-wrap align-items-center">
-                    <span class="player-category">{{ tournament.get_tournament_type_display }}</span>
                     {% if tournament.duration == 'multi' and tournament.entry_fee and tournament.entry_fee > 0 %}
-                        <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-success);">
-                            Взнос: {{ tournament.entry_fee|floatformat:0|intcomma }} ₽
-                        </span>
+                    <span class="tournament-card__chip tournament-card__chip--fee">Взнос {{ tournament.entry_fee|floatformat:0|intcomma }} ₽</span>
+                    {% endif %}
+                    {% if tournament.allowed_categories.all %}
+                    {% for ac in tournament.allowed_categories.all|slice:":3" %}
+                    <span class="tournament-card__chip tournament-card__chip--cat">{{ ac.category|skill_with_ntrp }}</span>
+                    {% endfor %}
+                    {% if tournament.allowed_categories.count > 3 %}
+                    <span class="tournament-card__chip tournament-card__chip--more">+{{ tournament.allowed_categories.count|add:"-3" }}</span>
+                    {% endif %}
                     {% endif %}
                 </div>
+            </div>
 
+            <p class="tournament-card__line tournament-card__line--meta tournament-card__meta-line">
+                <span>{{ tournament.city }}</span>
+                {% if tournament.court %}
+                <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
+                <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="tournament-card__meta-link" onclick="event.stopPropagation();" title="{{ tournament.court.address }}">{{ tournament.court.name }}</a>
+                {% endif %}
+                <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
+                <span>{{ tournament.get_gender_display }}</span>
+                <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
+                <span>{{ tournament.get_duration_display }}</span>
+                {% if tournament.variant == 'doubles' and tournament.max_teams %}
+                <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
+                <span>Команд {{ tournament.full_teams_count }}/{{ tournament.max_teams }}</span>
+                {% elif tournament.max_participants %}
+                <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
+                <span>Мест {{ tournament.participants.count }}/{{ tournament.max_participants }}</span>
+                {% endif %}
+            </p>
+
+            <div class="tournament-card__line tournament-card__line--participants" role="group" aria-label="{% if tournament.variant == 'doubles' %}Команды{% else %}Участники{% endif %}">
                 {% if tournament.variant == 'doubles' %}
-                <div class="tournament-participants-section">
-                    <span class="text-secondary section-label">Команды: {{ tournament.full_teams_count }}{% if tournament.max_teams %}/{{ tournament.max_teams }}{% endif %}</span>
                     {% if tournament.teams.all %}
-                    <div class="tournament-participants-grid">
-                        {% for team in tournament.teams.all|slice:":5" %}
-                        <div class="participant-badge">
-                            {% include 'includes/avatar.html' with avatar=team.player1.avatar %}
-                            <span class="participant-name">{% if team.player2 %}{{ team.player1.user.last_name|slice:":1" }}./{{ team.player2.user.last_name|slice:":1" }}.{% else %}{{ team.player1.user.last_name }} (ищет пару){% endif %}</span>
-                        </div>
+                    <div class="tournament-card__participants-strip tournament-card__participants-strip--stacked">
+                        {% for team in tournament.teams.all|slice:":12" %}
+                        <span
+                            class="tournament-card__avatar-wrap"
+                            title="{% if team.player2 %}{{ team.player1.user.last_name }} / {{ team.player2.user.last_name }}{% else %}{{ team.player1.user.get_full_name|default:team.player1.user.username }}{% endif %}"
+                        >
+                            {% include 'includes/avatar.html' with avatar=team.player1.avatar class="player-avatar tournament-card__avatar-img" %}
+                        </span>
                         {% endfor %}
-                        {% if tournament.teams.count > 5 %}
-                        <div class="participant-more">
-                            <span class="text-secondary">+{{ tournament.teams.count|add:"-5" }}</span>
-                        </div>
+                        {% if tournament.teams.count > 12 %}
+                        <span class="tournament-card__more-count">+{{ tournament.teams.count|add:"-12" }}</span>
                         {% endif %}
                     </div>
                     {% else %}
-                    <span class="text-secondary">Пока нет команд</span>
+                    <span class="tournament-card__empty-line">Нет команд</span>
+                    {% endif %}
+                {% elif tournament.participants.all %}
+                <div class="tournament-card__participants-strip tournament-card__participants-strip--stacked">
+                    {% for participant in tournament.participants.all|slice:":12" %}
+                    <span class="tournament-card__avatar-wrap" title="{{ participant.user.get_full_name|default:participant.user.username }}">
+                        {% include 'includes/avatar.html' with avatar=participant.avatar class="player-avatar tournament-card__avatar-img" %}
+                    </span>
+                    {% endfor %}
+                    {% if tournament.participants.count > 12 %}
+                    <span class="tournament-card__more-count">+{{ tournament.participants.count|add:"-12" }}</span>
                     {% endif %}
                 </div>
-                {% elif tournament.participants.all %}
-                <div class="tournament-participants-section">
-                    <span class="text-secondary section-label">Участники:</span>
-                    <div class="tournament-participants-grid">
-                        {% for participant in tournament.participants.all|slice:":10" %}
-                        <div class="participant-badge">
-                            {% include 'includes/avatar.html' with avatar=participant.avatar %}
-                            <span class="participant-name">{{ participant.user.first_name }} {{ participant.user.last_name }}</span>
-                        </div>
-                        {% endfor %}
-                        {% if tournament.participants.count > 10 %}
-                        <div class="participant-more">
-                            <span class="text-secondary">+{{ tournament.participants.count|add:"-10" }}</span>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
                 {% else %}
-                <span class="text-secondary section-label">Пока нет участников</span>
+                <span class="tournament-card__empty-line">Пока нет участников</span>
                 {% endif %}
             </div>
         </div>
 
-        <div class="tournament-action">
-            {% if tournament.card_action_disabled %}
+        <aside class="tournament-card__aside">
+            <div class="tournament-card__aside-statuses">
+                <span class="tournament-card__aside-pill tournament-card__aside-pill--type">{{ tournament.get_tournament_type_display }}</span>
+                <span class="tournament-status-badge tournament-status-badge--inline tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}">
+                    {% if tournament.status == 'upcoming' %}Идёт набор{% elif tournament.status == 'active' %}В игре{% elif tournament.status == 'cancelled' %}Отменён{% else %}Завершён{% endif %}
+                </span>
+            </div>
+            <div class="tournament-card__aside-action tournament-action">
+                {% if tournament.card_action_is_join_form %}
+                <form method="post" action="{% url 'clubs:join_request_create' slug=tournament.card_join_club_slug %}" onclick="event.stopPropagation();">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ tournament.card_join_next_url }}">
+                    <button type="submit" class="btn btn-primary btn--tournament-card">{{ tournament.card_action_label }}</button>
+                </form>
+                {% elif tournament.card_action_disabled %}
                 <button
                     type="button"
-                    class="btn btn-outline"
+                    class="btn btn-outline btn--tournament-card"
                     disabled
                     {% if tournament.card_action_reason %}title="{{ tournament.card_action_reason }}"{% endif %}
                 >{{ tournament.card_action_label }}</button>
-            {% elif tournament.card_action_url %}
+                {% elif tournament.card_action_url %}
                 <a
                     href="{{ tournament.card_action_url }}"
-                    class="btn {% if tournament.card_action_is_primary %}btn-primary{% else %}btn-outline{% endif %}"
+                    class="btn {% if tournament.card_action_is_primary %}btn-primary{% else %}btn-outline{% endif %} btn--tournament-card"
                     onclick="event.stopPropagation();"
                 >{{ tournament.card_action_label }}</a>
-            {% else %}
-                <button type="button" class="btn btn-outline" disabled>{{ tournament.card_action_label|default:"Недоступно" }}</button>
-            {% endif %}
-        </div>
+                {% else %}
+                <button type="button" class="btn btn-outline btn--tournament-card" disabled>{{ tournament.card_action_label|default:"Недоступно" }}</button>
+                {% endif %}
+            </div>
+        </aside>
     </div>
 </div>

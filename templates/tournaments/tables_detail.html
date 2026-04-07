@@ -1,49 +1,12 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load humanize %}
 {% load skill_tags club_tags %}
 
 {% block title %}Турнирная таблица: {{ tournament.name }}{% endblock %}
 
-{% block extra_css %}
-<style>
-.tables-detail .tables-hero-image img { max-width: 100%; height: auto; border-radius: var(--radius-md); }
-.tables-detail .tables-description { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-.tables-fan-points { padding: var(--spacing-md); background: var(--color-bg-elevated); border-radius: var(--radius-md); }
-.tables-fan-points h4 { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-.fan-points-grid { display: flex; flex-wrap: wrap; gap: var(--spacing-md); font-size: var(--font-size-sm); }
-.stats-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--spacing-md); }
-.stat-card .card-body { text-align: center; padding: var(--spacing-lg); }
-.stat-card-value { display: block; font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-primary); }
-.stat-card-label { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-.table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.standings-table { width: 100%; border-collapse: collapse; min-width: 400px; }
-.standings-table th, .standings-table td { padding: var(--spacing-sm) var(--spacing-md); text-align: left; border-bottom: 1px solid var(--color-border-light); }
-.standings-table th { font-weight: 600; color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-.standings-table tr.top-place { background: rgba(166, 130, 74, 0.08); }
-.place-cell { font-weight: 600; width: 50px; }
-.player-link { display: flex; align-items: center; gap: var(--spacing-sm); text-decoration: none; color: inherit; }
-.player-link:hover { color: var(--color-primary); }
-.player-avatar-sm { width: 32px; height: 32px; border-radius: var(--radius-full); object-fit: cover; background: var(--color-bg-elevated); }
-.fan-points { font-weight: 600; color: var(--color-primary); }
-.charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--spacing-lg); }
-.chart-card .chart-title { font-size: var(--font-size-lg); margin-bottom: var(--spacing-md); }
-.chart-container { position: relative; height: 250px; }
-.matches-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--spacing-md); }
-.match-card-mini { display: block; padding: var(--spacing-md); background: var(--color-bg-elevated); border-radius: var(--radius-md); text-decoration: none; color: inherit; transition: background var(--transition-fast); }
-.match-card-mini:hover { background: rgba(166, 130, 74, 0.15); }
-.match-mini-players { display: flex; flex-direction: column; gap: var(--spacing-xs); }
-.match-mini-player { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-sm); }
-.match-mini-player.winner { font-weight: 600; color: var(--color-primary); }
-.player-avatar-xs { width: 24px; height: 24px; border-radius: var(--radius-full); object-fit: cover; background: var(--color-bg); flex-shrink: 0; }
-.match-mini-vs { font-size: var(--font-size-xs); color: var(--color-text-secondary); padding-left: 32px; }
-.set-score { margin-left: auto; font-weight: 500; }
-.match-mini-status { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: var(--spacing-xs); }
-.round-title { font-size: var(--font-size-lg); margin-bottom: var(--spacing-md); color: var(--color-text-secondary); }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="container tables-detail" style="padding-top: var(--spacing-2xl);">
+<div class="container tables-detail">
     <div class="mb-4">
         <a href="{% url 'tournament_tables_list' %}" class="text-secondary">&larr; Все турнирные таблицы</a>
     </div>
@@ -58,13 +21,13 @@
             {% endif %}
             <div class="d-flex gap-2 mb-2 flex-wrap">
                 {% if tournament.format == 'single_elimination' %}
-                <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;" title="Турнир на выбывание с подвалом">{{ tournament.get_format_display }}</span>
+                <span class="player-category player-category--format-single_elimination" title="Турнир на выбывание с подвалом">{{ tournament.get_format_display }}</span>
                 {% elif tournament.format == 'olympic_consolation' %}
-                <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">Олимпийская система</span>
+                <span class="player-category player-category--format-olympic_consolation">Олимпийская система</span>
                 {% elif tournament.format == 'weekend_day' %}
-                <span class="player-category" style="background: rgba(72, 61, 139, 0.25); color: #483d8b;">OneDay</span>
+                <span class="player-category player-category--format-weekend_day">OneDay</span>
                 {% elif tournament.format == 'round_robin' %}
-                <span class="player-category" style="background: rgba(100, 149, 237, 0.2); color: #6495ed;">Круговой</span>
+                <span class="player-category player-category--format-round_robin">Круговой</span>
                 {% endif %}
                 {% for ac in tournament.allowed_categories.all %}
                 <span class="player-category">{{ ac.category|skill_with_ntrp }}</span>
@@ -73,12 +36,19 @@
                 <span class="player-category">{{ tournament.get_duration_display }}</span>
                 <span class="player-category">{{ tournament.get_status_display }}</span>
                 {% if tournament.entry_fee > 0 %}
-                <span class="player-category" style="background: var(--color-bg-elevated);">Взнос: {{ tournament.entry_fee|intcomma|cut:".00" }} ₽</span>
+                <span class="player-category player-category--fee-plate">Взнос: {{ tournament.entry_fee|intcomma|cut:".00" }} ₽</span>
                 {% else %}
-                <span class="player-category" style="background: var(--color-bg-elevated);">Бесплатно</span>
+                <span class="player-category player-category--fee-plate">Бесплатно</span>
                 {% endif %}
             </div>
-            <h1 class="page-title" style="text-align: left;">{{ tournament.name }}</h1>
+            <h1 class="page-title">{{ tournament.name }}</h1>
+            <div class="tables-detail__host" aria-label="Организатор турнира">
+                {% if tournament.club %}
+                <a href="{% url 'clubs:club_public_detail' slug=tournament.club.slug %}" class="tournament-table__club-badge tournament-table__club-badge--host" title="{{ tournament.club.name }}">{{ tournament.club.name }}</a>
+                {% else %}
+                <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                {% endif %}
+            </div>
             <p class="text-secondary mb-0">
                 {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
                 {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
@@ -197,7 +167,7 @@
     <!-- Графики -->
     <section class="tables-charts mb-4">
         <div class="charts-grid">
-            {% if chart_status_labels %}
+            {% if show_chart_status %}
             <div class="chart-card card">
                 <div class="card-body">
                     <h3 class="chart-title">Статус матчей</h3>
@@ -207,8 +177,7 @@
                 </div>
             </div>
             {% endif %}
-            {% if chart_round_labels %}
-            {% if is_fan or is_tvd %}
+            {% if show_chart_rounds %}
             <div class="chart-card card">
                 <div class="card-body">
                     <h3 class="chart-title">Распределение по раундам вылета</h3>
@@ -218,8 +187,7 @@
                 </div>
             </div>
             {% endif %}
-            {% endif %}
-            {% if ratings_sorted %}
+            {% if show_chart_ratings %}
             <div class="chart-card card">
                 <div class="card-body">
                     <h3 class="chart-title">Рейтинг участников (топ-20)</h3>
@@ -277,78 +245,6 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const chartColors = {
-        primary: '#A6824A',
-        accent: '#83530cd3',
-        palette: ['#A6824A', '#83530c', '#2d5a27', '#6b7280', '#9ca3af']
-    };
-
-    {% if chart_status_labels %}
-    new Chart(document.getElementById('chartStatus'), {
-        type: 'doughnut',
-        data: {
-            labels: {{ chart_status_labels|safe }},
-            datasets: [{
-                data: {{ chart_status_data|safe }},
-                backgroundColor: chartColors.palette,
-                borderColor: '#16302B',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: { legend: { position: 'bottom' } }
-        }
-    });
-    {% endif %}
-
-    {% if is_fan and chart_round_labels %}
-    new Chart(document.getElementById('chartRounds'), {
-        type: 'bar',
-        data: {
-            labels: {{ chart_round_labels|safe }},
-            datasets: [{
-                label: 'Участников',
-                data: {{ chart_round_data|safe }},
-                backgroundColor: chartColors.primary,
-                borderColor: chartColors.accent,
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-        }
-    });
-    {% endif %}
-
-    {% if ratings_sorted %}
-    new Chart(document.getElementById('chartRatings'), {
-        type: 'bar',
-        data: {
-            labels: {{ ratings_labels|safe }},
-            datasets: [{
-                label: 'Рейтинг',
-                data: {{ ratings_sorted|safe }},
-                backgroundColor: 'rgba(166, 130, 74, 0.6)',
-                borderColor: chartColors.primary,
-                borderWidth: 1
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: { legend: { display: false } },
-            scales: { x: { beginAtZero: true } }
-        }
-    });
-    {% endif %}
-});
-</script>
+<script type="application/json" id="tournament-tables-charts-config">{{ tables_charts_config|safe }}</script>
+<script src="{% static 'js/tournament_tables_detail.js' %}"></script>
 {% endblock %}

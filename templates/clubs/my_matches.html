@@ -58,6 +58,22 @@
                             {% if match.tournament.start_date %}
                             <span class="club-dashboard-table__hint">{{ match.tournament.start_date|date:"d.m.Y" }}</span>
                             {% endif %}
+                            <div class="club-my-matches-page__tournament-footer" aria-label="Организатор матча">
+                                {% if match.match_type == 'sparring' %}
+                                <span class="club-my-matches-page__tournament-footer-label">Спарринг</span>
+                                <div class="club-my-matches-page__tournament-footer-host">
+                                    <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                                </div>
+                                {% elif match.tournament.club_id %}
+                                <div class="club-my-matches-page__tournament-footer-host">
+                                    <span class="badge tournament-card-host-badge tournament-card-host-badge--club" title="Турнир клуба">{{ match.tournament.club.name }}</span>
+                                </div>
+                                {% else %}
+                                <div class="club-my-matches-page__tournament-footer-host">
+                                    <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                                </div>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                     <div class="club-dashboard-table__cell club-my-matches-page__meta-cell">

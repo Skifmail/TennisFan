@@ -49,6 +49,11 @@ from apps.tournaments.models import (
     TournamentGender,
     TournamentStatus,
 )
+from apps.tournaments.platform_home import (
+    attach_home_tournament_rows,
+    club_filter_choices_for_tournament_lists,
+    load_user_club_ids_for_platform_tournaments,
+)
 from apps.training.models import Coach
 from apps.users.models import Player, SkillLevel
 from apps.users.rating_utils import rating_to_ntrp_level
@@ -407,7 +412,7 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
                 "target_participants": target_participants,
                 "needs_attention": needs_attention,
                 "host_label": (
-                    tournament.club.name if tournament.club_id else "Платформа"
+                    tournament.club.name if tournament.club_id else "TennisFan"
                 ),
             }
         )
@@ -1121,8 +1126,7 @@ def home(request):
         Tournament.objects.filter(
             status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE],
         )
-        .filter(models.Q(club__isnull=True) | models.Q(is_open_interclub=True))
-        .select_related("court")
+        .select_related("court", "club")
         .prefetch_related(
             "participants__user",
             "allowed_categories",
@@ -1131,19 +1135,11 @@ def home(request):
         )
     )
 
-    upcoming_tournaments = Tournament.objects.filter(
-        status=TournamentStatus.UPCOMING,
-    ).filter(models.Q(club__isnull=True) | models.Q(is_open_interclub=True))
-    upcoming_tournaments = (
-        upcoming_tournaments.select_related("court")
-        .prefetch_related("allowed_categories")
-        .order_by("start_date")[:6]
-    )
-
     city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
     gender = request.GET.get("gender", "")
     duration = request.GET.get("duration", "")
+    club_filter = (request.GET.get("club") or "").strip()
 
     if city:
         tournaments = filter_field_contains_ci(
@@ -1157,12 +1153,39 @@ def home(request):
         tournaments = tournaments.filter(gender=gender)
     if duration:
         tournaments = tournaments.filter(duration=duration)
+    if club_filter == "__platform__":
+        tournaments = tournaments.filter(club__isnull=True)
+    elif club_filter:
+        tournaments = tournaments.filter(club__slug=club_filter)
+
+    upcoming_tournaments = Tournament.objects.filter(
+        status=TournamentStatus.UPCOMING,
+    )
+    if club_filter == "__platform__":
+        upcoming_tournaments = upcoming_tournaments.filter(club__isnull=True)
+    elif club_filter:
+        upcoming_tournaments = upcoming_tournaments.filter(club__slug=club_filter)
+    upcoming_tournaments = (
+        upcoming_tournaments.select_related("court", "club")
+        .prefetch_related("allowed_categories")
+        .order_by("start_date")[:6]
+    )
 
     tournaments = tournaments.order_by("start_date")
 
     paginator = Paginator(tournaments, 7)
     page_number = request.GET.get("page")
     tournaments_page = paginator.get_page(page_number)
+
+    pending_join_club_ids, member_club_ids = (
+        load_user_club_ids_for_platform_tournaments(request.user)
+    )
+    attach_home_tournament_rows(
+        tournaments_page.object_list,
+        request.user,
+        pending_join_club_ids=pending_join_club_ids,
+        member_club_ids=member_club_ids,
+    )
 
     # Получаем топ игроков по сезонным очкам
     from django.db.models import Case, F, IntegerField, Value, When
@@ -1205,9 +1228,7 @@ def home(request):
         "tournaments_count": format_number(
             Tournament.objects.filter(
                 status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE],
-            )
-            .filter(models.Q(club__isnull=True) | models.Q(is_open_interclub=True))
-            .count()
+            ).count()
         ),
         "matches_count": format_number(
             Match.objects.filter(
@@ -1239,10 +1260,12 @@ def home(request):
             "category": category,
             "gender": gender,
             "duration": duration,
+            "club": club_filter,
         },
         "category_choices": SkillLevel.choices,
         "gender_choices": TournamentGender.choices,
         "duration_choices": TournamentDuration.choices,
+        "club_filter_choices": club_filter_choices_for_tournament_lists(),
     }
 
     if (
@@ -1398,7 +1421,13 @@ def results(request):
     """Match results page."""
     matches = (
         Match.objects.filter(status=Match.MatchStatus.COMPLETED)
-        .select_related("player1__user", "player2__user", "winner__user", "tournament")
+        .select_related(
+            "player1__user",
+            "player2__user",
+            "winner__user",
+            "tournament",
+            "tournament__club",
+        )
         .order_by("-completed_datetime")[:50]
     )
     return render(request, "core/results.html", {"matches": matches})

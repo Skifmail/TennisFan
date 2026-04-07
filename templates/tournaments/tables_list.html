@@ -5,29 +5,54 @@
 {% block title %}Турнирные таблицы{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top: var(--spacing-2xl);">
+<div class="container tournament-tables-page">
     <div class="page-header mb-4">
         <h1 class="page-title">Турнирные таблицы</h1>
         <p class="page-subtitle">Подробная статистика по каждому турниру: участники, матчи, результаты, графики</p>
     </div>
 
+    <form method="get" class="filter-bar" aria-label="Фильтры списка турнирных таблиц">
+        <input type="search" name="city" class="form-control" placeholder="Город" value="{{ current_city }}" autocomplete="off" aria-label="Город" onchange="this.form.submit()">
+        <select name="status" class="form-control" aria-label="Статус турнира" onchange="this.form.submit()">
+            <option value="">Все статусы</option>
+            <option value="upcoming" {% if current_status == 'upcoming' %}selected{% endif %}>Предстоящие</option>
+            <option value="active" {% if current_status == 'active' %}selected{% endif %}>Активные</option>
+            <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Завершённые</option>
+            <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>Отменённые</option>
+        </select>
+        <select name="club" class="form-control" aria-label="Клуб" onchange="this.form.submit()">
+            <option value="">Все турниры</option>
+            <option value="__platform__" {% if tables_list_club_filter == '__platform__' %}selected{% endif %}>TennisFan</option>
+            {% for slug, name in club_filter_choices %}
+            <option value="{{ slug }}" {% if tables_list_club_filter == slug %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
+    </form>
+
     <div class="tournament-tables-grid">
         {% for t in tournaments %}
         <a href="{% url 'tournament_tables_detail' slug=t.slug %}" class="tournament-table-card card">
             <div class="card-body tournament-table-card__body">
+                <div class="tournament-table-card__host">
+                    {% if t.club %}
+                    <span class="badge tournament-card-host-badge tournament-card-host-badge--club" title="{{ t.club.name }}">{{ t.club.name }}</span>
+                    {% else %}
+                    {% include 'includes/tennis_fan_platform_badge.html' %}
+                    {% endif %}
+                </div>
                 <h2 class="tournament-table-title">{{ t.name }}</h2>
                 <p class="text-secondary mb-3">{{ t.city }} • {{ t.start_date|date:"d.m.Y" }}{% if t.end_date %} — {{ t.end_date|date:"d.m.Y" }}{% endif %}</p>
                 <div class="tournament-table-badges">
                     <div class="tournament-table-badges__main">
                         <div class="tournament-table-badges__format">
                             {% if t.format == 'single_elimination' %}
-                            <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;" title="Турнир на выбывание с подвалом">{{ t.get_format_display }}</span>
+                            <span class="player-category player-category--format-single_elimination" title="Турнир на выбывание с подвалом">{{ t.get_format_display }}</span>
                             {% elif t.format == 'olympic_consolation' %}
-                            <span class="player-category" style="background: rgba(70, 130, 180, 0.25); color: #4682b4;">Олимпийская</span>
+                            <span class="player-category player-category--format-olympic_consolation">Олимпийская</span>
                             {% elif t.format == 'round_robin' %}
-                            <span class="player-category" style="background: rgba(100, 149, 237, 0.2); color: #6495ed;">Круговой</span>
+                            <span class="player-category player-category--format-round_robin">Круговой</span>
                             {% elif t.format == 'weekend_day' %}
-                            <span class="player-category" style="background: rgba(72, 61, 139, 0.25); color: #483d8b;" title="{{ t.get_format_display }}">OneDay</span>
+                            <span class="player-category player-category--format-weekend_day" title="{{ t.get_format_display }}">OneDay</span>
                             {% endif %}
                         </div>
                         <div class="tournament-table-badges__levels">
@@ -74,190 +99,4 @@
         {% endfor %}
     </div>
 </div>
-
-<style>
-.tournament-tables-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--spacing-lg);
-}
-@media (max-width: 992px) {
-    .tournament-tables-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-@media (max-width: 768px) {
-    .tournament-tables-grid {
-        grid-template-columns: 1fr;
-    }
-}
-.tournament-table-card {
-    display: block;
-    text-decoration: none;
-    color: inherit;
-}
-.tournament-table-card__body {
-    position: relative;
-    padding-top: calc(var(--spacing-lg) + 4px);
-}
-.tournament-table-card.card-in-view {
-    transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-                transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-                box-shadow var(--transition-fast);
-}
-.tournament-table-card.card-in-view:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-}
-.tournament-table-badges {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-sm);
-}
-.tournament-table-badges__main {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.tournament-table-badges__format,
-.tournament-table-badges__levels {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: flex-start;
-}
-.tournament-table-badges__status-wrap {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    display: flex;
-    justify-content: flex-end;
-    align-items: flex-start;
-    max-width: calc(100% - 16px);
-}
-.tournament-table-badges .player-category,
-.tournament-table-badges .tournament-status-badge {
-    flex-shrink: 0;
-}
-.tournament-table-badges__status {
-    position: static;
-}
-@media (max-width: 640px) {
-    .tournament-table-card .card-body {
-        padding: 14px;
-    }
-
-    .tournament-table-card__body {
-        padding-top: 46px;
-    }
-
-    .tournament-table-badges__status-wrap {
-        top: 8px;
-        right: 8px;
-        max-width: calc(100% - 16px);
-    }
-
-    .tournament-table-title {
-        font-size: var(--font-size-base);
-        line-height: 1.35;
-        padding-right: 106px;
-    }
-
-    .tournament-table-badges__status {
-        min-height: 20px;
-        padding: 3px 7px;
-        gap: 4px;
-        font-size: 9px;
-        letter-spacing: 0.02em;
-        max-width: 100%;
-    }
-
-    .tournament-table-badges__status::before {
-        width: 6px;
-        height: 6px;
-        flex-basis: 6px;
-    }
-
-    .tournament-table-badges {
-        grid-template-columns: 1fr;
-        gap: 8px;
-    }
-
-    .tournament-table-badges__main {
-        gap: 8px;
-    }
-
-    .tournament-table-badges__format,
-    .tournament-table-badges__levels {
-        gap: 5px;
-    }
-
-    .tournament-table-badges .player-category {
-        font-size: 11px;
-        line-height: 1.2;
-    }
-
-    .tournament-table-stats {
-        gap: var(--spacing-sm);
-        justify-content: space-between;
-        flex-wrap: nowrap;
-    }
-
-    .stat-item {
-        min-width: 0;
-        flex: 1 1 0;
-    }
-
-    .stat-value {
-        font-size: var(--font-size-lg);
-    }
-
-    .stat-label {
-        font-size: 10px;
-        line-height: 1.2;
-    }
-}
-.tournament-table-title {
-    font-size: var(--font-size-lg);
-    font-weight: 600;
-    margin-bottom: var(--spacing-xs);
-}
-.tournament-table-stats {
-    display: flex;
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-md);
-}
-.stat-item {
-    display: flex;
-    flex-direction: column;
-}
-.stat-value {
-    font-weight: 600;
-    color: var(--color-primary);
-}
-.stat-label {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
-}
-.tournament-table-progress {
-    height: 6px;
-    background: var(--color-bg-elevated);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-    margin-bottom: var(--spacing-md);
-}
-.tournament-table-progress .progress-bar {
-    height: 100%;
-    background: var(--color-primary);
-    border-radius: var(--radius-full);
-    transition: width var(--transition-base);
-}
-.tournament-table-link {
-    font-size: var(--font-size-sm);
-    color: var(--color-primary);
-}
-</style>
 {% endblock %}

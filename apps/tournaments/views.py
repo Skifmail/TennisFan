@@ -19,7 +19,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from apps.clubs.models import ClubMember, ClubMembershipFee, ClubMemberStatus
+from apps.clubs.models import (
+    ClubJoinRequest,
+    ClubJoinRequestStatus,
+    ClubMember,
+    ClubMembershipFee,
+    ClubMemberStatus,
+)
 from apps.clubs.plan_services import (
     RegistrationMode,
     can_member_register_for_tournament,
@@ -49,6 +55,7 @@ from .models import (
 )
 from .olympic_consolation import _is_olympic
 from .olympic_consolation import generate_bracket as olympic_generate_bracket
+from .platform_home import club_filter_choices_for_tournament_lists
 from .proposal_service import apply_proposal
 from .round_robin import (
     _is_round_robin,
@@ -301,15 +308,12 @@ def tournament_list(request):
     city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
     status = request.GET.get("status", "")
+    club_filter = (request.GET.get("club") or "").strip()
 
-    # На общей странице показываем только турниры платформы (без клуба)
-    # и межклубные турниры (is_open_interclub=True). Внутриклубные турниры
-    # остаются внутри панели клуба.
+    # Турниры платформы и клубов (клубные — с отдельным CTA «Вступить в клуб»).
     tournaments = (
-        Tournament.objects.filter(
-            models.Q(club__isnull=True) | models.Q(is_open_interclub=True)
-        )
-        .select_related("court")
+        Tournament.objects.all()
+        .select_related("court", "club")
         .prefetch_related(
             "participants__user",
             "allowed_categories",
@@ -326,20 +330,41 @@ def tournament_list(request):
         ).distinct()
     if status:
         tournaments = tournaments.filter(status=status)
+    if club_filter == "__platform__":
+        tournaments = tournaments.filter(club__isnull=True)
+    elif club_filter:
+        tournaments = tournaments.filter(club__slug=club_filter)
 
     tournaments = list(tournaments.order_by("-created_at"))
 
     current_player = None
+    pending_join_club_ids: set[int] = set()
+    member_club_ids: set[int] = set()
     if request.user.is_authenticated:
         current_player = getattr(request.user, "player", None)
         if current_player is None:
             current_player = Player.objects.filter(user=request.user).first()
+        pending_join_club_ids = set(
+            ClubJoinRequest.objects.filter(
+                user=request.user,
+                status=ClubJoinRequestStatus.PENDING,
+            ).values_list("club_id", flat=True)
+        )
+        member_club_ids = set(
+            ClubMember.objects.filter(
+                user=request.user,
+                status=ClubMemberStatus.ACTIVE,
+            ).values_list("club_id", flat=True)
+        )
 
     for tournament in tournaments:
         tournament.card_action_label = "Записаться"
         tournament.card_action_url = None
         tournament.card_action_is_primary = False
         tournament.card_action_disabled = True
+        tournament.card_action_is_join_form = False
+        tournament.card_join_club_slug = ""
+        tournament.card_join_next_url = ""
 
         if tournament.status == TournamentStatus.COMPLETED:
             tournament.card_action_label = "Турнир завершён"
@@ -391,6 +416,26 @@ def tournament_list(request):
             tournament.card_action_label = "Вы записаны"
             continue
 
+        if (
+            tournament.club_id
+            and not tournament.is_open_interclub
+            and tournament.club_id not in member_club_ids
+        ):
+            tournament.card_join_next_url = reverse(
+                "tournament_detail",
+                kwargs={"slug": tournament.slug},
+            )
+            tournament.card_join_club_slug = tournament.club.slug
+            if tournament.club_id in pending_join_club_ids:
+                tournament.card_action_label = "Заявка на вступление отправлена"
+                tournament.card_action_disabled = True
+            else:
+                tournament.card_action_label = "Вступить в клуб"
+                tournament.card_action_is_primary = True
+                tournament.card_action_disabled = False
+                tournament.card_action_is_join_form = True
+            continue
+
         can_register, club_plan_error = True, ""
         tournament_member = _get_tournament_club_member(request.user, tournament)
         if tournament_member:
@@ -421,6 +466,9 @@ def tournament_list(request):
         "current_city": city,
         "current_category": category,
         "current_status": status,
+        # Не использовать ключ current_club — он зарезервирован под клуб из context processor (base.html).
+        "list_club_filter": club_filter,
+        "club_filter_choices": club_filter_choices_for_tournament_lists(),
         "category_choices": SkillLevel.choices,
     }
     return render(request, "tournaments/list.html", context)
@@ -478,9 +526,8 @@ def _get_interclub_context(request, tournament):
 def tournament_detail(request, slug):
     """Tournament detail page.
 
-    Для турниров клуба, которые не помечены как межклубные (is_open_interclub=False),
-    доступ ограничен участниками соответствующего клуба.
-    Общие турниры платформы и межклубные турниры доступны всем.
+    Внутриклубные турниры (клуб задан, не межклубные) доступны для просмотра всем;
+    зарегистрироваться может только активный член клуба-организатора.
     """
     # Проверяем и формируем сетки для турниров с истёкшим дедлайном регистрации
     from apps.tournaments.fan import check_and_generate_past_deadline_brackets
@@ -488,7 +535,7 @@ def tournament_detail(request, slug):
     check_and_generate_past_deadline_brackets()
 
     tournament = get_object_or_404(
-        Tournament.objects.select_related("court").prefetch_related(
+        Tournament.objects.select_related("court", "club").prefetch_related(
             "matches__player1__user",
             "matches__player2__user",
             "matches__winner__user",
@@ -509,26 +556,8 @@ def tournament_detail(request, slug):
         slug=slug,
     )
 
-    # Ограничиваем доступ к внутриклубным турнирам:
-    # - если у турнира есть клуб и он не межклубный (is_open_interclub=False),
-    #   страницу могут смотреть только участники этого клуба.
-    if tournament.club_id and not tournament.is_open_interclub:
-        club = tournament.club
-        if not request.user.is_authenticated:
-            login_url = reverse("login")
-            next_url = request.build_absolute_uri(request.get_full_path())
-            return redirect(f"{login_url}?next={next_url}")
-        is_member = ClubMember.objects.filter(
-            club=club,
-            user=request.user,
-            status=ClubMemberStatus.ACTIVE,
-        ).exists()
-        if not is_member:
-            messages.error(
-                request,
-                "Этот турнир доступен только участникам клуба.",
-            )
-            return redirect("clubs:club_public_detail", slug=club.slug)
+    # Внутриклубные турниры доступны для просмотра всем; регистрация — только членам
+    # клуба (см. can_register и блок «Вступить в клуб» в шаблоне).
     is_fan = _is_fan(tournament)
     is_olympic = _is_olympic(tournament)
     is_round_robin = _is_round_robin(tournament)
@@ -889,7 +918,10 @@ def tournament_detail(request, slug):
                 tournament_member = _get_tournament_club_member(
                     request.user, tournament
                 )
-                if tournament_member:
+                if tournament.club_id and not tournament.is_open_interclub:
+                    if not tournament_member:
+                        can_register = False
+                elif tournament_member:
                     can_register_by_plan, plan_error = (
                         can_member_register_for_tournament(
                             tournament_member,
@@ -899,6 +931,28 @@ def tournament_detail(request, slug):
                     if not can_register_by_plan:
                         can_register = False
                         club_plan_error = plan_error
+
+    show_club_join_cta = False
+    show_club_join_pending = False
+    if (
+        request.user.is_authenticated
+        and tournament.club_id
+        and not tournament.is_open_interclub
+        and tournament.status
+        not in (TournamentStatus.COMPLETED, TournamentStatus.CANCELLED)
+    ):
+        is_host_member = ClubMember.objects.filter(
+            club_id=tournament.club_id,
+            user=request.user,
+            status=ClubMemberStatus.ACTIVE,
+        ).exists()
+        if not is_host_member and not user_is_registered:
+            show_club_join_pending = ClubJoinRequest.objects.filter(
+                club_id=tournament.club_id,
+                user=request.user,
+                status=ClubJoinRequestStatus.PENDING,
+            ).exists()
+            show_club_join_cta = not show_club_join_pending
 
     interclub_ctx = _get_interclub_context(request, tournament)
 
@@ -944,6 +998,9 @@ def tournament_detail(request, slug):
         "can_register": can_register,
         "club_plan_error": club_plan_error,
         "registration_closed": registration_closed,
+        "show_club_join_cta": show_club_join_cta,
+        "show_club_join_pending": show_club_join_pending,
+        "tournament_join_next": request.get_full_path(),
         **interclub_ctx,
         "tvd_groups": tvd_groups if is_tvd else None,
         "tvd_main_matches": tvd_main_matches if is_tvd else None,
@@ -2227,13 +2284,32 @@ def tournament_manage_match_result(request, slug, pk):
 
 def tournament_tables_list(request):
     """Страница «Турнирные таблицы» — список турниров с краткой статистикой."""
+    city = (request.GET.get("city") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    club_filter = (request.GET.get("club") or "").strip()
+
     tournaments = (
         Tournament.objects.all()
+        .select_related("club")
         .prefetch_related(
-            "participants__user", "matches", "fan_results", "allowed_categories"
+            "participants__user",
+            "matches",
+            "fan_results",
+            "allowed_categories",
         )
-        .order_by("-start_date")
     )
+    if city:
+        tournaments = filter_field_contains_ci(
+            tournaments, "city", city, annotation="_tables_list_city_l"
+        )
+    if status:
+        tournaments = tournaments.filter(status=status)
+    if club_filter == "__platform__":
+        tournaments = tournaments.filter(club__isnull=True)
+    elif club_filter:
+        tournaments = tournaments.filter(club__slug=club_filter)
+
+    tournaments = list(tournaments.order_by("-start_date"))
     # Добавляем статистику для каждого турнира
     for t in tournaments:
         main_matches = t.matches.filter(is_consolation=False)
@@ -2248,7 +2324,13 @@ def tournament_tables_list(request):
         t.progress_pct = (
             int(100 * matches_completed / matches_total) if matches_total > 0 else 0
         )
-    context = {"tournaments": tournaments}
+    context = {
+        "tournaments": tournaments,
+        "current_city": city,
+        "current_status": status,
+        "tables_list_club_filter": club_filter,
+        "club_filter_choices": club_filter_choices_for_tournament_lists(),
+    }
     return render(request, "tournaments/tables_list.html", context)
 
 
@@ -2258,7 +2340,7 @@ def tournament_tables_list(request):
 def tournament_tables_detail(request, slug):
     """Детальная страница турнирной таблицы: графики, диаграммы, полная статистика."""
     tournament = get_object_or_404(
-        Tournament.objects.prefetch_related(
+        Tournament.objects.select_related("club").prefetch_related(
             "matches__player1__user",
             "matches__player2__user",
             "matches__winner__user",
@@ -2452,6 +2534,24 @@ def tournament_tables_detail(request, slug):
     ratings_sorted = sorted(ratings, reverse=True)[:20]  # топ-20
     ratings_labels = [f"Место {i}" for i in range(1, len(ratings_sorted) + 1)]
 
+    show_chart_status = len(chart_status_labels) > 0
+    show_chart_rounds = (is_fan or is_tvd) and len(chart_round_labels) > 0
+    show_chart_ratings = len(ratings_sorted) > 0
+    tables_charts_config = json.dumps(
+        {
+            "colors": {
+                "primary": "#A6824A",
+                "accent": "#83530cd3",
+                "palette": ["#A6824A", "#83530c", "#2d5a27", "#6b7280", "#9ca3af"],
+                "border": "#16302B",
+            },
+            "status": {"labels": chart_status_labels, "data": chart_status_data},
+            "rounds": {"labels": chart_round_labels, "data": chart_round_data},
+            "ratings": {"labels": ratings_labels, "data": ratings_sorted},
+        },
+        ensure_ascii=False,
+    )
+
     context = {
         "tournament": tournament,
         "is_fan": is_fan,
@@ -2461,12 +2561,10 @@ def tournament_tables_detail(request, slug):
         "participants": participants,
         "standings": standings,
         "matches_by_round": matches_by_round,
-        "chart_status_labels": json.dumps(chart_status_labels),
-        "chart_status_data": json.dumps(chart_status_data),
-        "chart_round_labels": json.dumps(chart_round_labels),
-        "chart_round_data": json.dumps(chart_round_data),
-        "ratings_sorted": json.dumps(ratings_sorted),
-        "ratings_labels": json.dumps(ratings_labels),
+        "show_chart_status": show_chart_status,
+        "show_chart_rounds": show_chart_rounds,
+        "show_chart_ratings": show_chart_ratings,
+        "tables_charts_config": tables_charts_config,
         "participants_count": len(participants),
         "matches_total": main_matches.count(),
         "matches_completed": main_matches.filter(
@@ -2508,6 +2606,7 @@ def match_detail(request, pk):
             "player2__user",
             "winner__user",
             "tournament",
+            "tournament__club",
             "court",
             "team1__player1__user",
             "team1__player2__user",
@@ -2940,6 +3039,9 @@ REGISTER_PAY_OR_SUBSCRIBE_MSG = (
 REGISTER_PAY_CLUB_ENTRY_FEE_MSG = (
     "Для регистрации на турнир клуба нужно оплатить вступительный взнос."
 )
+REGISTER_CLUB_MEMBERSHIP_REQUIRED_MSG = (
+    "Чтобы записаться на турнир клуба, вступите в клуб организатора."
+)
 
 
 def _tournament_does_not_consume_subscription_limit(tournament) -> bool:
@@ -3024,6 +3126,10 @@ def _check_tournament_registration_eligibility(request, tournament, player):
     # Администраторы обходят проверку подписки и лимитов
     if is_admin:
         return True, None
+
+    if tournament.club_id and not tournament.is_open_interclub:
+        if not _get_tournament_club_member(user, tournament):
+            return False, REGISTER_CLUB_MEMBERSHIP_REQUIRED_MSG
 
     can_access_by_fee, fee_error = _check_club_fee_access(user, tournament)
     if not can_access_by_fee:
@@ -3176,6 +3282,11 @@ def tournament_register(request, slug):
     player = getattr(request.user, "player", None)
     if player is None:
         player = Player.objects.create(user=request.user)
+
+    if tournament.club_id and not tournament.is_open_interclub:
+        if not _get_tournament_club_member(request.user, tournament):
+            messages.error(request, REGISTER_CLUB_MEMBERSHIP_REQUIRED_MSG)
+            return redirect("tournament_detail", slug=tournament.slug)
 
     if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
         messages.error(
@@ -3344,6 +3455,11 @@ def tournament_register_doubles(request, slug):
     if _is_player_registered_in_doubles(tournament, player):
         messages.info(request, "Вы уже зарегистрированы на этот турнир.")
         return redirect("tournament_detail", slug=slug)
+
+    if tournament.club_id and not tournament.is_open_interclub:
+        if not _get_tournament_club_member(request.user, tournament):
+            messages.error(request, REGISTER_CLUB_MEMBERSHIP_REQUIRED_MSG)
+            return redirect("tournament_detail", slug=tournament.slug)
 
     tournament_member = _get_tournament_club_member(request.user, tournament)
 

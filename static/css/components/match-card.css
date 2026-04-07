@@ -34,6 +34,16 @@
     gap: var(--spacing-sm);
 }
 
+.match-header__left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+    min-width: 0;
+    flex: 1 1 0;
+    padding-right: var(--spacing-sm);
+}
+
 .match-header__right {
     display: flex;
     flex-direction: column;
@@ -45,6 +55,43 @@
 .match-tournament {
     color: var(--color-primary);
     font-weight: 500;
+}
+
+/* Контекст и организатор в шапке карточки матча (профиль) */
+.match-card__context {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-primary);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+}
+
+.match-card__host {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.match-card__host .tournament-card-host-badge--club {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.match-card__host .tournament-brand-badge {
+    font-size: 9px;
+    padding: 2px 7px 2px 6px;
+    gap: 4px;
+}
+
+.match-card__host .tournament-brand-badge__dot {
+    width: 5px;
+    height: 5px;
 }
 
 .match-status-badge {

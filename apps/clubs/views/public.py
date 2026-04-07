@@ -46,6 +46,30 @@ from ..services import (
 from .helpers import logger
 
 
+def _annotate_public_tournament_badge(tournament: Tournament) -> None:
+    """Заполняет public_badge_status и public_badge_label для карточек на публичных страницах клуба."""
+    if tournament.status == TournamentStatus.CANCELLED:
+        tournament.public_badge_status = "cancelled"
+        tournament.public_badge_label = "ОТМЕНЕН"
+    elif tournament.status == TournamentStatus.COMPLETED:
+        tournament.public_badge_status = "completed"
+        tournament.public_badge_label = "ЗАВЕРШЕН"
+    elif (
+        tournament.status
+        in (
+            TournamentStatus.ACTIVE,
+            TournamentStatus.GROUP_STAGE,
+            TournamentStatus.PLAYOFFS,
+        )
+        or tournament.bracket_generated
+    ):
+        tournament.public_badge_status = "active"
+        tournament.public_badge_label = "В ИГРЕ"
+    else:
+        tournament.public_badge_status = "upcoming"
+        tournament.public_badge_label = "Идет набор"
+
+
 def _safe_next_url(request: HttpRequest, fallback: str) -> str:
     """Возвращает безопасный next URL или fallback."""
     next_url = (request.POST.get("next") or request.GET.get("next") or "").strip()
@@ -303,27 +327,7 @@ def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
         ).order_by("start_date")[:10]
     )
     for tournament in upcoming:
-        if tournament.status == TournamentStatus.CANCELLED:
-            tournament.public_badge_status = "cancelled"
-            tournament.public_badge_label = "ОТМЕНЕН"
-        elif tournament.status == TournamentStatus.COMPLETED:
-            tournament.public_badge_status = "completed"
-            tournament.public_badge_label = "ЗАВЕРШЕН"
-        elif (
-            tournament.status
-            in (
-                TournamentStatus.ACTIVE,
-                TournamentStatus.GROUP_STAGE,
-                TournamentStatus.PLAYOFFS,
-            )
-            or tournament.bracket_generated
-        ):
-            tournament.public_badge_status = "active"
-            tournament.public_badge_label = "В ИГРЕ"
-        else:
-            tournament.public_badge_status = "upcoming"
-            tournament.public_badge_label = "Идет набор"
-
+        _annotate_public_tournament_badge(tournament)
         tournament.public_action_label = (
             "Записаться"
             if tournament.public_badge_status == "upcoming" and not tournament.is_full()

@@ -2,8 +2,11 @@
 Tournament models: Tournaments, Matches, Ratings.
 """
 
+from typing import cast
+
 from django.conf import settings
 from django.db import models
+from django.db.models import Case, IntegerField, When
 
 from apps.users.models import Player, SkillLevel
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
@@ -74,6 +77,58 @@ class TournamentVariant(models.TextChoices):
     DOUBLES = "doubles", "Парный"
 
 
+_SKILL_ORDER_CASE = Case(
+    When(category=SkillLevel.NOVICE, then=0),
+    When(category=SkillLevel.AMATEUR, then=1),
+    When(category=SkillLevel.EXPERIENCED, then=2),
+    When(category=SkillLevel.ADVANCED, then=3),
+    When(category=SkillLevel.PROFESSIONAL, then=4),
+    default=99,
+    output_field=IntegerField(),
+)
+
+
+class TournamentAllowedCategoryQuerySet(models.QuerySet):
+    """
+    QuerySet для допустимых категорий турнира.
+
+    Сортировка по возрастанию уровня (Новичок → … → Профессионал).
+    """
+
+    def ordered_by_skill(self) -> "TournamentAllowedCategoryQuerySet":
+        """
+        Возвращает queryset с сортировкой категорий от меньшего уровня к большему.
+
+        Returns:
+            TournamentAllowedCategoryQuerySet: Аннотированный и отсортированный queryset.
+        """
+        return cast(
+            "TournamentAllowedCategoryQuerySet",
+            self.annotate(_skill_order=_SKILL_ORDER_CASE).order_by(
+                "tournament_id", "_skill_order", "pk"
+            ),
+        )
+
+
+class TournamentAllowedCategoryManager(models.Manager):
+    """
+    Менеджер модели допустимых категорий.
+
+    По умолчанию выборки упорядочены по уровню силы (SkillLevel), а не по строке ключа.
+    """
+
+    def get_queryset(self) -> TournamentAllowedCategoryQuerySet:
+        """
+        Возвращает queryset с сортировкой категорий по уровню.
+
+        Returns:
+            TournamentAllowedCategoryQuerySet: Базовый queryset для модели.
+        """
+        return TournamentAllowedCategoryQuerySet(
+            self.model, using=self._db
+        ).ordered_by_skill()
+
+
 class TournamentAllowedCategory(models.Model):
     """
     Допустимые категории участников турнира (Новичок, Любитель и т.д.).
@@ -92,11 +147,13 @@ class TournamentAllowedCategory(models.Model):
         choices=SkillLevel.choices,
     )
 
+    objects = TournamentAllowedCategoryManager()
+
     class Meta:
         verbose_name = "Допустимая категория турнира"
         verbose_name_plural = "Допустимые категории турнира"
         unique_together = [("tournament", "category")]
-        ordering = ["tournament", "category"]
+        ordering: list[str] = []
 
     def __str__(self) -> str:
         return f"{self.tournament.name}: {self.get_category_display()}"

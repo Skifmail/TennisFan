@@ -12,6 +12,30 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Шапка карточки: название / «Спарринг» и бейдж клуба или TennisFan справа от текста */
+.results-page .match-header {
+    align-items: flex-start;
+}
+
+.results-match-header__context {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.results-page .match-header .match-tournament {
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow-wrap: anywhere;
+}
+
+.results-match-header__host {
+    flex-shrink: 0;
+}
+
 .results-page .player-name {
     display: flex;
     align-items: center;

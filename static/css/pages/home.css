@@ -1226,6 +1226,123 @@
     #home-tournaments-filter .home-filter-group--submit .btn {
         width: 100%;
     }
+
+    /* Главная: компактные карточки турниров сразу под hero */
+    #home-tournaments-block .tournament-table__row {
+        position: relative;
+        margin-bottom: 6px;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid rgb(255 255 255 / 9%);
+        background: rgb(255 255 255 / 4%);
+    }
+
+    #home-tournaments-block .tournament-table td.tournament-table__cell {
+        padding: 2px 0;
+        border-bottom: none;
+    }
+
+    #home-tournaments-block .tournament-table__cell--status {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: auto !important;
+        padding: 0;
+        margin: 0;
+        z-index: 2;
+    }
+
+    #home-tournaments-block .tournament-table__cell--status .tournament-status-badge {
+        min-height: 20px;
+        height: 20px;
+        padding: 0 8px;
+        font-size: 10px;
+        line-height: 20px;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+
+    #home-tournaments-block .tournament-table__cell--status .tournament-status-badge::before {
+        width: 6px;
+        height: 6px;
+        flex-basis: 6px;
+    }
+
+    #home-tournaments-block .tournament-table__cell--club {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 20px;
+        padding-right: 6.5rem;
+    }
+
+    #home-tournaments-block .tournament-table__cell--club::before {
+        font-size: 9px;
+    }
+
+    #home-tournaments-block .tournament-table__title {
+        font-size: 13px;
+        line-height: 1.25;
+        margin-bottom: 1px;
+    }
+
+    #home-tournaments-block .tournament-table__sub {
+        font-size: 11px;
+        line-height: 1.25;
+    }
+
+    #home-tournaments-block .tournament-table__participants {
+        margin-top: 3px;
+        gap: 2px;
+    }
+
+    #home-tournaments-block .tournament-table__participants .section-label,
+    #home-tournaments-block .tournament-table__participants .tournament-participants-section__empty {
+        font-size: 11px;
+    }
+
+    #home-tournaments-block .tournament-table__tags {
+        gap: 4px;
+    }
+
+    #home-tournaments-block .tournament-table__tags .badge {
+        min-height: 20px;
+        padding: 1px 6px;
+        font-size: 10px;
+        line-height: 1.15;
+        border-radius: 6px;
+    }
+
+    #home-tournaments-block .tournament-table__cell--city,
+    #home-tournaments-block .tournament-table__cell--level,
+    #home-tournaments-block .tournament-table__cell--format,
+    #home-tournaments-block .tournament-table__cell--type,
+    #home-tournaments-block .tournament-table__cell--fee {
+        padding-top: 2px;
+        padding-bottom: 2px;
+    }
+
+    #home-tournaments-block .tournament-table__fee {
+        font-size: 14px;
+        line-height: 1.2;
+    }
+
+    #home-tournaments-block .tournament-table__places {
+        margin-top: 1px;
+        font-size: 11px;
+    }
+
+    #home-tournaments-block .tournament-table__cell--action {
+        margin-top: 4px;
+        padding-top: 2px;
+    }
+
+    #home-tournaments-block .tournament-table__action .btn {
+        height: 34px;
+        min-height: 34px;
+        font-size: 12px;
+        line-height: 1.2;
+    }
 }
 
 @media (width <= 420px) {
@@ -1332,11 +1449,26 @@
         min-width: 0;
     }
 
+    .home-section--upcoming .tournament-preview-card {
+        position: relative;
+    }
+
     .home-section--upcoming .tournament-preview-card .tournament-status-badge {
-        position: static;
-        align-self: flex-end;
-        margin: var(--spacing-md) var(--spacing-md) 0;
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 2;
+        margin: 0;
+        min-height: 22px;
+        padding: 0 8px;
+        font-size: 10px;
+        line-height: 20px;
         max-width: none;
+    }
+
+    .home-section--upcoming .tournament-preview-card .card-body {
+        gap: 6px;
+        padding: 0.75rem;
     }
 
     .home-section--upcoming .tournament-preview-card__categories {
@@ -1354,5 +1486,195 @@
     .home-section--news .grid-4,
     .home-section--news .home-grid--news {
         gap: var(--spacing-sm) !important;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Главная под hero: компактные карточки турниров только в home-блоке */
+    #home-tournaments-block .tournament-table-wrapper {
+        margin-top: var(--spacing-sm);
+    }
+
+    #home-tournaments-block .tournament-table {
+        min-width: 0;
+    }
+
+    #home-tournaments-block .tournament-table__row {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "club status"
+            "title title"
+            "city city"
+            "level level"
+            "format format"
+            "type type"
+            "fee fee"
+            "action action";
+        column-gap: 8px;
+        row-gap: 2px;
+        margin-bottom: 6px;
+        padding: 10px 11px 9px !important;
+        border-radius: 12px;
+    }
+
+    #home-tournaments-block .tournament-table td.tournament-table__cell {
+        display: block;
+        width: 100% !important;
+        margin: 0;
+        padding: 2px 0 !important;
+        border-bottom: none !important;
+    }
+
+    #home-tournaments-block .tournament-table__cell--status {
+        grid-area: status;
+        position: static !important;
+        justify-self: end;
+        align-self: start;
+        z-index: 1;
+        width: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: inline-flex !important;
+        pointer-events: auto;
+    }
+
+    #home-tournaments-block .tournament-table__cell--status .tournament-status-badge {
+        min-height: 21px;
+        height: 21px;
+        padding: 0 9px;
+        font-size: 10px;
+        line-height: 21px;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+
+    #home-tournaments-block .tournament-table__cell--status .tournament-status-badge::before {
+        width: 6px;
+        height: 6px;
+        flex-basis: 6px;
+    }
+
+    #home-tournaments-block .tournament-table__cell--club {
+        grid-area: club;
+    }
+
+    #home-tournaments-block .tournament-table__cell--title {
+        grid-area: title;
+    }
+
+    #home-tournaments-block .tournament-table__cell--city {
+        grid-area: city;
+    }
+
+    #home-tournaments-block .tournament-table__cell--level {
+        grid-area: level;
+    }
+
+    #home-tournaments-block .tournament-table__cell--format {
+        grid-area: format;
+    }
+
+    #home-tournaments-block .tournament-table__cell--type {
+        grid-area: type;
+    }
+
+    #home-tournaments-block .tournament-table__cell--fee {
+        grid-area: fee;
+    }
+
+    #home-tournaments-block .tournament-table__cell--action {
+        grid-area: action;
+    }
+
+    #home-tournaments-block .tournament-table__cell--club,
+    #home-tournaments-block .tournament-table__cell--title {
+        padding-right: 0 !important;
+    }
+
+    #home-tournaments-block .tournament-table__cell--club {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        min-height: 20px;
+    }
+
+    #home-tournaments-block .tournament-table__cell--club::before {
+        font-size: 9px;
+        line-height: 1;
+    }
+
+    #home-tournaments-block .tournament-table__club-badge {
+        max-width: 100%;
+    }
+
+    #home-tournaments-block .tournament-table__title {
+        margin-bottom: 2px;
+        font-size: 13px;
+        line-height: 1.25;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+    }
+
+    #home-tournaments-block .tournament-table__sub {
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    #home-tournaments-block .tournament-table__participants {
+        margin-top: 3px;
+        gap: 2px;
+    }
+
+    #home-tournaments-block .tournament-table__participants .section-label,
+    #home-tournaments-block .tournament-table__participants .tournament-participants-section__empty {
+        font-size: 11px;
+    }
+
+    #home-tournaments-block .tournament-table__tags {
+        gap: 4px;
+    }
+
+    #home-tournaments-block .tournament-table__tags .badge {
+        min-height: 20px;
+        padding: 1px 6px;
+        font-size: 10px;
+        line-height: 1.15;
+        border-radius: 6px;
+    }
+
+    #home-tournaments-block .tournament-table__cell--city,
+    #home-tournaments-block .tournament-table__cell--level,
+    #home-tournaments-block .tournament-table__cell--format,
+    #home-tournaments-block .tournament-table__cell--type,
+    #home-tournaments-block .tournament-table__cell--fee {
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+    }
+
+    #home-tournaments-block .tournament-table__fee {
+        font-size: 14px;
+        line-height: 1.2;
+    }
+
+    #home-tournaments-block .tournament-table__places {
+        margin-top: 1px;
+        font-size: 11px;
+    }
+
+    #home-tournaments-block .tournament-table__cell--action {
+        margin-top: 4px;
+        padding-top: 3px !important;
+    }
+
+    #home-tournaments-block .tournament-table__action .btn {
+        width: auto;
+        min-width: 112px;
+        height: 34px;
+        min-height: 34px;
+        padding: 0 14px;
+        font-size: 12px;
+        line-height: 1.2;
     }
 }

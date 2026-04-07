@@ -1,0 +1,57 @@
+{% comment %}
+  Универсальный кастомный выпадающий список для фильтров формы.
+  Параметры: field_name, selected_value, choices, empty_label, id_suffix, aria_label, auto_submit.
+{% endcomment %}
+<div
+    class="club-filter-select club-filter-select--custom"
+    data-filter-select
+    data-auto-submit="{% if auto_submit %}1{% else %}0{% endif %}"
+    id="filter-select-wrap-{{ id_suffix }}"
+>
+    <input type="hidden" name="{{ field_name }}" value="{{ selected_value|default:'' }}" id="filter-select-value-{{ id_suffix }}">
+    <button
+        type="button"
+        class="club-filter-select__toggle form-control"
+        id="filter-select-{{ id_suffix }}-toggle"
+        aria-haspopup="listbox"
+        aria-expanded="false"
+        aria-label="{{ aria_label|default:'Фильтр' }}"
+    >
+        <span class="club-filter-select__current" id="filter-select-{{ id_suffix }}-label">
+            {% if not selected_value %}
+                {{ empty_label|default:'Все' }}
+            {% else %}
+                {% for value, label in choices %}
+                    {% if selected_value|stringformat:'s' == value|stringformat:'s' %}
+                        {{ label }}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </span>
+        <span class="club-filter-select__chevron" aria-hidden="true"></span>
+    </button>
+    <div
+        class="club-filter-select__dropdown"
+        id="filter-select-{{ id_suffix }}-list"
+        hidden
+        role="listbox"
+        aria-labelledby="filter-select-{{ id_suffix }}-toggle"
+    >
+        <button
+            type="button"
+            class="club-filter-select__option{% if not selected_value %} is-selected{% endif %}"
+            role="option"
+            data-value=""
+            aria-selected="{% if not selected_value %}true{% else %}false{% endif %}"
+        >{{ empty_label|default:'Все' }}</button>
+        {% for value, label in choices %}
+        <button
+            type="button"
+            class="club-filter-select__option{% if selected_value|stringformat:'s' == value|stringformat:'s' %} is-selected{% endif %}"
+            role="option"
+            data-value="{{ value }}"
+            aria-selected="{% if selected_value|stringformat:'s' == value|stringformat:'s' %}true{% else %}false{% endif %}"
+        >{{ label }}</button>
+        {% endfor %}
+    </div>
+</div>

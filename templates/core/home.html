@@ -14,6 +14,8 @@
             <div class="hero-buttons hero-buttons--premium">
                 <a href="{% url 'tournament_list' %}" class="btn btn-primary btn-lg hero-btn-primary">Найти турнир</a>
                 <a href="{% url 'sparring_list' %}" class="btn btn-outline btn-lg hero-btn-outline">Найти соперника</a>
+                <a href="{% url 'clubs:club_discover' %}" class="btn btn-outline btn-lg hero-btn-outline">Клубы</a>
+                <a href="{% url 'tournament_list' %}?club=__club_only__" class="btn btn-outline btn-lg hero-btn-outline">Клубные турниры</a>
             </div>
             {% load skill_tags %}
             <div class="hero-metrics hero-metrics--premium">
@@ -191,48 +193,27 @@
 
         <form method="get" class="card mb-4" id="home-tournaments-filter" action="{% url 'home' %}">
             <div class="card-body filter-grid">
-                <div class="form-group">
+                <div class="form-group home-filter-group home-filter-group--city">
                     <label class="form-label">Город</label>
                     <input type="text" name="city" class="form-control" placeholder="Начните вводить город…" value="{{ current_filters.city }}" autocomplete="off" aria-autocomplete="list" aria-label="Город для фильтра турниров">
                 </div>
-                <div class="form-group">
+                <div class="form-group home-filter-group home-filter-group--level">
                     <label class="form-label">Уровень</label>
-                    <select name="category" class="form-control">
-                        <option value="">Все</option>
-                        {% for value, label in category_choices %}
-                        <option value="{{ value }}" {% if current_filters.category == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
+                    {% include 'includes/custom_filter_select.html' with field_name='category' selected_value=current_filters.category|default:'' choices=category_choices empty_label='Все' id_suffix='home-category' aria_label='Фильтр турниров по уровню' %}
                 </div>
-                <div class="form-group">
+                <div class="form-group home-filter-group home-filter-group--gender">
                     <label class="form-label">Пол</label>
-                    <select name="gender" class="form-control">
-                        <option value="">Все</option>
-                        {% for value, label in gender_choices %}
-                        <option value="{{ value }}" {% if current_filters.gender == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
+                    {% include 'includes/custom_filter_select.html' with field_name='gender' selected_value=current_filters.gender|default:'' choices=gender_choices empty_label='Все' id_suffix='home-gender' aria_label='Фильтр турниров по полу' %}
                 </div>
-                <div class="form-group">
+                <div class="form-group home-filter-group home-filter-group--duration">
                     <label class="form-label">Продолжительность</label>
-                    <select name="duration" class="form-control">
-                        <option value="">Все</option>
-                        {% for value, label in duration_choices %}
-                        <option value="{{ value }}" {% if current_filters.duration == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
+                    {% include 'includes/custom_filter_select.html' with field_name='duration' selected_value=current_filters.duration|default:'' choices=duration_choices empty_label='Все' id_suffix='home-duration' aria_label='Фильтр турниров по продолжительности' %}
                 </div>
-                <div class="form-group">
+                <div class="form-group home-filter-group home-filter-group--club">
                     <label class="form-label">Клуб</label>
-                    <select name="club" class="form-control" aria-label="Фильтр турниров по клубу">
-                        <option value="">Все турниры</option>
-                        <option value="__platform__" {% if current_filters.club == '__platform__' %}selected{% endif %}>TennisFan</option>
-                        {% for slug, name in club_filter_choices %}
-                        <option value="{{ slug }}" {% if current_filters.club == slug %}selected{% endif %}>{{ name }}</option>
-                        {% endfor %}
-                    </select>
+                    {% include 'includes/club_filter_select.html' with selected_club=current_filters.club|default:'' auto_submit=0 id_suffix='home' aria_label='Фильтр турниров по клубу' %}
                 </div>
-                <div class="form-group form-group-submit">
+                <div class="form-group form-group-submit home-filter-group home-filter-group--submit">
                     <label class="form-label">Применить</label>
                     <button type="submit" class="btn btn-primary">Применить</button>
                 </div>

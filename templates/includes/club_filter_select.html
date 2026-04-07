@@ -1,0 +1,72 @@
+{% comment %}
+  Кастомный выпадающий список «Клуб»: первые три пункта (пресеты) визуально выделены.
+  Параметры: selected_club, auto_submit (истина — отправить форму при выборе),
+  id_suffix (уникальный суффикс id), aria_label (опционально).
+  В контексте должен быть club_filter_choices.
+{% endcomment %}
+<div
+    class="club-filter-select club-filter-select--custom"
+    data-club-filter
+    data-auto-submit="{% if auto_submit %}1{% else %}0{% endif %}"
+    id="club-filter-wrap-{{ id_suffix }}"
+>
+    <input type="hidden" name="club" value="{{ selected_club|default:'' }}" id="club-filter-value-{{ id_suffix }}">
+    <button
+        type="button"
+        class="club-filter-select__toggle form-control"
+        id="club-filter-{{ id_suffix }}-toggle"
+        aria-haspopup="listbox"
+        aria-expanded="false"
+        aria-label="{{ aria_label|default:'Фильтр по клубу' }}"
+    >
+        <span class="club-filter-select__current" id="club-filter-{{ id_suffix }}-label">
+            {% if not selected_club %}Все турниры
+            {% elif selected_club == '__platform__' %}TennisFan
+            {% elif selected_club == '__club_only__' %}Только клубные
+            {% else %}
+                {% for slug, name in club_filter_choices %}
+                    {% if slug == selected_club %}{{ name }}{% endif %}
+                {% endfor %}
+            {% endif %}
+        </span>
+        <span class="club-filter-select__chevron" aria-hidden="true"></span>
+    </button>
+    <div
+        class="club-filter-select__dropdown"
+        id="club-filter-{{ id_suffix }}-list"
+        hidden
+        role="listbox"
+        aria-labelledby="club-filter-{{ id_suffix }}-toggle"
+    >
+        <button
+            type="button"
+            class="club-filter-select__option club-filter-select__option--preset{% if not selected_club %} is-selected{% endif %}"
+            role="option"
+            data-value=""
+            aria-selected="{% if not selected_club %}true{% else %}false{% endif %}"
+        >Все турниры</button>
+        <button
+            type="button"
+            class="club-filter-select__option club-filter-select__option--preset{% if selected_club == '__platform__' %} is-selected{% endif %}"
+            role="option"
+            data-value="__platform__"
+            aria-selected="{% if selected_club == '__platform__' %}true{% else %}false{% endif %}"
+        >TennisFan</button>
+        <button
+            type="button"
+            class="club-filter-select__option club-filter-select__option--preset{% if selected_club == '__club_only__' %} is-selected{% endif %}"
+            role="option"
+            data-value="__club_only__"
+            aria-selected="{% if selected_club == '__club_only__' %}true{% else %}false{% endif %}"
+        >Только клубные</button>
+        {% for slug, name in club_filter_choices %}
+        <button
+            type="button"
+            class="club-filter-select__option{% if slug == selected_club %} is-selected{% endif %}"
+            role="option"
+            data-value="{{ slug }}"
+            aria-selected="{% if slug == selected_club %}true{% else %}false{% endif %}"
+        >{{ name }}</button>
+        {% endfor %}
+    </div>
+</div>

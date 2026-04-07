@@ -419,58 +419,118 @@
 }
 
 .hero-buttons--premium {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--spacing-md);
+    width: 100%;
+    max-width: 56rem;
+    margin: 0 auto var(--spacing-2xl);
+    align-items: stretch;
+    box-sizing: border-box;
+}
+
+.hero--premium .hero-buttons--premium .hero-btn-primary,
+.hero--premium .hero-buttons--premium .hero-btn-outline {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
-    margin-bottom: var(--spacing-2xl);
-}
-
-.hero--premium .hero-btn-primary,
-.hero--premium .btn-primary.hero-btn-primary {
-    background: var(--color-primary);
-    color: #fff;
-    border: none;
-    padding: var(--spacing-md) var(--spacing-xl);
-    font-size: var(--font-size-base);
-    font-weight: 600;
+    width: 100%;
+    min-height: 3.5rem;
+    padding: 0.95rem 1.35rem;
+    line-height: 1.25;
+    text-align: center;
+    white-space: normal;
+    text-wrap: balance;
+    color: #e7f5ef;
+    border: 1px solid #1f6a50;
     border-radius: var(--radius-md);
-    transition: transform var(--transition-base), border-color var(--transition-base),
-                box-shadow var(--transition-base);
+    background: linear-gradient(135deg, #01442d 0%, #02593a 100%);
+    box-shadow: 0 10px 22px rgb(0 0 0 / 28%), inset 0 1px 0 rgb(255 255 255 / 16%);
+    transition: transform var(--transition-base), box-shadow var(--transition-base),
+                border-color var(--transition-base), background var(--transition-base);
     text-decoration: none;
-    display: inline-block;
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    animation: hero-cta-enter 450ms ease both;
 }
 
-.hero--premium .hero-btn-primary:hover,
-.hero--premium .btn-primary.hero-btn-primary:hover {
-    background: #b8945a;
+.hero--premium .hero-buttons--premium .hero-btn-primary::before,
+.hero--premium .hero-buttons--premium .hero-btn-outline::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 45%;
+    background: linear-gradient(115deg, transparent 0%, rgb(255 255 255 / 35%) 52%, transparent 100%);
+    transform: translateX(-190%) skewX(-20deg);
+    pointer-events: none;
+}
+
+.hero--premium .hero-buttons--premium .hero-btn-primary:hover,
+.hero--premium .hero-buttons--premium .hero-btn-outline:hover {
+    background: linear-gradient(135deg, #025338 0%, #046546 100%);
+    border-color: #2f8a68;
+    box-shadow: 0 14px 28px rgb(0 0 0 / 32%), inset 0 1px 0 rgb(255 255 255 / 22%);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(166, 130, 74, 0.3);
     color: #fff;
 }
 
-.hero--premium .hero-btn-outline,
-.hero--premium .btn-outline.hero-btn-outline {
-    background: transparent;
-    color: #fff;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    padding: var(--spacing-md) var(--spacing-xl);
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    border-radius: var(--radius-md);
-    transition: transform var(--transition-base), border-color var(--transition-base),
-                box-shadow var(--transition-base);
-    text-decoration: none;
-    display: inline-block;
+.hero--premium .hero-buttons--premium .hero-btn-primary:hover::before,
+.hero--premium .hero-buttons--premium .hero-btn-outline:hover::before {
+    animation: hero-cta-sheen 750ms ease;
 }
 
-.hero--premium .hero-btn-outline:hover,
-.hero--premium .btn-outline.hero-btn-outline:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    color: #fff;
+.hero--premium .hero-buttons--premium .hero-btn-primary:active,
+.hero--premium .hero-buttons--premium .hero-btn-outline:active {
+    transform: translateY(0);
+}
+
+.hero--premium .hero-buttons--premium .hero-btn-primary:focus-visible,
+.hero--premium .hero-buttons--premium .hero-btn-outline:focus-visible {
+    outline: 2px solid rgb(255 255 255 / 75%);
+    outline-offset: 2px;
+}
+
+.hero--premium .hero-buttons--premium > a:nth-child(1) { animation-delay: 40ms; }
+.hero--premium .hero-buttons--premium > a:nth-child(2) { animation-delay: 100ms; }
+.hero--premium .hero-buttons--premium > a:nth-child(3) { animation-delay: 160ms; }
+.hero--premium .hero-buttons--premium > a:nth-child(4) { animation-delay: 220ms; }
+
+@keyframes hero-cta-enter {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes hero-cta-sheen {
+    from {
+        transform: translateX(-190%) skewX(-20deg);
+    }
+
+    to {
+        transform: translateX(320%) skewX(-20deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero--premium .hero-buttons--premium .hero-btn-primary,
+    .hero--premium .hero-buttons--premium .hero-btn-outline {
+        animation: none;
+        transition: none;
+    }
+
+    .hero--premium .hero-buttons--premium .hero-btn-primary:hover::before,
+    .hero--premium .hero-buttons--premium .hero-btn-outline:hover::before {
+        animation: none;
+    }
 }
 
 /* Hero Video */
@@ -590,8 +650,17 @@
     }
 
     .hero-buttons--premium {
-        flex-direction: column;
-        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-width: none;
+        gap: var(--spacing-sm);
+    }
+
+    .hero--premium .hero-buttons--premium .hero-btn-primary,
+    .hero--premium .hero-buttons--premium .hero-btn-outline {
+        min-height: 2.9rem;
+        padding: 0.65rem 0.8rem;
+        font-size: var(--font-size-sm);
+        line-height: 1.2;
     }
 
     .hero-btn-primary,
@@ -1081,6 +1150,15 @@
     align-items: center;
 }
 
+/* Для нативных select на мобильных: убираем transform-анимацию карточки фильтра,
+   иначе popup списка может позиционироваться со смещением. */
+.main #home-tournaments-filter.card,
+.main #home-tournaments-filter.card.card-in-view,
+.main #home-tournaments-filter.card.card-in-view:hover {
+    opacity: 1;
+    transform: none !important;
+}
+
 @media (width <= 768px) {
     .section-header--home-tournaments {
         align-items: stretch;
@@ -1101,6 +1179,67 @@
         line-height: 1.25;
         justify-content: center;
         text-align: center;
+        min-height: 2.35rem;
+        padding: 0.35rem 0.65rem;
+        font-size: var(--font-size-sm);
+    }
+
+    #home-tournaments-filter {
+        margin-bottom: var(--spacing-md);
+    }
+
+    #home-tournaments-filter .card-body.filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.55rem 0.65rem;
+        padding: 0.75rem;
+    }
+
+    #home-tournaments-filter .home-filter-group {
+        margin-bottom: 0;
+    }
+
+    #home-tournaments-filter .home-filter-group--city,
+    #home-tournaments-filter .home-filter-group--submit {
+        grid-column: 1 / -1;
+    }
+
+    #home-tournaments-filter .home-filter-group--submit .form-label {
+        display: none;
+    }
+
+    #home-tournaments-filter .form-label {
+        margin-bottom: 0.2rem;
+        font-size: 0.74rem;
+        line-height: 1.15;
+    }
+
+    #home-tournaments-filter .form-control,
+    #home-tournaments-filter .club-filter-select__toggle.form-control,
+    #home-tournaments-filter .home-filter-group--submit .btn {
+        height: 2.35rem;
+        min-height: 2.35rem;
+        padding: 0 0.65rem;
+        font-size: 0.95rem;
+        line-height: 1.2;
+    }
+
+    #home-tournaments-filter .home-filter-group--submit .btn {
+        width: 100%;
+    }
+}
+
+@media (width <= 420px) {
+    #home-tournaments-filter .card-body.filter-grid {
+        gap: 0.5rem;
+        padding: 0.65rem;
+    }
+
+    #home-tournaments-filter .form-control,
+    #home-tournaments-filter .club-filter-select__toggle.form-control,
+    #home-tournaments-filter .home-filter-group--submit .btn {
+        height: 2.2rem;
+        min-height: 2.2rem;
+        font-size: 0.9rem;
     }
 }
 

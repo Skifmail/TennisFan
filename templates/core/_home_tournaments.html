@@ -23,7 +23,7 @@
                         {% if tournament.status == 'upcoming' %}Идет набор{% elif tournament.status == 'active' %}В ИГРЕ{% elif tournament.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
                     </span>
                 </td>
-                <td class="tournament-table__cell tournament-table__cell--club" onclick="event.stopPropagation();">
+                <td class="tournament-table__cell tournament-table__cell--club{% if tournament.club %} tournament-table__cell--club-host{% else %} tournament-table__cell--club-platform{% endif %}" onclick="event.stopPropagation();">
                     {% if tournament.club %}
                     <a href="{% url 'clubs:club_public_detail' slug=tournament.club.slug %}" class="tournament-table__club-badge tournament-table__club-badge--host" title="{{ tournament.club.name }}">{{ tournament.club.name }}</a>
                     {% else %}
@@ -197,4 +197,3 @@
 {% else %}
 <p class="text-secondary">Подходящих турниров не найдено.</p>
 {% endif %}
-

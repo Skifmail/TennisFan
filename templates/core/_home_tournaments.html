@@ -5,6 +5,7 @@
         <thead>
             <tr>
                 <th>Статус</th>
+                <th>Клуб</th>
                 <th>Турнир</th>
                 <th>Город / Корт</th>
                 <th>Уровень / Пол</th>
@@ -21,6 +22,13 @@
                     <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }} tournament-status-badge--inline" title="{{ tournament.get_status_display }}">
                         {% if tournament.status == 'upcoming' %}Идет набор{% elif tournament.status == 'active' %}В ИГРЕ{% elif tournament.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
                     </span>
+                </td>
+                <td class="tournament-table__cell tournament-table__cell--club" onclick="event.stopPropagation();">
+                    {% if tournament.club %}
+                    <a href="{% url 'clubs:club_public_detail' slug=tournament.club.slug %}" class="tournament-table__club-badge tournament-table__club-badge--host" title="{{ tournament.club.name }}">{{ tournament.club.name }}</a>
+                    {% else %}
+                    <span class="tournament-table__club-badge tournament-table__club-badge--brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                    {% endif %}
                 </td>
                 <td class="tournament-table__cell tournament-table__cell--title">
                     <div class="tournament-table__title">{{ tournament.name }}</div>
@@ -138,18 +146,26 @@
                         <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Завершён</button>
                     {% elif tournament.status == 'cancelled' %}
                         <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Отменён</button>
+                    {% elif tournament.home_cta_kind == 'reg_closed' %}
+                        <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Регистрация закрыта</button>
+                    {% elif tournament.home_cta_kind == 'full' %}
+                        <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Мест нет</button>
+                    {% elif tournament.home_cta_kind == 'terminal_status' %}
+                        <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>—</button>
+                    {% elif tournament.home_cta_kind == 'login' %}
+                        <a href="{% url 'login' %}?next={{ tournament.home_login_next|urlencode }}" class="btn btn-outline btn-sm">Войти</a>
+                    {% elif tournament.home_cta_kind == 'join_pending' %}
+                        <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Заявка на вступление отправлена</button>
+                    {% elif tournament.home_cta_kind == 'join_club' %}
+                        <form method="post" action="{% url 'clubs:join_request_create' slug=tournament.home_join_slug %}" class="tournament-table__join-club-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ tournament.home_join_next }}">
+                            <button type="submit" class="btn btn-primary btn-sm">Вступить в клуб</button>
+                        </form>
+                    {% elif tournament.home_cta_kind == 'register' %}
+                        <a href="{{ tournament.home_register_url }}" class="btn btn-primary btn-sm">Записаться</a>
                     {% else %}
-                        {% if user.is_authenticated %}
-                            {% if tournament.bracket_generated %}
-                            <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Регистрация закрыта</button>
-                            {% elif tournament.is_full %}
-                            <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>Мест нет</button>
-                            {% else %}
-                            <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary btn-sm">Записаться</a>
-                            {% endif %}
-                        {% else %}
-                            <a href="{% url 'login' %}?next={% url 'tournament_list' %}" class="btn btn-outline btn-sm">Войти</a>
-                        {% endif %}
+                        <button type="button" class="btn btn-outline btn-sm btn-disabled" disabled>—</button>
                     {% endif %}
                 </td>
             </tr>
@@ -168,7 +184,7 @@
             </li>
             {% else %}
             <li class="pagination__item">
-                <a href="?page={{ page_num }}{% if current_filters.city %}&city={{ current_filters.city }}{% endif %}{% if current_filters.category %}&category={{ current_filters.category }}{% endif %}{% if current_filters.gender %}&gender={{ current_filters.gender }}{% endif %}{% if current_filters.duration %}&duration={{ current_filters.duration }}{% endif %}"
+                <a href="?page={{ page_num }}{% if current_filters.city %}&city={{ current_filters.city }}{% endif %}{% if current_filters.category %}&category={{ current_filters.category }}{% endif %}{% if current_filters.gender %}&gender={{ current_filters.gender }}{% endif %}{% if current_filters.duration %}&duration={{ current_filters.duration }}{% endif %}{% if current_filters.club %}&club={{ current_filters.club }}{% endif %}"
                    data-page-link="home-tournaments">
                     {{ page_num }}
                 </a>

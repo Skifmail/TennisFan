@@ -222,6 +222,16 @@
                         {% endfor %}
                     </select>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">Клуб</label>
+                    <select name="club" class="form-control" aria-label="Фильтр турниров по клубу">
+                        <option value="">Все турниры</option>
+                        <option value="__platform__" {% if current_filters.club == '__platform__' %}selected{% endif %}>TennisFan</option>
+                        {% for slug, name in club_filter_choices %}
+                        <option value="{{ slug }}" {% if current_filters.club == slug %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <div class="form-group form-group-submit">
                     <label class="form-label">Применить</label>
                     <button type="submit" class="btn btn-primary">Применить</button>
@@ -324,6 +334,13 @@
                 </div>
                 <div class="card-body">
                     <h3 class="card-title">{{ tournament.name }}</h3>
+                    <div class="tournament-preview-card__host" aria-label="Организатор турнира">
+                        {% if tournament.club %}
+                        <span class="badge tournament-card-host-badge tournament-card-host-badge--club" title="Турнир клуба">{{ tournament.club.name }}</span>
+                        {% else %}
+                        <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                        {% endif %}
+                    </div>
                     {% if tournament.allowed_categories.all %}
                     <div class="tournament-preview-card__categories">
                         {% for ac in tournament.allowed_categories.all %}

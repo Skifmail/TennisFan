@@ -156,3 +156,318 @@
         gap: var(--spacing-sm);
     }
 }
+
+/* Страница деталей матча (шаблон match_detail) */
+.match-detail-page {
+    padding-top: var(--spacing-2xl);
+}
+
+.match-detail-page__card {
+    max-width: min(100%, 960px);
+    margin: 0 auto;
+}
+
+.match-detail-page__card .card-body {
+    padding: var(--spacing-2xl);
+}
+
+.match-details-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--spacing-lg);
+    align-items: start;
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .match-details-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.match-details-section {
+    border-radius: var(--radius-md);
+    min-width: 0;
+}
+
+.match-detail-page .match-details-section.card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.match-details-title {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--color-text);
+    padding-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.match-details-table {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.match-details-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    align-items: start;
+}
+
+.match-details-row:last-child {
+    border-bottom: none;
+}
+
+.match-details-row--highlight {
+    background: rgba(166, 130, 74, 0.1);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    margin: var(--spacing-xs) 0;
+    border-bottom: none;
+}
+
+.match-details-label {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+    max-width: 11rem;
+    line-height: 1.35;
+}
+
+.match-details-value {
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    text-align: right;
+    min-width: 0;
+    word-break: normal;
+    overflow-wrap: break-word;
+}
+
+.match-details-value--inline-badges {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: var(--spacing-sm);
+    width: 100%;
+    min-width: 0;
+}
+
+.match-details-value--inline-badges .match-details-value__lead {
+    max-width: 100%;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.match-details-value__lead {
+    font-weight: 600;
+    color: var(--color-text);
+    text-align: right;
+}
+
+.match-details-value--score {
+    font-weight: 600;
+    font-size: var(--font-size-base);
+}
+
+a.match-details-value__lead {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: color var(--transition-base);
+}
+
+a.match-details-value__lead:hover {
+    color: #b8945a;
+    text-decoration: underline;
+}
+
+.match-details-host-inline {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
+}
+
+.match-details-host-inline .tournament-card-host-badge--club {
+    max-width: 100%;
+    overflow: visible;
+    white-space: normal;
+    word-break: normal;
+    text-align: right;
+    line-height: 1.25;
+    text-decoration: none;
+}
+
+.match-details-host-inline .tournament-brand-badge {
+    font-size: 9px;
+    padding: 2px 7px 2px 6px;
+    gap: 4px;
+}
+
+.match-details-host-inline .tournament-brand-badge__dot {
+    width: 5px;
+    height: 5px;
+}
+
+.match-details-value a:not(.tournament-card-host-badge) {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: color var(--transition-base);
+}
+
+.match-details-value a:not(.tournament-card-host-badge):hover {
+    color: #b8945a;
+    text-decoration: underline;
+}
+
+.match-detail-page .status-badge {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    background: rgba(166, 130, 74, 0.2);
+    color: var(--color-primary);
+    border: 1px solid rgba(166, 130, 74, 0.3);
+}
+
+.match-detail-page .status-badge--completed,
+.match-detail-page .status-badge--active {
+    background: rgba(0, 200, 0, 0.2);
+    color: #4ade80;
+    border-color: rgba(0, 200, 0, 0.3);
+}
+
+.match-detail-page .status-badge--upcoming {
+    background: rgba(166, 130, 74, 0.2);
+    color: var(--color-primary);
+    border-color: rgba(166, 130, 74, 0.3);
+}
+
+.match-detail-page .status-badge--info {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.match-detail-page .category-tag {
+    display: inline-block;
+    padding: 2px var(--spacing-xs);
+    margin: 2px;
+    background: rgba(166, 130, 74, 0.15);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    border: 1px solid rgba(166, 130, 74, 0.2);
+}
+
+.match-detail-page .rating-change,
+.match-detail-page .season-points {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    align-items: flex-end;
+}
+
+.match-detail-page .rating-change-item,
+.match-detail-page .season-points-item {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-end;
+}
+
+.match-detail-page .rating-change-label,
+.match-detail-page .season-points-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+.match-detail-page .rating-change-value {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    padding: 2px var(--spacing-xs);
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.match-detail-page .rating-change-value--up {
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.15);
+}
+
+.match-detail-page .rating-change-value--down {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.15);
+}
+
+.match-detail-page .rating-change-value--neutral {
+    color: var(--color-text-muted);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.match-detail-page .season-points-value {
+    font-weight: 600;
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+    /* Строка «метка — значение» остаётся в двух колонках: меньше высоты блока */
+    .match-details-row {
+        grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
+        gap: var(--spacing-sm);
+    }
+
+    .match-details-label {
+        max-width: none;
+        font-size: var(--font-size-xs);
+    }
+
+    .match-details-value {
+        text-align: left;
+        font-size: var(--font-size-xs);
+    }
+
+    .match-details-value--inline-badges {
+        align-items: flex-start;
+    }
+
+    .match-details-value__lead {
+        text-align: left;
+    }
+
+    .match-details-host-inline {
+        justify-content: flex-start;
+    }
+
+    .match-details-host-inline .tournament-card-host-badge--club {
+        text-align: left;
+    }
+
+    .match-detail-page .rating-change-item,
+    .match-detail-page .season-points-item {
+        justify-content: flex-start;
+    }
+
+    .match-detail-page .rating-change,
+    .match-detail-page .season-points {
+        align-items: flex-start;
+    }
+}

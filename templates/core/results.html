@@ -13,7 +13,26 @@
         {% for match in matches %}
         <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
             <div class="match-header">
-                <span class="match-tournament">{{ match.tournament.name }}</span>
+                <div class="results-match-header__context" aria-label="Турнир и организатор">
+                    <span class="match-tournament">
+                        {% if match.match_type == 'sparring' %}
+                        Спарринг
+                        {% elif match.tournament %}
+                        {{ match.tournament.name }}
+                        {% else %}
+                        Матч
+                        {% endif %}
+                    </span>
+                    <div class="match-card__host results-match-header__host">
+                        {% if match.match_type == 'sparring' %}
+                        <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                        {% elif match.tournament and match.tournament.club_id %}
+                        <span class="badge tournament-card-host-badge tournament-card-host-badge--club" title="Турнир клуба">{{ match.tournament.club.name }}</span>
+                        {% elif match.tournament %}
+                        <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                        {% endif %}
+                    </div>
+                </div>
                 <span class="match-date">{{ match.completed_datetime|date:"d.m.Y H:i" }}</span>
             </div>
             <div class="match-players">

@@ -4,13 +4,13 @@
 {% block title %}Матч: {{ match.get_player1_display }} vs {{ match.get_player2_display }}{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top: var(--spacing-2xl);">
+<div class="container match-detail-page">
     <div class="mb-4">
         <a href="{{ next_url }}" class="text-secondary">&larr; Назад</a>
     </div>
 
-    <div class="card" style="max-width: 700px; margin: 0 auto;">
-        <div class="card-body" style="padding: var(--spacing-2xl);">
+    <div class="card match-detail-page__card">
+        <div class="card-body">
             <div class="text-center mb-4">
                 {% if match.tournament %}
                     <span class="player-category">{% for ac in match.tournament.allowed_categories.all %}{{ ac.category|skill_with_ntrp }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if match.round_name %} · {{ match.round_name }}{% endif %}</span>
@@ -200,13 +200,22 @@
             <h3 class="h5 mb-4">Подробная информация</h3>
             <div class="match-details-grid">
                 {% if match.tournament %}
-                <section class="match-details-section card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
+                <section class="match-details-section card">
                     <div class="card-body">
-                        <h4 class="match-details-title" style="margin-bottom: var(--spacing-md);">Турнир</h4>
+                        <h4 class="match-details-title">Турнир</h4>
                         <div class="match-details-table">
                             <div class="match-details-row">
                                 <div class="match-details-label">Название</div>
-                                <div class="match-details-value"><a href="{% url 'tournament_detail' slug=match.tournament.slug %}">{{ match.tournament.name }}</a></div>
+                                <div class="match-details-value match-details-value--inline-badges">
+                                    <a class="match-details-value__lead" href="{% url 'tournament_detail' slug=match.tournament.slug %}">{{ match.tournament.name }}</a>
+                                    <div class="match-card__host match-details-host-inline">
+                                        {% if match.tournament.club_id %}
+                                        <a href="{% url 'clubs:club_public_detail' slug=match.tournament.club.slug %}" class="badge tournament-card-host-badge tournament-card-host-badge--club" title="Турнир клуба">{{ match.tournament.club.name }}</a>
+                                        {% else %}
+                                        <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </div>
                             <div class="match-details-row">
                                 <div class="match-details-label">Город</div>
@@ -274,10 +283,19 @@
                     </div>
                 </section>
                 {% elif match.is_sparring %}
-                <section class="match-details-section card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
+                <section class="match-details-section card">
                     <div class="card-body">
-                        <h4 class="match-details-title" style="margin-bottom: var(--spacing-md);">Спарринг</h4>
+                        <h4 class="match-details-title">Спарринг</h4>
                         <div class="match-details-table">
+                            <div class="match-details-row">
+                                <div class="match-details-label">Название</div>
+                                <div class="match-details-value match-details-value--inline-badges">
+                                    <span class="match-details-value__lead">Спарринг</span>
+                                    <div class="match-card__host match-details-host-inline">
+                                        <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="match-details-row">
                                 <div class="match-details-label">Тип матча</div>
                                 <div class="match-details-value">Спарринг (личная встреча)</div>
@@ -296,9 +314,9 @@
                     </div>
                 </section>
                 {% endif %}
-                <section class="match-details-section card" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
+                <section class="match-details-section card">
                     <div class="card-body">
-                        <h4 class="match-details-title" style="margin-bottom: var(--spacing-md);">Матч</h4>
+                        <h4 class="match-details-title">Матч</h4>
                         <div class="match-details-table">
                             <div class="match-details-row">
                                 <div class="match-details-label">Раунд</div>
@@ -350,7 +368,7 @@
                             </div>
                             <div class="match-details-row">
                                 <div class="match-details-label">Счёт</div>
-                                <div class="match-details-value" style="font-weight: 600; font-size: var(--font-size-base);">{{ match.score_display }}</div>
+                                <div class="match-details-value match-details-value--score">{{ match.score_display }}</div>
                             </div>
                             {% if match.status == 'completed' or match.status == 'walkover' %}
                             {% if match.is_friendly_sparring %}
@@ -408,196 +426,4 @@
         </div>
     </div>
 </div>
-
-<style>
-.match-details-grid { 
-    display: grid; 
-    grid-template-columns: 1fr 1fr; 
-    gap: var(--spacing-lg); 
-}
-@media (max-width: 768px) { 
-    .match-details-grid { 
-        grid-template-columns: 1fr; 
-    } 
-}
-
-.match-details-section {
-    border-radius: var(--radius-md);
-    overflow: hidden;
-}
-
-.match-details-title {
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    color: var(--color-text);
-    padding-bottom: var(--spacing-sm);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.match-details-table {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-}
-
-.match-details-row {
-    display: grid;
-    grid-template-columns: 1fr 1.5fr;
-    gap: var(--spacing-md);
-    padding: var(--spacing-sm) 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    align-items: start;
-}
-
-.match-details-row:last-child {
-    border-bottom: none;
-}
-
-.match-details-row--highlight {
-    background: rgba(166, 130, 74, 0.1);
-    padding: var(--spacing-sm);
-    border-radius: var(--radius-sm);
-    margin: var(--spacing-xs) 0;
-    border-bottom: none;
-}
-
-.match-details-label {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.match-details-value {
-    color: var(--color-text);
-    font-size: var(--font-size-sm);
-    text-align: right;
-    word-break: break-word;
-}
-
-.match-details-value a {
-    color: var(--color-primary);
-    text-decoration: none;
-    transition: color var(--transition-base);
-}
-
-.match-details-value a:hover {
-    color: #b8945a;
-    text-decoration: underline;
-}
-
-.status-badge {
-    display: inline-block;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    background: rgba(166, 130, 74, 0.2);
-    color: var(--color-primary);
-    border: 1px solid rgba(166, 130, 74, 0.3);
-}
-
-.status-badge--completed,
-.status-badge--active {
-    background: rgba(0, 200, 0, 0.2);
-    color: #4ade80;
-    border-color: rgba(0, 200, 0, 0.3);
-}
-
-.status-badge--upcoming {
-    background: rgba(166, 130, 74, 0.2);
-    color: var(--color-primary);
-    border-color: rgba(166, 130, 74, 0.3);
-}
-
-.status-badge--info {
-    background: rgba(59, 130, 246, 0.2);
-    color: #60a5fa;
-    border-color: rgba(59, 130, 246, 0.3);
-}
-
-.category-tag {
-    display: inline-block;
-    padding: 2px var(--spacing-xs);
-    margin: 2px;
-    background: rgba(166, 130, 74, 0.15);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-xs);
-    border: 1px solid rgba(166, 130, 74, 0.2);
-}
-
-.rating-change,
-.season-points {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-    align-items: flex-end;
-}
-
-.rating-change-item,
-.season-points-item {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    width: 100%;
-    justify-content: flex-end;
-}
-
-.rating-change-label,
-.season-points-label {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
-}
-
-.rating-change-value {
-    font-weight: 600;
-    font-size: var(--font-size-sm);
-    padding: 2px var(--spacing-xs);
-    border-radius: var(--radius-sm);
-}
-
-.rating-change-value--up {
-    color: #4ade80;
-    background: rgba(74, 222, 128, 0.15);
-}
-
-.rating-change-value--down {
-    color: #f87171;
-    background: rgba(248, 113, 113, 0.15);
-}
-
-.rating-change-value--neutral {
-    color: var(--color-text-muted);
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.season-points-value {
-    font-weight: 600;
-    color: var(--color-primary);
-    font-size: var(--font-size-sm);
-}
-
-@media (max-width: 640px) {
-    .match-details-row {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-xs);
-    }
-    
-    .match-details-value {
-        text-align: left;
-    }
-    
-    .rating-change-item,
-    .season-points-item {
-        justify-content: flex-start;
-    }
-    
-    .rating-change,
-    .season-points {
-        align-items: flex-start;
-    }
-}
-</style>
 {% endblock %}

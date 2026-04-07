@@ -792,6 +792,12 @@
         gap: var(--spacing-xs);
     }
 
+    .match-header__left {
+        width: 100%;
+        flex: none;
+        padding-right: 0;
+    }
+
     .match-header__right {
         align-items: flex-start;
         width: 100%;

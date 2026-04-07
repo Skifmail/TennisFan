@@ -1,13 +1,20 @@
 import csv
-from datetime import timedelta
+from datetime import date, timedelta
 from io import StringIO
 
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.clubs.models import Club, ClubJoinRequest, ClubJoinRequestStatus
-from apps.tournaments.models import Match, Tournament
+from apps.clubs.models import (
+    Club,
+    ClubJoinRequest,
+    ClubJoinRequestStatus,
+    ClubMember,
+    ClubMemberRole,
+    ClubMemberStatus,
+)
+from apps.tournaments.models import Match, Tournament, TournamentStatus
 from apps.users.models import Player, User
 
 
@@ -189,3 +196,210 @@ class PlatformPlayersExportTestCase(TestCase):
         self.assertEqual(rows[1][3], "+79990000000")
         self.assertEqual(rows[1][4], "Москва")
         self.assertEqual(rows[1][5], "Мужской")
+
+
+class HomeClubTournamentsIntegrationTestCase(TestCase):
+    """Турниры клубов на главной, фильтр по клубу и CTA «Вступить в клуб»."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.club_a = Club.objects.create(
+            name="Клуб Альфа",
+            slug="club-alpha",
+            city="Москва",
+            address="ул. Альфа, 1",
+            email="alpha@test.local",
+            admin_name="Админ",
+        )
+        self.club_b = Club.objects.create(
+            name="Клуб Бета",
+            slug="club-beta",
+            city="Сочи",
+            address="ул. Бета, 2",
+            email="beta@test.local",
+            admin_name="Админ",
+        )
+        self.platform_tournament = Tournament.objects.create(
+            name="Турнир платформы",
+            slug="home-platform-tm",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.UPCOMING,
+            max_participants=32,
+        )
+        self.platform_tournament.allowed_categories.create(category="amateur")
+        self.club_tournament = Tournament.objects.create(
+            name="Внутриклубный кубок",
+            slug="home-club-internal",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.UPCOMING,
+            club=self.club_a,
+            is_open_interclub=False,
+            max_participants=16,
+        )
+        self.club_tournament.allowed_categories.create(category="amateur")
+        self.interclub_tournament = Tournament.objects.create(
+            name="Межклубный открытый",
+            slug="home-interclub-open",
+            city="Казань",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.UPCOMING,
+            club=self.club_a,
+            is_open_interclub=True,
+            max_participants=8,
+        )
+        self.interclub_tournament.allowed_categories.create(category="amateur")
+
+        self.member_user = User.objects.create_user(
+            email="member-alpha@test.local",
+            password="pass12345",
+            first_name="Мем",
+            last_name="Бер",
+            phone="+79990000001",
+        )
+        Player.objects.create(
+            user=self.member_user,
+            birth_date=date(1991, 5, 5),
+            skill_level="amateur",
+            gender="male",
+        )
+        ClubMember.objects.create(
+            club=self.club_a,
+            user=self.member_user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+
+        self.stranger_user = User.objects.create_user(
+            email="stranger@test.local",
+            password="pass12345",
+            first_name="Чуж",
+            last_name="Ак",
+            phone="+79990000002",
+        )
+        Player.objects.create(
+            user=self.stranger_user,
+            birth_date=date(1992, 6, 6),
+            skill_level="amateur",
+            gender="male",
+        )
+
+        self.beta_member_user = User.objects.create_user(
+            email="member-beta@test.local",
+            password="pass12345",
+            first_name="Бета",
+            last_name="Игрок",
+            phone="+79990000003",
+        )
+        Player.objects.create(
+            user=self.beta_member_user,
+            birth_date=date(1993, 7, 7),
+            skill_level="amateur",
+            gender="male",
+        )
+        ClubMember.objects.create(
+            club=self.club_b,
+            user=self.beta_member_user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+
+    def test_home_lists_platform_and_internal_club_tournaments(self) -> None:
+        response = self.client.get(reverse("home"), secure=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Турнир платформы")
+        self.assertContains(response, "Внутриклубный кубок")
+        self.assertContains(response, "Межклубный открытый")
+
+    def test_home_club_filter_platform_only_excludes_club_rows(self) -> None:
+        response = self.client.get(
+            reverse("home"),
+            {"club": "__platform__"},
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Турнир платформы")
+        self.assertNotContains(response, "Внутриклубный кубок")
+
+    def test_home_club_filter_by_slug(self) -> None:
+        response = self.client.get(
+            reverse("home"),
+            {"club": "club-alpha"},
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Внутриклубный кубок")
+        self.assertNotContains(response, "Турнир платформы")
+
+    def test_club_tournament_detail_visible_to_anonymous(self) -> None:
+        response = self.client.get(
+            reverse("tournament_detail", kwargs={"slug": self.club_tournament.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.club_tournament.name)
+
+    def test_non_member_sees_join_club_on_detail(self) -> None:
+        self.client.force_login(self.stranger_user)
+        response = self.client.get(
+            reverse("tournament_detail", kwargs={"slug": self.club_tournament.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Вступить в клуб")
+
+    def test_member_of_host_club_does_not_see_join_club_cta(self) -> None:
+        self.client.force_login(self.member_user)
+        response = self.client.get(
+            reverse("tournament_detail", kwargs={"slug": self.club_tournament.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Вступить в клуб")
+
+    def test_member_of_other_club_sees_join_club_for_internal_tournament(self) -> None:
+        self.client.force_login(self.beta_member_user)
+        response = self.client.get(
+            reverse("tournament_detail", kwargs={"slug": self.club_tournament.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Вступить в клуб")
+
+    def test_non_member_cannot_register_for_internal_club_tournament(self) -> None:
+        self.client.force_login(self.stranger_user)
+        response = self.client.post(
+            reverse("tournament_register", kwargs={"slug": self.club_tournament.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(self.club_tournament.slug, response.url or "")
+
+    def test_pending_join_request_shows_pending_state_on_detail(self) -> None:
+        ClubJoinRequest.objects.create(
+            club=self.club_a,
+            user=self.stranger_user,
+            status=ClubJoinRequestStatus.PENDING,
+        )
+        self.client.force_login(self.stranger_user)
+        response = self.client.get(
+            reverse("tournament_detail", kwargs={"slug": self.club_tournament.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Заявка на вступление отправлена")
+
+    def test_interclub_tournament_no_join_club_cta_for_stranger(self) -> None:
+        self.client.force_login(self.stranger_user)
+        response = self.client.get(
+            reverse(
+                "tournament_detail", kwargs={"slug": self.interclub_tournament.slug}
+            ),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Вступить в клуб")

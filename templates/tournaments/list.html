@@ -24,9 +24,16 @@
             <option value="active" {% if current_status == 'active' %}selected{% endif %}>Активные</option>
             <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Завершённые</option>
         </select>
+        <select name="club" class="form-control" onchange="this.form.submit()" aria-label="Фильтр по клубу">
+            <option value="">Все турниры</option>
+            <option value="__platform__" {% if list_club_filter == '__platform__' %}selected{% endif %}>TennisFan</option>
+            {% for slug, name in club_filter_choices %}
+            <option value="{{ slug }}" {% if list_club_filter == slug %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
     </form>
 
-    <div style="display: flex; flex-direction: column; gap: var(--spacing-md);">
+    <div class="tournament-list">
         {% for tournament in tournaments %}
             {% include 'includes/tournament_card.html' with tournament=tournament %}
         {% empty %}

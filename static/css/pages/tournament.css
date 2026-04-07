@@ -349,6 +349,59 @@
     position: relative;
 }
 
+/* Бейдж турниров платформы в стиле логотипа TennisFan */
+.tournament-brand-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px 3px 7px;
+    border-radius: 6px;
+    font-family: var(--font-heading, sans-serif);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    line-height: 1.15;
+    vertical-align: middle;
+    background: linear-gradient(180deg, #031a12 0%, #010f0a 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.tournament-brand-badge__dot {
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--color-primary);
+    box-shadow: 0 0 8px rgb(166 130 74 / 0.55);
+}
+
+.tournament-brand-badge__word {
+    display: inline-flex;
+    align-items: baseline;
+    white-space: nowrap;
+}
+
+.tournament-brand-badge__tennis {
+    color: #d1d5db;
+}
+
+.tournament-brand-badge__fan {
+    color: var(--color-primary);
+}
+
+.tournament-card-badge-slot__brand {
+    display: flex;
+    align-items: center;
+    max-width: 100%;
+}
+
+.tournament-card-host-badge--club {
+    background: rgba(255, 255, 255, 0.07);
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .tournament-status-badge {
     position: absolute;
     top: var(--spacing-sm);
@@ -528,9 +581,29 @@
     pointer-events: none;
 }
 
+/* Шапка страницы турнира: бейдж клуба / TennisFan под названием */
+.tournament-detail__host {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.tournament-detail__host .tournament-table__club-badge--host {
+    max-width: 100%;
+}
+
 /* Tournament detail meta */
 .tournament-meta {
     background: rgba(6, 22, 17, 0.95);
+}
+
+@media (width <= 768px) {
+    .tournament-meta .card-body {
+        padding: var(--spacing-md) var(--spacing-sm);
+    }
 }
 
 .tournament-meta-grid {
@@ -543,6 +616,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
+    min-width: 0;
 }
 
 .tournament-meta-group--compact {
@@ -559,19 +633,26 @@
 }
 
 .tournament-meta-row {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    align-items: start;
     gap: var(--spacing-sm);
     font-size: 13px;
+    column-gap: var(--spacing-md);
 }
 
 .tournament-meta-label {
     color: #64748b;
+    min-width: 0;
+    padding-right: 2px;
 }
 
 .tournament-meta-value {
     color: #e2e8f0;
     text-align: right;
+    min-width: 0;
+    word-break: normal;
+    overflow-wrap: break-word;
 }
 
 .tournament-meta-link {
@@ -596,15 +677,11 @@
     color: #facc6b;
 }
 
+/* До ширины «широкого» десктопа — одна колонка групп, без наложений текста */
 @media (width <= 992px) {
     .tournament-meta-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (width <= 768px) {
-    .tournament-meta-grid {
         grid-template-columns: minmax(0, 1fr);
+        gap: var(--spacing-lg);
     }
 
     .tournament-meta-group {
@@ -613,6 +690,18 @@
 
     .tournament-meta-row {
         font-size: 12px;
+        column-gap: var(--spacing-sm);
+        grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    }
+}
+
+@media (width <= 400px) {
+    .tournament-meta-grid {
+        gap: var(--spacing-md);
+    }
+
+    .tournament-meta-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
 }
 
@@ -626,7 +715,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: var(--font-size-sm);
-    min-width: 720px;
+    min-width: 900px;
 }
 
 .tournament-table thead tr {
@@ -791,6 +880,63 @@
     text-align: center;
 }
 
+.tournament-table__cell--club {
+    width: 11rem;
+    min-width: 9rem;
+    max-width: 14rem;
+    vertical-align: middle;
+}
+
+.tournament-table__join-club-form {
+    display: inline-block;
+    margin: 0;
+}
+
+.tournament-table__club-badge {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-decoration: none;
+}
+
+.tournament-table__club-badge--brand {
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.tournament-table__club-badge--brand .tournament-brand-badge {
+    font-size: 9px;
+    padding: 2px 7px 2px 6px;
+    gap: 4px;
+}
+
+.tournament-table__club-badge--brand .tournament-brand-badge__dot {
+    width: 5px;
+    height: 5px;
+}
+
+.tournament-table__club-badge--host {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    white-space: normal;
+    overflow: visible;
+    word-break: break-word;
+    hyphens: auto;
+}
+
+.tournament-table__club-badge--host:hover {
+    color: var(--color-primary);
+    border-color: rgba(166, 130, 74, 0.45);
+}
+
 .tournament-table__cell--title {
     width: auto;
     min-width: 0;
@@ -817,7 +963,15 @@
 }
 
 .tournament-table__cell--action {
-    width: 120px;
+    width: 150px;
+    max-width: 200px;
+    white-space: normal;
+}
+
+.tournament-table__action .btn-sm {
+    white-space: normal;
+    line-height: 1.25;
+    text-align: center;
 }
 
 .tournament-table__fee {
@@ -877,6 +1031,23 @@
         margin-top: 8px;
     }
 
+    .tournament-table__cell--club {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .tournament-table__cell--club::before {
+        content: "Клуб";
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #94a3b8;
+        flex-shrink: 0;
+    }
+
     .tournament-table__cell--city,
     .tournament-table__cell--level,
     .tournament-table__cell--format,
@@ -925,4 +1096,30 @@
     .tournament-table__participants .participant-more--table-tail {
         align-self: center;
     }
+}
+
+/* Список «Турнирные таблицы» (/tournaments/tables/) */
+.tournament-tables-page .filter-bar {
+    margin-bottom: var(--spacing-xl);
+}
+
+.tournament-table-card__host {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: var(--spacing-xs);
+    max-width: 100%;
+}
+
+.tournament-table-card__host .tournament-brand-badge {
+    flex-shrink: 0;
+}
+
+.tournament-table-card .tournament-card-host-badge--club {
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.25;
+    max-width: 100%;
+    text-align: left;
+    justify-content: flex-start;
 }

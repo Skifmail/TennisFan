@@ -1280,6 +1280,22 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         self.assertNotContains(response, "Идет набор")
         self.assertContains(response, "Подробнее")
 
+    def test_club_public_detail_links_to_all_tournaments_catalog(self) -> None:
+        self.client.logout()
+        response = self.client.get(
+            reverse("clubs:club_public_detail", kwargs={"slug": self.club.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Все турниры клуба")
+        self.assertContains(
+            response,
+            reverse(
+                "clubs:club_tournaments_list",
+                kwargs={"slug": self.club.slug},
+            ),
+        )
+
     def test_direct_join_without_token_shows_invite_required_message(self) -> None:
         response = self.client.get(
             reverse("clubs:join", kwargs={"slug": self.club.slug}),

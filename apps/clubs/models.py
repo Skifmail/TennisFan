@@ -1278,3 +1278,24 @@ class PlatformSettings(models.Model):
         """Загружает или создаёт единственный экземпляр настроек."""
         obj, _ = cls.objects.get_or_create(pk=1)
         return cast("PlatformSettings", obj)
+
+
+# Импорт после объявления моделей клубов — FK в Tournament задаётся строкой «clubs.Club».
+from apps.tournaments.models import Tournament  # noqa: E402
+
+
+class ClubTournament(Tournament):
+    """
+    Прокси к Tournament: записи с заполненным клубом-организатором.
+
+    Отображается в админке в приложении «Клубы»; общий список «Турниры → Многодневные»
+    показывает только турниры платформы (club пустой).
+    """
+
+    class Meta:
+        proxy = True
+        verbose_name = "Турнир клуба"
+        verbose_name_plural = "Турниры клубов"
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.city})"

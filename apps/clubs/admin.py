@@ -7,7 +7,7 @@
 
 from datetime import timedelta
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 
 from django.contrib import admin, messages
 from django.db.models import Count, Q, QuerySet, Sum
@@ -15,6 +15,8 @@ from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.urls import path
 from django.utils import timezone
+
+from apps.tournaments.admin import TournamentAdmin
 
 from .models import (
     Club,
@@ -34,6 +36,7 @@ from .models import (
     ClubStatus,
     ClubSubscription,
     ClubSubscriptionStatus,
+    ClubTournament,
     ClubTournamentApplication,
     PlatformAuditLog,
     PlatformPlan,
@@ -594,6 +597,63 @@ class ClubRatingHistoryAdmin(admin.ModelAdmin):
     list_filter = ("club_rating__club",)
     raw_id_fields = ("tournament",)
     readonly_fields = ("created_at",)
+
+
+@admin.register(ClubTournament)
+class ClubTournamentAdmin(TournamentAdmin):
+    """
+    Админка турниров с клубом-организатором.
+
+    Записи с непустым ``club`` не попадают в разделы «Турниры → Многодневные/Однодневные»;
+    управление ими сосредоточено здесь (приложение «Клубы»).
+    """
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        """
+        Ограничить список турнирами, у которых указан организатор-клуб.
+
+        Args:
+            request: HTTP-запрос админки.
+
+        Returns:
+            QuerySet с ``club__isnull=False`` и ``select_related`` для клуба и корта.
+        """
+        qs = admin.ModelAdmin.get_queryset(self, request)
+        return qs.filter(club__isnull=False).select_related("club", "court")
+
+    def get_list_display(self, request: HttpRequest) -> tuple[str, ...]:
+        """Добавить колонку «Клуб» после названия."""
+        parent = super().get_list_display(request)
+        if len(parent) < 2:
+            return tuple(parent)
+        return (parent[0], "club", parent[1], *parent[2:])
+
+    def get_list_filter(self, request: HttpRequest) -> tuple[Any, ...]:
+        """Фильтр по клубу первым в списке."""
+        return ("club", *super().get_list_filter(request))
+
+    def get_fieldsets(
+        self, request: HttpRequest, obj: ClubTournament | None = None
+    ) -> tuple[tuple[str, dict], ...]:
+        """
+        Дополняет первый fieldset полями ``club`` и ``is_open_interclub``.
+
+        Args:
+            request: HTTP-запрос админки.
+            obj: Редактируемый турнир или None на странице создания.
+
+        Returns:
+            Кортеж fieldsets с полями клуба в блоке «Базовая информация».
+        """
+        fieldsets = list(super().get_fieldsets(request, obj))
+        heading, options = fieldsets[0]
+        fields = list(options["fields"])
+        if "club" not in fields:
+            slug_idx = fields.index("slug")
+            fields.insert(slug_idx + 1, "club")
+            fields.insert(slug_idx + 2, "is_open_interclub")
+            fieldsets[0] = (heading, {**options, "fields": tuple(fields)})
+        return tuple(fieldsets)
 
 
 @admin.register(ClubTournamentApplication)

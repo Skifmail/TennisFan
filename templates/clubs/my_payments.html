@@ -52,17 +52,17 @@
             {% if payments_page.has_other_pages %}
             <div class="club-members-pagination" style="margin-top: var(--spacing-lg);">
                 {% if payments_page.has_previous %}
-                <a href="?page={{ payments_page.previous_page_number }}" class="club-members-pagination__link">← Назад</a>
+                <a href="?page={{ payments_page.previous_page_number }}" class="club-members-pagination__link">Назад</a>
                 {% else %}
-                <span class="club-members-pagination__link club-members-pagination__link--disabled">← Назад</span>
+                <span class="club-members-pagination__link club-members-pagination__link--disabled">Назад</span>
                 {% endif %}
 
                 <span class="club-members-pagination__current">Страница {{ payments_page.number }} из {{ payments_page.paginator.num_pages }}</span>
 
                 {% if payments_page.has_next %}
-                <a href="?page={{ payments_page.next_page_number }}" class="club-members-pagination__link">Вперёд →</a>
+                <a href="?page={{ payments_page.next_page_number }}" class="club-members-pagination__link">Вперёд</a>
                 {% else %}
-                <span class="club-members-pagination__link club-members-pagination__link--disabled">Вперёд →</span>
+                <span class="club-members-pagination__link club-members-pagination__link--disabled">Вперёд</span>
                 {% endif %}
             </div>
             {% endif %}

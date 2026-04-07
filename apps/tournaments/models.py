@@ -34,7 +34,7 @@ class TournamentGender(models.TextChoices):
 
     MALE = "male", "Мужчины"
     FEMALE = "female", "Женщины"
-    OPEN = "open", "Смешанный"
+    OPEN = "open", "Любой"
     MIXED = "mixed", "Микст"  # только для парных: М + Ж в команде
 
 
@@ -150,7 +150,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         default=TournamentGender.MALE,
         help_text=(
             "Мужчины/Женщины — только указанный пол. "
-            "Смешанный — любой пол (М против Ж, пары ММ против ЖЖ и т.д.). "
+            "Любой — любой пол (М против Ж, пары ММ против ЖЖ и т.д.). "
             "Микст — только для парных: в команде должны быть М + Ж."
         ),
     )

@@ -38,7 +38,7 @@
 
     <div class="sparring-toolbar sparring-toolbar__panel sparring-toolbar__panel--my-requests mb-4">
         <div class="sparring-toolbar__actions" role="toolbar" aria-label="Навигация по заявкам">
-            <a href="{% url 'sparring_list' %}?type={{ sparring_type }}" class="btn btn-outline sparring-toolbar__btn">← Все заявки</a>
+            <a href="{% url 'sparring_list' %}?type={{ sparring_type }}" class="btn btn-outline sparring-toolbar__btn">Все заявки</a>
             {% if has_sparring_access %}
             <a href="{% url 'sparring_create' %}?type={{ sparring_type }}" class="btn btn-outline sparring-toolbar__btn sparring-toolbar__btn--cta">Создать заявку</a>
             {% endif %}

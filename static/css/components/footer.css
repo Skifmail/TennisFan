@@ -94,21 +94,10 @@
     white-space: nowrap;
 }
 
-.footer-club-cta__button::after {
-    content: "→";
-    font-size: 0.75rem;
-    transform: translateX(0);
-    transition: transform 180ms ease-out;
-}
-
 .footer-club-cta__button:hover {
     transform: translateY(-1px);
     box-shadow: 0 0 18px rgba(166, 130, 74, 0.35);
     background: rgba(5, 30, 22, 0.98);
-}
-
-.footer-club-cta__button:hover::after {
-    transform: translateX(3px);
 }
 
 .footer-club-cta__button--secondary {

@@ -3196,7 +3196,7 @@ def tournament_register(request, slug):
         return redirect("tournament_register_doubles", slug=tournament.slug)
 
     # Check gender compatibility
-    # "open" — смешанный (любой пол), "mixed" — микст (для парных: М+Ж в команде)
+    # "open" — любой пол (открытая категория), "mixed" — микст (для парных: М+Ж в команде)
     if tournament.gender not in ("mixed", "open"):
         if (tournament.gender == "male" and player.gender != "male") or (
             tournament.gender == "female" and player.gender != "female"
@@ -3332,7 +3332,7 @@ def tournament_register_doubles(request, slug):
         messages.error(request, "Регистрация закрыта: все места заняты.")
         return redirect("tournament_detail", slug=slug)
 
-    # "open" — смешанный (любой пол), "mixed" — микст (для парных: М+Ж в команде)
+    # "open" — любой пол (открытая категория), "mixed" — микст (для парных: М+Ж в команде)
     if tournament.gender not in ("mixed", "open"):
         if (tournament.gender == "male" and player.gender != "male") or (
             tournament.gender == "female" and player.gender != "female"

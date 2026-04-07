@@ -139,8 +139,7 @@
                             </div>
                         </div>
                         <div class="register-step-actions">
-                            <button type="button" class="btn btn-primary btn-lg" id="register-btn-next">Далее →
-                                Тест уровня силы</button>
+                            <button type="button" class="btn btn-primary btn-lg" id="register-btn-next">Далее: тест уровня силы</button>
                         </div>
                     </div>
 
@@ -157,7 +156,7 @@
                             {% for err in register_form.ntrp_level.errors %}<p class="text-error form-error">{{ err }}</p>{% endfor %}
                         </div>
                         <div class="register-step-actions register-step-actions-two" style="margin-top: 1rem;">
-                            <button type="button" class="btn btn-outline" id="register-btn-back">← Назад</button>
+                            <button type="button" class="btn btn-outline" id="register-btn-back">Назад</button>
                             <button type="submit" class="btn btn-primary btn-lg register-form-submit" data-loading-text="Регистрация...">Зарегистрироваться</button>
                             <p class="text-secondary" style="margin-top: var(--spacing-md); font-size: var(--font-size-sm); text-align: center;">
                                 Представляете клуб? <a href="{% url 'clubs:register_choice' %}">Создать клуб на платформе</a>

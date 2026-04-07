@@ -110,7 +110,11 @@ class DoublesMatchRequestForm(forms.Form):
         + list(SparringPreferredGender.choices),
         required=False,
         widget=forms.Select(attrs={"class": "form-control"}),
-        help_text="Любой — подходят любые составы. Смешанный — открытая категория. Микст — пары мужчина + женщина.",
+        help_text=(
+            "«Любой (без ограничений)» — без фильтра по составу. "
+            "«Любой» — открытая категория по полу. "
+            "«Микст» — пары мужчина + женщина."
+        ),
     )
     desired_level = forms.ChoiceField(
         label="Желаемый уровень партнёров",

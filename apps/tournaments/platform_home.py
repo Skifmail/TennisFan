@@ -25,6 +25,10 @@ from apps.tournaments.models import Tournament, TournamentStatus
 
 UserLike: TypeAlias = AbstractBaseUser | AnonymousUser
 
+# Специальные значения query-параметра ``club`` в списках турниров (главная, /tournaments/, таблицы).
+CLUB_FILTER_PLATFORM = "__platform__"
+CLUB_FILTER_CLUB_ONLY = "__club_only__"
+
 
 def club_filter_choices_for_tournament_lists():
     """Возвращает queryset пар (slug, name) для фильтра «Клуб» на главной и /tournaments/.

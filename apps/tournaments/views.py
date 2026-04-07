@@ -55,7 +55,11 @@ from .models import (
 )
 from .olympic_consolation import _is_olympic
 from .olympic_consolation import generate_bracket as olympic_generate_bracket
-from .platform_home import club_filter_choices_for_tournament_lists
+from .platform_home import (
+    CLUB_FILTER_CLUB_ONLY,
+    CLUB_FILTER_PLATFORM,
+    club_filter_choices_for_tournament_lists,
+)
 from .proposal_service import apply_proposal
 from .round_robin import (
     _is_round_robin,
@@ -330,8 +334,10 @@ def tournament_list(request):
         ).distinct()
     if status:
         tournaments = tournaments.filter(status=status)
-    if club_filter == "__platform__":
+    if club_filter == CLUB_FILTER_PLATFORM:
         tournaments = tournaments.filter(club__isnull=True)
+    elif club_filter == CLUB_FILTER_CLUB_ONLY:
+        tournaments = tournaments.filter(club__isnull=False)
     elif club_filter:
         tournaments = tournaments.filter(club__slug=club_filter)
 
@@ -2304,8 +2310,10 @@ def tournament_tables_list(request):
         )
     if status:
         tournaments = tournaments.filter(status=status)
-    if club_filter == "__platform__":
+    if club_filter == CLUB_FILTER_PLATFORM:
         tournaments = tournaments.filter(club__isnull=True)
+    elif club_filter == CLUB_FILTER_CLUB_ONLY:
+        tournaments = tournaments.filter(club__isnull=False)
     elif club_filter:
         tournaments = tournaments.filter(club__slug=club_filter)
 

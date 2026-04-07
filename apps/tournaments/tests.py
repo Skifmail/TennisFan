@@ -1073,6 +1073,15 @@ class TournamentListCardStateTestCase(TestCase):
         self.assertContains(r_platform, platform_tm.name)
         self.assertNotContains(r_platform, club_tm.name)
 
+        r_club_only = self.client.get(
+            reverse("tournament_list"),
+            {"club": "__club_only__"},
+            secure=True,
+        )
+        self.assertEqual(r_club_only.status_code, 200)
+        self.assertContains(r_club_only, club_tm.name)
+        self.assertNotContains(r_club_only, platform_tm.name)
+
         r_club = self.client.get(
             reverse("tournament_list"),
             {"club": club.slug},
@@ -1120,6 +1129,13 @@ class TournamentTablesListFiltersTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.platform_tournament.name)
         self.assertNotContains(response, self.club_tournament.name)
+
+    def test_tables_list_club_only_filter_excludes_platform_tournaments(self) -> None:
+        url = reverse("tournament_tables_list")
+        response = self.client.get(url, {"club": "__club_only__"}, secure=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.club_tournament.name)
+        self.assertNotContains(response, self.platform_tournament.name)
 
     def test_tables_list_city_filter(self) -> None:
         url = reverse("tournament_tables_list")

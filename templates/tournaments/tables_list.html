@@ -20,13 +20,7 @@
             <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Завершённые</option>
             <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>Отменённые</option>
         </select>
-        <select name="club" class="form-control" aria-label="Клуб" onchange="this.form.submit()">
-            <option value="">Все турниры</option>
-            <option value="__platform__" {% if tables_list_club_filter == '__platform__' %}selected{% endif %}>TennisFan</option>
-            {% for slug, name in club_filter_choices %}
-            <option value="{{ slug }}" {% if tables_list_club_filter == slug %}selected{% endif %}>{{ name }}</option>
-            {% endfor %}
-        </select>
+        {% include 'includes/club_filter_select.html' with selected_club=tables_list_club_filter|default:'' auto_submit=1 id_suffix='tables' aria_label='Клуб' %}
     </form>
 
     <div class="tournament-tables-grid">

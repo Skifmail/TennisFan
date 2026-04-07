@@ -692,6 +692,141 @@ select.form-control {
     }
 }
 
+/* Кастомный фильтр «Клуб»: пресеты визуально отделены (не нативный <select>). */
+.club-filter-select--custom {
+    position: relative;
+    width: 100%;
+    z-index: 1;
+}
+
+/* Открытый список должен быть над таблицей турниров и соседними блоками на главной */
+.club-filter-select--custom.club-filter-select--open {
+    z-index: 200;
+}
+
+/*
+ * Таблица турниров — следующий sibling после формы с фильтром; без z-index на форме
+ * выпадающий список оказывается под таблицей, sticky-thead (z-index:10) перехватывает клики.
+ */
+form.club-filter-dropdown-open {
+    position: relative;
+    z-index: 100;
+}
+
+/*
+ * Карточка фильтров на главной: базовый .card { overflow: hidden } обрезает выпадающий список.
+ */
+#home-tournaments-filter.card,
+.card:has(.club-filter-select--custom) {
+    overflow: visible;
+}
+
+.filter-bar .club-filter-select--custom {
+    flex: 1;
+    min-width: 150px;
+}
+
+.club-filter-select__toggle.form-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    width: 100%;
+    cursor: pointer;
+    text-align: left;
+    background: var(--color-bg-elevated);
+    color: var(--color-text);
+}
+
+.club-filter-select__current {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.club-filter-select__chevron {
+    flex-shrink: 0;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid rgba(255, 255, 255, 0.45);
+}
+
+.club-filter-select__dropdown {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: min(40vh, 320px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    border: 1px solid rgba(166, 130, 74, 0.35);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* Иначе `display: flex` выше перебивает стандартное скрытие по атрибуту hidden */
+.club-filter-select__dropdown[hidden] {
+    display: none !important;
+}
+
+.club-filter-select__option {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 6px;
+    font: inherit;
+    font-size: var(--font-size-sm);
+    line-height: 1.35;
+    color: #e2e8f0;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.club-filter-select__option:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Пресеты: непрозрачный фон (без полупрозрачного rgba), полоска слева + тёмная подложка */
+.club-filter-select__option--preset {
+    background: linear-gradient(
+        90deg,
+        #8f7348 0,
+        #8f7348 3px,
+        #0e2218 3px,
+        #0e2218 100%
+    );
+    box-shadow: inset 0 0 0 1px rgba(166, 130, 74, 0.55);
+}
+
+.club-filter-select__option--preset:hover {
+    background: linear-gradient(
+        90deg,
+        #a08258 0,
+        #a08258 3px,
+        #123a28 3px,
+        #123a28 100%
+    );
+}
+
+.club-filter-select__option.is-selected {
+    font-weight: 600;
+    color: #facc6b;
+}
+
 /* ==========================================================================
    Consent (registration) & offer consent (payments)
    ========================================================================== */

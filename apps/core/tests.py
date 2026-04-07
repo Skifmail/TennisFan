@@ -325,6 +325,16 @@ class HomeClubTournamentsIntegrationTestCase(TestCase):
         self.assertContains(response, "Турнир платформы")
         self.assertNotContains(response, "Внутриклубный кубок")
 
+    def test_home_club_filter_club_only_excludes_platform_rows(self) -> None:
+        response = self.client.get(
+            reverse("home"),
+            {"club": "__club_only__"},
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Внутриклубный кубок")
+        self.assertNotContains(response, "Турнир платформы")
+
     def test_home_club_filter_by_slug(self) -> None:
         response = self.client.get(
             reverse("home"),

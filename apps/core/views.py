@@ -50,6 +50,8 @@ from apps.tournaments.models import (
     TournamentStatus,
 )
 from apps.tournaments.platform_home import (
+    CLUB_FILTER_CLUB_ONLY,
+    CLUB_FILTER_PLATFORM,
     attach_home_tournament_rows,
     club_filter_choices_for_tournament_lists,
     load_user_club_ids_for_platform_tournaments,
@@ -1153,16 +1155,20 @@ def home(request):
         tournaments = tournaments.filter(gender=gender)
     if duration:
         tournaments = tournaments.filter(duration=duration)
-    if club_filter == "__platform__":
+    if club_filter == CLUB_FILTER_PLATFORM:
         tournaments = tournaments.filter(club__isnull=True)
+    elif club_filter == CLUB_FILTER_CLUB_ONLY:
+        tournaments = tournaments.filter(club__isnull=False)
     elif club_filter:
         tournaments = tournaments.filter(club__slug=club_filter)
 
     upcoming_tournaments = Tournament.objects.filter(
         status=TournamentStatus.UPCOMING,
     )
-    if club_filter == "__platform__":
+    if club_filter == CLUB_FILTER_PLATFORM:
         upcoming_tournaments = upcoming_tournaments.filter(club__isnull=True)
+    elif club_filter == CLUB_FILTER_CLUB_ONLY:
+        upcoming_tournaments = upcoming_tournaments.filter(club__isnull=False)
     elif club_filter:
         upcoming_tournaments = upcoming_tournaments.filter(club__slug=club_filter)
     upcoming_tournaments = (

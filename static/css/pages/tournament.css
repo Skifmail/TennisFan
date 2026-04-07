@@ -758,6 +758,12 @@
     font-weight: 600;
     color: #f1f5f9;
     margin-bottom: 2px;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
 }
 
 .tournament-table__sub {
@@ -876,15 +882,27 @@
 }
 
 .tournament-table__cell--status {
-    width: 110px;
+    width: 100px;
     text-align: center;
 }
 
+.tournament-table th:nth-child(1),
+.tournament-table td.tournament-table__cell--status {
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
 .tournament-table__cell--club {
-    width: 11rem;
-    min-width: 9rem;
-    max-width: 14rem;
+    width: 7rem;
+    min-width: 6rem;
+    max-width: 8.5rem;
     vertical-align: middle;
+}
+
+.tournament-table th:nth-child(2),
+.tournament-table td.tournament-table__cell--club {
+    padding-left: 8px;
+    padding-right: 8px;
 }
 
 .tournament-table__join-club-form {
@@ -896,7 +914,7 @@
     display: inline-flex;
     align-items: center;
     max-width: 100%;
-    padding: 2px 8px;
+    padding: 2px 5px;
     border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
@@ -963,15 +981,22 @@
 }
 
 .tournament-table__cell--action {
-    width: 150px;
-    max-width: 200px;
+    width: 104px;
+    max-width: 122px;
     white-space: normal;
+}
+
+.tournament-table th:last-child,
+.tournament-table td.tournament-table__cell--action {
+    padding-left: 6px;
+    padding-right: 8px;
 }
 
 .tournament-table__action .btn-sm {
     white-space: normal;
     line-height: 1.25;
     text-align: center;
+    padding: 3px 6px;
 }
 
 .tournament-table__fee {

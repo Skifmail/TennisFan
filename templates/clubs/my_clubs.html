@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Мои клубы{% endblock %}
+
+{% block content %}
+<section class="page-header club-my-clubs-header">
+    <div class="container">
+        <div class="club-my-clubs-header__eyebrow">Клубный доступ</div>
+        <h1 class="page-title">Мои клубы</h1>
+        <p class="page-subtitle">Выберите клуб, в который хотите войти. После выбора система откроет нужный кабинет и переключит текущий клуб.</p>
+    </div>
+</section>
+
+<section class="section club-my-clubs-section">
+    <div class="container">
+        {% if club_cards %}
+        <div class="club-my-clubs-toolbar">
+            <div class="club-my-clubs-toolbar__count">Активных клубов: {{ clubs_count }}</div>
+            <div class="club-my-clubs-toolbar__actions">
+                <a href="{% url 'clubs:invitations_list' %}" class="btn btn-outline">Приглашения</a>
+                <a href="{% url 'clubs:club_discover' %}" class="btn btn-ghost">Найти клуб</a>
+            </div>
+        </div>
+
+        <div class="club-my-clubs-grid">
+            {% for item in club_cards %}
+            <article class="card club-my-clubs-card{% if item.is_current %} club-my-clubs-card--current{% endif %}">
+                <div class="club-my-clubs-card__media">
+                    {% if item.club.logo %}
+                    <img src="{{ item.club.logo.url }}" alt="{{ item.club.name }}" class="club-my-clubs-card__logo">
+                    {% else %}
+                    <div class="club-my-clubs-card__logo club-my-clubs-card__logo--fallback">{{ item.club.name|first|upper }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="club-my-clubs-card__body">
+                    <div class="club-my-clubs-card__topline">
+                        <div>
+                            <h2 class="club-my-clubs-card__title">{{ item.club.name }}</h2>
+                            <div class="club-my-clubs-card__city">{{ item.club.city }}</div>
+                        </div>
+                        <div class="club-my-clubs-card__badges">
+                            <span class="club-my-clubs-card__badge">{{ item.role_label }}</span>
+                            {% if item.is_current %}
+                            <span class="club-my-clubs-card__badge club-my-clubs-card__badge--current">Текущий клуб</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="club-my-clubs-card__meta">
+                        {% if item.club.address %}
+                        <span>{{ item.club.address }}</span>
+                        {% endif %}
+                        {% if item.club.phone %}
+                        <span>{{ item.club.phone }}</span>
+                        {% endif %}
+                    </div>
+
+                    {% if item.club.description %}
+                    <p class="club-my-clubs-card__description">{{ item.club.description|truncatewords:26 }}</p>
+                    {% else %}
+                    <p class="club-my-clubs-card__description club-my-clubs-card__description--muted">У клуба пока нет описания. Вы можете открыть страницу клуба или сразу перейти в его кабинет.</p>
+                    {% endif %}
+
+                    <div class="club-my-clubs-card__actions">
+                        <a href="{{ item.entry_url }}" class="btn btn-primary">{{ item.entry_label }}</a>
+                        <a href="{{ item.open_url }}" class="btn btn-ghost">Страница клуба</a>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card club-my-clubs-empty">
+            <div class="card-body">
+                <h2 class="club-my-clubs-empty__title">У вас пока нет активных клубов</h2>
+                <p class="club-my-clubs-empty__text">Примите приглашение в клуб, отправьте заявку на вступление или создайте свой клуб на платформе.</p>
+                <div class="club-my-clubs-empty__actions">
+                    <a href="{% url 'clubs:invitations_list' %}" class="btn btn-outline">Приглашения</a>
+                    <a href="{% url 'clubs:club_discover' %}" class="btn btn-ghost">Найти клуб</a>
+                    <a href="{% url 'clubs:register_step1' %}" class="btn btn-primary">Создать клуб</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

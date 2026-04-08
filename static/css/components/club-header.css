@@ -199,10 +199,211 @@
     white-space: nowrap;
 }
 
+.club-top-nav__club-pill--button {
+    appearance: none;
+    cursor: pointer;
+    font: inherit;
+}
+
 .club-top-nav__club-pill:hover {
     background: linear-gradient(145deg, rgba(6, 56, 28, 0.98), rgba(3, 54, 42, 0.98));
     border-color: rgba(201, 168, 76, 0.5);
     color: #fefce8;
+}
+
+.club-top-nav__switcher {
+    position: relative;
+}
+
+.club-top-nav__switcher::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    height: 18px;
+}
+
+.club-top-nav__club-caret {
+    width: 10px;
+    height: 10px;
+    border-right: 2px solid rgba(250, 204, 21, 0.9);
+    border-bottom: 2px solid rgba(250, 204, 21, 0.9);
+    transform: rotate(45deg) translateY(-2px);
+    transition: transform 0.2s ease;
+}
+
+.club-top-nav__switcher:hover .club-top-nav__club-caret,
+.club-top-nav__switcher:focus-within .club-top-nav__club-caret {
+    transform: rotate(225deg) translateY(-1px);
+}
+
+.club-top-nav__switcher-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: min(360px, 75vw);
+    padding: 14px;
+    background:
+        radial-gradient(circle at top left, rgba(250, 204, 21, 0.14), transparent 38%),
+        linear-gradient(180deg, rgba(8, 28, 23, 0.98), rgba(2, 16, 12, 0.98));
+    border: 1px solid rgba(201, 168, 76, 0.24);
+    border-radius: 22px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.34);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition:
+        opacity 0.22s ease,
+        transform 0.22s ease,
+        visibility 0.22s ease;
+    z-index: 30;
+}
+
+.club-top-nav__switcher:hover .club-top-nav__switcher-menu,
+.club-top-nav__switcher:focus-within .club-top-nav__switcher-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.club-top-nav__switcher-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 2px 12px;
+}
+
+.club-top-nav__switcher-eyebrow {
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(250, 204, 21, 0.78);
+    margin-bottom: 4px;
+}
+
+.club-top-nav__switcher-title {
+    color: #fefce8;
+    font-size: 0.96rem;
+    font-weight: 700;
+}
+
+.club-top-nav__switcher-all {
+    color: #fde68a;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.club-top-nav__switcher-all:hover {
+    color: #fff7cc;
+}
+
+.club-top-nav__switcher-list {
+    display: grid;
+    gap: 8px;
+}
+
+.club-top-nav__switcher-item {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(201, 168, 76, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+    text-decoration: none;
+    color: #fefce8;
+    transition:
+        transform 0.18s ease,
+        border-color 0.18s ease,
+        background 0.18s ease;
+}
+
+.club-top-nav__switcher-item:hover,
+.club-top-nav__switcher-item:focus-visible {
+    transform: translateY(-1px);
+    background: rgba(250, 204, 21, 0.08);
+    border-color: rgba(250, 204, 21, 0.24);
+    color: #fff;
+}
+
+.club-top-nav__switcher-item--current {
+    background: linear-gradient(145deg, rgba(22, 101, 52, 0.24), rgba(8, 47, 73, 0.18));
+    border-color: rgba(74, 222, 128, 0.2);
+}
+
+.club-top-nav__switcher-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.club-top-nav__switcher-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.club-top-nav__switcher-copy {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+}
+
+.club-top-nav__switcher-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.club-top-nav__switcher-name {
+    font-size: 0.92rem;
+    font-weight: 700;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.club-top-nav__switcher-badge {
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(74, 222, 128, 0.16);
+    color: #bbf7d0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.club-top-nav__switcher-meta {
+    font-size: 0.78rem;
+    color: rgba(250, 250, 249, 0.68);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.club-top-nav__switcher-action {
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #fde68a;
+    white-space: nowrap;
 }
 
 .club-top-nav__club-logo {
@@ -260,6 +461,140 @@
     min-width: 0;
     width: 100%;
     box-sizing: border-box;
+}
+
+.club-nav-mobile__switcher {
+    display: grid;
+    gap: 10px;
+}
+
+.club-nav-mobile__switcher-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: linear-gradient(145deg, rgba(5, 46, 22, 0.95), rgba(2, 44, 34, 0.98));
+    border: 1px solid rgba(201, 168, 76, 0.35);
+    border-radius: 16px;
+    color: #fefce8;
+    font-weight: 600;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.club-nav-mobile__switcher-copy {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+    text-align: left;
+}
+
+.club-nav-mobile__switcher-hint {
+    font-size: 0.76rem;
+    color: rgba(250, 250, 249, 0.72);
+}
+
+.club-nav-mobile__switcher-chevron {
+    width: 11px;
+    height: 11px;
+    border-right: 2px solid rgba(250, 204, 21, 0.9);
+    border-bottom: 2px solid rgba(250, 204, 21, 0.9);
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+}
+
+.club-nav-mobile__switcher-toggle[aria-expanded="true"] .club-nav-mobile__switcher-chevron {
+    transform: rotate(225deg);
+}
+
+.club-nav-mobile__switcher-list {
+    display: grid;
+    gap: 8px;
+}
+
+.club-nav-mobile__club-option {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    border-radius: 16px;
+    text-decoration: none;
+    color: #fefce8;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(201, 168, 76, 0.12);
+}
+
+.club-nav-mobile__club-option--current {
+    background: linear-gradient(145deg, rgba(22, 101, 52, 0.24), rgba(8, 47, 73, 0.18));
+    border-color: rgba(74, 222, 128, 0.24);
+}
+
+.club-nav-mobile__club-option--all {
+    background: rgba(250, 204, 21, 0.08);
+}
+
+.club-nav-mobile__club-logo,
+.club-nav-mobile__club-option-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.09);
+    color: #fde68a;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.club-nav-mobile__club-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.club-nav-mobile__club-copy {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+}
+
+.club-nav-mobile__club-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.club-nav-mobile__club-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.club-nav-mobile__club-meta {
+    font-size: 0.78rem;
+    color: rgba(250, 250, 249, 0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.club-nav-mobile__club-badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(74, 222, 128, 0.16);
+    color: #bbf7d0;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .club-nav-mobile__pill .club-top-nav__club-logo {

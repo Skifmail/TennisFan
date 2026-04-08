@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from io import StringIO
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
@@ -220,6 +221,258 @@ class ClubNotificationSettingsViewTestCase(TestCase):
             club=self.club,
         )
         self.assertTrue(settings_obj.telegram_enabled)
+
+
+class MyClubsViewTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="multi-club@test.local",
+            password="testpass123",
+            first_name="Иван",
+        )
+        Player.objects.create(user=self.user)
+        self.club_alpha = Club.objects.create(
+            name="Альфа Клуб",
+            slug="alpha-club",
+            city="Москва",
+            address="ул. Альфа, 1",
+            email="alpha@test.local",
+            admin_name="Администратор Альфа",
+            description="Первый клуб пользователя.",
+        )
+        self.club_beta = Club.objects.create(
+            name="Бета Клуб",
+            slug="beta-club",
+            city="Сочи",
+            address="ул. Бета, 2",
+            email="beta@test.local",
+            admin_name="Администратор Бета",
+            description="Второй клуб пользователя.",
+        )
+        self.club_removed = Club.objects.create(
+            name="Старый клуб",
+            slug="old-club",
+            city="Казань",
+            address="ул. Архивная, 3",
+            email="old@test.local",
+            admin_name="Архивный админ",
+        )
+        ClubMember.objects.create(
+            club=self.club_alpha,
+            user=self.user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        ClubMember.objects.create(
+            club=self.club_beta,
+            user=self.user,
+            role=ClubMemberRole.ADMIN,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        ClubMember.objects.create(
+            club=self.club_removed,
+            user=self.user,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.REMOVED,
+        )
+        self.client.force_login(self.user)
+
+    def test_my_clubs_page_lists_active_memberships_and_current_club(self) -> None:
+        session = self.client.session
+        session["current_club_slug"] = self.club_beta.slug
+        session.save()
+
+        response = self.client.get(reverse("clubs:my_clubs"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Мои клубы")
+        self.assertContains(response, self.club_alpha.name)
+        self.assertContains(response, self.club_beta.name)
+        self.assertNotContains(response, self.club_removed.name)
+        self.assertContains(
+            response,
+            reverse("clubs:set_current_club", kwargs={"slug": self.club_alpha.slug}),
+        )
+        self.assertContains(
+            response,
+            reverse("clubs:set_current_club", kwargs={"slug": self.club_beta.slug}),
+        )
+        self.assertContains(response, "Текущий клуб")
+        self.assertContains(response, "Личный кабинет")
+        self.assertContains(response, "Панель управления")
+
+    def test_base_dropdown_links_to_my_clubs_page(self) -> None:
+        response = self.client.get(reverse("clubs:club_discover"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("clubs:my_clubs"))
+        self.assertContains(response, "Мои клубы")
+
+    def test_club_my_home_redirects_to_my_clubs_page(self) -> None:
+        response = self.client.get(reverse("clubs:club_my_home"), secure=True)
+
+        self.assertRedirects(
+            response,
+            reverse("clubs:my_clubs"),
+            fetch_redirect_response=False,
+        )
+
+    def test_opening_other_club_public_page_switches_current_club_for_dashboard(
+        self,
+    ) -> None:
+        session = self.client.session
+        session["current_club_slug"] = self.club_alpha.slug
+        session.save()
+
+        response = self.client.get(
+            reverse("clubs:club_public_detail", kwargs={"slug": self.club_beta.slug}),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        session = self.client.session
+        self.assertEqual(session.get("current_club_slug"), self.club_beta.slug)
+        dashboard_response = self.client.get(reverse("clubs:my_dashboard"), secure=True)
+        self.assertEqual(dashboard_response.status_code, 200)
+        self.assertEqual(dashboard_response.context["club"].slug, self.club_beta.slug)
+
+    def test_my_clubs_public_page_link_switches_current_club_before_opening(
+        self,
+    ) -> None:
+        session = self.client.session
+        session["current_club_slug"] = self.club_alpha.slug
+        session.save()
+
+        response = self.client.get(reverse("clubs:my_clubs"), secure=True)
+
+        public_url = reverse(
+            "clubs:club_public_detail",
+            kwargs={"slug": self.club_beta.slug},
+        )
+        switch_url = reverse(
+            "clubs:set_current_club",
+            kwargs={"slug": self.club_beta.slug},
+        )
+        expected_open_url = f"{switch_url}?{urlencode({'next': public_url})}"
+        self.assertContains(response, expected_open_url)
+
+        open_response = self.client.get(
+            expected_open_url,
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(open_response.status_code, 200)
+        self.assertEqual(open_response.request["PATH_INFO"], public_url)
+        session = self.client.session
+        self.assertEqual(session.get("current_club_slug"), self.club_beta.slug)
+
+    def test_club_top_nav_renders_switcher_with_other_clubs(self) -> None:
+        session = self.client.session
+        session["current_club_slug"] = self.club_alpha.slug
+        session.save()
+
+        response = self.client.get(
+            reverse("clubs:my_dashboard"),
+            secure=True,
+        )
+
+        personal_url = reverse("clubs:my_dashboard")
+        switch_url = reverse(
+            "clubs:set_current_club",
+            kwargs={"slug": self.club_beta.slug},
+        )
+        expected_switch_url = f"{switch_url}?{urlencode({'next': personal_url})}"
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "club-top-nav__switcher")
+        self.assertContains(response, "club-mobile-switcher-toggle")
+        self.assertContains(response, self.club_beta.name)
+        self.assertContains(response, expected_switch_url)
+        self.assertContains(response, reverse("clubs:my_clubs"))
+
+
+class ClubProfileSubscriptionIsolationTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.owner = User.objects.create_user(
+            email="club-owner-sub@test.local",
+            password="testpass123",
+            first_name="Иван",
+        )
+        self.viewer = User.objects.create_user(
+            email="club-viewer-sub@test.local",
+            password="testpass123",
+            first_name="Петр",
+        )
+        self.owner_player = Player.objects.create(user=self.owner)
+        Player.objects.create(user=self.viewer)
+        self.club = Club.objects.create(
+            name="Клуб изоляции",
+            slug="club-isolation",
+            city="Москва",
+            address="ул. Тестовая, 7",
+            email="club-isolation@test.local",
+            admin_name="Администратор клуба",
+        )
+        ClubMember.objects.create(
+            club=self.club,
+            user=self.owner,
+            role=ClubMemberRole.PLAYER,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        ClubMember.objects.create(
+            club=self.club,
+            user=self.viewer,
+            role=ClubMemberRole.ADMIN,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        tier = SubscriptionTier.objects.create(
+            name="GLOBAL-PLATINUM-TEST",
+            price=Decimal("4900.00"),
+            max_tournaments=10,
+            has_badge=True,
+            can_see_stats=True,
+        )
+        UserSubscription.objects.create(
+            user=self.owner,
+            tier=tier,
+            start_date=timezone.now() - timedelta(days=1),
+            end_date=timezone.now() + timedelta(days=30),
+            is_active=True,
+        )
+
+    def test_my_club_dashboard_does_not_show_platform_subscription_name(self) -> None:
+        self.client.force_login(self.owner)
+        session = self.client.session
+        session["current_club_slug"] = self.club.slug
+        session.save()
+
+        response = self.client.get(reverse("clubs:my_dashboard"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "GLOBAL-PLATINUM-TEST")
+        self.assertContains(response, "У вас нет активного клубного тарифа")
+
+    def test_other_member_club_profile_does_not_show_platform_subscription_name(
+        self,
+    ) -> None:
+        self.client.force_login(self.viewer)
+        session = self.client.session
+        session["current_club_slug"] = self.club.slug
+        session.save()
+
+        response = self.client.get(
+            reverse(
+                "clubs:player_profile",
+                kwargs={"slug": self.club.slug, "player_id": self.owner_player.pk},
+            ),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "GLOBAL-PLATINUM-TEST")
 
 
 class ClubPlayerPlanManagementViewTestCase(TestCase):

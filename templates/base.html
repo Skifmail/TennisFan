@@ -131,10 +131,8 @@
                             <li><a href="{% url 'my_sparring_matches' %}">Личные встречи</a></li>
                             <li><a href="{% url 'my_trainings' %}">Мои тренировки</a></li>
                             <li><a href="{% url 'clubs:invitations_list' %}">Приглашения в клубы</a></li>
-                            {% if current_club %}
-                            <li><a href="{% url 'clubs:club_public_detail' slug=current_club.slug %}">Мой клуб</a></li>
-                            {% elif user_clubs %}
-                            <li><a href="{% url 'clubs:club_public_detail' slug=user_clubs.0.slug %}">Мой клуб</a></li>
+                            {% if user_clubs %}
+                            <li><a href="{% url 'clubs:my_clubs' %}">Мои клубы</a></li>
                             {% endif %}
                             <li><a href="{% url 'notifications' %}" class="nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a></li>
                             {% if user.is_staff or user.is_superuser %}

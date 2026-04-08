@@ -74,3 +74,28 @@ class GlobalProfileIsolationTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Глобальный турнир")
         self.assertNotContains(response, "Клубный турнир")
+
+
+class AuthEmailCaseInsensitiveLoginTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.password = "testpass123"
+        self.user = User.objects.create_user(
+            email="tennis@tennisfan.ru",
+            password=self.password,
+            first_name="Тест",
+            last_name="Пользователь",
+        )
+
+    def test_login_with_mixed_case_email_works(self) -> None:
+        response = self.client.post(
+            reverse("auth"),
+            data={"username": "Tennis@tennisfan.ru", "password": self.password},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("home"))
+        self.assertEqual(
+            str(self.client.session.get("_auth_user_id")), str(self.user.pk)
+        )

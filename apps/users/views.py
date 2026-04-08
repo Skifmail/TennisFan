@@ -11,7 +11,6 @@ from typing import Any
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import AuthenticationForm
 from django.db.models import Q
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
@@ -26,7 +25,7 @@ from apps.core.decorators import login_required_with_message
 from apps.core.models import LegalAcceptanceLog, UserConsent, UserTelegramLink
 from apps.legal.utils import get_legal_document_version
 
-from .forms import PlayerProfileForm, UserRegistrationForm
+from .forms import EmailAuthenticationForm, PlayerProfileForm, UserRegistrationForm
 from .models import Notification, NtrpTestResult, Player
 
 logger = logging.getLogger(__name__)
@@ -438,7 +437,7 @@ def auth(request):
         elif "username" in request.POST and "password" in request.POST:
             # Форма входа
             active_mode = "login"
-            login_form = AuthenticationForm(request, data=request.POST)
+            login_form = EmailAuthenticationForm(request, data=request.POST)
             if login_form.is_valid():
                 user = login_form.get_user()
                 login(request, user)
@@ -451,7 +450,7 @@ def auth(request):
     if register_form is None:
         register_form = UserRegistrationForm()
     if login_form is None:
-        login_form = AuthenticationForm(request)
+        login_form = EmailAuthenticationForm(request)
 
     return render(
         request,

@@ -97,7 +97,7 @@
     <div class="nav-menu-mobile club-nav-mobile club-nav-mobile--fullwidth" id="nav-menu-mobile">
         {% if club_switcher_items|length > 1 %}
         <div class="club-nav-mobile__switcher">
-            <button type="button" class="club-nav-mobile__switcher-toggle nav-menu-link" id="club-mobile-switcher-toggle" aria-expanded="false" aria-controls="club-mobile-switcher-list">
+            <button type="button" class="club-nav-mobile__switcher-toggle" id="club-mobile-switcher-toggle" aria-expanded="false" aria-controls="club-mobile-switcher-list">
                 <span class="club-top-nav__club-logo">
                     {% if club.logo %}
                     <img src="{{ club.logo.url }}" alt="">
@@ -107,7 +107,6 @@
                 </span>
                 <span class="club-nav-mobile__switcher-copy">
                     <span class="club-nav-mobile__club-name">{{ club.name }}</span>
-                    <span class="club-nav-mobile__switcher-hint">Сменить клуб без выхода на платформу</span>
                 </span>
                 <span class="club-nav-mobile__switcher-chevron" aria-hidden="true"></span>
             </button>
@@ -193,7 +192,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (!leaveLinks.length || !modal || !confirmBtn || !cancelBtn) {
         if (mobileSwitcherToggle && mobileSwitcherList) {
-            mobileSwitcherToggle.addEventListener('click', function() {
+            mobileSwitcherToggle.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
                 var isExpanded = mobileSwitcherToggle.getAttribute('aria-expanded') === 'true';
                 mobileSwitcherToggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
                 if (isExpanded) {
@@ -221,7 +222,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (mobileSwitcherToggle && mobileSwitcherList) {
-        mobileSwitcherToggle.addEventListener('click', function() {
+        mobileSwitcherToggle.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
             var isExpanded = mobileSwitcherToggle.getAttribute('aria-expanded') === 'true';
             mobileSwitcherToggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
             if (isExpanded) {

@@ -486,13 +486,8 @@
     flex: 1;
     min-width: 0;
     display: grid;
-    gap: 4px;
+    gap: 0;
     text-align: left;
-}
-
-.club-nav-mobile__switcher-hint {
-    font-size: 0.76rem;
-    color: rgba(250, 250, 249, 0.72);
 }
 
 .club-nav-mobile__switcher-chevron {
@@ -511,6 +506,10 @@
 .club-nav-mobile__switcher-list {
     display: grid;
     gap: 8px;
+}
+
+.club-nav-mobile__switcher-list[hidden] {
+    display: none;
 }
 
 .club-nav-mobile__club-option {

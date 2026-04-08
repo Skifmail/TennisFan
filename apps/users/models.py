@@ -164,6 +164,11 @@ class Player(CompressImageFieldsMixin, models.Model):
 
     is_verified = models.BooleanField("Подтверждён", default=True)
     is_legend = models.BooleanField("Легенда", default=False)
+    is_hidden_on_home = models.BooleanField(
+        "Не показывать на главной",
+        default=False,
+        help_text="Если включено, игрок не отображается в блоке рейтинга на главной странице.",
+    )
     has_ever_paid_subscription = models.BooleanField(
         "Уже покупал подписку",
         default=False,

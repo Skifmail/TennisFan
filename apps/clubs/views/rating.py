@@ -17,6 +17,7 @@ from .helpers import (
     _build_club_profile_context,
     _get_club_and_check_manage,
     _get_current_club_member,
+    _remember_current_club,
     _resolve_club_manage,
 )
 
@@ -235,6 +236,7 @@ def player_profile(request: HttpRequest, slug: str, player_id: int) -> HttpRespo
         return redirect("clubs:club_public_detail", slug=slug)
 
     club = viewer_member.club
+    _remember_current_club(request, club)
     member = get_object_or_404(
         ClubMember.objects.select_related("user", "user__player"),
         club=club,

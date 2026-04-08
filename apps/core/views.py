@@ -1200,7 +1200,11 @@ def home(request):
 
     current_season = get_current_season()
     top_players = (
-        Player.objects.filter(is_verified=True, is_bye=False)
+        Player.objects.filter(
+            is_verified=True,
+            is_bye=False,
+            is_hidden_on_home=False,
+        )
         .select_related(
             "user", "user__subscription", "user__subscription__tier", "season_points"
         )

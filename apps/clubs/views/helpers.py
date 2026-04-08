@@ -23,6 +23,14 @@ from ..services import (
 logger = logging.getLogger(__name__)
 
 
+def _remember_current_club(request: HttpRequest, club: Club) -> None:
+    """Синхронизирует текущий клуб в сессии с открытым клубным разделом."""
+    current_slug = str(request.session.get("current_club_slug") or "").strip()
+    if current_slug == club.slug:
+        return
+    request.session["current_club_slug"] = club.slug
+
+
 def _get_current_club_member(request: HttpRequest) -> ClubMember | None:
     """Возвращает ClubMember для текущего клуба пользователя из сессии или None."""
     if not request.user.is_authenticated:
@@ -490,6 +498,7 @@ def _get_club_and_check_manage(
             "Клуб приостановлен. Продлите подписку для возобновления доступа.",
         )
         return None, redirect("clubs:club_public_detail", slug=slug)
+    _remember_current_club(request, club)
     return club, None
 
 

@@ -75,6 +75,40 @@ class HomeRecentMatchesWidgetTestCase(TestCase):
         self.assertEqual(payload["matches"][0]["club_name"], club.name)
 
 
+class HomeTopPlayersVisibilityTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        hidden_user = User.objects.create_user(
+            email="hidden-home@test.local",
+            password="testpass123",
+            first_name="Скрытый",
+            last_name="Игрок",
+        )
+        visible_user = User.objects.create_user(
+            email="visible-home@test.local",
+            password="testpass123",
+            first_name="Видимый",
+            last_name="Игрок",
+        )
+        Player.objects.create(
+            user=hidden_user,
+            total_points=9999.0,
+            is_hidden_on_home=True,
+        )
+        Player.objects.create(
+            user=visible_user,
+            total_points=1000.0,
+            is_hidden_on_home=False,
+        )
+
+    def test_home_top_players_excludes_hidden_players(self) -> None:
+        response = self.client.get(reverse("home"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Скрытый Игрок")
+        self.assertContains(response, "Видимый Игрок")
+
+
 class ClubDiscoverPageTestCase(TestCase):
     def setUp(self) -> None:
         self.client = Client()

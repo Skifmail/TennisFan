@@ -5,6 +5,7 @@ Context processors для клубного раздела: клубный кон
 from typing import Any
 
 from .models import ClubMember, ClubMemberStatus
+from .navigation import build_club_navigation_entry
 from .plan_services import get_member_active_plan
 from .services import get_fee_status_for_member
 
@@ -15,6 +16,7 @@ def club_context(request: Any) -> dict[str, Any]:
     """
     out: dict[str, Any] = {
         "user_clubs": [],
+        "club_switcher_items": [],
         "current_club": None,
         "current_club_member": None,
         "current_club_member_plan": None,
@@ -54,4 +56,8 @@ def club_context(request: Any) -> dict[str, Any]:
     out["current_club_fee_status"] = get_fee_status_for_member(
         current_member.club, current_member
     )
+    out["club_switcher_items"] = [
+        build_club_navigation_entry(member, current_slug=current_member.club.slug)
+        for member in memberships
+    ]
     return out

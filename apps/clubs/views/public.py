@@ -32,6 +32,7 @@ from ..models import (
     ClubPlayerPlan,
     ClubRating,
 )
+from ..navigation import build_club_navigation_entry
 from ..notifications import send_new_member_notification
 from ..plan_services import assign_member_plan
 from ..services import (
@@ -43,7 +44,7 @@ from ..services import (
     get_platform_plans,
     user_can_manage_club,
 )
-from .helpers import logger
+from .helpers import _remember_current_club, logger
 
 
 def _annotate_public_tournament_badge(tournament: Tournament) -> None:
@@ -117,6 +118,40 @@ def _get_plan_prices_for_template() -> dict[str, dict[str, Any]]:
 def register_choice(request: HttpRequest) -> HttpResponse:
     """Страница выбора: регистрация как игрок или как клуб."""
     return render(request, "clubs/register_choice.html")
+
+
+@login_required
+@require_GET
+def my_clubs(request: HttpRequest) -> HttpResponse:
+    """Показывает список всех активных клубов пользователя с выбором входа."""
+    memberships = list(
+        ClubMember.objects.filter(
+            user=request.user,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        .select_related("club")
+        .order_by("club__name")
+    )
+
+    current_slug = str(request.session.get("current_club_slug") or "").strip()
+    if not current_slug and memberships:
+        current_slug = memberships[0].club.slug
+        request.session["current_club_slug"] = current_slug
+
+    club_cards: list[dict[str, Any]] = []
+    for member in memberships:
+        club_cards.append(
+            build_club_navigation_entry(member, current_slug=current_slug)
+        )
+
+    return render(
+        request,
+        "clubs/my_clubs.html",
+        {
+            "club_cards": club_cards,
+            "clubs_count": len(club_cards),
+        },
+    )
 
 
 @login_required
@@ -395,6 +430,7 @@ def club_public_detail(request: HttpRequest, slug: str) -> HttpResponse:
             is_pending_invite = membership.status == ClubMemberStatus.INVITED
             if is_member:
                 member_role = membership.role
+                _remember_current_club(request, club)
         is_pending_join_request = ClubJoinRequest.objects.filter(
             club=club,
             user=request.user,

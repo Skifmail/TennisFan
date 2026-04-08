@@ -15,6 +15,55 @@
             </a>
 
             <div class="nav-menu-desktop">
+                {% if club_switcher_items|length > 1 %}
+                <div class="club-top-nav__switcher">
+                    <button type="button" class="club-top-nav__club-pill club-top-nav__club-pill--button">
+                        <span class="club-top-nav__club-logo">
+                            {% if club.logo %}
+                            <img src="{{ club.logo.url }}" alt="">
+                            {% else %}
+                            <span class="club-top-nav__club-logo-fallback">{{ club.name|first|upper }}</span>
+                            {% endif %}
+                        </span>
+                        <span class="club-top-nav__club-name">{{ club.name }}</span>
+                        <span class="club-top-nav__club-caret" aria-hidden="true"></span>
+                    </button>
+                    <div class="club-top-nav__switcher-menu">
+                        <div class="club-top-nav__switcher-head">
+                            <div>
+                                <div class="club-top-nav__switcher-eyebrow">Мои клубы</div>
+                                <div class="club-top-nav__switcher-title">Быстрое переключение</div>
+                            </div>
+                            <a href="{% url 'clubs:my_clubs' %}" class="club-top-nav__switcher-all">Все клубы</a>
+                        </div>
+                        <div class="club-top-nav__switcher-list">
+                            {% for item in club_switcher_items %}
+                            <a href="{{ item.personal_url }}" class="club-top-nav__switcher-item{% if item.is_current %} club-top-nav__switcher-item--current{% endif %}">
+                                <span class="club-top-nav__switcher-logo">
+                                    {% if item.club.logo %}
+                                    <img src="{{ item.club.logo.url }}" alt="">
+                                    {% else %}
+                                    <span class="club-top-nav__club-logo-fallback">{{ item.club.name|first|upper }}</span>
+                                    {% endif %}
+                                </span>
+                                <span class="club-top-nav__switcher-copy">
+                                    <span class="club-top-nav__switcher-row">
+                                        <span class="club-top-nav__switcher-name">{{ item.club.name }}</span>
+                                        {% if item.is_current %}
+                                        <span class="club-top-nav__switcher-badge">Текущий</span>
+                                        {% endif %}
+                                    </span>
+                                    <span class="club-top-nav__switcher-meta">{{ item.role_label }}{% if item.club.city %} · {{ item.club.city }}{% endif %}</span>
+                                </span>
+                                {% if not item.is_current %}
+                                <span class="club-top-nav__switcher-action">{% if item.is_current %}Открыт{% else %}В кабинет{% endif %}</span>
+                                {% endif %}
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% else %}
                 <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="club-top-nav__club-pill">
                     <span class="club-top-nav__club-logo">
                         {% if club.logo %}
@@ -25,12 +74,13 @@
                     </span>
                     <span class="club-top-nav__club-name">{{ club.name }}</span>
                 </a>
+                {% endif %}
                 {% if can_manage_club %}
-                <a href="{% url 'clubs:my_dashboard' %}" class="btn btn-ghost btn-sm">
+                <a href="{% url 'clubs:set_current_club' slug=club.slug %}?next={% url 'clubs:my_dashboard' %}" class="btn btn-ghost btn-sm">
                     Личный кабинет
                 </a>
                 {% else %}
-                <a href="{% url 'clubs:my_dashboard' %}" class="btn btn-ghost btn-sm">
+                <a href="{% url 'clubs:set_current_club' slug=club.slug %}?next={% url 'clubs:my_dashboard' %}" class="btn btn-ghost btn-sm">
                     Личный кабинет
                 </a>
                 {% endif %}
@@ -45,6 +95,53 @@
         </nav>
     </div>
     <div class="nav-menu-mobile club-nav-mobile club-nav-mobile--fullwidth" id="nav-menu-mobile">
+        {% if club_switcher_items|length > 1 %}
+        <div class="club-nav-mobile__switcher">
+            <button type="button" class="club-nav-mobile__switcher-toggle nav-menu-link" id="club-mobile-switcher-toggle" aria-expanded="false" aria-controls="club-mobile-switcher-list">
+                <span class="club-top-nav__club-logo">
+                    {% if club.logo %}
+                    <img src="{{ club.logo.url }}" alt="">
+                    {% else %}
+                    <span class="club-top-nav__club-logo-fallback">{{ club.name|first|upper }}</span>
+                    {% endif %}
+                </span>
+                <span class="club-nav-mobile__switcher-copy">
+                    <span class="club-nav-mobile__club-name">{{ club.name }}</span>
+                    <span class="club-nav-mobile__switcher-hint">Сменить клуб без выхода на платформу</span>
+                </span>
+                <span class="club-nav-mobile__switcher-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="club-nav-mobile__switcher-list" id="club-mobile-switcher-list" hidden>
+                {% for item in club_switcher_items %}
+                <a href="{{ item.personal_url }}" class="club-nav-mobile__club-option{% if item.is_current %} club-nav-mobile__club-option--current{% endif %}">
+                    <span class="club-nav-mobile__club-logo">
+                        {% if item.club.logo %}
+                        <img src="{{ item.club.logo.url }}" alt="">
+                        {% else %}
+                        <span class="club-top-nav__club-logo-fallback">{{ item.club.name|first|upper }}</span>
+                        {% endif %}
+                    </span>
+                    <span class="club-nav-mobile__club-copy">
+                        <span class="club-nav-mobile__club-row">
+                            <span class="club-nav-mobile__club-title">{{ item.club.name }}</span>
+                            {% if item.is_current %}
+                            <span class="club-nav-mobile__club-badge">Текущий</span>
+                            {% endif %}
+                        </span>
+                        <span class="club-nav-mobile__club-meta">{{ item.role_label }}{% if item.club.city %} · {{ item.club.city }}{% endif %}</span>
+                    </span>
+                </a>
+                {% endfor %}
+                <a href="{% url 'clubs:my_clubs' %}" class="club-nav-mobile__club-option club-nav-mobile__club-option--all">
+                    <span class="club-nav-mobile__club-option-icon" aria-hidden="true">+</span>
+                    <span class="club-nav-mobile__club-copy">
+                        <span class="club-nav-mobile__club-title">Все клубы</span>
+                        <span class="club-nav-mobile__club-meta">Открыть полный список клубов</span>
+                    </span>
+                </a>
+            </div>
+        </div>
+        {% else %}
         <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="club-nav-mobile__pill nav-menu-link">
             <span class="club-top-nav__club-logo">
                 {% if club.logo %}
@@ -55,11 +152,12 @@
             </span>
             <span class="club-nav-mobile__club-name">{{ club.name }}</span>
         </a>
+        {% endif %}
         <div class="club-nav-mobile__links">
             {% if can_manage_club %}
-            <a href="{% url 'clubs:my_dashboard' %}" class="club-nav-mobile__link nav-menu-link">Личный кабинет</a>
+            <a href="{% url 'clubs:set_current_club' slug=club.slug %}?next={% url 'clubs:my_dashboard' %}" class="club-nav-mobile__link nav-menu-link">Личный кабинет</a>
             {% else %}
-            <a href="{% url 'clubs:my_dashboard' %}" class="club-nav-mobile__link nav-menu-link">Личный кабинет</a>
+            <a href="{% url 'clubs:set_current_club' slug=club.slug %}?next={% url 'clubs:my_dashboard' %}" class="club-nav-mobile__link nav-menu-link">Личный кабинет</a>
             {% endif %}
             <a href="{% url 'clubs:club_public_detail' slug=club.slug %}" class="club-nav-mobile__link nav-menu-link">На главную</a>
             <a href="{% url 'home' %}" class="club-nav-mobile__link club-nav-mobile__link--primary nav-menu-link js-club-leave-platform">На платформу</a>
@@ -89,9 +187,22 @@ document.addEventListener('DOMContentLoaded', function() {
     var modal = document.getElementById('club-leave-confirm-modal');
     var confirmBtn = document.getElementById('club-leave-confirm-yes');
     var cancelBtn = document.getElementById('club-leave-confirm-no');
+    var mobileSwitcherToggle = document.getElementById('club-mobile-switcher-toggle');
+    var mobileSwitcherList = document.getElementById('club-mobile-switcher-list');
     var pendingHref = null;
 
     if (!leaveLinks.length || !modal || !confirmBtn || !cancelBtn) {
+        if (mobileSwitcherToggle && mobileSwitcherList) {
+            mobileSwitcherToggle.addEventListener('click', function() {
+                var isExpanded = mobileSwitcherToggle.getAttribute('aria-expanded') === 'true';
+                mobileSwitcherToggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+                if (isExpanded) {
+                    mobileSwitcherList.setAttribute('hidden', 'hidden');
+                } else {
+                    mobileSwitcherList.removeAttribute('hidden');
+                }
+            });
+        }
         return;
     }
 
@@ -99,6 +210,26 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.style.display = 'none';
         modal.setAttribute('aria-hidden', 'true');
         pendingHref = null;
+    }
+
+    function closeMobileSwitcher() {
+        if (!mobileSwitcherToggle || !mobileSwitcherList) {
+            return;
+        }
+        mobileSwitcherToggle.setAttribute('aria-expanded', 'false');
+        mobileSwitcherList.setAttribute('hidden', 'hidden');
+    }
+
+    if (mobileSwitcherToggle && mobileSwitcherList) {
+        mobileSwitcherToggle.addEventListener('click', function() {
+            var isExpanded = mobileSwitcherToggle.getAttribute('aria-expanded') === 'true';
+            mobileSwitcherToggle.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+            if (isExpanded) {
+                mobileSwitcherList.setAttribute('hidden', 'hidden');
+            } else {
+                mobileSwitcherList.removeAttribute('hidden');
+            }
+        });
     }
 
     leaveLinks.forEach(function(link) {
@@ -133,6 +264,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape' && modal.style.display !== 'none') {
             closeModal();
+        }
+        if (event.key === 'Escape') {
+            closeMobileSwitcher();
         }
     });
 });

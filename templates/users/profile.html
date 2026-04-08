@@ -19,14 +19,12 @@
                     <div class="profile-info__title">
                         <h1 class="profile-info__name">{{ player }}</h1>
                         <div class="profile-info__badges">
-                            {% if is_club_profile and member_plan %}
+                            {% if is_club_profile %}
+                            {% if member_plan %}
                             <span class="profile-info__subscription-badge">
                                 <span class="badge badge-primary">{{ member_plan.plan.name }}</span>
                             </span>
-                            {% elif is_club_profile and club_subscription %}
-                            <span class="profile-info__subscription-badge">
-                                <span class="badge badge-primary">{{ club_subscription.get_plan_display }}</span>
-                            </span>
+                            {% endif %}
                             {% elif player.paid_subscription_tier %}
                             <span class="profile-info__subscription-badge">
                                 {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
@@ -363,7 +361,7 @@
                 </div>
                 {% endif %}
                 {% endif %}
-                {% elif player.user.subscription %}
+                {% elif not is_club_profile and player.user.subscription %}
                 <div class="subscription-info profile-info__subscription">
                     <div class="subscription-info__row">
                         <span class="subscription-info__label">Тариф:</span>
@@ -457,7 +455,7 @@
                     {% endif %}
                 </div>
 
-                {% else %}
+                {% elif not is_club_profile %}
                 <div class="alert alert-warning profile-info__subscription-alert">
                     У вас нет активной платной подписки. <a href="{% url 'pricing' %}">Купить</a>
                 </div>

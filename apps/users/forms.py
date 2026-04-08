@@ -6,10 +6,19 @@ from decimal import Decimal
 
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import AuthenticationForm
 
 from .models import Player
 
 User = get_user_model()
+
+
+class EmailAuthenticationForm(AuthenticationForm):
+    """Форма входа с нормализацией email без учета регистра."""
+
+    def clean_username(self) -> str:
+        username = (self.cleaned_data.get("username") or "").strip().lower()
+        return username
 
 
 class UserRegistrationForm(forms.ModelForm):

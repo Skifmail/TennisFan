@@ -70,6 +70,7 @@ from .helpers import (
     _build_club_profile_context,
     _get_club_and_check_manage,
     _get_current_club_member,
+    _remember_current_club,
     _resolve_club_manage,
 )
 
@@ -90,6 +91,7 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
             "Клуб приостановлен. Продлите подписку для возобновления доступа.",
         )
         return redirect("clubs:club_public_detail", slug=slug)
+    _remember_current_club(request, club)
 
     now = timezone.now()
     today = timezone.localdate()

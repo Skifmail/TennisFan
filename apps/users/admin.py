@@ -553,6 +553,7 @@ class PlayerAdmin(admin.ModelAdmin):
         "matches_won",
         "is_verified",
         "is_legend",
+        "is_hidden_on_home",
     )
 
     @admin.display(description="Email", ordering="user__email")
@@ -606,6 +607,7 @@ class PlayerAdmin(admin.ModelAdmin):
         "forehand",
         "is_verified",
         "is_legend",
+        "is_hidden_on_home",
         "is_bye",
     )
     search_fields = (
@@ -614,7 +616,7 @@ class PlayerAdmin(admin.ModelAdmin):
         "user__last_name",
         "user__phone",
     )
-    list_editable = ("is_verified", "is_legend")
+    list_editable = ("is_verified", "is_legend", "is_hidden_on_home")
     raw_id_fields = ("user",)
     readonly_fields = ("created_at", "updated_at")
 
@@ -684,7 +686,7 @@ class PlayerAdmin(admin.ModelAdmin):
         ("Уровень силы", {"fields": ("ntrp_level",)}),
         ("Контакты", {"fields": ("telegram", "whatsapp", "max_contact")}),
         ("Статистика", {"fields": ("total_points", "matches_played", "matches_won")}),
-        ("Статус", {"fields": ("is_verified", "is_legend")}),
+        ("Статус", {"fields": ("is_verified", "is_legend", "is_hidden_on_home")}),
         ("Даты", {"fields": ("created_at", "updated_at")}),
     )
 

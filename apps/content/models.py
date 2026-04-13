@@ -7,6 +7,12 @@ from typing import cast
 from django.db import models
 from django.utils.text import slugify
 
+from apps.core.contact_utils import (
+    build_max_url,
+    build_telegram_url,
+    build_whatsapp_url,
+    normalize_russian_phone,
+)
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
 
@@ -272,21 +278,14 @@ class ContactItem(models.Model):
         if self.item_type == self.ItemType.EMAIL and self.value:
             return f"mailto:{self.value.strip()}"
         if self.item_type == self.ItemType.PHONE and self.value:
-            tel = "".join(c for c in self.value if c.isdigit() or c in "+")
+            tel = normalize_russian_phone(self.value)
             return f"tel:{tel}" if tel else None
         if self.item_type == self.ItemType.TELEGRAM and self.value:
-            uname = self.value.strip().lstrip("@")
-            return f"https://t.me/{uname}" if uname else None
+            return build_telegram_url(self.value)
         if self.item_type == self.ItemType.WHATSAPP and self.value:
-            tel = "".join(c for c in self.value if c.isdigit())
-            return f"https://wa.me/{tel}" if tel else None
+            return build_whatsapp_url(self.value)
         if self.item_type == self.ItemType.MAX and self.value:
-            v = self.value.strip()
-            if v.startswith("http"):
-                return str(v)
-            return (
-                None  # Для MAX укажите ссылку в поле «Ссылка» или полный URL в значении
-            )
+            return build_max_url(self.value)
         if self.item_type == self.ItemType.VK and self.value:
             v = self.value.strip()
             if v.startswith("http"):
@@ -665,34 +664,14 @@ class StringerCompanyContact(models.Model):
             return None
         v = self.value.strip()
         if self.contact_type == StringerCompanyContactType.PHONE:
-            phone = "".join(c for c in v if c.isdigit())
-            if phone.startswith("8") and len(phone) == 11:
-                phone = "7" + phone[1:]
-            elif phone.startswith("7") and len(phone) == 11:
-                pass
-            elif len(phone) == 10:
-                phone = "7" + phone
-            else:
-                return None
-            return f"tel:+{phone}"
+            phone = normalize_russian_phone(v)
+            return f"tel:{phone}" if phone else None
         if self.contact_type == StringerCompanyContactType.TELEGRAM:
-            username = v.lstrip("@")
-            return f"https://t.me/{username}" if username else None
+            return build_telegram_url(v)
         if self.contact_type == StringerCompanyContactType.WHATSAPP:
-            phone = "".join(c for c in v if c.isdigit())
-            if phone.startswith("8") and len(phone) == 11:
-                phone = "7" + phone[1:]
-            elif len(phone) == 10:
-                phone = "7" + phone
-            elif phone.startswith("7") and len(phone) == 11:
-                pass
-            else:
-                return None
-            return f"https://wa.me/{phone}"
+            return build_whatsapp_url(v)
         if self.contact_type == StringerCompanyContactType.MAX:
-            if v.startswith(("http://", "https://")):
-                return str(v)
-            return str(v) if v else None
+            return build_max_url(v)
         return None
 
     def get_icon_path(self) -> str:

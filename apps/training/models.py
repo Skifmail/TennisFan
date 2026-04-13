@@ -7,6 +7,12 @@ from typing import cast
 from django.db import models
 from django.utils.text import slugify
 
+from apps.core.contact_utils import (
+    build_max_url,
+    build_telegram_url,
+    build_whatsapp_url,
+    get_max_display_contact,
+)
 from apps.users.models import SkillLevel
 from apps.users.skill_levels import SKILL_LEVEL_NTRP
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
@@ -49,7 +55,7 @@ class Coach(models.Model):
         "MAX",
         max_length=500,
         blank=True,
-        help_text="Ссылка на профиль в мессенджере MAX",
+        help_text="Ссылка на профиль в мессенджере MAX или номер телефона, привязанный к MAX.",
     )
 
     city = models.CharField("Город", max_length=100)
@@ -92,37 +98,26 @@ class Coach(models.Model):
         handle = self.telegram or (
             self.player_profile.telegram if self.player_profile else ""
         )
-        if not handle:
-            return None
-        u = handle.strip().lstrip("@")
-        return str(f"https://t.me/{u}") if u else None
+        return build_telegram_url(handle)
 
     @property
     def whatsapp_url(self) -> str | None:
         number = self.whatsapp or (
             self.player_profile.whatsapp if self.player_profile else ""
         )
-        if not number:
-            return None
-        phone = "".join(c for c in number if c.isdigit())
-        if phone.startswith("8") and len(phone) == 11:
-            phone = "7" + phone[1:]
-        elif phone.startswith("7") and len(phone) == 11:
-            pass
-        elif len(phone) == 10:
-            phone = "7" + phone
-        else:
-            return None
-        return str(f"https://wa.me/{phone}")
+        return build_whatsapp_url(number)
 
     @property
     def max_url(self) -> str | None:
-        if not self.max_contact:
-            return None
-        s = self.max_contact.strip()
-        if s.startswith(("http://", "https://")):
-            return str(s)
-        return None
+        return build_max_url(self.max_contact or self.max_contact_display)
+
+    @property
+    def max_contact_display(self) -> str | None:
+        """Нормализованное отображаемое значение контакта MAX."""
+        raw = self.max_contact or (
+            self.player_profile.max_contact if self.player_profile else ""
+        )
+        return get_max_display_contact(raw)
 
 
 class CoachApplicationStatus(models.TextChoices):

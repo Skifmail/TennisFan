@@ -8,6 +8,8 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 
+from apps.core.contact_utils import normalize_max_contact
+
 from .models import Player
 
 User = get_user_model()
@@ -247,7 +249,7 @@ class PlayerProfileForm(forms.ModelForm):
             "max_contact": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Ссылка на профиль MAX из «Поделиться»",
+                    "placeholder": "Ссылка на профиль MAX или номер телефона",
                 }
             ),
         }
@@ -305,6 +307,10 @@ class PlayerProfileForm(forms.ModelForm):
             "Нельзя сменить город на Москву: у вас активна подписка по региональному тарифу. "
             "Дождитесь окончания подписки или отмените её в профиле, после этого можно будет сменить город."
         )
+
+    def clean_max_contact(self) -> str:
+        """Нормализует контакт MAX как ссылку или номер телефона."""
+        return normalize_max_contact(self.cleaned_data.get("max_contact"))
 
     def save(self, commit=True):
         player = super().save(commit=False)

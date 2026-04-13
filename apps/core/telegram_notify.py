@@ -10,6 +10,8 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 
+from apps.core.contact_utils import get_max_display_contact
+
 logger = logging.getLogger(__name__)
 
 # Ключ кэша: приветствие при старте отправлено (не слать при каждом рестарте воркера)
@@ -151,7 +153,7 @@ def notify_coach_application(app) -> bool:
         f"  • Телефон: {_escape(app.phone) or '—'}",
         f"  • Telegram: {_escape(app.telegram) or '—'}",
         f"  • WhatsApp: {_escape(app.whatsapp) or '—'}",
-        f"  • MAX: {_escape(app.max_contact) or '—'}",
+        f"  • MAX: {_escape(get_max_display_contact(app.max_contact) or '') or '—'}",
         "",
         f"Биография: {_escape((app.bio or '')[:300])}{'…' if (app.bio or '') and len(app.bio or '') > 300 else ''}",
     ]

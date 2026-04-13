@@ -151,8 +151,8 @@
                             <span class="text-muted" style="font-size: var(--font-size-xs);">Заявка закрыта</span>
                             {% endif %}
                             <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-outline btn-sm">Профиль</a>
-                            {% if response.respondent.telegram or response.respondent.whatsapp or response.respondent.max_url %}
-                            <a href="#" class="btn btn-outline btn-sm contact-btn" data-telegram="{% if response.respondent.telegram %}https://t.me/{{ response.respondent.telegram|cut:'@' }}{% endif %}" data-whatsapp="{% if response.respondent.whatsapp %}{{ response.respondent.whatsapp }}{% endif %}" data-max="{% if response.respondent.max_url %}{{ response.respondent.max_url }}{% endif %}">Контакт</a>
+                            {% if response.respondent.telegram or response.respondent.whatsapp or response.respondent.max_contact_display %}
+                            <a href="#" class="btn btn-outline btn-sm contact-btn" data-telegram="{% if response.respondent.telegram %}https://t.me/{{ response.respondent.telegram|cut:'@' }}{% endif %}" data-whatsapp="{% if response.respondent.whatsapp %}{{ response.respondent.whatsapp }}{% endif %}" data-max="{% if response.respondent.max_url %}{{ response.respondent.max_url }}{% endif %}" data-max-display="{% if response.respondent.max_contact_display %}{{ response.respondent.max_contact_display }}{% endif %}">Контакт</a>
                             {% else %}
                             <span class="btn btn-outline btn-sm contact-btn--disabled" title="Контакт не указан">Контакт</span>
                             {% endif %}
@@ -246,7 +246,7 @@
                 <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> WhatsApp
             </a>
             <a href="#" class="btn sparring-modal__link sparring-modal__link--max messenger-btn" id="contact-max" style="display: none;">
-                <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> MAX
+                <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> <span id="contact-max-label">MAX</span>
             </a>
         </div>
         <button type="button" class="btn btn-ghost sparring-modal__close" id="sparring-contact-close">Закрыть</button>
@@ -264,8 +264,9 @@
     const tgLink = document.getElementById('contact-telegram');
     const waLink = document.getElementById('contact-whatsapp');
     const maxLink = document.getElementById('contact-max');
+    const maxLabel = document.getElementById('contact-max-label');
 
-    function openContactModal(telegram, whatsapp, max) {
+    function openContactModal(telegram, whatsapp, max, maxDisplay) {
         if (telegram) {
             tgLink.href = telegram;
             tgLink.style.display = '';
@@ -288,6 +289,15 @@
         }
         if (max) {
             maxLink.href = max;
+            maxLink.target = '_blank';
+            maxLink.rel = 'noopener';
+            if (maxLabel) maxLabel.textContent = 'MAX';
+            maxLink.style.display = '';
+        } else if (maxDisplay) {
+            maxLink.href = '#';
+            maxLink.removeAttribute('target');
+            maxLink.removeAttribute('rel');
+            if (maxLabel) maxLabel.textContent = 'MAX: ' + maxDisplay;
             maxLink.style.display = '';
         } else {
             maxLink.style.display = 'none';
@@ -305,9 +315,19 @@
             const telegram = this.dataset.telegram || '';
             const whatsapp = this.dataset.whatsapp || '';
             const max = this.dataset.max || '';
-            openContactModal(telegram, whatsapp, max);
+            const maxDisplay = this.dataset.maxDisplay || '';
+            openContactModal(telegram, whatsapp, max, maxDisplay);
         });
     });
+
+    if (maxLink) {
+        maxLink.addEventListener('click', function(e) {
+            if (this.getAttribute('href') !== '#') {
+                return;
+            }
+            e.preventDefault();
+        });
+    }
 
     if (backdrop) backdrop.addEventListener('click', closeContactModal);
     if (closeBtn) closeBtn.addEventListener('click', closeContactModal);

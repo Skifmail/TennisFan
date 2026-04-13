@@ -331,7 +331,7 @@
                 <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> WhatsApp
             </a>
             <a href="#" class="btn sparring-modal__link sparring-modal__link--max messenger-btn" data-method="max" style="display: none;">
-                <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> MAX
+                <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> <span class="sparring-max-label">MAX</span>
             </a>
         </div>
         <button type="button" class="btn btn-ghost sparring-modal__close" id="sparring-modal-close">Позже</button>
@@ -360,14 +360,28 @@
         var tg = modal.querySelector('.sparring-modal__link--tg');
         var wa = modal.querySelector('.sparring-modal__link--wa');
         var mx = modal.querySelector('.sparring-modal__link--max');
+        var mxLabel = modal.querySelector('.sparring-max-label');
         if (modalTitle) modalTitle.textContent = 'Отклик записан!';
         if (modalSub) modalSub.textContent = 'Автор заявки получит уведомление. Хотите связаться с ним?';
         tg.href = contactUrls.telegram || '#';
         tg.style.display = contactUrls.telegram ? '' : 'none';
         wa.href = contactUrls.whatsapp || '#';
         wa.style.display = contactUrls.whatsapp ? '' : 'none';
-        mx.href = contactUrls.max || '#';
-        mx.style.display = contactUrls.max ? '' : 'none';
+        if (contactUrls.max) {
+            mx.href = contactUrls.max;
+            mx.target = '_blank';
+            mx.rel = 'noopener';
+            if (mxLabel) mxLabel.textContent = 'MAX';
+            mx.style.display = '';
+        } else if (contactUrls.max_display) {
+            mx.href = '#';
+            mx.removeAttribute('target');
+            mx.removeAttribute('rel');
+            if (mxLabel) mxLabel.textContent = 'MAX: ' + contactUrls.max_display;
+            mx.style.display = '';
+        } else {
+            mx.style.display = 'none';
+        }
         modal.classList.remove('hidden');
     }
 

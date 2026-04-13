@@ -1,5 +1,5 @@
 {% load static %}
-{% if obj.telegram_url or obj.whatsapp_url or obj.max_url %}
+{% if obj.telegram_url or obj.whatsapp_url or obj.max_contact_display %}
 <div class="messenger-links d-flex gap-2 flex-wrap" style="justify-content: center;">
     {% if obj.telegram_url %}
     <a href="{{ obj.telegram_url }}" class="btn btn-outline messenger-btn" target="_blank" rel="noopener">
@@ -15,6 +15,10 @@
     <a href="{{ obj.max_url }}" class="btn btn-outline messenger-btn" target="_blank" rel="noopener">
         <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> MAX
     </a>
+    {% elif obj.max_contact_display %}
+    <span class="btn btn-outline messenger-btn" title="Контакт MAX: {{ obj.max_contact_display }}">
+        <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> MAX: {{ obj.max_contact_display }}
+    </span>
     {% endif %}
 </div>
 {% endif %}

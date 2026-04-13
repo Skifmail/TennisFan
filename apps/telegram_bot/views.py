@@ -1232,8 +1232,10 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
                 contact_info = (
                     f"WhatsApp: {respondent.whatsapp}\nСсылка: https://wa.me/{phone}"
                 )
-        elif contact_method == "max" and respondent.max_contact:
-            contact_info = f"MAX: {respondent.max_contact}"
+        elif contact_method == "max" and respondent.max_contact_display:
+            contact_info = f"MAX: {respondent.max_contact_display}"
+            if respondent.max_url:
+                contact_info += f"\nСсылка: {respondent.max_url}"
 
         if contact_info:
             bot.send_to_user(

@@ -27,6 +27,12 @@ from django.views.decorators.http import (
     require_POST,
 )
 
+from apps.core.contact_utils import (
+    build_max_url,
+    build_telegram_url,
+    build_whatsapp_url,
+    get_max_display_contact,
+)
 from apps.core.decorators import require_filled_profile
 from apps.core.text_search import filter_field_contains_ci
 from apps.users.models import Notification, Player
@@ -88,19 +94,9 @@ def _get_contact_url(player: Player, method: str) -> str | None:
     """Return contact URL for player and method (telegram/whatsapp/max), or None."""
     # TextChoices возвращает кортеж (value, label), используем строковые значения напрямую
     if method == "telegram" and player.telegram:
-        uname = player.telegram.strip().lstrip("@")
-        return f"https://t.me/{uname}"
+        return build_telegram_url(player.telegram)
     if method == "whatsapp" and player.whatsapp:
-        phone = "".join(c for c in player.whatsapp if c.isdigit())
-        if phone.startswith("8") and len(phone) == 11:
-            phone = "7" + phone[1:]
-        elif phone.startswith("7") and len(phone) == 11:
-            pass
-        elif len(phone) == 10:
-            phone = "7" + phone
-        else:
-            return None
-        return f"https://wa.me/{phone}"
+        return build_whatsapp_url(player.whatsapp)
     if method == "max":
         return player.max_url
     return None
@@ -463,12 +459,13 @@ def sparring_confirm_response(request, response_id):
     return redirect("sparring_my_requests")
 
 
-def _build_contact_urls(player: Player) -> dict:
-    """Return dict telegram/whatsapp/max -> URL or None."""
+def _build_contact_urls(player: Player) -> dict[str, str | None]:
+    """Возвращает контакты игрока для модалки связи."""
     return {
         "telegram": _get_contact_url(player, "telegram"),
         "whatsapp": _get_contact_url(player, "whatsapp"),
-        "max": _get_contact_url(player, "max"),
+        "max": build_max_url(player.max_contact),
+        "max_display": get_max_display_contact(player.max_contact),
     }
 
 

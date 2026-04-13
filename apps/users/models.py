@@ -8,6 +8,12 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
 
+from apps.core.contact_utils import (
+    build_max_url,
+    build_telegram_url,
+    build_whatsapp_url,
+    get_max_display_contact,
+)
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
 
@@ -145,7 +151,7 @@ class Player(CompressImageFieldsMixin, models.Model):
         "MAX",
         max_length=500,
         blank=True,
-        help_text="Ссылка на профиль в мессенджере MAX (из раздела «Поделиться»)",
+        help_text="Ссылка на профиль в мессенджере MAX или номер телефона, привязанный к MAX.",
     )
 
     # Statistics / Rating
@@ -220,36 +226,22 @@ class Player(CompressImageFieldsMixin, models.Model):
     @property
     def telegram_url(self) -> str | None:
         """Link to Telegram profile."""
-        if not self.telegram:
-            return None
-        u = self.telegram.strip().lstrip("@")
-        return f"https://t.me/{u}" if u else None
+        return build_telegram_url(self.telegram)
 
     @property
     def whatsapp_url(self) -> str | None:
         """Link to WhatsApp chat."""
-        if not self.whatsapp:
-            return None
-        phone = "".join(c for c in self.whatsapp if c.isdigit())
-        if phone.startswith("8") and len(phone) == 11:
-            phone = "7" + phone[1:]
-        elif phone.startswith("7") and len(phone) == 11:
-            pass
-        elif len(phone) == 10:
-            phone = "7" + phone
-        else:
-            return None
-        return f"https://wa.me/{phone}"
+        return build_whatsapp_url(self.whatsapp)
 
     @property
     def max_url(self) -> str | None:
         """Link to MAX profile (stored URL)."""
-        if not self.max_contact:
-            return None
-        s = self.max_contact.strip()
-        if s.startswith(("http://", "https://")):
-            return str(s)
-        return None
+        return build_max_url(self.max_contact)
+
+    @property
+    def max_contact_display(self) -> str | None:
+        """Нормализованное отображаемое значение контакта MAX."""
+        return get_max_display_contact(self.max_contact)
 
     @staticmethod
     def _calculate_age(birth_date):

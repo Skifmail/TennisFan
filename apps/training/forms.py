@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from django import forms
 
+from apps.core.contact_utils import normalize_max_contact
 from apps.courts.models import Court
 from apps.users.models import SkillLevel
 
@@ -159,7 +160,7 @@ class CoachApplicationForm(forms.ModelForm):
             "max_contact": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Ссылка на профиль MAX (из «Поделиться»)",
+                    "placeholder": "Ссылка на профиль MAX или номер телефона",
                 }
             ),
             "city": forms.TextInput(
@@ -177,6 +178,10 @@ class CoachApplicationForm(forms.ModelForm):
         self.fields["telegram"].required = False
         self.fields["whatsapp"].required = False
         self.fields["max_contact"].required = False
+
+    def clean_max_contact(self) -> str:
+        """Нормализует контакт MAX как ссылку или номер телефона."""
+        return normalize_max_contact(self.cleaned_data.get("max_contact"))
 
 
 class TrainingForm(forms.ModelForm):

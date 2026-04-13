@@ -94,7 +94,7 @@
                         {% for err in form.whatsapp.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                     <div class="form-group" style="flex: 1; min-width: 180px;">
-                        <label class="form-label" for="id_max_contact">{{ form.max_contact.label }}</label>
+                        <label class="form-label" for="id_max_contact">{{ form.max_contact.label }} (ссылка или номер)</label>
                         {{ form.max_contact }}
                         {% for err in form.max_contact.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>

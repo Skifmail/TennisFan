@@ -23,12 +23,37 @@
                 <p class="text-secondary">{{ coach.specialization }}</p>
                 <p class="text-muted mt-2">Опыт: {{ coach.experience_years }} {{ coach.experience_years|years_suffix }}</p>
 
-                {% if coach.phone or coach.telegram_url or coach.whatsapp_url or coach.max_url %}
-                <div class="d-flex gap-2 mt-3 flex-wrap" style="justify-content: center;">
+                {% if coach.phone or coach.telegram_url or coach.whatsapp_url or coach.max_contact_display %}
+                <div class="coach-contact-list mt-3">
                     {% if coach.phone %}
-                    <a href="tel:{{ coach.phone }}" class="btn btn-outline">Позвонить</a>
+                    <a href="tel:{{ coach.phone }}" class="btn btn-outline messenger-btn coach-contact-btn">
+                        <img src="{% static 'images/chat_icon.png' %}" alt="" class="messenger-btn__icon" width="20" height="20">
+                        <span>Позвонить</span>
+                    </a>
                     {% endif %}
-                    {% include 'includes/messenger_links.html' with obj=coach %}
+                    {% if coach.telegram_url %}
+                    <a href="{{ coach.telegram_url }}" class="btn btn-outline messenger-btn coach-contact-btn" target="_blank" rel="noopener">
+                        <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20">
+                        <span>Telegram</span>
+                    </a>
+                    {% endif %}
+                    {% if coach.whatsapp_url %}
+                    <a href="{{ coach.whatsapp_url }}" class="btn btn-outline messenger-btn coach-contact-btn" target="_blank" rel="noopener">
+                        <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20">
+                        <span>WhatsApp</span>
+                    </a>
+                    {% endif %}
+                    {% if coach.max_url %}
+                    <a href="{{ coach.max_url }}" class="btn btn-outline messenger-btn coach-contact-btn" target="_blank" rel="noopener">
+                        <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20">
+                        <span>MAX</span>
+                    </a>
+                    {% elif coach.max_contact_display %}
+                    <span class="btn btn-outline messenger-btn coach-contact-btn coach-contact-btn--static" title="Контакт MAX: {{ coach.max_contact_display }}">
+                        <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20">
+                        <span>MAX: {{ coach.max_contact_display }}</span>
+                    </span>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>

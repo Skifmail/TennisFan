@@ -9,6 +9,8 @@ from typing import cast
 import requests
 from django.conf import settings
 from django.core.cache import cache
+from django.core.mail import send_mail
+from django.utils.html import strip_tags
 
 from apps.core.contact_utils import get_max_display_contact
 
@@ -72,39 +74,113 @@ def _send_admin_message_raw(text: str, parse_mode: str = "HTML"):
     """
     token = (getattr(settings, "TELEGRAM_BOT_TOKEN", None) or "").strip()
     chat_ids = getattr(settings, "TELEGRAM_ADMIN_CHAT_IDS", None) or []
-    if not token or not chat_ids:
+    if not chat_ids:
         single = (getattr(settings, "TELEGRAM_ADMIN_CHAT_ID", None) or "").strip()
         if single:
             chat_ids = [single]
-        else:
-            logger.debug(
-                "Telegram notify skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID(s) not set"
-            )
-            return None, False
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     last_msg_id = None
-    any_ok = False
-    for chat_id in chat_ids:
-        cid = str(chat_id).strip()
-        if not cid:
-            continue
-        payload = {
-            "chat_id": cid,
-            "text": text,
-            "parse_mode": parse_mode,
-            "disable_web_page_preview": True,
-        }
-        try:
-            r = requests.post(url, json=payload, timeout=10)
-            r.raise_for_status()
-            data = r.json()
-            result = data.get("result", {})
-            last_msg_id = result.get("message_id")
-            any_ok = True
-        except Exception as e:
-            logger.warning("Telegram notify failed for chat_id=%s: %s", cid, e)
+    telegram_ok = False
+    if token and chat_ids:
+        for chat_id in chat_ids:
+            cid = str(chat_id).strip()
+            if not cid:
+                continue
+            payload = {
+                "chat_id": cid,
+                "text": text,
+                "parse_mode": parse_mode,
+                "disable_web_page_preview": True,
+            }
+            try:
+                r = requests.post(url, json=payload, timeout=10)
+                r.raise_for_status()
+                data = r.json()
+                result = data.get("result", {})
+                last_msg_id = result.get("message_id")
+                telegram_ok = True
+            except Exception as e:
+                logger.warning("Telegram notify failed for chat_id=%s: %s", cid, e)
+    else:
+        logger.debug(
+            "Telegram notify skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID(s) not set"
+        )
+
+    email_ok = _send_admin_email(text=text, parse_mode=parse_mode)
+    any_ok = telegram_ok or email_ok
     return last_msg_id, any_ok
+
+
+def _send_admin_email(text: str, parse_mode: str = "HTML") -> bool:
+    """Отправить дубликат админ-уведомления на email.
+
+    Args:
+        text (str): Текст уведомления из Telegram-канала.
+        parse_mode (str): Режим форматирования Telegram (используется для очистки HTML).
+
+    Returns:
+        bool: ``True``, если письмо успешно отправлено, иначе ``False``.
+    """
+    recipient = (
+        getattr(settings, "ADMIN_NOTIFICATIONS_EMAIL", None)
+        or getattr(settings, "COURT_APPLICATION_NOTIFICATION_EMAIL", None)
+        or "tennis@tennisfan.ru"
+    )
+    recipient = str(recipient).strip()
+    if not recipient:
+        return False
+
+    body = strip_tags(text) if parse_mode.upper() == "HTML" else text
+    subject = _build_admin_email_subject(body)
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru"),
+            recipient_list=[recipient],
+            fail_silently=False,
+        )
+        return True
+    except Exception as exc:
+        logger.warning("Admin email notify failed for %s: %s", recipient, exc)
+        return False
+
+
+def _build_admin_email_subject(body: str) -> str:
+    """Собрать тему email по первой информативной строке уведомления.
+
+    Args:
+        body (str): Текст уведомления без HTML-разметки.
+
+    Returns:
+        str: Тема письма в формате ``TennisFan: <тип уведомления>``.
+    """
+    default_subject = "TennisFan: Уведомление администратору"
+    if not body:
+        return default_subject
+
+    first_line = ""
+    for raw_line in body.splitlines():
+        line = raw_line.strip()
+        if line:
+            first_line = line
+            break
+    if not first_line:
+        return default_subject
+
+    # Убираем ведущие emoji/служебные маркеры, чтобы тема была читаемой.
+    normalized = first_line.lstrip(" \t-•:|")
+    while normalized and not (normalized[0].isalnum() or normalized[0] in ("№", "#")):
+        normalized = normalized[1:].lstrip(" \t-•:|")
+
+    if not normalized:
+        return default_subject
+    if len(normalized) > 120:
+        normalized = normalized[:117].rstrip() + "..."
+
+    return f"TennisFan: {normalized}"
 
 
 def _escape(s: str) -> str:
@@ -174,7 +250,7 @@ def notify_court_application(app) -> bool:
         f"  • Название: {_escape(app.name)}",
         f"  • Город: {_escape(app.city)}",
         f"  • Адрес: {_escape(app.address)}",
-        f"  • Покрытие: {_escape(app.get_surface_display())}",
+        f"  • Покрытие: {_escape(getattr(app, 'surface', '') or '—')}",
         f"  • Кортов: {app.courts_count}",
         f"  • Освещение: {'да' if app.has_lighting else 'нет'}, Крытый: {'да' if app.is_indoor else 'нет'}",
     ]

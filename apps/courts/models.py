@@ -181,9 +181,26 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
         max_length=100,
         help_text="Например: хард, грунт, трава. Укажите вручную.",
     )
+    indoor_surface = models.CharField(
+        "Покрытие крытых кортов",
+        max_length=100,
+        blank=True,
+        help_text="Например: хард, грунт, трава.",
+    )
+    outdoor_surface = models.CharField(
+        "Покрытие открытых кортов",
+        max_length=100,
+        blank=True,
+        help_text="Например: хард, грунт, трава.",
+    )
     courts_count = models.PositiveSmallIntegerField("Количество кортов", default=1)
     has_lighting = models.BooleanField("Освещение", default=True)
     is_indoor = models.BooleanField("Крытый", default=False)
+    is_outdoor = models.BooleanField(
+        "Открытый",
+        default=False,
+        help_text="Можно выбрать одновременно с «Крытый», если есть оба формата.",
+    )
 
     phone = models.CharField("Телефон", max_length=20, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
@@ -223,16 +240,18 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
         while Court.objects.filter(slug=slug).exists():
             n += 1
             slug = f"{base_slug}-{n}"
+        combined_surface = self._compose_surface_display()
         court = Court.objects.create(
             name=self.name,
             slug=slug,
             city=self.city,
             address=self.address,
             description=self.description,
-            surface=self.surface,
+            surface=combined_surface,
             courts_count=self.courts_count,
             has_lighting=self.has_lighting,
             is_indoor=self.is_indoor,
+            is_outdoor=self.is_outdoor,
             phone=self.phone,
             whatsapp=self.whatsapp,
             website=self.website or "",
@@ -248,6 +267,18 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
         self.status = CourtApplicationStatus.APPROVED
         self.save(update_fields=["court", "status", "updated_at"])
         return cast(Court, court)
+
+    def _compose_surface_display(self) -> str:
+        parts: list[str] = []
+        if self.is_indoor and self.indoor_surface:
+            parts.append(f"Крытые: {self.indoor_surface}")
+        if self.is_outdoor and self.outdoor_surface:
+            parts.append(f"Открытые: {self.outdoor_surface}")
+        if parts:
+            return "; ".join(parts)
+        if self.surface:
+            return str(self.surface)
+        return "не указано"
 
 
 class CourtRating(models.Model):

@@ -7,6 +7,10 @@ import html
 import logging
 import threading
 
+from django.conf import settings
+from django.core.mail import send_mail
+from django.utils.html import strip_tags
+
 from apps.core.models import UserTelegramLink
 from apps.tournaments.utils import (
     get_match_opponent_users,
@@ -33,10 +37,88 @@ def get_chat_id_for_user(user) -> int | None:
 
 def send_to_user_by_user(user, text: str, reply_markup: dict | None = None) -> bool:
     """Отправить сообщение пользователю по User (если привязан Telegram)."""
+    email_ok = _send_notification_email_to_user(user=user, text=text)
     chat_id = get_chat_id_for_user(user)
     if chat_id is None:
+        return email_ok
+    telegram_ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+    return telegram_ok or email_ok
+
+
+def _send_notification_email_to_user(user, text: str) -> bool:
+    """Отправить пользователю email-дубль Telegram-уведомления.
+
+    Args:
+        user: Пользователь-получатель уведомления.
+        text (str): Текст Telegram-уведомления (HTML-формат).
+
+    Returns:
+        bool: ``True``, если email отправлен успешно, иначе ``False``.
+    """
+    if not bool(getattr(settings, "USER_NOTIFICATIONS_EMAIL_ENABLED", True)):
         return False
-    return bot.send_to_user(chat_id, text, reply_markup=reply_markup)
+    if user is None:
+        return False
+    recipient = str(getattr(user, "email", "") or "").strip()
+    if not recipient or "@" not in recipient:
+        return False
+
+    body = strip_tags(text or "").strip()
+    if not body:
+        return False
+    subject = _build_user_email_subject(body)
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru")
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=from_email,
+            recipient_list=[recipient],
+            fail_silently=False,
+        )
+        return True
+    except Exception as exc:
+        logger.warning(
+            "User notification email failed for user_id=%s email=%s: %s",
+            getattr(user, "pk", None),
+            recipient,
+            exc,
+        )
+        return False
+
+
+def _build_user_email_subject(body: str) -> str:
+    """Собрать тему письма по первой непустой строке уведомления.
+
+    Args:
+        body (str): Текст уведомления без HTML-разметки.
+
+    Returns:
+        str: Тема письма в формате ``TennisFan: <тип уведомления>``.
+    """
+    default_subject = "TennisFan: Уведомление в личный кабинет"
+    if not body:
+        return default_subject
+
+    first_line = ""
+    for raw_line in body.splitlines():
+        line = raw_line.strip()
+        if line:
+            first_line = line
+            break
+    if not first_line:
+        return default_subject
+
+    normalized = first_line.lstrip(" \t-•:|")
+    while normalized and not (normalized[0].isalnum() or normalized[0] in ("№", "#")):
+        normalized = normalized[1:].lstrip(" \t-•:|")
+
+    if not normalized:
+        return default_subject
+    if len(normalized) > 120:
+        normalized = normalized[:117].rstrip() + "..."
+    return f"TennisFan: {normalized}"
 
 
 def _get_site_base_url() -> str:

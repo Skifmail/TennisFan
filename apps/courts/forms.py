@@ -2,6 +2,8 @@
 Courts forms.
 """
 
+from typing import Any, cast
+
 from django import forms
 from django.core.exceptions import ValidationError
 
@@ -41,9 +43,12 @@ class CourtApplicationForm(forms.ModelForm):
             "address",
             "description",
             "surface",
+            "indoor_surface",
+            "outdoor_surface",
             "courts_count",
             "has_lighting",
             "is_indoor",
+            "is_outdoor",
             "phone",
             "whatsapp",
             "website",
@@ -89,6 +94,16 @@ class CourtApplicationForm(forms.ModelForm):
                 }
             ),
             "surface": forms.TextInput(
+                attrs={"class": "form-control", "type": "hidden"}
+            ),
+            "indoor_surface": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Например: хард, грунт, трава",
+                    "maxlength": "100",
+                }
+            ),
+            "outdoor_surface": forms.TextInput(
                 attrs={
                     "class": "form-control",
                     "placeholder": "Например: хард, грунт, трава",
@@ -100,6 +115,7 @@ class CourtApplicationForm(forms.ModelForm):
             ),
             "has_lighting": forms.CheckboxInput(attrs={"class": "form-checkbox"}),
             "is_indoor": forms.CheckboxInput(attrs={"class": "form-checkbox"}),
+            "is_outdoor": forms.CheckboxInput(attrs={"class": "form-checkbox"}),
             "phone": forms.TextInput(
                 attrs={
                     "class": "form-control js-phone-input",
@@ -148,6 +164,9 @@ class CourtApplicationForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["applicant_phone"].required = False
         self.fields["description"].required = False
+        self.fields["surface"].required = False
+        self.fields["indoor_surface"].required = False
+        self.fields["outdoor_surface"].required = False
         self.fields["phone"].required = False
         self.fields["whatsapp"].required = False
         self.fields["website"].required = False
@@ -163,3 +182,43 @@ class CourtApplicationForm(forms.ModelForm):
                 "Необходимо согласиться с обработкой персональных данных."
             )
         return True
+
+    def clean(self) -> dict[str, Any]:
+        """Проверить согласованность выбранных характеристик корта.
+
+        Args:
+            None: Используются данные формы из ``self.cleaned_data``.
+
+        Returns:
+            dict: Очищенные данные формы.
+
+        Raises:
+            ValidationError: Если не выбран ни один формат площадки.
+        """
+        cleaned_data = cast(dict[str, Any], super().clean())
+        is_indoor = bool(cleaned_data.get("is_indoor"))
+        is_outdoor = bool(cleaned_data.get("is_outdoor"))
+        if not is_indoor and not is_outdoor:
+            raise ValidationError(
+                "Выберите минимум один формат площадки: «Крытый» и/или «Открытый»."
+            )
+        indoor_surface = (cleaned_data.get("indoor_surface") or "").strip()
+        outdoor_surface = (cleaned_data.get("outdoor_surface") or "").strip()
+        if is_indoor and not indoor_surface:
+            self.add_error(
+                "indoor_surface",
+                "Укажите покрытие для крытых кортов.",
+            )
+        if is_outdoor and not outdoor_surface:
+            self.add_error(
+                "outdoor_surface",
+                "Укажите покрытие для открытых кортов.",
+            )
+
+        parts: list[str] = []
+        if indoor_surface:
+            parts.append(f"Крытые: {indoor_surface}")
+        if outdoor_surface:
+            parts.append(f"Открытые: {outdoor_surface}")
+        cleaned_data["surface"] = "; ".join(parts) if parts else ""
+        return cleaned_data

@@ -370,7 +370,7 @@ def auth(request):
                     skill_level=skill,
                     total_points=starting_pts,
                     hidden_rating=float(starting_pts),
-                    is_verified=True,  # Новые пользователи автоматически верифицированы
+                    is_verified=False,  # В рейтинг попадает после модерации или загрузки аватара
                 )
 
                 quiz_raw = register_form.cleaned_data.get("ntrp_quiz_payload") or ""
@@ -787,6 +787,8 @@ def profile(request, pk):
         except Exception:
             pass
 
+    is_rating_visible = bool(player.is_verified or player.avatar)
+
     context = {
         "player": player,
         "recent_matches": recent_matches,
@@ -808,6 +810,7 @@ def profile(request, pk):
         "is_profile_owner": is_profile_owner,
         "can_view_profile_stats": can_view_profile_stats,
         "subscription_autopay_card": subscription_autopay_card,
+        "is_rating_visible": is_rating_visible,
     }
     return render(request, "users/profile.html", context)
 

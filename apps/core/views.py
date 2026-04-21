@@ -1199,12 +1199,13 @@ def home(request):
     from apps.tournaments.season_utils import get_current_season
 
     current_season = get_current_season()
+    rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
     top_players = (
         Player.objects.filter(
-            is_verified=True,
             is_bye=False,
             is_hidden_on_home=False,
         )
+        .filter(rating_visibility_filter)
         .select_related(
             "user", "user__subscription", "user__subscription__tier", "season_points"
         )
@@ -1312,8 +1313,10 @@ def rating(request):
     current_season = get_current_season()
 
     # Получаем игроков с сезонными очками (исключаем служебного игрока "Свободный круг")
+    rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
     players = (
         Player.objects.filter(is_bye=False)
+        .filter(rating_visibility_filter)
         .select_related(
             "user", "user__subscription", "user__subscription__tier", "season_points"
         )

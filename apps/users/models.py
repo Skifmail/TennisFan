@@ -168,7 +168,7 @@ class Player(CompressImageFieldsMixin, models.Model):
     matches_played = models.PositiveIntegerField("Сыграно матчей", default=0)
     matches_won = models.PositiveIntegerField("Побед", default=0)
 
-    is_verified = models.BooleanField("Подтверждён", default=True)
+    is_verified = models.BooleanField("Подтверждён", default=False)
     is_legend = models.BooleanField("Легенда", default=False)
     is_hidden_on_home = models.BooleanField(
         "Не показывать на главной",

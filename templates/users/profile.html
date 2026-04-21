@@ -48,6 +48,12 @@
                     <p><strong>Пол:</strong> {{ player.get_gender_display }}</p>
                     <p><strong>Ведущая рука:</strong> {{ player.get_forehand_display }}</p>
                 </div>
+                {% if is_profile_owner and not is_club_profile and not is_rating_visible %}
+                <div class="alert alert-warning" style="margin-bottom: var(--spacing-lg);">
+                    Для полноценного пользования платформой загрузите свой аватар в профиле.
+                    После этого вы автоматически появитесь в рейтинге (или после одобрения администратором).
+                </div>
+                {% endif %}
 
                 <!-- Статистика в виде таблицы (две строки: уровень/сила/FAN и очки сезона/матчей/побед) -->
                 <div class="profile-stats-table">

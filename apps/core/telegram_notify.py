@@ -250,9 +250,14 @@ def notify_court_application(app) -> bool:
         f"  • Название: {_escape(app.name)}",
         f"  • Город: {_escape(app.city)}",
         f"  • Адрес: {_escape(app.address)}",
-        f"  • Покрытие: {_escape(getattr(app, 'surface', '') or '—')}",
+        f"  • Покрытие (крытые): {_escape(getattr(app, 'indoor_surface', '') or '—')}",
+        f"  • Покрытие (открытые): {_escape(getattr(app, 'outdoor_surface', '') or '—')}",
         f"  • Кортов: {app.courts_count}",
-        f"  • Освещение: {'да' if app.has_lighting else 'нет'}, Крытый: {'да' if app.is_indoor else 'нет'}",
+        (
+            f"  • Освещение: {'да' if app.has_lighting else 'нет'}, "
+            f"Крытый: {'да' if app.is_indoor else 'нет'}, "
+            f"Открытый: {'да' if getattr(app, 'is_outdoor', False) else 'нет'}"
+        ),
     ]
     if app.price_per_hour:
         lines.append(f"  • Цена/час: {app.price_per_hour} ₽")

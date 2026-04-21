@@ -306,6 +306,9 @@ EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False") == "True"
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru")
+USER_NOTIFICATIONS_EMAIL_ENABLED = (
+    os.environ.get("USER_NOTIFICATIONS_EMAIL_ENABLED", "True") == "True"
+)
 ADMIN_NOTIFICATIONS_EMAIL = os.environ.get(
     "ADMIN_NOTIFICATIONS_EMAIL", "tennis@tennisfan.ru"
 )

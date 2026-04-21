@@ -116,6 +116,8 @@ class CourtAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "surface",
+                    "indoor_surface",
+                    "outdoor_surface",
                     "courts_count",
                     "has_lighting",
                     "is_indoor",
@@ -248,7 +250,15 @@ class CourtApplicationAdmin(admin.ModelAdmin):
         (None, {"fields": ("name", "city", "address", "description")}),
         (
             "Характеристики",
-            {"fields": ("surface", "courts_count", "has_lighting", "is_indoor")},
+            {
+                "fields": (
+                    "surface",
+                    "courts_count",
+                    "has_lighting",
+                    "is_indoor",
+                    "is_outdoor",
+                )
+            },
         ),
         ("Контакты корта", {"fields": ("phone", "whatsapp", "website")}),
         ("Карта", {"fields": ("latitude", "longitude")}),

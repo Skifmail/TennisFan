@@ -308,12 +308,24 @@ class PlayerProfileForm(forms.ModelForm):
             "Дождитесь окончания подписки или отмените её в профиле, после этого можно будет сменить город."
         )
 
+    def clean_avatar(self):
+        """Корректно обработать очистку аватара через чекбокс ClearableFileInput."""
+        if self.data.get("avatar-clear"):
+            return False
+        return self.cleaned_data.get("avatar")
+
     def clean_max_contact(self) -> str:
         """Нормализует контакт MAX как ссылку или номер телефона."""
         return normalize_max_contact(self.cleaned_data.get("max_contact"))
 
     def save(self, commit=True):
         player = super().save(commit=False)
+        # Явно обрабатываем очистку аватара из ClearableFileInput,
+        # чтобы удаление стабильно работало на любом backend хранилища.
+        avatar_cleared = bool(self.cleaned_data.get("avatar") is False)
+        if avatar_cleared and player.avatar:
+            player.avatar.delete(save=False)
+            player.avatar = None
         if self.user:
             self.user.first_name = self.cleaned_data["first_name"]
             self.user.last_name = self.cleaned_data["last_name"]

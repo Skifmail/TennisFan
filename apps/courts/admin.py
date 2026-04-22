@@ -163,6 +163,14 @@ class CourtAdmin(admin.ModelAdmin):
     )
 
     def save_model(self, request, obj, form, change):
+        # Синхронизируем агрегированное поле покрытия для витрины/фильтров.
+        parts: list[str] = []
+        if obj.is_indoor and obj.indoor_surface:
+            parts.append(f"Крытые: {obj.indoor_surface}")
+        if obj.is_outdoor and obj.outdoor_surface:
+            parts.append(f"Открытые: {obj.outdoor_surface}")
+        if parts:
+            obj.surface = "; ".join(parts)
         super().save_model(request, obj, form, change)
         # Автогеокодирование: если адрес есть, а координат нет — запросить по API
         if obj.address and (obj.latitude is None or obj.longitude is None):
@@ -253,6 +261,8 @@ class CourtApplicationAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "surface",
+                    "indoor_surface",
+                    "outdoor_surface",
                     "courts_count",
                     "has_lighting",
                     "is_indoor",

@@ -13,28 +13,37 @@
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
+                {% if form.non_field_errors %}
+                <div class="alert alert-error" style="margin-bottom: var(--spacing-lg);">
+                    {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+                </div>
+                {% endif %}
 
                 <h3 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Основная информация</h3>
 
                 <div class="form-group">
                     <label class="form-label">Аватар</label>
                     {{ form.avatar }}
+                    {% for err in form.avatar.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
 
                 <div class="d-flex gap-2">
                     <div class="form-group" style="flex: 1;">
                         <label class="form-label">{{ form.first_name.label }}</label>
                         {{ form.first_name }}
+                        {% for err in form.first_name.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                     <div class="form-group" style="flex: 1;">
                         <label class="form-label">{{ form.last_name.label }}</label>
                         {{ form.last_name }}
+                        {% for err in form.last_name.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">{{ form.phone.label }}</label>
                     {{ form.phone }}
+                    {% for err in form.phone.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
 
                 <div class="form-group">
@@ -49,16 +58,19 @@
                 <div class="form-group">
                     <label class="form-label">{{ form.birth_date.label }}</label>
                     {{ form.birth_date }}
+                    {% for err in form.birth_date.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
 
                 <div class="d-flex gap-2">
                     <div class="form-group" style="flex: 1;">
                         <label class="form-label">{{ form.gender.label }}</label>
                         {{ form.gender }}
+                        {% for err in form.gender.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                     <div class="form-group" style="flex: 1;">
                         <label class="form-label">{{ form.forehand.label }}</label>
                         {{ form.forehand }}
+                        {% for err in form.forehand.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                 </div>
 
@@ -66,6 +78,7 @@
                     <div class="form-group" style="flex: 1;">
                         <label class="form-label">{{ form.city.label }}</label>
                         {{ form.city }}
+                        {% for err in form.city.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                 </div>
 
@@ -76,6 +89,7 @@
                 <div class="form-group">
                     <label class="form-label">{{ form.bio.label }}</label>
                     {{ form.bio }}
+                    {% for err in form.bio.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap">
@@ -85,6 +99,7 @@
                                 width="18" height="18"> {{ form.telegram.label }} (username)
                         </label>
                         {{ form.telegram }}
+                        {% for err in form.telegram.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                     <div class="form-group form-group-messenger">
                         <label class="form-label form-label-with-logo">
@@ -92,6 +107,7 @@
                                 height="18"> {{ form.whatsapp.label }} (номер)
                         </label>
                         {{ form.whatsapp }}
+                        {% for err in form.whatsapp.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                     <div class="form-group form-group-messenger">
                         <label class="form-label form-label-with-logo">
@@ -99,6 +115,7 @@
                                 width="18" height="18"> {{ form.max_contact.label }} (ссылка или номер)
                         </label>
                         {{ form.max_contact }}
+                        {% for err in form.max_contact.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                 </div>
 
@@ -126,27 +143,21 @@
                             <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="btn-telegram__icon" width="20" height="20"> Открыть бота
                         </a>
                         {% endif %}
-                        <form method="post" action="{% url 'telegram_disconnect' %}">
-                            {% csrf_token %}
-                            <input type="hidden" name="next" value="{% url 'profile_edit' %}">
-                            <button type="submit" class="btn btn-outline btn-danger-text">Отключить бота</button>
-                        </form>
+                        <button type="submit" form="telegram-disconnect-form" class="btn btn-outline btn-danger-text">Отключить бота</button>
                     </div>
                     {% else %}
-                    <form method="post" action="{% url 'telegram_connect' %}" class="profile-info__telegram-consent-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{% url 'profile_edit' %}">
+                    <div class="profile-info__telegram-consent-form">
                         <label class="consent-label profile-info__telegram-consent">
-                            <input type="checkbox" name="telegram_transfer_consent" required>
+                            <input type="checkbox" name="telegram_transfer_consent" required form="telegram-connect-form">
                             <span class="consent-text">
                                 Я подтверждаю согласие на передачу необходимых данных в сервис Telegram
                                 для работы уведомлений бота.
                             </span>
                         </label>
-                        <button type="submit" class="btn btn-telegram">
+                        <button type="submit" form="telegram-connect-form" class="btn btn-telegram">
                             <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="btn-telegram__icon" width="20" height="20"> Подключить Telegram-бот
                         </button>
-                    </form>
+                    </div>
                     {% endif %}
                 </div>
 
@@ -166,6 +177,14 @@
                     <button type="submit" class="btn btn-primary btn-lg" style="flex: 1;">Сохранить</button>
                     <a href="{% url 'profile' pk=request.user.player.pk %}" class="btn btn-ghost btn-lg">Отмена</a>
                 </div>
+            </form>
+            <form id="telegram-disconnect-form" method="post" action="{% url 'telegram_disconnect' %}" style="display: none;">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'profile_edit' %}">
+            </form>
+            <form id="telegram-connect-form" method="post" action="{% url 'telegram_connect' %}" style="display: none;">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'profile_edit' %}">
             </form>
         </div>
     </div>

@@ -26,6 +26,18 @@ class Court(CompressImageFieldsMixin, models.Model):
         max_length=100,
         help_text="Например: хард, грунт, трава. Заполняется заявителем при подаче заявки.",
     )
+    indoor_surface = models.CharField(
+        "Покрытие крытых кортов",
+        max_length=100,
+        blank=True,
+        help_text="Например: хард, грунт, трава.",
+    )
+    outdoor_surface = models.CharField(
+        "Покрытие открытых кортов",
+        max_length=100,
+        blank=True,
+        help_text="Например: хард, грунт, трава.",
+    )
     courts_count = models.PositiveSmallIntegerField("Количество кортов", default=1)
     has_lighting = models.BooleanField("Освещение", default=True)
     is_indoor = models.BooleanField("Крытый", default=False)
@@ -248,6 +260,8 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
             address=self.address,
             description=self.description,
             surface=combined_surface,
+            indoor_surface=self.indoor_surface,
+            outdoor_surface=self.outdoor_surface,
             courts_count=self.courts_count,
             has_lighting=self.has_lighting,
             is_indoor=self.is_indoor,

@@ -163,7 +163,7 @@
             mixedOption.style.display = "none";
             mixedOption.setAttribute("hidden", "hidden");
             
-            // Если выбран "Микст", переключаем на "Смешанный" (open)
+            // Если выбран "Микст", переключаем на "Любой" (open)
             if (currentValue === "mixed") {
                 genderSelect.value = "open";
                 // Триггерим событие change для обновления формы
@@ -174,22 +174,8 @@
     }
 
     function updateRoundRobinPointsDefaults() {
-        const format = getFormatValue();
-        const isRoundRobin = format === ROUND_ROBIN_FORMAT;
-        if (!isRoundRobin) return;
-
-        const pointsWinnerInput = document.querySelector("#id_points_winner, [name='points_winner']");
-        const pointsLoserInput = document.querySelector("#id_points_loser, [name='points_loser']");
-
-        if (pointsWinnerInput && pointsLoserInput) {
-            const currentWinner = parseInt(pointsWinnerInput.value) || 0;
-            const currentLoser = parseInt(pointsLoserInput.value) || 0;
-            // Если значения равны дефолтам для других форматов (100/-50), устанавливаем стандартные для кругового
-            if (currentWinner === 100 && currentLoser === -50) {
-                pointsWinnerInput.value = "1";
-                pointsLoserInput.value = "0";
-            }
-        }
+        // points_winner / points_loser больше не используются, функция оставлена пустой для совместимости.
+        return;
     }
 
     function updateVisibility() {

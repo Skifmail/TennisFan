@@ -206,6 +206,16 @@
                         </label>
                         {% for error in form.is_one_day.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
                     </div>
+                    <div class="club-tournament-create__field club-tournament-create__field--toggle">
+                        <label class="club-tournament-create__toggle-row" for="{{ form.allow_postpayment.id_for_label }}">
+                            {{ form.allow_postpayment }}
+                            <span>
+                                <span class="club-tournament-create__toggle-title">{{ form.allow_postpayment.label }}</span>
+                                <span class="club-tournament-create__toggle-help">Разрешить регистрацию без немедленной оплаты взноса с окном постоплаты 12 часов.</span>
+                            </span>
+                        </label>
+                        {% for error in form.allow_postpayment.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
                     <div class="club-tournament-create__field">
                         <label for="{{ form.min_participants.id_for_label }}" class="form-label">{{ form.min_participants.label }}</label>
                         {{ form.min_participants }}

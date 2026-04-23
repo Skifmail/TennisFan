@@ -34,5 +34,20 @@
         <p class="text-secondary">Турниры не найдены.</p>
         {% endfor %}
     </div>
+    {% if tournaments_page and tournaments_page.paginator.num_pages > 1 %}
+    <div class="pagination pagination--center">
+        <ul class="pagination__list">
+            {% for page_num in tournaments_page.paginator.page_range %}
+                {% if page_num == tournaments_page.number %}
+                <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
+                {% else %}
+                <li class="pagination__item">
+                    <a href="?page={{ page_num }}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

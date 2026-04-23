@@ -41,6 +41,9 @@
                 {% if item_id %}
                     <input type="hidden" name="id" value="{{ item_id }}">
                 {% endif %}
+                {% if invoice_id %}
+                    <input type="hidden" name="invoice" value="{{ invoice_id }}">
+                {% endif %}
                 {% if payment_next_url %}
                     <input type="hidden" name="next" value="{{ payment_next_url }}">
                 {% endif %}

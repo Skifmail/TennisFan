@@ -489,6 +489,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "variant",
             "entry_fee",
             "is_one_day",
+            "allow_postpayment",
             "city",
             "court",
             "gender",
@@ -615,6 +616,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "fan_points_final",
             "fan_points_winner",
             "is_open_interclub",
+            "allow_postpayment",
         ):
             if field_name in self.fields:
                 self.fields[field_name].disabled = True
@@ -647,7 +649,9 @@ class ClubTournamentCreateForm(forms.ModelForm):
         variant = cleaned_data.get("variant")
         gender = cleaned_data.get("gender")
         is_one_day = cleaned_data.get("is_one_day")
+        allow_postpayment = bool(cleaned_data.get("allow_postpayment"))
         entry_fee = cleaned_data.get("entry_fee")
+        tournament_format = cleaned_data.get("format")
         start_date = cleaned_data.get("start_date")
         end_date = cleaned_data.get("end_date")
         registration_deadline = cleaned_data.get("registration_deadline")
@@ -674,6 +678,22 @@ class ClubTournamentCreateForm(forms.ModelForm):
             raise ValidationError(
                 "Для многодневного турнира укажите вступительный взнос больше 0 ₽."
             )
+        if allow_postpayment:
+            if is_one_day:
+                self.add_error(
+                    "allow_postpayment",
+                    "Постоплата недоступна для однодневных турниров.",
+                )
+            if tournament_format == TournamentFormat.WEEKEND_DAY:
+                self.add_error(
+                    "allow_postpayment",
+                    "Постоплата недоступна для формата ТВД.",
+                )
+            if float(entry_fee or 0) <= 0:
+                self.add_error(
+                    "allow_postpayment",
+                    "Постоплата доступна только при вступительном взносе больше 0 ₽.",
+                )
 
         if variant == TournamentVariant.DOUBLES:
             cleaned_data["min_participants"] = None

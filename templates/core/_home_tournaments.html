@@ -38,7 +38,7 @@
                     <div class="tournament-table__participants">
                         {% if tournament.variant == 'doubles' %}
                         <div class="tournament-participants-section tournament-participants-section--table">
-                            <span class="text-secondary section-label">Команды: {{ tournament.full_teams_count }}{% if tournament.max_teams %}/{{ tournament.max_teams }}{% endif %}</span>
+                            <span class="text-secondary section-label">Команды: {{ tournament.full_teams_count_annotated }}{% if tournament.max_teams %}/{{ tournament.max_teams }}{% endif %}</span>
                             {% if tournament.teams.all %}
                             <div class="tournament-participants-inline">
                                 <div class="tournament-participants-grid tournament-participants-grid--table-row">
@@ -48,9 +48,9 @@
                                     </div>
                                     {% endfor %}
                                 </div>
-                                {% if tournament.teams.count > 4 %}
-                                <div class="participant-more participant-more--table-tail" title="Ещё команд: {{ tournament.teams.count|add:"-4" }}" aria-label="Ещё команд: {{ tournament.teams.count|add:"-4" }}">
-                                    <span class="text-secondary">+{{ tournament.teams.count|add:"-4" }}</span>
+                                {% if tournament.teams_count > 4 %}
+                                <div class="participant-more participant-more--table-tail" title="Ещё команд: {{ tournament.teams_count|add:"-4" }}" aria-label="Ещё команд: {{ tournament.teams_count|add:"-4" }}">
+                                    <span class="text-secondary">+{{ tournament.teams_count|add:"-4" }}</span>
                                 </div>
                                 {% endif %}
                             </div>
@@ -69,9 +69,9 @@
                                     </div>
                                     {% endfor %}
                                 </div>
-                                {% if tournament.participants.count > 4 %}
-                                <div class="participant-more participant-more--table-tail" title="Ещё участников: {{ tournament.participants.count|add:"-4" }}" aria-label="Ещё участников: {{ tournament.participants.count|add:"-4" }}">
-                                    <span class="text-secondary">+{{ tournament.participants.count|add:"-4" }}</span>
+                                {% if tournament.participants_count > 4 %}
+                                <div class="participant-more participant-more--table-tail" title="Ещё участников: {{ tournament.participants_count|add:"-4" }}" aria-label="Ещё участников: {{ tournament.participants_count|add:"-4" }}">
+                                    <span class="text-secondary">+{{ tournament.participants_count|add:"-4" }}</span>
                                 </div>
                                 {% endif %}
                             </div>
@@ -115,6 +115,7 @@
                         {% if tournament.match_format %}
                         <span class="badge badge-muted">{{ tournament.get_match_format_display }}</span>
                         {% endif %}
+                        {% include 'includes/postpayment_badge.html' with tournament=tournament %}
                     </div>
                 </td>
                 <td class="tournament-table__cell tournament-table__cell--type">
@@ -135,9 +136,9 @@
                     </div>
                     <div class="tournament-table__places text-secondary">
                         {% if tournament.variant == 'doubles' and tournament.max_teams %}
-                            Команд: {{ tournament.full_teams_count }}/{{ tournament.max_teams }}
+                            Команд: {{ tournament.full_teams_count_annotated }}/{{ tournament.max_teams }}
                         {% elif tournament.max_participants %}
-                            Мест: {{ tournament.participants.count }}/{{ tournament.max_participants }}
+                            Мест: {{ tournament.participants_count }}/{{ tournament.max_participants }}
                         {% endif %}
                     </div>
                 </td>

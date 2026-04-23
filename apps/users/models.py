@@ -193,6 +193,11 @@ class Player(CompressImageFieldsMixin, models.Model):
         verbose_name = "Игрок"
         verbose_name_plural = "Игроки"
         ordering = ["-total_points"]
+        indexes = [
+            models.Index(fields=["is_bye", "is_verified"]),
+            models.Index(fields=["city", "skill_level"]),
+            models.Index(fields=["-total_points"]),
+        ]
 
     def __str__(self) -> str:
         if self.is_bye:

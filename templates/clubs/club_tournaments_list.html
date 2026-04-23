@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Турниры — {{ club.name }}{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=Unbounded:wght@600;700&display=swap">
+{% endblock %}
 
 {% block content %}
 {% if can_manage_club %}
@@ -19,7 +22,7 @@
 
                 <div class="club-tournaments-hero__identity">
                     {% if club.logo %}
-                    <img src="{{ club.logo.url }}" alt="{{ club.name }}" class="club-dashboard-page-header__logo">
+                    <img src="{{ club.logo.url }}" alt="{{ club.name }}" class="club-dashboard-page-header__logo" loading="lazy" decoding="async">
                     {% else %}
                     <div class="club-dashboard-page-header__logo-fallback">
                         {{ club.name|first|upper }}
@@ -176,7 +179,7 @@
                                             title="{{ participant.user.get_full_name|default:participant.user.email }}"
                                             aria-label="{{ participant.user.get_full_name|default:participant.user.email }}">
                                             {% if participant.avatar %}
-                                            <img src="{{ participant.avatar.url }}" alt="{{ participant.user.get_full_name|default:participant.user.email }}" class="club-tournament-card__participant-avatar">
+                                            <img src="{{ participant.avatar.url }}" alt="{{ participant.user.get_full_name|default:participant.user.email }}" class="club-tournament-card__participant-avatar" loading="lazy" decoding="async">
                                             {% else %}
                                             <span class="club-tournament-card__participant-avatar club-tournament-card__participant-avatar--fallback">
                                                 {% if participant.user.first_name %}
@@ -188,14 +191,14 @@
                                             {% endif %}
                                         </a>
                                         {% endfor %}
-                                        {% if t.participants.count > 6 %}
-                                        <span class="club-tournament-card__participant club-tournament-card__participant--more" title="Ещё {{ t.participants.count|add:'-6' }} участников">
-                                            +{{ t.participants.count|add:'-6' }}
+                                        {% if t.participants_count > 6 %}
+                                        <span class="club-tournament-card__participant club-tournament-card__participant--more" title="Ещё {{ t.participants_count|add:'-6' }} участников">
+                                            +{{ t.participants_count|add:'-6' }}
                                         </span>
                                         {% endif %}
                                     </div>
                                     <span class="club-tournament-card__participants-note">
-                                        {{ t.participants.count }}{% if t.max_participants %} / {{ t.max_participants }}{% endif %}
+                                        {{ t.participants_count }}{% if t.max_participants %} / {{ t.max_participants }}{% endif %}
                                     </span>
                                 </div>
                                 {% else %}
@@ -218,6 +221,7 @@
                                     <span class="club-tournament-card__tag">{{ t.get_gender_display }}</span>
                                     <span class="club-tournament-card__tag">{{ t.get_variant_display }}</span>
                                     <span class="club-tournament-card__tag">{{ t.get_format_display }}</span>
+                                    {% include 'includes/postpayment_badge.html' with tournament=t class_name='club-tournament-card__tag' %}
                                 </div>
                             </div>
                         </div>
@@ -239,6 +243,21 @@
                 </article>
                 {% endfor %}
             </div>
+            {% if tournaments_page and tournaments_page.paginator.num_pages > 1 %}
+            <div class="pagination pagination--center">
+                <ul class="pagination__list">
+                    {% for page_num in tournaments_page.paginator.page_range %}
+                        {% if page_num == tournaments_page.number %}
+                        <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
+                        {% else %}
+                        <li class="pagination__item">
+                            <a href="?page={{ page_num }}{% if search %}&q={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if gender_filter %}&gender={{ gender_filter }}{% endif %}{% if variant_filter %}&variant={{ variant_filter }}{% endif %}">{{ page_num }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
             {% else %}
             <div class="club-dashboard-empty-state club-tournaments-empty__state">
                 <div class="club-dashboard-empty-state__title">

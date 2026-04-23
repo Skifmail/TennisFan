@@ -20,6 +20,7 @@ from .models import (
     TournamentStatus,
     TournamentTeam,
 )
+from .postpayment import get_pending_postpayment_users, open_postpayment_window
 from .season_utils import get_current_season, get_season_display
 
 logger = logging.getLogger(__name__)
@@ -190,6 +191,16 @@ def check_and_generate_past_deadline_brackets() -> int:
     )
     total = 0
     for t in qs:
+        if t.allow_postpayment and t.postpayment_window_started_at is None:
+            pending_users = get_pending_postpayment_users(t)
+            if pending_users:
+                open_postpayment_window(t)
+                logger.info(
+                    "Opened postpayment window for %s with %s pending users",
+                    t.slug,
+                    len(pending_users),
+                )
+                continue
         # Проверка минимального количества участников/команд
         min_required = t.min_teams if t.is_doubles() else t.min_participants
         if min_required is not None:

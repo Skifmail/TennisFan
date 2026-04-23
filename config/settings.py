@@ -25,6 +25,7 @@ if os.environ.get("DEBUG", "False").strip().lower() == "true":
 
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 TESTING = "test" in sys.argv
+PROFILING = os.environ.get("PROFILING", "False") == "True"
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
@@ -72,7 +73,9 @@ if not DEBUG:
 
 SESSION_COOKIE_AGE = 1209600
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-SESSION_SAVE_EVERY_REQUEST = True
+SESSION_SAVE_EVERY_REQUEST = (
+    os.environ.get("SESSION_SAVE_EVERY_REQUEST", "False") == "True"
+)
 
 # Защита от перебора паролей (админка и вход на сайт)
 AXES_FAILURE_LIMIT = 5
@@ -121,6 +124,12 @@ INSTALLED_APPS = [
     "apps.player_ratings",
 ]
 
+if PROFILING and DEBUG:
+    INSTALLED_APPS += [
+        "debug_toolbar",
+        "silk",
+    ]
+
 # ------------------------------------------------------------------------------
 # MIDDLEWARE
 # ------------------------------------------------------------------------------
@@ -137,6 +146,14 @@ MIDDLEWARE = [
     "axes.middleware.AxesMiddleware",
     "apps.core.middleware.StartupMiddleware",
 ]
+
+if PROFILING and DEBUG:
+    MIDDLEWARE = [
+        "debug_toolbar.middleware.DebugToolbarMiddleware",
+        "silk.middleware.SilkyMiddleware",
+        *MIDDLEWARE,
+    ]
+MIDDLEWARE.append("apps.core.middleware.SlowRequestLoggingMiddleware")
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
@@ -188,6 +205,11 @@ if os.environ.get("USE_POSTGRES", "False") == "True":
             "PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
             "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
             "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+            "CONN_MAX_AGE": int(os.environ.get("CONN_MAX_AGE", "60")),
+            "CONN_HEALTH_CHECKS": True,
+            "OPTIONS": {
+                "connect_timeout": int(os.environ.get("POSTGRES_CONNECT_TIMEOUT", "5")),
+            },
         }
     }
 else:
@@ -279,12 +301,21 @@ if os.environ.get("USE_REDIS", "False") == "True":
             "LOCATION": os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1"),
         }
     }
+    SESSION_ENGINE = os.environ.get(
+        "SESSION_ENGINE",
+        "django.contrib.sessions.backends.cache",
+    )
+    SESSION_CACHE_ALIAS = "default"
 else:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         }
     }
+    SESSION_ENGINE = os.environ.get(
+        "SESSION_ENGINE",
+        "django.contrib.sessions.backends.signed_cookies",
+    )
 
 # ------------------------------------------------------------------------------
 # EMAIL
@@ -406,6 +437,11 @@ CRONJOBS = [
         "*/10 * * * *",
         "django.core.management.call_command",
         ["generate_brackets_past_deadlines"],
+    ),
+    (
+        "*/5 * * * *",
+        "django.core.management.call_command",
+        ["process_tournament_postpayment_window"],
     ),
     (
         "0 */6 * * *",

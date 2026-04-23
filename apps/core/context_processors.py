@@ -2,7 +2,10 @@
 Context processors for core app.
 """
 
+from urllib.parse import urlparse
+
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Count, Q
 from django.utils.encoding import iri_to_uri
 
@@ -17,6 +20,8 @@ from apps.clubs.services import club_can_add_member, club_has_public_page_access
 
 from .models import FooterSocialLink
 
+FOOTER_SOCIAL_LINKS_CACHE_KEY = "footer_social_links:v1"
+
 
 def telegram_community_url(request):
     """Добавляет в контекст публичную ссылку на открытое сообщество TennisFan в Telegram."""
@@ -29,7 +34,11 @@ def footer_social_links(request):
     Добавляет в контекст список ссылок на соцсети из админки (раздел «Соцсети»).
     Каждый элемент: url, name, icon_url (медиа) или icon_path (static).
     """
-    links = list(FooterSocialLink.objects.all())
+    links = cache.get_or_set(
+        FOOTER_SOCIAL_LINKS_CACHE_KEY,
+        lambda: list(FooterSocialLink.objects.all()),
+        timeout=300,
+    )
     return {"footer_social_links": links}
 
 
@@ -69,10 +78,16 @@ def site_meta(request):
 
     path = request.get_full_path() if request else "/"
     canonical_url = iri_to_uri(f"{base_url}{path}")
+    media_url = getattr(settings, "MEDIA_URL", "").strip()
+    media_origin = ""
+    if media_url.startswith("http://") or media_url.startswith("https://"):
+        parsed = urlparse(media_url)
+        media_origin = f"{parsed.scheme}://{parsed.netloc}"
 
     return {
         "site_base_url": base_url,
         "canonical_url": canonical_url,
+        "media_origin": media_origin,
     }
 
 

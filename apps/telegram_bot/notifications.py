@@ -169,6 +169,48 @@ def notify_tournament_removed_refund(user, tournament, feedback_url: str) -> Non
     send_to_user_by_user(user, text, reply_markup=reply_markup)
 
 
+def notify_postpayment_opened(
+    user, tournament, amount: str, due_at_text: str, payment_url: str
+) -> None:
+    """Уведомить игрока о старте окна постоплаты турнира."""
+    if not bot.is_configured():
+        return
+    text = (
+        f"💳 <b>Нужно оплатить турнир</b>\n\n"
+        f"Турнир: «{tournament.name}»\n"
+        f"Сумма: {amount} ₽\n"
+        f"Срок оплаты: {due_at_text}\n\n"
+        f"{payment_url}"
+    )
+    send_to_user_by_user(user, text)
+
+
+def notify_postpayment_1h_reminder(
+    user, tournament, due_at_text: str, payment_url: str
+) -> None:
+    """Уведомить игрока о скором завершении окна постоплаты."""
+    if not bot.is_configured():
+        return
+    text = (
+        f"⏰ <b>Напоминание об оплате турнира</b>\n\n"
+        f"Турнир: «{tournament.name}»\n"
+        f"Срок оплаты: {due_at_text}\n\n"
+        f"{payment_url}"
+    )
+    send_to_user_by_user(user, text)
+
+
+def notify_postpayment_removed(user, tournament) -> None:
+    """Уведомить игрока об удалении из турнира за неоплату."""
+    if not bot.is_configured():
+        return
+    text = (
+        f"⚠️ <b>Регистрация отменена</b>\n\n"
+        f"Вы удалены из турнира «{tournament.name}», потому что срок постоплаты истёк."
+    )
+    send_to_user_by_user(user, text)
+
+
 def _match_info_text(match) -> str:
     """Текст с информацией о матче для уведомления (без ссылки на сайт)."""
     side1 = match.get_player1_display()

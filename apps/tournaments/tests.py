@@ -23,12 +23,22 @@ from apps.clubs.plan_services import assign_member_plan
 from apps.subscriptions.models import SubscriptionTier, UserSubscription
 from apps.tournaments.fan import _bracket_r1_count, _expected_final_round
 from apps.tournaments.fan import generate_bracket as fan_generate_bracket
-from apps.tournaments.models import Match, Tournament, TournamentStatus
+from apps.tournaments.models import (
+    Match,
+    Tournament,
+    TournamentPostpaymentInvoice,
+    TournamentRegistrationCoverage,
+    TournamentStatus,
+)
 from apps.tournaments.olympic_consolation import (
     generate_bracket as olympic_generate_bracket,
 )
+from apps.tournaments.postpayment import (
+    get_pending_postpayment_users,
+    mark_registration_covered,
+)
 from apps.tournaments.utils import generate_unique_tournament_slug
-from apps.users.models import Player, User
+from apps.users.models import Player, SkillLevel, User
 
 
 class GenerateUniqueTournamentSlugTestCase(TestCase):
@@ -1778,3 +1788,54 @@ class MatchDetailPlayerActionsRedirectTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Действия игрока")
+
+
+class TournamentPostpaymentServiceTestCase(TestCase):
+    """Тесты сервиса постоплаты турнира."""
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(email="postpay@test.local", password="x")
+        self.user2 = User.objects.create_user(email="postpay2@test.local", password="x")
+        self.player = Player.objects.create(
+            user=self.user, skill_level=SkillLevel.AMATEUR
+        )
+        self.player2 = Player.objects.create(
+            user=self.user2, skill_level=SkillLevel.AMATEUR
+        )
+        self.tournament = Tournament.objects.create(
+            name="Postpayment test",
+            slug="postpayment-test",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            entry_fee=1000,
+            allow_postpayment=True,
+            is_one_day=False,
+            max_participants=32,
+        )
+        self.tournament.allowed_categories.create(category=SkillLevel.AMATEUR)
+        self.tournament.participants.add(self.player, self.player2)
+
+    def test_get_pending_postpayment_users_returns_uncovered_players(self) -> None:
+        pending_users = get_pending_postpayment_users(self.tournament)
+        self.assertEqual({u.id for u in pending_users}, {self.user.id, self.user2.id})
+
+    def test_mark_registration_covered_excludes_user_from_pending(self) -> None:
+        mark_registration_covered(
+            self.tournament,
+            self.user,
+            TournamentRegistrationCoverage.CoverageType("subscription_slot"),
+        )
+        pending_users = get_pending_postpayment_users(self.tournament)
+        self.assertEqual({u.id for u in pending_users}, {self.user2.id})
+
+    def test_paid_invoice_excludes_user_from_pending(self) -> None:
+        TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=self.user2,
+            amount=1000,
+            due_at=timezone.now() + timedelta(hours=12),
+            status=TournamentPostpaymentInvoice.Status.PAID,
+        )
+        pending_users = get_pending_postpayment_users(self.tournament)
+        self.assertEqual({u.id for u in pending_users}, {self.user.id})

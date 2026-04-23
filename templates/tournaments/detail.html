@@ -120,6 +120,13 @@
         {% else %}
             <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-info);">Многодневный</span>
         {% endif %}
+        {% if tournament.allow_postpayment %}
+            <span
+                class="player-category"
+                style="background: rgba(70, 130, 180, 0.2); color: #4682b4;"
+                title="Постоплата: при отсутствии подписки/лимита можно зарегистрироваться без мгновенной оплаты. После старта окна постоплаты нужно оплатить взнос в течение 12 часов."
+            >ПОСТОПЛАТА</span>
+        {% endif %}
         {% if tournament.variant == 'doubles' and tournament.max_teams %}
         {% if tournament.is_full %}
         <span class="player-category" style="background: rgba(255, 0, 0, 0.2); color: var(--color-error);">Команд: {{ tournament.full_teams_count }} из {{ tournament.max_teams }}</span>

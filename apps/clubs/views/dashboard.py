@@ -5,7 +5,8 @@ from typing import Any
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Sum
+from django.core.paginator import Paginator
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -20,6 +21,7 @@ from apps.tournaments.models import (
     TournamentDuration,
     TournamentEntryPayment,
     TournamentGender,
+    TournamentPostpaymentInvoice,
     TournamentStatus,
     TournamentTeam,
     TournamentVariant,
@@ -132,9 +134,20 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
         start_date__gte=previous_month_start,
         start_date__lte=previous_month_end,
     ).count()
-    upcoming_tournaments_qs = club.tournaments.filter(start_date__gte=today).order_by(
-        "start_date",
-        "registration_deadline",
+    upcoming_tournaments_qs = (
+        club.tournaments.filter(start_date__gte=today)
+        .annotate(
+            participants_count=Count("participants", distinct=True),
+            full_teams_count_annotated=Count(
+                "teams",
+                filter=Q(teams__player2__isnull=False),
+                distinct=True,
+            ),
+        )
+        .order_by(
+            "start_date",
+            "registration_deadline",
+        )
     )
     nearest_tournaments_count = upcoming_tournaments_qs.filter(
         start_date__lte=next_14_days
@@ -274,9 +287,9 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
     upcoming_tournaments: list[dict[str, Any]] = []
     for tournament in upcoming_tournaments_qs[:5]:
         participants_count = (
-            tournament.full_teams_count()
+            int(getattr(tournament, "full_teams_count_annotated", 0))
             if tournament.is_doubles()
-            else tournament.participants.count()
+            else int(getattr(tournament, "participants_count", 0))
         )
         target_participants = (
             tournament.max_teams
@@ -311,6 +324,16 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
     recent_matches = Match.objects.filter(
         tournament__club=club,
         match_type=Match.MatchType.TOURNAMENT,
+    ).select_related(
+        "tournament",
+        "player1__user",
+        "player2__user",
+        "partner1__user",
+        "partner2__user",
+        "team1__player1__user",
+        "team1__player2__user",
+        "team2__player1__user",
+        "team2__player2__user",
     )
     player_match_counts: dict[int, int] = defaultdict(int)
     for match in recent_matches.filter(created_at__gte=now - timedelta(days=30)):
@@ -459,6 +482,43 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
                 "title": "Турниры с недобором",
                 "description": (
                     f"{low_fill_tournaments_count} ближайших турниров пока не набрали минимальный состав."
+                ),
+                "action_label": "Турниры",
+                "action_url": reverse(
+                    "clubs:club_tournaments_list",
+                    kwargs={"slug": club.slug},
+                ),
+            }
+        )
+    active_postpayment_tournaments = (
+        Tournament.objects.filter(
+            club=club,
+            postpayment_window_started_at__isnull=False,
+            bracket_generated=False,
+        )
+        .annotate(
+            pending_postpayment=Count(
+                "postpayment_invoices",
+                filter=Q(
+                    postpayment_invoices__status=TournamentPostpaymentInvoice.Status.PENDING
+                ),
+            )
+        )
+        .filter(pending_postpayment__gt=0)
+    )
+    if active_postpayment_tournaments.exists():
+        postpayment_summary = active_postpayment_tournaments.aggregate(
+            total_pending=Coalesce(Sum("pending_postpayment"), 0),
+            total_tournaments=Count("id"),
+        )
+        total_pending = int(postpayment_summary["total_pending"] or 0)
+        total_tournaments = int(postpayment_summary["total_tournaments"] or 0)
+        attention_items.append(
+            {
+                "tone": "critical",
+                "title": "Открыта постоплата турниров",
+                "description": (
+                    f"Ожидается оплата от {total_pending} игроков в {total_tournaments} турнирах."
                 ),
                 "action_label": "Турниры",
                 "action_url": reverse(
@@ -1259,9 +1319,13 @@ def club_tournaments_list(request: HttpRequest, slug: str) -> HttpResponse:
     gender_filter = request.GET.get("gender", "").strip()
     variant_filter = request.GET.get("variant", "").strip()
 
-    tournaments = club.tournaments.all().prefetch_related(
-        "allowed_categories",
-        "participants__user",
+    tournaments = (
+        club.tournaments.all()
+        .annotate(participants_count=Count("participants", distinct=True))
+        .prefetch_related(
+            "allowed_categories",
+            "participants__user",
+        )
     )
     tournaments_total = tournaments.count()
 
@@ -1293,12 +1357,16 @@ def club_tournaments_list(request: HttpRequest, slug: str) -> HttpResponse:
         variant_filter = ""
 
     tournaments = tournaments.distinct().order_by("-start_date")
+    paginator = Paginator(tournaments, 20)
+    page_number = request.GET.get("page")
+    tournaments_page = paginator.get_page(page_number)
     return render(
         request,
         "clubs/club_tournaments_list.html",
         {
             "club": club,
-            "tournaments": tournaments,
+            "tournaments": tournaments_page.object_list,
+            "tournaments_page": tournaments_page,
             "tournaments_total": tournaments_total,
             "search": search,
             "status_filter": status_filter,

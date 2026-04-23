@@ -22,12 +22,15 @@ from .models import (
     TournamentEntryRefundRequest,
     TournamentPhoto,
     TournamentPlayerResult,
+    TournamentPostpaymentInvoice,
+    TournamentRegistrationCoverage,
     TournamentTeam,
     TVDGroup,
     TVDGroupMember,
     TVDTournament,
 )
 from .olympic_consolation import generate_bracket as generate_olympic_bracket
+from .postpayment import get_pending_postpayment_users, open_postpayment_window
 from .proposal_service import apply_proposal
 from .round_robin import generate_bracket as generate_round_robin_bracket
 from .tvd import (
@@ -66,6 +69,18 @@ def accept_proposal_action(modeladmin, request, queryset):
 @admin.action(description="Сформировать сетку (одноэтапная)")
 def generate_fan_bracket_action(modeladmin, request, queryset):
     for t in queryset:
+        pending_users = get_pending_postpayment_users(t)
+        if (
+            t.allow_postpayment
+            and t.postpayment_window_started_at is None
+            and pending_users
+        ):
+            opened = open_postpayment_window(t)
+            messages.info(
+                request,
+                f"{t.name}: запущено окно постоплаты, уведомления отправлены {opened} участникам.",
+            )
+            continue
         ok, msg = generate_bracket(t)
         if ok:
             messages.success(request, f"{t.name}: {msg}")
@@ -76,6 +91,18 @@ def generate_fan_bracket_action(modeladmin, request, queryset):
 @admin.action(description="Сформировать сетку (олимпийская)")
 def generate_olympic_bracket_action(modeladmin, request, queryset):
     for t in queryset:
+        pending_users = get_pending_postpayment_users(t)
+        if (
+            t.allow_postpayment
+            and t.postpayment_window_started_at is None
+            and pending_users
+        ):
+            opened = open_postpayment_window(t)
+            messages.info(
+                request,
+                f"{t.name}: запущено окно постоплаты, уведомления отправлены {opened} участникам.",
+            )
+            continue
         ok, msg = generate_olympic_bracket(t)
         if ok:
             messages.success(request, f"{t.name}: {msg}")
@@ -86,6 +113,18 @@ def generate_olympic_bracket_action(modeladmin, request, queryset):
 @admin.action(description="Сформировать сетку (круговой)")
 def generate_round_robin_bracket_action(modeladmin, request, queryset):
     for t in queryset:
+        pending_users = get_pending_postpayment_users(t)
+        if (
+            t.allow_postpayment
+            and t.postpayment_window_started_at is None
+            and pending_users
+        ):
+            opened = open_postpayment_window(t)
+            messages.info(
+                request,
+                f"{t.name}: запущено окно постоплаты, уведомления отправлены {opened} участникам.",
+            )
+            continue
         ok, msg = generate_round_robin_bracket(t)
         if ok:
             messages.success(request, f"{t.name}: {msg}")
@@ -188,6 +227,7 @@ class TournamentAdminForm(forms.ModelForm):
         cleaned_data = super().clean()
         variant = cleaned_data.get("variant")
         gender = cleaned_data.get("gender")
+        tournament_format = cleaned_data.get("format")
         # "Микст" доступен только для парных турниров
         if variant == "singles" and gender == "mixed":
             raise ValidationError(
@@ -197,11 +237,21 @@ class TournamentAdminForm(forms.ModelForm):
         # Многодневный турнир: обязателен вступительный взнос (для регистрации по подписке или по оплате)
         is_one_day = cleaned_data.get("is_one_day")
         entry_fee = cleaned_data.get("entry_fee")
+        allow_postpayment = bool(cleaned_data.get("allow_postpayment"))
         if is_one_day is False and (entry_fee is None or float(entry_fee or 0) <= 0):
             raise ValidationError(
                 "Для многодневного турнира укажите сумму вступительного взноса (руб). "
                 "По подписке игроки регистрируются бесплатно в рамках лимита; без подписки или при исчерпанном лимите — оплата взноса."
             )
+        if allow_postpayment:
+            if is_one_day:
+                raise ValidationError("Постоплата недоступна для однодневных турниров.")
+            if tournament_format == "weekend_day":
+                raise ValidationError("Постоплата недоступна для формата ТВД.")
+            if entry_fee is None or float(entry_fee or 0) <= 0:
+                raise ValidationError(
+                    "Постоплата доступна только при вступительном взносе больше 0 ₽."
+                )
         # Автогенерация уникального slug: при одинаковых названиях добавляется суффикс -2, -3 и т.д.
         name = cleaned_data.get("name") or ""
         slug = cleaned_data.get("slug") or ""
@@ -224,6 +274,36 @@ class TournamentEntryRefundRequestAdmin(admin.ModelAdmin):
     date_hierarchy = "removed_at"
 
 
+@admin.register(TournamentPostpaymentInvoice)
+class TournamentPostpaymentInvoiceAdmin(admin.ModelAdmin):
+    """Инвойсы постоплаты турниров."""
+
+    list_display = ("tournament", "user", "amount", "status", "due_at", "paid_at")
+    list_filter = ("status", "tournament")
+    search_fields = ("tournament__name", "user__email")
+    readonly_fields = (
+        "tournament",
+        "user",
+        "amount",
+        "status",
+        "due_at",
+        "created_at",
+        "paid_at",
+        "reminder_1h_sent_at",
+        "yookassa_payment_id",
+    )
+
+
+@admin.register(TournamentRegistrationCoverage)
+class TournamentRegistrationCoverageAdmin(admin.ModelAdmin):
+    """Источники покрытия регистрации на турниры."""
+
+    list_display = ("tournament", "user", "coverage_type", "created_at")
+    list_filter = ("coverage_type", "tournament")
+    search_fields = ("tournament__name", "user__email")
+    readonly_fields = ("tournament", "user", "coverage_type", "created_at")
+
+
 @admin.register(Tournament)
 class TournamentAdmin(admin.ModelAdmin):
     form = TournamentAdminForm
@@ -244,6 +324,7 @@ class TournamentAdmin(admin.ModelAdmin):
         "gender",
         "status",
         "bracket_generated",
+        "allow_postpayment",
         "start_date",
         "court",
         "min_participants",
@@ -265,7 +346,10 @@ class TournamentAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     filter_horizontal = ("participants",)
     date_hierarchy = "start_date"
-    readonly_fields = ("insufficient_participants_notified_at",)
+    readonly_fields = (
+        "insufficient_participants_notified_at",
+        "postpayment_window_started_at",
+    )
     actions = [
         generate_fan_bracket_action,
         generate_olympic_bracket_action,
@@ -301,6 +385,26 @@ class TournamentAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         return qs.filter(club__isnull=True)
 
+    def changelist_view(self, request, extra_context=None):
+        """Показать в админке статус активных окон постоплаты."""
+        pending_qs = TournamentPostpaymentInvoice.objects.filter(
+            tournament__club__isnull=True,
+            tournament__bracket_generated=False,
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        )
+        pending_total = pending_qs.count()
+        if pending_total:
+            affected_tournaments = pending_qs.values("tournament_id").distinct().count()
+            self.message_user(
+                request,
+                (
+                    "Активна постоплата: ожидается оплата от "
+                    f"{pending_total} участников в {affected_tournaments} турнирах."
+                ),
+                level=messages.WARNING,
+            )
+        return super().changelist_view(request, extra_context=extra_context)
+
     fieldsets = (
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
         ("Формат турнира", {"fields": ("format", "variant")}),
@@ -310,6 +414,9 @@ class TournamentAdmin(admin.ModelAdmin):
                 "fields": (
                     "entry_fee",
                     "is_one_day",
+                    "allow_postpayment",
+                    "postpayment_window_started_at",
+                    "postpayment_deadline_hours",
                     "city",
                     "court",
                     "gender",

@@ -16,6 +16,7 @@ from typing import Any, cast
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Count, Q, Sum
@@ -1128,6 +1129,15 @@ def home(request):
         Tournament.objects.filter(
             status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE],
         )
+        .annotate(
+            participants_count=Count("participants", distinct=True),
+            teams_count=Count("teams", distinct=True),
+            full_teams_count_annotated=Count(
+                "teams",
+                filter=Q(teams__player2__isnull=False),
+                distinct=True,
+            ),
+        )
         .select_related("court", "club")
         .prefetch_related(
             "participants__user",
@@ -1192,6 +1202,15 @@ def home(request):
         pending_join_club_ids=pending_join_club_ids,
         member_club_ids=member_club_ids,
     )
+    for tournament in tournaments_page.object_list:
+        if tournament.is_doubles():
+            current_count = int(getattr(tournament, "full_teams_count_annotated", 0))
+            max_slots = tournament.max_teams
+        else:
+            current_count = int(getattr(tournament, "participants_count", 0))
+            max_slots = tournament.max_participants
+        tournament.current_slots_count = current_count
+        tournament.is_full_annotated = bool(max_slots and current_count >= max_slots)
 
     # Получаем топ игроков по сезонным очкам
     from django.db.models import Case, F, IntegerField, Value, When
@@ -1232,26 +1251,29 @@ def home(request):
         """Форматирует число с пробелами для тысяч."""
         return f"{num:,}".replace(",", " ")
 
-    hero_stats = {
-        "players_count": format_number(
-            Player.objects.filter(is_bye=False, is_verified=True).count()
-        ),
-        "tournaments_count": format_number(
-            Tournament.objects.filter(
-                status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE],
-            ).count()
-        ),
-        "matches_count": format_number(
-            Match.objects.filter(
-                status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
-            ).count()
-        ),
-        "courts_count": format_number(Court.objects.count()),
-        "cities_count": format_number(
-            Player.objects.exclude(city="").values("city").distinct().count()
-        ),
-        "coaches_count": format_number(Coach.objects.count()),
-    }
+    def _build_hero_stats() -> dict[str, str]:
+        return {
+            "players_count": format_number(
+                Player.objects.filter(is_bye=False, is_verified=True).count()
+            ),
+            "tournaments_count": format_number(
+                Tournament.objects.filter(
+                    status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE],
+                ).count()
+            ),
+            "matches_count": format_number(
+                Match.objects.filter(
+                    status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
+                ).count()
+            ),
+            "courts_count": format_number(Court.objects.count()),
+            "cities_count": format_number(
+                Player.objects.exclude(city="").values("city").distinct().count()
+            ),
+            "coaches_count": format_number(Coach.objects.count()),
+        }
+
+    hero_stats = cache.get_or_set("home_hero_stats:v1", _build_hero_stats, timeout=300)
 
     context = {
         "filtered_tournaments": tournaments_page.object_list,
@@ -1350,8 +1372,23 @@ def rating(request):
         )
     ).order_by("-season_pts", "-total_points")
 
+    paginator = Paginator(players, 50)
+    page_number = request.GET.get("page")
+    players_page = paginator.get_page(page_number)
+
     context = {
-        "players": players,
+        "players": players_page,
+        "players_page": players_page,
+        "rating_data_json": json.dumps(
+            [
+                {
+                    "name": str(player),
+                    "points": float(getattr(player, "season_pts", 0) or 0),
+                }
+                for player in players_page.object_list
+            ],
+            ensure_ascii=False,
+        ),
         "current_city": city,
         "current_skill_level": skill_level,
         "search_query": search,

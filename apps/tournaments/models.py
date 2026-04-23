@@ -199,6 +199,25 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         default=False,
         help_text="Если отмечено, взнос платный для всех (с учетом скидок)",
     )
+    allow_postpayment = models.BooleanField(
+        "Постоплата",
+        default=False,
+        help_text=(
+            "Разрешить регистрацию без немедленной оплаты вступительного взноса. "
+            "После дедлайна участникам без оплаты отправляется ссылка и даётся 12 часов."
+        ),
+    )
+    postpayment_window_started_at = models.DateTimeField(
+        "Старт окна постоплаты",
+        null=True,
+        blank=True,
+        help_text="Когда запущено 12-часовое окно оплаты для участников без оплаты.",
+    )
+    postpayment_deadline_hours = models.PositiveSmallIntegerField(
+        "Длительность окна постоплаты (часы)",
+        default=12,
+        help_text="Через сколько часов после запуска окна неоплатившие удаляются.",
+    )
 
     gender = models.CharField(
         "Категория по полу",
@@ -325,6 +344,11 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         verbose_name = "Турнир"
         verbose_name_plural = "Многодневные Турниры"
         ordering = ["-start_date"]
+        indexes = [
+            models.Index(fields=["status", "-start_date"]),
+            models.Index(fields=["club", "status", "-start_date"]),
+            models.Index(fields=["registration_deadline"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.city})"
@@ -377,6 +401,13 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         # ТВД (format=weekend_day) задаёт duration в админке; остальные — многодневные.
         if self.format != TournamentFormat.WEEKEND_DAY:
             self.duration = TournamentDuration.MULTI_DAY
+        # Постоплата разрешена только для многодневных турниров с положительным взносом.
+        if (
+            self.is_one_day
+            or self.format == TournamentFormat.WEEKEND_DAY
+            or float(self.entry_fee or 0) <= 0
+        ):
+            self.allow_postpayment = False
         # Если дедлайн регистрации перенесли вперёд после отправки уведомления,
         # сбрасываем отметку, чтобы при следующей проверке уведомление могло уйти снова.
         if self.registration_deadline and self.insufficient_participants_notified_at:
@@ -480,6 +511,127 @@ class TournamentEntryRefundRequest(models.Model):
 
     def __str__(self) -> str:
         return f"{self.refund_ref}: {self.tournament.name} — {self.user}"
+
+
+class TournamentRegistrationCoverage(models.Model):
+    """Источник покрытия регистрации игрока в турнире.
+
+    Args:
+        models.Model: Базовый класс ORM.
+
+    Returns:
+        None: Экземпляр используется ORM.
+    """
+
+    class CoverageType(models.TextChoices):
+        """Тип покрытия регистрации.
+
+        Args:
+            models.TextChoices: Базовый класс перечислений Django.
+
+        Returns:
+            None: Константы используются в полях модели.
+        """
+
+        SUBSCRIPTION_SLOT = "subscription_slot", "Слот подписки"
+        CLUB_PLAN_SLOT = "club_plan_slot", "Слот клубного тарифа"
+        ADMIN_GRANTED = "admin_granted", "Выдано администратором"
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="registration_coverages",
+        verbose_name="Турнир",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tournament_registration_coverages",
+        verbose_name="Пользователь",
+    )
+    coverage_type = models.CharField(
+        "Тип покрытия",
+        max_length=32,
+        choices=CoverageType.choices,
+    )
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Покрытие регистрации турнира"
+        verbose_name_plural = "Покрытия регистрации турниров"
+        unique_together = [("tournament", "user")]
+
+    def __str__(self) -> str:
+        return f"{self.tournament} — {self.user} ({self.get_coverage_type_display()})"
+
+
+class TournamentPostpaymentInvoice(models.Model):
+    """Инвойс постоплаты для игрока, зарегистрированного без оплаты.
+
+    Args:
+        models.Model: Базовый класс ORM.
+
+    Returns:
+        None: Экземпляр используется ORM.
+    """
+
+    class Status(models.TextChoices):
+        """Статусы постоплатного инвойса.
+
+        Args:
+            models.TextChoices: Базовый класс перечислений Django.
+
+        Returns:
+            None: Константы используются в поле status.
+        """
+
+        PENDING = "pending", "Ожидает оплаты"
+        PAID = "paid", "Оплачен"
+        EXPIRED = "expired", "Просрочен"
+        CANCELLED = "cancelled", "Отменён"
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="postpayment_invoices",
+        verbose_name="Турнир",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tournament_postpayment_invoices",
+        verbose_name="Пользователь",
+    )
+    amount = models.DecimalField(
+        "Сумма (руб)", max_digits=10, decimal_places=2, default=0
+    )
+    due_at = models.DateTimeField("Оплатить до")
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    paid_at = models.DateTimeField("Оплачено", null=True, blank=True)
+    reminder_1h_sent_at = models.DateTimeField(
+        "Отправлено напоминание за 1 час",
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        "Статус",
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    yookassa_payment_id = models.CharField(
+        "ID платежа YooKassa",
+        max_length=64,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = "Инвойс постоплаты турнира"
+        verbose_name_plural = "Инвойсы постоплаты турниров"
+        unique_together = [("tournament", "user")]
+
+    def __str__(self) -> str:
+        return f"{self.tournament} — {self.user} ({self.get_status_display()})"
 
 
 class TVDTournament(Tournament):

@@ -42,6 +42,12 @@ urlpatterns = [
     path("club/", include("apps.clubs.urls")),
 ]
 
+if settings.DEBUG and getattr(settings, "PROFILING", False):
+    urlpatterns += [
+        path("__debug__/", include("debug_toolbar.urls")),
+        path("silk/", include("silk.urls", namespace="silk")),
+    ]
+
 # Serve media files (only if using local filesystem storage, not Cloudinary)
 if settings.MEDIA_ROOT is not None:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

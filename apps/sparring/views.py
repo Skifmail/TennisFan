@@ -9,6 +9,7 @@ from django.contrib import messages  # pyright: ignore[reportMissingImports]
 from django.contrib.auth.decorators import (
     login_required,
 )
+from django.core.paginator import Paginator
 
 # pyright: ignore[reportMissingImports]
 from django.http import Http404, JsonResponse  # pyright: ignore[reportMissingImports]
@@ -147,7 +148,10 @@ def sparring_list(request):
             requests_qs = requests_qs.filter(desired_category=category)
         if preferred_gender:
             requests_qs = requests_qs.filter(preferred_gender=preferred_gender)
-        context["sparring_requests"] = requests_qs
+        context["sparring_requests"] = Paginator(
+            requests_qs.order_by("-created_at"),
+            20,
+        ).get_page(request.GET.get("page"))
     else:
         doubles_qs = (
             DoublesMatchRequest.objects.filter(
@@ -177,7 +181,9 @@ def sparring_list(request):
             doubles_qs = doubles_qs.filter(desired_level=level)
         if preferred_gender:
             doubles_qs = doubles_qs.filter(preferred_gender=preferred_gender)
-        context["doubles_requests"] = doubles_qs
+        context["doubles_requests"] = Paginator(doubles_qs, 20).get_page(
+            request.GET.get("page")
+        )
 
     return render(request, "sparring/list.html", context)
 

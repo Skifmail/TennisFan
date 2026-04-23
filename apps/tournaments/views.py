@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Count, Min, Prefetch, Q
 from django.db.models.functions import Lower
@@ -49,6 +50,8 @@ from .models import (
     TournamentEntryPayment,
     TournamentEntryRefundRequest,
     TournamentPlayerResult,
+    TournamentPostpaymentInvoice,
+    TournamentRegistrationCoverage,
     TournamentStatus,
     TournamentTeam,
     TournamentType,
@@ -59,6 +62,14 @@ from .platform_home import (
     CLUB_FILTER_CLUB_ONLY,
     CLUB_FILTER_PLATFORM,
     club_filter_choices_for_tournament_lists,
+)
+from .postpayment import (
+    finalize_postpayment_window,
+    get_pending_postpayment_users,
+    get_postpayment_progress,
+    mark_registration_covered,
+    open_postpayment_window,
+    tournament_allows_postpayment_registration,
 )
 from .proposal_service import apply_proposal
 from .round_robin import (
@@ -304,10 +315,7 @@ def _build_bracket_standings(tournament, is_fan, is_olympic):
 
 
 def tournament_list(request):
-    """List of tournaments. При загрузке страницы проверяется дедлайн регистрации и при необходимости формируются сетки (также по cron)."""
-    from apps.tournaments.fan import check_and_generate_past_deadline_brackets
-
-    check_and_generate_past_deadline_brackets()
+    """List of tournaments. Формирование сеток выполняется по cron-задаче."""
 
     city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
@@ -317,10 +325,22 @@ def tournament_list(request):
     # Турниры платформы и клубов (клубные — с отдельным CTA «Вступить в клуб»).
     tournaments = (
         Tournament.objects.all()
+        .annotate(
+            participants_count=Count("participants", distinct=True),
+            teams_count=Count("teams", distinct=True),
+            full_teams_count_annotated=Count(
+                "teams",
+                filter=Q(teams__player2__isnull=False),
+                distinct=True,
+            ),
+        )
         .select_related("court", "club")
         .prefetch_related(
             "participants__user",
             "allowed_categories",
+            "teams__player1__user",
+            "teams__player2__user",
+            "photos",
         )
     )
 
@@ -341,7 +361,11 @@ def tournament_list(request):
     elif club_filter:
         tournaments = tournaments.filter(club__slug=club_filter)
 
-    tournaments = list(tournaments.order_by("-created_at"))
+    tournaments = tournaments.order_by("-created_at")
+    paginator = Paginator(tournaments, 20)
+    page_number = request.GET.get("page")
+    tournaments_page = paginator.get_page(page_number)
+    tournaments_page_list = list(tournaments_page.object_list)
 
     current_player = None
     pending_join_club_ids: set[int] = set()
@@ -363,7 +387,7 @@ def tournament_list(request):
             ).values_list("club_id", flat=True)
         )
 
-    for tournament in tournaments:
+    for tournament in tournaments_page_list:
         tournament.card_action_label = "Записаться"
         tournament.card_action_url = None
         tournament.card_action_is_primary = False
@@ -384,7 +408,17 @@ def tournament_list(request):
         if tournament.bracket_generated:
             tournament.card_action_label = "Регистрация закрыта"
             continue
-        if tournament.is_full():
+        if tournament.is_doubles():
+            current_slots_count = int(
+                getattr(tournament, "full_teams_count_annotated", 0)
+            )
+            max_slots = tournament.max_teams
+        else:
+            current_slots_count = int(getattr(tournament, "participants_count", 0))
+            max_slots = tournament.max_participants
+        tournament.current_slots_count = current_slots_count
+        is_full = bool(max_slots and current_slots_count >= max_slots)
+        if is_full:
             tournament.card_action_label = "Мест нет"
             continue
 
@@ -468,7 +502,8 @@ def tournament_list(request):
         tournament.card_action_disabled = False
 
     context = {
-        "tournaments": tournaments,
+        "tournaments": tournaments_page_list,
+        "tournaments_page": tournaments_page,
         "current_city": city,
         "current_category": category,
         "current_status": status,
@@ -535,11 +570,6 @@ def tournament_detail(request, slug):
     Внутриклубные турниры (клуб задан, не межклубные) доступны для просмотра всем;
     зарегистрироваться может только активный член клуба-организатора.
     """
-    # Проверяем и формируем сетки для турниров с истёкшим дедлайном регистрации
-    from apps.tournaments.fan import check_and_generate_past_deadline_brackets
-
-    check_and_generate_past_deadline_brackets()
-
     tournament = get_object_or_404(
         Tournament.objects.select_related("court", "club").prefetch_related(
             "matches__player1__user",
@@ -904,7 +934,11 @@ def tournament_detail(request, slug):
     user_is_registered = False
     can_register = False
     club_plan_error = ""
-    registration_closed = tournament.bracket_generated or tournament.is_full()
+    registration_closed = bool(
+        tournament.bracket_generated
+        or tournament.is_full()
+        or tournament.postpayment_window_started_at
+    )
 
     if request.user.is_authenticated:
         current_player = getattr(request.user, "player", None)
@@ -1371,6 +1405,12 @@ def tournament_manage(request, slug):
         not in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED),
         "players_available_to_add": players_available_to_add,
     }
+    context["postpayment_progress"] = get_postpayment_progress(tournament)
+    context["postpayment_invoices"] = list(
+        tournament.postpayment_invoices.select_related("user")
+        .filter(status=TournamentPostpaymentInvoice.Status.PENDING)
+        .order_by("due_at", "created_at")
+    )
     if tournament.club_id:
         context["club"] = tournament.club
         context["is_club_panel"] = True
@@ -1396,6 +1436,33 @@ def tournament_manage_generate_bracket(request, slug):
     tournament = _tournament_manage_get_any_tournament(request, slug)
     if tournament is None:
         return redirect("tournament_list")
+    pending_users = get_pending_postpayment_users(tournament)
+    if (
+        tournament.allow_postpayment
+        and tournament.postpayment_window_started_at is None
+        and pending_users
+    ):
+        opened = open_postpayment_window(tournament)
+        messages.info(
+            request,
+            f"Запущено окно постоплаты: уведомления отправлены {opened} игрокам. "
+            "Сетка будет сформирована после оплаты или по истечении срока.",
+        )
+        return redirect("tournament_manage", slug=slug)
+    if tournament.postpayment_window_started_at is not None:
+        progress = get_postpayment_progress(tournament)
+        if bool(progress["completed"]):
+            ok, msg = finalize_postpayment_window(tournament)
+            if ok:
+                messages.success(request, msg)
+            else:
+                messages.warning(request, msg)
+        else:
+            messages.info(
+                request,
+                "Окно постоплаты уже запущено. Сетка будет сформирована после завершения окна.",
+            )
+        return redirect("tournament_manage", slug=slug)
     ok, msg, _ = _tournament_manual_generate(tournament)
     if ok:
         messages.success(request, msg)
@@ -3163,6 +3230,8 @@ def _check_tournament_registration_eligibility(request, tournament, player):
     if _tournament_requires_entry_payment(tournament):
         if sub and sub.can_register_for_tournament():
             return True, None
+        if tournament_allows_postpayment_registration(tournament):
+            return True, None
         return False, REGISTER_PAY_OR_SUBSCRIBE_MSG
 
     # Многодневные без взноса: нужен активный безлимит или несгораемый остаток регистраций.
@@ -3305,6 +3374,12 @@ def tournament_register(request, slug):
     if getattr(tournament, "bracket_generated", False):
         messages.error(request, "Регистрация закрыта: сетка турнира уже сформирована.")
         return redirect("tournament_detail", slug=tournament.slug)
+    if getattr(tournament, "postpayment_window_started_at", None):
+        messages.error(
+            request,
+            "Регистрация закрыта: запущено окно постоплаты и формирование сетки.",
+        )
+        return redirect("tournament_detail", slug=tournament.slug)
 
     if tournament.is_full():
         messages.error(request, "Регистрация закрыта: все места заняты.")
@@ -3366,6 +3441,11 @@ def tournament_register(request, slug):
                     sub = request.user.subscription
                     if sub and sub.can_register_for_tournament():
                         sub.increment_usage()
+                        mark_registration_covered(
+                            tournament,
+                            request.user,
+                            TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
+                        )
                         messages.success(
                             request,
                             f"Вы зарегистрированы! Осталось регистраций: {sub.get_remaining_slots()}",
@@ -3385,6 +3465,11 @@ def tournament_register(request, slug):
             if not consumed:
                 messages.error(request, consume_error)
                 return redirect("tournament_detail", slug=tournament.slug)
+            mark_registration_covered(
+                tournament,
+                request.user,
+                TournamentRegistrationCoverage.CoverageType.CLUB_PLAN_SLOT,
+            )
 
         tournament.participants.add(player)
         try:
@@ -3445,6 +3530,12 @@ def tournament_register_doubles(request, slug):
 
     if tournament.bracket_generated:
         messages.error(request, "Регистрация закрыта: сетка турнира уже сформирована.")
+        return redirect("tournament_detail", slug=slug)
+    if getattr(tournament, "postpayment_window_started_at", None):
+        messages.error(
+            request,
+            "Регистрация закрыта: запущено окно постоплаты и формирование сетки.",
+        )
         return redirect("tournament_detail", slug=slug)
 
     if tournament.is_full():
@@ -3595,6 +3686,11 @@ def tournament_register_doubles(request, slug):
                     sub = request.user.subscription
                     if sub and sub.can_register_for_tournament():
                         sub.increment_usage()
+                        mark_registration_covered(
+                            tournament,
+                            request.user,
+                            TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
+                        )
                 except Exception:
                     pass
             paid_ids = request.session.get("tournament_entry_paid") or []
@@ -3679,6 +3775,11 @@ def _do_join_team(request, tournament, player, team):
         if not consumed:
             messages.error(request, consume_error)
             return redirect("tournament_detail", slug=tournament.slug)
+        mark_registration_covered(
+            tournament,
+            request.user,
+            TournamentRegistrationCoverage.CoverageType.CLUB_PLAN_SLOT,
+        )
 
     team.player2 = player
     team.save()
@@ -3687,6 +3788,11 @@ def _do_join_team(request, tournament, player, team):
             sub = request.user.subscription
             if sub and sub.can_register_for_tournament():
                 sub.increment_usage()
+                mark_registration_covered(
+                    tournament,
+                    request.user,
+                    TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
+                )
         except Exception:
             pass
     paid_ids = request.session.get("tournament_entry_paid") or []
@@ -3789,6 +3895,11 @@ def _do_add_partner(request, tournament, player, partner_id):
         if not consumed:
             messages.error(request, consume_error)
             return redirect("tournament_detail", slug=tournament.slug)
+        mark_registration_covered(
+            tournament,
+            request.user,
+            TournamentRegistrationCoverage.CoverageType.CLUB_PLAN_SLOT,
+        )
 
     partner_tournament_member = _get_tournament_club_member(partner.user, tournament)
     if partner_tournament_member:
@@ -3801,6 +3912,11 @@ def _do_add_partner(request, tournament, player, partner_id):
                 request, f"Партнёр не может участвовать: {partner_consume_error}"
             )
             return redirect("tournament_register_doubles", slug=tournament.slug)
+        mark_registration_covered(
+            tournament,
+            partner.user,
+            TournamentRegistrationCoverage.CoverageType.CLUB_PLAN_SLOT,
+        )
 
     TournamentTeam.objects.create(
         tournament=tournament, player1=player, player2=partner
@@ -3810,12 +3926,22 @@ def _do_add_partner(request, tournament, player, partner_id):
             sub = request.user.subscription
             if sub and sub.can_register_for_tournament():
                 sub.increment_usage()
+                mark_registration_covered(
+                    tournament,
+                    request.user,
+                    TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
+                )
         except Exception:
             pass
         try:
             psub = partner.user.subscription
             if psub and psub.can_register_for_tournament():
                 psub.increment_usage()
+                mark_registration_covered(
+                    tournament,
+                    partner.user,
+                    TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
+                )
         except Exception:
             pass
     paid_ids = request.session.get("tournament_entry_paid") or []

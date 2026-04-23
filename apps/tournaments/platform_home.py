@@ -113,7 +113,10 @@ def attach_home_tournament_row_cta(
     if tournament.bracket_generated:
         tournament.home_cta_kind = "reg_closed"
         return
-    if tournament.is_full():
+    is_full = getattr(tournament, "is_full_annotated", None)
+    if is_full is None:
+        is_full = tournament.is_full()
+    if bool(is_full):
         tournament.home_cta_kind = "full"
         return
 

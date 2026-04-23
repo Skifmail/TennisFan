@@ -21,38 +21,49 @@
     <link rel="icon" type="image/png" sizes="32x32" href="{% static site_favicon_path %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static site_favicon_path %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static site_favicon_path %}">
+    <link rel="preconnect" href="https://mc.yandex.ru" crossorigin>
+    {% if media_origin %}
+    <link rel="preconnect" href="{{ media_origin }}" crossorigin>
+    {% endif %}
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.min.css' %}">
     {% block extra_css %}{% endblock %}
+    {% block extra_head %}{% endblock %}
 
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
-        (function(m, e, t, r, i, k, a) {
-            m[i] = m[i] || function() {
-                (m[i].a = m[i].a || []).push(arguments);
-            };
-            m[i].l = 1 * new Date();
-            for (var j = 0; j < document.scripts.length; j++) {
-                if (document.scripts[j].src === r) {
-                    return;
-                }
-            }
-            k = e.createElement(t);
-            a = e.getElementsByTagName(t)[0];
-            k.async = 1;
-            k.src = r;
-            a.parentNode.insertBefore(k, a);
-        })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js?id=107284748", "ym");
+        window.addEventListener("load", function () {
+            window.setTimeout(function () {
+                (function(m, e, t, r, i, k, a) {
+                    m[i] = m[i] || function() {
+                        (m[i].a = m[i].a || []).push(arguments);
+                    };
+                    m[i].l = 1 * new Date();
+                    for (var j = 0; j < document.scripts.length; j++) {
+                        if (document.scripts[j].src === r) {
+                            return;
+                        }
+                    }
+                    k = e.createElement(t);
+                    a = e.getElementsByTagName(t)[0];
+                    k.async = 1;
+                    k.src = r;
+                    a.parentNode.insertBefore(k, a);
+                })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js?id=107284748", "ym");
 
-        ym(107284748, "init", {
-            ssr: true,
-            webvisor: true,
-            clickmap: true,
-            ecommerce: "dataLayer",
-            referrer: document.referrer,
-            url: location.href,
-            accurateTrackBounce: true,
-            trackLinks: true
+                ym(107284748, "init", {
+                    ssr: true,
+                    webvisor: true,
+                    clickmap: true,
+                    ecommerce: "dataLayer",
+                    referrer: document.referrer,
+                    url: location.href,
+                    accurateTrackBounce: true,
+                    trackLinks: true
+                });
+            }, 1500);
         });
     </script>
     <noscript>
@@ -64,6 +75,14 @@
 </head>
 
 <body class="{% if is_club_panel and club %}body--club-panel{% endif %}">
+    <script defer src="{% static 'js/loading-system.js' %}"></script>
+    <script defer src="{% static 'js/main.js' %}"></script>
+    <script defer src="{% static 'js/club_filter_select.js' %}?v=20260407-2"></script>
+    <script defer src="{% static 'js/phone_input.js' %}"></script>
+    <script defer src="{% static 'js/cookie_consent.js' %}"></script>
+    <script defer src="{% static 'js/lightbox.js' %}"></script>
+    <script defer src="{% static 'js/feedback_widget.js' %}"></script>
+    <script defer src="{% static 'js/city_autocomplete.js' %}"></script>
     <!-- Header -->
     {% if is_club_panel and club %}
     {% include "clubs/_club_top_nav.html" %}
@@ -368,14 +387,6 @@
         </div>
     </div>
 
-    <script src="{% static 'js/loading-system.js' %}"></script>
-    <script src="{% static 'js/main.js' %}"></script>
-    <script src="{% static 'js/club_filter_select.js' %}?v=20260407-2"></script>
-    <script src="{% static 'js/phone_input.js' %}"></script>
-    <script src="{% static 'js/cookie_consent.js' %}"></script>
-    <script src="{% static 'js/lightbox.js' %}"></script>
-    <script src="{% static 'js/feedback_widget.js' %}"></script>
-    <script src="{% static 'js/city_autocomplete.js' %}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 

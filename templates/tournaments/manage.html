@@ -31,6 +31,8 @@
         {% if tournament.start_date %} • {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}
     </p>
 
+    {% include "tournaments/_postpayment_status_banner.html" %}
+
     {% if messages %}
     <div class="mb-4">
         {% for message in messages %}

@@ -16,3 +16,4 @@ class CoreConfig(AppConfig):
         Инициализация Site и Telegram-приветствие перенесены в StartupMiddleware,
         чтобы избежать RuntimeWarning при доступе к БД во время загрузки приложений.
         """
+        from . import signals  # noqa: F401

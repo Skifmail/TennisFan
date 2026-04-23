@@ -1,3 +1,3 @@
 release: python manage.py migrate && python manage.py collectstatic --noinput && python manage.py crontab add
-web: gunicorn config.wsgi --log-file - --timeout 600
+web: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers ${GUNICORN_WORKERS:-3} --worker-class gthread --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5} --log-file -
 worker_private_chat: bash -lc 'while true; do python manage.py sync_private_chat_access; sleep ${PRIVATE_CHAT_SYNC_INTERVAL_SECONDS:-1800}; done'

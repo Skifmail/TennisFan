@@ -19,7 +19,8 @@ from django.views.decorators.http import require_POST
 from apps.core.models import LegalAcceptanceLog
 from apps.legal.utils import get_legal_document_version
 from apps.subscriptions.models import SubscriptionTier
-from apps.tournaments.models import Tournament
+from apps.tournaments.models import Tournament, TournamentPostpaymentInvoice
+from apps.tournaments.postpayment import finalize_postpayment_window
 
 from .forms import DonateForm
 from .models import PaymentRecord, SavedPaymentMethod
@@ -111,7 +112,7 @@ def _get_item_label(payment_type: str, item_id: str) -> str:
             return "Турнир"
         if tournament.club_id:
             return cast(str, f"{tournament.club.name}: {tournament.name}")
-        return cast(str, tournament.title)
+        return cast(str, tournament.name)
 
     if payment_type == "donation":
         return "Поддержка проекта"
@@ -256,6 +257,9 @@ def _build_preview_redirect(request: HttpRequest, payment_type: str | None):
     item_id = request.POST.get("id") or request.GET.get("id")
     if item_id:
         params["id"] = str(item_id)
+    invoice_id = request.POST.get("invoice") or request.GET.get("invoice")
+    if invoice_id:
+        params["invoice"] = str(invoice_id)
     next_url = request.POST.get("next") or request.GET.get("next")
     if next_url:
         params["next"] = str(next_url)
@@ -407,10 +411,26 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
 
     elif payment_type == "tournament":
         tournament_id = request.GET.get("id")
+        invoice_id_raw = (request.GET.get("invoice") or "").strip()
         tournament = get_object_or_404(
             Tournament.objects.select_related("club"),
             pk=tournament_id,
         )
+        invoice = None
+        if invoice_id_raw:
+            try:
+                invoice = TournamentPostpaymentInvoice.objects.select_related(
+                    "tournament", "user"
+                ).get(pk=int(invoice_id_raw), tournament=tournament, user=request.user)
+            except (TournamentPostpaymentInvoice.DoesNotExist, ValueError):
+                messages.error(request, "Ссылка на постоплату недействительна.")
+                return redirect("tournament_detail", slug=tournament.slug)
+            if invoice.status == TournamentPostpaymentInvoice.Status.PAID:
+                messages.info(request, "Этот взнос уже оплачен.")
+                return redirect("tournament_detail", slug=tournament.slug)
+            if invoice.status != TournamentPostpaymentInvoice.Status.PENDING:
+                messages.error(request, "Этот инвойс постоплаты недоступен для оплаты.")
+                return redirect("tournament_detail", slug=tournament.slug)
         next_url = request.GET.get("next", "").strip()
         tournament_member = _get_tournament_club_member(request.user, tournament)
 
@@ -502,6 +522,7 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
             "amount_value": f"{entry_fee:.2f}",
             "item_id": tournament.id,
             "payment_next_url": next_url,
+            "invoice_id": invoice.id if invoice else "",
             "details": [
                 *([("Клуб", tournament.club.name)] if tournament.club_id else []),
                 ("Турнир", tournament.name),
@@ -618,6 +639,7 @@ def payment_process(request: HttpRequest) -> HttpResponse:
         return _build_preview_redirect(request, payment_type)
 
     tournament = None
+    postpayment_invoice = None
     tournament_member = None
     balance_transaction = None
     club_payment_settings = None
@@ -631,10 +653,27 @@ def payment_process(request: HttpRequest) -> HttpResponse:
         amount_decimal = Decimal("0")
 
     if payment_type == "tournament":
+        invoice_id_raw = (request.POST.get("invoice") or "").strip()
         tournament = get_object_or_404(
             Tournament.objects.select_related("club"),
             pk=request.POST.get("id"),
         )
+        if invoice_id_raw:
+            try:
+                postpayment_invoice = TournamentPostpaymentInvoice.objects.get(
+                    pk=int(invoice_id_raw),
+                    tournament=tournament,
+                    user=request.user,
+                )
+            except (TournamentPostpaymentInvoice.DoesNotExist, ValueError):
+                messages.error(request, "Ссылка на постоплату недействительна.")
+                return redirect("tournament_detail", slug=tournament.slug)
+            if (
+                postpayment_invoice.status
+                != TournamentPostpaymentInvoice.Status.PENDING
+            ):
+                messages.error(request, "Инвойс постоплаты недоступен для оплаты.")
+                return redirect("tournament_detail", slug=tournament.slug)
         tournament_member = _get_tournament_club_member(request.user, tournament)
         if (
             tournament.club_id
@@ -784,6 +823,8 @@ def payment_process(request: HttpRequest) -> HttpResponse:
         "item_id": item_id or "",
         "next": next_url or "",
     }
+    if postpayment_invoice is not None:
+        metadata["postpayment_invoice_id"] = str(postpayment_invoice.id)
     if request.user.is_authenticated:
         metadata["user_id"] = str(request.user.pk)
     if tournament is not None and tournament.club_id:
@@ -896,6 +937,8 @@ def payment_process(request: HttpRequest) -> HttpResponse:
         if tournament.club_id:
             pending_data["club_id"] = str(tournament.club_id)
             pending_data["club_slug"] = tournament.club.slug
+        if postpayment_invoice is not None:
+            pending_data["postpayment_invoice_id"] = str(postpayment_invoice.id)
     if balance_transaction is not None:
         pending_data["balance_transaction_id"] = str(balance_transaction.id)
     request.session["yookassa_pending"] = pending_data
@@ -1145,6 +1188,9 @@ def payment_return(request: HttpRequest) -> HttpResponse:
         params.append(("type", payment_type))
     if item_id:
         params.append(("id", item_id))
+    postpayment_invoice_id = str(pending.get("postpayment_invoice_id") or "").strip()
+    if postpayment_invoice_id:
+        params.append(("invoice", postpayment_invoice_id))
     if next_url:
         params.append(("next", next_url))
     amount_paid = pending.get("amount", "").strip()
@@ -1301,6 +1347,7 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                 return redirect("clubs:my_plan")
 
     if payment_type == "tournament" and item_id:
+        invoice_id_raw = (request.GET.get("invoice") or "").strip()
         try:
             tid = int(item_id)
         except (TypeError, ValueError):
@@ -1314,6 +1361,18 @@ def payment_success(request: HttpRequest) -> HttpResponse:
 
             tournament = Tournament.objects.filter(pk=tid).first()
             if tournament:
+                if invoice_id_raw:
+                    try:
+                        invoice = TournamentPostpaymentInvoice.objects.get(
+                            pk=int(invoice_id_raw),
+                            tournament=tournament,
+                            user=request.user,
+                        )
+                        invoice.status = TournamentPostpaymentInvoice.Status.PAID
+                        invoice.paid_at = timezone.now()
+                        invoice.save(update_fields=["status", "paid_at"])
+                    except (TournamentPostpaymentInvoice.DoesNotExist, ValueError):
+                        pass
                 club_member = _get_tournament_club_member(request.user, tournament)
                 if tournament.club_id:
                     if club_member is None:
@@ -1350,6 +1409,12 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                         tournament=tournament,
                         user=request.user,
                     )
+                pending_count = TournamentPostpaymentInvoice.objects.filter(
+                    tournament=tournament,
+                    status=TournamentPostpaymentInvoice.Status.PENDING,
+                ).count()
+                if pending_count == 0 and tournament.postpayment_window_started_at:
+                    finalize_postpayment_window(tournament)
                 messages.success(
                     request,
                     "Оплата вступительного взноса прошла успешно. Вы зарегистрированы на турнир.",

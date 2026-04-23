@@ -464,6 +464,27 @@ def notify_tournament_entry_payment(
     return send_admin_message(text)
 
 
+def notify_tournament_postpayment_window_opened(tournament, pending_count: int) -> bool:
+    """Уведомление администратору о запуске окна постоплаты.
+
+    Args:
+        tournament: Турнир, для которого запущено окно постоплаты.
+        pending_count (int): Количество участников, которым отправлены инвойсы.
+
+    Returns:
+        bool: ``True``, если уведомление отправлено хотя бы в один канал.
+    """
+    tournament_name = _escape(getattr(tournament, "name", "") or "—")
+    deadline_hours = int(getattr(tournament, "postpayment_deadline_hours", 12) or 12)
+    text = (
+        "💬 <b>Запущена постоплата турнира</b>\n\n"
+        f"Турнир: {tournament_name}\n"
+        f"Ожидают оплату: {pending_count}\n"
+        f"Срок оплаты: {deadline_hours} ч"
+    )
+    return send_admin_message(text)
+
+
 def notify_subscription_purchase(user, tier, amount_paid: str | None = None) -> bool:
     """Уведомление о покупке подписки. amount_paid — фактически уплаченная сумма (регион, акция 1 ₽)."""
     name = _escape(user.get_full_name() or user.email or "—")

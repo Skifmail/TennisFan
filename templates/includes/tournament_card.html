@@ -7,9 +7,9 @@
             <div class="tournament-card__center-top">
                 {% if tournament.image %}
                 <div class="tournament-card-photos tournament-card__media">
-                    <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img" loading="lazy">
+                    <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img" loading="lazy" decoding="async">
                     {% for photo in tournament.photos.all|slice:":2" %}
-                    <img src="{{ photo.image.url }}" alt="" class="tournament-img" loading="lazy">
+                    <img src="{{ photo.image.url }}" alt="" class="tournament-img" loading="lazy" decoding="async">
                     {% endfor %}
                 </div>
                 {% else %}
@@ -51,12 +51,13 @@
                     {% if tournament.duration == 'multi' and tournament.entry_fee and tournament.entry_fee > 0 %}
                     <span class="tournament-card__chip tournament-card__chip--fee">Взнос {{ tournament.entry_fee|floatformat:0|intcomma }} ₽</span>
                     {% endif %}
+                    {% include 'includes/postpayment_badge.html' with tournament=tournament class_name='tournament-card__chip tournament-card__chip--format' %}
                     {% if tournament.allowed_categories.all %}
                     {% for ac in tournament.allowed_categories.all|slice:":3" %}
                     <span class="tournament-card__chip tournament-card__chip--cat">{{ ac.category|skill_with_ntrp }}</span>
                     {% endfor %}
-                    {% if tournament.allowed_categories.count > 3 %}
-                    <span class="tournament-card__chip tournament-card__chip--more">+{{ tournament.allowed_categories.count|add:"-3" }}</span>
+                    {% if tournament.allowed_categories.all|length > 3 %}
+                    <span class="tournament-card__chip tournament-card__chip--more">+{{ tournament.allowed_categories.all|length|add:"-3" }}</span>
                     {% endif %}
                     {% endif %}
                 </div>
@@ -74,10 +75,10 @@
                 <span>{{ tournament.get_duration_display }}</span>
                 {% if tournament.variant == 'doubles' and tournament.max_teams %}
                 <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
-                <span>Команд {{ tournament.full_teams_count }}/{{ tournament.max_teams }}</span>
+                <span>Команд {{ tournament.full_teams_count_annotated|default:tournament.full_teams_count }}/{{ tournament.max_teams }}</span>
                 {% elif tournament.max_participants %}
                 <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
-                <span>Мест {{ tournament.participants.count }}/{{ tournament.max_participants }}</span>
+                <span>Мест {{ tournament.participants_count|default:tournament.participants.count }}/{{ tournament.max_participants }}</span>
                 {% endif %}
             </p>
 
@@ -93,8 +94,8 @@
                             {% include 'includes/avatar.html' with avatar=team.player1.avatar class="player-avatar tournament-card__avatar-img" %}
                         </span>
                         {% endfor %}
-                        {% if tournament.teams.count > 12 %}
-                        <span class="tournament-card__more-count">+{{ tournament.teams.count|add:"-12" }}</span>
+                        {% if tournament.teams_count|default:tournament.teams.count > 12 %}
+                        <span class="tournament-card__more-count">+{{ tournament.teams_count|default:tournament.teams.count|add:"-12" }}</span>
                         {% endif %}
                     </div>
                     {% else %}
@@ -107,8 +108,8 @@
                         {% include 'includes/avatar.html' with avatar=participant.avatar class="player-avatar tournament-card__avatar-img" %}
                     </span>
                     {% endfor %}
-                    {% if tournament.participants.count > 12 %}
-                    <span class="tournament-card__more-count">+{{ tournament.participants.count|add:"-12" }}</span>
+                    {% if tournament.participants_count|default:tournament.participants.count > 12 %}
+                    <span class="tournament-card__more-count">+{{ tournament.participants_count|default:tournament.participants.count|add:"-12" }}</span>
                     {% endif %}
                 </div>
                 {% else %}

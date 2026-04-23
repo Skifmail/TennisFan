@@ -86,16 +86,29 @@
             </div>
         </div>
     </div>
+    {% if players_page and players_page.paginator.num_pages > 1 %}
+    <div class="pagination pagination--center">
+        <ul class="pagination__list">
+            {% for page_num in players_page.paginator.page_range %}
+                {% if page_num == players_page.number %}
+                <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
+                {% else %}
+                <li class="pagination__item">
+                    <a href="?page={{ page_num }}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_skill_level %}&skill_level={{ current_skill_level }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">{{ page_num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 </div>
 
+{{ rating_data_json|json_script:"rating-data" }}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         try {
-            const ratingData = [
-                {% for player in players %}
-                { name: "{{ player|escapejs }}", points: parseFloat({{ player.season_pts|default:0 }}) || 0 },
-                {% endfor %}
-            ];
+            const ratingDataElement = document.getElementById('rating-data');
+            const ratingData = ratingDataElement ? JSON.parse(ratingDataElement.textContent) : [];
 
             const ratingToggleBtn = document.getElementById('rating-toggle-btn');
             const ratingList = document.getElementById('rating-list');

@@ -60,4 +60,13 @@ echo "Setting Telegram webhooks..."
 python manage.py set_telegram_webhooks 2>/dev/null || true
 
 echo "Starting server..."
-exec gunicorn --bind 0.0.0.0:8000 --workers 2 --threads 4 config.wsgi:application
+exec gunicorn config.wsgi:application \
+  --bind 0.0.0.0:8000 \
+  --workers "${GUNICORN_WORKERS:-3}" \
+  --worker-class gthread \
+  --threads "${GUNICORN_THREADS:-4}" \
+  --timeout "${GUNICORN_TIMEOUT:-60}" \
+  --graceful-timeout "${GUNICORN_GRACEFUL_TIMEOUT:-30}" \
+  --keep-alive "${GUNICORN_KEEPALIVE:-5}" \
+  --access-logfile - \
+  --error-logfile -

@@ -266,6 +266,7 @@
                         <li><a href="{% url 'legal_privacy' %}">Политика конфиденциальности</a></li>
                         <li><a href="{% url 'legal_offer' %}">Публичная оферта</a></li>
                         <li><a href="{% url 'legal_club_organizer_rules' %}">Правила для клубов</a></li>
+                        <li><a href="{% url 'legal_fan_token' %}">Правила использования FAN-token</a></li>
                         <li><a href="{% url 'legal_terms' %}">Условия использования</a></li>
                         <li><a href="{% url 'legal_personal_data' %}">Обработка персональных данных</a></li>
                     </ul>
@@ -304,13 +305,14 @@
 
     <!-- Плавающая кнопка «Написать нам» -->
     {% if not is_club_panel or not club %}
-    <div id="feedback-widget" class="feedback-widget" data-submit-url="{% url 'feedback_submit' %}" data-threads-url="{% url 'feedback_threads' %}" data-csrf="{{ csrf_token }}" data-is-authenticated="{% if user.is_authenticated %}1{% else %}0{% endif %}">
+    <div id="feedback-widget" class="feedback-widget" data-submit-url="{% url 'feedback_submit' %}" data-threads-url="{% url 'feedback_threads' %}" data-unread-count-url="{% url 'feedback_unread_count' %}" data-csrf="{{ csrf_token }}" data-is-authenticated="{% if user.is_authenticated %}1{% else %}0{% endif %}">
         <!-- Кнопка открытия чата -->
         <button type="button" class="feedback-widget__btn" id="feedback-widget-btn" aria-label="Написать нам">
             <span class="feedback-widget__icon" aria-hidden="true">
                 <img src="{% static 'images/chat_icon.png' %}" alt="" class="feedback-widget__icon-img" width="24" height="24">
             </span>
             <span class="feedback-widget__label">НАПИСАТЬ НАМ</span>
+            <span class="feedback-widget__badge" id="feedback-widget-badge" hidden>0</span>
         </button>
 
         <!-- Виджет чата (скрыт по умолчанию) -->
@@ -319,12 +321,6 @@
                 <div class="feedback-chat-widget__header-content">
                     <h3 class="feedback-chat-widget__title">Обратная связь</h3>
                     <button type="button" class="feedback-chat-widget__close" id="feedback-chat-close" aria-label="Закрыть">&times;</button>
-                </div>
-                <div class="feedback-chat-widget__telegram-banner" id="feedback-telegram-banner" style="display:none;">
-                    <p class="feedback-chat-widget__telegram-text">
-                        <span>📱 Привяжите Telegram, чтобы получать ответы быстрее</span>
-                        <a href="#" id="feedback-telegram-link" class="feedback-chat-widget__telegram-link" target="_blank" rel="noopener noreferrer">Привязать</a>
-                    </p>
                 </div>
             </div>
 
@@ -348,7 +344,7 @@
                     <input type="text" id="feedback-guest-telegram" name="guest_telegram_username" class="form-control" maxlength="100" placeholder="Telegram @username (необязательно)">
                 </div>
                 <div class="form-group">
-                    <input type="text" id="feedback-guest-contact" name="guest_contact" class="form-control" maxlength="200" placeholder="Email или телефон (необязательно)">
+                    <input type="email" id="feedback-guest-contact" name="guest_contact" class="form-control" maxlength="200" required placeholder="Email (обязательно) *">
                 </div>
             </div>
             {% endif %}

@@ -18,8 +18,7 @@
     var sendBtn = document.getElementById("feedback-send-btn");
     var formError = document.getElementById("feedback-form-error");
     var guestForm = document.getElementById("feedback-guest-form");
-    var telegramBanner = document.getElementById("feedback-telegram-banner");
-    var telegramLink = document.getElementById("feedback-telegram-link");
+    var badge = document.getElementById("feedback-widget-badge");
     var welcomeMessage = document.getElementById("feedback-welcome-message");
 
     // Поля для гостей
@@ -29,6 +28,7 @@
 
     var submitUrl = widget.getAttribute("data-submit-url");
     var threadsUrl = widget.getAttribute("data-threads-url");
+    var unreadCountUrl = widget.getAttribute("data-unread-count-url");
     var csrfToken = widget.getAttribute("data-csrf");
     var isAuth = widget.getAttribute("data-is-authenticated") === "1";
 
@@ -38,6 +38,7 @@
         messages: [],
         guestInfoCollected: false,
         pollingInterval: null,
+        unreadInterval: null,
         lastMessageId: null,
     };
 
@@ -90,9 +91,7 @@
         // Загружаем историю сообщений (для всех пользователей)
         if (threadsUrl) {
             loadMessages();
-            if (isAuth) {
-                startPolling();
-            }
+            startPolling();
         }
 
         // Показываем форму для гостя только если еще не собирали информацию
@@ -160,6 +159,7 @@
                 });
 
                 renderMessages();
+                updateUnreadBadge(0);
             } catch (e) {
                 console.error("Failed to load messages:", e);
             }
@@ -185,9 +185,14 @@
             var isUser = !msg.isFromAdmin;
             var messageClass = isUser ? "feedback-chat-widget__message--user" : "feedback-chat-widget__message--admin";
             var timeStr = formatTime(msg.createdAt);
+            var authorLabel = isUser ? "Вы" : "Администратор";
+            var bubbleStyle = isUser
+                ? "background: rgba(0, 131, 116, 0.30); border: 1px solid rgba(0, 210, 180, 0.45); color: #ffffff;"
+                : "background: rgba(166, 130, 74, 0.28); border: 1px solid rgba(166, 130, 74, 0.55);";
 
             html += '<div class="feedback-chat-widget__message ' + messageClass + '">';
-            html += '<div class="feedback-chat-widget__message-bubble">' + escapeHtml(msg.text) + "</div>";
+            html += '<div class="feedback-chat-widget__message-time" style="margin-bottom:4px;font-weight:700;">' + authorLabel + "</div>";
+            html += '<div class="feedback-chat-widget__message-bubble" style="' + bubbleStyle + '">' + escapeHtml(msg.text) + "</div>";
             if (timeStr) {
                 html += '<div class="feedback-chat-widget__message-time">' + escapeHtml(timeStr) + "</div>";
             }
@@ -296,24 +301,9 @@
                         }
                     }
 
-                    // Показываем баннер с ссылкой на Telegram если есть
-                    if (data.telegram_binding_url) {
-                        if (telegramBanner) {
-                            telegramBanner.style.display = "block";
-                        }
-                        if (telegramLink) {
-                            telegramLink.href = data.telegram_binding_url;
-                        }
-                    }
-
                     // Начинаем polling для получения новых сообщений
                     if (threadsUrl) {
-                        if (isAuth) {
-                            startPolling();
-                        } else {
-                            // Для гостей тоже можно делать polling, но реже
-                            // Или можно обновлять историю при следующем открытии чата
-                        }
+                        startPolling();
                     }
                 } else {
                     // Удаляем последнее сообщение при ошибке
@@ -351,8 +341,8 @@
         // Останавливаем предыдущий polling если есть
         stopPolling();
 
-        // Polling каждые 10 секунд для новых сообщений (только для авторизованных)
-        if (!isAuth || !threadsUrl) return;
+        // Polling каждые 30 секунд для новых сообщений
+        if (!threadsUrl) return;
 
         chatState.pollingInterval = setInterval(function () {
             if (!chatState.isOpen) return;
@@ -403,13 +393,56 @@
                 }
             };
             xhr.send();
-        }, 10000); // 10 секунд
+        }, 30000); // 30 секунд
     }
 
     function stopPolling() {
         if (chatState.pollingInterval) {
             clearInterval(chatState.pollingInterval);
             chatState.pollingInterval = null;
+        }
+    }
+
+    function updateUnreadBadge(count) {
+        if (!badge) return;
+        var safeCount = Math.max(0, Number(count) || 0);
+        if (safeCount > 0) {
+            badge.hidden = false;
+            badge.textContent = safeCount > 99 ? "99+" : String(safeCount);
+        } else {
+            badge.hidden = true;
+            badge.textContent = "0";
+        }
+    }
+
+    function fetchUnreadCount() {
+        if (!unreadCountUrl) return;
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", unreadCountUrl);
+        xhr.onload = function () {
+            try {
+                var data = JSON.parse(xhr.responseText || "{}");
+                if (!chatState.isOpen) {
+                    updateUnreadBadge(data.count || 0);
+                }
+            } catch (e) {
+                console.error("Unread count parse error:", e);
+            }
+        };
+        xhr.send();
+    }
+
+    function startUnreadPolling() {
+        if (!unreadCountUrl) return;
+        stopUnreadPolling();
+        fetchUnreadCount();
+        chatState.unreadInterval = setInterval(fetchUnreadCount, 30000);
+    }
+
+    function stopUnreadPolling() {
+        if (chatState.unreadInterval) {
+            clearInterval(chatState.unreadInterval);
+            chatState.unreadInterval = null;
         }
     }
 
@@ -443,6 +476,14 @@
         sendBtn.disabled = true; // Начинаем с отключенной кнопки
     }
 
-    // Закрытие по клику вне виджета (опционально, но лучше не делать для виджета)
-    // Оставляем только закрытие по кнопке
+    if (window.location.search.indexOf("open_support=1") !== -1) {
+        openChat();
+    }
+
+    startUnreadPolling();
+
+    window.addEventListener("beforeunload", function () {
+        stopPolling();
+        stopUnreadPolling();
+    });
 })();

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Диалог поддержки{% endblock %}
+
+{% block content %}
+<div class="page-header club-dashboard-page-header">
+    <div class="container club-dashboard-shell">
+        <section class="club-dashboard-panel">
+            <div class="club-dashboard-panel__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">Поддержка</p>
+                    <h1 class="club-dashboard-panel__title">
+                        {% if thread.user %}
+                        {{ thread.user.get_full_name|default:thread.user.email }}
+                        {% else %}
+                        {{ thread.guest_name|default:thread.guest_email }}
+                        {% endif %}
+                    </h1>
+                </div>
+                <a href="{% url 'support_admin_list' %}" class="club-dashboard-panel__link">Назад к списку</a>
+            </div>
+
+            <div class="feedback-chat-widget__messages" id="support-admin-messages-container">
+                <div class="feedback-chat-widget__messages-list">
+                    {% for message in messages_list %}
+                    <div class="feedback-chat-widget__message {% if message.is_from_admin %}feedback-chat-widget__message--admin{% else %}feedback-chat-widget__message--user{% endif %}">
+                        <div class="feedback-chat-widget__message-time" style="margin-bottom: 4px; font-weight: 700;">
+                            {% if message.is_from_admin %}Администратор{% else %}Пользователь{% endif %}
+                        </div>
+                        <div class="feedback-chat-widget__message-bubble" style="{% if message.is_from_admin %}background: rgba(166, 130, 74, 0.28); border: 1px solid rgba(166, 130, 74, 0.55);{% else %}background: rgba(0, 131, 116, 0.30); border: 1px solid rgba(0, 210, 180, 0.45); color: #ffffff;{% endif %}">
+                            {{ message.text }}
+                        </div>
+                        <div class="feedback-chat-widget__message-time">{{ message.created_at|date:"d.m.Y H:i" }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="feedback-chat-widget__input-area" style="margin-top: 16px;">
+                <div class="feedback-chat-widget__input-wrapper">
+                    <input type="text" id="support-admin-reply-input" class="feedback-chat-widget__input" placeholder="Введите ответ..." maxlength="2000" autocomplete="off">
+                    <button type="button" id="support-admin-reply-btn" class="feedback-chat-widget__send-btn">Отправить</button>
+                </div>
+                <p id="support-admin-reply-error" class="feedback-chat-widget__error" style="display:none;"></p>
+            </div>
+        </section>
+    </div>
+</div>
+<script>
+(function () {
+    var input = document.getElementById("support-admin-reply-input");
+    var button = document.getElementById("support-admin-reply-btn");
+    var errorNode = document.getElementById("support-admin-reply-error");
+    if (!input || !button) return;
+
+    function getCookie(name) {
+        var match = document.cookie.match(new RegExp("(?:^|; )" + name.replace(/([.$?*|{}()[\]\\/+^])/g, "\\$1") + "=([^;]*)"));
+        return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    function sendReply() {
+        var text = (input.value || "").trim();
+        if (!text) return;
+        button.disabled = true;
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "{% url 'support_admin_reply' %}");
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("X-CSRFToken", getCookie("csrftoken") || "");
+        xhr.onload = function () {
+            button.disabled = false;
+            if (xhr.status >= 200 && xhr.status < 300) {
+                window.location.reload();
+                return;
+            }
+            if (errorNode) {
+                errorNode.textContent = "Не удалось отправить ответ.";
+                errorNode.style.display = "block";
+            }
+        };
+        xhr.onerror = function () {
+            button.disabled = false;
+            if (errorNode) {
+                errorNode.textContent = "Ошибка сети.";
+                errorNode.style.display = "block";
+            }
+        };
+        xhr.send(JSON.stringify({ thread_id: {{ thread.id }}, text: text }));
+    }
+
+    button.addEventListener("click", sendReply);
+    input.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            sendReply();
+        }
+    });
+})();
+</script>
+{% endblock %}

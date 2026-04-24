@@ -64,21 +64,28 @@
             </div>
 
             <div class="pricing-card__features">
-                {# --- Регистрации на турниры --- #}
+                {# --- FAN-token --- #}
                 <div class="pricing-feature">
                     <span
-                        class="pricing-feature__icon {% if tier.is_unlimited or tier.max_tournaments > 0 %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
-                        {% if tier.is_unlimited or tier.max_tournaments > 0 %}&#10003;{% else %}&#10007;{% endif %}
+                        class="pricing-feature__icon {% if tier.is_unlimited or tier.fancoin_per_purchase > 0 %}pricing-feature__icon--success{% else %}pricing-feature__icon--disabled{% endif %}">
+                        {% if tier.is_unlimited or tier.fancoin_per_purchase > 0 %}&#10003;{% else %}&#10007;{% endif %}
                     </span>
                     <div class="pricing-feature__content">
-                        <strong>Регистрации на турниры:</strong>
+                        <strong>FAN-token:</strong>
                         {% if tier.is_unlimited %}
                         <span class="pricing-feature__value">Безлимит</span>
-                        {% elif tier.max_tournaments == 0 %}
+                        {% elif tier.fancoin_per_purchase == 0 %}
                         <span class="pricing-feature__value pricing-feature__value--disabled">Недоступно</span>
                         {% else %}
-                        <span class="pricing-feature__value">{{ tier.max_tournaments }} за покупку</span>
+                        <span class="pricing-feature__value">{{ tier.fancoin_per_purchase }} за покупку</span>
                         {% endif %}
+                    </div>
+                </div>
+                <div class="pricing-feature">
+                    <span class="pricing-feature__icon pricing-feature__icon--success">&#8505;</span>
+                    <div class="pricing-feature__content">
+                        1 регистрация на турнир = 3 FT; 1 состоявшийся одиночный/парный спарринг = 1 FT;
+                        1 состоявшийся командный спарринг = 3 FT.
                     </div>
                 </div>
 
@@ -197,13 +204,23 @@
         <h2 class="pricing-faq__title">Часто задаваемые вопросы</h2>
         <div class="pricing-faq__list">
             <div class="pricing-faq__item">
+                <h3 class="pricing-faq__question">Что такое FAN-token?</h3>
+                <p class="pricing-faq__answer">
+                    FAN-token (FT) — это внутренняя единица доступа к игровым действиям на платформе.
+                    FAN-token начисляются при покупке или продлении подписки по выбранному тарифу, а также могут
+                    переноситься как неиспользованный остаток. Токены расходуются на активности: 1 регистрация
+                    на турнир = 3 FT; 1 состоявшийся одиночный или парный спарринг = 1 FT; 1 состоявшийся
+                    командный спарринг = 3 FT.
+                </p>
+            </div>
+            <div class="pricing-faq__item">
                 <h3 class="pricing-faq__question">Как работает подписка?</h3>
                 <p class="pricing-faq__answer">
                     Подписка действует в течение срока, указанного в выбранном тарифе. После окончания срока действия
                     вы можете продлить доступ вручную или включить автоматическое продление по банковской карте.
                     При включённом автосписании средства списываются в день продления по сохранённой карте, а отключить
                     автосписание и отвязать карту можно в любой момент в личном кабинете. Если в тарифе были включены
-                    регистрации на турниры и вы использовали не все, неиспользованный остаток сохраняется за вами
+                    FAN-token и вы использовали не все, неиспользованный остаток сохраняется за вами
                     даже после окончания подписки.
                 </p>
             </div>
@@ -212,7 +229,7 @@
                 <p class="pricing-faq__answer">
                     Да, вы можете отменить подписку в любой момент в своём профиле — в блоке «Подписка» нажмите кнопку
                     «Отменить подписку». Доступ ко всем функциям тарифа сохранится до конца оплаченного периода, а
-                    неиспользованный остаток регистраций на турниры не сгорит и останется доступен до его исчерпания.
+                    неиспользованный остаток FAN-token не сгорит и останется доступен до его исчерпания.
                 </p>
             </div>
             <div class="pricing-faq__item">
@@ -226,9 +243,9 @@
                 </p>
             </div>
             <div class="pricing-faq__item">
-                <h3 class="pricing-faq__question">Что происходит с регистрациями при смене тарифа?</h3>
+                <h3 class="pricing-faq__question">Что происходит с FAN-token при смене тарифа?</h3>
                 <p class="pricing-faq__answer">
-                    При покупке или продлении подписки вам начисляется новый пакет регистраций по выбранному тарифу.
+                    При покупке или продлении подписки вам начисляется новый пакет FAN-token по выбранному тарифу.
                     Неиспользованный остаток сохраняется и суммируется с новыми начислениями.
                 </p>
             </div>

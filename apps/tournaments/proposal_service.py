@@ -6,6 +6,7 @@
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.subscriptions.sparring_billing import charge_fancoin_for_completed_match
 from apps.users.models import Notification
 
 from .models import Match, MatchResultProposal
@@ -242,6 +243,7 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     # Mark match for FAN rating calculation
     match.rating_status = Match.RatingCalcStatus.PENDING
     match.save()
+    charge_fancoin_for_completed_match(match)
 
     match.result_proposals.exclude(pk=proposal.pk).update(
         status=Match.ProposalStatus.REJECTED

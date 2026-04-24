@@ -26,11 +26,11 @@
             <div class="ntrp-level">Ваш уровень силы: <span id="ntrp-level-value"></span></div>
             <p id="ntrp-description" class="text-secondary"></p>
             <p id="ntrp-score-total" class="text-secondary"></p>
+            <p id="ntrp-form-adjust-note" class="text-primary" style="font-weight: 700;"></p>
             <p id="ntrp-info-msg" class="hidden text-secondary" style="font-style: italic; margin-top: 0.5rem;">
                 Результат теста носит информационный характер и не влияет на ваш рейтинг. Рейтинг формируется только по результатам матчей.
             </p>
             <a id="ntrp-result-link" href="{% url 'tournament_list' %}" class="btn btn-primary">Записаться на турнир</a>
-            <p id="ntrp-result-form-msg" class="hidden text-primary" style="font-weight: 600;">Результат подставлен в форму. Заполните данные выше и нажмите «Зарегистрироваться».</p>
         </div>
     </div>
 </div>
@@ -324,7 +324,7 @@
 
     const formTarget = quizEl.dataset.formTarget || '';
     const resultLink = document.getElementById('ntrp-result-link');
-    const resultFormMsg = document.getElementById('ntrp-result-form-msg');
+    const formAdjustNoteEl = document.getElementById('ntrp-form-adjust-note');
 
     const infoMsgEl = document.getElementById('ntrp-info-msg');
 
@@ -346,6 +346,9 @@
         quizEl.classList.add('hidden');
         resultEl.classList.remove('hidden');
         if (formTarget) {
+            if (formAdjustNoteEl) {
+                formAdjustNoteEl.textContent = 'Калькулятор носит информативный характер. Если вы не согласны с уровнем, исправьте его вручную в поле «Как вы оцениваете свой уровень силы (NTRP)» выше.';
+            }
             const input = document.getElementById(formTarget);
             if (input) {
                 input.value = result.level.toFixed(1);
@@ -364,10 +367,12 @@
                 }
             }
             if (resultLink) resultLink.classList.add('hidden');
-            if (resultFormMsg) resultFormMsg.classList.remove('hidden');
             if (infoMsgEl) infoMsgEl.classList.add('hidden');
         } else {
-            // For registered users: show info message that result won't be saved
+            if (formAdjustNoteEl) {
+                formAdjustNoteEl.textContent = '';
+            }
+            // Для залогиненных пользователей: показываем инфо о том, что результат не сохраняется
             if (infoMsgEl && quizEl.dataset.canSave !== 'true') {
                 infoMsgEl.classList.remove('hidden');
             } else if (infoMsgEl) {

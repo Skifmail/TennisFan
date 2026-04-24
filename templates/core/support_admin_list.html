@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Диалоги поддержки{% endblock %}
+
+{% block content %}
+<style>
+    .support-dialog-user {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        text-decoration: none;
+        color: inherit;
+    }
+    .support-dialog-user:hover {
+        text-decoration: underline;
+    }
+    .support-dialog-user__avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex-shrink: 0;
+        border: 1px solid rgba(166, 130, 74, 0.45);
+    }
+    .support-dialog-user__avatar-fallback {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: #fff;
+        background: rgba(0, 131, 116, 0.45);
+        border: 1px solid rgba(0, 210, 180, 0.45);
+        flex-shrink: 0;
+    }
+    .support-dialog-user__name {
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .support-dialog-message-preview {
+        max-width: 340px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        word-break: break-word;
+        line-height: 1.35;
+        min-height: calc(1em * 1.35);
+    }
+</style>
+<div class="page-header club-dashboard-page-header">
+    <div class="container club-dashboard-shell">
+        <section class="club-dashboard-panel">
+            <div class="club-dashboard-panel__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">Поддержка</p>
+                    <h1 class="club-dashboard-panel__title">Диалоги поддержки</h1>
+                </div>
+                <div class="club-dashboard-panel__link">Непрочитано: {{ support_unread_count }}</div>
+            </div>
+            {% if threads %}
+            <div class="club-dashboard-table">
+                <div class="club-dashboard-table__head">
+                    <span>Пользователь</span>
+                    <span>Последнее сообщение</span>
+                    <span>Время</span>
+                    <span>Статус</span>
+                    <span></span>
+                </div>
+                {% for thread in threads %}
+                <div class="club-dashboard-table__row">
+                    <div class="club-dashboard-table__cell">
+                        {% if thread.user %}
+                        {% if thread.user.player %}
+                        <a href="{% url 'profile' pk=thread.user.player.pk %}" class="support-dialog-user">
+                            {% if thread.user.player.avatar %}
+                            <img src="{{ thread.user.player.avatar.url }}" alt="{{ thread.user.get_full_name|default:thread.user.email }}" class="support-dialog-user__avatar">
+                            {% else %}
+                            <span class="support-dialog-user__avatar-fallback">
+                                {{ thread.user.first_name|default:thread.user.email|slice:":1"|upper }}
+                            </span>
+                            {% endif %}
+                            <span class="support-dialog-user__name">{{ thread.user.get_full_name|default:thread.user.email }}</span>
+                        </a>
+                        {% else %}
+                        <span class="support-dialog-user">
+                            <span class="support-dialog-user__avatar-fallback">
+                                {{ thread.user.first_name|default:thread.user.email|slice:":1"|upper }}
+                            </span>
+                            <span class="support-dialog-user__name">{{ thread.user.get_full_name|default:thread.user.email }}</span>
+                        </span>
+                        {% endif %}
+                        {% else %}
+                        {{ thread.guest_name|default:thread.guest_email }}
+                        {% endif %}
+                    </div>
+                    <div class="club-dashboard-table__cell">
+                        <div class="support-dialog-message-preview">{{ thread.messages.last.text }}</div>
+                    </div>
+                    <div class="club-dashboard-table__cell">{{ thread.last_message_at|date:"d.m.Y H:i" }}</div>
+                    <div class="club-dashboard-table__cell">
+                        {% if thread.admin_unread_count %}
+                        <span class="notify-badge">{{ thread.admin_unread_count }}</span>
+                        {% else %}
+                        Нет новых
+                        {% endif %}
+                    </div>
+                    <div class="club-dashboard-table__cell club-dashboard-table__cell--actions">
+                        <a href="{% url 'support_admin_thread' thread.id %}">Открыть</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="club-dashboard-empty-state">
+                <div class="club-dashboard-empty-state__title">Пока нет диалогов</div>
+                <div class="club-dashboard-empty-state__text">Новые сообщения появятся здесь автоматически.</div>
+            </div>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}

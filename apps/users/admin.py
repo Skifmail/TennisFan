@@ -305,7 +305,7 @@ class UserAdmin(BaseUserAdmin):
                 "<div><strong>Начало:</strong> {}</div>"
                 "<div><strong>Окончание:</strong> {}</div>"
                 "<div><strong>Отменена:</strong> {}</div>"
-                "<div><strong>Остаток регистраций:</strong> {}</div>"
+                "<div><strong>Баланс FT:</strong> {}</div>"
                 "<div><strong>Город покупки:</strong> {}</div>"
                 "</div>",
                 subscription.tier.get_name_display(),
@@ -313,7 +313,7 @@ class UserAdmin(BaseUserAdmin):
                 subscription.start_date.strftime("%d.%m.%Y %H:%M"),
                 subscription.end_date.strftime("%d.%m.%Y %H:%M"),
                 cancelled_at,
-                subscription.tournament_registration_balance,
+                subscription.fancoin_balance,
                 subscription.purchase_city or "не указан",
             ),
         )

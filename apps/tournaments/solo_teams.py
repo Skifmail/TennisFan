@@ -6,6 +6,8 @@ import logging
 
 from django.urls import reverse
 
+from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
+from apps.subscriptions.models import FancoinTransaction
 from apps.users.models import Notification
 
 from .models import Tournament
@@ -36,8 +38,12 @@ def remove_solo_teams_from_doubles_tournament(tournament: Tournament) -> int:
         player = team.player1
         try:
             sub = player.user.subscription
-            if sub and not sub.has_unlimited_tournament_access():
-                sub.decrement_usage()
+            if sub:
+                sub.refund_fancoin(
+                    TOURNAMENT_REGISTRATION_COST,
+                    reason=FancoinTransaction.Reason.TOURNAMENT_CANCEL,
+                    tournament=tournament,
+                )
         except Exception:
             pass
 
@@ -46,7 +52,7 @@ def remove_solo_teams_from_doubles_tournament(tournament: Tournament) -> int:
             message=(
                 f"Вы были удалены из турнира «{tournament.name}»: "
                 "не удалось найти партнёра до дедлайна регистрации. "
-                "Лимит регистраций восстановлен (+1)."
+                f"Баланс FT восстановлен (+{TOURNAMENT_REGISTRATION_COST})."
             ),
             url=url,
         )

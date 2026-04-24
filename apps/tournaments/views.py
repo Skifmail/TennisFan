@@ -38,6 +38,8 @@ from apps.clubs.plan_services import (
 from apps.clubs.services import get_fee_status_for_member, user_can_manage_club
 from apps.core.decorators import require_filled_profile
 from apps.core.text_search import filter_field_contains_ci
+from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
+from apps.subscriptions.models import FancoinTransaction
 from apps.users.models import Notification, Player, SkillLevel
 
 from .cancel import cancel_tournament
@@ -3124,7 +3126,10 @@ def _tournament_does_not_consume_subscription_limit(tournament) -> bool:
     return bool(
         tournament.club_id
         or tournament.is_one_day
-        or _tournament_requires_entry_payment(tournament)
+        or (
+            _tournament_requires_entry_payment(tournament)
+            and not tournament_allows_postpayment_registration(tournament)
+        )
     )
 
 
@@ -3228,17 +3233,17 @@ def _check_tournament_registration_eligibility(request, tournament, player):
 
     # Многодневные с взносом: по подписке в рамках лимита — бесплатно; иначе — оплата взноса или оформление подписки
     if _tournament_requires_entry_payment(tournament):
-        if sub and sub.can_register_for_tournament():
+        if sub and sub.has_fancoin(TOURNAMENT_REGISTRATION_COST):
             return True, None
         if tournament_allows_postpayment_registration(tournament):
             return True, None
         return False, REGISTER_PAY_OR_SUBSCRIBE_MSG
 
     # Многодневные без взноса: нужен активный безлимит или несгораемый остаток регистраций.
-    if not sub or not sub.can_register_for_tournament():
+    if not sub or not sub.has_fancoin(TOURNAMENT_REGISTRATION_COST):
         return (
             False,
-            "Для участия в многодневных турнирах нужна активная подписка или доступный остаток регистраций.",
+            "Для участия в многодневных турнирах нужна активная подписка и минимум 3 FT.",
         )
 
     return True, None
@@ -3439,8 +3444,11 @@ def tournament_register(request, slug):
             if not _tournament_does_not_consume_subscription_limit(tournament):
                 try:
                     sub = request.user.subscription
-                    if sub and sub.can_register_for_tournament():
-                        sub.increment_usage()
+                    if sub and sub.spend_fancoin(
+                        TOURNAMENT_REGISTRATION_COST,
+                        reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
+                        tournament=tournament,
+                    ):
                         mark_registration_covered(
                             tournament,
                             request.user,
@@ -3448,7 +3456,7 @@ def tournament_register(request, slug):
                         )
                         messages.success(
                             request,
-                            f"Вы зарегистрированы! Осталось регистраций: {sub.get_remaining_slots()}",
+                            f"Вы зарегистрированы! Баланс FT: {sub.get_fancoin_balance()}",
                         )
                     else:
                         messages.success(request, "Вы зарегистрированы!")
@@ -3473,8 +3481,10 @@ def tournament_register(request, slug):
 
         tournament.participants.add(player)
         try:
+            from apps.core.telegram_notify import notify_tournament_registration
             from apps.telegram_bot import notifications as tg
 
+            notify_tournament_registration(request.user, tournament)
             tg.notify_tournament_registered(request.user, tournament)
         except Exception:
             pass
@@ -3684,8 +3694,11 @@ def tournament_register_doubles(request, slug):
             if not _tournament_does_not_consume_subscription_limit(tournament):
                 try:
                     sub = request.user.subscription
-                    if sub and sub.can_register_for_tournament():
-                        sub.increment_usage()
+                    if sub and sub.spend_fancoin(
+                        TOURNAMENT_REGISTRATION_COST,
+                        reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
+                        tournament=tournament,
+                    ):
                         mark_registration_covered(
                             tournament,
                             request.user,
@@ -3699,8 +3712,10 @@ def tournament_register_doubles(request, slug):
                 request.session["tournament_entry_paid"] = paid_ids
                 request.session.modified = True
             try:
+                from apps.core.telegram_notify import notify_tournament_registration
                 from apps.telegram_bot import notifications as tg
 
+                notify_tournament_registration(request.user, tournament)
                 tg.notify_tournament_registered(request.user, tournament)
             except Exception:
                 pass
@@ -3786,8 +3801,11 @@ def _do_join_team(request, tournament, player, team):
     if not _tournament_does_not_consume_subscription_limit(tournament):
         try:
             sub = request.user.subscription
-            if sub and sub.can_register_for_tournament():
-                sub.increment_usage()
+            if sub and sub.spend_fancoin(
+                TOURNAMENT_REGISTRATION_COST,
+                reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
+                tournament=tournament,
+            ):
                 mark_registration_covered(
                     tournament,
                     request.user,
@@ -3806,8 +3824,10 @@ def _do_join_team(request, tournament, player, team):
         url=reverse("tournament_detail", args=[tournament.slug]),
     )
     try:
+        from apps.core.telegram_notify import notify_tournament_registration
         from apps.telegram_bot import notifications as tg
 
+        notify_tournament_registration(request.user, tournament)
         tg.notify_tournament_registered(request.user, tournament)
     except Exception:
         pass
@@ -3924,8 +3944,11 @@ def _do_add_partner(request, tournament, player, partner_id):
     if not _tournament_does_not_consume_subscription_limit(tournament):
         try:
             sub = request.user.subscription
-            if sub and sub.can_register_for_tournament():
-                sub.increment_usage()
+            if sub and sub.spend_fancoin(
+                TOURNAMENT_REGISTRATION_COST,
+                reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
+                tournament=tournament,
+            ):
                 mark_registration_covered(
                     tournament,
                     request.user,
@@ -3935,8 +3958,11 @@ def _do_add_partner(request, tournament, player, partner_id):
             pass
         try:
             psub = partner.user.subscription
-            if psub and psub.can_register_for_tournament():
-                psub.increment_usage()
+            if psub and psub.spend_fancoin(
+                TOURNAMENT_REGISTRATION_COST,
+                reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
+                tournament=tournament,
+            ):
                 mark_registration_covered(
                     tournament,
                     partner.user,
@@ -3955,8 +3981,11 @@ def _do_add_partner(request, tournament, player, partner_id):
         url=reverse("tournament_detail", args=[tournament.slug]),
     )
     try:
+        from apps.core.telegram_notify import notify_tournament_registration
         from apps.telegram_bot import notifications as tg
 
+        notify_tournament_registration(request.user, tournament)
+        notify_tournament_registration(partner.user, tournament)
         tg.notify_tournament_registered(request.user, tournament)
         tg.notify_tournament_registered(partner.user, tournament)
     except Exception:

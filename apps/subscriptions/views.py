@@ -164,8 +164,8 @@ def buy_subscription(request, tier_id):
     )
     sub.purchase_city = normalize_city_for_pricing(city or "")
     sub.save()
-    if not tier.is_unlimited and tier.max_tournaments > 0:
-        sub.add_tournament_registration_slots(tier.max_tournaments)
+    if not tier.is_unlimited and tier.fancoin_per_purchase > 0:
+        sub.add_fancoin(tier.fancoin_per_purchase)
 
     _mark_user_paid_subscription(request.user)
 

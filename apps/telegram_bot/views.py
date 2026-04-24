@@ -1671,13 +1671,13 @@ def _handle_menu_callback_action(
 
         # Регистрации на турниры
         if tier_obj.is_unlimited:
-            registrations_text = "♾️ Неограниченные регистрации на турниры"
-        elif tier_obj.max_tournaments > 0:
+            registrations_text = "♾️ Неограниченный FAN-token"
+        elif tier_obj.fancoin_per_purchase > 0:
             registrations_text = (
-                f"🎟 <b>{tier_obj.max_tournaments}</b> регистраций на турниры за период"
+                f"🪙 <b>{tier_obj.fancoin_per_purchase}</b> FAN-token за покупку"
             )
         else:
-            registrations_text = "🚫 Регистрации на турниры не включены"
+            registrations_text = "🚫 FAN-token не включён"
 
         # Особенности тарифа (чек‑лист как на сайте)
         feature_rows: list[tuple[bool, str]] = [
@@ -1710,7 +1710,7 @@ def _handle_menu_callback_action(
             f"🔹 <b>{name}</b>",
             f"⏱ <b>Срок действия:</b> {tier_obj.duration_label}",
             price_block,
-            f"🎯 <b>Регистрации на турниры:</b>\n{registrations_text}",
+            f"🎯 <b>FAN-token:</b>\n{registrations_text}",
         ]
         if badges:
             lines.append("")
@@ -1910,13 +1910,13 @@ def _handle_menu_callback_action(
                     end_str = f"{end_str} (через {days_left} дн.)"
 
             # Регистрации на турниры
-            if sub.has_unlimited_tournament_access():
-                reg_text = "♾️ Безлимит"
-            elif tier.max_tournaments == 0 and sub.get_remaining_slots() == 0:
+            if sub.has_unlimited_fancoin():
+                reg_text = "♾️ Безлимит FAN-token"
+            elif tier.fancoin_per_purchase == 0 and sub.get_fancoin_balance() == 0:
                 reg_text = "🚫 Недоступно"
             else:
-                remaining = sub.get_remaining_slots()
-                reg_text = f"🎟️ Осталось: {remaining}"
+                remaining = sub.get_fancoin_balance()
+                reg_text = f"🪙 Баланс: {remaining}"
 
             # Список возможностей тарифа
             features = []

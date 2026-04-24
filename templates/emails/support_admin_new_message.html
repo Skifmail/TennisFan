@@ -1,0 +1,8 @@
+<p>Здравствуйте!</p>
+<p>Пользователь отправил новое сообщение в поддержку.</p>
+<p><strong>Автор:</strong> {{ author_name }}</p>
+<p><strong>Контакт:</strong> {{ author_email|default:"—" }}</p>
+<p><strong>Тема:</strong> {{ message.subject|default:"Без темы" }}</p>
+<p><strong>Сообщение:</strong></p>
+<p>{{ message.text|linebreaksbr }}</p>
+<p><a href="{{ thread_url }}">Открыть диалог в панели платформы</a></p>

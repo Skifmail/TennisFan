@@ -6,7 +6,6 @@ import csv
 import json
 import logging
 import re
-import secrets
 from calendar import monthrange
 from collections.abc import Iterable
 from datetime import datetime, timedelta
@@ -17,7 +16,9 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.core.validators import validate_email
 from django.db import models
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
@@ -26,7 +27,6 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import linebreaks
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_safe
 
 from apps.clubs.models import (
@@ -61,9 +61,22 @@ from apps.training.models import Coach
 from apps.users.models import Player, SkillLevel
 from apps.users.rating_utils import rating_to_ntrp_level
 
-from . import telegram_support as tg_support
 from .forms import FeedbackForm
-from .models import City, SupportMessage, SupportMessageAdminDelivery, UserTelegramLink
+from .models import City, SupportThread
+from .support_notifications import (
+    send_admin_support_notification,
+    send_user_support_reply,
+)
+from .support_service import (
+    SupportAuthor,
+    create_admin_reply,
+    create_user_message,
+    get_threads_for_admin,
+    get_unread_count_for_admin,
+    get_unread_count_for_user,
+    mark_thread_read_by_admin,
+    mark_thread_read_by_user,
+)
 from .text_search import filter_field_contains_ci
 
 logger = logging.getLogger(__name__)
@@ -99,6 +112,24 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
     current_month_start = today.replace(day=1)
     previous_month_end = current_month_start - timedelta(days=1)
     previous_month_start = previous_month_end.replace(day=1)
+    current_month_start_dt = _make_aware_datetime(
+        current_month_start.year,
+        current_month_start.month,
+        current_month_start.day,
+    )
+    previous_month_start_dt = _make_aware_datetime(
+        previous_month_start.year,
+        previous_month_start.month,
+        previous_month_start.day,
+    )
+    previous_month_end_dt = _make_aware_datetime(
+        previous_month_end.year,
+        previous_month_end.month,
+        previous_month_end.day,
+        23,
+        59,
+        59,
+    )
     next_14_days = today + timedelta(days=14)
     next_7_days = now + timedelta(days=7)
     last_30_days = now - timedelta(days=30)
@@ -194,12 +225,12 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
 
     payments_this_month = PaymentRecord.objects.filter(
         status="succeeded",
-        paid_at__gte=current_month_start,
+        paid_at__gte=current_month_start_dt,
     )
     payments_previous_month = PaymentRecord.objects.filter(
         status="succeeded",
-        paid_at__gte=previous_month_start,
-        paid_at__lte=previous_month_end,
+        paid_at__gte=previous_month_start_dt,
+        paid_at__lte=previous_month_end_dt,
     )
     subscription_revenue_month = payments_this_month.filter(
         payment_type=PaymentRecord.PaymentType.SUBSCRIPTION
@@ -211,7 +242,7 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         payment_type=PaymentRecord.PaymentType.DONATION
     ).aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"] or Decimal("0")
     club_subscription_revenue_month = ClubSubscription.objects.filter(
-        started_at__gte=current_month_start,
+        started_at__gte=current_month_start_dt,
         price__gt=0,
     ).aggregate(total=Coalesce(Sum("price"), Decimal("0")))["total"] or Decimal("0")
     total_platform_revenue_month = (
@@ -227,8 +258,8 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         or Decimal("0")
     ) + (
         ClubSubscription.objects.filter(
-            started_at__gte=previous_month_start,
-            started_at__lte=previous_month_end,
+            started_at__gte=previous_month_start_dt,
+            started_at__lte=previous_month_end_dt,
             price__gt=0,
         ).aggregate(total=Coalesce(Sum("price"), Decimal("0")))["total"]
         or Decimal("0")
@@ -714,6 +745,8 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         {"value": month_number, "label": month_names_ru[month_number - 1]}
         for month_number in range(1, 13)
     ]
+    support_unread_count = get_unread_count_for_admin()
+    support_recent_threads = get_threads_for_admin(limit=5)
 
     context = {
         "status_summary": status_summary,
@@ -735,6 +768,8 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         "activity_rate": activity_rate,
         "nearest_tournaments_count": nearest_tournaments_count,
         "active_user_subscriptions": active_user_subscriptions,
+        "support_unread_count": support_unread_count,
+        "support_recent_threads": support_recent_threads,
     }
     return render(request, "core/platform_dashboard.html", context)
 
@@ -1501,126 +1536,42 @@ def rules(request):
     return render(request, "core/rules.html", {"rules_content": rules_content})
 
 
-# ---------------------------------------------------------------------------
-# Обратная связь: новая система через Telegram (SupportMessage + UserTelegramLink)
-# ---------------------------------------------------------------------------
+def _get_or_create_guest_session_key(request: HttpRequest) -> str:
+    """Вернуть ключ сессии гостя для привязки диалога."""
+    if request.session.session_key:
+        return str(request.session.session_key)
+    request.session.create()
+    return str(request.session.session_key or "")
 
 
-def _create_support_message_and_send_to_admin(
-    request,
-    subject: str,
-    message: str,
-    guest_name: str | None = None,
-    guest_contact: str | None = None,
-    guest_telegram_username: str | None = None,
-):
-    """
-    Создать SupportMessage, отправить админу в Telegram, сохранить admin_telegram_message_id.
-    Возвращает (support_message, telegram_binding_url или None).
-    Поддерживает как зарегистрированных пользователей, так и гостей.
-    """
+def _build_support_author(
+    request: HttpRequest,
+    *,
+    guest_name: str,
+    guest_email: str,
+) -> SupportAuthor:
+    """Собрать автора обращения для сервисного слоя."""
     if request.user.is_authenticated:
-        # Уникальный токен для каждого сообщения (поле unique=True); для привязки бота используется UserTelegramLink
-        support_msg = SupportMessage.objects.create(
-            user=request.user,
-            guest_binding_token=secrets.token_urlsafe(32),
-            subject=(subject or "")[:200],
-            text=message,
-            is_from_admin=False,
+        return SupportAuthor(
+            user_id=request.user.id,
+            guest_email="",
+            guest_name="",
+            guest_session_key="",
         )
-        user_display = request.user.get_full_name() or request.user.email or "—"
-        user_email = request.user.email or ""
-        is_guest = False
-        guest_contact_val = ""
-        guest_telegram_val = ""
-    else:
-        # Незарегистрированный пользователь (гость)
-        guest_tg_username = (guest_telegram_username or "").strip().lstrip("@")
-        binding_token = None
 
-        # Если гость указал Telegram username, создаем токен привязки
-        if guest_tg_username and tg_support.is_telegram_configured():
-            binding_token = secrets.token_urlsafe(32)
-
-        support_msg = SupportMessage.objects.create(
-            user=None,
-            guest_name=(guest_name or "")[:200].strip(),
-            guest_contact=(guest_contact or "")[:200].strip(),
-            guest_telegram_username=guest_tg_username,
-            guest_binding_token=binding_token or "",
-            subject=(subject or "")[:200],
-            text=message,
-            is_from_admin=False,
-        )
-        user_display = guest_name or "Гость (незарегистрированный пользователь)"
-        user_email = guest_contact or ""
-        is_guest = True
-        guest_contact_val = guest_contact or ""
-        guest_telegram_val = guest_tg_username
-
-    text_for_admin = tg_support.format_support_message_to_admin(
-        support_message_id=support_msg.pk,
-        user_display=user_display,
-        user_email=user_email,
-        subject=subject,
-        text=message,
-        source="сайт",
-        is_guest=is_guest,
-        guest_contact=guest_contact_val,
-        guest_telegram_username=guest_telegram_val,
+    return SupportAuthor(
+        user_id=None,
+        guest_email=guest_email,
+        guest_name=guest_name,
+        guest_session_key=_get_or_create_guest_session_key(request),
     )
-    deliveries = tg_support.send_to_admin_with_deliveries(text_for_admin)
-    if deliveries:
-        support_msg.admin_telegram_text = text_for_admin
-        support_msg.admin_telegram_message_id = deliveries[0][1]
-        support_msg.save(
-            update_fields=["admin_telegram_message_id", "admin_telegram_text"]
-        )
-        for admin_chat_id, admin_msg_id in deliveries:
-            SupportMessageAdminDelivery.objects.create(
-                support_message=support_msg,
-                admin_chat_id=admin_chat_id,
-                admin_telegram_message_id=admin_msg_id,
-            )
-
-    binding_url = None
-    if request.user.is_authenticated and tg_support.is_telegram_configured():
-        link, _ = UserTelegramLink.objects.get_or_create(
-            user=request.user,
-            defaults={
-                "telegram_chat_id": None,
-                "binding_token": secrets.token_urlsafe(32),
-            },
-        )
-        # Если пользователь уже привязал бота, проверяем гостевые сообщения
-        if link.telegram_chat_id:
-            link.migrate_guest_messages()
-        elif link.telegram_chat_id is None:
-            token = link.get_or_create_binding_token()
-            bot_username = tg_support.get_bot_username()
-            if bot_username:
-                binding_url = f"https://t.me/{bot_username}?start={token}"
-    elif (
-        is_guest
-        and support_msg.guest_binding_token
-        and tg_support.is_telegram_configured()
-    ):
-        # Для гостя создаем ссылку привязки, если указан Telegram username
-        bot_username = tg_support.get_bot_username()
-        if bot_username:
-            binding_url = (
-                f"https://t.me/{bot_username}?start={support_msg.guest_binding_token}"
-            )
-
-    return support_msg, binding_url
 
 
 @login_required
 @require_http_methods(["GET", "POST"])
 def support_feedback(request):
     """
-    Форма обратной связи. POST: сохранить в БД, отправить админу в Telegram,
-    показать «Ваше сообщение принято. Ответ придёт в Telegram» и ссылку на привязку при необходимости.
+    Форма обратной связи.
     """
     if request.method == "GET":
         initial = {}
@@ -1639,23 +1590,25 @@ def support_feedback(request):
 
     subject = (form.cleaned_data.get("subject") or "").strip()
     message = (form.cleaned_data.get("message") or "").strip()
-    _, binding_url = _create_support_message_and_send_to_admin(
-        request, subject, message
+    author = _build_support_author(request, guest_name="", guest_email="")
+    support_message = create_user_message(
+        author=author,
+        text=message,
+        subject=subject,
     )
+    send_admin_support_notification(support_message)
 
     return render(
         request,
         "core/support_feedback_success.html",
-        {"telegram_binding_url": binding_url},
+        {"telegram_binding_url": None},
     )
 
 
 @require_http_methods(["POST"])
 def support_feedback_submit(request):
     """
-    API для виджета (JSON): создать SupportMessage, отправить админу.
-    Возвращает success и при необходимости telegram_binding_url.
-    Поддерживает как зарегистрированных пользователей, так и гостей.
+    API для виджета: создать сообщение и уведомить администратора по email.
     """
     try:
         if request.content_type and "application/json" in request.content_type:
@@ -1665,8 +1618,7 @@ def support_feedback_submit(request):
         message = (data.get("message") or "").strip()
         subject = (data.get("subject") or "").strip()
         guest_name = (data.get("guest_name") or "").strip()
-        guest_contact = (data.get("guest_contact") or "").strip()
-        guest_telegram_username = (data.get("guest_telegram_username") or "").strip()
+        guest_contact = (data.get("guest_contact") or "").strip().lower()
     except (json.JSONDecodeError, TypeError):
         return JsonResponse(
             {"success": False, "error": "Неверный формат запроса"}, status=400
@@ -1677,331 +1629,48 @@ def support_feedback_submit(request):
             {"success": False, "error": "Введите сообщение."}, status=400
         )
 
-    # Для незарегистрированных пользователей имя обязательно
+    # Для гостей имя и email обязательны.
     if not request.user.is_authenticated:
         if not guest_name:
             return JsonResponse(
                 {"success": False, "error": "Введите ваше имя."}, status=400
             )
+        if not guest_contact:
+            return JsonResponse(
+                {"success": False, "error": "Введите email для обратной связи."},
+                status=400,
+            )
+        try:
+            validate_email(guest_contact)
+        except ValidationError:
+            return JsonResponse(
+                {"success": False, "error": "Введите корректный email."}, status=400
+            )
 
+    author = _build_support_author(
+        request,
+        guest_name=guest_name,
+        guest_email=guest_contact,
+    )
     try:
-        support_msg, binding_url = _create_support_message_and_send_to_admin(
-            request,
-            subject,
-            message,
-            guest_name=guest_name,
-            guest_contact=guest_contact,
-            guest_telegram_username=guest_telegram_username,
+        support_message = create_user_message(
+            author=author,
+            text=message,
+            subject=subject,
         )
-    except Exception as e:
-        logger.exception(
-            "support_feedback_submit failed for user=%s",
-            getattr(request.user, "pk", None),
-        )
-        return JsonResponse(
-            {"success": False, "error": f"Ошибка отправки: {e!s}"},
-            status=500,
-        )
-
-    # Для гостей сохраняем message_id в session для получения истории
-    if not request.user.is_authenticated:
-        guest_message_ids = request.session.get("feedback_guest_message_ids", [])
-        if support_msg.pk not in guest_message_ids:
-            guest_message_ids.append(support_msg.pk)
-            request.session["feedback_guest_message_ids"] = guest_message_ids
+        if not request.user.is_authenticated:
+            request.session["feedback_thread_id"] = support_message.thread_id
             request.session.modified = True
+        send_admin_support_notification(support_message)
+    except Exception as exc:
+        logger.exception("support_feedback_submit failed: %s", exc)
+        return JsonResponse({"success": False, "error": "Ошибка отправки."}, status=500)
 
     payload = {
         "success": True,
-        "message_id": support_msg.pk,
+        "message_id": support_message.pk,
     }
-    if binding_url:
-        payload["telegram_binding_url"] = binding_url
     return JsonResponse(payload)
-
-
-# ---------------------------------------------------------------------------
-# Telegram Webhook: /start, сообщения пользователя, ответы админа
-# ---------------------------------------------------------------------------
-
-
-def _support_webhook_secret_ok(request) -> bool:
-    """Проверка секрета webhook бота поддержки (X-Telegram-Bot-Api-Secret-Token)."""
-    secret = getattr(settings, "TELEGRAM_SUPPORT_WEBHOOK_SECRET", None) or ""
-    if not secret:
-        return True
-    token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-    return bool(token == secret)
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def telegram_support_webhook(request):
-    """
-    Webhook бота поддержки (TELEGRAM_SUPPORT_BOT_TOKEN).
-    - /start с токеном: привязка telegram_chat_id к пользователю.
-    - Сообщение от пользователя (личный чат): сохранить, переслать админу.
-    - Ответ админа (Reply на сообщение): отправить пользователю, пометить «Ответ отправлен».
-    - Сообщение админа без Reply: отправить подсказку «выберите сообщение (Reply)».
-    """
-    if not _support_webhook_secret_ok(request):
-        return JsonResponse({"ok": False}, status=403)
-
-    try:
-        data = json.loads(request.body or "{}")
-    except (json.JSONDecodeError, TypeError):
-        return JsonResponse({"ok": True})
-
-    admin_chat_ids = tg_support.get_admin_chat_ids()
-    if not admin_chat_ids:
-        return JsonResponse({"ok": True})
-
-    message = data.get("message") or {}
-    chat_id = str(message.get("chat", {}).get("id", ""))
-    text = (message.get("text") or "").strip()
-    reply_to = message.get("reply_to_message") or {}
-
-    # ----- Ответ администратора (reply на наше сообщение админу) -----
-    if reply_to and chat_id in admin_chat_ids and text:
-        original_message_id = reply_to.get("message_id")
-        if not original_message_id:
-            return JsonResponse({"ok": True})
-
-        delivery = (
-            SupportMessageAdminDelivery.objects.filter(
-                admin_chat_id=chat_id,
-                admin_telegram_message_id=original_message_id,
-            )
-            .select_related("support_message", "support_message__user")
-            .first()
-        )
-        if delivery:
-            support_msg = delivery.support_message
-        else:
-            support_msg = (
-                SupportMessage.objects.filter(
-                    admin_telegram_message_id=original_message_id,
-                )
-                .select_related("user")
-                .first()
-            )
-        if not support_msg:
-            logger.debug(
-                "Webhook: no SupportMessage for chat_id=%s message_id=%s",
-                chat_id,
-                original_message_id,
-            )
-            return JsonResponse({"ok": True})
-
-        user = support_msg.user
-        is_guest = user is None
-        sent_via_telegram = False
-
-        # Если это зарегистрированный пользователь с привязанным Telegram, отправляем ответ
-        if user:
-            link = getattr(user, "telegram_link", None)
-            if link and link.telegram_chat_id:
-                safe_text = (
-                    text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                )
-                tg_support.send_to_user(
-                    link.telegram_chat_id, f"📩 <b>Ответ поддержки:</b>\n\n{safe_text}"
-                )
-                sent_via_telegram = True
-        elif is_guest and support_msg.guest_telegram_chat_id:
-            # Если гость привязал Telegram, отправляем ответ через бот
-            safe_text = (
-                text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            )
-            tg_support.send_to_user(
-                support_msg.guest_telegram_chat_id,
-                f"📩 <b>Ответ поддержки:</b>\n\n{safe_text}",
-            )
-            sent_via_telegram = True
-
-        # Сохраняем ответ админа в БД (guest_binding_token уникален в модели)
-        SupportMessage.objects.create(
-            user=user,
-            guest_binding_token=secrets.token_urlsafe(32),
-            guest_name=support_msg.guest_name if is_guest else "",
-            guest_contact=support_msg.guest_contact if is_guest else "",
-            guest_telegram_username=(
-                support_msg.guest_telegram_username if is_guest else ""
-            ),
-            guest_telegram_chat_id=(
-                support_msg.guest_telegram_chat_id if is_guest else None
-            ),
-            text=text,
-            is_from_admin=True,
-        )
-
-        # Обновляем сообщение админу с пометкой об отправке ответа
-        if support_msg.admin_telegram_text and support_msg.admin_telegram_message_id:
-            if is_guest:
-                if sent_via_telegram:
-                    new_text = (
-                        support_msg.admin_telegram_text
-                        + "\n\n✅ Ответ отправлен в Telegram"
-                    )
-                else:
-                    new_text = (
-                        support_msg.admin_telegram_text
-                        + "\n\n✅ Ответ сохранён. Свяжитесь с пользователем по указанным контактам (Telegram не привязан)."
-                    )
-            else:
-                new_text = support_msg.admin_telegram_text + "\n\n✅ Ответ отправлен"
-            tg_support.edit_message(chat_id, original_message_id, new_text)
-        return JsonResponse({"ok": True})
-
-    # Админ написал /start — первое приветствие (проверка, что бот работает)
-    if chat_id in admin_chat_ids and text and not reply_to:
-        if text.strip() == "/start":
-            tg_support.send_message(chat_id, tg_support.ADMIN_GREETING_SUPPORT)
-            return JsonResponse({"ok": True})
-        tg_support.send_message(
-            chat_id,
-            "⚠️ Чтобы ответить пользователю, выберите его сообщение (Reply) и введите ответ.",
-        )
-        return JsonResponse({"ok": True})
-
-    # ----- /start: привязка по токену или сообщение «уже привязан» -----
-    if text.startswith("/start") and message.get("chat", {}).get("type") == "private":
-        try:
-            chat_id_int = int(chat_id)
-        except (ValueError, TypeError):
-            return JsonResponse({"ok": True})
-
-        token = ""
-        parts = text.split(maxsplit=1)
-        if len(parts) > 1:
-            token = (parts[1] or "").strip()
-
-        if token:
-            # Сначала проверяем токен для зарегистрированных пользователей
-            link = UserTelegramLink.objects.filter(binding_token=token).first()
-            if link:
-                link.telegram_chat_id = chat_id_int
-                link.binding_token = None
-                link.token_created_at = None
-                link.save(
-                    update_fields=[
-                        "telegram_chat_id",
-                        "binding_token",
-                        "token_created_at",
-                    ]
-                )
-                # Переносим гостевые сообщения к этому пользователю, если они есть
-                migrated_count = link.migrate_guest_messages()
-                if migrated_count > 0:
-                    tg_support.send_message(
-                        chat_id_int,
-                        f"✅ Ваш аккаунт успешно привязан.\n"
-                        f"📨 Найдено и привязано {migrated_count} обращений, отправленных до регистрации.",
-                    )
-                else:
-                    tg_support.send_message(
-                        chat_id_int, "✅ Ваш аккаунт успешно привязан."
-                    )
-            else:
-                # Проверяем токен для гостей
-                guest_msg = SupportMessage.objects.filter(
-                    guest_binding_token=token, user__isnull=True
-                ).first()
-                if guest_msg:
-                    guest_msg.guest_telegram_chat_id = chat_id_int
-                    guest_msg.guest_binding_token = ""
-                    guest_msg.save(
-                        update_fields=["guest_telegram_chat_id", "guest_binding_token"]
-                    )
-                    tg_support.send_message(
-                        chat_id_int,
-                        f"✅ Ваш Telegram успешно привязан для получения ответов на обращение #{guest_msg.pk}.\n"
-                        f"Администратор сможет ответить вам здесь в Telegram.",
-                    )
-                else:
-                    tg_support.send_message(
-                        chat_id_int,
-                        "Токен не найден или устарел. Отправьте форму на сайте заново и перейдите по новой ссылке.",
-                    )
-        else:
-            # /start без токена — проверяем, привязан ли уже этот чат
-            existing = UserTelegramLink.objects.filter(
-                telegram_chat_id=chat_id_int
-            ).first()
-            if existing:
-                tg_support.send_message(chat_id_int, "✅ Ваш аккаунт уже привязан.")
-            else:
-                # Проверяем, есть ли гостевые сообщения с таким chat_id
-                guest_messages = SupportMessage.objects.filter(
-                    user__isnull=True, guest_telegram_chat_id=chat_id_int
-                ).first()
-                if guest_messages:
-                    tg_support.send_message(
-                        chat_id_int,
-                        "Вы отправили обращение как незарегистрированный пользователь. "
-                        "Зарегистрируйтесь на сайте и привяжите аккаунт по ссылке из профиля, "
-                        "чтобы ваши обращения были привязаны к вашему аккаунту.",
-                    )
-                else:
-                    tg_support.send_message(
-                        chat_id_int,
-                        tg_support.USER_GREETING_SUPPORT,
-                    )
-        return JsonResponse({"ok": True})
-
-    # ----- Обычное сообщение от пользователя (личный чат, уже привязан) -----
-    if message.get("chat", {}).get("type") == "private" and text:
-        try:
-            chat_id_int = int(chat_id)
-        except (ValueError, TypeError):
-            return JsonResponse({"ok": True})
-
-        link = UserTelegramLink.objects.filter(telegram_chat_id=chat_id_int).first()
-        if not link:
-            tg_support.send_message(
-                chat_id_int,
-                tg_support.USER_GREETING_SUPPORT,
-            )
-            return JsonResponse({"ok": True})
-
-        support_msg = SupportMessage.objects.create(
-            user=link.user,
-            guest_binding_token=secrets.token_urlsafe(32),
-            text=text,
-            is_from_admin=False,
-        )
-        user_display = link.user.get_full_name() or link.user.email or "—"
-        user_email = link.user.email or ""
-        text_for_admin = tg_support.format_support_message_to_admin(
-            support_message_id=support_msg.pk,
-            user_display=user_display,
-            user_email=user_email,
-            subject="",
-            text=text,
-            source="Telegram",
-        )
-        deliveries = tg_support.send_to_admin_with_deliveries(text_for_admin)
-        if deliveries:
-            support_msg.admin_telegram_text = text_for_admin
-            support_msg.admin_telegram_message_id = deliveries[0][1]
-            support_msg.save(
-                update_fields=["admin_telegram_message_id", "admin_telegram_text"]
-            )
-            for admin_chat_id, admin_msg_id in deliveries:
-                SupportMessageAdminDelivery.objects.create(
-                    support_message=support_msg,
-                    admin_chat_id=admin_chat_id,
-                    admin_telegram_message_id=admin_msg_id,
-                )
-
-        return JsonResponse({"ok": True})
-
-    return JsonResponse({"ok": True})
-
-
-# ---------------------------------------------------------------------------
-# Старые эндпоинты (виджет на сайте — можно переключить на support_feedback_submit)
-# ---------------------------------------------------------------------------
 
 
 @require_http_methods(["GET"])
@@ -2022,52 +1691,137 @@ def feedback_submit(request):
 @require_safe
 def feedback_threads(request):
     """
-    API: список обращений пользователя (SupportMessage) для виджета.
-    Поддерживает как авторизованных пользователей, так и гостей (через session).
-    Для гостей возвращаются и их сообщения, и ответы админа (по совпадению guest_*).
+    API: список сообщений одного диалога для виджета.
     """
     threads = []
-    messages = []
+    support_thread: SupportThread | None = None
 
     if request.user.is_authenticated:
-        # Для авторизованных пользователей - получаем все их сообщения и ответы админа
-        messages = SupportMessage.objects.filter(user=request.user).order_by(
-            "created_at"
-        )[:50]
+        support_thread = (
+            SupportThread.objects.filter(user=request.user)
+            .order_by("-last_message_at")
+            .first()
+        )
     else:
-        # Для гостей - сообщения из session + ответы админа с тем же guest_*
-        guest_message_ids = request.session.get("feedback_guest_message_ids", [])
-        if guest_message_ids:
-            guest_msgs = list(
-                SupportMessage.objects.filter(
-                    pk__in=guest_message_ids,
-                    user__isnull=True,
-                ).values_list("guest_name", "guest_contact", "guest_telegram_username")
-            )
-            triplets = set(guest_msgs)
-            q = Q(pk__in=guest_message_ids)
-            for gn, gc, gt in triplets:
-                q = q | Q(
-                    user__isnull=True,
-                    guest_name=gn,
-                    guest_contact=gc,
-                    guest_telegram_username=gt,
-                )
-            messages = SupportMessage.objects.filter(q).order_by("created_at")[:50]
+        thread_id = request.session.get("feedback_thread_id")
+        if thread_id:
+            support_thread = SupportThread.objects.filter(pk=thread_id).first()
 
     current_thread = []
-    for m in messages:
-        current_thread.append(
-            {
-                "id": m.pk,
-                "text": m.text,
-                "is_from_admin": m.is_from_admin,
-                "created_at": m.created_at.isoformat(),
-            }
-        )
+    if support_thread:
+        messages_qs = support_thread.messages.order_by("created_at")[:50]
+        for message in messages_qs:
+            current_thread.append(
+                {
+                    "id": message.pk,
+                    "text": message.text,
+                    "is_from_admin": message.is_from_admin,
+                    "created_at": message.created_at.isoformat(),
+                }
+            )
+        mark_thread_read_by_user(support_thread)
+
     if current_thread:
         threads.append({"messages": current_thread})
-    return JsonResponse({"threads": threads})
+    return JsonResponse(
+        {
+            "threads": threads,
+            "unread_count": get_unread_count_for_user(thread=support_thread),
+        }
+    )
+
+
+@require_safe
+def feedback_unread_count(request: HttpRequest) -> JsonResponse:
+    """Вернуть количество непрочитанных ответов поддержки для текущего пользователя."""
+    thread: SupportThread | None = None
+    if request.user.is_authenticated:
+        thread = (
+            SupportThread.objects.filter(user=request.user)
+            .order_by("-last_message_at")
+            .first()
+        )
+    else:
+        thread_id = request.session.get("feedback_thread_id")
+        if thread_id:
+            thread = SupportThread.objects.filter(pk=thread_id).first()
+    return JsonResponse({"count": get_unread_count_for_user(thread=thread)})
+
+
+@login_required
+def support_admin_list(request: HttpRequest) -> HttpResponse:
+    """Список диалогов поддержки для администратора."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(
+            request, "Доступ к разделу поддержки есть только у администратора."
+        )
+        return redirect("home")
+
+    threads = get_threads_for_admin(limit=200)
+    context = {
+        "threads": threads,
+        "support_unread_count": get_unread_count_for_admin(),
+    }
+    return render(request, "core/support_admin_list.html", context)
+
+
+@login_required
+def support_admin_thread(request: HttpRequest, thread_id: int) -> HttpResponse:
+    """Страница диалога поддержки для администратора."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(
+            request, "Доступ к разделу поддержки есть только у администратора."
+        )
+        return redirect("home")
+
+    thread = SupportThread.objects.select_related("user").filter(pk=thread_id).first()
+    if thread is None:
+        messages.error(request, "Диалог не найден.")
+        return redirect("support_admin_list")
+
+    mark_thread_read_by_admin(thread)
+    context = {
+        "thread": thread,
+        "messages_list": thread.messages.order_by("created_at"),
+    }
+    return render(request, "core/support_admin_thread.html", context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def support_admin_reply(request: HttpRequest) -> JsonResponse:
+    """API отправки ответа администратора по диалогу поддержки."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"success": False, "error": "forbidden"}, status=403)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = request.POST
+
+    thread_id = int(payload.get("thread_id") or 0)
+    text = str(payload.get("text") or "").strip()
+    if not thread_id or not text:
+        return JsonResponse({"success": False, "error": "Неверные данные."}, status=400)
+
+    thread = SupportThread.objects.filter(pk=thread_id).first()
+    if thread is None:
+        return JsonResponse(
+            {"success": False, "error": "Диалог не найден."}, status=404
+        )
+
+    message = create_admin_reply(thread=thread, text=text)
+    send_user_support_reply(message)
+    return JsonResponse({"success": True, "message_id": message.pk})
+
+
+@login_required
+@require_safe
+def support_admin_unread_count(request: HttpRequest) -> JsonResponse:
+    """Вернуть число непрочитанных сообщений для админского интерфейса."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"count": 0})
+    return JsonResponse({"count": get_unread_count_for_admin()})
 
 
 @require_safe

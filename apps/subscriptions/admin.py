@@ -4,7 +4,12 @@ from django.contrib import admin
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 
-from .models import RegionalTierPrice, SubscriptionTier, UserSubscription
+from .models import (
+    FancoinTransaction,
+    RegionalTierPrice,
+    SubscriptionTier,
+    UserSubscription,
+)
 
 
 class RegionalTierPriceInline(admin.TabularInline):
@@ -26,7 +31,7 @@ class SubscriptionTierAdmin(admin.ModelAdmin):
         "original_price",
         "original_price_ends_at",
         "first_subscription_one_ruble",
-        "max_tournaments",
+        "fancoin_per_purchase",
         "is_unlimited",
         "one_day_tournament_discount",
         "has_badge",
@@ -42,7 +47,7 @@ class SubscriptionTierAdmin(admin.ModelAdmin):
         "original_price",
         "original_price_ends_at",
         "first_subscription_one_ruble",
-        "max_tournaments",
+        "fancoin_per_purchase",
         "is_unlimited",
         "one_day_tournament_discount",
     )
@@ -99,7 +104,7 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
         "tier",
         "purchase_city",
         "status_display",
-        "tournament_registration_balance",
+        "fancoin_balance",
         "registrations_limit_display",
         "end_date",
         "cancelled_at",
@@ -109,7 +114,7 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
     # поэтому поиск по нему приводит к FieldError.
     search_fields = ("user__email", "user__last_name", "user__first_name")
     readonly_fields = (
-        "tournament_registration_balance",
+        "fancoin_balance",
         "cancelled_at",
         "purchase_city",
     )
@@ -261,9 +266,64 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
         return queryset.filter(combined_q), False
 
     def registrations_limit_display(self, obj: UserSubscription) -> str:
-        """Отображение лимита регистраций."""
+        """Отобразить лимит FAN-token по тарифу."""
         if obj.tier.is_unlimited:
             return "Безлимит"
-        return f"{obj.tier.max_tournaments}"
+        return f"{obj.tier.fancoin_per_purchase}"
 
-    registrations_limit_display.short_description = "Лимит"
+    registrations_limit_display.short_description = "FAN-token за покупку"
+
+
+@admin.register(FancoinTransaction)
+class FancoinTransactionAdmin(admin.ModelAdmin):
+    """Админка журнала FAN-token транзакций."""
+
+    list_display = (
+        "created_at",
+        "user",
+        "direction",
+        "reason",
+        "amount",
+        "balance_after",
+        "tournament",
+        "match",
+        "doubles_request",
+    )
+    list_filter = ("direction", "reason", "created_at")
+    search_fields = ("user__email", "user__first_name", "user__last_name")
+    readonly_fields = (
+        "created_at",
+        "user",
+        "direction",
+        "reason",
+        "amount",
+        "balance_after",
+        "tournament",
+        "match",
+        "doubles_request",
+    )
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Запретить ручное создание транзакций в админке.
+
+        Args:
+            request (HttpRequest): Текущий HTTP-запрос администратора.
+
+        Returns:
+            bool: Всегда ``False``.
+        """
+        return False
+
+    def has_change_permission(
+        self, request: HttpRequest, obj: FancoinTransaction | None = None
+    ) -> bool:
+        """Запретить редактирование транзакций в админке.
+
+        Args:
+            request (HttpRequest): Текущий HTTP-запрос администратора.
+            obj (FancoinTransaction | None): Объект транзакции или ``None``.
+
+        Returns:
+            bool: Всегда ``False``.
+        """
+        return False

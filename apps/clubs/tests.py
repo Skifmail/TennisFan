@@ -431,7 +431,7 @@ class ClubProfileSubscriptionIsolationTestCase(TestCase):
         tier = SubscriptionTier.objects.create(
             name="GLOBAL-PLATINUM-TEST",
             price=Decimal("4900.00"),
-            max_tournaments=10,
+            fancoin_per_purchase=10,
             has_badge=True,
             can_see_stats=True,
         )
@@ -2990,7 +2990,7 @@ class ClubTournamentPaymentFlowTestCase(TestCase):
             name="diamond",
             display_name="ДИАМАНТ",
             price=5000,
-            max_tournaments=20,
+            fancoin_per_purchase=20,
             duration_days=30,
             one_day_tournament_discount=25,
             is_visible=True,
@@ -3001,7 +3001,7 @@ class ClubTournamentPaymentFlowTestCase(TestCase):
             start_date=timezone.now(),
             end_date=timezone.now() + timedelta(days=30),
             is_active=True,
-            tournament_registration_balance=20,
+            fancoin_balance=20,
         )
         self.client.force_login(self.user)
 

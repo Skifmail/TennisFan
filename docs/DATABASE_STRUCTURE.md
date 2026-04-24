@@ -691,7 +691,7 @@ M2M: турнир ↔ игроки (участники).
 | id | PK |
 | name | varchar(50) UNIQUE |
 | price | decimal |
-| max_tournaments | int |
+| fancoin_per_purchase | int |
 | is_unlimited | bool |
 | one_day_tournament_discount | int |
 | can_see_stats | bool |

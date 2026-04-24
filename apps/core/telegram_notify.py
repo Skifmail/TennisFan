@@ -125,7 +125,7 @@ def _send_admin_email(text: str, parse_mode: str = "HTML") -> bool:
     recipient = (
         getattr(settings, "ADMIN_NOTIFICATIONS_EMAIL", None)
         or getattr(settings, "COURT_APPLICATION_NOTIFICATION_EMAIL", None)
-        or "tennis@tennisfan.ru"
+        or "admin@tennisfan.ru"
     )
     recipient = str(recipient).strip()
     if not recipient:
@@ -205,6 +205,111 @@ def notify_new_registration(user, player) -> bool:
         f"Телефон: {phone}\n"
         f"Город: {city}\n"
         f"Сила: {ntrp_s}"
+    )
+    return send_admin_message(text)
+
+
+def notify_club_registered(club, creator) -> bool:
+    """Уведомить админа о регистрации нового клуба.
+
+    Args:
+        club: Объект клуба.
+        creator: Пользователь, создавший клуб.
+
+    Returns:
+        bool: ``True``, если уведомление отправлено хотя бы в один канал.
+    """
+    club_name = _escape(getattr(club, "name", "") or "—")
+    club_slug = _escape(getattr(club, "slug", "") or "—")
+    club_city = _escape(getattr(club, "city", "") or "—")
+    club_email = _escape(getattr(club, "email", "") or "—")
+    admin_name = _escape(getattr(club, "admin_name", "") or "—")
+    creator_name = _escape(creator.get_full_name() or creator.email or "—")
+    creator_email = _escape(getattr(creator, "email", "") or "—")
+
+    text = (
+        "🏢 <b>Регистрация нового клуба</b>\n\n"
+        f"Клуб: {club_name}\n"
+        f"Slug: {club_slug}\n"
+        f"Город: {club_city}\n"
+        f"Email клуба: {club_email}\n"
+        f"Ответственный: {admin_name}\n\n"
+        f"Создатель: {creator_name}\n"
+        f"Email создателя: {creator_email}"
+    )
+    return send_admin_message(text)
+
+
+def notify_club_subscription_purchase(
+    club,
+    *,
+    plan: str,
+    period: str,
+    amount: str,
+) -> bool:
+    """Уведомить админа об оплате подписки клуба платформе.
+
+    Args:
+        club: Объект клуба.
+        plan (str): Код тарифа клуба.
+        period (str): Период оплаты (``monthly``/``yearly``).
+        amount (str): Сумма оплаты в рублях.
+
+    Returns:
+        bool: ``True``, если уведомление отправлено хотя бы в один канал.
+    """
+    club_name = _escape(getattr(club, "name", "") or "—")
+    club_slug = _escape(getattr(club, "slug", "") or "—")
+    plan_value = (plan or "").strip().lower()
+    if plan_value == "start":
+        plan_label = "START"
+    elif plan_value == "basic":
+        plan_label = "BASIC"
+    elif plan_value == "pro":
+        plan_label = "PRO"
+    else:
+        plan_label = (plan or "—").upper()
+
+    period_value = (period or "").strip().lower()
+    period_label = "ежемесячно" if period_value == "monthly" else "ежегодно"
+    amount_s = _escape(str(amount or "—"))
+
+    text = (
+        "💼 <b>Оплата тарифа клубом</b>\n\n"
+        f"Клуб: {club_name}\n"
+        f"Slug: {club_slug}\n"
+        f"Тариф: {plan_label}\n"
+        f"Период: {period_label}\n"
+        f"Сумма: {amount_s} ₽"
+    )
+    return send_admin_message(text)
+
+
+def notify_tournament_registration(user, tournament) -> bool:
+    """Уведомить админа о бесплатной регистрации игрока на турнир.
+
+    Args:
+        user: Пользователь, выполнивший регистрацию.
+        tournament: Объект турнира.
+
+    Returns:
+        bool: ``True``, если уведомление отправлено хотя бы в один канал.
+    """
+    user_name = _escape(user.get_full_name() or user.email or "—")
+    user_email = _escape(getattr(user, "email", "") or "—")
+    tournament_name = _escape(getattr(tournament, "name", "") or "—")
+    tournament_city = _escape(getattr(tournament, "city", "") or "—")
+    is_doubles = bool(getattr(tournament, "is_doubles", lambda: False)())
+    format_label = "парный" if is_doubles else "одиночный"
+
+    text = (
+        "📝 <b>Регистрация на турнир</b>\n\n"
+        f"Турнир: {tournament_name}\n"
+        f"Город: {tournament_city}\n"
+        f"Формат: {format_label}\n\n"
+        f"Игрок: {user_name}\n"
+        f"Email: {user_email}\n"
+        "Тип регистрации: без оплаты взноса"
     )
     return send_admin_message(text)
 

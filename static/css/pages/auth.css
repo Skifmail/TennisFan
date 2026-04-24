@@ -70,6 +70,17 @@
     padding: var(--spacing-lg);
     padding-left: calc(var(--spacing-lg) + var(--spacing-xl));
     overflow-y: auto;
+    /* Отключаем центрирование через justify-content, иначе при переполнении
+       (например, раскрытый калькулятор уровня силы) верхняя часть формы
+       становится недоступной для прокрутки. Вертикальное центрирование
+       достигается через `margin: auto 0` у самой формы ниже — оно
+       корректно схлопывается, когда контент больше контейнера. */
+    justify-content: flex-start;
+}
+
+.auth-form > form {
+    margin: auto 0;
+    width: 100%;
 }
 
 .auth-hero.active,

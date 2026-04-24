@@ -220,7 +220,7 @@
 │   │   ├── migrations
 │   │   │   ├── 0001_initial.py
 │   │   │   ├── 0002_set_has_sparring_for_paid_tiers.py
-│   │   │   ├── 0003_set_diamond_max_tournaments_to_100.py
+│   │   │   ├── 0003_set_diamond_fancoin_per_purchase_to_100.py
 │   │   │   ├── 0004_add_cancelled_at.py
 │   │   │   ├── 0005_regionaltierprice.py
 │   │   │   ├── 0006_add_original_price.py

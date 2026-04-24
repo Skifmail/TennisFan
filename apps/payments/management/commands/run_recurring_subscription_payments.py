@@ -161,8 +161,8 @@ class Command(BaseCommand):
                     sub.cancelled_at = None
                     sub.save(update_fields=["end_date", "is_active", "cancelled_at"])
 
-                    if not sub.tier.is_unlimited and sub.tier.max_tournaments > 0:
-                        sub.add_tournament_registration_slots(sub.tier.max_tournaments)
+                    if not sub.tier.is_unlimited and sub.tier.fancoin_per_purchase > 0:
+                        sub.add_fancoin(sub.tier.fancoin_per_purchase)
 
                     try:
                         notify_subscription_purchase(

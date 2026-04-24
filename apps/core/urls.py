@@ -28,9 +28,25 @@ urlpatterns = [
     path("api/feedback/submit/", views.feedback_submit, name="feedback_submit"),
     path("api/feedback/threads/", views.feedback_threads, name="feedback_threads"),
     path(
-        "telegram/support-webhook/",
-        views.telegram_support_webhook,
-        name="telegram_support_webhook",
+        "api/feedback/unread-count/",
+        views.feedback_unread_count,
+        name="feedback_unread_count",
+    ),
+    path("platform/support/", views.support_admin_list, name="support_admin_list"),
+    path(
+        "platform/support/<int:thread_id>/",
+        views.support_admin_thread,
+        name="support_admin_thread",
+    ),
+    path(
+        "api/support/admin/reply/",
+        views.support_admin_reply,
+        name="support_admin_reply",
+    ),
+    path(
+        "api/support/admin/unread-count/",
+        views.support_admin_unread_count,
+        name="support_admin_unread_count",
     ),
     path("private-chat/", views.private_chat_access, name="private_chat_access"),
 ]

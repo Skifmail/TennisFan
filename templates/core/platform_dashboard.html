@@ -161,6 +161,49 @@
                 {% endif %}
             </article>
 
+            <article class="club-dashboard-panel club-dashboard-panel--support">
+                <div class="club-dashboard-panel__header">
+                    <div>
+                        <p class="club-dashboard-panel__eyebrow">Поддержка</p>
+                        <h2 class="club-dashboard-panel__title">
+                            Диалоги поддержки
+                            {% if support_unread_count %}
+                            <span class="notify-badge">{{ support_unread_count }}</span>
+                            {% endif %}
+                        </h2>
+                    </div>
+                    <a href="{% url 'support_admin_list' %}" class="club-dashboard-panel__link">Открыть все</a>
+                </div>
+                {% if support_recent_threads %}
+                <div class="club-dashboard-alert-list">
+                    {% for thread in support_recent_threads %}
+                    <div class="club-dashboard-alert {% if thread.admin_unread_count %}club-dashboard-alert--critical{% else %}club-dashboard-alert--info{% endif %}">
+                        <div class="club-dashboard-alert__body">
+                            <div class="club-dashboard-alert__title">
+                                {% if thread.user %}
+                                {{ thread.user.get_full_name|default:thread.user.email }}
+                                {% else %}
+                                {{ thread.guest_name|default:thread.guest_email }}
+                                {% endif %}
+                            </div>
+                            <div class="club-dashboard-alert__description">
+                                {{ thread.messages.last.text|truncatechars:90 }}
+                            </div>
+                        </div>
+                        <a href="{% url 'support_admin_thread' thread.id %}" class="club-dashboard-alert__action">
+                            {% if thread.admin_unread_count %}Ответить ({{ thread.admin_unread_count }}){% else %}Открыть{% endif %}
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="club-dashboard-empty-state">
+                    <div class="club-dashboard-empty-state__title">Новых диалогов пока нет</div>
+                    <div class="club-dashboard-empty-state__text">Сообщения пользователей появятся здесь.</div>
+                </div>
+                {% endif %}
+            </article>
+
             <article class="club-dashboard-panel club-dashboard-panel--actions">
                 <div class="club-dashboard-panel__header">
                     <div>

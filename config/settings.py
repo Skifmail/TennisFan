@@ -341,12 +341,15 @@ USER_NOTIFICATIONS_EMAIL_ENABLED = (
     os.environ.get("USER_NOTIFICATIONS_EMAIL_ENABLED", "True") == "True"
 )
 ADMIN_NOTIFICATIONS_EMAIL = os.environ.get(
-    "ADMIN_NOTIFICATIONS_EMAIL", "tennis@tennisfan.ru"
+    "ADMIN_NOTIFICATIONS_EMAIL", "admin@tennisfan.ru"
 )
 COURT_APPLICATION_NOTIFICATION_EMAIL = os.environ.get(
-    "COURT_APPLICATION_NOTIFICATION_EMAIL", "tennis@tennisfan.ru"
+    "COURT_APPLICATION_NOTIFICATION_EMAIL", "admin@tennisfan.ru"
 )
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
+SUPPORT_EMAIL_TIMEOUT_SECONDS = int(
+    os.environ.get("SUPPORT_EMAIL_TIMEOUT_SECONDS", "3")
+)
 
 # ------------------------------------------------------------------------------
 # TELEGRAM
@@ -359,8 +362,6 @@ TELEGRAM_ADMIN_CHAT_ID = _telegram_admin_raw.strip()
 TELEGRAM_ADMIN_CHAT_IDS = [
     cid.strip() for cid in _telegram_admin_raw.split(",") if cid.strip()
 ]
-TELEGRAM_SUPPORT_BOT_TOKEN = os.environ.get("TELEGRAM_SUPPORT_BOT_TOKEN", "")
-TELEGRAM_SUPPORT_WEBHOOK_SECRET = os.environ.get("TELEGRAM_SUPPORT_WEBHOOK_SECRET", "")
 TELEGRAM_USER_BOT_TOKEN = os.environ.get("TELEGRAM_USER_BOT_TOKEN", "")
 TELEGRAM_USER_BOT_WEBHOOK_SECRET = os.environ.get(
     "TELEGRAM_USER_BOT_WEBHOOK_SECRET", ""

@@ -4,6 +4,8 @@
 
 import logging
 
+from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
+from apps.subscriptions.models import FancoinTransaction
 from apps.users.models import Notification
 
 from .models import Tournament, TournamentStatus
@@ -11,12 +13,16 @@ from .models import Tournament, TournamentStatus
 logger = logging.getLogger(__name__)
 
 
-def _decrement_subscription_for_user(user) -> None:
-    """Восстановить один слот регистрации пользователю, если подписка есть и не безлимитная."""
+def _decrement_subscription_for_user(user, tournament: Tournament) -> None:
+    """Вернуть FT пользователю при отмене турнира."""
     try:
         sub = getattr(user, "subscription", None)
-        if sub and not sub.has_unlimited_tournament_access():
-            sub.decrement_usage()
+        if sub:
+            sub.refund_fancoin(
+                TOURNAMENT_REGISTRATION_COST,
+                reason=FancoinTransaction.Reason.TOURNAMENT_CANCEL,
+                tournament=tournament,
+            )
     except Exception as e:
         logger.warning(
             "Could not decrement subscription for user %s: %s",
@@ -52,7 +58,7 @@ def cancel_tournament(
 
     message = notify_message or (
         f"Турнир «{tournament.name}» отменён из-за недостаточного количества участников. "
-        "Лимит регистраций на турниры восстановлен (+1)."
+        f"Баланс FT восстановлен (+{TOURNAMENT_REGISTRATION_COST})."
     )
 
     if tournament.is_doubles():
@@ -65,7 +71,7 @@ def cancel_tournament(
                 u = getattr(player, "user", None)
                 if u and u.pk not in users_done:
                     users_done.add(u.pk)
-                    _decrement_subscription_for_user(u)
+                    _decrement_subscription_for_user(u, tournament)
                     Notification.objects.create(
                         user=u,
                         message=message,
@@ -75,7 +81,7 @@ def cancel_tournament(
         for player in tournament.participants.select_related("user").only("user_id"):
             user = getattr(player, "user", None)
             if user:
-                _decrement_subscription_for_user(user)
+                _decrement_subscription_for_user(user, tournament)
                 Notification.objects.create(
                     user=user,
                     message=message,

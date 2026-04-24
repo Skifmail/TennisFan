@@ -365,6 +365,7 @@ def confirm_match(match_request_id: int, confirmed_by: "Player") -> Match:
             opponent_team=opponent_team,
             is_friendly=req.is_friendly,
             request_created_at=req.created_at,
+            team_request=None,
         )
         req.status = DoublesMatchRequestStatus.CONFIRMED
         req.confirmed_at = timezone.now()
@@ -418,6 +419,7 @@ def _create_doubles_match_from_teams(
     opponent_team: DoublesTeam,
     is_friendly: bool,
     request_created_at,
+    team_request: DoublesMatchRequest | None = None,
 ) -> Match:
     """Создать Match (2×2) из двух DoublesTeam. Использует player1/partner1 и player2/partner2."""
     a_members = list(
@@ -448,6 +450,7 @@ def _create_doubles_match_from_teams(
         tournament=None,
         match_type=Match.MatchType.SPARRING,
         sparring_response=None,
+        sparring_team_request=team_request,
         player1=p1,
         player2=p2,
         partner1=p1_partner,
@@ -464,6 +467,7 @@ def _create_team_sparring_singles(
     author_team: DoublesTeam,
     opponent_team: DoublesTeam,
     is_friendly: bool,
+    team_request: DoublesMatchRequest,
 ) -> list[Match]:
     """
     Создать одиночные матчи для командного спарринга.
@@ -508,6 +512,7 @@ def _create_team_sparring_singles(
             tournament=None,
             match_type=Match.MatchType.SPARRING,
             sparring_response=None,
+            sparring_team_request=team_request,
             player1=players[p1_id],
             player2=players[p2_id],
             status=Match.MatchStatus.SCHEDULED,
@@ -547,12 +552,14 @@ def confirm_team_sparring_series(
             author_team=author_team,
             opponent_team=opponent_team,
             is_friendly=req.is_friendly,
+            team_request=req,
         )
         doubles_match = _create_doubles_match_from_teams(
             author_team=author_team,
             opponent_team=opponent_team,
             is_friendly=req.is_friendly,
             request_created_at=req.created_at,
+            team_request=req,
         )
 
         req.status = DoublesMatchRequestStatus.CONFIRMED

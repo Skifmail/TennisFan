@@ -389,11 +389,11 @@
                         <span>{{ player.user.subscription.end_date|date:"d.m.Y" }}</span>
                     </div>
                     {% endif %}
-                    {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.tier.max_tournaments > 0 %}
+                    {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.tier.fancoin_per_purchase > 0 %}
                     <div class="subscription-info__limit">
                         <div class="subscription-info__row">
-                            <span class="subscription-info__label">Остаток регистраций:</span>
-                            <span>{{ player.user.subscription.get_remaining_slots }}</span>
+                            <span class="subscription-info__label">Баланс FT:</span>
+                            <span>{{ player.user.subscription.get_fancoin_balance }}</span>
                         </div>
                         <div class="subscription-info__bar">
                             <div class="subscription-info__bar-fill" data-width-pct="{{ subscription_usage_percent }}"></div>

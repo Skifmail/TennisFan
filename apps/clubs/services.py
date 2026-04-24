@@ -292,6 +292,13 @@ def create_club_with_trial(data: dict[str, Any], user: AbstractUser) -> Club:
             },
         )
 
+    try:
+        from apps.core.telegram_notify import notify_club_registered
+
+        notify_club_registered(club, user)
+    except Exception:
+        pass
+
     return club
 
 

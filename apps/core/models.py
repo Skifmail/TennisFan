@@ -79,26 +79,12 @@ class UserTelegramLink(models.Model):
 
     def migrate_guest_messages(self):
         """
-        Переносит гостевые SupportMessage к этому пользователю, если они связаны с тем же chat_id.
-        Вызывается после привязки Telegram бота зарегистрированным пользователем.
-        Возвращает количество перенесенных сообщений.
+        Заглушка для обратной совместимости.
+
+        Returns:
+            int: Всегда 0, так как Telegram-support удален.
         """
-        if not self.telegram_chat_id:
-            return 0
-
-        # Ищем гостевые сообщения с таким же chat_id
-        guest_messages = SupportMessage.objects.filter(
-            user__isnull=True, guest_telegram_chat_id=self.telegram_chat_id
-        )
-
-        # Переносим найденные сообщения к пользователю
-        updated_count = guest_messages.update(
-            user=self.user,
-            guest_telegram_chat_id=None,  # Очищаем, так как теперь это зарегистрированный пользователь
-            guest_binding_token="",  # Очищаем токен
-        )
-
-        return updated_count
+        return 0
 
 
 class TelegramTransferConsentLog(models.Model):
@@ -281,12 +267,74 @@ class UserConsent(models.Model):
         )
 
 
+class SupportThread(models.Model):
+    """
+    Диалог поддержки между пользователем (или гостем) и администрацией.
+
+    Хранит агрегированное состояние диалога и счетчики непрочитанных сообщений
+    для каждой стороны.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="support_threads",
+        null=True,
+        blank=True,
+        help_text="Зарегистрированный пользователь (null для гостя).",
+    )
+    guest_email = models.EmailField(
+        "Email гостя",
+        blank=True,
+        help_text="Email гостя, если диалог создан без авторизации.",
+    )
+    guest_name = models.CharField(
+        "Имя гостя",
+        max_length=200,
+        blank=True,
+        help_text="Имя гостя, если диалог создан без авторизации.",
+    )
+    guest_session_key = models.CharField(
+        "Ключ сессии гостя",
+        max_length=64,
+        blank=True,
+        db_index=True,
+        help_text="Используется для доступа гостя к своему диалогу из виджета.",
+    )
+    last_message_at = models.DateTimeField("Последнее сообщение", db_index=True)
+    admin_unread_count = models.PositiveIntegerField(
+        "Непрочитано админом",
+        default=0,
+    )
+    user_unread_count = models.PositiveIntegerField(
+        "Непрочитано пользователем",
+        default=0,
+    )
+    is_closed = models.BooleanField("Диалог закрыт", default=False)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        ordering = ["-last_message_at"]
+        verbose_name = "диалог поддержки"
+        verbose_name_plural = "диалоги поддержки"
+
+    def __str__(self) -> str:
+        if self.user_id:
+            return f"Диалог #{self.pk} / user={self.user_id}"
+        return f"Диалог #{self.pk} / guest={self.guest_email or 'unknown'}"
+
+
 class SupportMessage(models.Model):
     """
-    Сообщение в системе поддержки: от пользователя (с сайта или из Telegram)
-    или от администратора (ответ в Telegram).
-    Поддерживает как зарегистрированных пользователей, так и гостей (незарегистрированных).
+    Сообщение в диалоге поддержки.
     """
+
+    thread = models.ForeignKey(
+        SupportThread,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -308,42 +356,10 @@ class SupportMessage(models.Model):
         blank=True,
         help_text="Email или телефон незарегистрированного пользователя",
     )
-    guest_telegram_username = models.CharField(
-        "Telegram username гостя",
-        max_length=100,
-        blank=True,
-        help_text="Telegram username незарегистрированного пользователя (без @)",
-    )
-    guest_telegram_chat_id = models.BigIntegerField(
-        "Telegram chat_id гостя",
-        null=True,
-        blank=True,
-        db_index=True,
-        help_text="Chat ID гостя в Telegram (заполняется после привязки бота)",
-    )
-    guest_binding_token = models.CharField(
-        "Токен привязки для гостя",
-        max_length=64,
-        blank=True,
-        unique=True,
-        db_index=True,
-        help_text="Токен для привязки Telegram бота гостю (t.me/bot?start=TOKEN)",
-    )
     subject = models.CharField("Тема", max_length=200, blank=True)
     text = models.TextField("Текст сообщения")
     is_from_admin = models.BooleanField("От администратора", default=False)
     created_at = models.DateTimeField("Создано", auto_now_add=True)
-    # ID сообщения в Telegram (наше сообщение админу), чтобы связать reply админа с этим сообщением
-    # Храним только для обратной совместимости; реальные привязки — в SupportMessageAdminDelivery.
-    admin_telegram_message_id = models.BigIntegerField(
-        "ID сообщения в Telegram (админу)",
-        null=True,
-        blank=True,
-        db_index=True,
-        help_text="Сохраняем первый успешный message_id для совместимости; у каждого админа свой message_id.",
-    )
-    # Текст, который мы отправили админу (для редактирования сообщения после ответа — пометка «Ответ отправлен»)
-    admin_telegram_text = models.TextField("Текст сообщения админу", blank=True)
 
     class Meta:
         ordering = ["created_at"]
@@ -356,41 +372,9 @@ class SupportMessage(models.Model):
         return f"#{self.pk} {'(админ)' if self.is_from_admin else ''} Гость: {self.guest_name or 'Без имени'}"
 
 
-class SupportMessageAdminDelivery(models.Model):
+class SupportConversation(SupportThread):
     """
-    Доставка сообщения поддержки конкретному админу в Telegram.
-    У каждого админа своя копия сообщения со своим message_id в его чате.
-    По (admin_chat_id, admin_telegram_message_id) находим SupportMessage при ответе админа.
-    """
-
-    support_message = models.ForeignKey(
-        SupportMessage,
-        on_delete=models.CASCADE,
-        related_name="admin_deliveries",
-    )
-    admin_chat_id = models.CharField(
-        "Chat ID админа в Telegram",
-        max_length=32,
-        db_index=True,
-    )
-    admin_telegram_message_id = models.BigIntegerField(
-        "ID сообщения в чате админа",
-        db_index=True,
-    )
-
-    class Meta:
-        verbose_name = "доставка сообщения админу"
-        verbose_name_plural = "доставки сообщений админам"
-        unique_together = [("admin_chat_id", "admin_telegram_message_id")]
-
-    def __str__(self):
-        return f"#{self.support_message_id} → chat {self.admin_chat_id} msg {self.admin_telegram_message_id}"
-
-
-class SupportConversation(SupportMessage):
-    """
-    Прокси-модель для группировки сообщений по пользователям в админке.
-    Представляет "диалог" с пользователем.
+    Прокси-модель для отображения диалогов в Django Admin.
     """
 
     class Meta:

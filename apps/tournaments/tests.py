@@ -1274,7 +1274,7 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
             name="club-test-tier",
             display_name="Club Test Tier",
             price=990,
-            max_tournaments=slots,
+            fancoin_per_purchase=slots,
             duration_days=30,
             is_visible=True,
         )
@@ -1284,7 +1284,7 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
             start_date=timezone.now(),
             end_date=timezone.now() + timedelta(days=30),
             is_active=True,
-            tournament_registration_balance=slots,
+            fancoin_balance=slots,
         )
 
     def _assert_tournament_payment_redirect(

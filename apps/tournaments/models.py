@@ -840,6 +840,18 @@ class Match(models.Model):
         verbose_name="Отклик на спарринг",
         help_text="Связь с откликом на спарринг, если матч создан из спарринга",
     )
+    sparring_team_request = models.ForeignKey(
+        "sparring.DoublesMatchRequest",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="series_matches",
+        verbose_name="Командная серия спарринга",
+        help_text=(
+            "Для командного спарринга хранит исходную заявку, к которой относится "
+            "матч из серии."
+        ),
+    )
     court = models.ForeignKey(
         "courts.Court",
         on_delete=models.SET_NULL,

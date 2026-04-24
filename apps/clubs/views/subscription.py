@@ -914,6 +914,21 @@ def subscription_return(request: HttpRequest, slug: str) -> HttpResponse:
         payment_ref=payment_id,
         status=ClubSubscriptionStatus.ACTIVE,
     )
+    try:
+        from apps.core.telegram_notify import notify_club_subscription_purchase
+
+        notify_club_subscription_purchase(
+            club,
+            plan=str(pending.plan),
+            period=str(pending.period),
+            amount=f"{pending.amount:.2f}",
+        )
+    except Exception:
+        logger.exception(
+            "notify_club_subscription_purchase failed | club=%s payment_id=%s",
+            club.pk,
+            payment_id,
+        )
     if club.status != ClubStatus.ACTIVE or club.trial_ends_at is not None:
         club.status = ClubStatus.ACTIVE
         club.trial_ends_at = None

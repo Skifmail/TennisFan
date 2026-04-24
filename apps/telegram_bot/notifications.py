@@ -1019,12 +1019,12 @@ def notify_subscription_expiring(
         features_lost.append("• Доступ в закрытый чат сообщества")
     if tier.has_sparring:
         features_lost.append("• Организация спаррингов")
-    if tier.max_tournaments > 0 or tier.is_unlimited:
+    if tier.fancoin_per_purchase > 0 or tier.is_unlimited:
         if tier.is_unlimited:
-            features_lost.append("• Регистрация на турниры (безлимит)")
+            features_lost.append("• FAN-token (безлимит)")
         else:
             features_lost.append(
-                f"• Регистрация на турниры ({tier.max_tournaments} за покупку)"
+                f"• FAN-token ({tier.fancoin_per_purchase} за покупку)"
             )
     if tier.one_day_tournament_discount > 0:
         features_lost.append(

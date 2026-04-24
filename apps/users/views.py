@@ -753,11 +753,11 @@ def profile(request, pk):
     if getattr(player.user, "subscription", None):
         sub = player.user.subscription
         tier = getattr(sub, "tier", None)
-        max_t = getattr(tier, "max_tournaments", None) if tier else None
+        max_t = getattr(tier, "fancoin_per_purchase", None) if tier else None
         if max_t and max_t > 0:
             subscription_usage_percent = min(
                 100,
-                int(100 * min(sub.get_remaining_slots(), max_t) / max_t),
+                int(100 * min(sub.get_fancoin_balance(), max_t) / max_t),
             )
 
     telegram_user_bot_connected = False

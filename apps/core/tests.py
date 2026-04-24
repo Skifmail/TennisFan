@@ -2,6 +2,7 @@ import csv
 from datetime import date, timedelta
 from io import StringIO
 
+from django.core import mail
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -14,6 +15,7 @@ from apps.clubs.models import (
     ClubMemberRole,
     ClubMemberStatus,
 )
+from apps.core.models import SupportThread
 from apps.tournaments.models import Match, Tournament, TournamentStatus
 from apps.users.models import Player, User
 
@@ -447,3 +449,65 @@ class HomeClubTournamentsIntegrationTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Вступить в клуб")
+
+
+class SupportDialogsFlowTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.staff = User.objects.create_user(
+            email="support-admin@test.local",
+            password="pass12345",
+            is_staff=True,
+        )
+        self.user = User.objects.create_user(
+            email="support-user@test.local",
+            password="pass12345",
+        )
+
+    def test_guest_feedback_requires_email(self) -> None:
+        response = self.client.post(
+            reverse("feedback_submit"),
+            data='{"guest_name":"Гость","message":"Помогите"}',
+            content_type="application/json",
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("email", response.json()["error"].lower())
+
+    def test_create_message_sends_email_and_unread_count(self) -> None:
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("feedback_submit"),
+            data='{"message":"Нужна помощь"}',
+            content_type="application/json",
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        thread = SupportThread.objects.filter(user=self.user).first()
+        self.assertIsNotNone(thread)
+        assert thread is not None
+        self.assertEqual(thread.admin_unread_count, 1)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_admin_reply_updates_user_unread_and_sends_mail(self) -> None:
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse("feedback_submit"),
+            data='{"message":"Нужна помощь"}',
+            content_type="application/json",
+            secure=True,
+        )
+        thread = SupportThread.objects.get(user=self.user)
+
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse("support_admin_reply"),
+            data=f'{{"thread_id":{thread.id},"text":"Ответ поддержки"}}',
+            content_type="application/json",
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        thread.refresh_from_db()
+        self.assertEqual(thread.admin_unread_count, 0)
+        self.assertEqual(thread.user_unread_count, 1)
+        self.assertEqual(len(mail.outbox), 2)

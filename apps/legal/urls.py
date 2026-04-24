@@ -14,6 +14,12 @@ urlpatterns = [
     path("offer/", views.legal_document, {"slug": "offer"}, name="legal_offer"),
     path("terms/", views.legal_document, {"slug": "terms"}, name="legal_terms"),
     path(
+        "fan-token/",
+        views.legal_document,
+        {"slug": "fan-token"},
+        name="legal_fan_token",
+    ),
+    path(
         "club-organizer-rules/",
         views.legal_document,
         {"slug": "club-organizer-rules"},

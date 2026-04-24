@@ -3,7 +3,7 @@ from typing import Any, ClassVar, cast
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -105,13 +105,13 @@ class SubscriptionTier(models.Model):
         help_text="Дата и время, после которых перечёркнутая цена не показывается. Пусто — акция без срока.",
     )
 
-    # Registration limits
-    max_tournaments = models.PositiveIntegerField(
-        "Количество регистраций за покупку",
-        help_text="Сколько регистраций на турниры начисляется при покупке или продлении этого тарифа. 0 = регистрации запрещены.",
+    # FAN-token limits
+    fancoin_per_purchase = models.PositiveIntegerField(
+        "FAN-token за покупку",
+        help_text="Сколько FAN-token начисляется при покупке или продлении этого тарифа.",
         default=0,
     )
-    is_unlimited = models.BooleanField("Неограниченные регистрации", default=False)
+    is_unlimited = models.BooleanField("Неограниченный FAN-token", default=False)
 
     # Discounts
     one_day_tournament_discount = models.PositiveIntegerField(
@@ -451,13 +451,13 @@ class UserSubscription(models.Model):
         help_text="Если заполнено — подписка отменена, но действует до end_date.",
     )
 
-    # Несгораемый баланс регистраций на турниры
-    tournament_registration_balance = models.PositiveIntegerField(
-        "Остаток регистраций на турниры",
+    # Несгораемый баланс FAN-token
+    fancoin_balance = models.PositiveIntegerField(
+        "Баланс FT",
         default=0,
         help_text=(
-            "Баланс регистраций, который пополняется при покупке подписки и "
-            "расходуется при записи на многодневные турниры."
+            "Баланс FAN-token, который пополняется при покупке подписки и расходуется "
+            "на регистрации турниров и состоявшиеся спарринги."
         ),
     )
     # Город при покупке (для защиты от смены города на Москву после покупки по региональному тарифу)
@@ -530,21 +530,8 @@ class UserSubscription(models.Model):
         """
         return bool(self.is_active and self.end_date > timezone.now())
 
-    def can_register_for_tournament(self) -> bool:
-        """Проверить, остались ли у пользователя слоты регистрации.
-
-        Args:
-            None: Метод использует поля текущего экземпляра.
-
-        Returns:
-            bool: ``True``, если регистрация на турнир доступна.
-        """
-        if self.has_unlimited_tournament_access():
-            return True
-        return bool(self.tournament_registration_balance > 0)
-
-    def has_unlimited_tournament_access(self) -> bool:
-        """Проверить, есть ли у подписки безлимитная регистрация на турниры.
+    def has_unlimited_fancoin(self) -> bool:
+        """Проверить, есть ли у подписки безлимитный FANcoin.
 
         Args:
             None: Метод использует поля текущего экземпляра.
@@ -554,70 +541,215 @@ class UserSubscription(models.Model):
         """
         return bool(self.is_valid() and self.tier.is_unlimited)
 
-    def add_tournament_registration_slots(self, slots: int) -> None:
-        """Пополнить баланс регистраций на турниры.
+    def has_fancoin(self, amount: int) -> bool:
+        """Проверить, хватает ли FANcoin для операции.
 
         Args:
-            slots (int): Количество слотов для добавления в баланс.
+            amount (int): Требуемое количество FANcoin.
 
         Returns:
-            None: Метод обновляет баланс регистраций в базе данных.
+            bool: ``True``, если доступен безлимит или баланс не меньше ``amount``.
+        """
+        if amount <= 0:
+            return True
+        if self.has_unlimited_fancoin():
+            return True
+        return bool(self.fancoin_balance >= amount)
+
+    def add_fancoin(self, amount: int) -> None:
+        """Пополнить баланс FANcoin.
+
+        Args:
+            amount (int): Количество монет для начисления.
+
+        Returns:
+            None: Метод сохраняет новый баланс в базе данных.
 
         Raises:
-            ValueError: Если передано отрицательное количество слотов.
+            ValueError: Если передано отрицательное количество монет.
         """
-        if slots < 0:
-            raise ValueError(
-                "Нельзя пополнить баланс отрицательным количеством слотов."
+        if amount < 0:
+            raise ValueError("Нельзя начислить отрицательное количество FANcoin.")
+        if amount == 0:
+            return
+        self.fancoin_balance += amount
+        self.save(update_fields=["fancoin_balance"])
+
+    def spend_fancoin(
+        self,
+        amount: int,
+        *,
+        reason: "FancoinTransaction.Reason",
+        tournament: "models.Model | None" = None,
+        match: "models.Model | None" = None,
+        doubles_request: "models.Model | None" = None,
+    ) -> bool:
+        """Списать FANcoin и записать транзакцию.
+
+        Args:
+            amount (int): Количество FANcoin к списанию.
+            reason (FancoinTransaction.Reason): Причина списания.
+            tournament (models.Model | None): Связанный турнир, если есть.
+            match (models.Model | None): Связанный матч, если есть.
+            doubles_request (models.Model | None): Связанная командная серия, если есть.
+
+        Returns:
+            bool: ``True`` если списание выполнено, иначе ``False``.
+        """
+        if amount <= 0:
+            return True
+        with transaction.atomic():
+            current = type(self).objects.select_for_update().get(pk=self.pk)
+            if current.has_unlimited_fancoin():
+                return True
+            if current.fancoin_balance < amount:
+                return False
+            current.fancoin_balance -= amount
+            current.save(update_fields=["fancoin_balance"])
+            FancoinTransaction.objects.create(
+                user=current.user,
+                amount=amount,
+                direction=FancoinTransaction.Direction.CHARGE,
+                reason=reason,
+                tournament=tournament,
+                match=match,
+                doubles_request=doubles_request,
+                balance_after=current.fancoin_balance,
             )
-        if slots == 0:
-            return
-        self.tournament_registration_balance += slots
-        self.save(update_fields=["tournament_registration_balance"])
+            self.fancoin_balance = current.fancoin_balance
+            return True
 
-    def increment_usage(self) -> None:
-        """Списать одну регистрацию из несгораемого баланса.
+    def refund_fancoin(
+        self,
+        amount: int,
+        *,
+        reason: "FancoinTransaction.Reason",
+        tournament: "models.Model | None" = None,
+        match: "models.Model | None" = None,
+        doubles_request: "models.Model | None" = None,
+    ) -> None:
+        """Вернуть FANcoin и записать транзакцию.
+
+        Args:
+            amount (int): Количество FANcoin к возврату.
+            reason (FancoinTransaction.Reason): Причина возврата.
+            tournament (models.Model | None): Связанный турнир, если есть.
+            match (models.Model | None): Связанный матч, если есть.
+            doubles_request (models.Model | None): Связанная командная серия, если есть.
+
+        Returns:
+            None: Метод сохраняет новый баланс и запись истории.
+        """
+        if amount <= 0:
+            return
+        with transaction.atomic():
+            current = type(self).objects.select_for_update().get(pk=self.pk)
+            if not current.has_unlimited_fancoin():
+                current.fancoin_balance += amount
+                current.save(update_fields=["fancoin_balance"])
+            FancoinTransaction.objects.create(
+                user=current.user,
+                amount=amount,
+                direction=FancoinTransaction.Direction.REFUND,
+                reason=reason,
+                tournament=tournament,
+                match=match,
+                doubles_request=doubles_request,
+                balance_after=current.fancoin_balance,
+            )
+            self.fancoin_balance = current.fancoin_balance
+
+    def get_fancoin_balance(self) -> int:
+        """Вернуть доступный баланс FANcoin.
 
         Args:
             None: Метод использует поля текущего экземпляра.
 
         Returns:
-            None: Метод обновляет баланс регистраций в базе данных.
+            int: Текущий баланс. Для безлимитной подписки возвращает ``999999``.
         """
-        if self.has_unlimited_tournament_access():
-            return
-        if self.tournament_registration_balance <= 0:
-            return
-        self.tournament_registration_balance -= 1
-        self.save(update_fields=["tournament_registration_balance"])
+        if self.has_unlimited_fancoin():
+            return 999999
+        return int(max(0, self.fancoin_balance))
 
-    def decrement_usage(self) -> None:
-        """Вернуть одну регистрацию в баланс пользователя.
 
-        Args:
-            None: Метод использует поля текущего экземпляра.
+class FancoinTransaction(models.Model):
+    """Журнал операций по FAN-token.
 
-        Returns:
-            None: Метод обновляет баланс регистраций в базе данных.
-        """
-        if self.has_unlimited_tournament_access():
-            return
-        self.tournament_registration_balance += 1
-        self.save(update_fields=["tournament_registration_balance"])
+    Args:
+        models.Model: Базовый класс Django-модели.
 
-    def get_remaining_slots(self) -> int:
-        """Вернуть количество доступных регистраций на турниры.
+    Returns:
+        None: Экземпляр модели используется Django ORM.
+    """
 
-        Args:
-            None: Метод использует поля текущего экземпляра.
+    class Direction(models.TextChoices):
+        CHARGE = "charge", "Списание"
+        REFUND = "refund", "Возврат"
 
-        Returns:
-            int: Остаток слотов регистрации. Для активного безлимита возвращается
-                ``999`` как технический маркер.
-        """
-        if self.has_unlimited_tournament_access():
-            return 999
-        return int(max(0, self.tournament_registration_balance))
+    class Reason(models.TextChoices):
+        TOURNAMENT_REGISTRATION = "tournament_registration", "Регистрация на турнир"
+        TOURNAMENT_CANCEL = "tournament_cancel", "Отмена турнира"
+        SPARRING_SINGLES = "sparring_singles", "Состоявшийся одиночный спарринг"
+        SPARRING_DOUBLES = "sparring_doubles", "Состоявшийся парный спарринг"
+        SPARRING_TEAM = "sparring_team", "Состоявшийся командный спарринг"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="fancoin_transactions",
+        verbose_name="Пользователь",
+    )
+    amount = models.PositiveIntegerField("Количество FT")
+    direction = models.CharField(
+        "Направление операции",
+        max_length=12,
+        choices=Direction.choices,
+    )
+    reason = models.CharField("Причина операции", max_length=64, choices=Reason.choices)
+    tournament = models.ForeignKey(
+        "tournaments.Tournament",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fancoin_transactions",
+        verbose_name="Турнир",
+    )
+    match = models.ForeignKey(
+        "tournaments.Match",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fancoin_transactions",
+        verbose_name="Матч",
+    )
+    doubles_request = models.ForeignKey(
+        "sparring.DoublesMatchRequest",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fancoin_transactions",
+        verbose_name="Командная серия",
+    )
+    balance_after = models.PositiveIntegerField("Баланс после операции", default=0)
+    created_at = models.DateTimeField("Дата операции", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Транзакция FAN-token"
+        verbose_name_plural = "Транзакции FAN-token"
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "match", "reason"],
+                name="uniq_fancoin_user_match_reason",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.user_id}: {self.get_direction_display()} {self.amount} "
+            f"({self.reason})"
+        )
 
 
 class RegionalTierPrice(models.Model):

@@ -144,13 +144,11 @@ def send_subscription_purchase_email(
     end_str = subscription.end_date.strftime("%d.%m.%Y")
 
     if tier.is_unlimited:
-        registrations_text = "Безлимитные регистрации на турниры."
+        registrations_text = "Безлимитный баланс FAN-token."
     else:
-        remaining = subscription.get_remaining_slots()
+        remaining = subscription.get_fancoin_balance()
         registrations_text = (
-            "Регистрации на турниры недоступны."
-            if remaining == 0
-            else f"Доступно регистраций на турниры: {remaining}."
+            "FAN-token недоступен." if remaining == 0 else f"Баланс FT: {remaining}."
         )
 
     features: list[str] = []

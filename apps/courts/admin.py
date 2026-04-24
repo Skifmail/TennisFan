@@ -224,9 +224,21 @@ def approve_court_applications(modeladmin, request, queryset):
 
 @admin.action(description="Отклонить заявки")
 def reject_court_applications(modeladmin, request, queryset):
-    updated = queryset.filter(status=CourtApplicationStatus.PENDING).update(
-        status=CourtApplicationStatus.REJECTED
-    )
+    pending = list(queryset.filter(status=CourtApplicationStatus.PENDING))
+    updated = 0
+    for app in pending:
+        app.status = CourtApplicationStatus.REJECTED
+        app.save(update_fields=["status", "updated_at"])
+        updated += 1
+        try:
+            from apps.core.email_service import send_court_application_decision_email
+
+            send_court_application_decision_email(app, approved=False)
+        except Exception:
+            logger.exception(
+                "send_court_application_decision_email failed | application=%s",
+                app.pk,
+            )
     if updated:
         messages.success(request, f"Отклонено заявок: {updated}.")
 

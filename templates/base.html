@@ -190,6 +190,19 @@
         </div>
     </div>
     {% endif %}
+    {% if user.is_authenticated and not user.email_verified %}
+    <div class="messages-container">
+        <div class="container">
+            <div class="alert alert-warning">
+                Подтвердите email, чтобы получать важные уведомления платформы.
+                <form action="{% url 'verify_email_resend' %}" method="post" style="display:inline-block; margin-left: 8px;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-ghost" style="padding: 4px 10px;">Отправить письмо повторно</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Main Content -->
     <main class="main">

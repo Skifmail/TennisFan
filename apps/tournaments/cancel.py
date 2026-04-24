@@ -4,8 +4,10 @@
 
 import logging
 
+from apps.core.email_service import send_tournament_cancelled_email
 from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
 from apps.subscriptions.models import FancoinTransaction
+from apps.telegram_bot.notifications import send_to_user_by_user
 from apps.users.models import Notification
 
 from .models import Tournament, TournamentStatus
@@ -72,6 +74,13 @@ def cancel_tournament(
                 if u and u.pk not in users_done:
                     users_done.add(u.pk)
                     _decrement_subscription_for_user(u, tournament)
+                    send_tournament_cancelled_email(
+                        u,
+                        tournament,
+                        refunded_ft=TOURNAMENT_REGISTRATION_COST,
+                        reason=message,
+                    )
+                    send_to_user_by_user(u, message)
                     Notification.objects.create(
                         user=u,
                         message=message,
@@ -82,6 +91,13 @@ def cancel_tournament(
             user = getattr(player, "user", None)
             if user:
                 _decrement_subscription_for_user(user, tournament)
+                send_tournament_cancelled_email(
+                    user,
+                    tournament,
+                    refunded_ft=TOURNAMENT_REGISTRATION_COST,
+                    reason=message,
+                )
+                send_to_user_by_user(user, message)
                 Notification.objects.create(
                     user=user,
                     message=message,

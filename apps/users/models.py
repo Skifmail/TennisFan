@@ -52,6 +52,7 @@ class User(AbstractUser):
     username = None
     email = models.EmailField("Email", unique=True)
     phone = models.CharField("Телефон", max_length=20, blank=True)
+    email_verified = models.BooleanField("Email подтвержден", default=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS: list[str] = []
@@ -475,3 +476,26 @@ class Notification(models.Model):
 
     def __str__(self) -> str:
         return str(self.message)
+
+
+class EmailVerificationToken(models.Model):
+    """Токен подтверждения email пользователя."""
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="email_verification_tokens",
+        verbose_name="Пользователь",
+    )
+    token = models.CharField("Токен", max_length=128, unique=True)
+    expires_at = models.DateTimeField("Истекает")
+    used_at = models.DateTimeField("Использован", null=True, blank=True)
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Токен подтверждения email"
+        verbose_name_plural = "Токены подтверждения email"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.user_id}:{self.token[:8]}"

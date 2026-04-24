@@ -2,6 +2,7 @@
 Courts models.
 """
 
+import logging
 from typing import cast
 
 from django.conf import settings
@@ -9,6 +10,8 @@ from django.db import models
 from django.utils.text import slugify
 
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
+
+logger = logging.getLogger(__name__)
 
 
 class Court(CompressImageFieldsMixin, models.Model):
@@ -280,6 +283,15 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
         self.court = court
         self.status = CourtApplicationStatus.APPROVED
         self.save(update_fields=["court", "status", "updated_at"])
+        try:
+            from apps.core.email_service import send_court_application_decision_email
+
+            send_court_application_decision_email(self, approved=True)
+        except Exception:
+            logger.exception(
+                "send_court_application_decision_email failed | application=%s",
+                self.pk,
+            )
         return cast(Court, court)
 
     def _compose_surface_display(self) -> str:

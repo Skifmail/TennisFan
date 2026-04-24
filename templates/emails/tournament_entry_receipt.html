@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Оплата турнирного взноса</title>
+</head>
+<body>
+    <p>Здравствуйте, {{ user.get_full_name|default:user.email }}!</p>
+    <p>Оплата турнирного взноса прошла успешно.</p>
+    <ul>
+        <li>Турнир: {{ tournament.name }}</li>
+        <li>Сумма: {{ amount }} ₽</li>
+        <li>Дата операции: {{ paid_at|date:"d.m.Y H:i" }}</li>
+        <li>Тип оплаты: {% if is_postpayment %}постоплата{% else %}обычная{% endif %}</li>
+    </ul>
+    <p><a href="{{ tournament_url }}">Перейти к турниру</a></p>
+    <p>С уважением,<br>Команда TennisFan</p>
+</body>
+</html>

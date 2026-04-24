@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Решение по заявке на корт</title>
+</head>
+<body>
+    <p>Здравствуйте, {{ application.applicant_name }}!</p>
+    {% if approved %}
+    <p>Ваша заявка на добавление корта «{{ application.name }}» одобрена.</p>
+    {% else %}
+    <p>Ваша заявка на добавление корта «{{ application.name }}» отклонена.</p>
+    {% endif %}
+    <p>С уважением,<br>Команда TennisFan</p>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Телефон изменён</title>
+</head>
+<body>
+    <p>Здравствуйте, {{ user.get_full_name|default:user.email }}!</p>
+    <p>В профиле изменён номер телефона.</p>
+    <ul>
+        <li>Было: {{ old_phone }}</li>
+        <li>Стало: {{ new_phone }}</li>
+        <li>Время: {{ event_at|date:"d.m.Y H:i" }}</li>
+    </ul>
+    <p>Если это были не вы, обратитесь в поддержку.</p>
+</body>
+</html>

@@ -32,7 +32,7 @@ urlpatterns = [
     ),
     path(
         "password-reset-confirm/<uidb64>/<token>/",
-        auth_views.PasswordResetConfirmView.as_view(
+        views.PasswordResetConfirmNotifyView.as_view(
             template_name="users/password_reset_confirm.html",
             success_url=reverse_lazy("password_reset_complete"),
         ),
@@ -48,11 +48,21 @@ urlpatterns = [
     # Смена пароля (для авторизованных пользователей)
     path(
         "password-change/",
-        auth_views.PasswordChangeView.as_view(
+        views.PasswordChangeNotifyView.as_view(
             template_name="users/password_change.html",
             success_url=reverse_lazy("password_change_done"),
         ),
         name="password_change",
+    ),
+    path(
+        "verify-email/resend/",
+        views.verify_email_resend,
+        name="verify_email_resend",
+    ),
+    path(
+        "verify-email/<str:token>/",
+        views.verify_email_confirm,
+        name="verify_email_confirm",
     ),
     path(
         "password-change/done/",

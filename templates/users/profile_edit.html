@@ -47,15 +47,6 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Уровень силы</label>
-                    <p class="text-secondary" style="margin-bottom: var(--spacing-sm);">
-                        {{ form.instance.get_skill_level_display }} ({{ form.instance.ntrp_level }}).
-                        Изменить можно только через <a href="{% url 'ntrp_test' %}" target="_blank" rel="noopener">тест
-                            уровня силы</a> или в админке.
-                    </p>
-                </div>
-
-                <div class="form-group">
                     <label class="form-label">{{ form.birth_date.label }}</label>
                     {{ form.birth_date }}
                     {% for err in form.birth_date.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}

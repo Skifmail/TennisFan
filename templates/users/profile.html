@@ -8,6 +8,15 @@
 {% include "clubs/_club_player_nav.html" with current="dashboard" %}
 {% endif %}
 <div class="container container--profile" style="padding-top: var(--spacing-2xl);">
+    {% if request.user == player.user and not request.user.email_verified %}
+    <div class="alert alert-warning" style="margin-bottom: var(--spacing-lg);">
+        Email не подтверждён. Подтвердите адрес, чтобы получать все важные уведомления.
+        <form action="{% url 'verify_email_resend' %}" method="post" style="display:inline-block; margin-left: 8px;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-ghost" style="padding: 4px 10px;">Отправить письмо повторно</button>
+        </form>
+    </div>
+    {% endif %}
     <!-- Profile Card: full width, left info + right charts -->
     <div class="card profile-card profile-card--wide">
         <div class="card-body">
@@ -389,17 +398,23 @@
                         <span>{{ player.user.subscription.end_date|date:"d.m.Y" }}</span>
                     </div>
                     {% endif %}
-                    {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.tier.fancoin_per_purchase > 0 %}
                     <div class="subscription-info__limit">
                         <div class="subscription-info__row">
                             <span class="subscription-info__label">Баланс FT:</span>
+                            {% if player.user.subscription.tier.is_unlimited %}
+                            <span>Безлимит</span>
+                            {% elif player.user.subscription.tier.fancoin_per_purchase > 0 %}
                             <span>{{ player.user.subscription.get_fancoin_balance }}</span>
+                            {% else %}
+                            <span>Не включено в тариф</span>
+                            {% endif %}
                         </div>
+                        {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.tier.fancoin_per_purchase > 0 %}
                         <div class="subscription-info__bar">
                             <div class="subscription-info__bar-fill" data-width-pct="{{ subscription_usage_percent }}"></div>
                         </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
 
                     {# --- Кнопки управления подпиской --- #}
                     <div class="subscription-info__actions">

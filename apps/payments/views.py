@@ -1230,6 +1230,16 @@ def payment_success(request: HttpRequest) -> HttpResponse:
     next_url = request.GET.get("next", "").strip()
 
     if payment_type == "donation":
+        if request.user.is_authenticated:
+            try:
+                from apps.core.email_service import send_donation_thanks_email
+
+                send_donation_thanks_email(request.user, request.GET.get("amount"))
+            except Exception:
+                logger.exception(
+                    "send_donation_thanks_email failed | user=%s",
+                    getattr(request.user, "pk", None),
+                )
         messages.success(request, "Спасибо за поддержку проекта!")
         return redirect("home")
 
@@ -1340,6 +1350,22 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                     change_reason="Оплата клубного тарифа участником",
                     auto_renew=auto_renew_enabled,
                 )
+                try:
+                    from apps.core.email_service import send_club_plan_receipt_email
+
+                    send_club_plan_receipt_email(
+                        request.user,
+                        club_name=plan.club.name,
+                        plan_name=plan.name,
+                        amount=request.GET.get("amount"),
+                        auto_renew=auto_renew_enabled,
+                    )
+                except Exception:
+                    logger.exception(
+                        "send_club_plan_receipt_email failed | user=%s plan=%s",
+                        request.user.pk,
+                        plan.pk,
+                    )
                 messages.success(
                     request,
                     f"Клубный тариф «{plan.name}» успешно оформлен.",
@@ -1397,6 +1423,23 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                     logger.warning(
                         "Telegram notify_tournament_entry_payment failed: %s",
                         e,
+                    )
+                try:
+                    from apps.core.email_service import (
+                        send_tournament_entry_receipt_email,
+                    )
+
+                    send_tournament_entry_receipt_email(
+                        request.user,
+                        tournament,
+                        amount=request.GET.get("amount"),
+                        is_postpayment=bool(invoice_id_raw),
+                    )
+                except Exception:
+                    logger.exception(
+                        "send_tournament_entry_receipt_email failed | user=%s tournament=%s",
+                        request.user.pk,
+                        tournament.pk,
                     )
             if tournament and not tournament.is_doubles():
                 # Одиночный турнир: сразу добавляем участника (лимит подписки не тратим)

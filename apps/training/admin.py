@@ -61,9 +61,21 @@ def approve_coach_applications(modeladmin, request, queryset):
 
 @admin.action(description="Отклонить заявки")
 def reject_coach_applications(modeladmin, request, queryset):
-    updated = queryset.filter(status=CoachApplicationStatus.PENDING).update(
-        status=CoachApplicationStatus.REJECTED
-    )
+    pending = list(queryset.filter(status=CoachApplicationStatus.PENDING))
+    updated = 0
+    for app in pending:
+        app.status = CoachApplicationStatus.REJECTED
+        app.save(update_fields=["status", "updated_at"])
+        updated += 1
+        try:
+            from apps.core.email_service import send_coach_application_decision_email
+
+            send_coach_application_decision_email(app, approved=False)
+        except Exception:
+            logger.exception(
+                "send_coach_application_decision_email failed | application=%s",
+                app.pk,
+            )
     if updated:
         messages.success(request, f"Отклонено заявок: {updated}.")
 

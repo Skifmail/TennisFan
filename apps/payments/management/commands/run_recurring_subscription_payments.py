@@ -7,6 +7,7 @@ from typing import Any
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from apps.core.email_service import send_subscription_autorenew_failed_email
 from apps.core.telegram_notify import notify_subscription_purchase
 from apps.payments.models import PaymentRecord, SavedPaymentMethod
 from apps.payments.yookassa_client import create_recurring_payment
@@ -204,12 +205,22 @@ class Command(BaseCommand):
                         sub.pk,
                         user.pk,
                     )
+                    send_subscription_autorenew_failed_email(
+                        user,
+                        tier_name=sub.tier.get_name_display(),
+                        reason=f"Статус платежа: {status}",
+                    )
             except Exception as exc:
                 logger.exception(
                     "Error during recurring payment for subscription=%s user=%s: %s",
                     sub.pk,
                     user.pk,
                     exc,
+                )
+                send_subscription_autorenew_failed_email(
+                    user,
+                    tier_name=sub.tier.get_name_display(),
+                    reason="Техническая ошибка при автосписании. Попробуйте позже.",
                 )
 
         summary = (

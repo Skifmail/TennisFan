@@ -10,7 +10,9 @@ from typing import Any
 
 from django.contrib import messages
 from django.contrib.auth import login
+from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.db.models import Q
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
@@ -26,9 +28,57 @@ from apps.core.models import LegalAcceptanceLog, UserConsent, UserTelegramLink
 from apps.legal.utils import get_legal_document_version
 
 from .forms import EmailAuthenticationForm, PlayerProfileForm, UserRegistrationForm
-from .models import Notification, NtrpTestResult, Player
+from .models import EmailVerificationToken, Notification, NtrpTestResult, Player
 
 logger = logging.getLogger(__name__)
+
+
+class PasswordChangeNotifyView(auth_views.PasswordChangeView):
+    """Смена пароля с отправкой security-письма."""
+
+    def form_valid(self, form):
+        """Сохранить новый пароль и отправить уведомление пользователю.
+
+        Args:
+            form: Валидная форма смены пароля.
+
+        Returns:
+            HttpResponse: Ответ базового обработчика.
+        """
+        response = super().form_valid(form)
+        try:
+            from apps.core.email_service import send_password_changed_email
+
+            send_password_changed_email(self.request.user, self.request)
+        except Exception:
+            logger.exception(
+                "send_password_changed_email failed | user=%s",
+                getattr(self.request.user, "pk", None),
+            )
+        return response
+
+
+class PasswordResetConfirmNotifyView(auth_views.PasswordResetConfirmView):
+    """Подтверждение сброса пароля с security-уведомлением."""
+
+    def form_valid(self, form):
+        """Сохранить пароль из формы и отправить security-письмо.
+
+        Args:
+            form: Валидная форма сброса пароля.
+
+        Returns:
+            HttpResponse: Ответ базового обработчика.
+        """
+        response = super().form_valid(form)
+        try:
+            user = form.user
+            from apps.core.email_service import send_password_changed_email
+
+            send_password_changed_email(user, self.request)
+        except Exception:
+            logger.exception("send_password_changed_email failed after reset confirm")
+        return response
 
 
 def _get_request_ip(request) -> str | None:
@@ -397,6 +447,9 @@ def auth(request):
                 from apps.core.email_service import send_welcome_email
 
                 send_welcome_email(user)
+                from apps.core.email_service import send_email_verification
+
+                send_email_verification(user)
                 _log_registration_legal_acceptances(request, user)
 
                 login(
@@ -883,6 +936,81 @@ def notifications(request):
     # mark all as read when viewed
     notes.filter(is_read=False).update(is_read=True)
     return render(request, "users/notifications.html", {"notifications": notes})
+
+
+def verify_email_confirm(request, token: str):
+    """Подтвердить email по токену.
+
+    Args:
+        request: HTTP-запрос.
+        token (str): Токен подтверждения email.
+
+    Returns:
+        HttpResponse: Редирект на профиль или страницу входа.
+    """
+    verification = (
+        EmailVerificationToken.objects.select_related("user")
+        .filter(token=token)
+        .first()
+    )
+    if verification is None:
+        messages.error(request, "Ссылка подтверждения недействительна.")
+        return redirect("login")
+    if verification.used_at is not None:
+        messages.info(request, "Этот токен уже был использован.")
+        return redirect("login")
+    if verification.expires_at <= timezone.now():
+        messages.error(request, "Срок действия ссылки истёк.")
+        return redirect("login")
+    verification.used_at = timezone.now()
+    verification.save(update_fields=["used_at"])
+    user = verification.user
+    user.email_verified = True
+    user.save(update_fields=["email_verified"])
+    messages.success(request, "Email успешно подтверждён.")
+    player = getattr(user, "player", None)
+    if player is not None:
+        return redirect("profile", pk=player.pk)
+    return redirect("login")
+
+
+@login_required
+@require_POST
+def verify_email_resend(request):
+    """Повторно отправить письмо подтверждения email с rate limit.
+
+    Args:
+        request: HTTP-запрос.
+
+    Returns:
+        HttpResponse: Редирект обратно в профиль пользователя.
+    """
+    cache_key = f"verify_email_resend:{request.user.pk}"
+    if cache.get(cache_key):
+        messages.warning(
+            request,
+            "Письмо уже отправлялось недавно. Попробуйте снова через минуту.",
+        )
+    else:
+        cache.set(cache_key, "1", timeout=60)
+        try:
+            from apps.core.email_service import send_email_verification
+
+            send_email_verification(request.user)
+            messages.success(request, "Письмо для подтверждения email отправлено.")
+        except Exception:
+            logger.exception(
+                "send_email_verification failed | user=%s",
+                request.user.pk,
+            )
+            messages.error(
+                request,
+                "Не удалось отправить письмо подтверждения. Попробуйте позже.",
+            )
+    player = getattr(request.user, "player", None)
+    if player is not None:
+        return redirect("profile", pk=player.pk)
+    return redirect("home")
 
 
 def ntrp_test(request):

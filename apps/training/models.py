@@ -2,6 +2,7 @@
 Training models for adult tennis training.
 """
 
+import logging
 from typing import cast
 
 from django.db import models
@@ -16,6 +17,8 @@ from apps.core.contact_utils import (
 from apps.users.models import SkillLevel
 from apps.users.skill_levels import SKILL_LEVEL_NTRP
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
+
+logger = logging.getLogger(__name__)
 
 
 class TrainingType(models.TextChoices):
@@ -186,6 +189,17 @@ class CoachApplication(CompressImageFieldsMixin, models.Model):
         return f"{self.name} ({self.city}) — {self.get_status_display()}"
 
     def approve_and_create_coach(self) -> Coach:
+        """Одобрить заявку и создать профиль тренера.
+
+        Args:
+            None: Метод не принимает дополнительных аргументов.
+
+        Returns:
+            Coach: Созданный объект тренера.
+
+        Raises:
+            ValueError: Если заявка уже не в статусе ожидания.
+        """
         if self.status != CoachApplicationStatus.PENDING:
             raise ValueError(
                 "Можно одобрять только заявки со статусом «На рассмотрении»."
@@ -216,6 +230,15 @@ class CoachApplication(CompressImageFieldsMixin, models.Model):
         self.coach = coach
         self.status = CoachApplicationStatus.APPROVED
         self.save(update_fields=["coach", "status", "updated_at"])
+        try:
+            from apps.core.email_service import send_coach_application_decision_email
+
+            send_coach_application_decision_email(self, approved=True)
+        except Exception:
+            logger.exception(
+                "send_coach_application_decision_email failed | application=%s",
+                self.pk,
+            )
         return cast(Coach, coach)
 
 

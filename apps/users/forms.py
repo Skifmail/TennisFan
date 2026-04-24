@@ -2,6 +2,7 @@
 User forms.
 """
 
+import logging
 from decimal import Decimal
 
 from django import forms
@@ -13,6 +14,7 @@ from apps.core.contact_utils import normalize_max_contact
 from .models import Player
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class EmailAuthenticationForm(AuthenticationForm):
@@ -192,6 +194,7 @@ class UserRegistrationForm(forms.ModelForm):
         user.first_name = self.cleaned_data.get("first_name", "").strip()
         user.last_name = self.cleaned_data.get("last_name", "").strip()
         user.phone = self.cleaned_data.get("phone", "").strip()
+        user.email_verified = False
         if commit:
             user.save()
         return user
@@ -319,6 +322,14 @@ class PlayerProfileForm(forms.ModelForm):
         return normalize_max_contact(self.cleaned_data.get("max_contact"))
 
     def save(self, commit=True):
+        """Сохранить профиль игрока и отправить security-уведомление при смене телефона.
+
+        Args:
+            commit (bool): Нужно ли сохранять изменения в БД немедленно.
+
+        Returns:
+            Player: Сохранённый профиль игрока.
+        """
         player = super().save(commit=False)
         # Явно обрабатываем очистку аватара из ClearableFileInput,
         # чтобы удаление стабильно работало на любом backend хранилища.
@@ -327,11 +338,23 @@ class PlayerProfileForm(forms.ModelForm):
             player.avatar.delete(save=False)
             player.avatar = None
         if self.user:
+            old_phone = str(getattr(self.user, "phone", "") or "").strip()
             self.user.first_name = self.cleaned_data["first_name"]
             self.user.last_name = self.cleaned_data["last_name"]
             self.user.phone = self.cleaned_data["phone"]
             if commit:
                 self.user.save()
+                new_phone = str(self.user.phone or "").strip()
+                if old_phone != new_phone:
+                    try:
+                        from apps.core.email_service import send_phone_changed_email
+
+                        send_phone_changed_email(self.user, old_phone, new_phone)
+                    except Exception:
+                        logger.exception(
+                            "send_phone_changed_email failed | user=%s",
+                            self.user.pk,
+                        )
         if commit:
             player.save()
         return player

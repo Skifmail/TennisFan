@@ -145,6 +145,8 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 - **Яндекс:** `YANDEX_MAPS_API_KEY`, `YANDEX_GEOCODER_API_KEY`, `YANDEX_GEOCODER_REFERER`
 - **Верификация поисковиков:** `GOOGLE_SITE_VERIFICATION`, `YANDEX_VERIFICATION`. Если для `tennisfan.ru` и `tennistop.ru` будут разные meta-токены, укажите оба через запятую.
 - **Почта:** `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`
+- **Redis cache:** `USE_REDIS=True`, `REDIS_URL=redis://redis:6379/1`, `CACHE_KEY_PREFIX=tennison`, `CACHE_DEFAULT_TIMEOUT=300`, `CACHE_SOCKET_CONNECT_TIMEOUT=2.0`, `CACHE_SOCKET_TIMEOUT=2.0`
+- **Сессии (рекомендуемо):** `SESSION_ENGINE=django.contrib.sessions.backends.signed_cookies` (не хранить сессии в вытесняемом кешe Redis по умолчанию)
 - **S3:** `USE_S3`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET_NAME`, `S3_ENDPOINT_URL`, `S3_REGION`
 - **Опционально:** `TELEGRAM_USER_BOT_WEBHOOK_SECRET`, `TELEGRAM_SUPPORT_WEBHOOK_SECRET`, `ADMIN_URL`
 - **Первый вход в админку:** чтобы при первом деплое автоматически создать суперпользователя, добавьте в Environment:
@@ -188,11 +190,26 @@ ss -tulnp | grep -E ':80 |:443 |:3000 '
 
 Порядок запуска в compose:
 
-- Поднимается **db** (PostgreSQL), затем **web** и **cron**.
+- Поднимаются **db** (PostgreSQL) и **redis**, затем **web** и **cron**.
 - **web** при старте: ожидание БД → `migrate` → `collectstatic` → **`set_telegram_webhooks`** → gunicorn.
 - **cron** при старте: ожидание БД → `crontab add` → демон cron.
 
 Таким образом, при каждом деплое webhook’и Telegram переустанавливаются автоматически и не «слетают».
+
+### 6.1 Проверка Redis-кеша после деплоя
+
+Выполните в контейнере `web`:
+
+```bash
+python manage.py check
+python manage.py check_telegram_notify_cache
+```
+
+Ожидаемый результат:
+
+- в выводе `check_telegram_notify_cache` backend — Redis (`django.core.cache.backends.redis.RedisCache`);
+- команда пишет, что кэш общий, и `set/get/delete` выполняются успешно;
+- в логах `web`/`cron` нет ошибок подключения к `redis`.
 
 ---
 

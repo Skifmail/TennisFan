@@ -294,28 +294,45 @@ else:
 # CACHE (Redis optional)
 # ------------------------------------------------------------------------------
 
-if os.environ.get("USE_REDIS", "False") == "True":
+USE_REDIS = os.environ.get("USE_REDIS", "False") == "True"
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1")
+CACHE_KEY_PREFIX = os.environ.get("CACHE_KEY_PREFIX", "tennison")
+CACHE_DEFAULT_TIMEOUT = int(os.environ.get("CACHE_DEFAULT_TIMEOUT", "300"))
+CACHE_SOCKET_CONNECT_TIMEOUT = float(
+    os.environ.get("CACHE_SOCKET_CONNECT_TIMEOUT", "2.0")
+)
+CACHE_SOCKET_TIMEOUT = float(os.environ.get("CACHE_SOCKET_TIMEOUT", "2.0"))
+
+if USE_REDIS:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
-            "LOCATION": os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/1"),
+            "LOCATION": REDIS_URL,
+            "TIMEOUT": CACHE_DEFAULT_TIMEOUT,
+            "KEY_PREFIX": CACHE_KEY_PREFIX,
+            "OPTIONS": {
+                "socket_connect_timeout": CACHE_SOCKET_CONNECT_TIMEOUT,
+                "socket_timeout": CACHE_SOCKET_TIMEOUT,
+            },
         }
     }
-    SESSION_ENGINE = os.environ.get(
-        "SESSION_ENGINE",
-        "django.contrib.sessions.backends.cache",
-    )
-    SESSION_CACHE_ALIAS = "default"
 else:
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "TIMEOUT": CACHE_DEFAULT_TIMEOUT,
+            "KEY_PREFIX": CACHE_KEY_PREFIX,
         }
     }
-    SESSION_ENGINE = os.environ.get(
-        "SESSION_ENGINE",
-        "django.contrib.sessions.backends.signed_cookies",
-    )
+
+# По умолчанию не храним пользовательские сессии в вытесняемом кэше.
+# При необходимости можно явно задать SESSION_ENGINE через env.
+SESSION_ENGINE = os.environ.get(
+    "SESSION_ENGINE",
+    "django.contrib.sessions.backends.signed_cookies",
+)
+if SESSION_ENGINE == "django.contrib.sessions.backends.cache":
+    SESSION_CACHE_ALIAS = "default"
 
 # ------------------------------------------------------------------------------
 # EMAIL

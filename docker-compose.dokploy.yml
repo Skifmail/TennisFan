@@ -47,6 +47,13 @@ x-app-env: &app-env
   CONN_MAX_AGE: ${CONN_MAX_AGE:-60}
   POSTGRES_CONNECT_TIMEOUT: ${POSTGRES_CONNECT_TIMEOUT:-5}
   SESSION_SAVE_EVERY_REQUEST: ${SESSION_SAVE_EVERY_REQUEST:-False}
+  USE_REDIS: ${USE_REDIS:-True}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/1}
+  CACHE_KEY_PREFIX: ${CACHE_KEY_PREFIX:-tennison}
+  CACHE_DEFAULT_TIMEOUT: ${CACHE_DEFAULT_TIMEOUT:-300}
+  CACHE_SOCKET_CONNECT_TIMEOUT: ${CACHE_SOCKET_CONNECT_TIMEOUT:-2.0}
+  CACHE_SOCKET_TIMEOUT: ${CACHE_SOCKET_TIMEOUT:-2.0}
+  SESSION_ENGINE: ${SESSION_ENGINE:-django.contrib.sessions.backends.signed_cookies}
   # Gunicorn runtime (используются в /entrypoint.sh)
   GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
   GUNICORN_THREADS: ${GUNICORN_THREADS:-4}
@@ -72,6 +79,29 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "256mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   web:
     build: .
@@ -106,6 +136,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     deploy:
       restart_policy:
         condition: on-failure
@@ -118,6 +150,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     deploy:
       restart_policy:
         condition: on-failure
@@ -125,3 +159,4 @@ services:
 volumes:
   postgres_data:
   static_data:
+  redis_data:

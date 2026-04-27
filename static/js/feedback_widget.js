@@ -20,6 +20,7 @@
     var guestForm = document.getElementById("feedback-guest-form");
     var badge = document.getElementById("feedback-widget-badge");
     var welcomeMessage = document.getElementById("feedback-welcome-message");
+    var buttonLabel = btn ? btn.querySelector(".feedback-widget__label") : null;
 
     // Поля для гостей
     var guestNameInput = document.getElementById("feedback-guest-name");
@@ -29,8 +30,11 @@
     var submitUrl = widget.getAttribute("data-submit-url");
     var threadsUrl = widget.getAttribute("data-threads-url");
     var unreadCountUrl = widget.getAttribute("data-unread-count-url");
+    var adminUnreadCountUrl = widget.getAttribute("data-admin-unread-count-url");
+    var adminSupportUrl = widget.getAttribute("data-admin-support-url");
     var csrfToken = widget.getAttribute("data-csrf");
     var isAuth = widget.getAttribute("data-is-authenticated") === "1";
+    var isPlatformAdmin = widget.getAttribute("data-is-platform-admin") === "1";
 
     // Состояние чата
     var chatState = {
@@ -413,20 +417,37 @@
             badge.hidden = true;
             badge.textContent = "0";
         }
+
+        if (isPlatformAdmin && buttonLabel) {
+            var adminLabel = safeCount > 0 ? "Есть обращения" : "Сообщений нет";
+            buttonLabel.textContent = adminLabel;
+            if (btn) {
+                btn.setAttribute("aria-label", adminLabel);
+            }
+        }
     }
 
     function fetchUnreadCount() {
-        if (!unreadCountUrl) return;
+        var targetUnreadCountUrl = isPlatformAdmin ? adminUnreadCountUrl : unreadCountUrl;
+        if (!targetUnreadCountUrl) return;
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", unreadCountUrl);
+        xhr.open("GET", targetUnreadCountUrl);
         xhr.onload = function () {
             try {
                 var data = JSON.parse(xhr.responseText || "{}");
-                if (!chatState.isOpen) {
+                if (isPlatformAdmin || !chatState.isOpen) {
                     updateUnreadBadge(data.count || 0);
                 }
             } catch (e) {
                 console.error("Unread count parse error:", e);
+                if (isPlatformAdmin) {
+                    updateUnreadBadge(0);
+                }
+            }
+        };
+        xhr.onerror = function () {
+            if (isPlatformAdmin) {
+                updateUnreadBadge(0);
             }
         };
         xhr.send();
@@ -448,7 +469,14 @@
 
     // Обработчики событий
     if (btn) {
-        btn.addEventListener("click", toggleChat);
+        if (isPlatformAdmin) {
+            btn.addEventListener("click", function () {
+                if (!adminSupportUrl) return;
+                window.location.assign(adminSupportUrl);
+            });
+        } else {
+            btn.addEventListener("click", toggleChat);
+        }
     }
     if (closeBtn) {
         closeBtn.addEventListener("click", closeChat);
@@ -476,7 +504,7 @@
         sendBtn.disabled = true; // Начинаем с отключенной кнопки
     }
 
-    if (window.location.search.indexOf("open_support=1") !== -1) {
+    if (!isPlatformAdmin && window.location.search.indexOf("open_support=1") !== -1) {
         openChat();
     }
 

@@ -71,21 +71,14 @@
                         {% if tier.is_unlimited or tier.fancoin_per_purchase > 0 %}&#10003;{% else %}&#10007;{% endif %}
                     </span>
                     <div class="pricing-feature__content">
-                        <strong>FAN-token:</strong>
+                        <strong>FAN-token в тарифе:</strong>
                         {% if tier.is_unlimited %}
                         <span class="pricing-feature__value">Безлимит</span>
                         {% elif tier.fancoin_per_purchase == 0 %}
-                        <span class="pricing-feature__value pricing-feature__value--disabled">Недоступно</span>
+                        <span class="pricing-feature__value pricing-feature__value--disabled">Не входит в тариф</span>
                         {% else %}
-                        <span class="pricing-feature__value">{{ tier.fancoin_per_purchase }} за покупку</span>
+                        <span class="pricing-feature__value">{{ tier.fancoin_per_purchase }}</span>
                         {% endif %}
-                    </div>
-                </div>
-                <div class="pricing-feature">
-                    <span class="pricing-feature__icon pricing-feature__icon--success">&#8505;</span>
-                    <div class="pricing-feature__content">
-                        1 регистрация на турнир = 3 FT; 1 состоявшийся одиночный/парный спарринг = 1 FT;
-                        1 состоявшийся командный спарринг = 3 FT.
                     </div>
                 </div>
 

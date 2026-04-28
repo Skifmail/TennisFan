@@ -360,6 +360,7 @@ class SupportMessage(models.Model):
     text = models.TextField("Текст сообщения")
     is_from_admin = models.BooleanField("От администратора", default=False)
     created_at = models.DateTimeField("Создано", auto_now_add=True)
+    edited_at = models.DateTimeField("Изменено", null=True, blank=True)
 
     class Meta:
         ordering = ["created_at"]

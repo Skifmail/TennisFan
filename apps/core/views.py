@@ -62,20 +62,24 @@ from apps.users.models import Player, SkillLevel
 from apps.users.rating_utils import rating_to_ntrp_level
 
 from .forms import FeedbackForm
-from .models import City, SupportThread
+from .models import City, SupportMessage, SupportThread
 from .support_notifications import (
     send_admin_support_notification,
-    send_user_support_reply,
+    send_user_support_reply_async,
 )
 from .support_service import (
     SupportAuthor,
+    can_delete_support_message,
+    can_edit_support_message,
     create_admin_reply,
     create_user_message,
+    delete_support_message,
     get_threads_for_admin,
     get_unread_count_for_admin,
     get_unread_count_for_user,
     mark_thread_read_by_admin,
     mark_thread_read_by_user,
+    update_support_message_text,
 )
 from .text_search import filter_field_contains_ci
 
@@ -1717,6 +1721,26 @@ def feedback_threads(request):
                     "text": message.text,
                     "is_from_admin": message.is_from_admin,
                     "created_at": message.created_at.isoformat(),
+                    "edited_at": (
+                        message.edited_at.isoformat() if message.edited_at else None
+                    ),
+                    "is_edited": bool(message.edited_at),
+                    "can_edit": (
+                        (not message.is_from_admin)
+                        and (
+                            (
+                                request.user.is_authenticated
+                                and message.user_id == request.user.id
+                            )
+                            or (
+                                (not request.user.is_authenticated)
+                                and support_thread is not None
+                                and support_thread.id
+                                == request.session.get("feedback_thread_id")
+                            )
+                        )
+                        and can_edit_support_message(message)
+                    ),
                 }
             )
         mark_thread_read_by_user(support_thread)
@@ -1780,9 +1804,14 @@ def support_admin_thread(request: HttpRequest, thread_id: int) -> HttpResponse:
         return redirect("support_admin_list")
 
     mark_thread_read_by_admin(thread)
+    messages_list = list(thread.messages.order_by("created_at"))
+    for item in messages_list:
+        item.can_edit = bool(item.is_from_admin and can_edit_support_message(item))
+        item.can_delete = bool(item.is_from_admin and can_delete_support_message(item))
+
     context = {
         "thread": thread,
-        "messages_list": thread.messages.order_by("created_at"),
+        "messages_list": messages_list,
     }
     return render(request, "core/support_admin_thread.html", context)
 
@@ -1811,8 +1840,186 @@ def support_admin_reply(request: HttpRequest) -> JsonResponse:
         )
 
     message = create_admin_reply(thread=thread, text=text)
-    send_user_support_reply(message)
+    send_user_support_reply_async(message)
     return JsonResponse({"success": True, "message_id": message.pk})
+
+
+@require_http_methods(["POST"])
+def feedback_message_update(request: HttpRequest) -> JsonResponse:
+    """Обновить сообщение пользователя/гостя в виджете поддержки.
+
+    Args:
+        request (HttpRequest): HTTP-запрос с JSON payload (message_id, text).
+
+    Returns:
+        JsonResponse: Результат обновления сообщения.
+    """
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = request.POST
+
+    message_id = int(payload.get("message_id") or 0)
+    new_text = str(payload.get("text") or "").strip()
+    if not message_id or not new_text:
+        return JsonResponse({"success": False, "error": "Неверные данные."}, status=400)
+
+    message = (
+        SupportMessage.objects.select_related("thread").filter(pk=message_id).first()
+    )
+    if message is None:
+        return JsonResponse(
+            {"success": False, "error": "Сообщение не найдено."},
+            status=404,
+        )
+    if message.is_from_admin:
+        return JsonResponse(
+            {"success": False, "error": "Редактировать можно только свои сообщения."},
+            status=403,
+        )
+
+    if request.user.is_authenticated:
+        if message.user_id != request.user.id:
+            return JsonResponse({"success": False, "error": "forbidden"}, status=403)
+    else:
+        thread_id = request.session.get("feedback_thread_id")
+        if not thread_id or message.thread_id != thread_id:
+            return JsonResponse({"success": False, "error": "forbidden"}, status=403)
+
+    if not can_edit_support_message(message):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Сообщение можно редактировать только в течение 15 минут после отправки.",
+            },
+            status=400,
+        )
+
+    updated_message = update_support_message_text(message=message, text=new_text)
+    return JsonResponse(
+        {
+            "success": True,
+            "message_id": updated_message.pk,
+            "edited_at": (
+                updated_message.edited_at.isoformat()
+                if updated_message.edited_at
+                else None
+            ),
+        }
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def support_admin_update_message(request: HttpRequest) -> JsonResponse:
+    """Обновить сообщение администратора в диалоге поддержки.
+
+    Args:
+        request (HttpRequest): HTTP-запрос с JSON payload (message_id, text).
+
+    Returns:
+        JsonResponse: Результат обновления сообщения.
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"success": False, "error": "forbidden"}, status=403)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = request.POST
+
+    message_id = int(payload.get("message_id") or 0)
+    new_text = str(payload.get("text") or "").strip()
+    if not message_id or not new_text:
+        return JsonResponse({"success": False, "error": "Неверные данные."}, status=400)
+
+    message = SupportMessage.objects.filter(pk=message_id).first()
+    if message is None:
+        return JsonResponse(
+            {"success": False, "error": "Сообщение не найдено."},
+            status=404,
+        )
+    if not message.is_from_admin:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Можно редактировать только сообщения администратора.",
+            },
+            status=403,
+        )
+    if not can_edit_support_message(message):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Сообщение можно редактировать только в течение 15 минут после отправки.",
+            },
+            status=400,
+        )
+
+    updated_message = update_support_message_text(message=message, text=new_text)
+    return JsonResponse(
+        {
+            "success": True,
+            "message_id": updated_message.pk,
+            "edited_at": (
+                updated_message.edited_at.isoformat()
+                if updated_message.edited_at
+                else None
+            ),
+        }
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def support_admin_delete_message(request: HttpRequest) -> JsonResponse:
+    """Удалить сообщение администратора в диалоге поддержки.
+
+    Args:
+        request (HttpRequest): HTTP-запрос с JSON payload (message_id).
+
+    Returns:
+        JsonResponse: Результат удаления сообщения.
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({"success": False, "error": "forbidden"}, status=403)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = request.POST
+
+    message_id = int(payload.get("message_id") or 0)
+    if not message_id:
+        return JsonResponse({"success": False, "error": "Неверные данные."}, status=400)
+
+    message = (
+        SupportMessage.objects.select_related("thread").filter(pk=message_id).first()
+    )
+    if message is None:
+        return JsonResponse(
+            {"success": False, "error": "Сообщение не найдено."},
+            status=404,
+        )
+    if not message.is_from_admin:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Можно удалять только сообщения администратора.",
+            },
+            status=403,
+        )
+    if not can_delete_support_message(message):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Сообщение нельзя удалить.",
+            },
+            status=400,
+        )
+
+    delete_support_message(message=message)
+    return JsonResponse({"success": True, "message_id": message_id})
 
 
 @login_required

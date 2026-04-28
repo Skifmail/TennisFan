@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import cast
 
 from django.db.models import QuerySet, Sum
@@ -26,6 +27,40 @@ class SupportAuthor:
     guest_email: str
     guest_name: str
     guest_session_key: str
+
+
+SUPPORT_MESSAGE_EDIT_WINDOW = timedelta(minutes=15)
+
+
+def can_edit_support_message(
+    message: SupportMessage, *, now: datetime | None = None
+) -> bool:
+    """Проверить, можно ли редактировать сообщение.
+
+    Args:
+        message (SupportMessage): Сообщение поддержки.
+        now (datetime | None): Текущее время для проверки окна редактирования.
+
+    Returns:
+        bool: True, если сообщение попадает в окно редактирования.
+    """
+    now_value = now or timezone.now()
+    return bool((now_value - message.created_at) <= SUPPORT_MESSAGE_EDIT_WINDOW)
+
+
+def can_delete_support_message(
+    message: SupportMessage, *, now: datetime | None = None
+) -> bool:
+    """Проверить, можно ли удалить сообщение.
+
+    Args:
+        message (SupportMessage): Сообщение поддержки.
+        now (datetime | None): Текущее время для проверки окна удаления.
+
+    Returns:
+        bool: True, если сообщение можно удалить.
+    """
+    return True
 
 
 def _resolve_thread(author: SupportAuthor) -> SupportThread:
@@ -124,6 +159,58 @@ def create_admin_reply(*, thread: SupportThread, text: str) -> SupportMessage:
         ]
     )
     return cast(SupportMessage, message)
+
+
+def update_support_message_text(
+    *, message: SupportMessage, text: str
+) -> SupportMessage:
+    """Обновить текст сообщения поддержки и отметить факт редактирования.
+
+    Args:
+        message (SupportMessage): Сообщение для обновления.
+        text (str): Новый текст сообщения.
+
+    Returns:
+        SupportMessage: Обновленный объект сообщения.
+    """
+    message.text = text
+    message.edited_at = timezone.now()
+    message.save(update_fields=["text", "edited_at"])
+    return cast(SupportMessage, message)
+
+
+def delete_support_message(*, message: SupportMessage) -> None:
+    """Удалить сообщение поддержки и синхронизировать агрегаты диалога.
+
+    Args:
+        message (SupportMessage): Сообщение для удаления.
+
+    Returns:
+        None: Функция ничего не возвращает.
+    """
+    thread = message.thread
+    latest_before_delete = thread.messages.order_by("-created_at", "-id").first()
+    is_latest_message = bool(
+        latest_before_delete and latest_before_delete.id == message.id
+    )
+    is_admin_message = bool(message.is_from_admin)
+    message.delete()
+
+    update_fields: list[str] = ["updated_at"]
+    if is_admin_message and thread.user_unread_count > 0:
+        # В модели нет per-message read-флага, поэтому корректируем счетчик
+        # по нижней границе, чтобы не уходить в отрицательные значения.
+        thread.user_unread_count = max(thread.user_unread_count - 1, 0)
+        update_fields.append("user_unread_count")
+
+    if is_latest_message:
+        latest_message = thread.messages.order_by("-created_at", "-id").first()
+        thread.last_message_at = (
+            latest_message.created_at if latest_message else timezone.now()
+        )
+        update_fields.append("last_message_at")
+
+    thread.save(update_fields=update_fields)
 
 
 def mark_thread_read_by_user(thread: SupportThread) -> None:

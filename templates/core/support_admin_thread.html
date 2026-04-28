@@ -23,14 +23,45 @@
             <div class="feedback-chat-widget__messages" id="support-admin-messages-container">
                 <div class="feedback-chat-widget__messages-list">
                     {% for message in messages_list %}
-                    <div class="feedback-chat-widget__message {% if message.is_from_admin %}feedback-chat-widget__message--admin{% else %}feedback-chat-widget__message--user{% endif %}">
-                        <div class="feedback-chat-widget__message-time" style="margin-bottom: 4px; font-weight: 700;">
+                    <div
+                        class="feedback-chat-widget__message {% if message.is_from_admin %}feedback-chat-widget__message--admin{% else %}feedback-chat-widget__message--user{% endif %}"
+                        style="margin-bottom: 12px; border-radius: 12px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(4, 48, 43, 0.45);"
+                    >
+                        <div class="feedback-chat-widget__message-time" style="margin-bottom: 6px; font-weight: 700;">
                             {% if message.is_from_admin %}Администратор{% else %}Пользователь{% endif %}
                         </div>
                         <div class="feedback-chat-widget__message-bubble" style="{% if message.is_from_admin %}background: rgba(166, 130, 74, 0.28); border: 1px solid rgba(166, 130, 74, 0.55);{% else %}background: rgba(0, 131, 116, 0.30); border: 1px solid rgba(0, 210, 180, 0.45); color: #ffffff;{% endif %}">
                             {{ message.text }}
                         </div>
-                        <div class="feedback-chat-widget__message-time">{{ message.created_at|date:"d.m.Y H:i" }}</div>
+                        {% if message.can_edit or message.can_delete %}
+                        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+                            {% if message.can_edit %}
+                            <button
+                                type="button"
+                                class="btn btn-ghost js-support-admin-edit-btn"
+                                data-message-id="{{ message.id }}"
+                                data-message-text="{{ message.text|escape }}"
+                                style="padding:4px 8px;font-size:12px;"
+                            >
+                                Редактировать
+                            </button>
+                            {% endif %}
+                            {% if message.can_delete %}
+                            <button
+                                type="button"
+                                class="btn btn-ghost js-support-admin-delete-btn"
+                                data-message-id="{{ message.id }}"
+                                style="padding:4px 8px;font-size:12px;"
+                            >
+                                Удалить
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        <div class="feedback-chat-widget__message-time" style="margin-top: 8px;">
+                            {% if message.is_from_admin %}Администратор{% else %}Пользователь{% endif %}
+                            · {{ message.created_at|date:"d.m.Y H:i" }}{% if message.edited_at %} · изменено{% endif %}
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -55,10 +86,21 @@
 </div>
 <script>
 (function () {
+    var messagesContainer = document.getElementById("support-admin-messages-container");
     var input = document.getElementById("support-admin-reply-input");
     var button = document.getElementById("support-admin-reply-btn");
     var errorNode = document.getElementById("support-admin-reply-error");
+    var editButtons = document.querySelectorAll(".js-support-admin-edit-btn");
+    var deleteButtons = document.querySelectorAll(".js-support-admin-delete-btn");
+    var threadId = Number("{{ thread.id }}");
     if (!input || !button) return;
+
+    function scrollMessagesToBottom() {
+        if (!messagesContainer) return;
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    scrollMessagesToBottom();
 
     function getCookie(name) {
         var match = document.cookie.match(new RegExp("(?:^|; )" + name.replace(/([.$?*|{}()[\]\\/+^])/g, "\\$1") + "=([^;]*)"));
@@ -76,6 +118,7 @@
         xhr.onload = function () {
             button.disabled = false;
             if (xhr.status >= 200 && xhr.status < 300) {
+                sessionStorage.setItem("supportAdminScrollBottom", "1");
                 window.location.reload();
                 return;
             }
@@ -91,7 +134,7 @@
                 errorNode.style.display = "block";
             }
         };
-        xhr.send(JSON.stringify({ thread_id: {{ thread.id }}, text: text }));
+        xhr.send(JSON.stringify({ thread_id: threadId, text: text }));
     }
 
     button.addEventListener("click", sendReply);
@@ -101,6 +144,207 @@
             sendReply();
         }
     });
+
+    function openEditModal(initialText, onSubmit) {
+        var overlay = document.createElement("div");
+        overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:12000;padding:16px;";
+
+        var modal = document.createElement("div");
+        modal.style.cssText = "width:min(560px,100%);background:#062d29;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:16px;box-shadow:0 20px 40px rgba(0,0,0,.45);";
+
+        var title = document.createElement("div");
+        title.textContent = "Редактировать сообщение";
+        title.style.cssText = "font-weight:700;color:#fff;margin-bottom:10px;";
+
+        var textarea = document.createElement("textarea");
+        textarea.value = initialText || "";
+        textarea.maxLength = 2000;
+        textarea.style.cssText = "width:100%;min-height:110px;resize:vertical;background:rgba(0,0,0,.2);color:#fff;border:1px solid rgba(255,255,255,.24);border-radius:10px;padding:10px;";
+
+        var actions = document.createElement("div");
+        actions.style.cssText = "display:flex;gap:10px;justify-content:flex-end;margin-top:12px;";
+
+        var cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "btn btn-ghost";
+        cancelBtn.textContent = "Отмена";
+
+        var saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.className = "btn btn-primary";
+        saveBtn.textContent = "Сохранить";
+
+        actions.appendChild(cancelBtn);
+        actions.appendChild(saveBtn);
+        modal.appendChild(title);
+        modal.appendChild(textarea);
+        modal.appendChild(actions);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+        function closeModal() {
+            if (overlay && overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+        }
+
+        cancelBtn.addEventListener("click", closeModal);
+        overlay.addEventListener("click", function (event) {
+            if (event.target === overlay) closeModal();
+        });
+        textarea.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeModal();
+            }
+            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                event.preventDefault();
+                saveBtn.click();
+            }
+        });
+
+        saveBtn.addEventListener("click", function () {
+            var nextText = (textarea.value || "").trim();
+            if (!nextText || nextText === (initialText || "")) {
+                closeModal();
+                return;
+            }
+            closeModal();
+            onSubmit(nextText);
+        });
+    }
+
+    function editMessage(messageId, nextText) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "{% url 'support_admin_update_message' %}");
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("X-CSRFToken", getCookie("csrftoken") || "");
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                window.location.reload();
+                return;
+            }
+            if (errorNode) {
+                errorNode.textContent = "Не удалось отредактировать сообщение.";
+                errorNode.style.display = "block";
+            }
+        };
+        xhr.onerror = function () {
+            if (errorNode) {
+                errorNode.textContent = "Ошибка сети.";
+                errorNode.style.display = "block";
+            }
+        };
+        xhr.send(JSON.stringify({ message_id: messageId, text: nextText }));
+    }
+
+    function openConfirmModal(text, onConfirm) {
+        var overlay = document.createElement("div");
+        overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:12000;padding:16px;";
+
+        var modal = document.createElement("div");
+        modal.style.cssText = "width:min(480px,100%);background:#062d29;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:16px;box-shadow:0 20px 40px rgba(0,0,0,.45);";
+
+        var title = document.createElement("div");
+        title.textContent = "Удалить сообщение?";
+        title.style.cssText = "font-weight:700;color:#fff;margin-bottom:8px;";
+
+        var body = document.createElement("div");
+        body.textContent = text || "Это действие нельзя отменить.";
+        body.style.cssText = "color:rgba(255,255,255,.88);margin-bottom:12px;";
+
+        var actions = document.createElement("div");
+        actions.style.cssText = "display:flex;gap:10px;justify-content:flex-end;";
+
+        var cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "btn btn-ghost";
+        cancelBtn.textContent = "Отмена";
+
+        var deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "btn btn-primary";
+        deleteBtn.textContent = "Удалить";
+
+        actions.appendChild(cancelBtn);
+        actions.appendChild(deleteBtn);
+        modal.appendChild(title);
+        modal.appendChild(body);
+        modal.appendChild(actions);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        function closeModal() {
+            if (overlay && overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+        }
+
+        cancelBtn.addEventListener("click", closeModal);
+        overlay.addEventListener("click", function (event) {
+            if (event.target === overlay) closeModal();
+        });
+        deleteBtn.addEventListener("click", function () {
+            closeModal();
+            onConfirm();
+        });
+    }
+
+    function deleteMessage(messageId) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "{% url 'support_admin_delete_message' %}");
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("X-CSRFToken", getCookie("csrftoken") || "");
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                sessionStorage.setItem("supportAdminScrollBottom", "1");
+                window.location.reload();
+                return;
+            }
+            if (errorNode) {
+                errorNode.textContent = "Не удалось удалить сообщение.";
+                errorNode.style.display = "block";
+            }
+        };
+        xhr.onerror = function () {
+            if (errorNode) {
+                errorNode.textContent = "Ошибка сети.";
+                errorNode.style.display = "block";
+            }
+        };
+        xhr.send(JSON.stringify({ message_id: messageId }));
+    }
+
+    editButtons.forEach(function (editBtn) {
+        editBtn.addEventListener("click", function () {
+            var messageId = Number(editBtn.getAttribute("data-message-id") || "0");
+            var messageText = editBtn.getAttribute("data-message-text") || "";
+            if (!messageId) return;
+            openEditModal(messageText, function (nextText) {
+                editMessage(messageId, nextText);
+            });
+        });
+    });
+
+    deleteButtons.forEach(function (deleteBtn) {
+        deleteBtn.addEventListener("click", function () {
+            var messageId = Number(deleteBtn.getAttribute("data-message-id") || "0");
+            if (!messageId) return;
+            openConfirmModal(
+                "Сообщение будет удалено из диалога.",
+                function () {
+                    deleteMessage(messageId);
+                }
+            );
+        });
+    });
+
+    if (sessionStorage.getItem("supportAdminScrollBottom") === "1") {
+        sessionStorage.removeItem("supportAdminScrollBottom");
+        scrollMessagesToBottom();
+    }
 })();
 </script>
 {% endblock %}

@@ -196,6 +196,7 @@
                         <span class="court-rate-stars__star">★</span>
                     </label>
                     {% endfor %}
+                    <span class="court-rate-stars__value" id="court-rate-stars-value" aria-live="polite">0/5</span>
                 </div>
                 <label for="court-comment-text" class="form-label">Текст комментария (обязательно)</label>
                 <textarea name="text" id="court-comment-text" class="form-control mb-2" rows="3" maxlength="2000" placeholder="Напишите ваш отзыв о корте..." required></textarea>
@@ -507,10 +508,14 @@
 .court-rate-stars { display: flex; gap: 0.25rem; align-items: center; }
 .court-rate-stars__input { position: absolute; opacity: 0; }
 .court-rate-stars__label { cursor: pointer; }
-.court-rate-stars__star { font-size: 1.5rem; color: var(--color-text-muted); }
-.court-rate-stars__label:hover .court-rate-stars__star,
-.court-rate-stars__input:checked ~ .court-rate-stars__star { color: var(--color-primary); }
-.court-rate-stars__label:has(.court-rate-stars__input:checked) .court-rate-stars__star { color: var(--color-primary); }
+.court-rate-stars__star { font-size: 1.5rem; color: var(--color-text-muted); transition: color 0.15s ease; }
+.court-rate-stars__star.is-active { color: var(--color-primary); }
+.court-rate-stars__value {
+    margin-left: 0.5rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    min-width: 2.5rem;
+}
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -647,6 +652,70 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     applyPhoto(currentIndex, false);
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var starsContainer = document.querySelector('.court-rate-stars');
+    if (!starsContainer) {
+        return;
+    }
+    var starsValue = document.getElementById('court-rate-stars-value');
+
+    var starLabels = Array.prototype.slice.call(starsContainer.querySelectorAll('.court-rate-stars__label'));
+    if (!starLabels.length) {
+        return;
+    }
+
+    function setActiveStars(score) {
+        starLabels.forEach(function (label) {
+            var input = label.querySelector('.court-rate-stars__input');
+            var star = label.querySelector('.court-rate-stars__star');
+            if (!input || !star) {
+                return;
+            }
+            var currentScore = Number(input.value || 0);
+            star.classList.toggle('is-active', currentScore <= score);
+        });
+        if (starsValue) {
+            starsValue.textContent = String(score) + '/5';
+        }
+    }
+
+    function getSelectedScore() {
+        var checkedInput = starsContainer.querySelector('.court-rate-stars__input:checked');
+        return checkedInput ? Number(checkedInput.value || 0) : 0;
+    }
+
+    starLabels.forEach(function (label) {
+        var input = label.querySelector('.court-rate-stars__input');
+        if (!input) {
+            return;
+        }
+        var score = Number(input.value || 0);
+
+        label.addEventListener('mouseenter', function () {
+            setActiveStars(score);
+        });
+
+        label.addEventListener('click', function () {
+            setActiveStars(score);
+        });
+
+        input.addEventListener('focus', function () {
+            setActiveStars(score);
+        });
+
+        input.addEventListener('change', function () {
+            setActiveStars(score);
+        });
+    });
+
+    starsContainer.addEventListener('mouseleave', function () {
+        setActiveStars(getSelectedScore());
+    });
+
+    setActiveStars(getSelectedScore());
 });
 </script>
 {% if court_has_coords and yandex_maps_api_key %}

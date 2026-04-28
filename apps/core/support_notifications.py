@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import cast
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives, get_connection
+from django.db import connection
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
@@ -147,3 +149,45 @@ def send_user_support_reply(message: SupportMessage) -> bool:
     except Exception:
         logger.exception("send_user_support_reply failed")
         return False
+
+
+def _send_user_support_reply_in_background(message_id: int) -> None:
+    """Отправить email-ответ поддержки в фоновом потоке.
+
+    Args:
+        message_id (int): Идентификатор сообщения администратора.
+
+    Returns:
+        None: Функция ничего не возвращает.
+    """
+    connection.close()
+    try:
+        message = SupportMessage.objects.select_related("thread", "thread__user").get(
+            pk=message_id
+        )
+    except SupportMessage.DoesNotExist:
+        logger.warning("support reply message not found: id=%s", message_id)
+        return
+    except Exception:
+        logger.exception("failed to load support reply message: id=%s", message_id)
+        return
+
+    send_user_support_reply(message)
+
+
+def send_user_support_reply_async(message: SupportMessage) -> None:
+    """Запустить отправку email-ответа поддержки в фоне.
+
+    Args:
+        message (SupportMessage): Сообщение администратора.
+
+    Returns:
+        None: Функция ничего не возвращает.
+    """
+    thread = threading.Thread(
+        target=_send_user_support_reply_in_background,
+        args=(int(message.pk),),
+        daemon=True,
+        name=f"support_reply_email_{message.pk}",
+    )
+    thread.start()

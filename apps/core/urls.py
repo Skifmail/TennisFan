@@ -28,6 +28,11 @@ urlpatterns = [
     path("api/feedback/submit/", views.feedback_submit, name="feedback_submit"),
     path("api/feedback/threads/", views.feedback_threads, name="feedback_threads"),
     path(
+        "api/feedback/message/update/",
+        views.feedback_message_update,
+        name="feedback_message_update",
+    ),
+    path(
         "api/feedback/unread-count/",
         views.feedback_unread_count,
         name="feedback_unread_count",
@@ -42,6 +47,16 @@ urlpatterns = [
         "api/support/admin/reply/",
         views.support_admin_reply,
         name="support_admin_reply",
+    ),
+    path(
+        "api/support/admin/message/update/",
+        views.support_admin_update_message,
+        name="support_admin_update_message",
+    ),
+    path(
+        "api/support/admin/message/delete/",
+        views.support_admin_delete_message,
+        name="support_admin_delete_message",
     ),
     path(
         "api/support/admin/unread-count/",

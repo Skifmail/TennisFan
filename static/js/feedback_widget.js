@@ -29,6 +29,7 @@
 
     var submitUrl = widget.getAttribute("data-submit-url");
     var threadsUrl = widget.getAttribute("data-threads-url");
+    var updateMessageUrl = widget.getAttribute("data-update-message-url");
     var unreadCountUrl = widget.getAttribute("data-unread-count-url");
     var adminUnreadCountUrl = widget.getAttribute("data-admin-unread-count-url");
     var adminSupportUrl = widget.getAttribute("data-admin-support-url");
@@ -149,6 +150,9 @@
                                 text: msg.text,
                                 isFromAdmin: msg.is_from_admin,
                                 createdAt: msg.created_at,
+                                isEdited: !!msg.is_edited,
+                                editedAt: msg.edited_at || null,
+                                canEdit: !!msg.can_edit,
                             });
                             if (!chatState.lastMessageId || msg.id > chatState.lastMessageId) {
                                 chatState.lastMessageId = msg.id;
@@ -193,12 +197,20 @@
             var bubbleStyle = isUser
                 ? "background: rgba(0, 131, 116, 0.30); border: 1px solid rgba(0, 210, 180, 0.45); color: #ffffff;"
                 : "background: rgba(166, 130, 74, 0.28); border: 1px solid rgba(166, 130, 74, 0.55);";
+            var canEdit = isUser && !!msg.canEdit;
 
-            html += '<div class="feedback-chat-widget__message ' + messageClass + '">';
+            html += '<div class="feedback-chat-widget__message ' + messageClass + '" data-message-id="' + String(msg.id) + '" style="margin-bottom:12px;border-radius:12px;padding:10px 12px;border:1px solid rgba(255,255,255,0.12);background:rgba(4, 48, 43, 0.45);">';
             html += '<div class="feedback-chat-widget__message-time" style="margin-bottom:4px;font-weight:700;">' + authorLabel + "</div>";
             html += '<div class="feedback-chat-widget__message-bubble" style="' + bubbleStyle + '">' + escapeHtml(msg.text) + "</div>";
+            if (canEdit) {
+                html += '<button type="button" class="btn btn-ghost feedback-chat-widget__edit-btn" data-edit-message-id="' + String(msg.id) + '" style="margin-top:6px;padding:4px 8px;font-size:12px;">Редактировать</button>';
+            }
             if (timeStr) {
-                html += '<div class="feedback-chat-widget__message-time">' + escapeHtml(timeStr) + "</div>";
+                html += '<div class="feedback-chat-widget__message-time" style="margin-top:8px;">' + escapeHtml(authorLabel) + " · " + escapeHtml(timeStr);
+                if (msg.isEdited) {
+                    html += ' · изменено';
+                }
+                html += "</div>";
             }
             html += "</div>";
         });
@@ -358,12 +370,13 @@
                     var data = JSON.parse(xhr.responseText);
                     var threads = data.threads || [];
                     var newMessages = [];
+            var hasUpdates = false;
 
                     threads.forEach(function (thread) {
                         if (thread.messages && thread.messages.length) {
                             thread.messages.forEach(function (msg) {
                                 // Проверяем, есть ли это сообщение уже в нашем списке
-                                var exists = chatState.messages.some(function (m) {
+                        var exists = chatState.messages.some(function (m) {
                                     return m.id === msg.id;
                                 });
                                 if (!exists) {
@@ -372,14 +385,35 @@
                                         text: msg.text,
                                         isFromAdmin: msg.is_from_admin,
                                         createdAt: msg.created_at,
+                                isEdited: !!msg.is_edited,
+                                editedAt: msg.edited_at || null,
+                                canEdit: !!msg.can_edit,
                                     });
+                        } else {
+                            var existingMessage = chatState.messages.find(function (m) {
+                                return m.id === msg.id;
+                            });
+                            if (
+                                existingMessage
+                                && (
+                                    existingMessage.text !== msg.text
+                                    || existingMessage.isEdited !== !!msg.is_edited
+                                    || existingMessage.canEdit !== !!msg.can_edit
+                                )
+                            ) {
+                                existingMessage.text = msg.text;
+                                existingMessage.isEdited = !!msg.is_edited;
+                                existingMessage.editedAt = msg.edited_at || null;
+                                existingMessage.canEdit = !!msg.can_edit;
+                                hasUpdates = true;
+                            }
                                 }
                             });
                         }
                     });
 
                     // Добавляем новые сообщения
-                    if (newMessages.length > 0) {
+                    if (newMessages.length > 0 || hasUpdates) {
                         newMessages.forEach(function (msg) {
                             chatState.messages.push(msg);
                             if (!chatState.lastMessageId || msg.id > chatState.lastMessageId) {
@@ -502,6 +536,125 @@
     if (sendBtn) {
         sendBtn.addEventListener("click", sendMessage);
         sendBtn.disabled = true; // Начинаем с отключенной кнопки
+    }
+
+    function openEditModal(initialText, onSubmit) {
+        var overlay = document.createElement("div");
+        overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:12000;padding:16px;";
+
+        var modal = document.createElement("div");
+        modal.style.cssText = "width:min(560px,100%);background:#062d29;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:16px;box-shadow:0 20px 40px rgba(0,0,0,.45);";
+
+        var title = document.createElement("div");
+        title.textContent = "Редактировать сообщение";
+        title.style.cssText = "font-weight:700;color:#fff;margin-bottom:10px;";
+
+        var textarea = document.createElement("textarea");
+        textarea.value = initialText || "";
+        textarea.maxLength = 2000;
+        textarea.style.cssText = "width:100%;min-height:110px;resize:vertical;background:rgba(0,0,0,.2);color:#fff;border:1px solid rgba(255,255,255,.24);border-radius:10px;padding:10px;";
+
+        var actions = document.createElement("div");
+        actions.style.cssText = "display:flex;gap:10px;justify-content:flex-end;margin-top:12px;";
+
+        var cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "btn btn-ghost";
+        cancelBtn.textContent = "Отмена";
+
+        var saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.className = "btn btn-primary";
+        saveBtn.textContent = "Сохранить";
+
+        actions.appendChild(cancelBtn);
+        actions.appendChild(saveBtn);
+        modal.appendChild(title);
+        modal.appendChild(textarea);
+        modal.appendChild(actions);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+        function closeModal() {
+            if (overlay && overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+        }
+
+        cancelBtn.addEventListener("click", closeModal);
+        overlay.addEventListener("click", function (event) {
+            if (event.target === overlay) closeModal();
+        });
+        textarea.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeModal();
+            }
+            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                event.preventDefault();
+                saveBtn.click();
+            }
+        });
+
+        saveBtn.addEventListener("click", function () {
+            var nextText = (textarea.value || "").trim();
+            if (!nextText || nextText === (initialText || "")) {
+                closeModal();
+                return;
+            }
+            closeModal();
+            onSubmit(nextText);
+        });
+    }
+
+    if (messagesList) {
+        messagesList.addEventListener("click", function (event) {
+            var editButton = event.target.closest("[data-edit-message-id]");
+            if (!editButton || !updateMessageUrl) return;
+            var messageId = Number(editButton.getAttribute("data-edit-message-id") || 0);
+            if (!messageId) return;
+            var message = chatState.messages.find(function (item) {
+                return item.id === messageId;
+            });
+            if (!message || !message.canEdit || message.isFromAdmin) return;
+            openEditModal(message.text || "", function (newText) {
+                var token = csrfToken || getCookie("csrftoken");
+                var xhr = new XMLHttpRequest();
+                xhr.open("POST", updateMessageUrl);
+                xhr.setRequestHeader("Content-Type", "application/json");
+                xhr.setRequestHeader("X-CSRFToken", token || "");
+                xhr.onload = function () {
+                    try {
+                        var data = JSON.parse(xhr.responseText || "{}");
+                        if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+                            message.text = newText;
+                            message.isEdited = true;
+                            message.editedAt = data.edited_at || null;
+                            renderMessages();
+                            return;
+                        }
+                        if (formError) {
+                            formError.textContent = data.error || "Не удалось отредактировать сообщение.";
+                            formError.style.display = "block";
+                        }
+                    } catch (e) {
+                        if (formError) {
+                            formError.textContent = "Не удалось отредактировать сообщение.";
+                            formError.style.display = "block";
+                        }
+                    }
+                };
+                xhr.onerror = function () {
+                    if (formError) {
+                        formError.textContent = "Ошибка сети.";
+                        formError.style.display = "block";
+                    }
+                };
+                xhr.send(JSON.stringify({ message_id: messageId, text: newText }));
+            });
+        });
     }
 
     if (!isPlatformAdmin && window.location.search.indexOf("open_support=1") !== -1) {

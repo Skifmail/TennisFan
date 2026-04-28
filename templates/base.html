@@ -318,7 +318,7 @@
 
     <!-- Плавающая кнопка «Написать нам» -->
     {% if not is_club_panel or not club %}
-    <div id="feedback-widget" class="feedback-widget" data-submit-url="{% url 'feedback_submit' %}" data-threads-url="{% url 'feedback_threads' %}" data-unread-count-url="{% url 'feedback_unread_count' %}" data-admin-unread-count-url="{% url 'support_admin_unread_count' %}" data-admin-support-url="{% url 'support_admin_list' %}" data-csrf="{{ csrf_token }}" data-is-authenticated="{% if user.is_authenticated %}1{% else %}0{% endif %}" data-is-platform-admin="{% if user.is_authenticated and user.is_staff or user.is_authenticated and user.is_superuser %}1{% else %}0{% endif %}">
+    <div id="feedback-widget" class="feedback-widget" data-submit-url="{% url 'feedback_submit' %}" data-threads-url="{% url 'feedback_threads' %}" data-update-message-url="{% url 'feedback_message_update' %}" data-unread-count-url="{% url 'feedback_unread_count' %}" data-admin-unread-count-url="{% url 'support_admin_unread_count' %}" data-admin-support-url="{% url 'support_admin_list' %}" data-csrf="{{ csrf_token }}" data-is-authenticated="{% if user.is_authenticated %}1{% else %}0{% endif %}" data-is-platform-admin="{% if user.is_authenticated and user.is_staff or user.is_authenticated and user.is_superuser %}1{% else %}0{% endif %}">
         <!-- Кнопка открытия чата -->
         <button type="button" class="feedback-widget__btn" id="feedback-widget-btn" aria-label="{% if user.is_authenticated and user.is_staff or user.is_authenticated and user.is_superuser %}Сообщений нет{% else %}Написать нам{% endif %}">
             <span class="feedback-widget__icon" aria-hidden="true">

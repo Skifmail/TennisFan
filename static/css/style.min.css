@@ -756,31 +756,6 @@ button {
     box-shadow: 0 0 0 3px rgb(255 42 42 / 35%), 0 8px 18px rgb(255 42 42 / 55%);
 }
 
-.feedback-widget__badge {
-    position: absolute;
-    top: -9px;
-    right: -9px;
-    min-width: 24px;
-    height: 24px;
-    padding: 0 7px;
-    border-radius: 999px;
-    background: #ff2a2a;
-    color: #fff;
-    border: 2px solid #fff;
-    font-size: 13px;
-    font-weight: 800;
-    line-height: 20px;
-    text-align: center;
-    text-shadow:
-        -1px -1px 0 #b30000,
-        1px -1px 0 #b30000,
-        -1px 1px 0 #b30000,
-        1px 1px 0 #b30000,
-        0 0 10px rgb(255 40 40 / 75%);
-    box-shadow: 0 0 0 3px rgb(255 42 42 / 35%), 0 8px 18px rgb(255 42 42 / 55%);
-    animation: feedback-widget-pulse 1.4s ease-in-out infinite;
-}
-
 /* Navigation Dropdown: кнопка и меню */
 .nav-dropdown {
     position: relative;
@@ -7249,6 +7224,31 @@ body.has-fullscreen-loader {
     margin-left: 0;
 }
 
+.feedback-widget__badge {
+    position: absolute;
+    top: -9px;
+    right: -9px;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: #ff2a2a;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 20px;
+    text-align: center;
+    text-shadow:
+        -1px -1px 0 #b30000,
+        1px -1px 0 #b30000,
+        -1px 1px 0 #b30000,
+        1px 1px 0 #b30000,
+        0 0 10px rgb(255 40 40 / 75%);
+    box-shadow: 0 0 0 3px rgb(255 42 42 / 35%), 0 8px 18px rgb(255 42 42 / 55%);
+    animation: feedback-widget-pulse 1.4s ease-in-out infinite;
+}
+
 /* END feedback.css */
 
 /* BEGIN autocomplete.css */
@@ -12547,6 +12547,60 @@ a.match-details-value__lead:hover {
     flex: 1;
 }
 
+.hero-metric--link {
+    position: relative;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    transition: transform var(--transition-base), border-color var(--transition-base),
+        background-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.hero-metric--link::after {
+    content: "↗";
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity var(--transition-base), transform var(--transition-base),
+        color var(--transition-base);
+}
+
+.hero-metric--link:hover {
+    transform: translateY(-2px);
+    border-color: rgba(111, 220, 141, 0.45);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.hero-metric--link:hover::after {
+    opacity: 1;
+    transform: translateY(0);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.hero-metric--link:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 2px;
+}
+
+.hero-metric--link .hero-metric__label {
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    transition: text-decoration-color var(--transition-base), color var(--transition-base);
+}
+
+.hero-metric--link:hover .hero-metric__label {
+    color: rgba(255, 255, 255, 0.95);
+    text-decoration-color: rgba(255, 255, 255, 0.45);
+}
+
 .hero-metric__value {
     font-size: var(--font-size-3xl);
     font-weight: 700;
@@ -13080,6 +13134,10 @@ a.match-details-value__lead:hover {
     align-items: center;
 }
 
+#home-tournaments-block .home-tournaments-mobile-list {
+    display: none;
+}
+
 /* Для нативных select на мобильных: убираем transform-анимацию карточки фильтра,
    иначе popup списка может позиционироваться со смещением. */
 .main #home-tournaments-filter.card,
@@ -13420,6 +13478,18 @@ a.match-details-value__lead:hover {
 }
 
 @media (max-width: 768px) {
+    #home-tournaments-block .home-tournaments-desktop-table {
+        display: none;
+    }
+
+    #home-tournaments-block .home-tournaments-mobile-list {
+        display: block;
+    }
+
+    #home-tournaments-block .home-tournaments-mobile-list .tournament-list {
+        margin-top: var(--spacing-sm);
+    }
+
     /* Главная под hero: компактные карточки турниров только в home-блоке */
     #home-tournaments-block .tournament-table-wrapper {
         margin-top: var(--spacing-sm);

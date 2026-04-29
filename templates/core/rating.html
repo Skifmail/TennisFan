@@ -12,7 +12,12 @@
 <div class="container">
     <!-- Filters -->
     <form method="get" class="filter-bar">
-        <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}">
+        <select name="city" class="form-control">
+            <option value="">Любой город России</option>
+            {% for city in city_options %}
+            <option value="{{ city }}" {% if current_city == city %}selected{% endif %}>{{ city }}</option>
+            {% endfor %}
+        </select>
         <select name="skill_level" class="form-control" onchange="this.form.submit()">
             <option value="">Все уровни</option>
             {% for value, label in skill_level_choices %}
@@ -94,7 +99,7 @@
                 <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
                 {% else %}
                 <li class="pagination__item">
-                    <a href="?page={{ page_num }}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_skill_level %}&skill_level={{ current_skill_level }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">{{ page_num }}</a>
+                    <a href="?page={{ page_num }}{% if current_city %}&city={{ current_city|urlencode }}{% endif %}{% if current_skill_level %}&skill_level={{ current_skill_level }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">{{ page_num }}</a>
                 </li>
                 {% endif %}
             {% endfor %}

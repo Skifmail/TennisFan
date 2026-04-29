@@ -63,12 +63,12 @@
                     </span>
                 </a>
                 <div class="hero-metric-divider"></div>
-                <div class="hero-metric">
+                <a href="{% url 'cities' %}" class="hero-metric hero-metric--link">
                     <span class="hero-metric__value">{{ hero_stats.cities_count|default:"0" }}</span>
                     <span class="hero-metric__label">
                         {{ hero_stats.cities_count|default:"0"|ru_pluralize:"город,города,городов" }}
                     </span>
-                </div>
+                </a>
                 <div class="hero-metric-divider"></div>
                 <a href="{% url 'coach_list' %}" class="hero-metric hero-metric--link">
                     <span class="hero-metric__value">{{ hero_stats.coaches_count|default:"0" }}</span>

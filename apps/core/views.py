@@ -86,6 +86,73 @@ from .text_search import filter_field_contains_ci
 logger = logging.getLogger(__name__)
 
 
+def _build_cities_map_payload() -> list[dict[str, Any]]:
+    """Собрать данные городов и игроков для карты."""
+    players = (
+        Player.objects.filter(is_bye=False)
+        .exclude(city__exact="")
+        .select_related("user")
+        .order_by("city", "-total_points", "id")
+    )
+    if not players:
+        return []
+
+    city_coords = {
+        row["name"]: (row["lat"], row["lng"])
+        for row in City.objects.exclude(lat__isnull=True)
+        .exclude(lng__isnull=True)
+        .values("name", "lat", "lng")
+    }
+    fallback_coords = {
+        "Москва": (55.7558, 37.6173),
+        "Санкт-Петербург": (59.9343, 30.3351),
+        "Казань": (55.7961, 49.1064),
+        "Екатеринбург": (56.8389, 60.6057),
+        "Новосибирск": (55.0084, 82.9357),
+    }
+
+    grouped: dict[str, dict[str, Any]] = {}
+    next_city_id = 1
+
+    for player in players:
+        city_name = (player.city or "").strip()
+        if not city_name:
+            continue
+
+        if city_name not in grouped:
+            coords = city_coords.get(city_name) or fallback_coords.get(city_name)
+            if coords is None:
+                continue
+            grouped[city_name] = {
+                "id": next_city_id,
+                "name": city_name,
+                "lat": float(coords[0]),
+                "lng": float(coords[1]),
+                "players": [],
+            }
+            next_city_id += 1
+
+        full_name = str(player).strip()
+        grouped[city_name]["players"].append(
+            {
+                "id": player.pk,
+                "name": full_name,
+                "rating": int(round(float(player.total_points))),
+                "avatar_url": player.avatar.url if player.avatar else "",
+            }
+        )
+
+    result: list[dict[str, Any]] = []
+    for city in grouped.values():
+        city_players = city["players"]
+        city["players_count"] = len(city_players)
+        city["players"] = sorted(city_players, key=lambda p: p["rating"], reverse=True)
+        result.append(city)
+
+    result.sort(key=lambda city: (-city["players_count"], city["name"]))
+    return result
+
+
 def _make_aware_datetime(
     year: int,
     month: int,
@@ -841,16 +908,17 @@ def platform_players_export(request: HttpRequest) -> HttpResponse:
 @require_safe
 def api_cities(request: Any) -> JsonResponse:
     """
-    API автодополнения городов: GET /api/cities/?q=<query>.
+    API городов.
 
-    Возвращает JSON-список названий (макс. 10). Подсказки собираются из:
-    фактических значений ``Tournament.city`` (платформа и межклубные турниры) и
-    справочника ``City``. Поиск без учёта регистра, по подстроке (короткие префиксы
-    вроде «Мос»), без триграмм с порогом — они отсекали нормальные совпадения.
+    Режимы:
+      1. ``GET /api/cities/?q=<query>`` — автодополнение названий (обратная совместимость).
+      2. ``GET /api/cities/`` — данные городов и игроков для интерактивной карты.
     """
     q = (request.GET.get("q") or "").strip()
+    if not q:
+        return JsonResponse(_build_cities_map_payload(), safe=False)
     if len(q) < 2:
-        return JsonResponse([], safe=True)
+        return JsonResponse([], safe=False)
 
     q_cf = q.casefold()
     seen_keys: set[str] = set()
@@ -898,6 +966,24 @@ def api_cities(request: Any) -> JsonResponse:
         )
     )
     return JsonResponse(names[:10], safe=False)
+
+
+@require_safe
+def cities_page(request: HttpRequest) -> HttpResponse:
+    """Страница городов с интерактивной картой и списком игроков."""
+    cities_payload = _build_cities_map_payload()
+    total_players = sum(city["players_count"] for city in cities_payload)
+    most_active_city = ""
+    if cities_payload:
+        most_active_city = cities_payload[0]["name"]
+
+    context = {
+        "cities_count": len(cities_payload),
+        "players_count": total_players,
+        "most_active_city": most_active_city or "—",
+        "yandex_maps_api_key": getattr(settings, "YANDEX_MAPS_API_KEY", "") or "",
+    }
+    return render(request, "core/cities.html", context)
 
 
 @require_safe
@@ -1415,6 +1501,13 @@ def rating(request):
     page_number = request.GET.get("page")
     players_page = paginator.get_page(page_number)
 
+    city_options = (
+        Player.objects.exclude(city__exact="")
+        .values_list("city", flat=True)
+        .distinct()
+        .order_by("city")
+    )
+
     context = {
         "players": players_page,
         "players_page": players_page,
@@ -1431,6 +1524,7 @@ def rating(request):
         "current_city": city,
         "current_skill_level": skill_level,
         "search_query": search,
+        "city_options": list(city_options),
         "skill_level_choices": SkillLevel.choices,
         "current_season_display": f"{current_season.name} {current_season.year}",
     }

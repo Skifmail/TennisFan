@@ -448,6 +448,18 @@ class City(models.Model):
     """
 
     name = models.CharField("Название", max_length=100, unique=True, db_index=True)
+    lat = models.FloatField(
+        "Широта",
+        null=True,
+        blank=True,
+        help_text="Широта города для отображения на карте.",
+    )
+    lng = models.FloatField(
+        "Долгота",
+        null=True,
+        blank=True,
+        help_text="Долгота города для отображения на карте.",
+    )
 
     class Meta:
         verbose_name = "город"

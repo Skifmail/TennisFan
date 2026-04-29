@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Города игроков{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container cities-page">
+        <div class="page-header">
+            <h1 class="page-title">Города игроков</h1>
+            <p class="page-subtitle">Интерактивная карта географии игроков TennisFan</p>
+        </div>
+
+        <div class="cities-stats">
+            <article class="cities-stat-card">
+                <span class="cities-stat-card__label">Всего городов</span>
+                <span class="cities-stat-card__value" id="cities-count">{{ cities_count }}</span>
+            </article>
+            <article class="cities-stat-card">
+                <span class="cities-stat-card__label">Игроков на карте</span>
+                <span class="cities-stat-card__value" id="players-count">{{ players_count }}</span>
+            </article>
+            <article class="cities-stat-card">
+                <span class="cities-stat-card__label">Самый активный город</span>
+                <span class="cities-stat-card__value" id="most-active-city">{{ most_active_city }}</span>
+            </article>
+        </div>
+
+        <div class="cities-map-wrap">
+            <div id="cities-map" class="cities-map"></div>
+        </div>
+
+        <div class="cities-grid" id="cities-grid"></div>
+    </div>
+</section>
+
+<style>
+.cities-page { color: var(--color-text-primary); }
+.cities-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--spacing-md); margin-bottom: var(--spacing-xl); }
+.cities-stat-card { background: rgba(8, 28, 22, 0.95); border: 1px solid rgba(76, 175, 80, 0.35); border-radius: var(--radius-lg); padding: var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-xs); }
+.cities-stat-card__label { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.cities-stat-card__value { font-size: var(--font-size-2xl); font-weight: 700; color: #fff; }
+.cities-map-wrap { margin-bottom: var(--spacing-xl); }
+.cities-map { width: 100%; height: 60vh; min-height: 420px; background: #0d221a; border-radius: var(--radius-lg); border: 1px solid rgba(76, 175, 80, 0.35); overflow: hidden; }
+.cities-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacing-md); }
+.city-card { background: rgba(9, 26, 21, 0.98); border: 1px solid rgba(76, 175, 80, 0.24); border-radius: var(--radius-lg); padding: var(--spacing-md); cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease; }
+.city-card:hover { transform: translateY(-2px); border-color: rgba(76, 175, 80, 0.6); }
+.city-card__title { font-size: var(--font-size-lg); font-weight: 700; margin-bottom: var(--spacing-xs); }
+.city-card__count { color: #8fe89b; font-weight: 600; margin-bottom: var(--spacing-sm); }
+.city-card__top { display: flex; flex-direction: column; gap: 4px; color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.city-balloon { color: #10231b; min-width: 260px; max-width: 360px; }
+.city-balloon__title { font-size: 18px; font-weight: 700; margin-bottom: 10px; color: #10231b; }
+.city-balloon__list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.city-balloon__player { display: flex; align-items: center; gap: 10px; }
+.city-balloon__avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: rgba(255, 255, 255, 0.08); }
+.city-balloon__name { font-size: 14px; color: #10231b; }
+.city-balloon__rating { font-size: 12px; color: #8fe89b; }
+.city-balloon__link { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border-radius: 8px; background: #2f8f46; color: #fff; text-decoration: none; font-weight: 600; }
+@media (max-width: 1200px) { .cities-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .cities-stats { grid-template-columns: 1fr; } .cities-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .cities-grid { grid-template-columns: 1fr; } }
+</style>
+
+{% if yandex_maps_api_key %}
+<script src="https://api-maps.yandex.ru/2.1?apikey={{ yandex_maps_api_key }}&lang=ru_RU" type="text/javascript"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var mapElement = document.getElementById('cities-map');
+    var gridElement = document.getElementById('cities-grid');
+    if (!mapElement || !gridElement) {
+        return;
+    }
+
+    var mapInstance = null;
+    var placemarksByCity = {};
+    var citiesData = [];
+    var markerSvg = encodeURIComponent(
+        "<svg xmlns='http://www.w3.org/2000/svg' width='52' height='52' viewBox='0 0 52 52'>" +
+        "<circle cx='26' cy='26' r='21' fill='#2f8f46' stroke='#9df3aa' stroke-width='3'/>" +
+        "</svg>"
+    );
+    var markerIconUrl = "data:image/svg+xml;charset=UTF-8," + markerSvg;
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;');
+    }
+
+    function buildBalloonHtml(city) {
+        var playersHtml = (city.players || []).map(function (player) {
+            var avatar = player.avatar_url || "{% static 'images/avatar_placeholder.png' %}";
+            return (
+                '<div class="city-balloon__player">' +
+                '<img class="city-balloon__avatar" src="' + avatar + '" alt="">' +
+                '<div>' +
+                '<div class="city-balloon__name">' + escapeHtml(player.name) + '</div>' +
+                '<div class="city-balloon__rating">Рейтинг: ' + escapeHtml(player.rating) + '</div>' +
+                '</div>' +
+                '</div>'
+            );
+        }).join('');
+        var ratingUrl = "{% url 'rating' %}?" + new URLSearchParams({ city: city.name }).toString();
+        return (
+            '<div class="city-balloon">' +
+            '<div class="city-balloon__title">' + escapeHtml(city.name) + '</div>' +
+            '<div class="city-balloon__list">' + playersHtml + '</div>' +
+            '<a class="city-balloon__link" href="' + ratingUrl + '">Смотреть всех игроков из ' + escapeHtml(city.name) + '</a>' +
+            '</div>'
+        );
+    }
+
+    function renderCards() {
+        gridElement.innerHTML = '';
+        citiesData.forEach(function (city) {
+            var top3 = (city.players || []).slice(0, 3).map(function (player) {
+                return '<div>' + escapeHtml(player.name) + ' - ' + escapeHtml(player.rating) + '</div>';
+            }).join('');
+            var card = document.createElement('article');
+            card.className = 'city-card';
+            card.innerHTML =
+                '<div class="city-card__title">' + escapeHtml(city.name) + '</div>' +
+                '<div class="city-card__count">Игроков: ' + escapeHtml(city.players_count) + '</div>' +
+                '<div class="city-card__top">' + (top3 || '<div>Нет данных</div>') + '</div>';
+            card.addEventListener('click', function () {
+                var placemark = placemarksByCity[String(city.id)];
+                if (!placemark || !mapInstance) {
+                    return;
+                }
+                mapInstance.setCenter([city.lat, city.lng], 9, { duration: 250 });
+                placemark.balloon.open();
+            });
+            gridElement.appendChild(card);
+        });
+    }
+
+    function renderMap() {
+        mapInstance = new ymaps.Map('cities-map', {
+            center: [61.5, 105.3],
+            zoom: 3.5,
+            controls: ['zoomControl', 'fullscreenControl']
+        });
+
+        citiesData.forEach(function (city) {
+            var placemark = new ymaps.Placemark(
+                [city.lat, city.lng],
+                {
+                    balloonContent: buildBalloonHtml(city),
+                    iconContent: String(city.players_count)
+                },
+                {
+                    iconLayout: 'default#imageWithContent',
+                    iconImageHref: markerIconUrl,
+                    iconImageSize: [52, 52],
+                    iconImageOffset: [-26, -26],
+                    iconContentOffset: [20, 14],
+                    iconContentLayout: ymaps.templateLayoutFactory.createClass(
+                        '<div style="color:#fff;font-weight:700;font-size:16px;line-height:1;">$[properties.iconContent]</div>'
+                    ),
+                    hideIconOnBalloonOpen: false
+                }
+            );
+            placemarksByCity[String(city.id)] = placemark;
+            mapInstance.geoObjects.add(placemark);
+        });
+
+        window.addEventListener('resize', function () {
+            if (mapInstance && mapInstance.container) {
+                mapInstance.container.fitToViewport();
+            }
+        });
+    }
+
+    ymaps.ready(function () {
+        fetch("{% url 'api_cities' %}")
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                citiesData = Array.isArray(data) ? data : [];
+                renderCards();
+                renderMap();
+            })
+            .catch(function () {
+                gridElement.innerHTML = '<p class="text-secondary">Не удалось загрузить данные городов.</p>';
+            });
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

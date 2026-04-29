@@ -82,6 +82,15 @@
         wrap.setAttribute("role", "listbox");
         wrap.setAttribute("aria-hidden", "true");
         wrap.style.display = "none";
+        /* Дублируем критичные стили инлайном, чтобы список оставался читаемым
+           даже если тема/страница переопределяет CSS класса. */
+        wrap.style.background = "#ffffff";
+        wrap.style.border = "1px solid #cbd5e1";
+        wrap.style.borderRadius = "8px";
+        wrap.style.boxShadow = "0 8px 20px rgba(15, 23, 42, 0.18)";
+        wrap.style.padding = "4px 0";
+        wrap.style.overflowY = "auto";
+        wrap.style.maxHeight = "240px";
         /* Оформление — в autocomplete.css (тема сайта); позиция задаётся в positionDropdown */
         return wrap;
     }
@@ -114,6 +123,9 @@
             item.setAttribute("role", "option");
             item.setAttribute("data-index", index);
             item.textContent = name;
+            item.style.background = "#ffffff";
+            item.style.color = "#0f172a";
+            item.style.padding = "8px 12px";
 
             // Используем mousedown, чтобы успеть выбрать до blur/focus смены (особенно в админке)
             function handleSelect(event) {
@@ -137,6 +149,11 @@
         var items = dropdown.querySelectorAll(".city-autocomplete__item");
         items.forEach(function (el, i) {
             el.classList.toggle("city-autocomplete__item--active", i === index);
+            if (i === index) {
+                el.style.background = "rgba(37, 99, 235, 0.12)";
+            } else {
+                el.style.background = "#ffffff";
+            }
         });
     }
 

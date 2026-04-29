@@ -1150,6 +1150,10 @@
     align-items: center;
 }
 
+#home-tournaments-block .home-tournaments-mobile-list {
+    display: none;
+}
+
 /* Для нативных select на мобильных: убираем transform-анимацию карточки фильтра,
    иначе popup списка может позиционироваться со смещением. */
 .main #home-tournaments-filter.card,
@@ -1490,6 +1494,18 @@
 }
 
 @media (max-width: 768px) {
+    #home-tournaments-block .home-tournaments-desktop-table {
+        display: none;
+    }
+
+    #home-tournaments-block .home-tournaments-mobile-list {
+        display: block;
+    }
+
+    #home-tournaments-block .home-tournaments-mobile-list .tournament-list {
+        margin-top: var(--spacing-sm);
+    }
+
     /* Главная под hero: компактные карточки турниров только в home-блоке */
     #home-tournaments-block .tournament-table-wrapper {
         margin-top: var(--spacing-sm);

@@ -5,6 +5,21 @@
 {% block title %}Главная{% endblock %}
 
 {% block content %}
+<style>
+    #home-tournaments-block .home-tournaments-mobile-list {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        #home-tournaments-block .home-tournaments-desktop-table {
+            display: none !important;
+        }
+
+        #home-tournaments-block .home-tournaments-mobile-list {
+            display: block !important;
+        }
+    }
+</style>
 <!-- Hero Section -->
 <section class="hero hero--premium">
     <div class="container hero-grid">

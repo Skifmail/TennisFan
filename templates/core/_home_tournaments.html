@@ -1,6 +1,6 @@
 {% load skill_tags %}
 {% if tournaments_page and tournaments_page.paginator.count %}
-<div class="tournament-table-wrapper">
+<div class="tournament-table-wrapper home-tournaments-desktop-table">
     <table class="tournament-table">
         <thead>
             <tr>
@@ -173,6 +173,14 @@
             {% endfor %}
         </tbody>
     </table>
+</div>
+
+<div class="home-tournaments-mobile-list">
+    <div class="tournament-list">
+        {% for tournament in tournaments_page %}
+            {% include 'includes/tournament_card.html' with tournament=tournament %}
+        {% endfor %}
+    </div>
 </div>
 
 {% if tournaments_page.paginator.num_pages > 1 %}

@@ -86,6 +86,42 @@ from .text_search import filter_field_contains_ci
 logger = logging.getLogger(__name__)
 
 
+def _normalize_city_name(raw_name: str) -> str:
+    """Нормализовать название города для устойчивого сравнения."""
+    normalized = (raw_name or "").strip().lower().replace("ё", "е")
+    normalized = re.sub(r"^(г\.?|город)\s+", "", normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized
+
+
+def _resolve_city_coordinates(
+    city_name: str,
+    city_coords_exact: dict[str, tuple[float, float]],
+    city_coords_normalized: dict[str, tuple[float, float]],
+) -> tuple[float, float] | None:
+    """Найти координаты города по точному и нормализованному имени."""
+    coords = city_coords_exact.get(city_name)
+    if coords is not None:
+        return coords
+
+    normalized_city_name = _normalize_city_name(city_name)
+    if not normalized_city_name:
+        return None
+
+    coords = city_coords_normalized.get(normalized_city_name)
+    if coords is not None:
+        return coords
+
+    # Частый случай: "Москва, Россия" или "Санкт-Петербург, РФ".
+    if "," in normalized_city_name:
+        short_name = normalized_city_name.split(",", 1)[0].strip()
+        coords = city_coords_normalized.get(short_name)
+        if coords is not None:
+            return coords
+
+    return None
+
+
 def _build_cities_map_payload() -> list[dict[str, Any]]:
     """Собрать данные городов и игроков для карты."""
     players = (
@@ -97,11 +133,14 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
     if not players:
         return []
 
-    city_coords = {
+    city_coords_exact = {
         row["name"]: (row["lat"], row["lng"])
         for row in City.objects.exclude(lat__isnull=True)
         .exclude(lng__isnull=True)
         .values("name", "lat", "lng")
+    }
+    city_coords_normalized = {
+        _normalize_city_name(name): coords for name, coords in city_coords_exact.items()
     }
     fallback_coords = {
         "Москва": (55.7558, 37.6173),
@@ -120,7 +159,33 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
             continue
 
         if city_name not in grouped:
-            coords = city_coords.get(city_name) or fallback_coords.get(city_name)
+            coords = _resolve_city_coordinates(
+                city_name=city_name,
+                city_coords_exact=city_coords_exact,
+                city_coords_normalized=city_coords_normalized,
+            ) or fallback_coords.get(city_name)
+            if coords is None:
+                # Пробуем геокодировать и сохраняем в справочник, чтобы не терять города.
+                yandex_geocoder_api_key = (
+                    getattr(settings, "YANDEX_MAPS_API_KEY", "") or ""
+                )
+                if yandex_geocoder_api_key:
+                    from apps.courts.geocoder import geocode_address
+
+                    lat, lng = geocode_address(
+                        city_name,
+                        api_key=yandex_geocoder_api_key,
+                        hint_city=city_name,
+                    )
+                    if lat is not None and lng is not None:
+                        coords = (float(lat), float(lng))
+                        city_obj, _ = City.objects.get_or_create(name=city_name)
+                        if city_obj.lat is None or city_obj.lng is None:
+                            city_obj.lat = coords[0]
+                            city_obj.lng = coords[1]
+                            city_obj.save(update_fields=["lat", "lng"])
+                        city_coords_exact[city_name] = coords
+                        city_coords_normalized[_normalize_city_name(city_name)] = coords
             if coords is None:
                 continue
             grouped[city_name] = {

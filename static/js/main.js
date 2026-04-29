@@ -209,6 +209,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (tournamentsForm && tournamentsBlock) {
         var baseUrl = tournamentsForm.getAttribute('action') || window.location.pathname;
 
+        function revealHomeTournamentCards() {
+            tournamentsBlock.querySelectorAll('.card, .match-card').forEach(function(card) {
+                card.classList.add('card-in-view');
+                card.style.willChange = 'auto';
+                card.style.transitionDelay = '0s';
+            });
+        }
+
         function attachPaginationHandlers() {
             tournamentsBlock.querySelectorAll('[data-page-link="home-tournaments"]').forEach(function(link) {
                 link.addEventListener('click', function(e) {
@@ -247,6 +255,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(function(html) {
                     tournamentsBlock.innerHTML = html;
                     tournamentsBlock.classList.remove('is-loading');
+                    revealHomeTournamentCards();
                     if (pushState) {
                         updateUrlWithoutPartial(url);
                     }

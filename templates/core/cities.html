@@ -43,11 +43,62 @@
 .cities-map-wrap { margin-bottom: var(--spacing-xl); }
 .cities-map { width: 100%; height: 60vh; min-height: 420px; background: #0d221a; border-radius: var(--radius-lg); border: 1px solid rgba(76, 175, 80, 0.35); overflow: hidden; }
 .cities-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacing-md); }
-.city-card { background: rgba(9, 26, 21, 0.98); border: 1px solid rgba(76, 175, 80, 0.24); border-radius: var(--radius-lg); padding: var(--spacing-md); cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease; }
-.city-card:hover { transform: translateY(-2px); border-color: rgba(76, 175, 80, 0.6); }
-.city-card__title { font-size: var(--font-size-lg); font-weight: 700; margin-bottom: var(--spacing-xs); }
-.city-card__count { color: #8fe89b; font-weight: 600; margin-bottom: var(--spacing-sm); }
-.city-card__top { display: flex; flex-direction: column; gap: 4px; color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.city-card {
+    background: linear-gradient(180deg, rgba(8, 30, 23, 0.98) 0%, rgba(6, 23, 18, 0.98) 100%);
+    border: 1px solid rgba(76, 175, 80, 0.30);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    height: 182px;
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    gap: var(--spacing-xs);
+    overflow: hidden;
+}
+.city-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(120, 224, 137, 0.78);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+.city-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--spacing-sm);
+}
+.city-card__title {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.city-card__count { color: #8fe89b; font-weight: 700; margin: 0; }
+.city-card__top {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    overflow: hidden;
+    max-height: 84px;
+}
+.city-card__player {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.25;
+}
+.city-card__more {
+    color: #89d997;
+    font-size: 12px;
+    margin-top: 2px;
+    line-height: 1.2;
+}
 .city-balloon { color: #10231b; min-width: 260px; max-width: 360px; }
 .city-balloon__title { font-size: 18px; font-weight: 700; margin-bottom: 10px; color: #10231b; }
 .city-balloon__list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -115,20 +166,29 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderCards() {
         gridElement.innerHTML = '';
         citiesData.forEach(function (city) {
-            var top3 = (city.players || []).slice(0, 3).map(function (player) {
-                return '<div>' + escapeHtml(player.name) + ' - ' + escapeHtml(player.rating) + '</div>';
+            var players = city.players || [];
+            var top3 = players.slice(0, 3).map(function (player) {
+                return '<div class="city-card__player">' + escapeHtml(player.name) + ' - ' + escapeHtml(player.rating) + '</div>';
             }).join('');
+            var moreCount = Math.max(players.length - 3, 0);
+            var moreHtml = moreCount > 0
+                ? '<div class="city-card__more">+' + moreCount + ' еще</div>'
+                : '';
             var card = document.createElement('article');
             card.className = 'city-card';
             card.innerHTML =
-                '<div class="city-card__title">' + escapeHtml(city.name) + '</div>' +
+                '<div class="city-card__header">' +
+                    '<div class="city-card__title">' + escapeHtml(city.name) + '</div>' +
+                '</div>' +
                 '<div class="city-card__count">Игроков: ' + escapeHtml(city.players_count) + '</div>' +
-                '<div class="city-card__top">' + (top3 || '<div>Нет данных</div>') + '</div>';
+                '<div class="city-card__top">' + (top3 || '<div class="city-card__player">Нет данных</div>') + moreHtml + '</div>';
             card.addEventListener('click', function () {
                 var placemark = placemarksByCity[String(city.id)];
                 if (!placemark || !mapInstance) {
                     return;
                 }
+                var mapTop = mapElement.getBoundingClientRect().top + window.scrollY - 84;
+                window.scrollTo({ top: Math.max(mapTop, 0), behavior: 'smooth' });
                 mapInstance.setCenter([city.lat, city.lng], 9, { duration: 250 });
                 placemark.balloon.open();
             });

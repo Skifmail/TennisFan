@@ -10,6 +10,8 @@ from calendar import monthrange
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, cast
 
 from django.conf import settings
@@ -86,6 +88,38 @@ from .text_search import filter_field_contains_ci
 logger = logging.getLogger(__name__)
 
 
+@lru_cache(maxsize=1)
+def _load_city_coordinates_from_csv() -> dict[str, tuple[float, float]]:
+    """Загрузить координаты городов из статического CSV-справочника."""
+    csv_path = Path(settings.BASE_DIR) / "static" / "documents" / "city.csv"
+    if not csv_path.exists():
+        return {}
+
+    coordinates: dict[str, tuple[float, float]] = {}
+    try:
+        with csv_path.open("r", encoding="utf-8") as csv_file:
+            reader = csv.DictReader(csv_file)
+            for row in reader:
+                city_name = (row.get("city") or "").strip()
+                geo_lat_raw = (row.get("geo_lat") or "").strip()
+                geo_lon_raw = (row.get("geo_lon") or "").strip()
+                if not city_name or not geo_lat_raw or not geo_lon_raw:
+                    continue
+                try:
+                    lat = float(geo_lat_raw)
+                    lng = float(geo_lon_raw)
+                except ValueError:
+                    continue
+                normalized_city_name = _normalize_city_name(city_name)
+                if normalized_city_name and normalized_city_name not in coordinates:
+                    coordinates[normalized_city_name] = (lat, lng)
+    except OSError:
+        logger.exception("Не удалось прочитать city.csv для координат городов.")
+        return {}
+
+    return coordinates
+
+
 def _normalize_city_name(raw_name: str) -> str:
     """Нормализовать название города для устойчивого сравнения."""
     normalized = (raw_name or "").strip().lower().replace("ё", "е")
@@ -142,6 +176,7 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
     city_coords_normalized = {
         _normalize_city_name(name): coords for name, coords in city_coords_exact.items()
     }
+    csv_coords_normalized = _load_city_coordinates_from_csv()
     fallback_coords = {
         "Москва": (55.7558, 37.6173),
         "Санкт-Петербург": (59.9343, 30.3351),
@@ -169,11 +204,15 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
             city_name = (
                 normalized_to_display_name.get(normalized_city_name) or raw_city_name
             )
-            coords = _resolve_city_coordinates(
-                city_name=city_name,
-                city_coords_exact=city_coords_exact,
-                city_coords_normalized=city_coords_normalized,
-            ) or fallback_coords.get(city_name)
+            coords = (
+                _resolve_city_coordinates(
+                    city_name=city_name,
+                    city_coords_exact=city_coords_exact,
+                    city_coords_normalized=city_coords_normalized,
+                )
+                or csv_coords_normalized.get(normalized_city_name)
+                or fallback_coords.get(city_name)
+            )
             if coords is None:
                 # Пробуем геокодировать и сохраняем в справочник, чтобы не терять города.
                 yandex_geocoder_api_key = (

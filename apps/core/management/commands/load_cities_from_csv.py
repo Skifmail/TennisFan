@@ -1,6 +1,9 @@
-"""Команда для загрузки городов в справочник City из CSV-файла.
+"""Команда для загрузки городов и координат в справочник City из CSV-файла.
 
-Ожидается CSV с колонкой ``city`` (заголовок в первой строке).
+Ожидается CSV с колонками:
+    - ``city`` (название города)
+    - ``geo_lat`` (широта, опционально)
+    - ``geo_lon`` (долгота, опционально)
 
 Пример запуска:
     python manage.py load_cities_from_csv --path /path/to/city.csv
@@ -18,7 +21,7 @@ from apps.core.models import City
 
 
 class Command(BaseCommand):
-    """Загружает города в модель City из CSV-файла.
+    """Загружает города и координаты в модель City из CSV-файла.
 
     Args:
         path: Путь к CSV-файлу (через опцию ``--path``).
@@ -27,7 +30,10 @@ class Command(BaseCommand):
         CommandError: Если файл не найден или не содержит колонки ``city``.
     """
 
-    help = "Загрузка городов в City из CSV с колонкой 'city'."
+    help = (
+        "Загрузка городов и координат в City из CSV "
+        "с колонками 'city', 'geo_lat', 'geo_lon'."
+    )
 
     def add_arguments(self, parser: Any) -> None:
         """Добавляет аргументы командной строки.
@@ -41,7 +47,15 @@ class Command(BaseCommand):
             dest="path",
             type=str,
             required=True,
-            help="Путь к CSV-файлу со списком городов (должна быть колонка 'city').",
+            help=(
+                "Путь к CSV-файлу со списком городов " "(должна быть колонка 'city')."
+            ),
+        )
+        parser.add_argument(
+            "--force-update",
+            dest="force_update",
+            action="store_true",
+            help="Обновлять координаты даже если в базе они уже заполнены.",
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
@@ -59,8 +73,11 @@ class Command(BaseCommand):
             raise CommandError(f"CSV-файл не найден: {path}")
 
         created = 0
+        updated = 0
         skipped = 0
+        without_coords = 0
         seen: set[str] = set()
+        force_update = bool(options.get("force_update"))
 
         with path.open("r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -78,14 +95,49 @@ class Command(BaseCommand):
                     continue
                 seen.add(name)
 
-                obj, created_flag = City.objects.get_or_create(name=name)
+                geo_lat_raw = (row.get("geo_lat") or "").strip()
+                geo_lon_raw = (row.get("geo_lon") or "").strip()
+                lat: float | None = None
+                lng: float | None = None
+                if geo_lat_raw and geo_lon_raw:
+                    try:
+                        lat = float(geo_lat_raw)
+                        lng = float(geo_lon_raw)
+                    except ValueError:
+                        lat = None
+                        lng = None
+
+                if lat is None or lng is None:
+                    without_coords += 1
+
+                defaults: dict[str, Any] = {}
+                if lat is not None and lng is not None:
+                    defaults = {"lat": lat, "lng": lng}
+
+                obj, created_flag = City.objects.get_or_create(
+                    name=name, defaults=defaults
+                )
                 if created_flag:
                     created += 1
                 else:
-                    skipped += 1
+                    # Обновляем координаты только если они отсутствуют
+                    # или если явно задан флаг принудительного обновления.
+                    if (
+                        lat is not None
+                        and lng is not None
+                        and (force_update or obj.lat is None or obj.lng is None)
+                    ):
+                        obj.lat = lat
+                        obj.lng = lng
+                        obj.save(update_fields=["lat", "lng"])
+                        updated += 1
+                    else:
+                        skipped += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Города загружены из {path}. Создано: {created}, пропущено: {skipped}."
+                f"Города загружены из {path}. "
+                f"Создано: {created}, обновлено координат: {updated}, "
+                f"без координат в CSV: {without_coords}, пропущено: {skipped}."
             )
         )

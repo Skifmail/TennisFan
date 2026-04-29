@@ -150,15 +150,25 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
         "Новосибирск": (55.0084, 82.9357),
     }
 
+    normalized_to_display_name: dict[str, str] = {}
+    for city_name in City.objects.values_list("name", flat=True):
+        normalized_name = _normalize_city_name(str(city_name))
+        if normalized_name and normalized_name not in normalized_to_display_name:
+            normalized_to_display_name[normalized_name] = str(city_name)
+
     grouped: dict[str, dict[str, Any]] = {}
     next_city_id = 1
 
     for player in players:
-        city_name = (player.city or "").strip()
-        if not city_name:
+        raw_city_name = (player.city or "").strip()
+        normalized_city_name = _normalize_city_name(raw_city_name)
+        if not normalized_city_name:
             continue
 
-        if city_name not in grouped:
+        if normalized_city_name not in grouped:
+            city_name = (
+                normalized_to_display_name.get(normalized_city_name) or raw_city_name
+            )
             coords = _resolve_city_coordinates(
                 city_name=city_name,
                 city_coords_exact=city_coords_exact,
@@ -188,7 +198,7 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
                         city_coords_normalized[_normalize_city_name(city_name)] = coords
             if coords is None:
                 continue
-            grouped[city_name] = {
+            grouped[normalized_city_name] = {
                 "id": next_city_id,
                 "name": city_name,
                 "lat": float(coords[0]),
@@ -198,7 +208,7 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
             next_city_id += 1
 
         full_name = str(player).strip()
-        grouped[city_name]["players"].append(
+        grouped[normalized_city_name]["players"].append(
             {
                 "id": player.pk,
                 "name": full_name,

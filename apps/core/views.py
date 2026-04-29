@@ -159,7 +159,7 @@ def _resolve_city_coordinates(
 def _build_cities_map_payload() -> list[dict[str, Any]]:
     """Собрать данные городов и игроков для карты."""
     players = (
-        Player.objects.filter(is_bye=False)
+        Player.objects.filter(is_bye=False, is_verified=True)
         .exclude(city__exact="")
         .select_related("user")
         .order_by("city", "-total_points", "id")

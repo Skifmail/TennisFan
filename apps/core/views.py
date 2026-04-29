@@ -1508,12 +1508,14 @@ def home(request):
                     status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
                 ).count()
             ),
-            "courts_count": format_number(Court.objects.count()),
             "cities_count": format_number(cities_count),
-            "coaches_count": format_number(Coach.objects.count()),
+            "courts_count": format_number(Court.objects.filter(is_active=True).count()),
+            "coaches_count": format_number(
+                Coach.objects.filter(is_active=True).count()
+            ),
         }
 
-    hero_stats = cache.get_or_set("home_hero_stats:v2", _build_hero_stats, timeout=300)
+    hero_stats = cache.get_or_set("home_hero_stats:v3", _build_hero_stats, timeout=300)
 
     context = {
         "filtered_tournaments": tournaments_page.object_list,

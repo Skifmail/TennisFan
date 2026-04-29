@@ -617,6 +617,60 @@
     flex: 1;
 }
 
+.hero-metric--link {
+    position: relative;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    transition: transform var(--transition-base), border-color var(--transition-base),
+        background-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.hero-metric--link::after {
+    content: "↗";
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity var(--transition-base), transform var(--transition-base),
+        color var(--transition-base);
+}
+
+.hero-metric--link:hover {
+    transform: translateY(-2px);
+    border-color: rgba(111, 220, 141, 0.45);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.hero-metric--link:hover::after {
+    opacity: 1;
+    transform: translateY(0);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.hero-metric--link:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 2px;
+}
+
+.hero-metric--link .hero-metric__label {
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    transition: text-decoration-color var(--transition-base), color var(--transition-base);
+}
+
+.hero-metric--link:hover .hero-metric__label {
+    color: rgba(255, 255, 255, 0.95);
+    text-decoration-color: rgba(255, 255, 255, 0.45);
+}
+
 .hero-metric__value {
     font-size: var(--font-size-3xl);
     font-weight: 700;

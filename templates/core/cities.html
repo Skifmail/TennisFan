@@ -27,6 +27,9 @@
         </div>
 
         <div class="cities-map-wrap">
+            <div class="cities-map-toolbar">
+                <button type="button" class="btn btn-outline" id="toggle-city-links">Скрыть связи</button>
+            </div>
             <div id="cities-map" class="cities-map"></div>
         </div>
 
@@ -41,6 +44,11 @@
 .cities-stat-card__label { color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .cities-stat-card__value { font-size: var(--font-size-2xl); font-weight: 700; color: #fff; }
 .cities-map-wrap { margin-bottom: var(--spacing-xl); }
+.cities-map-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--spacing-sm);
+}
 .cities-map { width: 100%; height: 60vh; min-height: 420px; background: #0d221a; border-radius: var(--radius-lg); border: 1px solid rgba(76, 175, 80, 0.35); overflow: hidden; }
 .cities-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacing-md); }
 .city-card {
@@ -125,6 +133,9 @@ document.addEventListener('DOMContentLoaded', function () {
     var mapInstance = null;
     var placemarksByCity = {};
     var citiesData = [];
+    var cityLinks = [];
+    var linksVisible = true;
+    var linksAnimationTimer = null;
     var markerSvg = encodeURIComponent(
         "<svg xmlns='http://www.w3.org/2000/svg' width='52' height='52' viewBox='0 0 52 52'>" +
         "<circle cx='26' cy='26' r='21' fill='#2f8f46' stroke='#9df3aa' stroke-width='3'/>" +
@@ -215,9 +226,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     iconImageHref: markerIconUrl,
                     iconImageSize: [52, 52],
                     iconImageOffset: [-26, -26],
-                    iconContentOffset: [20, 14],
+                    iconContentOffset: [0, 0],
                     iconContentLayout: ymaps.templateLayoutFactory.createClass(
-                        '<div style="color:#fff;font-weight:700;font-size:16px;line-height:1;">$[properties.iconContent]</div>'
+                        '<div style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;line-height:1;">$[properties.iconContent]</div>'
                     ),
                     hideIconOnBalloonOpen: false
                 }
@@ -226,11 +237,107 @@ document.addEventListener('DOMContentLoaded', function () {
             mapInstance.geoObjects.add(placemark);
         });
 
+        buildCityLinks();
+        setupLinksToggle();
+        fitMapToCities();
+
         window.addEventListener('resize', function () {
             if (mapInstance && mapInstance.container) {
                 mapInstance.container.fitToViewport();
             }
         });
+    }
+
+    function fitMapToCities() {
+        if (!mapInstance || !citiesData.length) {
+            return;
+        }
+        if (citiesData.length === 1) {
+            mapInstance.setCenter([citiesData[0].lat, citiesData[0].lng], 7, { duration: 250 });
+            return;
+        }
+        var bounds = mapInstance.geoObjects.getBounds();
+        if (!bounds) {
+            return;
+        }
+        mapInstance.setBounds(bounds, {
+            checkZoomRange: true,
+            zoomMargin: [48, 48, 48, 48],
+            duration: 250
+        });
+    }
+
+    function buildCityLinks() {
+        cityLinks = [];
+        if (!mapInstance || citiesData.length < 2) {
+            return;
+        }
+        var hub = citiesData[0];
+        citiesData.slice(1).forEach(function (city) {
+            var line = new ymaps.Polyline(
+                [[hub.lat, hub.lng], [city.lat, city.lng]],
+                {},
+                {
+                    strokeColor: '#FF4D4F',
+                    strokeWidth: 3,
+                    strokeStyle: 'dash',
+                    opacity: 0.7,
+                    zIndex: 2000
+                }
+            );
+            cityLinks.push(line);
+        });
+    }
+
+    function setLinksVisible(visible) {
+        if (!mapInstance) {
+            return;
+        }
+        linksVisible = visible;
+        cityLinks.forEach(function (line) {
+            if (visible) {
+                mapInstance.geoObjects.add(line);
+                return;
+            }
+            mapInstance.geoObjects.remove(line);
+        });
+    }
+
+    function startLinksAnimation() {
+        if (linksAnimationTimer !== null) {
+            window.cancelAnimationFrame(linksAnimationTimer);
+        }
+        var start = null;
+        function frame(timestamp) {
+            if (start === null) {
+                start = timestamp;
+            }
+            if (linksVisible) {
+                var elapsed = (timestamp - start) / 1000;
+                var opacity = 0.45 + Math.sin(elapsed * 1.8) * 0.2;
+                var dashOffset = Math.floor((elapsed * 28) % 24);
+                cityLinks.forEach(function (line) {
+                    line.options.set('opacity', opacity);
+                    line.options.set('strokeDashoffset', dashOffset);
+                });
+            }
+            linksAnimationTimer = window.requestAnimationFrame(frame);
+        }
+        linksAnimationTimer = window.requestAnimationFrame(frame);
+    }
+
+    function setupLinksToggle() {
+        var toggleButton = document.getElementById('toggle-city-links');
+        if (!toggleButton) {
+            return;
+        }
+        setLinksVisible(true);
+        toggleButton.addEventListener('click', function () {
+            var nextVisible = !linksVisible;
+            setLinksVisible(nextVisible);
+            toggleButton.textContent = nextVisible ? 'Скрыть связи' : 'Показать связи';
+        });
+        startLinksAnimation();
     }
 
     ymaps.ready(function () {

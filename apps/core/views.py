@@ -1491,6 +1491,9 @@ def home(request):
         return f"{num:,}".replace(",", " ")
 
     def _build_hero_stats() -> dict[str, str]:
+        # Важно: считаем города той же логикой, что и страница /cities,
+        # чтобы не было рассинхрона между карточками и метрикой на главной.
+        cities_count = len(_build_cities_map_payload())
         return {
             "players_count": format_number(
                 Player.objects.filter(is_bye=False, is_verified=True).count()
@@ -1506,13 +1509,11 @@ def home(request):
                 ).count()
             ),
             "courts_count": format_number(Court.objects.count()),
-            "cities_count": format_number(
-                Player.objects.exclude(city="").values("city").distinct().count()
-            ),
+            "cities_count": format_number(cities_count),
             "coaches_count": format_number(Coach.objects.count()),
         }
 
-    hero_stats = cache.get_or_set("home_hero_stats:v1", _build_hero_stats, timeout=300)
+    hero_stats = cache.get_or_set("home_hero_stats:v2", _build_hero_stats, timeout=300)
 
     context = {
         "filtered_tournaments": tournaments_page.object_list,

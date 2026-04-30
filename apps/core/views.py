@@ -1411,21 +1411,6 @@ def home(request):
     elif club_filter:
         tournaments = tournaments.filter(club__slug=club_filter)
 
-    upcoming_tournaments = Tournament.objects.filter(
-        status=TournamentStatus.UPCOMING,
-    )
-    if club_filter == CLUB_FILTER_PLATFORM:
-        upcoming_tournaments = upcoming_tournaments.filter(club__isnull=True)
-    elif club_filter == CLUB_FILTER_CLUB_ONLY:
-        upcoming_tournaments = upcoming_tournaments.filter(club__isnull=False)
-    elif club_filter:
-        upcoming_tournaments = upcoming_tournaments.filter(club__slug=club_filter)
-    upcoming_tournaments = (
-        upcoming_tournaments.select_related("court", "club")
-        .prefetch_related("allowed_categories")
-        .order_by("start_date")[:6]
-    )
-
     tournaments = tournaments.order_by("start_date")
 
     paginator = Paginator(tournaments, 7)
@@ -1520,7 +1505,6 @@ def home(request):
     context = {
         "filtered_tournaments": tournaments_page.object_list,
         "tournaments_page": tournaments_page,
-        "upcoming_tournaments": upcoming_tournaments,
         "top_players": top_players,
         "recent_matches": recent_matches,
         "recent_matches_json": json.dumps(recent_matches, default=str),

@@ -19,6 +19,118 @@
             display: block !important;
         }
     }
+
+    /* Home actions block: local styles to avoid cascade conflicts */
+    .home-section--actions .section-header {
+        display: block;
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .home-section--actions .section-title {
+        margin-bottom: var(--spacing-xs);
+    }
+
+    .home-section--actions .home-section-subtitle {
+        margin: 0;
+        color: var(--color-text-secondary);
+        max-width: 760px;
+        line-height: 1.45;
+    }
+
+    .home-section--actions .home-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--spacing-md);
+    }
+
+    .home-section--actions .home-action-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 180px;
+        grid-template-areas:
+            "title image"
+            "text image"
+            "button image";
+        column-gap: var(--spacing-md);
+        row-gap: var(--spacing-sm);
+        min-height: 210px;
+        padding: var(--spacing-lg);
+        border-radius: var(--radius-lg);
+        border: 1px solid rgb(255 255 255 / 12%);
+        background: linear-gradient(180deg, rgb(8 29 23 / 98%) 0%, rgb(6 21 17 / 98%) 100%);
+        box-shadow: 0 10px 22px rgb(0 0 0 / 20%);
+    }
+
+    .home-section--actions .home-action-card__title {
+        grid-area: title;
+        margin: 0;
+        color: #fff;
+        font-size: var(--font-size-lg);
+        line-height: 1.25;
+        align-self: end;
+    }
+
+    .home-section--actions .home-action-card__image-wrap {
+        grid-area: image;
+        width: 180px;
+        justify-self: end;
+        align-self: center;
+    }
+
+    .home-section--actions .home-action-card__image {
+        width: 100%;
+        height: auto;
+        object-fit: contain;
+        display: block;
+    }
+
+    .home-section--actions .home-action-card__text {
+        grid-area: text;
+        margin: 0;
+        color: var(--color-text-secondary);
+        line-height: 1.45;
+        align-self: start;
+    }
+
+    .home-section--actions .home-action-card__btn {
+        grid-area: button;
+        width: fit-content;
+        min-width: 198px;
+        justify-content: center;
+        align-self: end;
+    }
+
+    @media (max-width: 900px) {
+        .home-section--actions .home-actions-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .home-section--actions .section-header {
+            margin-bottom: var(--spacing-md);
+        }
+
+        .home-section--actions .home-section-subtitle {
+            font-size: var(--font-size-sm);
+        }
+
+        .home-section--actions .home-action-card {
+            min-height: 0;
+            padding: var(--spacing-md);
+            grid-template-columns: minmax(0, 1fr) 120px;
+            column-gap: 0.75rem;
+            row-gap: 0.5rem;
+        }
+
+        .home-section--actions .home-action-card__image-wrap {
+            width: 120px;
+        }
+
+        .home-section--actions .home-action-card__btn {
+            width: fit-content;
+            min-width: 172px;
+        }
+    }
 </style>
 <!-- Hero Section -->
 <section class="hero hero--premium">
@@ -298,63 +410,49 @@
     </div>
 </section>
 
-<!-- Upcoming Tournaments -->
-<section class="section home-section home-section--upcoming">
+<!-- Find Your Game -->
+<section class="section home-section home-section--actions">
     <div class="container">
         <div class="section-header">
-            <h2 class="section-title">Ближайшие турниры</h2>
-            <a href="{% url 'tournament_list' %}" class="btn btn-outline">Все турниры</a>
+            <h2 class="section-title">Найди свою игру</h2>
         </div>
 
-        <div class="grid grid-3 home-grid home-grid--tournaments">
-            {% for tournament in upcoming_tournaments %}
-            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="card tournament-preview-card">
-                <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}">
-                    {% if tournament.status == 'upcoming' %}Идет набор{% elif tournament.status == 'active' %}В ИГРЕ{% elif tournament.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
-                </span>
-                <div class="tournament-preview-card__media">
-                    {% if tournament.image %}
-                    <img src="{{ tournament.image.url }}" alt="" class="tournament-preview-card__cover-img">
-                    {% else %}
-                    <video
-                        class="tournament-preview-card__fallback-video"
-                        autoplay
-                        muted
-                        loop
-                        playsinline
-                        preload="metadata"
-                    >
-                        <source src="{% static 'video/logotip.MP4' %}" type="video/mp4">
-                    </video>
-                    {% endif %}
+        <div class="home-actions-grid" aria-label="Основные действия на платформе">
+            <article class="home-action-card">
+                <div class="home-action-card__image-wrap">
+                    <img src="{% static 'images/find_tournament.png' %}" alt="" class="home-action-card__image">
                 </div>
-                <div class="card-body">
-                    <h3 class="card-title">{{ tournament.name }}</h3>
-                    <div class="tournament-preview-card__host" aria-label="Организатор турнира">
-                        {% if tournament.club %}
-                        <span class="badge tournament-card-host-badge tournament-card-host-badge--club" title="Турнир клуба">{{ tournament.club.name }}</span>
-                        {% else %}
-                        <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
-                        {% endif %}
-                    </div>
-                    {% if tournament.allowed_categories.all %}
-                    <div class="tournament-preview-card__categories">
-                        {% for ac in tournament.allowed_categories.all %}
-                        <span class="tournament-preview-card__category">{{ ac.category|skill_with_ntrp }}</span>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    <p class="card-text">
-                        {{ tournament.city }}{% if tournament.court %} • {{ tournament.court.name }}{% endif %} • {{ tournament.start_date|date:"d.m.Y" }}
-                    </p>
-                    {% if tournament.get_gender_display %}
-                    <p class="tournament-preview-card__meta">{{ tournament.get_gender_display }}</p>
-                    {% endif %}
+                <h3 class="home-action-card__title">Записаться на турнир</h3>
+                <p class="home-action-card__text">Подбери турнир по городу, уровню и формату за пару кликов.</p>
+                <a href="{% url 'tournament_list' %}" class="btn btn-outline home-action-card__btn">Подобрать турнир</a>
+            </article>
+
+            <article class="home-action-card">
+                <div class="home-action-card__image-wrap">
+                    <img src="{% static 'images/find_an_oppomemt.png' %}" alt="" class="home-action-card__image">
                 </div>
-            </a>
-            {% empty %}
-            <p class="text-secondary">Нет предстоящих турниров.</p>
-            {% endfor %}
+                <h3 class="home-action-card__title">Найти соперника</h3>
+                <p class="home-action-card__text">Организуй личную встречу и играй с соперниками подходящего уровня.</p>
+                <a href="{% url 'sparring_list' %}" class="btn btn-outline home-action-card__btn">Найти соперника</a>
+            </article>
+
+            <article class="home-action-card">
+                <div class="home-action-card__image-wrap">
+                    <img src="{% static 'images/join_in_club.png' %}" alt="" class="home-action-card__image">
+                </div>
+                <h3 class="home-action-card__title">Вступить в клуб</h3>
+                <p class="home-action-card__text">Открой клубные турниры, сообщество игроков и новые игровые связи.</p>
+                <a href="{% url 'clubs:club_discover' %}" class="btn btn-outline home-action-card__btn">Смотреть клубы</a>
+            </article>
+
+            <article class="home-action-card">
+                <div class="home-action-card__image-wrap">
+                    <img src="{% static 'images/boost_rating.png' %}" alt="" class="home-action-card__image">
+                </div>
+                <h3 class="home-action-card__title">Прокачать рейтинг</h3>
+                <p class="home-action-card__text">Следи за очками сезона и ростом позиции в общем рейтинге игроков.</p>
+                <a href="{% url 'rating' %}" class="btn btn-outline home-action-card__btn">Открыть рейтинг</a>
+            </article>
         </div>
     </div>
 </section>

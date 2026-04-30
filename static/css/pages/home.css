@@ -1418,7 +1418,96 @@
     }
 }
 
+/* Home actions section */
+.section-header--stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+}
+
+.home-section-subtitle {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-base);
+    max-width: 720px;
+}
+
+.home-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-md);
+}
+
+.home-action-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    min-height: 220px;
+    padding: var(--spacing-lg);
+    border: 1px solid rgb(255 255 255 / 10%);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, rgb(8 30 23 / 96%) 0%, rgb(6 23 18 / 96%) 100%);
+    transition: transform var(--transition-base), border-color var(--transition-base),
+                box-shadow var(--transition-base);
+}
+
+.home-action-card:hover {
+    transform: translateY(-2px);
+    border-color: rgb(120 224 137 / 45%);
+    box-shadow: 0 12px 24px rgb(0 0 0 / 24%);
+}
+
+.home-action-card__title {
+    margin: 0;
+    color: #fff;
+    font-size: var(--font-size-xl);
+    line-height: 1.25;
+}
+
+.home-action-card__text {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+}
+
+.home-action-card__btn {
+    margin-top: auto;
+    width: fit-content;
+    min-width: 210px;
+    justify-content: center;
+}
+
 @media (width <= 768px) {
+    .section-header--stacked {
+        align-items: stretch;
+    }
+
+    .home-section--actions .home-section-subtitle {
+        font-size: var(--font-size-sm);
+    }
+
+    .home-actions-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--spacing-sm);
+    }
+
+    .home-action-card {
+        min-height: 0;
+        padding: var(--spacing-md);
+        gap: 0.5rem;
+    }
+
+    .home-action-card__title {
+        font-size: var(--font-size-lg);
+    }
+
+    .home-action-card__btn {
+        width: 100%;
+        min-width: 0;
+    }
+
     .home-section--upcoming .section-header,
     .home-section--news .section-header {
         align-items: stretch;

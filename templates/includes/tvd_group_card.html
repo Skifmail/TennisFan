@@ -33,10 +33,10 @@
         <div class="d-flex flex-column gap-2 tvd-group-matches">
             {% for match in group.matches.all %}
             <a href="{% url 'match_detail' pk=match.pk %}" class="tvd-group-match-link" style="display: block; padding: var(--spacing-sm) var(--spacing-md); border: 1px solid var(--color-border-light); border-radius: var(--radius-md); text-decoration: none; color: var(--color-text); background: var(--color-bg-elevated);">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
-                    <span class="{% if match.winner_team_id == match.team1_id or match.winner_id == match.player1_id %}winner{% endif %}">{{ match.get_player1_display|default:"—" }}</span>
-                    <span style="font-weight: 600;">{% if match.player1_set1 is not None %}{{ match.player1_set1 }}{% if match.player2_set1 is not None %}:{{ match.player2_set1 }}{% endif %}{% if match.player1_set2 is not None %} {{ match.player1_set2 }}:{{ match.player2_set2 }}{% endif %}{% else %}—{% endif %}</span>
-                    <span class="{% if match.winner_team_id == match.team2_id or match.winner_id == match.player2_id %}winner{% endif %}">{{ match.get_player2_display|default:"—" }}</span>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 tvd-group-match-link__row">
+                    <span class="tvd-group-match-link__player {% if match.winner_team_id == match.team1_id or match.winner_id == match.player1_id %}winner{% endif %}">{{ match.get_player1_display|default:"—" }}</span>
+                    <span class="tvd-group-match-link__score" style="font-weight: 600;">{% if match.player1_set1 is not None %}{{ match.player1_set1 }}{% if match.player2_set1 is not None %}:{{ match.player2_set1 }}{% endif %}{% if match.player1_set2 is not None %} {{ match.player1_set2 }}:{{ match.player2_set2 }}{% endif %}{% else %}—{% endif %}</span>
+                    <span class="tvd-group-match-link__player {% if match.winner_team_id == match.team2_id or match.winner_id == match.player2_id %}winner{% endif %}">{{ match.get_player2_display|default:"—" }}</span>
                 </div>
             </a>
             {% empty %}

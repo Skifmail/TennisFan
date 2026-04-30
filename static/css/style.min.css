@@ -1863,73 +1863,65 @@ button {
     background: rgb(220 53 69 / 8%);
 }
 
-/* Кнопка «Управление турниром» с бегущей змейкой по контуру */
+/* Кнопка «Управление турниром» / «Открыть публичную страницу» с RGB-обводкой */
 .btn-manage-tournament-wrap {
-    position: relative;
-    display: inline-block;
-    border-radius: 8px;
-    padding: 2px; /* толщина рамки */
-    overflow: hidden;
-    transition: transform 0.2s ease;
-}
-
-/* Бегущая змейка — градиент больше обводки, центрирован через transform */
-.btn-manage-tournament-wrap::before {
-    content: "";
-    position: absolute;
-    z-index: 0;
-    width: 200%;
-    height: 200%;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    transform-origin: 50% 50%;
-    background: conic-gradient(
-        from 0deg,
-        transparent 0deg 300deg,
-        #e8c547 320deg,
-        #a6824a 340deg,
-        transparent 360deg
+    display: inline-flex;
+    border-radius: 10px;
+    padding: 2px; /* толщина RGB-рамки */
+    background: linear-gradient(
+        120deg,
+        #ff4d4d,
+        #ffb84d,
+        #ffe066,
+        #5dff8b,
+        #58e0ff,
+        #6f8dff,
+        #c67dff,
+        #ff68cc,
+        #ff4d4d
     );
-    animation: snake-rotate 3s linear infinite;
-    will-change: transform;
-}
-
-/* Маска — оставляем только рамку */
-.btn-manage-tournament-wrap::after {
-    content: "";
-    position: absolute;
-    inset: 2px; /* = padding */
-    background: #012b1c;
-    border-radius: 6px;
-    z-index: 1;
+    background-size: 260% 260%;
+    animation: manage-rgb-shift 6s linear infinite;
+    box-shadow: 0 0 16px rgb(88 224 255 / 22%);
+    transition: transform 0.25s ease;
 }
 
 /* Сама кнопка */
 .btn-manage-tournament {
-    position: relative;
-    z-index: 2;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0.5rem 1.25rem;
-    border-radius: 6px;
+    border-radius: 9px;
     background: #012b1c;
     color: #a6824a;
     font-weight: 600;
     text-decoration: none;
     border: none;
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition:
+        background 0.25s ease,
+        color 0.25s ease,
+        box-shadow 0.25s ease;
 }
 
-/* Hover */
 .btn-manage-tournament-wrap:hover {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
 }
 
 .btn-manage-tournament:hover {
-    background: rgb(166 130 74 / 0.18);
+    background: #0b3525;
+    color: #cfaa6e;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 6%);
+}
+
+@keyframes manage-rgb-shift {
+    0% {
+        background-position: 0% 50%;
+    }
+    100% {
+        background-position: 260% 50%;
+    }
 }
 
 /* Admin Button */
@@ -10354,6 +10346,43 @@ a.match-details-value__lead:hover {
     flex-shrink: 0;
 }
 
+/* Блок «Действия» — ровная сетка, на мобилке одна колонка на всю ширину */
+.manage-page__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+}
+
+.manage-page__actions > form {
+    margin: 0;
+}
+
+@media (width <= 768px) {
+    .manage-page__actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-md);
+    }
+
+    .manage-page__actions > form {
+        display: block !important;
+        width: 100%;
+    }
+
+    .manage-page__actions > a.btn {
+        width: 100%;
+        box-sizing: border-box;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .manage-page__actions .btn {
+        width: 100%;
+        box-sizing: border-box;
+    }
+}
+
 /* Мобильная адаптация страницы управления турниром */
 @media (width <= 768px) {
     .manage-list-item {
@@ -10542,6 +10571,19 @@ a.match-details-value__lead:hover {
     border-color: transparent;
 }
 
+.tournament-status-badge--cancelled {
+    background: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.45);
+}
+
+/* Точно красный для карточек турниров (платформа + клубы) */
+.tournament-status-badge.tournament-status-badge--inline.tournament-status-badge--cancelled {
+    background: rgba(239, 68, 68, 0.22);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.55);
+}
+
 .tournament-status-badge--upcoming::before,
 .tournament-status-badge--active::before {
     animation: status-pulse 1.4s infinite ease-out;
@@ -10646,6 +10688,91 @@ a.match-details-value__lead:hover {
 
 .tournament-detail__host .tournament-table__club-badge--host {
     max-width: 100%;
+}
+
+/* Шапка страницы турнира: системная раскладка бейджей на мобилке */
+.tournament-detail-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tournament-detail-header__group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tournament-detail-header__label {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.tournament-detail-header__chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.tournament-detail-header__chips .tournament-card__chip {
+    max-width: 100%;
+}
+
+.tournament-detail-header__chips--primary,
+.tournament-detail-header__chips--secondary {
+    width: 100%;
+}
+
+.tournament-detail-header__chip--danger {
+    color: var(--color-error);
+    border-color: rgb(239 68 68 / 35%);
+    background: rgb(239 68 68 / 12%);
+}
+
+.tournament-participant-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: var(--font-size-sm);
+}
+
+.tournament-participant-metric {
+    color: var(--color-text-secondary);
+}
+
+@media (width <= 768px) {
+    .tournament-detail-header {
+        gap: 8px;
+        margin-bottom: var(--spacing-sm);
+    }
+
+    .tournament-detail-header__chips {
+        gap: 5px;
+        flex-wrap: wrap;
+        overflow: visible;
+        padding: 2px 0;
+    }
+
+    .tournament-detail-header__chips--primary {
+        margin-bottom: 1px;
+    }
+
+    .tournament-detail-header__chips .tournament-card__chip {
+        height: 24px;
+        padding: 0 9px;
+        font-size: 11px;
+        line-height: 24px;
+    }
+
+    .tournament-detail-header__label {
+        font-size: 10px;
+    }
+
 }
 
 /* Tournament detail meta */
@@ -13348,7 +13475,96 @@ a.match-details-value__lead:hover {
     }
 }
 
+/* Home actions section */
+.section-header--stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+}
+
+.home-section-subtitle {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-base);
+    max-width: 720px;
+}
+
+.home-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-md);
+}
+
+.home-action-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    min-height: 220px;
+    padding: var(--spacing-lg);
+    border: 1px solid rgb(255 255 255 / 10%);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, rgb(8 30 23 / 96%) 0%, rgb(6 23 18 / 96%) 100%);
+    transition: transform var(--transition-base), border-color var(--transition-base),
+                box-shadow var(--transition-base);
+}
+
+.home-action-card:hover {
+    transform: translateY(-2px);
+    border-color: rgb(120 224 137 / 45%);
+    box-shadow: 0 12px 24px rgb(0 0 0 / 24%);
+}
+
+.home-action-card__title {
+    margin: 0;
+    color: #fff;
+    font-size: var(--font-size-xl);
+    line-height: 1.25;
+}
+
+.home-action-card__text {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+}
+
+.home-action-card__btn {
+    margin-top: auto;
+    width: fit-content;
+    min-width: 210px;
+    justify-content: center;
+}
+
 @media (width <= 768px) {
+    .section-header--stacked {
+        align-items: stretch;
+    }
+
+    .home-section--actions .home-section-subtitle {
+        font-size: var(--font-size-sm);
+    }
+
+    .home-actions-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--spacing-sm);
+    }
+
+    .home-action-card {
+        min-height: 0;
+        padding: var(--spacing-md);
+        gap: 0.5rem;
+    }
+
+    .home-action-card__title {
+        font-size: var(--font-size-lg);
+    }
+
+    .home-action-card__btn {
+        width: 100%;
+        min-width: 0;
+    }
+
     .home-section--upcoming .section-header,
     .home-section--news .section-header {
         align-items: stretch;
@@ -16263,9 +16479,42 @@ a.match-details-value__lead:hover {
     margin-top: var(--spacing-md);
 }
 
+.tvd-group-match-link__row {
+    min-width: 0;
+}
+
+.tvd-group-match-link__player {
+    flex: 1 1 7.5rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.tvd-group-match-link__score {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
 @media (width <= 768px) {
     .tvd-group-matches-row {
         grid-template-columns: 1fr;
+    }
+
+    .tvd-group-match-link {
+        padding: var(--spacing-sm);
+    }
+
+    .tvd-group-match-link__row {
+        gap: var(--spacing-xs);
+    }
+
+    .tvd-group-match-link__player {
+        flex-basis: 100%;
+    }
+
+    .tvd-group-match-link__score {
+        order: 2;
+        align-self: flex-start;
     }
 }
 

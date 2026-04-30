@@ -301,6 +301,43 @@
     flex-shrink: 0;
 }
 
+/* Блок «Действия» — ровная сетка, на мобилке одна колонка на всю ширину */
+.manage-page__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+}
+
+.manage-page__actions > form {
+    margin: 0;
+}
+
+@media (width <= 768px) {
+    .manage-page__actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-md);
+    }
+
+    .manage-page__actions > form {
+        display: block !important;
+        width: 100%;
+    }
+
+    .manage-page__actions > a.btn {
+        width: 100%;
+        box-sizing: border-box;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .manage-page__actions .btn {
+        width: 100%;
+        box-sizing: border-box;
+    }
+}
+
 /* Мобильная адаптация страницы управления турниром */
 @media (width <= 768px) {
     .manage-list-item {
@@ -489,6 +526,19 @@
     border-color: transparent;
 }
 
+.tournament-status-badge--cancelled {
+    background: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.45);
+}
+
+/* Точно красный для карточек турниров (платформа + клубы) */
+.tournament-status-badge.tournament-status-badge--inline.tournament-status-badge--cancelled {
+    background: rgba(239, 68, 68, 0.22);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.55);
+}
+
 .tournament-status-badge--upcoming::before,
 .tournament-status-badge--active::before {
     animation: status-pulse 1.4s infinite ease-out;
@@ -593,6 +643,91 @@
 
 .tournament-detail__host .tournament-table__club-badge--host {
     max-width: 100%;
+}
+
+/* Шапка страницы турнира: системная раскладка бейджей на мобилке */
+.tournament-detail-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tournament-detail-header__group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tournament-detail-header__label {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.tournament-detail-header__chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.tournament-detail-header__chips .tournament-card__chip {
+    max-width: 100%;
+}
+
+.tournament-detail-header__chips--primary,
+.tournament-detail-header__chips--secondary {
+    width: 100%;
+}
+
+.tournament-detail-header__chip--danger {
+    color: var(--color-error);
+    border-color: rgb(239 68 68 / 35%);
+    background: rgb(239 68 68 / 12%);
+}
+
+.tournament-participant-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: var(--font-size-sm);
+}
+
+.tournament-participant-metric {
+    color: var(--color-text-secondary);
+}
+
+@media (width <= 768px) {
+    .tournament-detail-header {
+        gap: 8px;
+        margin-bottom: var(--spacing-sm);
+    }
+
+    .tournament-detail-header__chips {
+        gap: 5px;
+        flex-wrap: wrap;
+        overflow: visible;
+        padding: 2px 0;
+    }
+
+    .tournament-detail-header__chips--primary {
+        margin-bottom: 1px;
+    }
+
+    .tournament-detail-header__chips .tournament-card__chip {
+        height: 24px;
+        padding: 0 9px;
+        font-size: 11px;
+        line-height: 24px;
+    }
+
+    .tournament-detail-header__label {
+        font-size: 10px;
+    }
+
 }
 
 /* Tournament detail meta */

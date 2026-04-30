@@ -20,6 +20,9 @@
     </div>
     {% if match.status == 'walkover' %}<div class="bracket-match-badge">RT</div>{% endif %}
     {% else %}
+    {% if tournament.status == "cancelled" or tournament.status == "completed" %}
+    <div class="bracket-match-pending">В этом статусе турнира редактирование результатов недоступно.</div>
+    {% else %}
     <form action="{% url 'tournament_manage_match_result' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-form">
         {% csrf_token %}
         <div class="bracket-match-players">
@@ -82,5 +85,6 @@
         <div class="bracket-match-pending">Ожидание участников</div>
         {% endif %}
     </form>
+    {% endif %}
     {% endif %}
 </div>

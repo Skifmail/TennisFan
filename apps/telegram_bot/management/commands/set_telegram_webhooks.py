@@ -19,6 +19,8 @@ import requests
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from apps.telegram_bot.telegram_http import telegram_requests_proxies
+
 logger = logging.getLogger(__name__)
 
 TELEGRAM_API = "https://api.telegram.org/bot"
@@ -29,7 +31,7 @@ def _api(token: str, method: str, params: dict | None = None) -> dict:
     if params:
         url = f"{url}?{urlencode(params)}"
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(url, timeout=15, proxies=telegram_requests_proxies())
         r.raise_for_status()
         return r.json() or {}
     except Exception as e:

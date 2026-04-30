@@ -13,6 +13,7 @@ from django.core.mail import send_mail
 from django.utils.html import strip_tags
 
 from apps.core.contact_utils import get_max_display_contact
+from apps.telegram_bot.telegram_http import telegram_requests_proxies
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,12 @@ def _send_admin_message_raw(text: str, parse_mode: str = "HTML"):
                 "disable_web_page_preview": True,
             }
             try:
-                r = requests.post(url, json=payload, timeout=10)
+                r = requests.post(
+                    url,
+                    json=payload,
+                    timeout=10,
+                    proxies=telegram_requests_proxies(),
+                )
                 r.raise_for_status()
                 data = r.json()
                 result = data.get("result", {})

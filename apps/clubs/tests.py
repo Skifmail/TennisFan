@@ -1000,6 +1000,92 @@ class ClubTournamentManagementViewsTestCase(TestCase):
             ),
         )
 
+    def test_platform_staff_without_club_role_cannot_manage_club_tournament(
+        self,
+    ) -> None:
+        """Сотрудник платформы без роли в клубе не видит страницу управления клубным турниром."""
+        staff = User.objects.create_user(
+            email="platform-staff-no-club@test.local",
+            password="testpass123",
+            is_staff=True,
+        )
+        tournament = Tournament.objects.create(
+            name="Клубный ТВД",
+            slug="staff-manage-forbidden",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.WEEKEND_DAY,
+            status=TournamentStatus.UPCOMING,
+            entry_fee=0,
+        )
+        tournament.allowed_categories.create(category="amateur")
+        self.client.force_login(staff)
+        response = self.client.get(
+            reverse("tournament_manage", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_platform_staff_without_club_role_cannot_post_generate_groups(self) -> None:
+        """POST «сформировать группы» для клубного ТВД недоступен без прав клуба."""
+        staff = User.objects.create_user(
+            email="platform-staff-post@test.local",
+            password="testpass123",
+            is_staff=True,
+        )
+        tournament = Tournament.objects.create(
+            name="Клубный ТВД POST",
+            slug="staff-post-forbidden",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.WEEKEND_DAY,
+            status=TournamentStatus.UPCOMING,
+            entry_fee=0,
+        )
+        tournament.allowed_categories.create(category="amateur")
+        self.client.force_login(staff)
+        response = self.client.post(
+            reverse(
+                "tournament_manage_generate_groups",
+                kwargs={"slug": tournament.slug},
+            ),
+            secure=True,
+        )
+        self.assertRedirects(
+            response,
+            reverse("tournament_list"),
+            status_code=302,
+            target_status_code=200,
+            fetch_redirect_response=False,
+        )
+
+    def test_platform_staff_can_manage_platform_tvd_tournament(self) -> None:
+        """Сотрудник платформы может управлять турниром без клуба (организатор — платформа)."""
+        staff = User.objects.create_user(
+            email="platform-staff-open@test.local",
+            password="testpass123",
+            is_staff=True,
+        )
+        tournament = Tournament.objects.create(
+            name="Платформенный ТВД",
+            slug="platform-open-tvd",
+            city="Москва",
+            club=None,
+            start_date=date.today(),
+            format=TournamentFormat.WEEKEND_DAY,
+            status=TournamentStatus.UPCOMING,
+            entry_fee=0,
+        )
+        tournament.allowed_categories.create(category="amateur")
+        self.client.force_login(staff)
+        response = self.client.get(
+            reverse("tournament_manage", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
     def test_tournament_detail_uses_club_navigation_for_club_member(self) -> None:
         tournament = Tournament.objects.create(
             name="Клубный турнир",

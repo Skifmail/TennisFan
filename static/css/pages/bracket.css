@@ -38,9 +38,42 @@
     margin-top: var(--spacing-md);
 }
 
+.tvd-group-match-link__row {
+    min-width: 0;
+}
+
+.tvd-group-match-link__player {
+    flex: 1 1 7.5rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.tvd-group-match-link__score {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
 @media (width <= 768px) {
     .tvd-group-matches-row {
         grid-template-columns: 1fr;
+    }
+
+    .tvd-group-match-link {
+        padding: var(--spacing-sm);
+    }
+
+    .tvd-group-match-link__row {
+        gap: var(--spacing-xs);
+    }
+
+    .tvd-group-match-link__player {
+        flex-basis: 100%;
+    }
+
+    .tvd-group-match-link__score {
+        order: 2;
+        align-self: flex-start;
     }
 }
 

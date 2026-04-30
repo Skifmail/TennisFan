@@ -1070,6 +1070,7 @@ def tournament_detail(request, slug):
         "tvd_rr_4_6_matrix_participants": (
             tvd_rr_4_6_matrix_participants if is_tvd else None
         ),
+        "can_manage_tournament": _can_manage_tournament(request, tournament),
     }
     context.update(_get_club_panel_context_for_tournament(request, tournament))
     if is_tvd:
@@ -1089,14 +1090,27 @@ def _group_matches_by_round(matches):
 
 
 def _can_manage_tournament(request, tournament):
-    """Доступ к управлению турниром: staff или admin/manager клуба турнира."""
+    """Доступ к странице и действиям управления турниром.
+
+    Клубный турнир может управлять только admin/manager этого клуба — те же
+    правила, что и для редактирования турнира в панели клуба. Права staff
+    платформы без роли в клубе недостаточны (иначе расходится с
+    ``clubs:tournament_edit`` и создаёт риск случайных действий).
+
+    Турнир без клуба (платформа): только сотрудники (``is_staff``).
+
+    Args:
+        request: HTTP-запрос.
+        tournament: Модель турнира.
+
+    Returns:
+        bool: True, если пользователь может управлять турниром.
+    """
     if not getattr(request, "user", None) or not request.user.is_authenticated:
         return False
-    if request.user.is_staff:
-        return True
-    if tournament.club_id and user_can_manage_club(request.user, tournament.club):
-        return True
-    return False
+    if tournament.club_id:
+        return user_can_manage_club(request.user, tournament.club)
+    return bool(request.user.is_staff)
 
 
 def _tournament_manage_get_any_tournament(request, slug):
@@ -2223,6 +2237,12 @@ def tournament_manage_match_result(request, slug, pk):
     if tournament is None:
         return redirect("tournament_list")
     match = get_object_or_404(Match, tournament=tournament, pk=pk)
+    if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
+        messages.warning(
+            request,
+            "В отмененном или завершенном турнире изменение результатов недоступно.",
+        )
+        return redirect("tournament_manage", slug=slug)
     is_walkover = request.POST.get("walkover") in ("1", "on", "true", "yes")
     score1 = _parse_int_post(request, "score1")
     score2 = _parse_int_post(request, "score2")

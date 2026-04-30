@@ -392,6 +392,8 @@ TELEGRAM_PUBLIC_COMMUNITY_URL = (
     or "https://t.me/TennisFanu"
 )
 TELEGRAM_BOT_SITE_BASE_URL = os.environ.get("TELEGRAM_BOT_SITE_BASE_URL", "")
+# Исходящий прокси только для Telegram Bot API (если api.telegram.org недоступен напрямую).
+TELEGRAM_API_PROXY_URL = os.environ.get("TELEGRAM_API_PROXY_URL", "").strip()
 SITE_URL = os.environ.get("SITE_URL", "").strip()
 
 # ------------------------------------------------------------------------------

@@ -26,7 +26,7 @@ module = ["*.admin"]
 disable_error_code = ["attr-defined"]
 
 [[tool.mypy.overrides]]
-module = ["apps.subscriptions.models", "apps.core.telegram_support", "apps.core.telegram_notify", "apps.telegram_bot.views", "apps.telegram_bot.services", "apps.content.views", "apps.legal.views", "apps.courts.geocoder", "apps.shop.views", "apps.clubs.views.legal"]
+module = ["apps.subscriptions.models", "apps.core.telegram_support", "apps.core.telegram_notify", "apps.telegram_bot.views", "apps.telegram_bot.services", "apps.telegram_bot.telegram_http", "apps.content.views", "apps.legal.views", "apps.courts.geocoder", "apps.shop.views", "apps.clubs.views.legal"]
 disable_error_code = ["import-untyped"]
 
 [[tool.mypy.overrides]]

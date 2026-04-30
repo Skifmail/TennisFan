@@ -30,6 +30,7 @@ from apps.users.models import Notification, Player
 
 from . import notifications as tg_notify
 from . import services as bot
+from .telegram_http import telegram_requests_proxies
 
 
 def _get_site_base_url() -> str:
@@ -217,6 +218,7 @@ def _answer_callback(
             f"https://api.telegram.org/bot{token}/answerCallbackQuery",
             json=payload,
             timeout=5,
+            proxies=telegram_requests_proxies(),
         )
         r.raise_for_status()
     except Exception as e:
@@ -237,6 +239,7 @@ def _edit_message_remove_reply_markup(chat_id: int, message_id: int) -> None:
                 "reply_markup": {"inline_keyboard": []},
             },
             timeout=5,
+            proxies=telegram_requests_proxies(),
         )
         r.raise_for_status()
     except Exception as e:
@@ -2124,6 +2127,7 @@ def user_bot_webhook(request):
                         f"https://api.telegram.org/bot{token}/answerCallbackQuery",
                         json={"callback_query_id": str(cq_id)},
                         timeout=5,
+                        proxies=telegram_requests_proxies(),
                     )
                 except Exception:
                     pass

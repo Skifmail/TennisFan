@@ -11,6 +11,8 @@ from typing import Any, cast
 import requests
 from django.conf import settings
 
+from apps.telegram_bot.telegram_http import telegram_requests_proxies
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,7 +71,9 @@ def _api_post(
         return None, False
     url = f"https://api.telegram.org/bot{token}/{method}"
     try:
-        r = requests.post(url, json=payload, timeout=timeout)
+        r = requests.post(
+            url, json=payload, timeout=timeout, proxies=telegram_requests_proxies()
+        )
         if not r.ok:
             logger.warning(
                 "Telegram API %s failed: %s %s", method, r.status_code, r.text[:300]
@@ -226,6 +230,7 @@ def get_bot_username() -> str | None:
         r = requests.get(
             f"https://api.telegram.org/bot{token}/getMe",
             timeout=5,
+            proxies=telegram_requests_proxies(),
         )
         r.raise_for_status()
         data = r.json()
@@ -260,7 +265,9 @@ def send_message(
         # Telegram API ожидает reply_markup как JSON-строку
         payload["reply_markup"] = json.dumps(reply_markup)
     try:
-        r = requests.post(url, json=payload, timeout=10)
+        r = requests.post(
+            url, json=payload, timeout=10, proxies=telegram_requests_proxies()
+        )
         if not r.ok:
             err_body = r.text
             try:
@@ -309,7 +316,9 @@ def edit_message_text(
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
     try:
-        r = requests.post(url, json=payload, timeout=10)
+        r = requests.post(
+            url, json=payload, timeout=10, proxies=telegram_requests_proxies()
+        )
         if not r.ok:
             logger.warning("editMessageText failed: %s %s", r.status_code, r.text[:200])
             return False
@@ -357,11 +366,18 @@ def send_photo(
     else:
         logger.warning("send_photo: unsupported photo type %s", type(photo))
         return None, False
+    proxies = telegram_requests_proxies()
     try:
         if files:
-            r = requests.post(api_url, data=payload, files=cast(Any, files), timeout=30)
+            r = requests.post(
+                api_url,
+                data=payload,
+                files=cast(Any, files),
+                timeout=30,
+                proxies=proxies,
+            )
         else:
-            r = requests.post(api_url, json=payload, timeout=10)
+            r = requests.post(api_url, json=payload, timeout=10, proxies=proxies)
         if not r.ok:
             logger.warning("send_photo failed: %s %s", r.status_code, r.text[:200])
             return None, False

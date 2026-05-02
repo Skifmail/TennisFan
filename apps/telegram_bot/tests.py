@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from apps.clubs.models import (
     Club,
@@ -22,8 +23,38 @@ from apps.telegram_bot.notifications import (
     _send_new_tournament_notification,
 )
 from apps.telegram_bot.private_chat import get_private_chat_access_status
+from apps.telegram_bot.telegram_http import is_telegram_api_enabled
 from apps.tournaments.models import Tournament, TournamentFormat, TournamentStatus
 from apps.users.models import User
+
+
+class TelegramApiEnabledParsingTests(SimpleTestCase):
+    """Проверка разбора TELEGRAM_ENABLED (окружение имеет приоритет над settings)."""
+
+    def test_env_false_disables_even_if_settings_true(self) -> None:
+        """Строка false в окружении отключает API независимо от settings."""
+        with patch.dict(os.environ, {"TELEGRAM_ENABLED": "false"}, clear=False):
+            with override_settings(TELEGRAM_ENABLED=True):
+                self.assertFalse(is_telegram_api_enabled())
+
+    def test_env_true_enables(self) -> None:
+        with patch.dict(os.environ, {"TELEGRAM_ENABLED": "true"}, clear=False):
+            with override_settings(TELEGRAM_ENABLED=False):
+                self.assertTrue(is_telegram_api_enabled())
+
+    def test_env_empty_string_disables(self) -> None:
+        with patch.dict(os.environ, {"TELEGRAM_ENABLED": ""}, clear=False):
+            self.assertFalse(is_telegram_api_enabled())
+
+    def test_fallback_settings_respects_bool_false(self) -> None:
+        """Если ключа нет в os.environ, используется settings (bool)."""
+        backup = os.environ.pop("TELEGRAM_ENABLED", None)
+        try:
+            with override_settings(TELEGRAM_ENABLED=False):
+                self.assertFalse(is_telegram_api_enabled())
+        finally:
+            if backup is not None:
+                os.environ["TELEGRAM_ENABLED"] = backup
 
 
 class PrivateChatAccessStatusTests(SimpleTestCase):

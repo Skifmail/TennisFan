@@ -242,8 +242,18 @@ def get_bot_username() -> str | None:
         r.raise_for_status()
         data = r.json()
         return (data.get("result") or {}).get("username")
-    except Exception as e:
-        logger.warning("Telegram user bot getMe failed: %s", e)
+    except requests.RequestException as exc:
+        # Не логируем str(exc): в нём может быть URL с токеном бота. Повод — сеть/блокировка, не ERROR.
+        logger.debug(
+            "Telegram getMe: сеть (%s), username не получен",
+            type(exc).__name__,
+        )
+        return None
+    except Exception as exc:
+        logger.debug(
+            "Telegram getMe: неожиданная ошибка (%s)",
+            type(exc).__name__,
+        )
         return None
 
 

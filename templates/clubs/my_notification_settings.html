@@ -46,14 +46,18 @@
                     <div class="club-finance-summary__item">
                         <span class="club-finance-summary__label">Telegram</span>
                         <strong class="club-finance-summary__value">
-                            {% if telegram_connected %}
+                            {% if not telegram_api_enabled %}
+                                Временно недоступно
+                            {% elif telegram_connected %}
                                 {% if telegram_bot_username %}@{{ telegram_bot_username }}{% else %}Бот подключён{% endif %}
                             {% else %}
                                 Бот не подключён
                             {% endif %}
                         </strong>
                         <span class="club-payments-form__hint">
-                            {% if club_notification_config.notify_by_telegram %}
+                            {% if not telegram_api_enabled %}
+                                Интеграция с Telegram отключена на стороне сайта; уведомления в Telegram не отправляются.
+                            {% elif club_notification_config.notify_by_telegram %}
                                 {% if telegram_connected %}
                                     Сообщения придут в чат с подключённым ботом.
                                 {% else %}
@@ -95,7 +99,12 @@
                 </div>
                 {% endif %}
 
-                {% if not telegram_connected %}
+                {% if not telegram_api_enabled %}
+                <div class="club-payments-check club-payments-check--error club-notification-settings-page__check">
+                    <span class="club-payments-check__icon">!</span>
+                    <span>Канал Telegram на сайте временно отключён. Включать клубные уведомления в Telegram сейчас нельзя — пользуйтесь email и личным кабинетом.</span>
+                </div>
+                {% elif not telegram_connected %}
                 <div class="club-payments-check club-payments-check--error club-notification-settings-page__check">
                     <span class="club-payments-check__icon">!</span>
                     <span>Telegram сейчас недоступен: сначала подключите бота в <a href="{% url 'profile_edit' %}" class="club-notification-settings__inline-link">профиле</a>, затем включите этот канал здесь.</span>
@@ -154,7 +163,9 @@
                             <div class="club-notification-settings__option-copy">
                                 <div class="club-notification-settings__option-title">Telegram</div>
                                 <p class="club-payments-form__hint">
-                                    {% if telegram_connected %}
+                                    {% if not telegram_api_enabled %}
+                                        Временно недоступно на стороне сайта. Переключатель ниже сохранит ваше текущее значение при сохранении формы.
+                                    {% elif telegram_connected %}
                                         Уведомления придут в чат с подключённым ботом{% if telegram_bot_username %} <strong>@{{ telegram_bot_username }}</strong>{% endif %}.
                                         {% if not club_notification_config.notify_by_telegram %}Клубный Telegram-канал сейчас выключен.{% endif %}
                                     {% else %}
@@ -165,7 +176,7 @@
                                 <p class="club-payments-form__error">{{ error }}</p>
                                 {% endfor %}
                             </div>
-                            <label class="club-payments-switch">
+                            <label class="club-payments-switch"{% if not telegram_api_enabled %} style="opacity: 0.65; pointer-events: none;" title="Канал Telegram временно отключён на сайте"{% endif %}>
                                 <span class="club-payments-switch__label">Вкл</span>
                                 {{ form.telegram_enabled }}
                                 <span class="club-payments-switch__track">

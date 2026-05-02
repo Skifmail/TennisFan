@@ -58,6 +58,22 @@
     align-items: flex-start;
 }
 
+/* Ненавязчивое сообщение: интеграция Telegram отключена на сайте */
+.profile-info__telegram-unavailable {
+    margin: 0 0 var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 1px solid rgb(166 130 74 / 28%);
+    border-radius: var(--radius-sm);
+    background: rgb(0 43 28 / 35%);
+}
+
+.profile-info__telegram-unavailable-text {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    line-height: 1.55;
+    color: var(--color-text-muted);
+}
+
 /* --- Subscription actions in profile --- */
 .subscription-info__actions {
     display: flex;

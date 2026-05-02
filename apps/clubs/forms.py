@@ -741,9 +741,16 @@ class ClubNotificationSettingsForm(forms.ModelForm):
 
     def clean_telegram_enabled(self) -> bool:
         """Запрещает включать Telegram без привязанного пользовательского бота."""
+        from apps.telegram_bot.telegram_http import is_telegram_api_enabled
+
         telegram_enabled = bool(self.cleaned_data.get("telegram_enabled"))
         if not telegram_enabled:
             return False
+
+        if not is_telegram_api_enabled():
+            raise ValidationError(
+                "Подключение Telegram временно недоступно на стороне сайта."
+            )
 
         user = self._user or getattr(self.instance, "user", None)
         if user is None:

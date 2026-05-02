@@ -18,6 +18,7 @@ from urllib.parse import urlencode
 import requests
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from requests import RequestException
 
 from apps.telegram_bot.telegram_http import (
     is_telegram_api_enabled,
@@ -30,6 +31,9 @@ TELEGRAM_API = "https://api.telegram.org/bot"
 
 
 def _api(token: str, method: str, params: dict | None = None) -> dict:
+    """Вызов Telegram Bot API GET (без логирования URL с токеном)."""
+    if not is_telegram_api_enabled():
+        return {"ok": False, "description": "telegram_disabled"}
     url = f"{TELEGRAM_API}{token}/{method}"
     if params:
         url = f"{url}?{urlencode(params)}"
@@ -37,9 +41,21 @@ def _api(token: str, method: str, params: dict | None = None) -> dict:
         r = requests.get(url, timeout=15, proxies=telegram_requests_proxies())
         r.raise_for_status()
         return r.json() or {}
-    except Exception as e:
-        logger.exception("Telegram API %s: %s", method, e)
-        return {"ok": False, "description": str(e)}
+    except RequestException as exc:
+        # Не подставлять str(exc): может содержать URL с секретом бота.
+        logger.debug(
+            "Telegram API %s: недоступен (%s)",
+            method,
+            type(exc).__name__,
+        )
+        return {"ok": False, "description": type(exc).__name__}
+    except Exception as exc:
+        logger.debug(
+            "Telegram API %s: ошибка (%s)",
+            method,
+            type(exc).__name__,
+        )
+        return {"ok": False, "description": type(exc).__name__}
 
 
 def _set_webhook(token: str, url: str, secret: str = "") -> bool:
@@ -53,10 +69,6 @@ def _set_webhook(token: str, url: str, secret: str = "") -> bool:
 def _delete_webhook(token: str) -> bool:
     data = _api(token, "deleteWebhook")
     return bool(data.get("ok", False))
-
-
-def _get_webhook_info(token: str) -> dict:
-    return _api(token, "getWebhookInfo")
 
 
 class Command(BaseCommand):
@@ -129,10 +141,10 @@ class Command(BaseCommand):
                         self.style.SUCCESS(f"Бот ЛК: webhook установлен -> {user_url}")
                     )
                 else:
-                    info = _get_webhook_info(user_token)
                     self.stderr.write(
                         self.style.WARNING(
-                            f"Бот ЛК: setWebhook не удался. getWebhookInfo: {info}"
+                            "Бот ЛК: setWebhook не удался (сеть, токен или Telegram API недоступен). "
+                            "Повторный getWebhookInfo не вызывается, чтобы не дублировать таймаут."
                         )
                     )
         else:
@@ -159,10 +171,9 @@ class Command(BaseCommand):
                         )
                     )
                 else:
-                    info = _get_webhook_info(support_token)
                     self.stderr.write(
                         self.style.WARNING(
-                            f"Бот поддержки: setWebhook не удался. getWebhookInfo: {info}"
+                            "Бот поддержки: setWebhook не удался (сеть, токен или Telegram API недоступен)."
                         )
                     )
         else:

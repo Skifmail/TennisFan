@@ -383,6 +383,8 @@ TELEGRAM_USER_BOT_TOKEN = os.environ.get("TELEGRAM_USER_BOT_TOKEN", "")
 TELEGRAM_USER_BOT_WEBHOOK_SECRET = os.environ.get(
     "TELEGRAM_USER_BOT_WEBHOOK_SECRET", ""
 )
+# Задайте @username бота без запроса getMe к API (удобно при блокировке api.telegram.org).
+TELEGRAM_USER_BOT_USERNAME = os.environ.get("TELEGRAM_USER_BOT_USERNAME", "").strip()
 TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID = os.environ.get(
     "TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID", ""
 )

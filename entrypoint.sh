@@ -57,7 +57,17 @@ echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
 echo "Setting Telegram webhooks..."
-python manage.py set_telegram_webhooks 2>/dev/null || true
+# TELEGRAM_ENABLED: те же значения, что в Django settings (false/off/nет → пропуск HTTP к api.telegram.org)
+_te="${TELEGRAM_ENABLED:-True}"
+_te_lc=$(printf '%s' "$_te" | tr '[:upper:]' '[:lower:]')
+case "$_te_lc" in
+  1|true|yes|on)
+    python manage.py set_telegram_webhooks || true
+    ;;
+  *)
+    echo "Skipping set_telegram_webhooks (TELEGRAM_ENABLED is off)."
+    ;;
+esac
 
 echo "Starting server..."
 exec gunicorn config.wsgi:application \

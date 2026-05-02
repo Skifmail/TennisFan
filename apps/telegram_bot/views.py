@@ -2434,10 +2434,17 @@ def connect_redirect(request):
         )
 
     if not bot.is_configured():
-        messages.error(
-            request,
-            "Telegram-бот временно недоступен. Проверьте TELEGRAM_USER_BOT_TOKEN в .env и перезапустите сервер.",
-        )
+        if not is_telegram_api_enabled():
+            messages.warning(
+                request,
+                "Подключение Telegram сейчас недоступно на стороне сайта. "
+                "Уведомления приходят по email и в личном кабинете.",
+            )
+        else:
+            messages.error(
+                request,
+                "Telegram-бот временно недоступен. Проверьте TELEGRAM_USER_BOT_TOKEN в .env и перезапустите сервер.",
+            )
         return redirect(_get_redirect_url_after_bot_settings_change(request))
 
     link, _ = UserTelegramLink.objects.get_or_create(

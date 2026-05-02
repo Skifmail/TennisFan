@@ -139,6 +139,7 @@ class ClubPlayerPlanFormTestCase(TestCase):
         self.assertIn("max_tournaments_per_month", form.errors)
 
 
+@override_settings(TELEGRAM_ENABLED=True)
 class ClubNotificationSettingsViewTestCase(TestCase):
     def setUp(self) -> None:
         self.client = Client()

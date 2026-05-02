@@ -17,6 +17,7 @@ from apps.payments.yookassa_client import (
     get_payment_details_with_credentials,
     get_payment_status_with_credentials,
 )
+from apps.telegram_bot.telegram_http import is_telegram_api_enabled
 
 from ..finance_services import (
     calculate_balance_payment_breakdown,
@@ -89,6 +90,9 @@ def _get_user_telegram_bot_state(user) -> tuple[bool, str]:
 
     if not is_connected:
         return False, ""
+
+    if not is_telegram_api_enabled():
+        return True, ""
 
     try:
         from apps.telegram_bot import services as bot_services
@@ -956,6 +960,7 @@ def my_notification_settings(request: HttpRequest) -> HttpResponse:
     telegram_connected, telegram_bot_username = _get_user_telegram_bot_state(
         request.user
     )
+    telegram_api_enabled = is_telegram_api_enabled()
     email_destination = (request.user.email or "").strip()
     active_delivery_channels = 0
 
@@ -971,12 +976,16 @@ def my_notification_settings(request: HttpRequest) -> HttpResponse:
         and obj.telegram_enabled
         and config.notify_by_telegram
         and telegram_connected
+        and telegram_api_enabled
     ):
         active_delivery_channels += 1
 
     if request.method == "POST":
+        post = request.POST.copy()
+        if not telegram_api_enabled:
+            post["telegram_enabled"] = "on" if obj.telegram_enabled else ""
         form = ClubNotificationSettingsForm(
-            request.POST,
+            post,
             instance=obj,
             user=request.user,
         )
@@ -998,6 +1007,7 @@ def my_notification_settings(request: HttpRequest) -> HttpResponse:
             "email_destination": email_destination,
             "telegram_connected": telegram_connected,
             "telegram_bot_username": telegram_bot_username,
+            "telegram_api_enabled": telegram_api_enabled,
             "active_delivery_channels": active_delivery_channels,
             "player_notification_events": [
                 "напоминания о членском взносе",

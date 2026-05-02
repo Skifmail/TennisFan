@@ -826,12 +826,15 @@ def profile(request, pk):
         except UserTelegramLink.DoesNotExist:
             pass
         if telegram_user_bot_connected:
-            try:
-                from apps.telegram_bot import services as bot_services
+            from apps.telegram_bot.telegram_http import is_telegram_api_enabled
 
-                telegram_bot_username = bot_services.get_bot_username() or ""
-            except Exception:
-                pass
+            if is_telegram_api_enabled():
+                try:
+                    from apps.telegram_bot import services as bot_services
+
+                    telegram_bot_username = bot_services.get_bot_username() or ""
+                except Exception:
+                    pass
 
     player_skills_data = None
     if can_view_profile_stats:
@@ -873,6 +876,8 @@ def profile(request, pk):
 
 
 def _get_telegram_bot_connection_context(user) -> dict[str, str | bool]:
+    from apps.telegram_bot.telegram_http import is_telegram_api_enabled
+
     telegram_user_bot_connected = False
     telegram_bot_username = ""
 
@@ -882,7 +887,7 @@ def _get_telegram_bot_connection_context(user) -> dict[str, str | bool]:
     except UserTelegramLink.DoesNotExist:
         pass
 
-    if telegram_user_bot_connected:
+    if telegram_user_bot_connected and is_telegram_api_enabled():
         try:
             from apps.telegram_bot import services as bot_services
 
@@ -893,6 +898,7 @@ def _get_telegram_bot_connection_context(user) -> dict[str, str | bool]:
     return {
         "telegram_user_bot_connected": telegram_user_bot_connected,
         "telegram_bot_username": telegram_bot_username,
+        "telegram_api_enabled": is_telegram_api_enabled(),
     }
 
 

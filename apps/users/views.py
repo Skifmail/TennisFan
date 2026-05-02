@@ -778,12 +778,16 @@ def profile(request, pk):
             season_points.season_name != current_season.name
             or season_points.season_year != current_season.year
         ):
-            # Создаём новую запись для нового сезона
-            season_points = SeasonPoints.objects.create(
-                player=player,
-                current_season_points=0,
-                season_name=current_season.name,
-                season_year=current_season.year,
+            # Один SeasonPoints на игрока (OneToOne): при смене сезона обновляем строку
+            season_points.current_season_points = 0
+            season_points.season_name = current_season.name
+            season_points.season_year = current_season.year
+            season_points.save(
+                update_fields=[
+                    "current_season_points",
+                    "season_name",
+                    "season_year",
+                ]
             )
     except SeasonPoints.DoesNotExist:
         current_season = get_current_season()

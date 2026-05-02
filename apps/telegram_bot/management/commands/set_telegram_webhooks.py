@@ -19,7 +19,10 @@ import requests
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from apps.telegram_bot.telegram_http import telegram_requests_proxies
+from apps.telegram_bot.telegram_http import (
+    is_telegram_api_enabled,
+    telegram_requests_proxies,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +71,13 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
+        if not is_telegram_api_enabled():
+            self.stdout.write(
+                self.style.WARNING(
+                    "Telegram API отключён (TELEGRAM_ENABLED=false). Вызовы setWebhook/deleteWebhook пропущены."
+                )
+            )
+            return
         base = (getattr(settings, "TELEGRAM_BOT_SITE_BASE_URL", None) or "").rstrip("/")
         if not base:
             self.stderr.write(

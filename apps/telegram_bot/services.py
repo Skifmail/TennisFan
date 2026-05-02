@@ -11,7 +11,10 @@ from typing import Any, cast
 import requests
 from django.conf import settings
 
-from apps.telegram_bot.telegram_http import telegram_requests_proxies
+from apps.telegram_bot.telegram_http import (
+    is_telegram_api_enabled,
+    telegram_requests_proxies,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +55,8 @@ def _get_private_chat_channel_id() -> int | None:
 
 
 def is_configured() -> bool:
-    """Проверка, что бот настроен."""
-    return bool(_get_bot_token())
+    """Проверка, что бот настроен и исходящие вызовы к API включены."""
+    return bool(_get_bot_token()) and is_telegram_api_enabled()
 
 
 def is_private_chat_configured() -> bool:
@@ -66,6 +69,8 @@ def _api_post(
     method: str, payload: dict[str, Any], timeout: int = 10
 ) -> tuple[Any, bool]:
     """Унифицированный POST в Telegram Bot API с проверкой `ok` в JSON-ответе."""
+    if not is_telegram_api_enabled():
+        return None, False
     token = _get_bot_token()
     if not token:
         return None, False
@@ -220,6 +225,8 @@ def get_bot_username() -> str | None:
     """
     Получить @username бота для ссылки привязки (t.me/BotUsername?start=TOKEN).
     """
+    if not is_telegram_api_enabled():
+        return None
     token = _get_bot_token()
     if not token:
         return None
@@ -250,6 +257,8 @@ def send_message(
     Отправить сообщение пользователю от имени пользовательского бота.
     Возвращает (message_id, success).
     """
+    if not is_telegram_api_enabled():
+        return None, False
     token = _get_bot_token()
     if not token:
         logger.debug("TELEGRAM_USER_BOT_TOKEN not set")
@@ -303,6 +312,8 @@ def edit_message_text(
     reply_markup: dict | None = None,
 ) -> bool:
     """Редактировать текст и/или кнопки сообщения."""
+    if not is_telegram_api_enabled():
+        return False
     token = _get_bot_token()
     if not token:
         return False
@@ -339,6 +350,8 @@ def send_photo(
     photo: путь к файлу (str), HTTP(S) URL (str) или bytes.
     Возвращает (message_id, success).
     """
+    if not is_telegram_api_enabled():
+        return None, False
     token = _get_bot_token()
     if not token:
         logger.debug("TELEGRAM_USER_BOT_TOKEN not set")

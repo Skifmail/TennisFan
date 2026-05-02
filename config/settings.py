@@ -394,6 +394,14 @@ TELEGRAM_PUBLIC_COMMUNITY_URL = (
 TELEGRAM_BOT_SITE_BASE_URL = os.environ.get("TELEGRAM_BOT_SITE_BASE_URL", "")
 # Исходящий прокси только для Telegram Bot API (если api.telegram.org недоступен напрямую).
 TELEGRAM_API_PROXY_URL = os.environ.get("TELEGRAM_API_PROXY_URL", "").strip()
+# Глобально отключить исходящие запросы к Telegram Bot API (боты, уведомления, webhooks-команда).
+# При False токены могут оставаться в окружении, но сеть к api.telegram.org не используется.
+TELEGRAM_ENABLED = os.environ.get("TELEGRAM_ENABLED", "True").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
 SITE_URL = os.environ.get("SITE_URL", "").strip()
 
 # ------------------------------------------------------------------------------

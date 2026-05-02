@@ -30,7 +30,7 @@ from apps.users.models import Notification, Player
 
 from . import notifications as tg_notify
 from . import services as bot
-from .telegram_http import telegram_requests_proxies
+from .telegram_http import is_telegram_api_enabled, telegram_requests_proxies
 
 
 def _get_site_base_url() -> str:
@@ -205,6 +205,8 @@ def _answer_callback(
     show_alert: bool = False,
 ) -> None:
     """Ответить на callback_query в Telegram (убрать «часики», опционально показать текст)."""
+    if not is_telegram_api_enabled():
+        return
     token = bot._get_bot_token()
     if not token or callback_query_id is None:
         return
@@ -227,6 +229,8 @@ def _answer_callback(
 
 def _edit_message_remove_reply_markup(chat_id: int, message_id: int) -> None:
     """Убрать inline-кнопки у сообщения (после подтверждения/отклонения)."""
+    if not is_telegram_api_enabled():
+        return
     token = bot._get_bot_token()
     if not token:
         return
@@ -2119,7 +2123,7 @@ def user_bot_webhook(request):
         if not handled:
             handled = _handle_menu_callback(callback_query, base_url)
         cq_id = callback_query.get("id")
-        if cq_id and not handled:
+        if cq_id and not handled and is_telegram_api_enabled():
             token = bot._get_bot_token()
             if token:
                 try:

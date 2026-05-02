@@ -7,6 +7,19 @@
 from django.conf import settings
 
 
+def is_telegram_api_enabled() -> bool:
+    """
+    Разрешены ли исходящие HTTP-вызовы к Telegram Bot API в этом процессе.
+
+    При значении ``False`` (переменная окружения ``TELEGRAM_ENABLED``) приложение
+    не обращается к ``api.telegram.org``, чтобы избежать таймаутов при блокировках.
+
+    Returns:
+        bool: ``True``, если вызовы к API разрешены; иначе ``False``.
+    """
+    return bool(getattr(settings, "TELEGRAM_ENABLED", True))
+
+
 def telegram_requests_proxies() -> dict[str, str] | None:
     """
     Вернуть словарь ``proxies`` для библиотеки ``requests`` при настроенном прокси.

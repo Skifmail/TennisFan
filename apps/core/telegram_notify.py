@@ -13,7 +13,10 @@ from django.core.mail import send_mail
 from django.utils.html import strip_tags
 
 from apps.core.contact_utils import get_max_display_contact
-from apps.telegram_bot.telegram_http import telegram_requests_proxies
+from apps.telegram_bot.telegram_http import (
+    is_telegram_api_enabled,
+    telegram_requests_proxies,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,30 +87,33 @@ def _send_admin_message_raw(text: str, parse_mode: str = "HTML"):
     last_msg_id = None
     telegram_ok = False
     if token and chat_ids:
-        for chat_id in chat_ids:
-            cid = str(chat_id).strip()
-            if not cid:
-                continue
-            payload = {
-                "chat_id": cid,
-                "text": text,
-                "parse_mode": parse_mode,
-                "disable_web_page_preview": True,
-            }
-            try:
-                r = requests.post(
-                    url,
-                    json=payload,
-                    timeout=10,
-                    proxies=telegram_requests_proxies(),
-                )
-                r.raise_for_status()
-                data = r.json()
-                result = data.get("result", {})
-                last_msg_id = result.get("message_id")
-                telegram_ok = True
-            except Exception as e:
-                logger.warning("Telegram notify failed for chat_id=%s: %s", cid, e)
+        if not is_telegram_api_enabled():
+            logger.debug("Telegram notify skipped: TELEGRAM_ENABLED is off")
+        else:
+            for chat_id in chat_ids:
+                cid = str(chat_id).strip()
+                if not cid:
+                    continue
+                payload = {
+                    "chat_id": cid,
+                    "text": text,
+                    "parse_mode": parse_mode,
+                    "disable_web_page_preview": True,
+                }
+                try:
+                    r = requests.post(
+                        url,
+                        json=payload,
+                        timeout=10,
+                        proxies=telegram_requests_proxies(),
+                    )
+                    r.raise_for_status()
+                    data = r.json()
+                    result = data.get("result", {})
+                    last_msg_id = result.get("message_id")
+                    telegram_ok = True
+                except Exception as e:
+                    logger.warning("Telegram notify failed for chat_id=%s: %s", cid, e)
     else:
         logger.debug(
             "Telegram notify skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_ADMIN_CHAT_ID(s) not set"

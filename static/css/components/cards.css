@@ -1068,9 +1068,11 @@
     }
 
     .tournament-card__line--participants {
-        min-height: 28px;
+        min-height: 38px;
         height: auto;
         max-height: none;
+        margin-top: 2px;
+        padding-bottom: 2px;
     }
 
     .tournament-card__participants-strip--stacked {
@@ -1078,11 +1080,11 @@
         flex-direction: row;
         align-items: center;
         flex-wrap: nowrap;
-        height: 28px;
-        min-height: 28px;
+        height: auto;
+        min-height: 38px;
         padding: 0 2px 0 0;
         overflow-x: auto;
-        overflow-y: hidden;
+        overflow-y: visible;
         gap: 0;
     }
 
@@ -1097,18 +1099,22 @@
         margin-left: 0;
     }
 
-    .tournament-card__avatar-img {
-        width: 24px;
-        height: 24px;
+    /* Выше специфичность, чем у .player-avatar из tournament.css (40×40 и min-*). */
+    .tournament-card__participants-strip--stacked .tournament-card__avatar-img.player-avatar {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+        box-sizing: border-box;
     }
 
     .tournament-card__empty-line {
         font-size: 11px;
-        line-height: 28px;
+        line-height: 38px;
     }
 
     .tournament-card__more-count {
-        line-height: 28px;
+        line-height: 38px;
         margin-left: 4px;
         font-size: 11px;
     }

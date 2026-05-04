@@ -24,7 +24,21 @@
             <!-- Left: player info -->
             <div class="profile-info">
                 <div class="profile-info__header">
+                    {% if player.avatar %}
+                    <a
+                        href="{{ player.avatar.url }}"
+                        class="profile-info__avatar-link js-lightbox"
+                        data-lightbox-src="{{ player.avatar.url }}"
+                        data-lightbox-caption="{{ player }}"
+                        data-lightbox-group="profile-avatar"
+                        aria-label="Открыть фото профиля в полном размере"
+                        style="--profile-avatar-bg: url('{{ player.avatar.url|escape }}');"
+                    >
+                        {% include 'includes/avatar.html' with avatar=player.avatar class="player-avatar profile-info__avatar" %}
+                    </a>
+                    {% else %}
                     {% include 'includes/avatar.html' with avatar=player.avatar class="player-avatar profile-info__avatar" %}
+                    {% endif %}
                     <div class="profile-info__title">
                         <h1 class="profile-info__name">{{ player }}</h1>
                         <div class="profile-info__badges">

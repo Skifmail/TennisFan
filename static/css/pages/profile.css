@@ -158,12 +158,73 @@
     z-index: 1;
 }
 
-.profile-info__avatar {
-    width: 100px;
-    height: 100px;
+/* Портрет 3:4; специфичность выше, чем у .player-avatar из tournament.css */
+.profile-info__header .profile-info__avatar.player-avatar {
+    position: relative;
+    z-index: 1;
+    width: 120px;
+    height: 160px;
+    min-width: 120px;
+    min-height: 160px;
     flex-shrink: 0;
     border-radius: var(--radius-md);
-    object-fit: cover;
+    object-fit: contain;
+    object-position: center;
+    background: transparent;
+}
+
+.profile-info__avatar-link {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    isolation: isolate;
+    background: rgb(0 26 18 / 90%);
+    border: 1px solid rgb(255 255 255 / 12%);
+    cursor: zoom-in;
+    text-decoration: none;
+    color: inherit;
+    outline-offset: 4px;
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+/* Размытое «заполнение» полей при object-fit: contain (тот же кадр на фоне) */
+.profile-info__avatar-link::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    z-index: 0;
+    background-image: var(--profile-avatar-bg);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: blur(16px);
+    transform: scale(1.12);
+    opacity: 0.92;
+}
+
+.profile-info__avatar-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: rgb(0 26 18 / 42%);
+    pointer-events: none;
+}
+
+.profile-info__avatar-link:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 24px rgb(0 0 0 / 35%);
+}
+
+.profile-info__avatar-link:focus-visible {
+    outline: 2px solid var(--color-primary, #a6824a);
 }
 
 .profile-info__title {
@@ -931,6 +992,10 @@
     .profile-info__header {
         flex-direction: column;
         text-align: center;
+    }
+
+    .profile-info__avatar-link {
+        align-self: center;
     }
 
     .profile-info__badges {

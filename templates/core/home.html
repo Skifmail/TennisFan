@@ -447,6 +447,15 @@
 
             <article class="home-action-card">
                 <div class="home-action-card__image-wrap">
+                    <img src="{% static 'images/training.png' %}" alt="" class="home-action-card__image">
+                </div>
+                <h3 class="home-action-card__title">Тренировки</h3>
+                <p class="home-action-card__text">Подбери индивидуальные и групповые занятия с тренерами в своем городе.</p>
+                <a href="{% url 'training_list' %}" class="btn btn-outline home-action-card__btn">Смотреть тренировки</a>
+            </article>
+
+            <article class="home-action-card">
+                <div class="home-action-card__image-wrap">
                     <img src="{% static 'images/boost_rating.png' %}" alt="" class="home-action-card__image">
                 </div>
                 <h3 class="home-action-card__title">Прокачать рейтинг</h3>

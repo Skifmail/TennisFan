@@ -1,7 +1,0 @@
-{
-  "project_name": "Tennison Club Module",
-  "description": "Клубный раздел теннисной платформы — регистрация клубов, игроки, турниры, рейтинг, взносы",
-  "parallelization": false,
-  "created_from": "club_dev_spec.docx",
-  "created_at": "2026-03-13"
-}

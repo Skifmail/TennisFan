@@ -43,3 +43,8 @@ media/
 
 # Docker
 .docker/
+
+# AI/Planning local artifacts
+.cursor/
+.planning/
+AGENTS.md

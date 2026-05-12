@@ -27,19 +27,23 @@
   <div class="module" id="recent-actions-module">
     <h2>{% translate 'Recent actions' %}</h2>
     <h3>{% translate 'My actions' %}</h3>
-    {% get_admin_log 10 as admin_log for_user user %}
+    {% get_admin_log 25 as admin_log for_user user %}
     {% if not admin_log %}
     <p>{% translate 'None available' %}</p>
     {% else %}
     <ul class="actionlist">
       {% for entry in admin_log %}
-      <li class="{% if entry.is_addition %}addlink{% endif %}{% if entry.is_change %}changelink{% endif %}{% if entry.is_deletion %}deletelink{% endif %}">
-        <span class="visually-hidden">
-          {% if entry.is_addition %}{% translate 'Added:' %}
-          {% elif entry.is_change %}{% translate 'Changed:' %}
-          {% elif entry.is_deletion %}{% translate 'Deleted:' %}
-          {% endif %}
-        </span>
+      <li class="{% if entry.is_deletion %}deletelink{% elif entry.is_addition %}addlink{% elif entry.is_change %}changelink{% endif %}">
+        <span class="mini quiet">{{ entry.action_time|date:"d.m.Y H:i" }}</span>
+        —
+        {% if entry.is_addition %}
+          <span class="mini">{% translate "Добавлено" %}</span>
+        {% elif entry.is_change %}
+          <span class="mini">{% translate "Изменено" %}</span>
+        {% elif entry.is_deletion %}
+          <span class="mini">{% translate "Удалено" %}</span>
+        {% endif %}
+        <br>
         {% if entry.is_deletion or not entry.get_admin_url %}
           {{ entry.object_repr }}
         {% else %}
@@ -54,6 +58,10 @@
       </li>
       {% endfor %}
     </ul>
+    <p class="mini quiet" style="margin: 0.75rem 0 0; padding: 0 0.5rem;">
+      Показаны последние 25 действий в админке под вашей учётной записью. Сюда не попадают
+      изменения вне этой панели (например, через API или бота).
+    </p>
     {% endif %}
   </div>
 </div>

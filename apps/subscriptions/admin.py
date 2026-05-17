@@ -114,11 +114,36 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
     # поэтому поиск по нему приводит к FieldError.
     search_fields = ("user__email", "user__last_name", "user__first_name")
     readonly_fields = (
-        "fancoin_balance",
         "cancelled_at",
         "purchase_city",
     )
     autocomplete_fields = ("user",)
+
+    actions = ["add_1_fancoin", "add_tier_fancoins"]
+
+    @admin.action(description="Начислить 1 FAN-token")
+    def add_1_fancoin(self, request, queryset):
+        count = 0
+        for sub in queryset:
+            sub.fancoin_balance += 1
+            sub.save(update_fields=["fancoin_balance"])
+            count += 1
+        self.message_user(
+            request, f"Успешно начислено по 1 FAN-token для {count} подписок."
+        )
+
+    @admin.action(description="Начислить FAN-tokens по тарифу")
+    def add_tier_fancoins(self, request, queryset):
+        count = 0
+        for sub in queryset:
+            added = sub.tier.fancoin_per_purchase
+            if added > 0:
+                sub.fancoin_balance += added
+                sub.save(update_fields=["fancoin_balance"])
+                count += 1
+        self.message_user(
+            request, f"Успешно начислены FAN-tokens по тарифу для {count} подписок."
+        )
 
     @admin.display(description="Email", ordering="user__email")
     def user_email(self, obj: UserSubscription) -> str:

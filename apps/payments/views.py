@@ -1,3 +1,4 @@
+import json
 import logging
 import secrets
 from decimal import Decimal
@@ -14,6 +15,7 @@ from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from apps.core.models import LegalAcceptanceLog
@@ -27,9 +29,6 @@ from .models import PaymentRecord, SavedPaymentMethod
 from .yookassa_client import (
     create_payment,
     create_payment_with_credentials,
-    get_payment_details,
-    get_payment_status,
-    get_payment_status_with_credentials,
 )
 
 logger = logging.getLogger(__name__)
@@ -722,7 +721,7 @@ def payment_process(request: HttpRequest) -> HttpResponse:
                     return _build_preview_redirect(request, payment_type)
 
             if breakdown.external_amount_due <= 0:
-                spend_member_balance(
+                balance_transaction = spend_member_balance(
                     tournament_member,
                     breakdown.balance_to_apply,
                     source=ClubMemberBalanceTransaction.Source.TOURNAMENT_PAYMENT,
@@ -730,6 +729,34 @@ def payment_process(request: HttpRequest) -> HttpResponse:
                     reference=f"tournament:{tournament.id}",
                     metadata={"tournament_id": tournament.id},
                 )
+
+                # We do not need yookassa, the entire amount was covered by balance.
+                record_metadata = {
+                    "payment_type": "tournament",
+                    "item_id": str(tournament.id),
+                    "next": request.POST.get("next", "").strip(),
+                    "club_id": str(tournament.club_id) if tournament.club_id else "",
+                    "club_slug": tournament.club.slug if tournament.club_id else "",
+                    "balance_amount": f"{breakdown.balance_to_apply:.2f}",
+                    "total_amount": f"{amount_decimal:.2f}",
+                    "balance_transaction_id": (
+                        str(balance_transaction.id) if balance_transaction else ""
+                    ),
+                }
+
+                pr = PaymentRecord.objects.create(
+                    user=request.user,
+                    payment_type="tournament",
+                    item_id=str(tournament.id),
+                    amount=amount_decimal,
+                    status="succeeded",
+                    yookassa_payment_id="balance_"
+                    + (str(balance_transaction.id) if balance_transaction else "free"),
+                    metadata=record_metadata,
+                )
+
+                finalize_successful_payment(pr, request)
+
                 success_url = reverse("payment_success")
                 success_url += "?" + urlencode(
                     {
@@ -911,6 +938,55 @@ def payment_process(request: HttpRequest) -> HttpResponse:
         )
         return _build_preview_redirect(request, payment_type)
 
+    payment_user = (
+        request.user
+        if request.user.is_authenticated
+        else _get_or_create_donation_guest_user()
+    )
+
+    _log_offer_acceptance(
+        request,
+        user=payment_user,
+        payment_type=payment_type,
+        item_id=item_id,
+        payment_id=payment_id,
+    )
+
+    # Store metadata on PaymentRecord so we can finalize correctly from a webhook
+    record_metadata = {
+        "payment_type": payment_type,
+        "item_id": item_id,
+        "next": next_url,
+        "enable_autopay": "1" if enable_autopay else "",
+    }
+    if payment_type == "donation":
+        record_metadata["name_or_email"] = request.POST.get("name_or_email", "").strip()
+        record_metadata["comment"] = request.POST.get("comment", "").strip()
+    if tournament is not None:
+        record_metadata["balance_amount"] = f"{balance_to_apply:.2f}"
+        record_metadata["total_amount"] = (
+            f"{_get_discounted_tournament_entry_fee(request, tournament):.2f}"
+        )
+        if tournament.club_id:
+            record_metadata["club_id"] = str(tournament.club_id)
+            record_metadata["club_slug"] = tournament.club.slug
+        if postpayment_invoice is not None:
+            record_metadata["postpayment_invoice_id"] = str(postpayment_invoice.id)
+    if balance_transaction is not None:
+        record_metadata["balance_transaction_id"] = str(balance_transaction.id)
+
+    # CREATE PENDING RECORD
+    _create_payment_record(
+        user=payment_user,
+        payment_type=payment_type,
+        item_id=item_id,
+        amount_str=amount_str,
+        payment_id=payment_id,
+        autopay_enabled=enable_autopay,
+        status="pending",
+        metadata=record_metadata,
+    )
+
     pending_data = {
         "payment_id": payment_id,
         "payment_type": payment_type,
@@ -946,304 +1022,37 @@ def payment_process(request: HttpRequest) -> HttpResponse:
     return redirect(confirmation_url)
 
 
-def payment_return(request: HttpRequest) -> HttpResponse:
-    """Обработка возврата пользователя с формы ЮKassa.
+def finalize_successful_payment(payment_record, request=None) -> None:
+    """Выдача услуг после успешной оплаты. Вызывается один раз."""
+    if payment_record.status != "succeeded":
+        return
 
-    ЮKassa перенаправляет браузер на ``return_url``. На этой странице мы
-    проверяем статус платежа и перенаправляем пользователя далее на
-    ``payment_success`` при успешной оплате.
+    payment_type = payment_record.payment_type
+    item_id = payment_record.item_id
+    user = payment_record.user
+    metadata = payment_record.metadata or {}
 
-    Args:
-        request (HttpRequest): Текущий HTTP-запрос.
+    amount_str = str(payment_record.amount)
 
-    Returns:
-        HttpResponse: Редирект на страницу успеха или обратно к оформлению.
-    """
-    pending = request.session.get("yookassa_pending")
-    if not pending:
-        messages.warning(
-            request,
-            "Сессия истекла или вы уже обработали этот платёж. Проверьте результат в личном кабинете.",
-        )
-        return redirect("donate")
-
-    payment_id = pending.get("payment_id")
-    payment_type = pending.get("payment_type", "")
-    item_id = pending.get("item_id", "")
-    next_url = pending.get("next", "")
-    enable_autopay = str(pending.get("enable_autopay", "")).strip() == "1"
-    balance_transaction = _get_balance_transaction_by_id(
-        str(pending.get("balance_transaction_id") or "")
-    )
-    club_id = str(pending.get("club_id") or "").strip()
-    status = None
-    tournament = None
-    if payment_type == "tournament" and item_id:
-        try:
-            tournament = (
-                Tournament.objects.select_related("club")
-                .filter(pk=int(item_id))
-                .first()
-            )
-        except (TypeError, ValueError):
-            tournament = None
-        if tournament and tournament.club_id and club_id:
-            from apps.clubs.payment_utils import decrypt_secret
-            from apps.clubs.views.helpers import _get_club_payment_settings
-
-            club_payment_settings = _get_club_payment_settings(tournament.club)
-            if club_payment_settings is None:
-                if balance_transaction is not None:
-                    from apps.clubs.finance_services import cancel_reserved_balance
-
-                    cancel_reserved_balance(balance_transaction)
-                messages.error(
-                    request,
-                    "Клуб отключил YooKassa или не настроил платёжные реквизиты. Оплата турнира не подтверждена.",
-                )
-                del request.session["yookassa_pending"]
-                request.session.modified = True
-                return redirect("tournament_detail", slug=tournament.slug)
-            try:
-                club_secret = decrypt_secret(club_payment_settings.payment_api_key)
-            except Exception as exc:
-                if balance_transaction is not None:
-                    from apps.clubs.finance_services import cancel_reserved_balance
-
-                    cancel_reserved_balance(balance_transaction)
-                logger.warning(
-                    "Не удалось расшифровать ключ YooKassa клуба при проверке оплаты турнира: %s",
-                    exc,
-                )
-                messages.error(request, "Ошибка проверки клубного платежа.")
-                del request.session["yookassa_pending"]
-                request.session.modified = True
-                return redirect("tournament_detail", slug=tournament.slug)
-            status = (
-                get_payment_status_with_credentials(
-                    payment_id,
-                    club_payment_settings.payment_shop_id,
-                    club_secret,
-                )
-                if payment_id
-                else None
-            )
-        else:
-            status = get_payment_status(payment_id) if payment_id else None
-    else:
-        status = get_payment_status(payment_id) if payment_id else None
-    if status != "succeeded":
-        if balance_transaction is not None:
-            from apps.clubs.finance_services import cancel_reserved_balance
-
-            cancel_reserved_balance(balance_transaction)
-        messages.error(
-            request,
-            "Оплата не была завершена или отменена. Попробуйте снова или выберите другой способ.",
-        )
-        del request.session["yookassa_pending"]
-        request.session.modified = True
-        preview_params: dict[str, str] = {}
-        if payment_type:
-            preview_params["type"] = payment_type
-        if item_id:
-            preview_params["id"] = item_id
-        if preview_params:
-            return redirect(
-                reverse("payment_preview") + "?" + urlencode(preview_params)
-            )
-        return redirect("donate")
-
-    if balance_transaction is not None:
-        from apps.clubs.finance_services import confirm_reserved_balance
-
-        confirm_reserved_balance(balance_transaction)
-
-    # Уведомление админу о донате до очистки сессии
     if payment_type == "donation":
+        try:
+            from apps.core.email_service import send_donation_thanks_email
+
+            send_donation_thanks_email(user, amount_str)
+        except Exception:
+            pass
         try:
             from apps.core.telegram_notify import notify_donation
 
             notify_donation(
-                amount=pending.get("amount", ""),
-                name_or_email=pending.get("name_or_email", ""),
-                comment=pending.get("comment", ""),
+                amount=amount_str,
+                name_or_email=metadata.get("name_or_email", ""),
+                comment=metadata.get("comment", ""),
             )
         except Exception as e:
             logger.warning("Telegram notify_donation failed: %s", e)
 
-    # Для подписки и клубного тарифа при включённом автопродлении пробуем сохранить способ оплаты.
-    if (
-        payment_type in ("subscription", "club_plan")
-        and enable_autopay
-        and request.user.is_authenticated
-        and payment_id
-    ):
-        details = get_payment_details(payment_id)
-        if isinstance(details, dict):
-            pm = details.get("payment_method") or {}
-            pm_id = pm.get("id")
-            if isinstance(pm_id, str) and pm_id:
-                card = pm.get("card") or {}
-                card_last4 = str(card.get("last4") or "")[-4:]
-                exp_month = str(card.get("expiry_month") or "")[:2]
-                exp_year = str(card.get("expiry_year") or "")[:4]
-                network = str(card.get("card_type") or card.get("brand") or "").strip()
-
-                if payment_type == "subscription":
-                    SavedPaymentMethod.objects.filter(
-                        user=request.user,
-                        club__isnull=True,
-                        is_default_for_subscriptions=True,
-                    ).update(is_default_for_subscriptions=False)
-                else:
-                    SavedPaymentMethod.objects.filter(
-                        user=request.user,
-                        is_default_for_club_plans=True,
-                    ).update(is_default_for_club_plans=False)
-
-                existing_method = SavedPaymentMethod.objects.filter(
-                    payment_method_id=pm_id
-                ).first()
-                defaults = {
-                    "user": request.user,
-                    "club": (
-                        None
-                        if payment_type == "subscription"
-                        else (existing_method.club if existing_method else None)
-                    ),
-                    "card_last4": card_last4,
-                    "card_exp_month": exp_month,
-                    "card_exp_year": exp_year,
-                    "card_network": network,
-                    "is_active": True,
-                    "is_default_for_subscriptions": (
-                        True
-                        if payment_type == "subscription"
-                        else bool(
-                            existing_method
-                            and existing_method.is_default_for_subscriptions
-                        )
-                    ),
-                    "is_default_for_club_plans": (
-                        True
-                        if payment_type == "club_plan"
-                        else bool(
-                            existing_method
-                            and existing_method.is_default_for_club_plans
-                        )
-                    ),
-                    "is_default_for_club_fees": bool(
-                        existing_method and existing_method.is_default_for_club_fees
-                    ),
-                }
-
-                SavedPaymentMethod.objects.update_or_create(
-                    payment_method_id=pm_id, defaults=defaults
-                )
-
-    if payment_id and (request.user.is_authenticated or payment_type == "donation"):
-        payment_user: AbstractBaseUser
-        if request.user.is_authenticated:
-            payment_user = cast(AbstractBaseUser, request.user)
-        else:
-            payment_user = _get_or_create_donation_guest_user()
-
-        _log_offer_acceptance(
-            request,
-            user=payment_user,
-            payment_type=payment_type,
-            item_id=item_id,
-            payment_id=payment_id,
-        )
-        _create_payment_record(
-            user=payment_user,
-            payment_type=payment_type,
-            item_id=item_id,
-            amount_str=str(pending.get("amount", "")),
-            payment_id=payment_id,
-            autopay_enabled=enable_autopay,
-            metadata={
-                "club_id": str(pending.get("club_id", "") or ""),
-                "club_slug": str(pending.get("club_slug", "") or ""),
-                "balance_amount": str(pending.get("balance_amount", "") or "0"),
-                "external_amount": str(pending.get("amount", "") or "0"),
-                "total_amount": str(
-                    pending.get("total_amount", "") or pending.get("amount", "") or "0"
-                ),
-            },
-        )
-
-    del request.session["yookassa_pending"]
-    request.session.modified = True
-
-    # Донат от гостя — просто благодарим и редирект на главную
-    if payment_type == "donation" and not request.user.is_authenticated:
-        messages.success(request, "Спасибо за поддержку проекта!")
-        return redirect("home")
-
-    success_url = reverse("payment_success")
-    params: list[tuple[str, str]] = []
-    if payment_type:
-        params.append(("type", payment_type))
-    if item_id:
-        params.append(("id", item_id))
-    postpayment_invoice_id = str(pending.get("postpayment_invoice_id") or "").strip()
-    if postpayment_invoice_id:
-        params.append(("invoice", postpayment_invoice_id))
-    if next_url:
-        params.append(("next", next_url))
-    amount_paid = pending.get("amount", "").strip()
-    if amount_paid:
-        params.append(("amount", amount_paid))
-    if params:
-        if payment_type == "club_plan" and enable_autopay:
-            params.append(("autopay", "1"))
-        success_url += "?" + urlencode(params)
-    return redirect(success_url)
-
-
-def payment_success(request: HttpRequest) -> HttpResponse:
-    """Финальная обработка успешного платежа и перенаправление пользователя.
-
-    GET-параметры:
-
-    * ``type`` — тип платежа (``tournament``, ``subscription``, ``donation``);
-    * ``id`` — идентификатор объекта (турнир или тариф);
-    * ``next`` — опциональный URL для дальнейшего редиректа.
-
-    Args:
-        request (HttpRequest): Текущий HTTP-запрос.
-
-    Returns:
-        HttpResponse: Редирект на страницу профиля, турнира или список турниров.
-    """
-    if not request.user.is_authenticated:
-        from django.conf import settings
-
-        messages.info(request, "Для просмотра необходимо войти.")
-        login_url = getattr(settings, "LOGIN_URL", "login")
-        return redirect(f"{reverse(login_url)}?next={request.get_full_path()}")
-
-    payment_type = request.GET.get("type")
-    item_id = request.GET.get("id")
-    next_url = request.GET.get("next", "").strip()
-
-    if payment_type == "donation":
-        if request.user.is_authenticated:
-            try:
-                from apps.core.email_service import send_donation_thanks_email
-
-                send_donation_thanks_email(request.user, request.GET.get("amount"))
-            except Exception:
-                logger.exception(
-                    "send_donation_thanks_email failed | user=%s",
-                    getattr(request.user, "pk", None),
-                )
-        messages.success(request, "Спасибо за поддержку проекта!")
-        return redirect("home")
-
-    if payment_type == "subscription" and item_id:
+    elif payment_type == "subscription" and item_id:
         try:
             tier_id = int(item_id)
         except (TypeError, ValueError):
@@ -1255,7 +1064,7 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                 from apps.subscriptions.views import _mark_user_paid_subscription
 
                 sub, created = UserSubscription.objects.get_or_create(
-                    user=request.user,
+                    user=user,
                     defaults={"tier": tier, "end_date": timezone.now()},
                 )
                 sub.tier = tier
@@ -1270,23 +1079,18 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                     sub.end_date = tier.apply_duration(base)
                 from apps.subscriptions.utils import normalize_city_for_pricing
 
-                city = getattr(request.user, "player", None) and getattr(
-                    request.user.player, "city", None
+                city = getattr(user, "player", None) and getattr(
+                    user.player, "city", None
                 )
                 sub.purchase_city = normalize_city_for_pricing(city or "")
                 sub.save()
                 if not tier.is_unlimited and tier.fancoin_per_purchase > 0:
                     sub.add_fancoin(tier.fancoin_per_purchase)
-                _mark_user_paid_subscription(request.user)
-                amount_paid = request.GET.get("amount")
+                _mark_user_paid_subscription(user)
                 try:
                     from apps.core.telegram_notify import notify_subscription_purchase
 
-                    notify_subscription_purchase(
-                        request.user,
-                        tier,
-                        amount_paid=amount_paid,
-                    )
+                    notify_subscription_purchase(user, tier, amount_paid=amount_str)
                 except Exception as e:
                     logger.warning(
                         "Telegram notify_subscription_purchase failed: %s", e
@@ -1297,94 +1101,68 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                     )
 
                     send_subscription_purchase_email(
-                        user=request.user,
-                        subscription=sub,
-                        amount_paid=amount_paid,
+                        user=user, subscription=sub, amount_paid=amount_str
                     )
                 except Exception:
-                    # Ошибки отправки email не должны ломать успешный флоу оплаты.
                     pass
-                messages.success(
-                    request, f"Подписка «{tier.get_name_display()}» успешно оформлена."
-                )
-                try:
-                    return redirect("profile", pk=request.user.player.pk)
-                except Exception:
-                    return redirect("pricing")
 
-    if payment_type == "club_plan" and item_id:
+    elif payment_type == "club_plan" and item_id:
         try:
             plan_id = int(item_id)
         except (TypeError, ValueError):
             plan_id = None
         if plan_id is not None:
-            from apps.clubs.models import ClubMember, ClubMemberStatus, ClubPlayerPlan
-            from apps.clubs.plan_services import purchase_member_plan
+            from apps.clubs.models import ClubPlayerPlan
 
             plan = (
                 ClubPlayerPlan.objects.select_related("club").filter(pk=plan_id).first()
             )
-            if plan is not None:
+            if plan:
+                from apps.clubs.plan_services import purchase_member_plan
+
+                auto_renew_enabled = metadata.get("enable_autopay") == "1"
+                from apps.clubs.models import ClubMember, ClubMemberStatus
+
                 member = (
                     ClubMember.objects.select_related("club")
                     .filter(
                         club=plan.club,
-                        user=request.user,
+                        user=user,
                         status=ClubMemberStatus.ACTIVE,
                     )
                     .first()
                 )
-                if member is None:
-                    messages.error(request, "Вы не состоите в клубе для этого тарифа.")
-                    return redirect("clubs:club_public_detail", slug=plan.club.slug)
-
-                request.session["current_club_slug"] = plan.club.slug
-                request.session.modified = True
-                auto_renew_enabled = str(
-                    request.GET.get("autopay", "")
-                ).strip().lower() in {"1", "true"}
-                purchase_member_plan(
-                    member,
-                    plan,
-                    assigned_by=request.user,
-                    change_reason="Оплата клубного тарифа участником",
-                    auto_renew=auto_renew_enabled,
-                )
+                if member:
+                    try:
+                        purchase_member_plan(
+                            member,
+                            plan,
+                            assigned_by=user,
+                            change_reason="Оплата клубного тарифа",
+                            auto_renew=auto_renew_enabled,
+                        )
+                    except Exception:
+                        logger.exception("purchase_member_plan failed")
                 try:
                     from apps.core.email_service import send_club_plan_receipt_email
 
                     send_club_plan_receipt_email(
-                        request.user,
+                        user,
                         club_name=plan.club.name,
                         plan_name=plan.name,
-                        amount=request.GET.get("amount"),
+                        amount=amount_str,
                         auto_renew=auto_renew_enabled,
                     )
                 except Exception:
-                    logger.exception(
-                        "send_club_plan_receipt_email failed | user=%s plan=%s",
-                        request.user.pk,
-                        plan.pk,
-                    )
-                messages.success(
-                    request,
-                    f"Клубный тариф «{plan.name}» успешно оформлен.",
-                )
-                return redirect("clubs:my_plan")
+                    pass
 
-    if payment_type == "tournament" and item_id:
-        invoice_id_raw = (request.GET.get("invoice") or "").strip()
+    elif payment_type == "tournament" and item_id:
+        invoice_id_raw = metadata.get("postpayment_invoice_id", "")
         try:
             tid = int(item_id)
         except (TypeError, ValueError):
             tid = None
         if tid is not None:
-            paid_ids = list(request.session.get("tournament_entry_paid") or [])
-            if tid not in paid_ids:
-                paid_ids.append(tid)
-                request.session["tournament_entry_paid"] = paid_ids
-                request.session.modified = True
-
             tournament = Tournament.objects.filter(pk=tid).first()
             if tournament:
                 if invoice_id_raw:
@@ -1392,37 +1170,22 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                         invoice = TournamentPostpaymentInvoice.objects.get(
                             pk=int(invoice_id_raw),
                             tournament=tournament,
-                            user=request.user,
+                            user=user,
                         )
                         invoice.status = TournamentPostpaymentInvoice.Status.PAID
                         invoice.paid_at = timezone.now()
                         invoice.save(update_fields=["status", "paid_at"])
                     except (TournamentPostpaymentInvoice.DoesNotExist, ValueError):
                         pass
-                club_member = _get_tournament_club_member(request.user, tournament)
-                if tournament.club_id:
-                    if club_member is None:
-                        messages.error(
-                            request,
-                            "Вы больше не состоите в клубе и не можете завершить регистрацию на его турнир.",
-                        )
-                        return redirect("tournament_detail", slug=tournament.slug)
-                    request.session["current_club_slug"] = tournament.club.slug
-                    request.session.modified = True
                 try:
                     from apps.core.telegram_notify import (
                         notify_tournament_entry_payment,
                     )
 
-                    notify_tournament_entry_payment(
-                        tournament,
-                        request.user,
-                        amount=request.GET.get("amount"),
-                    )
+                    notify_tournament_entry_payment(tournament, user, amount=amount_str)
                 except Exception as e:
                     logger.warning(
-                        "Telegram notify_tournament_entry_payment failed: %s",
-                        e,
+                        "Telegram notify_tournament_entry_payment failed: %s", e
                     )
                 try:
                     from apps.core.email_service import (
@@ -1430,27 +1193,22 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                     )
 
                     send_tournament_entry_receipt_email(
-                        request.user,
+                        user,
                         tournament,
-                        amount=request.GET.get("amount"),
+                        amount=amount_str,
                         is_postpayment=bool(invoice_id_raw),
                     )
                 except Exception:
-                    logger.exception(
-                        "send_tournament_entry_receipt_email failed | user=%s tournament=%s",
-                        request.user.pk,
-                        tournament.pk,
-                    )
+                    pass
             if tournament and not tournament.is_doubles():
-                # Одиночный турнир: сразу добавляем участника (лимит подписки не тратим)
-                player = getattr(request.user, "player", None)
+                player = getattr(user, "player", None)
                 if player and not tournament.participants.filter(pk=player.pk).exists():
                     tournament.participants.add(player)
                     from apps.tournaments.models import TournamentEntryPayment
 
                     TournamentEntryPayment.objects.get_or_create(
                         tournament=tournament,
-                        user=request.user,
+                        user=user,
                     )
                 pending_count = TournamentPostpaymentInvoice.objects.filter(
                     tournament=tournament,
@@ -1458,19 +1216,247 @@ def payment_success(request: HttpRequest) -> HttpResponse:
                 ).count()
                 if pending_count == 0 and tournament.postpayment_window_started_at:
                     finalize_postpayment_window(tournament)
-                messages.success(
-                    request,
-                    "Оплата вступительного взноса прошла успешно. Вы зарегистрированы на турнир.",
-                )
-                return redirect("tournament_detail", slug=tournament.slug)
-            if tournament and tournament.is_doubles():
-                messages.success(
-                    request,
-                    "Оплата вступительного взноса прошла успешно. Завершите регистрацию на странице турнира: выберите партнёра или создайте команду.",
-                )
-                if next_url:
-                    return redirect(next_url)
-                return redirect("tournament_detail", slug=tournament.slug)
+
+    if metadata.get("enable_autopay") == "1" and payment_record.yookassa_payment_id:
+        try:
+            from apps.payments.yookassa_client import (
+                get_payment_details,
+                get_payment_details_with_credentials,
+            )
+
+            details = None
+            if metadata.get("club_id"):
+                from apps.clubs.models import Club
+                from apps.clubs.payment_utils import decrypt_secret
+                from apps.clubs.views.helpers import _get_club_payment_settings
+
+                club = Club.objects.filter(pk=metadata["club_id"]).first()
+                if club:
+                    club_settings = _get_club_payment_settings(club)
+                    if club_settings:
+                        secret = decrypt_secret(club_settings.payment_api_key)
+                        details = get_payment_details_with_credentials(
+                            payment_record.yookassa_payment_id,
+                            club_settings.payment_shop_id,
+                            secret,
+                        )
+            else:
+                details = get_payment_details(payment_record.yookassa_payment_id)
+
+            if details:
+                payment_method = details.get("payment_method")
+                if payment_method and payment_method.get("saved"):
+                    pm_id = payment_method.get("id")
+                    card = payment_method.get("card", {})
+                    if pm_id:
+                        SavedPaymentMethod.objects.update_or_create(
+                            user=user,
+                            payment_method_id=pm_id,
+                            defaults={
+                                "club_id": metadata.get("club_id") or None,
+                                "card_last4": str(card.get("last4", "")),
+                                "card_exp_month": str(card.get("expiry_month", "")),
+                                "card_exp_year": str(card.get("expiry_year", "")),
+                                "card_network": str(card.get("card_type", "")),
+                                "is_active": True,
+                                "is_default_for_subscriptions": payment_type
+                                == "subscription",
+                                "is_default_for_club_plans": payment_type
+                                == "club_plan",
+                                "is_default_for_club_fees": False,
+                            },
+                        )
+        except Exception as e:
+            logger.exception("Failed to save payment method: %s", e)
+
+
+@csrf_exempt
+def yookassa_webhook(request: HttpRequest) -> HttpResponse:
+    """Фоновый вебхук от ЮKassa для подтверждения успешных платежей."""
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return HttpResponse(status=400)
+
+    event = data.get("event")
+    if event != "payment.succeeded":
+        return HttpResponse(status=200)
+
+    payment_obj = data.get("object", {})
+    payment_id = payment_obj.get("id")
+    if not payment_id:
+        return HttpResponse(status=200)
+
+    try:
+        pr = PaymentRecord.objects.get(yookassa_payment_id=payment_id)
+    except PaymentRecord.DoesNotExist:
+        return HttpResponse(status=200)
+
+    if pr.status == "succeeded":
+        return HttpResponse(status=200)
+
+    # Server-side verification
+    status = None
+    if pr.metadata.get("club_id"):
+        from apps.clubs.models import Club
+        from apps.clubs.payment_utils import decrypt_secret
+        from apps.clubs.views.helpers import _get_club_payment_settings
+        from apps.payments.yookassa_client import get_payment_status_with_credentials
+
+        club = Club.objects.filter(pk=pr.metadata["club_id"]).first()
+        if club:
+            club_settings = _get_club_payment_settings(club)
+            if club_settings:
+                try:
+                    secret = decrypt_secret(club_settings.payment_api_key)
+                    status = get_payment_status_with_credentials(
+                        payment_id, club_settings.payment_shop_id, secret
+                    )
+                except Exception:
+                    pass
+    else:
+        from apps.payments.yookassa_client import get_payment_status
+
+        status = get_payment_status(payment_id)
+
+    if status == "succeeded":
+        pr.status = "succeeded"
+        pr.save(update_fields=["status"])
+        finalize_successful_payment(pr)
+
+    return HttpResponse(status=200)
+
+
+def payment_return(request: HttpRequest) -> HttpResponse:
+    """Обработка возврата пользователя с формы ЮKassa.
+    Теперь также является резервным методом проверки статуса, если вебхук задерживается.
+    """
+    pending = request.session.get("yookassa_pending")
+    if not pending or not isinstance(pending, dict):
+        messages.info(request, "Сессия оплаты истекла или не найдена.")
+        return redirect("home")
+
+    payment_id = pending.get("payment_id")
+    payment_type = pending.get("payment_type")
+    item_id = pending.get("item_id")
+    next_url = pending.get("next", "").strip()
+
+    if payment_id:
+        try:
+            pr = PaymentRecord.objects.get(yookassa_payment_id=payment_id)
+            if pr.status == "pending":
+                # Check status
+                status = None
+                if pr.metadata.get("club_id"):
+                    from apps.clubs.models import Club
+                    from apps.clubs.payment_utils import decrypt_secret
+                    from apps.clubs.views.helpers import _get_club_payment_settings
+                    from apps.payments.yookassa_client import (
+                        get_payment_status_with_credentials,
+                    )
+
+                    club = Club.objects.filter(pk=pr.metadata["club_id"]).first()
+                    if club:
+                        club_settings = _get_club_payment_settings(club)
+                        if club_settings:
+                            try:
+                                secret = decrypt_secret(club_settings.payment_api_key)
+                                status = get_payment_status_with_credentials(
+                                    payment_id, club_settings.payment_shop_id, secret
+                                )
+                            except Exception:
+                                pass
+                else:
+                    from apps.payments.yookassa_client import get_payment_status
+
+                    status = get_payment_status(payment_id)
+
+                if status == "succeeded":
+                    pr.status = "succeeded"
+                    pr.save(update_fields=["status"])
+                    finalize_successful_payment(pr, request)
+        except PaymentRecord.DoesNotExist:
+            pass
+
+    del request.session["yookassa_pending"]
+    request.session.modified = True
+
+    if payment_type == "donation" and not request.user.is_authenticated:
+        messages.success(request, "Спасибо за поддержку проекта!")
+        return redirect("home")
+
+    from urllib.parse import urlencode
+
+    from django.urls import reverse
+
+    success_url = reverse("payment_success")
+    params = []
+    if payment_type:
+        params.append(("type", payment_type))
+    if item_id:
+        params.append(("id", item_id))
+    if next_url:
+        params.append(("next", next_url))
+
+    if params:
+        success_url += "?" + urlencode(params)
+    return redirect(success_url)
+
+
+def payment_success(request: HttpRequest) -> HttpResponse:
+    """Финальная страница успешного платежа. (Визуальный экран/редирект)
+    Бизнес-логика выдачи теперь работает через вебхук и payment_return.
+    """
+    if not request.user.is_authenticated:
+        from django.conf import settings
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        from django.urls import reverse
+
+        messages.info(request, "Для просмотра необходимо войти.")
+        login_url = getattr(settings, "LOGIN_URL", "login")
+        return redirect(f"{reverse(login_url)}?next={request.get_full_path()}")
+
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    payment_type = request.GET.get("type")
+    item_id = request.GET.get("id")
+    next_url = request.GET.get("next", "").strip()
+
+    if payment_type == "donation":
+        messages.success(request, "Спасибо за поддержку проекта!")
+        return redirect("home")
+
+    if payment_type == "subscription":
+        messages.success(request, "Оплата прошла успешно! Ваша подписка активирована.")
+        player = getattr(request.user, "player", None)
+        if player:
+            return redirect("profile", pk=player.pk)
+        return redirect("pricing")
+
+    if payment_type == "club_plan":
+        messages.success(request, "Клубный тариф успешно оформлен.")
+        return redirect("clubs:my_plan")
+
+    if payment_type == "tournament":
+        messages.success(request, "Оплата вступительного взноса прошла успешно.")
+        if next_url:
+            return redirect(next_url)
+        # Attempt to redirect to tournament if item_id is given
+        if item_id:
+            try:
+                from apps.tournaments.models import Tournament
+
+                tournament = Tournament.objects.filter(pk=int(item_id)).first()
+                if tournament:
+                    return redirect("tournament_detail", slug=tournament.slug)
+            except (ValueError, TypeError):
+                pass
+        return redirect("tournament_list")
 
     if next_url:
         return redirect(next_url)

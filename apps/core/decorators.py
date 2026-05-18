@@ -93,3 +93,50 @@ def require_filled_profile(view_func):
         return view_func(request, *args, **kwargs)
 
     return wrapper
+
+
+def require_verified_player(view_func):
+    """
+    Декоратор, блокирующий доступ к функционалу для неподтверждённых игроков.
+    Суперпользователи и staff всегда проходят.
+    Применяется поверх require_filled_profile там, где нужна верификация.
+    """
+
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return login_required_with_message()(view_func)(request, *args, **kwargs)
+
+        user = request.user
+        if user.is_superuser or user.is_staff:
+            return view_func(request, *args, **kwargs)
+
+        try:
+            player = user.player
+        except Exception:
+            player = None
+
+        if not player or not player.is_verified:
+            if (
+                request.method == "POST"
+                and request.content_type
+                and "application/json" in request.content_type
+            ):
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "error": "Ваш аккаунт ещё не подтверждён администратором.",
+                        "redirect": reverse("profile_edit"),
+                    },
+                    status=403,
+                )
+            messages.warning(
+                request,
+                "Ваш аккаунт ещё не подтверждён администратором. "
+                "Регистрация на турниры и спарринги будет доступна после подтверждения.",
+            )
+            return redirect("profile_edit")
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper

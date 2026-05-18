@@ -74,3 +74,70 @@
 .alert-close:hover {
     opacity: 1;
 }
+
+/* ==========================================================================
+   Unverified account banner
+   ========================================================================== */
+.unverified-banner {
+    background: linear-gradient(90deg, rgba(133, 77, 14, 0.92) 0%, rgba(120, 53, 15, 0.92) 100%);
+    border-bottom: 1px solid rgba(251, 191, 36, 0.4);
+    padding: 10px 0;
+    position: sticky;
+    top: 0;
+    z-index: 900;
+    backdrop-filter: blur(6px);
+}
+
+.unverified-banner__inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.unverified-banner__icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.unverified-banner__text {
+    flex: 1;
+    min-width: 200px;
+    font-size: var(--font-size-sm);
+    color: #fef3c7;
+    line-height: 1.4;
+}
+
+.unverified-banner__support-btn {
+    flex-shrink: 0;
+    background: rgba(251, 191, 36, 0.18);
+    border: 1px solid rgba(251, 191, 36, 0.55);
+    color: #fde68a;
+    border-radius: var(--radius-sm);
+    padding: 4px 14px;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+    white-space: nowrap;
+}
+
+.unverified-banner__support-btn:hover {
+    background: rgba(251, 191, 36, 0.3);
+    border-color: rgba(251, 191, 36, 0.8);
+    color: #fff;
+}
+
+@media (width <= 480px) {
+    .unverified-banner {
+        padding: 8px 0;
+    }
+
+    .unverified-banner__inner {
+        gap: 8px;
+    }
+
+    .unverified-banner__text {
+        font-size: 0.78rem;
+    }
+}

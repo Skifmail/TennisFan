@@ -203,6 +203,31 @@
         </div>
     </div>
     {% endif %}
+    {% if user.is_authenticated and not user.is_staff and not user.is_superuser %}
+    {% with player=user.player %}
+    {% if player and not player.is_verified %}
+    <div class="unverified-banner">
+        <div class="container">
+            <div class="unverified-banner__inner">
+                <span class="unverified-banner__icon" aria-hidden="true">⏳</span>
+                <span class="unverified-banner__text">
+                    Ваш аккаунт ожидает подтверждения администратором. До этого регистрация на турниры, спарринги и другие активности недоступна. 
+                    Вы можете дождаться ручной проверки или получить подтверждение автоматически при <a href="{% url 'pricing' %}" style="color: inherit; text-decoration: underline;">оформлении любой подписки</a>.
+                </span>
+                <button
+                    type="button"
+                    class="unverified-banner__support-btn"
+                    onclick="document.getElementById('feedback-widget-btn').click()"
+                    title="Открыть чат с поддержкой"
+                >
+                    Написать в поддержку
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+    {% endif %}
 
     <!-- Main Content -->
     <main class="main">

@@ -15,12 +15,20 @@ logger = logging.getLogger(__name__)
 
 
 def _mark_user_paid_subscription(user):
-    """Отметить, что пользователь хотя бы раз оплатил подписку (для акции «первая за 1 ₽»)."""
+    """Отметить, что пользователь хотя бы раз оплатил подписку (для акции «первая за 1 ₽») и автоматически подтвердить аккаунт."""
     try:
         player = user.player
+        update_fields = []
         if not player.has_ever_paid_subscription:
             player.has_ever_paid_subscription = True
-            player.save(update_fields=["has_ever_paid_subscription"])
+            update_fields.append("has_ever_paid_subscription")
+
+        if not player.is_verified:
+            player.is_verified = True
+            update_fields.append("is_verified")
+
+        if update_fields:
+            player.save(update_fields=update_fields)
     except Exception:
         pass
 

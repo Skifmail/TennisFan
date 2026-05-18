@@ -36,7 +36,7 @@ from apps.clubs.plan_services import (
     check_tournament_registration_eligibility as check_club_tournament_registration_eligibility,
 )
 from apps.clubs.services import get_fee_status_for_member, user_can_manage_club
-from apps.core.decorators import require_filled_profile
+from apps.core.decorators import require_filled_profile, require_verified_player
 from apps.core.text_search import filter_field_contains_ci
 from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
 from apps.subscriptions.models import FancoinTransaction
@@ -3377,6 +3377,7 @@ def _get_tournament_club_member(user, tournament) -> ClubMember | None:
 
 @login_required
 @require_filled_profile
+@require_verified_player
 def tournament_register(request, slug):
     """Register authenticated user to a tournament."""
 
@@ -3513,6 +3514,7 @@ def tournament_register(request, slug):
 
 @login_required
 @require_filled_profile
+@require_verified_player
 def tournament_register_required(request, slug):
     """Страница выбора: оплатить вступительный взнос или оформить подписку (для многодневного турнира)."""
     tournament = get_object_or_404(Tournament, slug=slug)
@@ -3541,6 +3543,7 @@ def tournament_register_required(request, slug):
 
 @login_required
 @require_filled_profile
+@require_verified_player
 def tournament_register_doubles(request, slug):
     """Регистрация на парный турнир: solo, с партнёром или присоединение к существующей паре."""
 
@@ -4016,6 +4019,7 @@ def _do_add_partner(request, tournament, player, partner_id):
 
 @login_required
 @require_filled_profile
+@require_verified_player
 def tournament_join_team(request, slug, team_id):
     """Присоединиться к команде (партнёр без пары)."""
     if request.method != "POST":

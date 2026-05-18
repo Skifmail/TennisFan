@@ -34,7 +34,7 @@ from apps.core.contact_utils import (
     build_whatsapp_url,
     get_max_display_contact,
 )
-from apps.core.decorators import require_filled_profile
+from apps.core.decorators import require_filled_profile, require_verified_player
 from apps.core.text_search import filter_field_contains_ci
 from apps.users.models import Notification, Player
 
@@ -190,6 +190,7 @@ def sparring_list(request):
 
 @login_required
 @require_filled_profile
+@require_verified_player
 def sparring_create(request):
     """Создать заявку на спарринг: одиночный (1×1) или парный (2×2)."""
     if not user_has_sparring_access(request.user):
@@ -478,6 +479,7 @@ def _build_contact_urls(player: Player) -> dict[str, str | None]:
 @require_http_methods(["GET", "POST"])
 @login_required
 @require_filled_profile
+@require_verified_player
 def sparring_respond(request, pk):
     """
     Записать отклик и (при GET с method) перенаправить на контакт.
@@ -722,6 +724,7 @@ def doubles_detail(request, pk):
 
 @require_POST
 @login_required
+@require_verified_player
 def doubles_join(request, pk):
     """Откликнуться на заявку: в команду автора или соперников, один или с партнёром."""
     try:
@@ -964,6 +967,7 @@ def doubles_cancel_request(request, pk):
 
 @login_required
 @require_filled_profile
+@require_verified_player
 def sparring_invite(request):
     """Поиск игрока по ФИО или email и отправка приглашения на спарринг."""
     if not user_has_sparring_access(request.user):
@@ -1047,6 +1051,7 @@ def sparring_invite(request):
 
 @login_required
 @require_filled_profile
+@require_verified_player
 def sparring_my_invitations(request):
     """История приглашений на спарринг: исходящие и входящие."""
     try:

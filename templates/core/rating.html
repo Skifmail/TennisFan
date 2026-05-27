@@ -86,8 +86,12 @@
     <div class="rating-chart hidden" id="rating-chart">
         <div class="card">
             <div class="card-body">
-                <h2 class="section-title">Рейтинг в виде диаграммы</h2>
-                <div id="rating-chart-bars" class="rating-chart-bars"></div>
+                <div
+                    id="rating-chart-bars"
+                    class="fan-chart"
+                    data-placeholder-url="{% static 'images/avatar_placeholder.png' %}"
+                    aria-live="polite"
+                ></div>
             </div>
         </div>
     </div>
@@ -108,105 +112,6 @@
     {% endif %}
 </div>
 
-{{ rating_data_json|json_script:"rating-data" }}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        try {
-            const ratingDataElement = document.getElementById('rating-data');
-            const ratingData = ratingDataElement ? JSON.parse(ratingDataElement.textContent) : [];
-
-            const ratingToggleBtn = document.getElementById('rating-toggle-btn');
-            const ratingList = document.getElementById('rating-list');
-            const ratingChart = document.getElementById('rating-chart');
-            const ratingChartBars = document.getElementById('rating-chart-bars');
-
-            if (!ratingToggleBtn) {
-                console.error('Rating page: rating-toggle-btn not found');
-                return;
-            }
-            if (!ratingList) {
-                console.error('Rating page: rating-list not found');
-                return;
-            }
-            if (!ratingChart) {
-                console.error('Rating page: rating-chart not found');
-                return;
-            }
-            if (!ratingChartBars) {
-                console.error('Rating page: rating-chart-bars not found');
-                return;
-            }
-
-            const renderChart = () => {
-                try {
-                    ratingChartBars.innerHTML = '';
-                    if (!ratingData || !ratingData.length) {
-                        ratingChartBars.innerHTML = '<p class="text-secondary">Игроки не найдены.</p>';
-                        return;
-                    }
-
-                    // Фильтруем и валидируем данные
-                    const validData = ratingData.filter(item => item && typeof item.points === 'number' && !isNaN(item.points));
-                    if (!validData.length) {
-                        ratingChartBars.innerHTML = '<p class="text-secondary">Нет данных для отображения.</p>';
-                        return;
-                    }
-
-                    const maxPoints = Math.max(...validData.map(item => item.points));
-                    if (maxPoints <= 0) {
-                        // Если все значения 0, показываем все с шириной 0%
-                        validData.forEach((item, index) => {
-                            const row = document.createElement('div');
-                            row.className = 'rating-chart-row';
-                            row.innerHTML = `
-                                <div class="rating-chart-label">${index + 1}. ${item.name}</div>
-                                <div class="rating-chart-bar">
-                                    <span style="width:0%;"></span>
-                                </div>
-                                <div class="rating-chart-value">${item.points.toFixed(1)}</div>
-                            `;
-                            ratingChartBars.appendChild(row);
-                        });
-                        return;
-                    }
-
-                    validData.forEach((item, index) => {
-                        const row = document.createElement('div');
-                        row.className = 'rating-chart-row';
-                        const width = maxPoints > 0 ? (item.points / maxPoints) * 100 : 0;
-                        row.innerHTML = `
-                            <div class="rating-chart-label">${index + 1}. ${item.name}</div>
-                            <div class="rating-chart-bar">
-                                <span style="width:${width}%;"></span>
-                            </div>
-                            <div class="rating-chart-value">${item.points.toFixed(1)}</div>
-                        `;
-                        ratingChartBars.appendChild(row);
-                    });
-                } catch (error) {
-                    console.error('Error rendering chart:', error);
-                    ratingChartBars.innerHTML = '<p class="text-danger">Ошибка при отображении диаграммы.</p>';
-                }
-            };
-
-            ratingToggleBtn.addEventListener('click', function() {
-                try {
-                    const isHidden = ratingChart.classList.contains('hidden');
-                    ratingChart.classList.toggle('hidden');
-                    ratingList.classList.toggle('hidden');
-                    if (isHidden) {
-                        renderChart();
-                        ratingToggleBtn.textContent = 'Показать списком';
-                    } else {
-                        ratingToggleBtn.textContent = 'Показать в виде диаграммы';
-                    }
-                } catch (error) {
-                    console.error('Error toggling view:', error);
-                }
-            });
-        } catch (error) {
-            console.error('Rating page initialization error:', error);
-        }
-    });
-</script>
+{{ rating_data|json_script:"rating-data" }}
+<script src="{% static 'js/rating_chart.js' %}" defer></script>
 {% endblock %}

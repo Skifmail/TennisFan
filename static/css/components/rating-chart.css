@@ -1,16 +1,7 @@
 /*
- * rating-chart.css
- * 
- * Описание: Визуализация рейтинга в виде строк/баров и адаптивное поведение.
- * Компоненты: .rating-toggle, .rating-chart, .rating-chart-bars, .rating-chart-row, .rating-chart-bar, .rating-chart-value
- * Используется на: профиль игрока, блоки статистики рейтинга
- * 
- * Последнее обновление: 2026-03
+ * rating-chart.css — FAN-диаграмма в стиле референса: темный фон + лайм бары.
  */
 
-/* ==========================================================================
-   Rating Chart
-   ========================================================================== */
 .rating-toggle {
     display: flex;
     justify-content: flex-end;
@@ -28,59 +19,227 @@
     margin-top: var(--spacing-lg);
 }
 
-.rating-chart-bars {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
+.rating-chart .card {
+    overflow: hidden;
+    border: 1px solid rgb(255 255 255 / 10%);
+    border-radius: 22px;
+    background:
+        radial-gradient(circle at 10% 10%, rgb(95 247 140 / 8%) 0%, rgb(95 247 140 / 0%) 42%),
+        #012518;
+    box-shadow: 0 16px 44px rgb(0 0 0 / 30%);
 }
 
-.rating-chart-row {
+.rating-chart .card-body {
+    padding: clamp(0.9rem, 2.4vw, 1.6rem);
+}
+
+.fan-chart {
+    --fan-green: #5ff78c;
+    --fan-green-dim: #4cdd7a;
+    --fan-text-main: #f1f5f9;
+    --fan-text-soft: rgb(241 245 249 / 74%);
+    --fan-track: rgb(255 255 255 / 7%);
+    --fan-stagger: 42ms;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.fan-chart__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.fan-chart__eyebrow {
+    margin: 0 0 0.2rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fan-text-soft);
+}
+
+.fan-chart__title {
+    margin: 0;
+    font-size: clamp(1.45rem, 4.8vw, 2.5rem);
+    line-height: 1;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--fan-text-main);
+}
+
+.fan-chart__subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.82rem;
+    color: var(--fan-text-soft);
+}
+
+.fan-chart__leader-value {
+    font-size: clamp(0.95rem, 2.5vw, 1.15rem);
+    font-weight: 800;
+    color: var(--fan-green);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.fan-chart__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.46rem;
+}
+
+.fan-chart__item {
+    animation: fan-chart-row-in 0.4s ease-out both;
+    animation-delay: calc(var(--fan-chart-index, 0) * var(--fan-stagger));
+}
+
+.fan-chart__row {
     display: grid;
-    grid-template-columns: minmax(140px, 1.5fr) 3fr minmax(60px, 0.6fr);
-    gap: var(--spacing-md);
+    grid-template-columns: 2.2rem minmax(130px, 1.85fr) minmax(150px, 3fr) minmax(72px, 0.9fr);
+    gap: 0.7rem;
     align-items: center;
+    min-height: 44px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.fan-chart__rank {
+    font-size: clamp(1rem, 2.6vw, 2rem);
+    font-weight: 800;
+    line-height: 1;
+    color: var(--fan-green);
+    font-variant-numeric: tabular-nums;
+    text-align: left;
+}
+
+.fan-chart__name {
+    font-size: clamp(0.9rem, 2.4vw, 1.08rem);
+    font-weight: 600;
+    color: var(--fan-text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fan-chart__track {
+    position: relative;
+    height: 0.62rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--fan-track);
+}
+
+.fan-chart__fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--fan-green) 0%, var(--fan-green-dim) 100%);
+    transition: width 0.8s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+.fan-chart__value {
+    font-size: clamp(1rem, 2.5vw, 1.08rem);
+    font-weight: 800;
+    color: var(--fan-text-main);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.fan-chart__row:hover .fan-chart__name,
+.fan-chart__row:hover .fan-chart__value {
+    color: #fff;
+}
+
+.fan-chart__message {
+    margin: 0;
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--fan-text-soft);
+}
+
+.fan-chart__message--error {
+    color: var(--color-error);
+}
+
+.fan-chart--empty .fan-chart__message,
+.fan-chart--error .fan-chart__message {
+    width: 100%;
+}
+
+@keyframes fan-chart-row-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @media (width <= 768px) {
-    .rating-chart-row {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-sm);
+    .fan-chart__header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
     }
 
-    .rating-chart-bar {
-        width: 100%;
+    .fan-chart__row {
+        grid-template-columns: 1.9rem minmax(90px, 1.4fr) minmax(100px, 2fr) minmax(62px, 0.9fr);
+        gap: 0.5rem;
+        min-height: 40px;
     }
 
-    .rating-chart-value {
-        text-align: left;
+    .fan-chart__rank {
+        font-size: 1.35rem;
+    }
+
+    .fan-chart__name {
+        font-size: 0.9rem;
+    }
+
+    .fan-chart__value {
+        font-size: 0.93rem;
     }
 }
 
-.rating-chart-label {
-    font-size: var(--font-size-sm);
-    color: var(--color-text);
+@media (width <= 420px) {
+    .fan-chart__title {
+        font-size: 1.25rem;
+    }
+
+    .fan-chart__row {
+        grid-template-columns: 1.6rem minmax(80px, 1.3fr) minmax(86px, 1.8fr) minmax(54px, 0.8fr);
+        gap: 0.4rem;
+    }
+
+    .fan-chart__track {
+        height: 0.52rem;
+    }
+
+    .fan-chart__rank {
+        font-size: 1.08rem;
+    }
+
+    .fan-chart__value {
+        font-size: 0.84rem;
+    }
 }
 
-.rating-chart-bar {
-    position: relative;
-    height: 12px;
-    background: var(--color-bg-elevated);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-    border: 1px solid var(--color-border-light);
-}
+@media (prefers-reduced-motion: reduce) {
+    .fan-chart__item {
+        animation: none;
+    }
 
-.rating-chart-bar span {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    background: var(--color-primary);
-    border-radius: var(--radius-full);
-}
-
-.rating-chart-value {
-    text-align: right;
-    font-weight: 600;
-    color: var(--color-primary);
+    .fan-chart__fill {
+        transition: none;
+    }
 }

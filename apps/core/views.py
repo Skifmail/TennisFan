@@ -1437,13 +1437,10 @@ def home(request):
         tournament.is_full_annotated = bool(max_slots and current_count >= max_slots)
 
     # Получаем топ игроков по сезонным очкам
-    from django.db.models import Case, F, IntegerField, Value, When
+    from apps.tournaments.season_utils import annotate_season_pts
 
-    from apps.tournaments.season_utils import get_current_season
-
-    current_season = get_current_season()
     rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
-    top_players = (
+    top_players = annotate_season_pts(
         Player.objects.filter(
             is_bye=False,
             is_hidden_on_home=False,
@@ -1452,19 +1449,7 @@ def home(request):
         .select_related(
             "user", "user__subscription", "user__subscription__tier", "season_points"
         )
-        .annotate(
-            season_pts=Case(
-                When(
-                    season_points__season_name=current_season.name,
-                    season_points__season_year=current_season.year,
-                    then=F("season_points__current_season_points"),
-                ),
-                default=Value(0),
-                output_field=IntegerField(),
-            )
-        )
-        .order_by("-season_pts", "-total_points")[:10]
-    )
+    ).order_by("-season_pts", "-total_points")[:10]
 
     recent_matches = _build_recent_matches(limit=10, days=5)
     upcoming_matches = _build_upcoming_matches(limit=10, days=5)
@@ -1568,7 +1553,6 @@ def rating(request):
         .select_related(
             "user", "user__subscription", "user__subscription__tier", "season_points"
         )
-        .prefetch_related("season_points")
     )
 
     if city:
@@ -1582,21 +1566,9 @@ def rating(request):
             Q(user__first_name__icontains=search) | Q(user__last_name__icontains=search)
         )
 
-    # Сортируем по сезонным очкам текущего сезона
-    # Используем аннотацию для получения сезонных очков
-    from django.db.models import Case, F, IntegerField, Value, When
+    from apps.tournaments.season_utils import annotate_season_pts
 
-    players = players.annotate(
-        season_pts=Case(
-            When(
-                season_points__season_name=current_season.name,
-                season_points__season_year=current_season.year,
-                then=F("season_points__current_season_points"),
-            ),
-            default=Value(0),
-            output_field=IntegerField(),
-        )
-    ).order_by("-season_pts", "-total_points")
+    players = annotate_season_pts(players).order_by("-season_pts", "-total_points")
 
     paginator = Paginator(players, 50)
     page_number = request.GET.get("page")
@@ -1609,19 +1581,35 @@ def rating(request):
         .order_by("city")
     )
 
+    sorted_for_chart = sorted(
+        players_page.object_list,
+        key=lambda p: float(p.total_points or 0),
+        reverse=True,
+    )
+    max_fan_points = (
+        float(sorted_for_chart[0].total_points or 0) if sorted_for_chart else 0.0
+    )
+    rating_data: list[dict[str, object]] = []
+    for rank, player in enumerate(sorted_for_chart, start=1):
+        points = float(player.total_points or 0)
+        share = round((points / max_fan_points) * 100, 1) if max_fan_points > 0 else 0.0
+        rating_data.append(
+            {
+                "pk": player.pk,
+                "name": str(player),
+                "points": points,
+                "rank": rank,
+                "skill_level": player.get_skill_level_display(),
+                "avatar_url": player.avatar.url if player.avatar else "",
+                "profile_url": reverse("profile", kwargs={"pk": player.pk}),
+                "share": share,
+            }
+        )
+
     context = {
         "players": players_page,
         "players_page": players_page,
-        "rating_data_json": json.dumps(
-            [
-                {
-                    "name": str(player),
-                    "points": float(getattr(player, "season_pts", 0) or 0),
-                }
-                for player in players_page.object_list
-            ],
-            ensure_ascii=False,
-        ),
+        "rating_data": rating_data,
         "current_city": city,
         "current_skill_level": skill_level,
         "search_query": search,

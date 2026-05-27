@@ -7,7 +7,10 @@
 """
 
 from datetime import date
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
 
 
 class Season(NamedTuple):
@@ -58,6 +61,27 @@ def get_season_display(season: Season) -> str:
     else:
         # Для лета показываем текущий год
         return f"{season.name} {season.year}"
+
+
+def annotate_season_pts(queryset: "QuerySet") -> "QuerySet":
+    """Добавить аннотацию ``season_pts`` из связанных SeasonPoints.
+
+    У модели SeasonPoints связь OneToOne с игроком: в строке хранятся очки
+    накопленного сезона. Сброс при смене сезона выполняет команда
+    ``reset_season_points``, а не фильтр по ``season_name``/``season_year`` в SQL.
+
+    Args:
+        queryset: QuerySet игроков с ``select_related("season_points")``.
+
+    Returns:
+        QuerySet с полем ``season_pts`` (int).
+    """
+    from django.db.models import F, Value
+    from django.db.models.functions import Coalesce
+
+    return queryset.annotate(
+        season_pts=Coalesce(F("season_points__current_season_points"), Value(0))
+    )
 
 
 def get_season_key(season: Season) -> str:

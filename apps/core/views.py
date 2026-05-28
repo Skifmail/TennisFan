@@ -88,6 +88,20 @@ from .text_search import filter_field_contains_ci
 logger = logging.getLogger(__name__)
 
 
+def _get_geocoder_api_key() -> str:
+    """Вернуть ключ для Yandex Geocoder с корректным fallback."""
+    return (
+        getattr(settings, "YANDEX_GEOCODER_API_KEY", None)
+        or getattr(settings, "YANDEX_MAPS_API_KEY", "")
+        or ""
+    )
+
+
+def _get_geocoder_referer() -> str:
+    """Вернуть Referer для Yandex Geocoder (если ключ ограничен по домену)."""
+    return str(getattr(settings, "YANDEX_GEOCODER_REFERER", "") or "")
+
+
 @lru_cache(maxsize=1)
 def _load_city_coordinates_from_csv() -> dict[str, tuple[float, float]]:
     """Загрузить координаты городов из статического CSV-справочника."""
@@ -215,15 +229,15 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
             )
             if coords is None:
                 # Пробуем геокодировать и сохраняем в справочник, чтобы не терять города.
-                yandex_geocoder_api_key = (
-                    getattr(settings, "YANDEX_MAPS_API_KEY", "") or ""
-                )
+                yandex_geocoder_api_key = _get_geocoder_api_key()
+                yandex_geocoder_referer = _get_geocoder_referer()
                 if yandex_geocoder_api_key:
                     from apps.courts.geocoder import geocode_address
 
                     lat, lng = geocode_address(
                         city_name,
                         api_key=yandex_geocoder_api_key,
+                        referer=yandex_geocoder_referer or None,
                         hint_city=city_name,
                     )
                     if lat is not None and lng is not None:

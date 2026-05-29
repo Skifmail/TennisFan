@@ -27,6 +27,7 @@ from apps.core.decorators import login_required_with_message
 from apps.core.models import LegalAcceptanceLog, UserConsent, UserTelegramLink
 from apps.legal.utils import get_legal_document_version
 
+from .context_processors import invalidate_unread_notifications_cache
 from .forms import EmailAuthenticationForm, PlayerProfileForm, UserRegistrationForm
 from .models import EmailVerificationToken, Notification, NtrpTestResult, Player
 
@@ -943,8 +944,9 @@ def notifications(request):
     """User notifications inbox."""
 
     notes = Notification.objects.filter(user=request.user).order_by("-created_at")
-    # mark all as read when viewed
-    notes.filter(is_read=False).update(is_read=True)
+    if notes.filter(is_read=False).exists():
+        notes.filter(is_read=False).update(is_read=True)
+        invalidate_unread_notifications_cache(request.user.pk)
     return render(request, "users/notifications.html", {"notifications": notes})
 
 

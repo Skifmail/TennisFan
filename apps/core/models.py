@@ -6,6 +6,7 @@ import secrets
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 # ---------------------------------------------------------------------------
 # Новая система обратной связи через Telegram (пользователь ↔ админ в Telegram)
@@ -513,3 +514,332 @@ class FooterSocialLink(models.Model):
         if self.icon:
             return self.icon.url
         return None
+
+
+# ---------------------------------------------------------------------------
+# Лента активности платформы (вечный журнал действий пользователей)
+# ---------------------------------------------------------------------------
+
+
+# Соответствие кода валюты её символу для компактного отображения сумм.
+_CURRENCY_SYMBOLS: dict[str, str] = {
+    "RUB": "₽",
+    "USD": "$",
+    "EUR": "€",
+}
+
+
+class PlatformActivityEvent(models.Model):
+    """Событие активности на платформе.
+
+    Единый журнал всех значимых действий пользователей и игроков: регистрации,
+    оплаты (подписки, тарифы, турниры, донаты), внесение и подтверждение
+    результатов матчей, регистрации на турниры, спарринги и т.д. Записи никогда
+    не удаляются автоматически и используются для построения ленты активности
+    на «Панели платформы».
+
+    Имя действующего лица сохраняется отдельным снимком (``actor_name``), чтобы
+    запись оставалась читаемой даже после удаления пользователя или смены ФИО.
+    """
+
+    class EventType(models.TextChoices):
+        """Тип события для фильтрации и отображения в ленте."""
+
+        REGISTRATION = "registration", "Регистрация"
+        PAYMENT_SUBSCRIPTION = "payment_subscription", "Оплата подписки"
+        PAYMENT_CLUB_PLAN = "payment_club_plan", "Оплата тарифа клуба"
+        PAYMENT_CLUB_FEE = "payment_club_fee", "Оплата членского взноса"
+        PAYMENT_TOURNAMENT = "payment_tournament", "Оплата турнира"
+        PAYMENT_DONATION = "payment_donation", "Донат"
+        TOURNAMENT_REGISTERED = "tournament_registered", "Регистрация на турнир"
+        MATCH_RESULT_PROPOSED = "match_result_proposed", "Внесён результат матча"
+        MATCH_RESULT_CONFIRMED = (
+            "match_result_confirmed",
+            "Подтверждён результат матча",
+        )
+        MATCH_RESULT_REJECTED = "match_result_rejected", "Отклонён результат матча"
+        SPARRING_CREATED = "sparring_created", "Создан спарринг"
+        SPARRING_APPLIED = "sparring_applied", "Отклик на спарринг"
+        SPARRING_APPROVED = "sparring_approved", "Одобрен отклик на спарринг"
+        SPARRING_REJECTED = "sparring_rejected", "Отклонён отклик на спарринг"
+        SPARRING_INVITED = "sparring_invited", "Приглашение на спарринг"
+        DOUBLES_CREATED = "doubles_created", "Создан парный спарринг"
+        DOUBLES_JOIN_REQUESTED = "doubles_join_requested", "Заявка в парный спарринг"
+        DOUBLES_JOIN_APPROVED = (
+            "doubles_join_approved",
+            "Одобрена заявка в парный спарринг",
+        )
+        DOUBLES_JOIN_REJECTED = (
+            "doubles_join_rejected",
+            "Отклонена заявка в парный спарринг",
+        )
+        CLUB_JOIN_REQUESTED = "club_join_requested", "Заявка в клуб"
+        CLUB_JOINED = "club_joined", "Вступление в клуб"
+        CLUB_JOIN_REJECTED = "club_join_rejected", "Отклонена заявка в клуб"
+        COACH_APPLICATION = "coach_application", "Заявка на тренера"
+        TRAINING_PUBLISHED = "training_published", "Опубликована тренировка"
+        TRAINING_ENROLLED = "training_enrolled", "Запись на тренировку"
+        COMMENT_ADDED = "comment_added", "Комментарий"
+        SUBSCRIPTION_CANCELLED = "subscription_cancelled", "Отмена подписки"
+        FANCOIN_CHARGE = "fancoin_charge", "Списание FAN-коинов"
+        FANCOIN_REFUND = "fancoin_refund", "Возврат FAN-коинов"
+
+    #: Типы событий, относящиеся к оплатам (для подсветки и группировки в UI).
+    PAYMENT_EVENT_TYPES = frozenset(
+        {
+            EventType.PAYMENT_SUBSCRIPTION,
+            EventType.PAYMENT_CLUB_PLAN,
+            EventType.PAYMENT_CLUB_FEE,
+            EventType.PAYMENT_TOURNAMENT,
+            EventType.PAYMENT_DONATION,
+        }
+    )
+
+    event_type = models.CharField(
+        "Тип события",
+        max_length=40,
+        choices=EventType.choices,
+        db_index=True,
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="platform_activity_events",
+        verbose_name="Пользователь",
+        help_text="Кто совершил действие. NULL — системное событие или удалённый пользователь.",
+    )
+    actor_name = models.CharField(
+        "Имя на момент события",
+        max_length=255,
+        blank=True,
+        db_index=True,
+        help_text="Снимок ФИО/email действующего лица, сохраняется навсегда.",
+    )
+    actor_role = models.CharField(
+        "Статус пользователя",
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Снимок роли действующего лица: Игрок, Тренер, Админ и т.д.",
+    )
+    description = models.CharField(
+        "Описание действия",
+        max_length=500,
+        blank=True,
+    )
+    amount = models.DecimalField(
+        "Сумма",
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Заполняется только для событий-оплат.",
+    )
+    currency = models.CharField(
+        "Валюта",
+        max_length=8,
+        default="RUB",
+        blank=True,
+    )
+    target_url = models.CharField(
+        "Ссылка на объект",
+        max_length=500,
+        blank=True,
+        help_text="Относительный URL связанного объекта (матч, турнир и т.д.).",
+    )
+    metadata = models.JSONField(
+        "Дополнительные данные",
+        default=dict,
+        blank=True,
+    )
+    dedupe_key = models.CharField(
+        "Ключ дедупликации",
+        max_length=120,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Стабильный ключ источника события для защиты от дубликатов.",
+    )
+    created_at = models.DateTimeField(
+        "Когда произошло",
+        default=timezone.now,
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = "событие активности"
+        verbose_name_plural = "лента активности платформы"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["event_type", "created_at"]),
+            models.Index(fields=["actor", "created_at"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dedupe_key"],
+                condition=models.Q(dedupe_key__gt=""),
+                name="uniq_activity_dedupe_key",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        """Вернуть краткое строковое представление события.
+
+        Returns:
+            str: Дата, имя действующего лица и тип события.
+        """
+        return (
+            f"{self.created_at:%d.%m.%Y %H:%M} / {self.actor_name or 'Система'} / "
+            f"{self.get_event_type_display()}"
+        )
+
+    def get_actor_display(self) -> str:
+        """Вернуть имя действующего лица для отображения в ленте.
+
+        Returns:
+            str: Снимок имени, либо актуальное имя пользователя, либо «Система».
+        """
+        if self.actor_name:
+            return str(self.actor_name)
+        if self.actor_id:
+            from apps.users.display import format_user_display_name
+
+            name = format_user_display_name(self.actor)
+            if name:
+                return name
+        return "Система"
+
+    def get_role_modifier(self) -> str:
+        """Вернуть CSS-модификатор бейджа статуса пользователя.
+
+        Returns:
+            str: Суффикс класса «admin», «coach», «club_organizer», «player»
+            или «default».
+        """
+        role_map: dict[str, str] = {
+            "Админ": "admin",
+            "Тренер": "coach",
+            "Организатор клуба": "club_organizer",
+            "Игрок": "player",
+        }
+        return role_map.get(self.actor_role or "", "default")
+
+    @property
+    def is_payment(self) -> bool:
+        """Является ли событие оплатой.
+
+        Returns:
+            bool: True, если тип события относится к оплатам.
+        """
+        return self.event_type in self.PAYMENT_EVENT_TYPES
+
+    def get_tone(self) -> str:
+        """Вернуть визуальный тон события для подсветки бейджа в UI.
+
+        Returns:
+            str: Один из «payment», «registration», «match», «tournament»,
+            «sparring», «default».
+        """
+        et = self.EventType
+        if self.is_payment:
+            return "payment"
+        if self.event_type in {
+            et.MATCH_RESULT_REJECTED,
+            et.SPARRING_REJECTED,
+            et.DOUBLES_JOIN_REJECTED,
+            et.CLUB_JOIN_REJECTED,
+            et.SUBSCRIPTION_CANCELLED,
+        }:
+            return "rejected"
+        if self.event_type == et.REGISTRATION:
+            return "registration"
+        if self.event_type in {
+            et.MATCH_RESULT_PROPOSED,
+            et.MATCH_RESULT_CONFIRMED,
+        }:
+            return "match"
+        if self.event_type == et.TOURNAMENT_REGISTERED:
+            return "tournament"
+        if self.event_type in {
+            et.SPARRING_CREATED,
+            et.SPARRING_APPLIED,
+            et.SPARRING_APPROVED,
+            et.SPARRING_INVITED,
+            et.DOUBLES_CREATED,
+            et.DOUBLES_JOIN_REQUESTED,
+            et.DOUBLES_JOIN_APPROVED,
+        }:
+            return "sparring"
+        if self.event_type in {
+            et.CLUB_JOIN_REQUESTED,
+            et.CLUB_JOINED,
+        }:
+            return "club"
+        if self.event_type in {
+            et.COACH_APPLICATION,
+            et.TRAINING_PUBLISHED,
+            et.TRAINING_ENROLLED,
+        }:
+            return "training"
+        if self.event_type == et.COMMENT_ADDED:
+            return "comment"
+        if self.event_type in {
+            et.FANCOIN_CHARGE,
+            et.FANCOIN_REFUND,
+        }:
+            return "fancoin"
+        return "default"
+
+    def get_amount_display(self) -> str:
+        """Отформатировать сумму с символом валюты.
+
+        Returns:
+            str: Например «1 500 ₽» или пустая строка, если суммы нет.
+        """
+        if self.amount is None:
+            return ""
+        symbol = _CURRENCY_SYMBOLS.get(self.currency, self.currency or "")
+        # Целые суммы показываем без копеек, дробные — с двумя знаками.
+        if self.amount == self.amount.to_integral_value():
+            amount_str = f"{int(self.amount):,}".replace(",", " ")
+        else:
+            amount_str = f"{self.amount:.2f}"
+        return f"{amount_str} {symbol}".strip()
+
+
+class PlatformDashboardSeen(models.Model):
+    """Отметка последнего просмотра панели управления staff-пользователем.
+
+    Используется для индикатора новых событий в ленте активности: события,
+    созданные после ``seen_at``, считаются непросмотренными.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="platform_dashboard_seen",
+        verbose_name="Пользователь",
+    )
+    last_seen_event_id = models.PositiveBigIntegerField(
+        "ID последнего просмотренного события",
+        default=0,
+        help_text="События с большим id считаются непросмотренными.",
+    )
+    seen_at = models.DateTimeField(
+        "Последний просмотр",
+        default=timezone.now,
+    )
+
+    class Meta:
+        verbose_name = "просмотр панели управления"
+        verbose_name_plural = "просмотры панели управления"
+
+    def __str__(self) -> str:
+        """Вернуть краткое представление отметки просмотра.
+
+        Returns:
+            str: Email пользователя и время последнего просмотра.
+        """
+        return f"{self.user_id} @ {self.seen_at:%d.%m.%Y %H:%M}"

@@ -9,6 +9,15 @@ from .models import Notification
 UNREAD_NOTIFICATIONS_CACHE_KEY_PREFIX = "unread_notifications_count"
 
 
+def invalidate_unread_notifications_cache(user_id: int) -> None:
+    """Сбросить кэш счётчика непрочитанных уведомлений пользователя.
+
+    Args:
+        user_id: ID пользователя, для которого нужно обновить бейдж в шапке.
+    """
+    cache.delete(f"{UNREAD_NOTIFICATIONS_CACHE_KEY_PREFIX}:{user_id}")
+
+
 def unread_notifications(request):
     """Add unread notifications count to context."""
     if request.user.is_authenticated:

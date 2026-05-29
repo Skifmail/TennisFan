@@ -14,6 +14,11 @@ urlpatterns = [
         views.platform_players_export,
         name="platform_players_export",
     ),
+    path(
+        "platform/dashboard/activity/export/",
+        views.platform_activity_export,
+        name="platform_activity_export",
+    ),
     path("api/cities/", views.api_cities, name="api_cities"),
     path("api/recent-matches/", views.api_recent_matches, name="api_recent_matches"),
     path(

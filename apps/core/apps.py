@@ -17,3 +17,6 @@ class CoreConfig(AppConfig):
         чтобы избежать RuntimeWarning при доступе к БД во время загрузки приложений.
         """
         from . import signals  # noqa: F401
+        from .activity_signals import register as register_activity_signals
+
+        register_activity_signals()

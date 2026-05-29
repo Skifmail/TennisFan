@@ -693,6 +693,29 @@
     color: #facc15;
 }
 
+.club-nav-mobile__dropdown > li.nav-dropdown-content__admin-group {
+    margin: 6px 8px;
+    padding: 4px;
+    border-radius: 10px;
+    background: rgba(201, 168, 76, 0.1);
+    border: 1px solid rgba(201, 168, 76, 0.22);
+    list-style: none;
+}
+
+.club-nav-mobile__dropdown > li.nav-dropdown-content__admin-group a {
+    padding: 10px 12px;
+    color: rgba(254, 252, 232, 0.92);
+}
+
+.club-nav-mobile__dropdown > li.nav-dropdown-content__admin-group a + a {
+    margin-top: 2px;
+}
+
+.club-nav-mobile__dropdown > li.nav-dropdown-content__admin-group a:hover {
+    background: rgba(201, 168, 76, 0.18);
+    color: #fde68a;
+}
+
 .club-nav-mobile__user .nav-dropdown:not(.open) .club-nav-mobile__dropdown {
     display: none;
 }

@@ -1,16 +1,15 @@
 """Сигналы users для кэша уведомлений."""
 
-from django.core.cache import cache
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from apps.users.context_processors import UNREAD_NOTIFICATIONS_CACHE_KEY_PREFIX
+from apps.users.context_processors import invalidate_unread_notifications_cache
 from apps.users.models import Notification
 
 
 @receiver(post_save, sender=Notification)
 @receiver(post_delete, sender=Notification)
-def invalidate_unread_notifications_cache(
+def clear_unread_notifications_cache_on_change(
     instance: Notification,
     **kwargs,
 ) -> None:
@@ -23,4 +22,4 @@ def invalidate_unread_notifications_cache(
     Returns:
         None: Удаляет ключ кэша по user_id.
     """
-    cache.delete(f"{UNREAD_NOTIFICATIONS_CACHE_KEY_PREFIX}:{instance.user_id}")
+    invalidate_unread_notifications_cache(instance.user_id)

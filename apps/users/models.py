@@ -66,6 +66,16 @@ class User(AbstractUser):
     def __str__(self) -> str:
         return str(self.email)
 
+    def get_display_name(self) -> str:
+        """Отображаемое имя в формате «Имя Фамилия».
+
+        Returns:
+            str: Имя и фамилия или email, если ФИО не заполнены.
+        """
+        from apps.users.display import format_user_display_name
+
+        return format_user_display_name(self)
+
 
 class PlayerCategory(models.TextChoices):
     """Player skill categories based on level of strength."""
@@ -200,12 +210,18 @@ class Player(CompressImageFieldsMixin, models.Model):
             models.Index(fields=["-total_points"]),
         ]
 
+    def get_display_name(self) -> str:
+        """Отображаемое имя игрока в формате «Имя Фамилия».
+
+        Returns:
+            str: Имя для UI или «Свободный круг» для служебного игрока bye.
+        """
+        from apps.users.display import format_player_display_name
+
+        return format_player_display_name(self)
+
     def __str__(self) -> str:
-        if self.is_bye:
-            return "Свободный круг"
-        return (
-            f"{self.user.first_name} {self.user.last_name}".strip() or self.user.email
-        )
+        return self.get_display_name()
 
     @property
     def active_subscription_tier(self):

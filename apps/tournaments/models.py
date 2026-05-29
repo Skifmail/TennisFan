@@ -680,10 +680,12 @@ class TournamentTeam(models.Model):
         return f"{self.player1} (ожидает партнёра)"
 
     def get_display_name(self) -> str:
-        """Возвращает отображаемое имя команды."""
+        """Возвращает отображаемое имя команды (Имя Фамилия / Имя Фамилия)."""
         if self.player2:
-            return f"{self.player1.user.last_name} {self.player1.user.first_name} / {self.player2.user.last_name} {self.player2.user.first_name}"
-        return f"{self.player1.user.last_name} {self.player1.user.first_name} (ожидает партнёра)"
+            return (
+                f"{self.player1.get_display_name()} / {self.player2.get_display_name()}"
+            )
+        return f"{self.player1.get_display_name()} (ожидает партнёра)"
 
     def is_complete(self) -> bool:
         """Команда полная (оба игрока указаны)."""

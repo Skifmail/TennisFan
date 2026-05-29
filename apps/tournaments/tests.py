@@ -1217,6 +1217,7 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
             user=self.user,
             skill_level="amateur",
             birth_date=date(1990, 1, 1),
+            is_verified=True,
         )
         self.club = Club.objects.create(
             name="Спартак",

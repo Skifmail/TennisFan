@@ -506,7 +506,7 @@
                 <form method="post" action="{% url 'tournament_join_team' slug=tournament.slug team_id=team.id %}" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline btn-sm">
-                        {{ team.player1.user.last_name }} {{ team.player1.user.first_name }} <span class="text-secondary">(УС: {{ team.player1.ntrp_level|floatformat:1 }}, Р: {{ team.player1.total_points|floatformat:0 }})</span> — присоединиться
+                        {{ team.player1 }} <span class="text-secondary">(УС: {{ team.player1.ntrp_level|floatformat:1 }}, Р: {{ team.player1.total_points|floatformat:0 }})</span> — присоединиться
                     </button>
                 </form>
                 {% endfor %}
@@ -523,9 +523,9 @@
                     {% include 'includes/avatar.html' with avatar=participant.player1.avatar class="player-avatar" size="48" %}
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px;">
-                            <a href="{% player_profile_url participant.player1 %}">{{ participant.player1.user.last_name }} {{ participant.player1.user.first_name }}</a> <span class="text-secondary small">(УС: {{ participant.player1.ntrp_level|floatformat:1 }}, Р: {{ participant.player1.total_points|floatformat:0 }})</span>
+                            <a href="{% player_profile_url participant.player1 %}">{{ participant.player1 }}</a> <span class="text-secondary small">(УС: {{ participant.player1.ntrp_level|floatformat:1 }}, Р: {{ participant.player1.total_points|floatformat:0 }})</span>
                             {% if participant.player2 %}
-                            / <a href="{% player_profile_url participant.player2 %}">{{ participant.player2.user.last_name }} {{ participant.player2.user.first_name }}</a> <span class="text-secondary small">(УС: {{ participant.player2.ntrp_level|floatformat:1 }}, Р: {{ participant.player2.total_points|floatformat:0 }})</span>
+                            / <a href="{% player_profile_url participant.player2 %}">{{ participant.player2 }}</a> <span class="text-secondary small">(УС: {{ participant.player2.ntrp_level|floatformat:1 }}, Р: {{ participant.player2.total_points|floatformat:0 }})</span>
                             {% else %}
                             <span class="text-muted">(ожидает партнёра)</span>
                             {% endif %}
@@ -537,7 +537,7 @@
                     {% include 'includes/avatar.html' with avatar=participant.avatar class="player-avatar" size="48" %}
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            {{ participant.user.first_name }} {{ participant.user.last_name }}
+                            {{ participant }}
                         </div>
                         {% with rating_changes=participant.get_rating_changes %}
                         <div class="tournament-participant-metrics">
@@ -578,7 +578,7 @@
                             {% if tournament.variant == 'doubles' %}
                             <a href="{% player_profile_url row.participant.player1 %}">{{ row.participant }}</a>
                             {% else %}
-                            <a href="{% player_profile_url row.participant %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                            <a href="{% player_profile_url row.participant %}">{{ row.participant }}</a>
                             {% endif %}
                         </td>
                         {% for cell in row.cells %}
@@ -629,7 +629,7 @@
                             {% if row.team %}
                             <a href="{% player_profile_url row.team.player1 %}">{{ row.team }}</a>
                             {% else %}
-                            <a href="{% player_profile_url row.player %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                            <a href="{% player_profile_url row.player %}">{{ row.player }}</a>
                             {% endif %}
                         </td>
                         <td>{{ row.matches }}</td>
@@ -673,7 +673,7 @@
                                 {% if s.team %}
                                 <a href="{% player_profile_url s.team.player1 %}">{{ s.team }}</a>
                                 {% else %}
-                                <a href="{% player_profile_url s.player %}">{{ s.player.user.last_name }} {{ s.player.user.first_name }}</a>
+                                <a href="{% player_profile_url s.player %}">{{ s.player }}</a>
                                 {% endif %}
                             </td>
                             {% if is_fan %}

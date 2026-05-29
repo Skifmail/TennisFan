@@ -596,6 +596,11 @@
 .tournament-card__avatar-wrap {
     flex: 0 0 auto;
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    box-sizing: border-box;
     border-radius: 50%;
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -606,6 +611,17 @@
     height: 28px;
     object-fit: cover;
     display: block;
+}
+
+/* Перебиваем .player-avatar (40×40 min) из tournament.css — иначе круг обрезается в строке карточки */
+.tournament-card__avatar-img.player-avatar {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    max-width: 28px;
+    max-height: 28px;
+    border-radius: 50%;
 }
 
 .tournament-card__more-count {
@@ -800,6 +816,27 @@
 
     .tournament-card__participants-strip--stacked {
         margin: 0;
+        gap: 0;
+    }
+
+    .tournament-card__participants-strip--stacked .tournament-card__avatar-wrap {
+        width: 28px;
+        height: 28px;
+        margin-left: -8px;
+        box-sizing: border-box;
+    }
+
+    .tournament-card__participants-strip--stacked .tournament-card__avatar-wrap:first-child {
+        margin-left: 0;
+    }
+
+    .tournament-card__participants-strip--stacked .tournament-card__avatar-img.player-avatar {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+        max-width: 28px;
+        max-height: 28px;
     }
 
     .tournament-card__line--participants .tournament-card__empty-line,
@@ -1090,9 +1127,11 @@
 
     .tournament-card__participants-strip--stacked .tournament-card__avatar-wrap {
         flex: 0 0 auto;
+        width: 32px;
+        height: 32px;
         margin-left: -8px;
         border: 2px solid var(--color-bg-card, rgb(12 28 20));
-        box-sizing: content-box;
+        box-sizing: border-box;
     }
 
     .tournament-card__participants-strip--stacked .tournament-card__avatar-wrap:first-child {
@@ -1105,6 +1144,8 @@
         height: 32px;
         min-width: 32px;
         min-height: 32px;
+        max-width: 32px;
+        max-height: 32px;
         box-sizing: border-box;
     }
 

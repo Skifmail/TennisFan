@@ -155,12 +155,13 @@
                         <input type="hidden" name="next" value="{{ next_url }}">
                         <div class="form-group">
                             <label class="form-label">Кто победил?</label>
-                            <select name="result" class="form-control">
+                            <select name="result" class="form-control" id="match-result-select">
                                 <option value="win">Я (мы) победил(и)</option>
                                 <option value="loss">Соперник победил</option>
-                                <option value="walkover_win">Техническая победа</option>
-                                <option value="walkover_loss">Техническое поражение</option>
+                                <option value="walkover_win">Тех. победа мне — соперник не явился</option>
+                                <option value="walkover_loss">Тех. поражение мне — я не явился (−40 очков)</option>
                             </select>
+                            <p id="match-result-hint" class="text-muted mt-2" style="font-size: var(--font-size-sm); display: none;"></p>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Счёт по сетам</label>
@@ -191,6 +192,68 @@
                     {% else %}
                     <p class="text-secondary mb-0">Сейчас действие игрока недоступно.</p>
                     {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if can_view_match_actions and opponents %}
+            <div class="card mt-4 mb-4" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">Контакты соперника</h3>
+                    {% for opp in opponents %}
+                    <div class="{% if not forloop.last %}mb-4{% endif %}">
+                        {% if opponents|length > 1 %}
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            {% include 'includes/avatar.html' with avatar=opp.avatar class="player-avatar" size="32" %}
+                            <a href="{% player_profile_url opp %}" style="font-weight: 600; color: var(--color-text);">{{ opp }}</a>
+                        </div>
+                        {% endif %}
+                        <div class="match-details-table">
+                            {% if opp.telegram %}
+                            <div class="match-details-row">
+                                <div class="match-details-label">Telegram</div>
+                                <div class="match-details-value">
+                                    <a href="{{ opp.telegram_url }}" target="_blank" rel="noopener" class="text-primary">@{{ opp.telegram }}</a>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if opp.whatsapp %}
+                            <div class="match-details-row">
+                                <div class="match-details-label">WhatsApp</div>
+                                <div class="match-details-value">
+                                    <a href="{{ opp.whatsapp_url }}" target="_blank" rel="noopener" class="text-primary">{{ opp.whatsapp }}</a>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if opp.max_contact_display %}
+                            <div class="match-details-row">
+                                <div class="match-details-label">MAX</div>
+                                <div class="match-details-value">
+                                    {% if opp.max_url %}
+                                    <a href="{{ opp.max_url }}" target="_blank" rel="noopener" class="text-primary">{{ opp.max_contact_display }}</a>
+                                    {% else %}
+                                    {{ opp.max_contact_display }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if opp.user.phone %}
+                            <div class="match-details-row">
+                                <div class="match-details-label">Телефон</div>
+                                <div class="match-details-value">
+                                    <a href="tel:{{ opp.user.phone }}" class="text-primary">{{ opp.user.phone }}</a>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if not opp.telegram and not opp.whatsapp and not opp.max_contact_display and not opp.user.phone %}
+                            <div class="match-details-row">
+                                <div class="match-details-label">Контакты</div>
+                                <div class="match-details-value text-muted">не указаны</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
             {% endif %}
@@ -426,4 +489,28 @@
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const sel = document.getElementById('match-result-select');
+    const hint = document.getElementById('match-result-hint');
+    if (!sel || !hint) return;
+
+    const hints = {
+        'walkover_win':  '⚠️ Соперник не явился на матч — вам засчитывается техническая победа. Из рейтинга соперника будет вычтено 40 очков.',
+        'walkover_loss': '⚠️ Вы не явились на матч — вам засчитывается техническое поражение. Из вашего рейтинга будет вычтено 40 очков.',
+    };
+
+    function update() {
+        const msg = hints[sel.value] || '';
+        hint.textContent = msg;
+        hint.style.display = msg ? 'block' : 'none';
+    }
+
+    sel.addEventListener('change', update);
+    update();
+}());
+</script>
+{% endblock extra_js %}

@@ -141,7 +141,7 @@
                                 {% else %}
                                 <a href="{% player_profile_url s.player %}" class="player-link">
                                     {% include 'includes/avatar.html' with avatar=s.player.avatar class="player-avatar-sm" %}
-                                    {{ s.player.user.first_name }} {{ s.player.user.last_name }}
+                                    {{ s.player }}
                                 </a>
                                 {% endif %}
                             </td>

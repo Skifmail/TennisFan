@@ -94,9 +94,9 @@
                 <li class="manage-list-item">
                     <div class="manage-list-item-content">
                         {% if t.player2_id %}
-                        {{ t.player1.user.last_name }} {{ t.player1.user.first_name }} <span class="text-secondary">(УС: {{ t.player1.ntrp_level|floatformat:1 }}, Р: {{ t.player1.total_points|floatformat:0 }})</span> / {{ t.player2.user.last_name }} {{ t.player2.user.first_name }} <span class="text-secondary">(УС: {{ t.player2.ntrp_level|floatformat:1 }}, Р: {{ t.player2.total_points|floatformat:0 }})</span>
+                        {{ t.player1 }} <span class="text-secondary">(УС: {{ t.player1.ntrp_level|floatformat:1 }}, Р: {{ t.player1.total_points|floatformat:0 }})</span> / {{ t.player2 }} <span class="text-secondary">(УС: {{ t.player2.ntrp_level|floatformat:1 }}, Р: {{ t.player2.total_points|floatformat:0 }})</span>
                         {% else %}
-                        {{ t.player1.user.last_name }} {{ t.player1.user.first_name }} <span class="text-secondary">(УС: {{ t.player1.ntrp_level|floatformat:1 }}, Р: {{ t.player1.total_points|floatformat:0 }})</span> <span class="text-secondary">— ожидает партнёра</span>
+                        {{ t.player1 }} <span class="text-secondary">(УС: {{ t.player1.ntrp_level|floatformat:1 }}, Р: {{ t.player1.total_points|floatformat:0 }})</span> <span class="text-secondary">— ожидает партнёра</span>
                         {% endif %}
                     </div>
                     {% if not tournament.bracket_generated %}
@@ -123,14 +123,14 @@
                     <select name="player1_id" required class="form-select form-select-sm manage-player-select" style="width: auto; min-width: 18rem;">
                         <option value="">—</option>
                         {% for p in players_for_pairs %}
-                        <option value="{{ p.pk }}">{{ p.user.last_name }} {{ p.user.first_name }} (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</option>
+                        <option value="{{ p.pk }}">{{ p }} (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</option>
                         {% endfor %}
                     </select>
                     <label class="mb-0">Игрок 2</label>
                     <select name="player2_id" required class="form-select form-select-sm manage-player-select" style="width: auto; min-width: 18rem;">
                         <option value="">—</option>
                         {% for p in players_for_pairs %}
-                        <option value="{{ p.pk }}">{{ p.user.last_name }} {{ p.user.first_name }} (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</option>
+                        <option value="{{ p.pk }}">{{ p }} (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</option>
                         {% endfor %}
                     </select>
                     <button type="submit" class="btn btn-sm btn-primary">Составить пару</button>
@@ -168,7 +168,7 @@
                 {% for p in participants %}
                 <li class="manage-list-item">
                     <div class="manage-list-item-content">
-                        <a href="{% player_profile_url p %}">{{ p.user.last_name }} {{ p.user.first_name }}</a>
+                        <a href="{% player_profile_url p %}">{{ p }}</a>
                         <span class="text-secondary"> (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</span>
                     </div>
                     {% if not tournament.bracket_generated %}
@@ -292,7 +292,7 @@
                                 {% if is_doubles_tvd %}
                                 <a href="{% player_profile_url row.participant.player1 %}">{{ row.participant }}</a>
                                 {% else %}
-                                <a href="{% player_profile_url row.participant %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                <a href="{% player_profile_url row.participant %}">{{ row.participant }}</a>
                                 {% endif %}
                             </td>
                             {% for cell in row.cells %}
@@ -337,7 +337,7 @@
                                 {% if row.team %}
                                 <a href="{% player_profile_url row.team.player1 %}">{{ row.team }}</a>
                                 {% else %}
-                                <a href="{% player_profile_url row.player %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                <a href="{% player_profile_url row.player %}">{{ row.player }}</a>
                                 {% endif %}
                             </td>
                             <td>{{ row.matches }}</td>
@@ -377,7 +377,7 @@
                                 {% if is_doubles_tvd %}
                                 <a href="{% player_profile_url row.participant.player1 %}">{{ row.participant }}</a>
                                 {% else %}
-                                <a href="{% player_profile_url row.participant %}">{{ row.participant.user.last_name }} {{ row.participant.user.first_name }}</a>
+                                <a href="{% player_profile_url row.participant %}">{{ row.participant }}</a>
                                 {% endif %}
                             </td>
                             {% for cell in row.cells %}
@@ -422,7 +422,7 @@
                                 {% if row.team %}
                                 <a href="{% player_profile_url row.team.player1 %}">{{ row.team }}</a>
                                 {% else %}
-                                <a href="{% player_profile_url row.player %}">{{ row.player.user.last_name }} {{ row.player.user.first_name }}</a>
+                                <a href="{% player_profile_url row.player %}">{{ row.player }}</a>
                                 {% endif %}
                             </td>
                             <td>{{ row.matches }}</td>
@@ -459,7 +459,7 @@
                         {% for r in tvd_standings %}
                         <tr>
                             <td class="text-center">{% if r.place == 1 %}🥇{% elif r.place == 2 %}🥈{% elif r.place == 3 %}🥉{% else %}{{ r.place }}{% endif %}</td>
-                            <td><a href="{% player_profile_url r.player %}">{{ r.player.user.last_name }} {{ r.player.user.first_name }}</a></td>
+                            <td><a href="{% player_profile_url r.player %}">{{ r.player }}</a></td>
                             <td class="text-center">{{ r.fan_points }}</td>
                         </tr>
                         {% endfor %}

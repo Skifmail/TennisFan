@@ -1552,7 +1552,7 @@ def tournament_manage_compose_pair(request, slug):
         if _player_in_full_team(tournament, player2_id):
             messages.error(
                 request,
-                f"{player2.user.last_name} {player2.user.first_name} уже в другой полной команде. Нельзя добавить в пару повторно.",
+                f"{player2.get_display_name()} уже в другой полной команде. Нельзя добавить в пару повторно.",
             )
             return redirect("tournament_manage", slug=slug)
         solo1.player2 = player2
@@ -1564,7 +1564,7 @@ def tournament_manage_compose_pair(request, slug):
         if _player_in_full_team(tournament, player1_id):
             messages.error(
                 request,
-                f"{player1.user.last_name} {player1.user.first_name} уже в другой полной команде. Нельзя добавить в пару повторно.",
+                f"{player1.get_display_name()} уже в другой полной команде. Нельзя добавить в пару повторно.",
             )
             return redirect("tournament_manage", slug=slug)
         solo2.player2 = player1
@@ -1576,13 +1576,13 @@ def tournament_manage_compose_pair(request, slug):
         if _player_in_full_team(tournament, player1_id):
             messages.error(
                 request,
-                f"{player1.user.last_name} {player1.user.first_name} уже в полной команде. Один игрок — одна команда в турнире.",
+                f"{player1.get_display_name()} уже в полной команде. Один игрок — одна команда в турнире.",
             )
             return redirect("tournament_manage", slug=slug)
         if _player_in_full_team(tournament, player2_id):
             messages.error(
                 request,
-                f"{player2.user.last_name} {player2.user.first_name} уже в полной команде. Один игрок — одна команда в турнире.",
+                f"{player2.get_display_name()} уже в полной команде. Один игрок — одна команда в турнире.",
             )
             return redirect("tournament_manage", slug=slug)
         existing = tournament.teams.filter(
@@ -1599,7 +1599,7 @@ def tournament_manage_compose_pair(request, slug):
             )
             messages.success(
                 request,
-                f"Пара создана: {player1.user.last_name} {player1.user.first_name} / {player2.user.last_name} {player2.user.first_name}.",
+                f"Пара создана: {player1.get_display_name()} / {player2.get_display_name()}.",
             )
     return redirect("tournament_manage", slug=slug)
 
@@ -1895,7 +1895,7 @@ def tournament_manage_search_participants(request, slug):
             results.append(
                 {
                     "id": p.pk,
-                    "display": f"{p.user.last_name} {p.user.first_name} (УС: {uc_str}, Р: {rating_str}) — {p.user.phone or '—'}",
+                    "display": f"{p.get_display_name()} (УС: {uc_str}, Р: {rating_str}) — {p.user.phone or '—'}",
                 }
             )
     from django.http import JsonResponse
@@ -1948,9 +1948,7 @@ def tournament_manage_add_participant(request, slug):
                 player_id=player.pk,
             )
     _do_add_participant_to_tournament(tournament, player)
-    messages.success(
-        request, f"Участник добавлен: {player.user.last_name} {player.user.first_name}."
-    )
+    messages.success(request, f"Участник добавлен: {player.get_display_name()}.")
     return redirect("tournament_manage", slug=slug)
 
 
@@ -1975,7 +1973,7 @@ def tournament_manage_add_participant_confirm(request, slug, player_id):
         _do_add_participant_to_tournament(tournament, player)
         messages.success(
             request,
-            f"Участник добавлен: {player.user.last_name} {player.user.first_name}.",
+            f"Участник добавлен: {player.get_display_name()}.",
         )
         return redirect("tournament_manage", slug=slug)
     if tournament.is_doubles():
@@ -2026,7 +2024,7 @@ def tournament_manage_add_participant_force(request, slug):
     _do_add_participant_to_tournament(tournament, player)
     messages.success(
         request,
-        f"Участник добавлен без проверки оплаты: {player.user.last_name} {player.user.first_name}.",
+        f"Участник добавлен без проверки оплаты: {player.get_display_name()}.",
     )
     return redirect("tournament_manage", slug=slug)
 
@@ -2063,13 +2061,13 @@ def tournament_manage_send_payment_notification(request, slug):
     if tournament.is_doubles():
         messages.success(
             request,
-            f"Уведомление об оплате отправлено {player.user.last_name} {player.user.first_name}. "
+            f"Уведомление об оплате отправлено {player.get_display_name()}. "
             "После оплаты участник сможет завершить регистрацию на странице турнира.",
         )
     else:
         messages.success(
             request,
-            f"Уведомление об оплате отправлено {player.user.last_name} {player.user.first_name}. "
+            f"Уведомление об оплате отправлено {player.get_display_name()}. "
             "После оплаты участник будет добавлен в турнир автоматически.",
         )
     return redirect("tournament_manage", slug=slug)
@@ -2083,9 +2081,7 @@ def _build_refund_feedback_url(
 
     subject = f"Возврат взноса — турнир «{refund.tournament.name}»"
     user = refund.user
-    user_display = (
-        f"{user.last_name} {user.first_name}".strip() or user.email or f"ID {user.pk}"
-    )
+    user_display = user.get_display_name() or f"ID {user.pk}"
     removed_str = (
         refund.removed_at.strftime("%d.%m.%Y %H:%M") if refund.removed_at else "—"
     )
@@ -2757,6 +2753,13 @@ def match_detail(request, pk):
         and not pending_proposals
     )
 
+    # Соперники для блока контактов (только для участников матча)
+    opponents: list = []
+    if player and can_view_match_actions:
+        from apps.tournaments.utils import get_match_opponents_for_player
+
+        opponents = get_match_opponents_for_player(match, player)
+
     return render(
         request,
         "tournaments/match_detail.html",
@@ -2771,6 +2774,7 @@ def match_detail(request, pk):
             "is_olympic": _is_olympic(match.tournament),
             "season_points_player1": season_points_p1,
             "season_points_player2": season_points_p2,
+            "opponents": opponents,
             **_get_club_panel_context_for_tournament(request, match.tournament),
         },
     )

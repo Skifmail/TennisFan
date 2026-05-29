@@ -51,7 +51,11 @@ def notify_telegram_match_created(sender, instance, created, **kwargs):
     try:
         from django.urls import reverse
 
-        from apps.tournaments.utils import get_match_participant_users
+        from apps.tournaments.utils import (
+            get_match_opponents_for_player,
+            get_match_participants,
+            get_opponents_contacts_short,
+        )
         from apps.users.models import Notification
 
         deadline_str = (
@@ -59,20 +63,30 @@ def notify_telegram_match_created(sender, instance, created, **kwargs):
             if instance.deadline
             else "не указан"
         )
-        msg = (
-            f"Новый матч: {instance.get_player1_display()} — {instance.get_player2_display()}. "
-            f"Дедлайн: {deadline_str}. Внесите результат в «Мои матчи»."
-        )
-        if len(msg) > 255:
-            msg = msg[:252] + "..."
         url = reverse("match_detail", args=[instance.pk])
-        for user in get_match_participant_users(instance):
+        participants = [
+            p
+            for p in get_match_participants(instance)
+            if p and not getattr(p, "is_bye", False) and getattr(p, "user_id", None)
+        ]
+        for player in participants:
+            opponents = get_match_opponents_for_player(instance, player)
+            contacts = get_opponents_contacts_short(opponents)
+            # Сообщение персональное: контакты — соперника конкретного получателя.
+            msg = (
+                f"Новый матч: {instance.get_player1_display()} — "
+                f"{instance.get_player2_display()}. "
+                f"Дедлайн: {deadline_str}. Контакты соперника: {contacts}. "
+                "Подробнее в «Мои матчи»."
+            )
+            if len(msg) > 255:
+                msg = msg[:252] + "..."
             try:
-                Notification.objects.create(user=user, message=msg, url=url)
+                Notification.objects.create(user=player.user, message=msg, url=url)
             except Exception as e:
                 logger.warning(
                     "notify_match_created LK for user %s: %s",
-                    getattr(user, "pk", None),
+                    getattr(player, "user_id", None),
                     e,
                 )
     except Exception as e:

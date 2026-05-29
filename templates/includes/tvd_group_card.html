@@ -17,7 +17,7 @@
                     <tr style="border-bottom: 1px solid var(--color-border-light);">
                         <td style="padding: var(--spacing-xs) var(--spacing-sm); font-weight: 600;">{{ m.final_place|default:"—" }}</td>
                         <td style="padding: var(--spacing-xs) var(--spacing-sm);">
-                            {% if m.team_id %}{{ m.team.get_display_name }}{% elif m.player_id %}<a href="{% url 'profile' pk=m.player.pk %}">{{ m.player.user.last_name }} {{ m.player.user.first_name }}</a>{% else %}—{% endif %}
+                            {% if m.team_id %}{{ m.team.get_display_name }}{% elif m.player_id %}<a href="{% url 'profile' pk=m.player.pk %}">{{ m.player }}</a>{% else %}—{% endif %}
                         </td>
                         <td style="padding: var(--spacing-xs) var(--spacing-sm); text-align: center;">{{ m.wins }}</td>
                         <td style="padding: var(--spacing-xs) var(--spacing-sm); text-align: center;">{{ m.losses }}</td>

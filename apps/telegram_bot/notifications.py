@@ -211,8 +211,86 @@ def notify_postpayment_removed(user, tournament) -> None:
     send_to_user_by_user(user, text)
 
 
-def _match_info_text(match) -> str:
-    """Текст с информацией о матче для уведомления (без ссылки на сайт)."""
+def _player_contact_lines(player) -> list[str]:
+    """Строки контактов игрока для уведомления (HTML; читаемы и после strip_tags в email).
+
+    Включает мессенджеры (Telegram, WhatsApp, MAX) и телефон. Показываются только
+    заполненные контакты.
+
+    Args:
+        player: Объект ``Player``, чьи контакты нужно вывести.
+
+    Returns:
+        list[str]: Список строк вида ``"Telegram: @user"`` (с HTML-ссылками,
+        где это возможно). Пустой список, если контактов нет.
+    """
+    lines: list[str] = []
+    tg_url = getattr(player, "telegram_url", None)
+    if tg_url:
+        username = str(player.telegram or "").strip().lstrip("@")
+        label = f"@{html.escape(username)}" if username else "профиль"
+        lines.append(f'Telegram: <a href="{tg_url}">{label}</a>')
+    wa_url = getattr(player, "whatsapp_url", None)
+    if wa_url:
+        lines.append(
+            f'WhatsApp: <a href="{wa_url}">{html.escape(str(player.whatsapp))}</a>'
+        )
+    max_url = getattr(player, "max_url", None)
+    max_display = getattr(player, "max_contact_display", None)
+    if max_url:
+        label = html.escape(str(max_display)) if max_display else "профиль"
+        lines.append(f'MAX: <a href="{max_url}">{label}</a>')
+    elif max_display:
+        lines.append(f"MAX: {html.escape(str(max_display))}")
+    phone = str(getattr(getattr(player, "user", None), "phone", "") or "").strip()
+    if phone:
+        lines.append(f"Телефон: {html.escape(phone)}")
+    return lines
+
+
+def _opponent_contacts_block(opponents: list) -> str:
+    """Блок контактов соперника(ов) для уведомления о матче (HTML).
+
+    Args:
+        opponents (list): Список объектов ``Player`` — соперники получателя.
+
+    Returns:
+        str: HTML-блок «Контакты соперника» с мессенджерами и телефоном.
+        Если контактов нет — строка с пометкой, что контакты не указаны.
+    """
+    named = len(opponents) > 1
+    parts: list[str] = ["<b>Контакты соперника:</b>"]
+    any_contacts = False
+    for opp in opponents:
+        if not opp or getattr(opp, "is_bye", False):
+            continue
+        contact_lines = _player_contact_lines(opp)
+        if named:
+            parts.append(f"<b>{html.escape(str(opp))}</b>")
+        if contact_lines:
+            any_contacts = True
+            parts.extend(contact_lines)
+        else:
+            parts.append("контакты не указаны")
+    if not any_contacts and not named:
+        return (
+            "<b>Контакты соперника:</b>\n"
+            "не указаны — свяжитесь через карточку матча на сайте."
+        )
+    return "\n".join(parts)
+
+
+def _match_info_text(match, opponents: list | None = None) -> str:
+    """Текст с информацией о матче для уведомления (без ссылки на сайт).
+
+    Args:
+        match: Объект ``Match``.
+        opponents (list | None): Соперники получателя для блока контактов.
+            Если ``None`` — блок контактов не добавляется (общий текст).
+
+    Returns:
+        str: HTML-текст уведомления о новом матче.
+    """
     side1 = match.get_player1_display()
     side2 = match.get_player2_display()
     deadline_str = (
@@ -232,12 +310,17 @@ def _match_info_text(match) -> str:
             tournament_info = f"{tournament_info} (OneDay)"
         round_info = match.round_name or "—"
 
+    contacts_block = ""
+    if opponents:
+        contacts_block = f"\n{_opponent_contacts_block(opponents)}\n"
+
     return (
         f"🎾 <b>Новый матч</b>\n\n"
         f"Турнир: {tournament_info}\n"
         f"Этап: {round_info}\n"
         f"{side1} — {side2}\n"
-        f"Дедлайн: {deadline_str}\n\n"
+        f"Дедлайн: {deadline_str}\n"
+        f"{contacts_block}\n"
         "Внести результат или посмотреть матчи — кнопки ниже."
     )
 
@@ -293,10 +376,20 @@ def notify_bracket_formed(tournament, subtitle: str | None = None) -> None:
 
 
 def notify_match_created(match) -> None:
-    """Уведомление участникам о создании матча (кнопки только в боте)."""
-    if not bot.is_configured():
-        return
-    text = _match_info_text(match)
+    """Уведомление участникам о создании матча: соперник, дедлайн и контакты соперника.
+
+    Каждому участнику отправляется персональный текст с контактами именно его
+    соперника (Telegram/WhatsApp/MAX/телефон). Отправка идёт в Telegram (если бот
+    настроен) и дублируется на email — письмо приходит даже без Telegram.
+
+    Args:
+        match: Объект ``Match``, для которого рассылаются уведомления.
+    """
+    from apps.tournaments.utils import (
+        get_match_opponents_for_player,
+        get_match_participants,
+    )
+
     reply_markup = {
         "inline_keyboard": [
             [
@@ -308,8 +401,15 @@ def notify_match_created(match) -> None:
             [{"text": "📅 Мои матчи", "callback_data": "menu_my_matches"}],
         ],
     }
-    for user in get_match_participant_users(match):
-        send_to_user_by_user(user, text, reply_markup=reply_markup)
+    participants = [
+        p
+        for p in get_match_participants(match)
+        if p and not getattr(p, "is_bye", False) and getattr(p, "user_id", None)
+    ]
+    for player in participants:
+        opponents = get_match_opponents_for_player(match, player)
+        text = _match_info_text(match, opponents=opponents)
+        send_to_user_by_user(player.user, text, reply_markup=reply_markup)
 
 
 def notify_result_proposal(proposal) -> None:

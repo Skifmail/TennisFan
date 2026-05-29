@@ -116,33 +116,36 @@ def get_match_participant_users(match: Match) -> list:
     ]
 
 
-def get_match_opponent_users(match: Match, exclude_player) -> list:
+def get_match_opponents_for_player(match: Match, player) -> list:
     """
-    Пользователи только противоположной стороны (соперники).
-    В парном матче возвращаются только игроки другой команды; сокомандник не входит.
-    Без bye-игроков.
+    Возвращает игроков (Player) противоположной стороны матча для заданного игрока.
+
+    Используется для персональных уведомлений (показать контакты соперника).
+    В парном матче возвращаются только игроки другой команды/пары; сокомандник не входит.
+    bye-игроки исключаются.
+
+    Args:
+        match (Match): Матч, для которого определяются соперники.
+        player (Player): Игрок, относительно которого ищется противоположная сторона.
+
+    Returns:
+        list: Список объектов ``Player`` — соперники игрока (без bye-игроков).
     """
     if match.partner1_id and match.partner2_id:
         side1 = (match.player1, match.partner1)
         side2 = (match.player2, match.partner2)
-        if exclude_player in side1:
-            return [
-                p.user
-                for p in side2
-                if p and getattr(p, "user_id", None) and not getattr(p, "is_bye", False)
-            ]
-        if exclude_player in side2:
-            return [
-                p.user
-                for p in side1
-                if p and getattr(p, "user_id", None) and not getattr(p, "is_bye", False)
-            ]
-        return []
+        if player in side1:
+            opponents = side2
+        elif player in side2:
+            opponents = side1
+        else:
+            return []
+        return [p for p in opponents if p and not getattr(p, "is_bye", False)]
     if match.team1_id and match.team2_id:
         if not match.team1 or not match.team2:
             return []
-        in_team1 = exclude_player in (match.team1.player1, match.team1.player2)
-        in_team2 = exclude_player in (match.team2.player1, match.team2.player2)
+        in_team1 = player in (match.team1.player1, match.team1.player2)
+        in_team2 = player in (match.team2.player1, match.team2.player2)
         if in_team1:
             opponent_team = match.team2
         elif in_team2:
@@ -150,18 +153,67 @@ def get_match_opponent_users(match: Match, exclude_player) -> list:
         else:
             return []
         return [
-            p.user
+            p
             for p in (opponent_team.player1, opponent_team.player2)
-            if p and getattr(p, "user_id", None) and not getattr(p, "is_bye", False)
+            if p and not getattr(p, "is_bye", False)
         ]
     # Одиночный матч
     other = None
-    if match.player1_id and exclude_player != match.player1:
+    if match.player1_id and player != match.player1:
         other = match.player1
-    elif match.player2_id and exclude_player != match.player2:
+    elif match.player2_id and player != match.player2:
         other = match.player2
     if not other or getattr(other, "is_bye", False):
         return []
-    if getattr(other, "user_id", None):
-        return [other.user]
-    return []
+    return [other]
+
+
+def get_opponents_contacts_short(opponents: list) -> str:
+    """Компактная строка контактов соперника(ов) для ЛК-уведомления (plain text).
+
+    Включает заполненные контакты: Telegram, WhatsApp, MAX, телефон. Формат
+    рассчитан на короткое сообщение (поле ``Notification.message`` ограничено
+    255 символами).
+
+    Args:
+        opponents (list): Список объектов ``Player`` — соперники получателя.
+
+    Returns:
+        str: Строка вида ``"TG @user, тел. +7..."``; для парных матчей контакты
+        каждого соперника предваряются его именем. Если контактов нет —
+        ``"контакты не указаны"``.
+    """
+    multi = len([o for o in opponents if o and not getattr(o, "is_bye", False)]) > 1
+    chunks: list[str] = []
+    for opp in opponents:
+        if not opp or getattr(opp, "is_bye", False):
+            continue
+        items: list[str] = []
+        telegram = str(getattr(opp, "telegram", "") or "").strip().lstrip("@")
+        if telegram:
+            items.append(f"TG @{telegram}")
+        whatsapp = str(getattr(opp, "whatsapp", "") or "").strip()
+        if whatsapp:
+            items.append(f"WhatsApp {whatsapp}")
+        max_display = getattr(opp, "max_contact_display", None)
+        if max_display:
+            items.append(f"MAX {max_display}")
+        phone = str(getattr(getattr(opp, "user", None), "phone", "") or "").strip()
+        if phone:
+            items.append(f"тел. {phone}")
+        joined = ", ".join(items) if items else "контакты не указаны"
+        chunks.append(f"{opp.get_display_name()}: {joined}" if multi else joined)
+    return "; ".join(chunks) if chunks else "контакты не указаны"
+
+
+def get_match_opponent_users(match: Match, exclude_player) -> list:
+    """
+    Пользователи только противоположной стороны (соперники).
+    В парном матче возвращаются только игроки другой команды; сокомандник не входит.
+    Без bye-игроков.
+    """
+    return [
+        p.user
+        for p in get_match_opponents_for_player(match, exclude_player)
+        if getattr(p, "user_id", None)
+    ]

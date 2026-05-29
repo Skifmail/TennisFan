@@ -26,7 +26,7 @@
                         {% csrf_token %}
                         <input type="hidden" name="action" value="join">
                         <input type="hidden" name="team_id" value="{{ team.id }}">
-                        <span class="flex-grow-1">{{ team.player1.user.last_name }} {{ team.player1.user.first_name }}</span>
+                        <span class="flex-grow-1">{{ team.player1 }}</span>
                         <button type="submit" class="btn btn-primary">Присоединиться</button>
                     </form>
                     {% endfor %}
@@ -78,7 +78,7 @@
                             <input type="hidden" name="action" value="add_partner">
                             <input type="hidden" name="partner_id" value="{{ p.id }}">
                             <div class="flex-grow-1">
-                                <div>{{ p.user.last_name }} {{ p.user.first_name }} (ID: {{ p.id }}) <span class="text-secondary">— УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }}</span></div>
+                                <div>{{ p }} (ID: {{ p.id }}) <span class="text-secondary">— УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }}</span></div>
                                 {% if tournament.is_mixed_doubles and p.gender %}
                                 <small class="text-muted">{{ p.get_gender_display }}</small>
                                 {% endif %}

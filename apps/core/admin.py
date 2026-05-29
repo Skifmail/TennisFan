@@ -9,11 +9,62 @@ from .models import (
     City,
     FooterSocialLink,
     LegalAcceptanceLog,
+    PlatformActivityEvent,
     SupportMessage,
     SupportThread,
     TelegramTransferConsentLog,
     UserConsent,
 )
+
+
+@admin.register(PlatformActivityEvent)
+class PlatformActivityEventAdmin(admin.ModelAdmin):
+    """Админка ленты активности платформы (только просмотр).
+
+    События формируются автоматически и не редактируются вручную, поэтому
+    добавление и изменение записей через админку запрещены.
+    """
+
+    list_display = (
+        "created_at",
+        "actor_name",
+        "actor_role",
+        "event_type",
+        "amount",
+        "currency",
+        "description",
+    )
+    list_filter = ("event_type", "actor_role", "currency", "created_at")
+    search_fields = (
+        "actor_name",
+        "description",
+        "actor__first_name",
+        "actor__last_name",
+        "actor__email",
+    )
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+    readonly_fields = (
+        "event_type",
+        "actor",
+        "actor_name",
+        "actor_role",
+        "description",
+        "amount",
+        "currency",
+        "target_url",
+        "metadata",
+        "dedupe_key",
+        "created_at",
+    )
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Запретить ручное добавление событий в журнал."""
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: object = None) -> bool:
+        """Запретить ручное изменение событий в журнале."""
+        return False
 
 
 class SupportMessageInline(admin.TabularInline):

@@ -181,6 +181,7 @@ TEMPLATES = [
                 "apps.core.context_processors.search_engine_verification",
                 "apps.core.context_processors.site_meta",
                 "apps.core.context_processors.site_branding",
+                "apps.core.context_processors.platform_activity_unseen",
                 "apps.clubs.context_processors.club_context",
             ],
         },

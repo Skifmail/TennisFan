@@ -55,6 +55,117 @@
             </aside>
         </section>
 
+        <section class="club-dashboard-panel club-dashboard-panel--activity">
+            <div class="club-dashboard-panel__header">
+                <div>
+                    <p class="club-dashboard-panel__eyebrow">Активность платформы</p>
+                    <h2 class="club-dashboard-panel__title">Лента действий</h2>
+                    <p class="club-dashboard-activity__summary">
+                        Все события {{ activity_period_label }}: регистрации, оплаты, результаты матчей, турниры, спарринги, клубы, тренеры и комментарии.
+                        Найдено записей: {{ activity_total_count }}.
+                    </p>
+                </div>
+                <div class="club-dashboard-panel__header-actions">
+                    <a href="{% url 'platform_activity_export' %}{% if activity_querystring %}?{{ activity_querystring }}{% endif %}" class="btn btn-outline club-dashboard-finance-action-btn">Экспорт в CSV</a>
+                </div>
+            </div>
+
+            <form method="get" class="club-dashboard-activity-filters">
+                {% if selected_finance_year %}<input type="hidden" name="finance_year" value="{{ selected_finance_year }}">{% endif %}
+                {% if selected_finance_month %}<input type="hidden" name="finance_month" value="{{ selected_finance_month }}">{% endif %}
+                <label class="club-dashboard-activity-filters__field club-dashboard-activity-filters__field--name">
+                    <span class="club-dashboard-activity-filters__label">Имя</span>
+                    <input type="text" name="act_q" value="{{ activity_filters.q }}" class="form-control" placeholder="Иван Петров">
+                </label>
+                <label class="club-dashboard-activity-filters__field club-dashboard-activity-filters__field--type">
+                    <span class="club-dashboard-activity-filters__label">Событие</span>
+                    <select name="act_type" class="form-control">
+                        <option value="">Все</option>
+                        {% for value, label in activity_event_type_options %}
+                        <option value="{{ value }}" {% if activity_filters.type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="club-dashboard-activity-filters__field club-dashboard-activity-filters__field--date">
+                    <span class="club-dashboard-activity-filters__label">С</span>
+                    <input type="date" name="act_from" value="{{ activity_filters.from }}" class="form-control">
+                </label>
+                <label class="club-dashboard-activity-filters__field club-dashboard-activity-filters__field--date">
+                    <span class="club-dashboard-activity-filters__label">По</span>
+                    <input type="date" name="act_to" value="{{ activity_filters.to }}" class="form-control">
+                </label>
+                <div class="club-dashboard-activity-filters__actions">
+                    <button type="submit" class="btn btn-outline club-dashboard-activity-filters__btn">Найти</button>
+                    <a href="{% url 'platform_dashboard' %}" class="btn btn-outline club-dashboard-activity-filters__btn">Сброс</a>
+                </div>
+            </form>
+
+            {% if activity_page.object_list %}
+            <div class="club-dashboard-activity-scroll" data-activity-scroll>
+                <div class="club-dashboard-activity" tabindex="0">
+                <div class="club-dashboard-activity__head">
+                    <span>Дата</span>
+                    <span>ФИО</span>
+                    <span>Статус</span>
+                    <span>Действие</span>
+                    <span class="club-dashboard-activity__amount-col">Сумма</span>
+                </div>
+                {% for event in activity_page %}
+                <div class="club-dashboard-activity__row">
+                    <div class="club-dashboard-activity__cell club-dashboard-activity__cell--date">
+                        <span class="club-dashboard-activity__date">{{ event.created_at|date:"d.m.Y" }}</span>
+                        <span class="club-dashboard-activity__time">{{ event.created_at|date:"H:i" }}</span>
+                    </div>
+                    <div class="club-dashboard-activity__cell club-dashboard-activity__cell--actor">
+                        {{ event.get_actor_display }}
+                    </div>
+                    <div class="club-dashboard-activity__cell club-dashboard-activity__cell--role">
+                        {% if event.actor_role %}<span class="club-dashboard-activity__role club-dashboard-activity__role--{{ event.get_role_modifier }}">{{ event.actor_role }}</span>{% else %}<span class="club-dashboard-activity__dash">—</span>{% endif %}
+                    </div>
+                    <div class="club-dashboard-activity__cell club-dashboard-activity__cell--action">
+                        <span class="club-dashboard-activity__badge club-dashboard-activity__badge--{{ event.get_tone }}">{{ event.get_event_type_display }}</span>
+                        {% if event.description %}
+                        <span class="club-dashboard-activity__desc">
+                            {% if event.target_url %}<a href="{{ event.target_url }}">{{ event.description }}</a>{% else %}{{ event.description }}{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="club-dashboard-activity__cell club-dashboard-activity__cell--amount">
+                        {% if event.amount is not None %}{{ event.get_amount_display }}{% else %}<span class="club-dashboard-activity__dash">—</span>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                </div>
+                <div class="club-dashboard-activity-scroll__rail" aria-hidden="true">
+                    <div class="club-dashboard-activity-scroll__thumb"></div>
+                </div>
+            </div>
+
+            {% if activity_page.paginator.num_pages > 1 %}
+            <div class="club-dashboard-activity__pagination">
+                {% if activity_page.has_previous %}
+                <a class="btn btn-ghost" href="?{{ activity_querystring }}{% if activity_querystring %}&{% endif %}act_page={{ activity_page.previous_page_number }}">Назад</a>
+                {% endif %}
+                <span class="club-dashboard-activity__page-info">Страница {{ activity_page.number }} из {{ activity_page.paginator.num_pages }}</span>
+                {% if activity_page.has_next %}
+                <a class="btn btn-ghost" href="?{{ activity_querystring }}{% if activity_querystring %}&{% endif %}act_page={{ activity_page.next_page_number }}">Вперёд</a>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="club-dashboard-empty-state">
+                <div class="club-dashboard-empty-state__title">Событий не найдено</div>
+                <div class="club-dashboard-empty-state__text">
+                    {% if activity_is_filtered %}
+                    По заданным условиям ничего не найдено. Измените фильтр или сбросьте его.
+                    {% else %}
+                    В текущем месяце пока нет зафиксированных действий на платформе.
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </section>
+
         <section class="club-dashboard-kpi-grid">
             {% for card in summary_cards %}
             <article class="club-dashboard-kpi-card club-dashboard-kpi-card--{{ card.tone }}">
@@ -123,7 +234,7 @@
                     {% for point in finance_chart_points %}
                     <div class="club-dashboard-chart__item">
                         <div class="club-dashboard-chart__bar-wrap">
-                            <div class="club-dashboard-chart__bar club-dashboard-chart__bar--soft" style="height: {{ point.height }}%;"></div>
+                            <div class="club-dashboard-chart__bar club-dashboard-chart__bar--soft" data-height="{{ point.height }}"></div>
                         </div>
                         <div class="club-dashboard-chart__value">{{ point.value }}</div>
                         <div class="club-dashboard-chart__label">{{ point.label }}</div>
@@ -244,7 +355,7 @@
                     {% for point in player_growth_points %}
                     <div class="club-dashboard-chart__item">
                         <div class="club-dashboard-chart__bar-wrap">
-                            <div class="club-dashboard-chart__bar" style="height: {{ point.height }}%;"></div>
+                            <div class="club-dashboard-chart__bar" data-height="{{ point.height }}"></div>
                         </div>
                         <div class="club-dashboard-chart__value">{{ point.value }}</div>
                         <div class="club-dashboard-chart__label">{{ point.label }}</div>
@@ -391,4 +502,46 @@
         </section>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var wrap = document.querySelector("[data-activity-scroll]");
+    if (!wrap) return;
+    var scroller = wrap.querySelector(".club-dashboard-activity");
+    var thumb = wrap.querySelector(".club-dashboard-activity-scroll__thumb");
+    var rail = wrap.querySelector(".club-dashboard-activity-scroll__rail");
+    if (!scroller || !thumb || !rail) return;
+
+    function updateThumb() {
+        var scrollHeight = scroller.scrollHeight;
+        var clientHeight = scroller.clientHeight;
+        var scrollTop = scroller.scrollTop;
+        var trackHeight = rail.clientHeight;
+
+        if (scrollHeight <= clientHeight + 1) {
+            thumb.style.height = trackHeight + "px";
+            thumb.style.transform = "translateY(0)";
+            thumb.style.opacity = "0.35";
+            return;
+        }
+
+        thumb.style.opacity = "1";
+        var ratio = clientHeight / scrollHeight;
+        var thumbHeight = Math.max(24, Math.round(trackHeight * ratio));
+        var maxThumbTop = trackHeight - thumbHeight;
+        var scrollRatio = scrollTop / (scrollHeight - clientHeight);
+        thumb.style.height = thumbHeight + "px";
+        thumb.style.transform = "translateY(" + Math.round(maxThumbTop * scrollRatio) + "px)";
+    }
+
+    scroller.addEventListener("scroll", updateThumb, { passive: true });
+    window.addEventListener("resize", updateThumb);
+    if (typeof ResizeObserver !== "undefined") {
+        new ResizeObserver(updateThumb).observe(scroller);
+    }
+    updateThumb();
+})();
+</script>
 {% endblock %}

@@ -20,6 +20,8 @@ from apps.clubs.services import club_can_add_member, club_has_public_page_access
 
 from .models import FooterSocialLink
 
+PLATFORM_ACTIVITY_UNSEEN_CACHE_PREFIX = "platform_activity_unseen"
+
 FOOTER_SOCIAL_LINKS_CACHE_KEY = "footer_social_links:v1"
 
 
@@ -230,3 +232,35 @@ def footer_joinable_clubs(request):
         items.append(item)
 
     return {"footer_joinable_clubs": items}
+
+
+def platform_activity_unseen(request):
+    """Добавить флаг новых событий ленты для индикатора «Панель управления».
+
+    Args:
+        request: HTTP-запрос текущей страницы.
+
+    Returns:
+        dict[str, bool]: ``platform_activity_unseen`` — True, если есть новые события.
+    """
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return {"platform_activity_unseen": False}
+    if not (user.is_staff or user.is_superuser):
+        return {"platform_activity_unseen": False}
+
+    from apps.core.activity import has_unseen_platform_activity
+    from apps.core.models import PlatformActivityEvent
+
+    latest_event_id = (
+        PlatformActivityEvent.objects.order_by("-id")
+        .values_list("id", flat=True)
+        .first()
+        or 0
+    )
+    cache_key = f"{PLATFORM_ACTIVITY_UNSEEN_CACHE_PREFIX}:{user.id}:{latest_event_id}"
+    unseen = cache.get(cache_key)
+    if unseen is None:
+        unseen = has_unseen_platform_activity(user)
+        cache.set(cache_key, unseen, timeout=30)
+    return {"platform_activity_unseen": unseen}

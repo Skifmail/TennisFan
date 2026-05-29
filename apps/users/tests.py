@@ -116,3 +116,40 @@ class DisplayNameFormatTestCase(TestCase):
         self.assertEqual(user.get_display_name(), "Кристина Козубова")
         self.assertEqual(player.get_display_name(), "Кристина Козубова")
         self.assertEqual(str(player), "Кристина Козубова")
+
+
+class NotificationUnreadCacheTestCase(TestCase):
+    """Тесты сброса бейджа непрочитанных уведомлений."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="notify-cache@test.local",
+            password="testpass123",
+        )
+
+    def test_notifications_page_clears_unread_badge_cache(self) -> None:
+        """После просмотра уведомлений бейдж обнуляется без перезагрузки кэша браузера."""
+        from django.core.cache import cache
+
+        from apps.users.context_processors import (
+            UNREAD_NOTIFICATIONS_CACHE_KEY_PREFIX,
+            unread_notifications,
+        )
+        from apps.users.models import Notification
+
+        Notification.objects.create(
+            user=self.user,
+            message="Тестовое уведомление",
+            is_read=False,
+        )
+        cache_key = f"{UNREAD_NOTIFICATIONS_CACHE_KEY_PREFIX}:{self.user.pk}"
+        cache.set(cache_key, 5, timeout=30)
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("notifications"), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(cache.get(cache_key), 0)
+        request = response.wsgi_request
+        self.assertEqual(unread_notifications(request)["unread_notifications_count"], 0)

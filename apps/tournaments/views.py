@@ -3104,6 +3104,8 @@ def confirm_proposal(request, pk):
 
     action = request.POST.get("action")
     if action == "accept":
+        # Передаём в сигнал ленты активности, кто именно подтвердил результат.
+        proposal._confirmed_by_user = request.user
         apply_proposal(proposal)
         # FAN-логика (advance, consolation, finalize) вызывается из post_save сигнала Match
         # Уведомления в ЛК и Telegram (с рейтингом и силой) создаются внутри apply_proposal для обоих участников
@@ -3116,6 +3118,20 @@ def confirm_proposal(request, pk):
             notify_proposal_rejected(proposal)
         except Exception:
             pass  # Telegram-уведомление не критично
+        # Фиксируем отклонение результата в ленте активности до удаления заявки.
+        try:
+            from apps.core.activity import log_activity
+            from apps.core.models import PlatformActivityEvent
+
+            log_activity(
+                event_type=PlatformActivityEvent.EventType.MATCH_RESULT_REJECTED,
+                actor=request.user,
+                description=f"Отклонил результат матча: {match}",
+                target_url=reverse("match_detail", args=[match.pk]),
+                dedupe_key=f"proposal_rejected:{proposal.pk}",
+            )
+        except Exception:
+            pass  # запись в ленту не должна мешать основному сценарию
         proposal.delete()
         Notification.objects.create(
             user=proposal.proposer.user,

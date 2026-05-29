@@ -63,8 +63,9 @@ from apps.training.models import Coach
 from apps.users.models import Player, SkillLevel
 from apps.users.rating_utils import rating_to_ntrp_level
 
+from .activity import mark_platform_dashboard_seen
 from .forms import FeedbackForm
-from .models import City, SupportMessage, SupportThread
+from .models import City, PlatformActivityEvent, SupportMessage, SupportThread
 from .support_notifications import (
     send_admin_support_notification,
     send_user_support_reply_async,
@@ -297,6 +298,123 @@ def _make_aware_datetime(
     )
 
 
+def _name_search_variants(text: str) -> set[str]:
+    """Сформировать варианты строки для регистронезависимого поиска (SQLite + PG).
+
+    Args:
+        text: Исходная строка поиска.
+
+    Returns:
+        Набор вариантов написания для фильтра ``__contains``.
+    """
+    cleaned = text.strip()
+    if not cleaned:
+        return set()
+    variants = {
+        cleaned,
+        cleaned.lower(),
+        cleaned.upper(),
+        cleaned.capitalize(),
+        cleaned.title(),
+    }
+    parts = cleaned.split()
+    if len(parts) > 1:
+        variants.add(" ".join(part.capitalize() for part in parts))
+        variants.add(" ".join(part.lower() for part in parts))
+        variants.add(" ".join(part.upper() for part in parts))
+    return {variant for variant in variants if variant}
+
+
+def _filter_platform_activity_by_name(
+    qs: models.QuerySet, activity_q: str
+) -> models.QuerySet:
+    """Отфильтровать ленту по имени без учёта регистра (в т.ч. кириллица в SQLite).
+
+    Args:
+        qs: Базовый queryset событий ленты.
+        activity_q: Строка поиска по имени, email или снимку actor_name.
+
+    Returns:
+        QuerySet с применённым фильтром по имени.
+    """
+    variants = _name_search_variants(activity_q)
+    if not variants:
+        return qs
+    name_filter = Q()
+    for variant in variants:
+        name_filter |= (
+            Q(actor_name__contains=variant)
+            | Q(actor__first_name__contains=variant)
+            | Q(actor__last_name__contains=variant)
+            | Q(actor__email__contains=variant)
+        )
+    return qs.filter(name_filter)
+
+
+def _build_platform_activity_queryset(
+    request: HttpRequest,
+) -> tuple[Any, bool, str, dict[str, str]]:
+    """Построить queryset ленты активности по GET-фильтрам дашборда.
+
+    Учитывает поиск по имени (за всё время), фильтр по типу события и диапазону
+    дат. Без фильтров возвращает события текущего месяца.
+
+    Args:
+        request: HTTP-запрос с GET-параметрами act_q, act_type, act_from, act_to.
+
+    Returns:
+        tuple: queryset событий, флаг наличия фильтра, подпись периода и словарь
+        применённых значений фильтров.
+    """
+    activity_q = (request.GET.get("act_q") or "").strip()
+    activity_type = (request.GET.get("act_type") or "").strip()
+    activity_from_raw = (request.GET.get("act_from") or "").strip()
+    activity_to_raw = (request.GET.get("act_to") or "").strip()
+
+    if activity_type not in set(PlatformActivityEvent.EventType.values):
+        activity_type = ""
+
+    def _parse(raw: str):
+        try:
+            return datetime.strptime(raw, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            return None
+
+    activity_from = _parse(activity_from_raw)
+    activity_to = _parse(activity_to_raw)
+    is_filtered = bool(activity_q or activity_type or activity_from or activity_to)
+
+    qs = PlatformActivityEvent.objects.select_related("actor")
+    if activity_q:
+        qs = _filter_platform_activity_by_name(qs, activity_q)
+    if activity_type:
+        qs = qs.filter(event_type=activity_type)
+    if activity_from:
+        qs = qs.filter(created_at__date__gte=activity_from)
+    if activity_to:
+        qs = qs.filter(created_at__date__lte=activity_to)
+
+    if is_filtered:
+        period_label = "по заданному фильтру"
+    else:
+        today = timezone.localdate()
+        month_start = today.replace(day=1)
+        qs = qs.filter(
+            created_at__gte=_make_aware_datetime(
+                month_start.year, month_start.month, month_start.day
+            )
+        )
+        period_label = "за текущий месяц"
+
+    filters = {
+        "q": activity_q,
+        "type": activity_type,
+        "from": activity_from_raw,
+        "to": activity_to_raw,
+    }
+    return qs, is_filtered, period_label, filters
+
+
 @login_required
 def platform_dashboard(request: HttpRequest) -> HttpResponse:
     """Глобальный дашборд платформы для staff/superuser."""
@@ -305,6 +423,8 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
             request, "Доступ к панели платформы есть только у администратора."
         )
         return redirect("home")
+
+    mark_platform_dashboard_seen(request.user)
 
     now = timezone.now()
     today = timezone.localdate()
@@ -947,6 +1067,23 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
     support_unread_count = get_unread_count_for_admin()
     support_recent_threads = get_threads_for_admin(limit=5)
 
+    # ------------------------------------------------------------------
+    # Лента активности платформы (вечный журнал действий пользователей)
+    # ------------------------------------------------------------------
+    (
+        activity_qs,
+        activity_is_filtered,
+        activity_period_label,
+        activity_filters,
+    ) = _build_platform_activity_queryset(request)
+    activity_total_count = activity_qs.count()
+    activity_paginator = Paginator(activity_qs, 60)
+    activity_page = activity_paginator.get_page(request.GET.get("act_page") or 1)
+
+    activity_query = request.GET.copy()
+    activity_query.pop("act_page", None)
+    activity_querystring = activity_query.urlencode()
+
     context = {
         "status_summary": status_summary,
         "summary_cards": summary_cards,
@@ -969,6 +1106,13 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         "active_user_subscriptions": active_user_subscriptions,
         "support_unread_count": support_unread_count,
         "support_recent_threads": support_recent_threads,
+        "activity_page": activity_page,
+        "activity_total_count": activity_total_count,
+        "activity_event_type_options": PlatformActivityEvent.EventType.choices,
+        "activity_is_filtered": activity_is_filtered,
+        "activity_period_label": activity_period_label,
+        "activity_querystring": activity_querystring,
+        "activity_filters": activity_filters,
     }
     return render(request, "core/platform_dashboard.html", context)
 
@@ -1028,6 +1172,59 @@ def platform_players_export(request: HttpRequest) -> HttpResponse:
                     if player.created_at
                     else ""
                 ),
+            ]
+        )
+    return response
+
+
+@login_required
+@require_safe
+def platform_activity_export(request: HttpRequest) -> HttpResponse:
+    """Выгружает ленту активности платформы в CSV с учётом текущих фильтров.
+
+    Args:
+        request: HTTP-запрос с GET-фильтрами act_q, act_type, act_from, act_to.
+
+    Returns:
+        HttpResponse: CSV-файл со всеми событиями, удовлетворяющими фильтру.
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(
+            request, "Доступ к панели платформы есть только у администратора."
+        )
+        return redirect("home")
+
+    qs, _is_filtered, _label, _filters = _build_platform_activity_queryset(request)
+
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="platform_activity.csv"'
+    response.write("\ufeff")
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "Дата",
+            "Время",
+            "ФИО",
+            "Статус",
+            "Событие",
+            "Описание",
+            "Сумма",
+            "Валюта",
+        ]
+    )
+    for event in qs.iterator(chunk_size=1000):
+        local_dt = timezone.localtime(event.created_at)
+        writer.writerow(
+            [
+                local_dt.strftime("%Y-%m-%d"),
+                local_dt.strftime("%H:%M"),
+                event.get_actor_display(),
+                event.actor_role or "",
+                event.get_event_type_display(),
+                event.description or "",
+                event.amount if event.amount is not None else "",
+                event.currency if event.amount is not None else "",
             ]
         )
     return response

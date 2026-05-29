@@ -155,8 +155,13 @@
                             {% endif %}
                             <li><a href="{% url 'notifications' %}" class="nav-notify">Уведомления{% if unread_notifications_count > 0 %}<span class="notify-badge">{{ unread_notifications_count }}</span>{% endif %}</a></li>
                             {% if user.is_staff or user.is_superuser %}
-                            <li><a href="{% url 'platform_dashboard' %}">Панель платформы</a></li>
-                            <li><a href="{% url 'admin:index' %}">Админ панель</a></li>
+                            <li class="nav-dropdown-content__admin-group">
+                                <a href="{% url 'platform_dashboard' %}" class="nav-admin-link">
+                                    <span>Панель управления</span>
+                                    {% if platform_activity_unseen %}<span class="notify-dot" aria-label="Есть новые события"></span>{% endif %}
+                                </a>
+                                <a href="{% url 'admin:index' %}">Админ панель</a>
+                            </li>
                             {% endif %}
                             <li>
                                 <form action="{% url 'logout' %}" method="post">

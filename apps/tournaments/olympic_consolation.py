@@ -15,9 +15,9 @@ from apps.users.models import Player
 from .fan import (
     _expected_final_round,
     _get_bye_player,
-    _tournament_start_dt,
 )
 from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam
+from .utils import tournament_deadline_schedule_start
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +199,7 @@ def create_consolation_bracket_for_round(
         round_index, _count_main_participants(tournament)
     )
 
-    start = _tournament_start_dt(tournament)
+    start = tournament_deadline_schedule_start(tournament)
     days = getattr(tournament, "match_days_per_round", 7) or 7
     delta = timedelta(days=days)
     base = start + delta * (round_index + 1)

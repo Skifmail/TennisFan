@@ -3,8 +3,10 @@
 Используются в views и в telegram_bot без циклических импортов.
 """
 
+from datetime import datetime, timedelta
 from typing import cast
 
+from django.utils import timezone
 from django.utils.text import slugify
 
 from .models import Match, Tournament, TournamentStatus
@@ -50,6 +52,64 @@ def generate_unique_tournament_slug(
             base = base[: SLUG_MAX_LENGTH - len(suffix)].rstrip("-") or "tournament"
         candidate = base + suffix
     return candidate
+
+
+def tournament_deadline_schedule_start(tournament: Tournament) -> datetime:
+    """Базовая точка для расчёта deadline матчей при формировании сетки.
+
+    Используется ``start_date`` турнира, но не раньше начала текущих суток
+    (локальная TZ): если сетка создаётся позже запланированного старта
+    (задержка постоплаты, ручной запуск), дедлайны отсчитываются от фактической
+    даты генерации.
+
+    Args:
+        tournament (Tournament): Турнир.
+
+    Returns:
+        datetime: Aware datetime начала отсчёта дедлайнов.
+    """
+    local_today = timezone.localdate()
+    today_start = cast(
+        datetime,
+        timezone.make_aware(datetime.combine(local_today, datetime.min.time())),
+    )
+    if not tournament.start_date:
+        return today_start
+
+    planned_date = tournament.start_date
+    if isinstance(planned_date, str):
+        planned_date = datetime.strptime(planned_date, "%Y-%m-%d").date()
+    planned_start = cast(
+        datetime,
+        timezone.make_aware(datetime.combine(planned_date, datetime.min.time())),
+    )
+    return max(planned_start, today_start)
+
+
+def recalculate_tournament_match_deadlines(tournament: Tournament) -> int:
+    """Пересчитать deadline всех матчей турнира от актуальной базовой даты.
+
+    Используйте, если сетка была сформирована позже ``start_date`` и дедлайны
+    оказались в прошлом.
+
+    Args:
+        tournament (Tournament): Турнир с уже созданными матчами.
+
+    Returns:
+        int: Число обновлённых матчей.
+    """
+    days = int(getattr(tournament, "match_days_per_round", 7) or 7)
+    delta = timedelta(days=days)
+    start = tournament_deadline_schedule_start(tournament)
+    updated = 0
+    for match in tournament.matches.filter(round_index__isnull=False):
+        round_index = match.round_index
+        if not round_index:
+            continue
+        match.deadline = start + delta * round_index
+        match.save(update_fields=["deadline"])
+        updated += 1
+    return updated
 
 
 def mark_tournament_bracket_generated(tournament: Tournament) -> None:

@@ -4,7 +4,7 @@
 
 import logging
 import math
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import cast
 
 from django.urls import reverse
@@ -22,6 +22,7 @@ from .models import (
 )
 from .postpayment import get_pending_postpayment_users, open_postpayment_window
 from .season_utils import get_current_season, get_season_display
+from .utils import tournament_deadline_schedule_start
 
 logger = logging.getLogger(__name__)
 
@@ -140,17 +141,6 @@ def _round_eliminated(round_index: int) -> str:
     }
     val = m.get(round_index, TournamentPlayerResult.RoundEliminated.R1)
     return val if isinstance(val, str) else str(val)
-
-
-def _tournament_start_dt(tournament: Tournament):
-    """Дата/время старта турнира для дедлайнов."""
-    start = timezone.now()
-    if tournament.start_date:
-        d = tournament.start_date
-        if isinstance(d, str):
-            d = datetime.strptime(d, "%Y-%m-%d").date()
-        start = timezone.make_aware(datetime.combine(d, datetime.min.time()))
-    return start
 
 
 def check_and_generate_past_deadline_brackets() -> int:
@@ -321,7 +311,7 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     while len(padded) < bracket_size:
         padded.append(bye_entity)
 
-    start = _tournament_start_dt(tournament)
+    start = tournament_deadline_schedule_start(tournament)
     days = getattr(tournament, "match_days_per_round", 7) or 7
     delta = timedelta(days=days)
     is_doubles = tournament.is_doubles()
@@ -446,7 +436,7 @@ def create_consolation_matches(tournament: Tournament) -> tuple[bool, str]:
     if n < 2:
         return True, "Подвал не создаётся: меньше двух проигравших в R1."
 
-    start = _tournament_start_dt(tournament)
+    start = tournament_deadline_schedule_start(tournament)
     days = getattr(tournament, "match_days_per_round", 7) or 7
     delta = timedelta(days=days)
     base = start + delta

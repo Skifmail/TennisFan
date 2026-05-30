@@ -2,8 +2,9 @@
 Тесты для FAN- и олимпийской систем (продвижение победителей, bye).
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import cast
+from unittest.mock import patch
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -48,9 +49,14 @@ from apps.tournaments.postpayment import (
     tournament_needs_fancoin_settlement,
     try_cover_registration_with_fancoin,
 )
+from apps.tournaments.round_robin import (
+    generate_bracket as round_robin_generate_bracket,
+)
 from apps.tournaments.utils import (
     generate_unique_tournament_slug,
     mark_tournament_bracket_generated,
+    recalculate_tournament_match_deadlines,
+    tournament_deadline_schedule_start,
 )
 from apps.users.models import Player, SkillLevel, User
 
@@ -80,6 +86,117 @@ class MarkTournamentBracketGeneratedTestCase(TestCase):
         mark_tournament_bracket_generated(self.tournament)
         self.tournament.refresh_from_db()
         self.assertEqual(self.tournament.status, TournamentStatus.COMPLETED)
+
+
+class TournamentDeadlineScheduleStartTestCase(TestCase):
+    """Дедлайны матчей не уходят в прошлое, если сетка создана позже start_date."""
+
+    def test_schedule_start_uses_today_when_start_date_in_past(self) -> None:
+        tournament = Tournament.objects.create(
+            name="Поздний старт",
+            slug="late-start-deadline",
+            city="Москва",
+            start_date=date(2026, 4, 28),
+            format="round_robin",
+        )
+        with patch(
+            "apps.tournaments.utils.timezone.localdate",
+            return_value=date(2026, 5, 30),
+        ):
+            start = tournament_deadline_schedule_start(tournament)
+        self.assertEqual(start.date(), date(2026, 5, 30))
+
+    def test_schedule_start_keeps_future_start_date(self) -> None:
+        tournament = Tournament.objects.create(
+            name="Будущий старт",
+            slug="future-start-deadline",
+            city="Москва",
+            start_date=date(2026, 6, 15),
+            format="round_robin",
+        )
+        with patch(
+            "apps.tournaments.utils.timezone.localdate",
+            return_value=date(2026, 5, 30),
+        ):
+            start = tournament_deadline_schedule_start(tournament)
+        self.assertEqual(start.date(), date(2026, 6, 15))
+
+    def test_round_robin_deadlines_from_actual_bracket_date(self) -> None:
+        players = [
+            Player.objects.create(
+                user=User.objects.create_user(
+                    email=f"rr-deadline-{i}@test.local",
+                    password="x",
+                )
+            )
+            for i in range(3)
+        ]
+        tournament = Tournament.objects.create(
+            name="Круговой дедлайны",
+            slug="rr-deadline-bracket",
+            city="Москва",
+            start_date=date(2026, 4, 28),
+            format="round_robin",
+            match_days_per_round=7,
+        )
+        tournament.participants.set(players)
+        with patch(
+            "apps.tournaments.utils.timezone.localdate",
+            return_value=date(2026, 5, 30),
+        ):
+            schedule_start = tournament_deadline_schedule_start(tournament)
+            ok, msg = round_robin_generate_bracket(tournament)
+        self.assertTrue(ok, msg)
+        match = tournament.matches.order_by("round_index", "pk").first()
+        assert match is not None
+        expected_deadline = (schedule_start + timedelta(days=7)).date()
+        self.assertEqual(
+            timezone.localtime(match.deadline).date(),
+            expected_deadline,
+        )
+
+    def test_recalculate_updates_existing_match_deadlines(self) -> None:
+        players = [
+            Player.objects.create(
+                user=User.objects.create_user(
+                    email=f"rr-recalc-{i}@test.local",
+                    password="x",
+                )
+            )
+            for i in range(3)
+        ]
+        tournament = Tournament.objects.create(
+            name="Пересчёт дедлайнов",
+            slug="rr-recalc-deadline",
+            city="Москва",
+            start_date=date(2026, 4, 28),
+            format="round_robin",
+            match_days_per_round=7,
+            bracket_generated=True,
+        )
+        tournament.participants.set(players)
+        old_deadline = timezone.make_aware(datetime(2026, 5, 5, 12, 0, 0))
+        match = Match.objects.create(
+            tournament=tournament,
+            round_index=1,
+            round_name="Тур 1",
+            player1=players[0],
+            player2=players[1],
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=old_deadline,
+        )
+        with patch(
+            "apps.tournaments.utils.timezone.localdate",
+            return_value=date(2026, 5, 30),
+        ):
+            updated = recalculate_tournament_match_deadlines(tournament)
+            schedule_start = tournament_deadline_schedule_start(tournament)
+        self.assertEqual(updated, 1)
+        match.refresh_from_db()
+        self.assertEqual(
+            timezone.localtime(match.deadline).date(),
+            (schedule_start + timedelta(days=7)).date(),
+        )
 
 
 class GenerateUniqueTournamentSlugTestCase(TestCase):

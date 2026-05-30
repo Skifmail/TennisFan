@@ -317,6 +317,46 @@ def try_settle_pending_users_with_fancoin(
     return settled
 
 
+def tournament_needs_fancoin_settlement(tournament: Tournament) -> bool:
+    """Проверить, есть ли участники для списания FT по постоплате.
+
+    Args:
+        tournament (Tournament): Турнир.
+
+    Returns:
+        bool: ``True``, если остались непокрытые участники или pending-инвойсы.
+    """
+    if not tournament.allow_postpayment:
+        return False
+    if get_pending_postpayment_users(tournament):
+        return True
+    return bool(
+        tournament.postpayment_invoices.filter(
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        ).exists()
+    )
+
+
+def _users_for_fancoin_settlement(tournament: Tournament) -> list:
+    """Собрать пользователей, для которых нужно попытаться списать FT.
+
+    Args:
+        tournament (Tournament): Турнир.
+
+    Returns:
+        list: Уникальные пользователи с pending-инвойсом или без покрытия взноса.
+    """
+    pending_invoices = list(
+        tournament.postpayment_invoices.filter(
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        ).select_related("user")
+    )
+    user_by_id = {invoice.user.pk: invoice.user for invoice in pending_invoices}
+    for user in get_pending_postpayment_users(tournament):
+        user_by_id.setdefault(user.pk, user)
+    return list(user_by_id.values())
+
+
 def settle_postpayment_with_available_fancoin() -> int:
     """Проверить FT у участников с открытым окном постоплаты (cron).
 
@@ -326,29 +366,27 @@ def settle_postpayment_with_available_fancoin() -> int:
     Returns:
         int: Число участников, для которых выполнено покрытие FT в этом запуске.
     """
-    tournaments = Tournament.objects.filter(
-        postpayment_window_started_at__isnull=False,
-        bracket_generated=False,
-        allow_postpayment=True,
+    tournament_ids: set[int] = set(
+        TournamentPostpaymentInvoice.objects.filter(
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+            tournament__allow_postpayment=True,
+        ).values_list("tournament_id", flat=True)
+    )
+    tournament_ids |= set(
+        Tournament.objects.filter(
+            allow_postpayment=True,
+            postpayment_window_started_at__isnull=False,
+        ).values_list("pk", flat=True)
     )
     total = 0
-    for tournament in tournaments:
-        pending_invoices = list(
-            tournament.postpayment_invoices.filter(
-                status=TournamentPostpaymentInvoice.Status.PENDING,
-            ).select_related("user")
-        )
-        users = [invoice.user for invoice in pending_invoices]
-        uncovered = get_pending_postpayment_users(tournament)
-        user_by_id = {user.pk: user for user in users}
-        for user in uncovered:
-            user_by_id.setdefault(user.pk, user)
-        if not user_by_id:
+    for tournament in Tournament.objects.filter(pk__in=tournament_ids):
+        users = _users_for_fancoin_settlement(tournament)
+        if not users:
             continue
         with transaction.atomic():
             covered = try_settle_pending_users_with_fancoin(
                 tournament,
-                users=list(user_by_id.values()),
+                users=users,
             )
         total += covered
     return total

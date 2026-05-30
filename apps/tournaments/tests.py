@@ -44,6 +44,7 @@ from apps.tournaments.postpayment import (
     mark_registration_covered,
     open_postpayment_window,
     settle_postpayment_with_available_fancoin,
+    tournament_needs_fancoin_settlement,
     try_cover_registration_with_fancoin,
 )
 from apps.tournaments.utils import generate_unique_tournament_slug
@@ -1965,6 +1966,23 @@ class TournamentPostpaymentServiceTestCase(TestCase):
         tg_mock.assert_called_once()
         email_mock.assert_called_once()
         self.assertTrue(email_mock.call_args.kwargs["had_payment_request"])
+
+    def test_tournament_needs_fancoin_settlement_with_bracket_and_pending_invoice(
+        self,
+    ) -> None:
+        self.tournament.bracket_generated = True
+        self.tournament.postpayment_window_started_at = timezone.now()
+        self.tournament.save(
+            update_fields=["bracket_generated", "postpayment_window_started_at"]
+        )
+        TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=self.user,
+            amount=1000,
+            due_at=timezone.now() + timedelta(hours=12),
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        )
+        self.assertTrue(tournament_needs_fancoin_settlement(self.tournament))
 
     def test_build_participant_payment_statuses(self) -> None:
         mark_registration_covered(

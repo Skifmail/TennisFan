@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
-from typing import cast
+from typing import Literal, cast
 
 from django.db import transaction
 from django.db.models import Count, Q
@@ -26,6 +26,8 @@ from .models import (
     TournamentRegistrationCoverage,
 )
 
+PaymentStatusTone = Literal["success", "warning", "danger", "neutral"]
+
 logger = logging.getLogger(__name__)
 
 _SUBSCRIPTION_SLOT_COVERAGE = cast(
@@ -43,12 +45,50 @@ class ParticipantPaymentStatus:
         display_name (str): Имя для отображения.
         status (str): Краткий статус.
         details (str): Подробности.
+        status_tone (PaymentStatusTone): Цветовая категория для админки.
     """
 
     user_id: int
     display_name: str
     status: str
     details: str
+    status_tone: PaymentStatusTone = "neutral"
+
+
+def participant_payment_status_tone(status: str) -> PaymentStatusTone:
+    """Определить цветовую категорию статуса оплаты для админки.
+
+    Args:
+        status (str): Текст статуса из ``build_participant_payment_statuses``.
+
+    Returns:
+        PaymentStatusTone: ``success`` — оплачено, ``danger`` — требует действия,
+        ``warning`` — ожидание, ``neutral`` — прочее.
+    """
+    success_statuses = {
+        "Покрыто FT (подписка)",
+        "Клубный тариф",
+        "Выдано администратором",
+        "Оплачен взнос (₽)",
+        "Оплачено постоплатой (₽)",
+    }
+    danger_statuses = {
+        "Ожидает оплату (₽)",
+        "Не оплачен",
+        "Не оплатил (срок истёк)",
+    }
+    warning_statuses = {
+        "Постоплата (окно не открыто)",
+        "Инвойс отменён",
+        "Без отметки оплаты",
+    }
+    if status in success_statuses:
+        return "success"
+    if status in danger_statuses:
+        return "danger"
+    if status in warning_statuses:
+        return "warning"
+    return "neutral"
 
 
 def tournament_allows_postpayment_registration(tournament: Tournament) -> bool:
@@ -317,6 +357,18 @@ def try_settle_pending_users_with_fancoin(
     return settled
 
 
+def tournament_has_generated_matches(tournament: Tournament) -> bool:
+    """Проверить, есть ли у турнира созданные матчи сетки.
+
+    Args:
+        tournament (Tournament): Турнир.
+
+    Returns:
+        bool: ``True``, если в турнире есть хотя бы один матч.
+    """
+    return bool(tournament.matches.exists())
+
+
 def tournament_needs_fancoin_settlement(tournament: Tournament) -> bool:
     """Проверить, есть ли участники для списания FT по постоплате.
 
@@ -583,6 +635,7 @@ def build_participant_payment_statuses(
                 display_name=display_name,
                 status=status,
                 details=details,
+                status_tone=participant_payment_status_tone(status),
             )
         )
     return rows
@@ -757,8 +810,17 @@ def finalize_postpayment_window(tournament: Tournament) -> tuple[bool, str]:
         tuple[bool, str]: Результат выполнения (успех, сообщение).
     """
     tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
-    if tournament.bracket_generated:
+    if tournament.bracket_generated and tournament_has_generated_matches(tournament):
         return True, "Сетка уже сформирована."
+    if tournament.bracket_generated and not tournament_has_generated_matches(
+        tournament
+    ):
+        logger.warning(
+            "Турнир %s: флаг bracket_generated без матчей — сбрасываем и формируем сетку",
+            tournament.slug,
+        )
+        tournament.bracket_generated = False
+        tournament.save(update_fields=["bracket_generated", "updated_at"])
     _remove_unpaid_players(tournament)
     if tournament.is_doubles():
         current_count = tournament.full_teams_count()

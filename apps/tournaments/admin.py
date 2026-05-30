@@ -35,11 +35,15 @@ from .models import (
 )
 from .olympic_consolation import generate_bracket as generate_olympic_bracket
 from .postpayment import (
+    ParticipantPaymentStatus,
+    PaymentStatusTone,
     build_participant_payment_statuses,
+    finalize_postpayment_window,
     format_postpayment_open_summary,
     get_pending_postpayment_users,
     get_postpayment_progress,
     open_postpayment_window,
+    tournament_has_generated_matches,
     tournament_needs_fancoin_settlement,
     try_settle_pending_users_with_fancoin,
 )
@@ -58,6 +62,13 @@ from .tvd import (
     generate_playoffs as tvd_generate_playoffs,
 )
 from .utils import generate_unique_tournament_slug
+
+_PAYMENT_STATUS_TONE_STYLES: dict[PaymentStatusTone, str] = {
+    "success": "color:#2da44e; font-weight:600;",
+    "warning": "color:#bf8700; font-weight:600;",
+    "danger": "color:#cf222e; font-weight:600;",
+    "neutral": "color:#57606a;",
+}
 
 
 @admin.action(description="Подтвердить результат матча")
@@ -142,55 +153,73 @@ def settle_postpayment_fancoin_action(modeladmin, request, queryset):
 @admin.action(description="Сформировать сетку (одноэтапная)")
 def generate_fan_bracket_action(modeladmin, request, queryset):
     for t in queryset:
-        pending_users = get_pending_postpayment_users(t)
-        if (
-            t.allow_postpayment
-            and t.postpayment_window_started_at is None
-            and pending_users
-        ):
-            _report_postpayment_window_opened(request, t)
-            continue
-        ok, msg = generate_bracket(t)
-        if ok:
-            messages.success(request, f"{t.name}: {msg}")
-        else:
-            messages.warning(request, f"{t.name}: {msg}")
+        _admin_generate_bracket_after_postpayment(request, t, generate_bracket)
 
 
 @admin.action(description="Сформировать сетку (олимпийская)")
 def generate_olympic_bracket_action(modeladmin, request, queryset):
     for t in queryset:
-        pending_users = get_pending_postpayment_users(t)
-        if (
-            t.allow_postpayment
-            and t.postpayment_window_started_at is None
-            and pending_users
-        ):
-            _report_postpayment_window_opened(request, t)
-            continue
-        ok, msg = generate_olympic_bracket(t)
-        if ok:
-            messages.success(request, f"{t.name}: {msg}")
-        else:
-            messages.warning(request, f"{t.name}: {msg}")
+        _admin_generate_bracket_after_postpayment(request, t, generate_olympic_bracket)
+
+
+def _admin_generate_bracket_after_postpayment(
+    request,
+    tournament: Tournament,
+    generate_fn,
+) -> bool:
+    """Сформировать сетку с учётом окна постоплаты.
+
+    Args:
+        request: HTTP-запрос админки.
+        tournament (Tournament): Турнир.
+        generate_fn: Функция генерации сетки ``(tournament) -> (bool, str)``.
+
+    Returns:
+        bool: ``True``, если действие для турнира обработано (continue в цикле).
+    """
+    pending_users = get_pending_postpayment_users(tournament)
+    if (
+        tournament.allow_postpayment
+        and tournament.postpayment_window_started_at is None
+        and pending_users
+    ):
+        _report_postpayment_window_opened(request, tournament)
+        return True
+    if tournament.postpayment_window_started_at is not None:
+        progress = get_postpayment_progress(tournament)
+        if bool(progress["completed"]):
+            ok, msg = finalize_postpayment_window(tournament)
+            if ok:
+                messages.success(request, f"{tournament.name}: {msg}")
+            else:
+                messages.warning(request, f"{tournament.name}: {msg}")
+            return True
+        if pending_users:
+            messages.info(
+                request,
+                f"{tournament.name}: окно постоплаты открыто, "
+                f"ожидают оплату {len(pending_users)} участников.",
+            )
+            return True
+    if tournament.bracket_generated and not tournament_has_generated_matches(
+        tournament
+    ):
+        tournament.bracket_generated = False
+        tournament.save(update_fields=["bracket_generated", "updated_at"])
+    ok, msg = generate_fn(tournament)
+    if ok:
+        messages.success(request, f"{tournament.name}: {msg}")
+    else:
+        messages.warning(request, f"{tournament.name}: {msg}")
+    return True
 
 
 @admin.action(description="Сформировать сетку (круговой)")
 def generate_round_robin_bracket_action(modeladmin, request, queryset):
     for t in queryset:
-        pending_users = get_pending_postpayment_users(t)
-        if (
-            t.allow_postpayment
-            and t.postpayment_window_started_at is None
-            and pending_users
-        ):
-            _report_postpayment_window_opened(request, t)
-            continue
-        ok, msg = generate_round_robin_bracket(t)
-        if ok:
-            messages.success(request, f"{t.name}: {msg}")
-        else:
-            messages.warning(request, f"{t.name}: {msg}")
+        _admin_generate_bracket_after_postpayment(
+            request, t, generate_round_robin_bracket
+        )
 
 
 @admin.action(description="Сформировать группы (ТВД)")
@@ -463,12 +492,36 @@ class TournamentAdmin(admin.ModelAdmin):
                 "%d.%m.%Y %H:%M"
             )
             summary_parts.append(f"окно открыто: {started}")
+
+        def _status_cell(row: ParticipantPaymentStatus) -> str:
+            tone_style = _PAYMENT_STATUS_TONE_STYLES.get(
+                row.status_tone, _PAYMENT_STATUS_TONE_STYLES["neutral"]
+            )
+            return cast(
+                str,
+                format_html(
+                    '<span style="{}">{}</span>',
+                    tone_style,
+                    row.status,
+                ),
+            )
+
         table_rows = format_html_join(
             "",
             "<tr><td style='padding:6px; border-bottom:1px solid #eee'>{}</td>"
             "<td style='padding:6px; border-bottom:1px solid #eee'>{}</td>"
             "<td style='padding:6px; border-bottom:1px solid #eee'>{}</td></tr>",
-            ((row.display_name, row.status, row.details) for row in rows),
+            ((row.display_name, _status_cell(row), row.details) for row in rows),
+        )
+        legend = format_html(
+            "<p style='margin:8px 0 0; font-size:12px'>"
+            '<span style="{}">■</span> оплачено &nbsp; '
+            '<span style="{}">■</span> ожидает оплату &nbsp; '
+            '<span style="{}">■</span> ждёт окно постоплаты'
+            "</p>",
+            _PAYMENT_STATUS_TONE_STYLES["success"],
+            _PAYMENT_STATUS_TONE_STYLES["danger"],
+            _PAYMENT_STATUS_TONE_STYLES["warning"],
         )
         summary = format_html(
             "<p><strong>{}</strong></p>",
@@ -490,9 +543,10 @@ class TournamentAdmin(admin.ModelAdmin):
                 "Статус</th>"
                 '<th style="text-align:left; padding:6px; border-bottom:1px solid #ccc">'
                 "Детали</th>"
-                "</tr></thead><tbody>{}</tbody></table>",
+                "</tr></thead><tbody>{}</tbody></table>{}",
                 summary,
                 table_rows,
+                legend,
             ),
         )
 

@@ -40,6 +40,7 @@ from apps.tournaments.olympic_consolation import (
 from apps.tournaments.postpayment import (
     _SUBSCRIPTION_SLOT_COVERAGE,
     build_participant_payment_statuses,
+    finalize_postpayment_window,
     get_pending_postpayment_users,
     mark_registration_covered,
     open_postpayment_window,
@@ -47,8 +48,38 @@ from apps.tournaments.postpayment import (
     tournament_needs_fancoin_settlement,
     try_cover_registration_with_fancoin,
 )
-from apps.tournaments.utils import generate_unique_tournament_slug
+from apps.tournaments.utils import (
+    generate_unique_tournament_slug,
+    mark_tournament_bracket_generated,
+)
 from apps.users.models import Player, SkillLevel, User
+
+
+class MarkTournamentBracketGeneratedTestCase(TestCase):
+    """Тесты смены статуса турнира после формирования сетки."""
+
+    def setUp(self) -> None:
+        self.tournament = Tournament.objects.create(
+            name="Status test",
+            slug="status-test",
+            city="Москва",
+            start_date=date.today(),
+            format="round_robin",
+            status=TournamentStatus.UPCOMING,
+        )
+
+    def test_marks_bracket_and_sets_active_from_upcoming(self) -> None:
+        mark_tournament_bracket_generated(self.tournament)
+        self.tournament.refresh_from_db()
+        self.assertTrue(self.tournament.bracket_generated)
+        self.assertEqual(self.tournament.status, TournamentStatus.ACTIVE)
+
+    def test_does_not_change_non_upcoming_status(self) -> None:
+        self.tournament.status = TournamentStatus.COMPLETED
+        self.tournament.save(update_fields=["status"])
+        mark_tournament_bracket_generated(self.tournament)
+        self.tournament.refresh_from_db()
+        self.assertEqual(self.tournament.status, TournamentStatus.COMPLETED)
 
 
 class GenerateUniqueTournamentSlugTestCase(TestCase):
@@ -1967,6 +1998,33 @@ class TournamentPostpaymentServiceTestCase(TestCase):
         email_mock.assert_called_once()
         self.assertTrue(email_mock.call_args.kwargs["had_payment_request"])
 
+    def test_finalize_postpayment_regenerates_when_flag_without_matches(self) -> None:
+        from unittest.mock import patch
+
+        self.tournament.bracket_generated = True
+        self.tournament.postpayment_window_started_at = timezone.now()
+        self.tournament.save(
+            update_fields=["bracket_generated", "postpayment_window_started_at"]
+        )
+        mark_registration_covered(
+            self.tournament,
+            self.user,
+            _SUBSCRIPTION_SLOT_COVERAGE,
+        )
+        mark_registration_covered(
+            self.tournament,
+            self.user2,
+            _SUBSCRIPTION_SLOT_COVERAGE,
+        )
+        with patch(
+            "apps.tournaments.postpayment._generate_after_postpayment",
+            return_value=(True, "Сетка сформирована: 15 матчей"),
+        ) as generate_mock:
+            ok, msg = finalize_postpayment_window(self.tournament)
+        self.assertTrue(ok)
+        generate_mock.assert_called_once()
+        self.assertIn("15 матчей", msg)
+
     def test_tournament_needs_fancoin_settlement_with_bracket_and_pending_invoice(
         self,
     ) -> None:
@@ -2002,5 +2060,7 @@ class TournamentPostpaymentServiceTestCase(TestCase):
             for row in build_participant_payment_statuses(self.tournament)
         }
         self.assertIn("FT", rows[self.user.id].status)
+        self.assertEqual(rows[self.user.id].status_tone, "success")
         self.assertEqual(rows[self.user2.id].status, "Ожидает оплату (₽)")
+        self.assertEqual(rows[self.user2.id].status_tone, "danger")
         self.assertIn("уведомление", rows[self.user2.id].details)

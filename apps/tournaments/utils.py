@@ -7,7 +7,7 @@ from typing import cast
 
 from django.utils.text import slugify
 
-from .models import Match, Tournament
+from .models import Match, Tournament, TournamentStatus
 
 SLUG_MAX_LENGTH = 50
 SUFFIX_RESERVED = 4
@@ -50,6 +50,27 @@ def generate_unique_tournament_slug(
             base = base[: SLUG_MAX_LENGTH - len(suffix)].rstrip("-") or "tournament"
         candidate = base + suffix
     return candidate
+
+
+def mark_tournament_bracket_generated(tournament: Tournament) -> None:
+    """Отметить сформированную сетку и перевести турнир в активный статус.
+
+    Для форматов FAN, кругового и олимпийской системы при успешной генерации
+    матчей статус меняется с «Предстоящий» на «Активный». ТВД использует
+    собственные статусы (групповой этап / плей-офф).
+
+    Args:
+        tournament (Tournament): Турнир после создания матчей.
+
+    Returns:
+        None: Поля сохраняются в базе данных.
+    """
+    tournament.bracket_generated = True
+    update_fields = ["bracket_generated", "updated_at"]
+    if tournament.status == TournamentStatus.UPCOMING:
+        tournament.status = TournamentStatus.ACTIVE
+        update_fields.append("status")
+    tournament.save(update_fields=update_fields)
 
 
 def get_tournament_participant_users(tournament: Tournament) -> list:

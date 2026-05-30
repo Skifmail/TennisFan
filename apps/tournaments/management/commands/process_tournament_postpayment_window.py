@@ -36,8 +36,7 @@ class Command(BaseCommand):
         processed = 0
         tournaments = Tournament.objects.filter(
             postpayment_window_started_at__isnull=False,
-            bracket_generated=False,
-        )
+        ).distinct()
         for tournament in tournaments:
             progress = get_postpayment_progress(tournament)
             is_completed = bool(progress["completed"])

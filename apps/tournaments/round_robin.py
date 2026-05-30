@@ -201,9 +201,16 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
                 )
             created += 1
 
-    tournament.bracket_generated = True
-    tournament.save(update_fields=["bracket_generated"])
     total_expected = n * (n - 1) // 2
+    if created == 0 and not tournament.matches.exists():
+        return (
+            False,
+            f"Матчи не созданы: проверьте состав участников ({n} {entity_name}).",
+        )
+
+    from .utils import mark_tournament_bracket_generated
+
+    mark_tournament_bracket_generated(tournament)
     logger.info(
         "Round-robin bracket created for %s: %d matches (n=%d)",
         tournament.name,

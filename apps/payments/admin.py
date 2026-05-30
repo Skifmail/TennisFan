@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import csv
-from typing import Iterable
+from collections.abc import Iterable
 
 from django.contrib import admin
 from django.http import HttpRequest, HttpResponse

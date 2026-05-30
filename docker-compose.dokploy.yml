@@ -129,8 +129,8 @@ services:
       - "traefik.http.routers.tennisfan.service=tennisfan"
       - "traefik.http.services.tennisfan.loadbalancer.server.port=8000"
 
-      # Описываем middleware с кастомной страницей техработ
-      - "traefik.http.middlewares.maintenance-errors.errors.status=404,500-599"
+      # Кастомная страница техработ только при 5xx (не 404 — иначе favicon/статика подменяют весь UI)
+      - "traefik.http.middlewares.maintenance-errors.errors.status=500-599"
       - "traefik.http.middlewares.maintenance-errors.errors.service=maintenance@docker"
       - "traefik.http.middlewares.maintenance-errors.errors.query=/"
 

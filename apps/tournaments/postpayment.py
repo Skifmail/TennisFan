@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
+from typing import cast
 
 from django.db import transaction
 from django.db.models import Count, Q
@@ -12,6 +14,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.telegram_notify import notify_tournament_postpayment_window_opened
+from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
+from apps.subscriptions.models import FancoinTransaction
 from apps.telegram_bot.notifications import send_to_user_by_user
 from apps.users.models import Notification
 
@@ -23,6 +27,28 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+_SUBSCRIPTION_SLOT_COVERAGE = cast(
+    TournamentRegistrationCoverage.CoverageType,
+    TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
+)
+
+
+@dataclass(frozen=True)
+class ParticipantPaymentStatus:
+    """Строка статуса оплаты участника для админки и отчётов.
+
+    Args:
+        user_id (int): ID пользователя.
+        display_name (str): Имя для отображения.
+        status (str): Краткий статус.
+        details (str): Подробности.
+    """
+
+    user_id: int
+    display_name: str
+    status: str
+    details: str
 
 
 def tournament_allows_postpayment_registration(tournament: Tournament) -> bool:
@@ -86,6 +112,248 @@ def get_pending_postpayment_users(tournament: Tournament) -> list:
     return list(user_model.objects.filter(id__in=user_ids))
 
 
+def _can_pay_entry_with_fancoin(tournament: Tournament) -> bool:
+    """Проверить, можно ли покрыть взнос глобальными FT (как при регистрации).
+
+    Args:
+        tournament (Tournament): Турнир для проверки.
+
+    Returns:
+        bool: ``True``, если для турнира допустимо списание FT с подписки.
+    """
+    fee = Decimal(tournament.entry_fee or 0)
+    has_entry_fee = fee > 0
+    postpayment_enabled = bool(
+        tournament.allow_postpayment and not tournament.is_one_day
+    )
+    return not (
+        tournament.club_id
+        or tournament.is_one_day
+        or (has_entry_fee and not postpayment_enabled)
+    )
+
+
+def _user_already_settled_for_tournament(tournament: Tournament, user) -> bool:
+    """Проверить, закрыта ли оплата участия пользователя без постоплаты.
+
+    Args:
+        tournament (Tournament): Турнир.
+        user: Пользователь.
+
+    Returns:
+        bool: ``True``, если оплата или покрытие уже зафиксированы.
+    """
+    if tournament.registration_coverages.filter(user=user).exists():
+        return True
+    if tournament.entry_payments.filter(user=user).exists():
+        return True
+    return bool(
+        tournament.postpayment_invoices.filter(
+            user=user,
+            status=TournamentPostpaymentInvoice.Status.PAID,
+        ).exists()
+    )
+
+
+def try_cover_registration_with_fancoin(tournament: Tournament, user) -> bool:
+    """Списать FT и отметить покрытие регистрации, если хватает баланса.
+
+    Args:
+        tournament (Tournament): Турнир.
+        user: Пользователь участника.
+
+    Returns:
+        bool: ``True``, если участие уже было или успешно покрыто FT.
+    """
+    if _user_already_settled_for_tournament(tournament, user):
+        return True
+    if not _can_pay_entry_with_fancoin(tournament):
+        return False
+    try:
+        sub = user.subscription
+    except Exception:
+        return False
+    if sub is None or not sub.has_fancoin(TOURNAMENT_REGISTRATION_COST):
+        return False
+    if not sub.spend_fancoin(
+        TOURNAMENT_REGISTRATION_COST,
+        reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
+        tournament=tournament,
+    ):
+        return False
+    mark_registration_covered(
+        tournament,
+        user,
+        _SUBSCRIPTION_SLOT_COVERAGE,
+    )
+    logger.info(
+        "Postpayment: участие в турнире %s покрыто FT для user_id=%s",
+        tournament.slug,
+        user.pk,
+    )
+    return True
+
+
+def _cancel_pending_postpayment_invoice(tournament: Tournament, user) -> int:
+    """Отменить ожидающий инвойс постоплаты после покрытия FT.
+
+    Args:
+        tournament (Tournament): Турнир.
+        user: Пользователь.
+
+    Returns:
+        int: Количество отменённых инвойсов (0 или 1).
+    """
+    return int(
+        TournamentPostpaymentInvoice.objects.filter(
+            tournament=tournament,
+            user=user,
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        ).update(status=TournamentPostpaymentInvoice.Status.CANCELLED)
+    )
+
+
+def _send_fancoin_settled_notification(
+    tournament: Tournament,
+    user,
+    *,
+    had_payment_request: bool,
+) -> None:
+    """Уведомить участника, что взнос покрыт FT и рубли платить не нужно.
+
+    Args:
+        tournament (Tournament): Турнир.
+        user: Пользователь участника.
+        had_payment_request (bool): Был ли ранее инвойс/запрос оплаты в рублях.
+
+    Returns:
+        None: Функция отправляет сообщения в каналы уведомлений.
+    """
+    try:
+        sub = user.subscription
+        balance = sub.get_fancoin_balance() if sub else 0
+    except Exception:
+        balance = 0
+    tournament_url = reverse("tournament_detail", kwargs={"slug": tournament.slug})
+    if had_payment_request:
+        intro = (
+            "Ранее мы просили оплатить вступительный взнос в рублях, "
+            "но на вашем балансе достаточно FT — дополнительная оплата не нужна."
+        )
+    else:
+        intro = "Вступительный взнос покрыт с баланса подписки."
+    text = (
+        f"✅ <b>Участие в турнире подтверждено</b>\n\n"
+        f"Турнир: «{tournament.name}»\n"
+        f"{intro}\n"
+        f"Списано: {TOURNAMENT_REGISTRATION_COST} FT\n"
+        f"Остаток FT: {balance}\n\n"
+        f"Страница турнира: {tournament_url}"
+    )
+    send_to_user_by_user(user, text)
+    Notification.objects.create(
+        user=user,
+        message=(
+            f"Участие в «{tournament.name}» подтверждено: списано "
+            f"{TOURNAMENT_REGISTRATION_COST} FT. Оплата в рублях не требуется."
+        ),
+        url=tournament_url,
+    )
+    try:
+        from apps.core.email_service import (
+            send_tournament_entry_fancoin_confirmed_email,
+        )
+
+        send_tournament_entry_fancoin_confirmed_email(
+            user,
+            tournament,
+            fancoin_spent=TOURNAMENT_REGISTRATION_COST,
+            fancoin_balance=balance,
+            had_payment_request=had_payment_request,
+        )
+    except Exception:
+        logger.exception(
+            "Не удалось отправить email о подтверждении участия FT: user_id=%s, tournament=%s",
+            user.pk,
+            tournament.slug,
+        )
+
+
+def try_settle_pending_users_with_fancoin(
+    tournament: Tournament,
+    *,
+    users: list | None = None,
+) -> int:
+    """Попытаться покрыть FT участников без оплаты взноса.
+
+    Args:
+        tournament (Tournament): Турнир.
+        users (list | None): Список пользователей; если ``None`` — все ожидающие.
+
+    Returns:
+        int: Число пользователей, для которых выполнено новое покрытие FT.
+    """
+    if users is None:
+        users = get_pending_postpayment_users(tournament)
+    settled = 0
+    for user in users:
+        already_settled = _user_already_settled_for_tournament(tournament, user)
+        had_pending_invoice = tournament.postpayment_invoices.filter(
+            user=user,
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        ).exists()
+        if try_cover_registration_with_fancoin(tournament, user):
+            _cancel_pending_postpayment_invoice(tournament, user)
+            if (
+                not already_settled
+                and tournament.registration_coverages.filter(user=user).exists()
+            ):
+                _send_fancoin_settled_notification(
+                    tournament,
+                    user,
+                    had_payment_request=had_pending_invoice,
+                )
+                settled += 1
+    return settled
+
+
+def settle_postpayment_with_available_fancoin() -> int:
+    """Проверить FT у участников с открытым окном постоплаты (cron).
+
+    Args:
+        None: Параметры не требуются.
+
+    Returns:
+        int: Число участников, для которых выполнено покрытие FT в этом запуске.
+    """
+    tournaments = Tournament.objects.filter(
+        postpayment_window_started_at__isnull=False,
+        bracket_generated=False,
+        allow_postpayment=True,
+    )
+    total = 0
+    for tournament in tournaments:
+        pending_invoices = list(
+            tournament.postpayment_invoices.filter(
+                status=TournamentPostpaymentInvoice.Status.PENDING,
+            ).select_related("user")
+        )
+        users = [invoice.user for invoice in pending_invoices]
+        uncovered = get_pending_postpayment_users(tournament)
+        user_by_id = {user.pk: user for user in users}
+        for user in uncovered:
+            user_by_id.setdefault(user.pk, user)
+        if not user_by_id:
+            continue
+        with transaction.atomic():
+            covered = try_settle_pending_users_with_fancoin(
+                tournament,
+                users=list(user_by_id.values()),
+            )
+        total += covered
+    return total
+
+
 def mark_registration_covered(
     tournament: Tournament,
     user,
@@ -141,22 +409,204 @@ def _send_postpayment_opened_notification(
     )
 
 
+def _collect_tournament_participant_users(tournament: Tournament) -> list:
+    """Собрать пользователей всех зарегистрированных участников турнира.
+
+    Args:
+        tournament (Tournament): Турнир.
+
+    Returns:
+        list: Уникальные пользователи участников (включая парные команды).
+    """
+    from django.contrib.auth import get_user_model
+
+    user_ids: set[int] = set(
+        int(uid)
+        for uid in tournament.participants.values_list("user_id", flat=True).distinct()
+    )
+    if tournament.is_doubles():
+        for user_id_1, user_id_2 in tournament.teams.filter(
+            player2__isnull=False
+        ).values_list("player1__user_id", "player2__user_id"):
+            if user_id_1:
+                user_ids.add(int(user_id_1))
+            if user_id_2:
+                user_ids.add(int(user_id_2))
+    user_model = get_user_model()
+    return list(
+        user_model.objects.filter(id__in=user_ids).order_by(
+            "last_name", "first_name", "email"
+        )
+    )
+
+
+def build_participant_payment_statuses(
+    tournament: Tournament,
+) -> list[ParticipantPaymentStatus]:
+    """Построить статусы оплаты всех участников турнира для админки.
+
+    Args:
+        tournament (Tournament): Турнир.
+
+    Returns:
+        list[ParticipantPaymentStatus]: Строки таблицы статусов.
+    """
+    coverages = {
+        row.user_id: row
+        for row in tournament.registration_coverages.select_related("user")
+    }
+    entry_paid_ids = set(tournament.entry_payments.values_list("user_id", flat=True))
+    invoices = {
+        row.user_id: row
+        for row in tournament.postpayment_invoices.select_related("user")
+    }
+    coverage_labels = {
+        TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT: (
+            "Покрыто FT (подписка)"
+        ),
+        TournamentRegistrationCoverage.CoverageType.CLUB_PLAN_SLOT: ("Клубный тариф"),
+        TournamentRegistrationCoverage.CoverageType.ADMIN_GRANTED: (
+            "Выдано администратором"
+        ),
+    }
+    invoice_status_labels = {
+        TournamentPostpaymentInvoice.Status.PENDING: "Ожидает оплату (₽)",
+        TournamentPostpaymentInvoice.Status.PAID: "Оплачено постоплатой (₽)",
+        TournamentPostpaymentInvoice.Status.CANCELLED: "Инвойс отменён",
+        TournamentPostpaymentInvoice.Status.EXPIRED: "Не оплатил (срок истёк)",
+    }
+    rows: list[ParticipantPaymentStatus] = []
+    window_open = tournament.postpayment_window_started_at is not None
+    for user in _collect_tournament_participant_users(tournament):
+        display_name = user.get_full_name() or user.email or f"ID {user.pk}"
+        coverage = coverages.get(user.pk)
+        invoice = invoices.get(user.pk)
+        if coverage:
+            status = coverage_labels.get(
+                coverage.coverage_type,
+                coverage.get_coverage_type_display(),
+            )
+            details_parts: list[str] = []
+            if (
+                coverage.coverage_type
+                == TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT
+            ):
+                details_parts.append(f"Списано {TOURNAMENT_REGISTRATION_COST} FT")
+                if (
+                    invoice
+                    and invoice.status == TournamentPostpaymentInvoice.Status.CANCELLED
+                ):
+                    details_parts.append("ранее отправлялось уведомление об оплате в ₽")
+            if coverage.created_at:
+                details_parts.append(
+                    f"с {timezone.localtime(coverage.created_at).strftime('%d.%m.%Y %H:%M')}"
+                )
+            details = "; ".join(details_parts) if details_parts else "—"
+        elif user.pk in entry_paid_ids:
+            status = "Оплачен взнос (₽)"
+            details = "Запись TournamentEntryPayment"
+        elif invoice:
+            status = invoice_status_labels.get(invoice.status, invoice.status)
+            details_parts = [f"Сумма: {invoice.amount} ₽"]
+            if invoice.due_at:
+                details_parts.append(
+                    f"до {timezone.localtime(invoice.due_at).strftime('%d.%m.%Y %H:%M')}"
+                )
+            if invoice.created_at and invoice.status in (
+                TournamentPostpaymentInvoice.Status.PENDING,
+                TournamentPostpaymentInvoice.Status.PAID,
+            ):
+                details_parts.append(
+                    "уведомление: "
+                    f"{timezone.localtime(invoice.created_at).strftime('%d.%m.%Y %H:%M')}"
+                )
+            if invoice.paid_at:
+                details_parts.append(
+                    f"оплачено: {timezone.localtime(invoice.paid_at).strftime('%d.%m.%Y %H:%M')}"
+                )
+            if invoice.reminder_1h_sent_at:
+                details_parts.append(
+                    "напоминание за 1 ч: "
+                    f"{timezone.localtime(invoice.reminder_1h_sent_at).strftime('%d.%m.%Y %H:%M')}"
+                )
+            details = "; ".join(details_parts)
+        elif window_open:
+            status = "Не оплачен"
+            details = "Окно постоплаты открыто, инвойс не создавался"
+        elif tournament.allow_postpayment:
+            status = "Постоплата (окно не открыто)"
+            details = "Зарегистрирован без оплаты, ждёт дедлайна"
+        else:
+            status = "Без отметки оплаты"
+            details = "—"
+        rows.append(
+            ParticipantPaymentStatus(
+                user_id=user.pk,
+                display_name=display_name,
+                status=status,
+                details=details,
+            )
+        )
+    return rows
+
+
+def format_postpayment_open_summary(tournament: Tournament, invoice_count: int) -> str:
+    """Сформировать текст итога запуска окна постоплаты для админки.
+
+    Args:
+        tournament (Tournament): Турнир.
+        invoice_count (int): Число созданных инвойсов с уведомлением.
+
+    Returns:
+        str: Текст для сообщения администратору.
+    """
+    pending_rows = [
+        row
+        for row in build_participant_payment_statuses(tournament)
+        if row.status == "Ожидает оплату (₽)"
+    ]
+    fancoin_rows = [
+        row
+        for row in build_participant_payment_statuses(tournament)
+        if "FT" in row.status
+    ]
+    parts: list[str] = []
+    if fancoin_rows:
+        names = ", ".join(row.display_name for row in fancoin_rows)
+        parts.append(f"покрыто FT ({len(fancoin_rows)}): {names}")
+    if invoice_count:
+        names = ", ".join(row.display_name for row in pending_rows)
+        parts.append(f"уведомления об оплате в ₽ ({invoice_count}): {names or '—'}")
+    if not parts:
+        return "все участники уже оплачены или покрыты FT"
+    return "; ".join(parts)
+
+
 @transaction.atomic
-def open_postpayment_window(tournament: Tournament) -> int:
+def open_postpayment_window(tournament: Tournament) -> tuple[int, int]:
     """Запустить окно постоплаты и создать инвойсы.
+
+    Перед созданием инвойсов пытается списать FT у участников, у которых
+    появился баланс после регистрации с постоплатой.
 
     Args:
         tournament (Tournament): Турнир, для которого запускается постоплата.
 
     Returns:
-        int: Количество созданных инвойсов.
+        tuple[int, int]: (созданные инвойсы, участники с новым покрытием FT).
     """
     tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
     if tournament.postpayment_window_started_at is not None:
-        return 0
+        return 0, 0
+    pending_users = get_pending_postpayment_users(tournament)
+    fancoin_settled = 0
+    if pending_users:
+        fancoin_settled = try_settle_pending_users_with_fancoin(
+            tournament, users=pending_users
+        )
     pending_users = get_pending_postpayment_users(tournament)
     if not pending_users:
-        return 0
+        return 0, fancoin_settled
     now = timezone.now()
     due_at = now + timedelta(hours=int(tournament.postpayment_deadline_hours or 12))
     created_count = 0
@@ -172,11 +622,11 @@ def open_postpayment_window(tournament: Tournament) -> int:
         )
         if created:
             created_count += 1
-        _send_postpayment_opened_notification(tournament, invoice)
+            _send_postpayment_opened_notification(tournament, invoice)
     tournament.postpayment_window_started_at = now
     tournament.save(update_fields=["postpayment_window_started_at", "updated_at"])
     notify_tournament_postpayment_window_opened(tournament, created_count)
-    return created_count
+    return created_count, fancoin_settled
 
 
 def send_1h_reminders() -> int:

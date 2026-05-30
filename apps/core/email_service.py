@@ -266,6 +266,57 @@ def send_tournament_cancelled_email(
     )
 
 
+def send_tournament_entry_fancoin_confirmed_email(
+    user: User,
+    tournament: Tournament,
+    *,
+    fancoin_spent: int,
+    fancoin_balance: int,
+    had_payment_request: bool,
+) -> bool:
+    """Отправить письмо о подтверждении участия за счёт FT.
+
+    Args:
+        user (User): Получатель письма.
+        tournament (Tournament): Турнир.
+        fancoin_spent (int): Количество списанных FT.
+        fancoin_balance (int): Остаток FT после списания.
+        had_payment_request (bool): Был ли ранее запрос оплаты в рублях.
+
+    Returns:
+        bool: ``True``, если письмо отправлено успешно.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    base_url = _get_site_base_url()
+    if had_payment_request:
+        intro_text = (
+            "Ранее мы просили оплатить вступительный взнос в рублях, "
+            "но на вашем балансе достаточно FT — участие подтверждено автоматически."
+        )
+    else:
+        intro_text = (
+            "Ваше участие в турнире подтверждено: вступительный взнос "
+            "покрыт с баланса подписки."
+        )
+    return _send_html_email(
+        subject=f"TennisFan: участие в турнире «{tournament.name}» подтверждено",
+        template_name="emails/tournament_entry_fancoin_confirmed.html",
+        context={
+            "user": user,
+            "tournament": tournament,
+            "fancoin_spent": fancoin_spent,
+            "fancoin_balance": fancoin_balance,
+            "intro_text": intro_text,
+            "confirmed_at": timezone.now(),
+            "tournament_url": f"{base_url}{reverse('tournament_detail', args=[tournament.slug])}",
+            "base_url": base_url,
+        },
+        recipient=email,
+    )
+
+
 def send_tournament_entry_receipt_email(
     user: User,
     tournament: Tournament,

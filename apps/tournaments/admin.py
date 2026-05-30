@@ -2,9 +2,13 @@
 Tournaments admin configuration.
 """
 
+from typing import cast
+
 from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.utils.html import format_html, format_html_join
 
 from apps.users.models import SkillLevel
 from apps.users.skill_levels import skill_with_ntrp
@@ -30,7 +34,14 @@ from .models import (
     TVDTournament,
 )
 from .olympic_consolation import generate_bracket as generate_olympic_bracket
-from .postpayment import get_pending_postpayment_users, open_postpayment_window
+from .postpayment import (
+    build_participant_payment_statuses,
+    format_postpayment_open_summary,
+    get_pending_postpayment_users,
+    get_postpayment_progress,
+    open_postpayment_window,
+    try_settle_pending_users_with_fancoin,
+)
 from .proposal_service import apply_proposal
 from .round_robin import generate_bracket as generate_round_robin_bracket
 from .tvd import (
@@ -66,6 +77,64 @@ def accept_proposal_action(modeladmin, request, queryset):
         )
 
 
+def _report_postpayment_window_opened(request, tournament: Tournament) -> None:
+    """Показать администратору итог открытия окна постоплаты.
+
+    Args:
+        request: HTTP-запрос админки.
+        tournament (Tournament): Турнир.
+
+    Returns:
+        None: Сообщение добавляется во flash messages.
+    """
+    invoice_count, fancoin_settled = open_postpayment_window(tournament)
+    summary = format_postpayment_open_summary(tournament, invoice_count)
+    if fancoin_settled:
+        messages.success(
+            request,
+            f"{tournament.name}: списано FT у {fancoin_settled} участников. {summary}",
+        )
+    if invoice_count:
+        messages.info(
+            request,
+            f"{tournament.name}: запущено окно постоплаты. {summary}",
+        )
+    elif not fancoin_settled:
+        messages.info(
+            request,
+            f"{tournament.name}: окно постоплаты — {summary}",
+        )
+
+
+@admin.action(description="Списать FT у участников с постоплатой")
+def settle_postpayment_fancoin_action(modeladmin, request, queryset):
+    """Проверить баланс FT и закрыть инвойсы без оплаты в рублях."""
+    total = 0
+    for tournament in queryset:
+        if tournament.bracket_generated:
+            messages.warning(
+                request,
+                f"{tournament.name}: сетка уже сформирована, списание FT не требуется.",
+            )
+            continue
+        settled = try_settle_pending_users_with_fancoin(tournament)
+        total += settled
+        if settled:
+            progress = get_postpayment_progress(tournament)
+            messages.success(
+                request,
+                f"{tournament.name}: списано FT у {settled} участников. "
+                f"Ожидают оплату в ₽: {progress['pending']}.",
+            )
+        else:
+            messages.info(
+                request,
+                f"{tournament.name}: новых списаний FT нет (баланс недостаточен или уже оплачено).",
+            )
+    if total and queryset.count() > 1:
+        messages.success(request, f"Всего списано FT у {total} участников.")
+
+
 @admin.action(description="Сформировать сетку (одноэтапная)")
 def generate_fan_bracket_action(modeladmin, request, queryset):
     for t in queryset:
@@ -75,11 +144,7 @@ def generate_fan_bracket_action(modeladmin, request, queryset):
             and t.postpayment_window_started_at is None
             and pending_users
         ):
-            opened = open_postpayment_window(t)
-            messages.info(
-                request,
-                f"{t.name}: запущено окно постоплаты, уведомления отправлены {opened} участникам.",
-            )
+            _report_postpayment_window_opened(request, t)
             continue
         ok, msg = generate_bracket(t)
         if ok:
@@ -97,11 +162,7 @@ def generate_olympic_bracket_action(modeladmin, request, queryset):
             and t.postpayment_window_started_at is None
             and pending_users
         ):
-            opened = open_postpayment_window(t)
-            messages.info(
-                request,
-                f"{t.name}: запущено окно постоплаты, уведомления отправлены {opened} участникам.",
-            )
+            _report_postpayment_window_opened(request, t)
             continue
         ok, msg = generate_olympic_bracket(t)
         if ok:
@@ -119,11 +180,7 @@ def generate_round_robin_bracket_action(modeladmin, request, queryset):
             and t.postpayment_window_started_at is None
             and pending_users
         ):
-            opened = open_postpayment_window(t)
-            messages.info(
-                request,
-                f"{t.name}: запущено окно постоплаты, уведомления отправлены {opened} участникам.",
-            )
+            _report_postpayment_window_opened(request, t)
             continue
         ok, msg = generate_round_robin_bracket(t)
         if ok:
@@ -349,8 +406,10 @@ class TournamentAdmin(admin.ModelAdmin):
     readonly_fields = (
         "insufficient_participants_notified_at",
         "postpayment_window_started_at",
+        "participant_payment_status_display",
     )
     actions = [
+        settle_postpayment_fancoin_action,
         generate_fan_bracket_action,
         generate_olympic_bracket_action,
         generate_round_robin_bracket_action,
@@ -371,6 +430,71 @@ class TournamentAdmin(admin.ModelAdmin):
         return ", ".join(parts)
 
     allowed_skill_levels.short_description = "Уровень участников"
+
+    def participant_payment_status_display(self, obj: Tournament) -> str:
+        """HTML-таблица статусов оплаты участников.
+
+        Args:
+            obj (Tournament): Редактируемый турнир.
+
+        Returns:
+            str: HTML для readonly-поля.
+        """
+        if not obj.pk:
+            return "—"
+        rows = build_participant_payment_statuses(obj)
+        if not rows:
+            return "Нет зарегистрированных участников."
+        progress = get_postpayment_progress(obj)
+        summary_parts = [
+            f"Всего участников: {len(rows)}",
+        ]
+        if obj.postpayment_window_started_at:
+            summary_parts.append(
+                f"инвойсов: {progress['total']}, "
+                f"оплачено ₽: {progress['paid']}, "
+                f"ожидают ₽: {progress['pending']}"
+            )
+            started = timezone.localtime(obj.postpayment_window_started_at).strftime(
+                "%d.%m.%Y %H:%M"
+            )
+            summary_parts.append(f"окно открыто: {started}")
+        table_rows = format_html_join(
+            "",
+            "<tr><td style='padding:6px; border-bottom:1px solid #eee'>{}</td>"
+            "<td style='padding:6px; border-bottom:1px solid #eee'>{}</td>"
+            "<td style='padding:6px; border-bottom:1px solid #eee'>{}</td></tr>",
+            ((row.display_name, row.status, row.details) for row in rows),
+        )
+        summary = format_html(
+            "<p><strong>{}</strong></p>",
+            format_html_join(
+                "; ",
+                "<span>{}</span>",
+                ((part,) for part in summary_parts),
+            ),
+        )
+        return cast(
+            str,
+            format_html(
+                "{}"
+                '<table style="width:100%; border-collapse:collapse; margin-top:8px">'
+                "<thead><tr>"
+                '<th style="text-align:left; padding:6px; border-bottom:1px solid #ccc">'
+                "Участник</th>"
+                '<th style="text-align:left; padding:6px; border-bottom:1px solid #ccc">'
+                "Статус</th>"
+                '<th style="text-align:left; padding:6px; border-bottom:1px solid #ccc">'
+                "Детали</th>"
+                "</tr></thead><tbody>{}</tbody></table>",
+                summary,
+                table_rows,
+            ),
+        )
+
+    participant_payment_status_display.short_description = (
+        "Оплата и постоплата участников"
+    )
 
     def get_queryset(self, request):
         """
@@ -408,6 +532,16 @@ class TournamentAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
         ("Формат турнира", {"fields": ("format", "variant")}),
+        (
+            "Постоплата: статус оплаты участников",
+            {
+                "fields": ("participant_payment_status_display",),
+                "description": (
+                    "Кто оплатил FT или рублями, кому отправлены уведомления, "
+                    "кто ещё должен оплатить. Обновите страницу после действий."
+                ),
+            },
+        ),
         (
             "Общие поля (одноэтапная сетка, Олимпийская, Круговой)",
             {

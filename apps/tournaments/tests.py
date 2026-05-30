@@ -20,22 +20,31 @@ from apps.clubs.models import (
     ClubPlayerPlan,
 )
 from apps.clubs.plan_services import assign_member_plan
-from apps.subscriptions.models import SubscriptionTier, UserSubscription
+from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
+from apps.subscriptions.models import (
+    FancoinTransaction,
+    SubscriptionTier,
+    UserSubscription,
+)
 from apps.tournaments.fan import _bracket_r1_count, _expected_final_round
 from apps.tournaments.fan import generate_bracket as fan_generate_bracket
 from apps.tournaments.models import (
     Match,
     Tournament,
     TournamentPostpaymentInvoice,
-    TournamentRegistrationCoverage,
     TournamentStatus,
 )
 from apps.tournaments.olympic_consolation import (
     generate_bracket as olympic_generate_bracket,
 )
 from apps.tournaments.postpayment import (
+    _SUBSCRIPTION_SLOT_COVERAGE,
+    build_participant_payment_statuses,
     get_pending_postpayment_users,
     mark_registration_covered,
+    open_postpayment_window,
+    settle_postpayment_with_available_fancoin,
+    try_cover_registration_with_fancoin,
 )
 from apps.tournaments.utils import generate_unique_tournament_slug
 from apps.users.models import Player, SkillLevel, User
@@ -1825,7 +1834,7 @@ class TournamentPostpaymentServiceTestCase(TestCase):
         mark_registration_covered(
             self.tournament,
             self.user,
-            TournamentRegistrationCoverage.CoverageType("subscription_slot"),
+            _SUBSCRIPTION_SLOT_COVERAGE,
         )
         pending_users = get_pending_postpayment_users(self.tournament)
         self.assertEqual({u.id for u in pending_users}, {self.user2.id})
@@ -1840,3 +1849,140 @@ class TournamentPostpaymentServiceTestCase(TestCase):
         )
         pending_users = get_pending_postpayment_users(self.tournament)
         self.assertEqual({u.id for u in pending_users}, {self.user.id})
+
+    def _create_subscription_with_fancoin(self, user: User, balance: int) -> None:
+        tier = SubscriptionTier.objects.create(
+            name=f"tier-{user.pk}",
+            display_name="Test",
+            fancoin_per_purchase=15,
+            duration_days=30,
+            is_visible=True,
+            is_unlimited=False,
+        )
+        UserSubscription.objects.create(
+            user=user,
+            tier=tier,
+            start_date=timezone.now(),
+            end_date=timezone.now() + timedelta(days=30),
+            fancoin_balance=balance,
+            is_active=True,
+        )
+
+    def test_try_cover_registration_with_fancoin(self) -> None:
+        self._create_subscription_with_fancoin(self.user, TOURNAMENT_REGISTRATION_COST)
+        covered = try_cover_registration_with_fancoin(self.tournament, self.user)
+        self.assertTrue(covered)
+        self.assertTrue(
+            self.tournament.registration_coverages.filter(user=self.user).exists()
+        )
+        pending_users = get_pending_postpayment_users(self.tournament)
+        self.assertEqual({u.id for u in pending_users}, {self.user2.id})
+
+    def test_open_postpayment_window_skips_payment_notification_when_fancoin_available(
+        self,
+    ) -> None:
+        from unittest.mock import patch
+
+        self._create_subscription_with_fancoin(self.user, TOURNAMENT_REGISTRATION_COST)
+        with (
+            patch(
+                "apps.tournaments.postpayment._send_postpayment_opened_notification"
+            ) as payment_notify_mock,
+            patch(
+                "apps.tournaments.postpayment._send_fancoin_settled_notification"
+            ) as fancoin_notify_mock,
+        ):
+            created, fancoin_settled = open_postpayment_window(self.tournament)
+        self.assertEqual(created, 1)
+        self.assertEqual(fancoin_settled, 1)
+        payment_notify_mock.assert_called_once()
+        fancoin_notify_mock.assert_called_once()
+        self.tournament.refresh_from_db()
+        self.assertIsNotNone(self.tournament.postpayment_window_started_at)
+        self.assertFalse(
+            TournamentPostpaymentInvoice.objects.filter(
+                tournament=self.tournament,
+                user=self.user,
+            ).exists()
+        )
+
+    def test_settle_postpayment_with_available_fancoin_cancels_pending_invoice(
+        self,
+    ) -> None:
+        self.tournament.postpayment_window_started_at = timezone.now()
+        self.tournament.save(update_fields=["postpayment_window_started_at"])
+        due_at = timezone.now() + timedelta(hours=12)
+        TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=self.user,
+            amount=1000,
+            due_at=due_at,
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        )
+        self._create_subscription_with_fancoin(self.user, TOURNAMENT_REGISTRATION_COST)
+        settled = settle_postpayment_with_available_fancoin()
+        self.assertEqual(settled, 1)
+        invoice = TournamentPostpaymentInvoice.objects.get(
+            tournament=self.tournament,
+            user=self.user,
+        )
+        self.assertEqual(invoice.status, TournamentPostpaymentInvoice.Status.CANCELLED)
+        self.assertTrue(
+            self.tournament.registration_coverages.filter(user=self.user).exists()
+        )
+        sub = UserSubscription.objects.get(user=self.user)
+        self.assertEqual(sub.fancoin_balance, 0)
+        self.assertTrue(
+            FancoinTransaction.objects.filter(
+                user=self.user,
+                reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
+                tournament=self.tournament,
+            ).exists()
+        )
+
+    def test_settle_sends_notification_when_invoice_was_pending(self) -> None:
+        from unittest.mock import patch
+
+        self.tournament.postpayment_window_started_at = timezone.now()
+        self.tournament.save(update_fields=["postpayment_window_started_at"])
+        due_at = timezone.now() + timedelta(hours=12)
+        TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=self.user,
+            amount=1000,
+            due_at=due_at,
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        )
+        self._create_subscription_with_fancoin(self.user, TOURNAMENT_REGISTRATION_COST)
+        with (
+            patch("apps.tournaments.postpayment.send_to_user_by_user") as tg_mock,
+            patch(
+                "apps.core.email_service.send_tournament_entry_fancoin_confirmed_email",
+                return_value=True,
+            ) as email_mock,
+        ):
+            settle_postpayment_with_available_fancoin()
+        tg_mock.assert_called_once()
+        email_mock.assert_called_once()
+        self.assertTrue(email_mock.call_args.kwargs["had_payment_request"])
+
+    def test_build_participant_payment_statuses(self) -> None:
+        mark_registration_covered(
+            self.tournament,
+            self.user,
+            _SUBSCRIPTION_SLOT_COVERAGE,
+        )
+        TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=self.user2,
+            amount=1000,
+            due_at=timezone.now() + timedelta(hours=12),
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        )
+        rows = {
+            row.user_id: row
+            for row in build_participant_payment_statuses(self.tournament)
+        }
+        self.assertIn("FT", rows[self.user.id].status)
+        self.assertEqual(rows[self.user2.id].status, "Ожидает оплату (₽)")
+        self.assertIn("уведомление", rows[self.user2.id].details)

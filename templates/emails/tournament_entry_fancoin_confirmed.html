@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Участие в турнире подтверждено</title>
+</head>
+<body>
+    <p>Здравствуйте, {{ user.get_full_name|default:user.email }}!</p>
+    <p>{{ intro_text }}</p>
+    <ul>
+        <li>Турнир: {{ tournament.name }}</li>
+        <li>Списано с баланса подписки: {{ fancoin_spent }} FT</li>
+        <li>Остаток FT: {{ fancoin_balance }}</li>
+        <li>Дата: {{ confirmed_at|date:"d.m.Y H:i" }}</li>
+    </ul>
+    <p>Оплата вступительного взноса в рублях <strong>не требуется</strong>.</p>
+    <p><a href="{{ tournament_url }}">Перейти к турниру</a></p>
+    <p>С уважением,<br>Команда TennisFan</p>
+</body>
+</html>

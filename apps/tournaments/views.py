@@ -67,6 +67,7 @@ from .platform_home import (
 )
 from .postpayment import (
     finalize_postpayment_window,
+    format_postpayment_open_summary,
     get_pending_postpayment_users,
     get_postpayment_progress,
     mark_registration_covered,
@@ -1458,12 +1459,24 @@ def tournament_manage_generate_bracket(request, slug):
         and tournament.postpayment_window_started_at is None
         and pending_users
     ):
-        opened = open_postpayment_window(tournament)
-        messages.info(
-            request,
-            f"Запущено окно постоплаты: уведомления отправлены {opened} игрокам. "
-            "Сетка будет сформирована после оплаты или по истечении срока.",
-        )
+        invoice_count, fancoin_settled = open_postpayment_window(tournament)
+        summary = format_postpayment_open_summary(tournament, invoice_count)
+        if fancoin_settled:
+            messages.success(
+                request,
+                f"Списано FT у {fancoin_settled} участников. {summary}",
+            )
+        if invoice_count:
+            messages.info(
+                request,
+                f"Запущено окно постоплаты. {summary} "
+                "Сетка будет сформирована после оплаты или по истечении срока.",
+            )
+        elif not fancoin_settled:
+            messages.info(
+                request,
+                f"Окно постоплаты: {summary}",
+            )
         return redirect("tournament_manage", slug=slug)
     if tournament.postpayment_window_started_at is not None:
         progress = get_postpayment_progress(tournament)

@@ -8,6 +8,7 @@ from apps.tournaments.postpayment import (
     finalize_postpayment_window,
     get_postpayment_progress,
     send_1h_reminders,
+    settle_postpayment_with_available_fancoin,
 )
 
 
@@ -15,8 +16,8 @@ class Command(BaseCommand):
     """Cron-команда обработки постоплаты турниров."""
 
     help = (
-        "Отправляет напоминания по постоплате, закрывает истёкшие окна и "
-        "формирует сетки после оплаты."
+        "Списывает FT при появлении баланса, отправляет напоминания по постоплате, "
+        "закрывает истёкшие окна и формирует сетки после оплаты."
     )
 
     def handle(self, *args, **options):
@@ -29,6 +30,7 @@ class Command(BaseCommand):
         Returns:
             None: Результат выводится в stdout.
         """
+        fancoin_settled = settle_postpayment_with_available_fancoin()
         reminders_sent = send_1h_reminders()
         now = timezone.now()
         processed = 0
@@ -50,6 +52,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 "Postpayment processed: "
+                f"fancoin_settled={fancoin_settled}, "
                 f"reminders={reminders_sent}, finalized={processed}"
             )
         )

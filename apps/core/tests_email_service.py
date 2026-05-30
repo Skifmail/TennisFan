@@ -7,6 +7,7 @@ from apps.core.email_service import (
     send_donation_thanks_email,
     send_email_verification,
     send_phone_changed_email,
+    send_tournament_entry_fancoin_confirmed_email,
     send_tournament_entry_receipt_email,
 )
 from apps.tournaments.models import Tournament
@@ -30,6 +31,26 @@ class EmailServiceTestCase(TestCase):
         self.assertTrue(ok)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Спасибо за поддержку", mail.outbox[0].subject)
+
+    def test_send_tournament_entry_fancoin_confirmed_email(self) -> None:
+        tournament = Tournament.objects.create(
+            name="Тестовый турнир FT",
+            slug="test-mail-tournament-ft",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+        )
+        ok = send_tournament_entry_fancoin_confirmed_email(
+            self.user,
+            tournament,
+            fancoin_spent=3,
+            fancoin_balance=12,
+            had_payment_request=True,
+        )
+        self.assertTrue(ok)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("подтверждено", mail.outbox[0].subject.lower())
+        self.assertIn("не требуется", mail.outbox[0].alternatives[0][0])
 
     def test_send_tournament_entry_receipt_email(self) -> None:
         tournament = Tournament.objects.create(

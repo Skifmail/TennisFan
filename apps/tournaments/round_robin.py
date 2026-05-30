@@ -3,7 +3,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, cast
 
 from django.urls import reverse
@@ -12,6 +12,7 @@ from django.utils import timezone
 from apps.users.models import Notification, Player
 
 from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam
+from .utils import tournament_deadline_schedule_start
 
 logger = logging.getLogger(__name__)
 
@@ -45,17 +46,6 @@ def _get_bye_player() -> Player | None:
         .select_related("user")
         .first(),
     )
-
-
-def _tournament_start_dt(tournament: Tournament):
-    """Дата/время старта турнира для дедлайнов."""
-    start = timezone.now()
-    if tournament.start_date:
-        d = tournament.start_date
-        if isinstance(d, str):
-            d = datetime.strptime(d, "%Y-%m-%d").date()
-        start = timezone.make_aware(datetime.combine(d, datetime.min.time()))
-    return start
 
 
 def _circle_schedule(participants: list) -> list[list[tuple]]:
@@ -139,7 +129,7 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
         )
 
     schedule = _circle_schedule(entities)
-    start = _tournament_start_dt(tournament)
+    start = tournament_deadline_schedule_start(tournament)
     days = getattr(tournament, "match_days_per_round", 7) or 7
     delta = timedelta(days=days)
 

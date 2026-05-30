@@ -21,6 +21,7 @@ from .models import (
     TVDGroupMember,
 )
 from .season_utils import get_current_season
+from .utils import tournament_deadline_schedule_start
 
 logger = logging.getLogger(__name__)
 
@@ -74,17 +75,6 @@ def get_tvd_rr_entities_and_matches(
 
 def _is_tvd(t: Tournament | None) -> bool:
     return t is not None and getattr(t, "format", None) == TVD_FORMAT
-
-
-def _tournament_start_dt(tournament: Tournament):
-    """Дата/время старта турнира для дедлайнов."""
-    start = timezone.now()
-    if tournament.start_date:
-        d = tournament.start_date
-        if isinstance(d, str):
-            d = datetime.strptime(d, "%Y-%m-%d").date()
-        start = timezone.make_aware(datetime.combine(d, datetime.min.time()))
-    return start
 
 
 def calculate_group_structure(n: int) -> list[int]:
@@ -167,7 +157,7 @@ def generate_groups(tournament: Tournament) -> tuple[bool, str]:
     if tournament.bracket_generated:
         return False, "Группы уже сформированы (сетка зафиксирована)."
 
-    start = _tournament_start_dt(tournament)
+    start = tournament_deadline_schedule_start(tournament)
     days = getattr(tournament, "match_days_per_round", 7) or 7
     delta = timedelta(days=days)
 
@@ -549,7 +539,7 @@ def _collect_place_123(tournament: Tournament) -> dict[str, Any] | None:
                 place_3.append((g.name, entity, m))
     if group_count == 5:
         place_1.sort(key=lambda x: (-x[2].wins, -(x[2].games_won - x[2].games_lost)))
-    start = _tournament_start_dt(tournament)
+    start = tournament_deadline_schedule_start(tournament)
     days = getattr(tournament, "match_days_per_round", 7) or 7
     delta = timedelta(days=days)
     return {
@@ -578,7 +568,7 @@ def _create_tvd_round_robin(
     if len(entities) < 2:
         return False, "Нужно минимум 2 участника для круговой сетки."
     schedule = _circle_schedule(entities)
-    start = _tournament_start_dt(tournament)
+    start = tournament_deadline_schedule_start(tournament)
     days = getattr(tournament, "match_days_per_round", 7) or 7
     delta = timedelta(days=days)
     is_doubles = isinstance(entities[0], TournamentTeam)
@@ -952,7 +942,7 @@ def generate_playoffs(
     if group_count == 5:
         place_1.sort(key=lambda x: (-x[2].wins, -(x[2].games_won - x[2].games_lost)))
 
-    start = _tournament_start_dt(tournament)
+    start = tournament_deadline_schedule_start(tournament)
     days = getattr(tournament, "match_days_per_round", 7) or 7
     delta = timedelta(days=days)
 

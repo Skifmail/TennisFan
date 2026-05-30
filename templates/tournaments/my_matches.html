@@ -190,7 +190,11 @@
                 {% endif %}
 
                 {% if match.status != 'completed' and match.status != 'walkover' and not match.winner %}
-                {% if not match.has_pending %}
+                {% if match.result_order_block_message %}
+                <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--spacing-sm);">
+                    {{ match.result_order_block_message }}
+                </p>
+                {% elif not match.has_pending %}
                 <form method="post" action="{% url 'propose_result' match.pk %}">
                     {% csrf_token %}
                     <div class="form-group">

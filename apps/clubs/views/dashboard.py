@@ -26,6 +26,11 @@ from apps.tournaments.models import (
     TournamentTeam,
     TournamentVariant,
 )
+from apps.tournaments.utils import (
+    find_blocking_earlier_tournament_match,
+    format_tournament_match_order_block_message,
+    order_player_matches_for_display,
+)
 from apps.users.models import SkillLevel
 
 from ..finance_services import credit_member_balance
@@ -1019,7 +1024,7 @@ def my_matches(request: HttpRequest) -> HttpResponse:
         | Q(team2__player1=player)
         | Q(team2__player2=player)
     )
-    all_matches = list(
+    matches_qs = (
         Match.objects.filter(
             base_q,
             tournament__club=club,
@@ -1038,9 +1043,9 @@ def my_matches(request: HttpRequest) -> HttpResponse:
             "winner_team__player1__user",
             "winner_team__player2__user",
         )
-        .order_by("deadline", "scheduled_datetime", "pk")
         .distinct()
     )
+    all_matches = list(order_player_matches_for_display(matches_qs))
     pending_proposals = MatchResultProposal.objects.filter(
         match__in=all_matches,
         status=Match.ProposalStatus.PENDING,
@@ -1060,6 +1065,7 @@ def my_matches(request: HttpRequest) -> HttpResponse:
         match.awaiting_confirmation = any(
             proposal.proposer_id == player.pk for proposal in proposals
         )
+        result_order_blocker = find_blocking_earlier_tournament_match(match, player)
         match.can_submit_result = (
             match.status
             not in (
@@ -1068,6 +1074,12 @@ def my_matches(request: HttpRequest) -> HttpResponse:
                 Match.MatchStatus.CANCELLED,
             )
             and not match.has_pending
+            and not result_order_blocker
+        )
+        match.result_order_block_message = (
+            format_tournament_match_order_block_message(result_order_blocker, player)
+            if result_order_blocker
+            else ""
         )
         match.next_url = (
             f"{reverse('match_detail', kwargs={'pk': match.pk})}"
@@ -1088,6 +1100,9 @@ def my_matches(request: HttpRequest) -> HttpResponse:
         elif match.awaiting_confirmation:
             match.club_action_label = "Результат отправлен"
             match.club_action_hint = "Ожидание подтверждения соперником"
+        elif result_order_blocker:
+            match.club_action_label = "Сначала предыдущий матч"
+            match.club_action_hint = match.result_order_block_message
         elif match.can_submit_result:
             match.club_action_label = "Внести результат"
             match.club_action_hint = "Матч сыгран, результат ещё не внесён"

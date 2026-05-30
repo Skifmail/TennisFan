@@ -1,7 +1,8 @@
-from datetime import date
+from datetime import date, timedelta
 
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.clubs.models import Club
 from apps.tournaments.models import Match, Tournament
@@ -153,3 +154,59 @@ class NotificationUnreadCacheTestCase(TestCase):
         self.assertEqual(cache.get(cache_key), 0)
         request = response.wsgi_request
         self.assertEqual(unread_notifications(request)["unread_notifications_count"], 0)
+
+
+class ProfileMatchOrderingTestCase(TestCase):
+    """Ближайший запланированный матч отображается первым в профиле."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="profile-order@test.local",
+            password="testpass123",
+        )
+        self.player = Player.objects.create(user=self.user)
+        self.opponent = Player.objects.create(
+            user=User.objects.create_user(
+                email="profile-order-op@test.local",
+                password="testpass123",
+            )
+        )
+        self.tournament = Tournament.objects.create(
+            name="Круговой для сортировки",
+            slug="profile-order-rr",
+            city="Москва",
+            start_date=date.today(),
+            format="round_robin",
+        )
+        now = timezone.now()
+        self.near_deadline = now + timedelta(days=7)
+        self.far_deadline = now + timedelta(days=35)
+        Match.objects.create(
+            tournament=self.tournament,
+            player1=self.player,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=self.far_deadline,
+            round_index=5,
+        )
+        Match.objects.create(
+            tournament=self.tournament,
+            player1=self.player,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=self.near_deadline,
+            round_index=1,
+        )
+
+    def test_profile_lists_nearest_scheduled_match_first(self) -> None:
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("profile", kwargs={"pk": self.player.pk}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        near_label = timezone.localtime(self.near_deadline).strftime("%d.%m.%Y")
+        far_label = timezone.localtime(self.far_deadline).strftime("%d.%m.%Y")
+        self.assertLess(content.index(near_label), content.index(far_label))

@@ -1260,6 +1260,97 @@ class TournamentListCardStateTestCase(TestCase):
         self.assertNotContains(r_club, platform_tm.name)
 
 
+class MyMatchesOrderingTestCase(TestCase):
+    """Ближайший матч первым в детальном списке «Мои матчи»."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="my-matches-order@test.local",
+            password="x",
+        )
+        self.player = Player.objects.create(user=self.user)
+        self.opponent = Player.objects.create(
+            user=User.objects.create_user(
+                email="my-matches-order-op@test.local",
+                password="x",
+            )
+        )
+        self.client.force_login(self.user)
+        self.tournament = Tournament.objects.create(
+            name="Турнир сортировки матчей",
+            slug="my-matches-order-tm",
+            city="Москва",
+            start_date=date.today(),
+            format="round_robin",
+        )
+        now = timezone.now()
+        Match.objects.create(
+            tournament=self.tournament,
+            player1=self.player,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=now + timedelta(days=28),
+        )
+        Match.objects.create(
+            tournament=self.tournament,
+            player1=self.player,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=now + timedelta(days=7),
+        )
+
+    def test_tournament_matches_sorted_nearest_first(self) -> None:
+        url = reverse("my_matches") + f"?tournament={self.tournament.slug}"
+        response = self.client.get(url, secure=True)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        near = (timezone.now() + timedelta(days=7)).strftime("%d.%m.%Y")
+        far = (timezone.now() + timedelta(days=28)).strftime("%d.%m.%Y")
+        self.assertLess(content.index(near), content.index(far))
+
+
+class TournamentPublicListOrderingTestCase(TestCase):
+    """Активные турниры выше предстоящих на главной и в /tournaments/."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.active = Tournament.objects.create(
+            name="Активный Воскресенск тест",
+            slug="ordering-active-rr",
+            city="Москва",
+            start_date=date(2020, 1, 1),
+            format="round_robin",
+            status=TournamentStatus.ACTIVE,
+        )
+        self.upcoming = Tournament.objects.create(
+            name="Набор Раменский тест",
+            slug="ordering-upcoming-olympic",
+            city="Москва",
+            start_date=date.today() + timedelta(days=30),
+            format="single_elimination",
+            status=TournamentStatus.UPCOMING,
+        )
+
+    def test_tournament_list_shows_active_before_upcoming(self) -> None:
+        response = self.client.get(reverse("tournament_list"), secure=True)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertLess(
+            content.index(self.active.name),
+            content.index(self.upcoming.name),
+        )
+
+    def test_home_shows_active_before_upcoming(self) -> None:
+        response = self.client.get(reverse("home"), secure=True)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertLess(
+            content.index(self.active.name),
+            content.index(self.upcoming.name),
+        )
+
+
 class TournamentTablesListFiltersTestCase(TestCase):
     """Фильтры на странице «Турнирные таблицы»."""
 
@@ -1880,6 +1971,91 @@ class ClubTournamentRegistrationWithoutGlobalSubscriptionTestCase(TestCase):
             tournament,
             next_url=next_url,
         )
+
+
+class TournamentMatchResultOrderTestCase(TestCase):
+    """Результаты в турнире вносятся по порядку дедлайнов."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="order-result@test.local",
+            password="testpass123",
+        )
+        self.player = Player.objects.create(user=self.user)
+        self.opponent = Player.objects.create(
+            user=User.objects.create_user(
+                email="order-result-op@test.local",
+                password="testpass123",
+            )
+        )
+        self.tournament = Tournament.objects.create(
+            name="Порядок результатов",
+            slug="result-order-rr",
+            city="Москва",
+            start_date=date.today(),
+            format="round_robin",
+            status=TournamentStatus.ACTIVE,
+        )
+        now = timezone.now()
+        self.early_match = Match.objects.create(
+            tournament=self.tournament,
+            player1=self.player,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=now + timedelta(days=7),
+            round_index=1,
+        )
+        self.late_match = Match.objects.create(
+            tournament=self.tournament,
+            player1=self.player,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=now + timedelta(days=14),
+            round_index=2,
+        )
+        self.client.force_login(self.user)
+        self._proposal_payload = {
+            "result": "win",
+            "p1s1": "6",
+            "p2s1": "4",
+            "p1s2": "6",
+            "p2s2": "3",
+        }
+
+    def test_cannot_propose_result_for_later_match_first(self) -> None:
+        response = self.client.post(
+            reverse("propose_result", kwargs={"pk": self.late_match.pk}),
+            self._proposal_payload,
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.late_match.result_proposals.count(), 0)
+        detail = self.client.get(
+            reverse("match_detail", kwargs={"pk": self.late_match.pk}),
+            secure=True,
+        )
+        self.assertContains(detail, "Сначала завершите матч")
+        self.assertNotContains(detail, 'name="p1s1"')
+
+    def test_can_propose_after_earlier_match_completed(self) -> None:
+        self.early_match.status = Match.MatchStatus.COMPLETED
+        self.early_match.winner = self.player
+        self.early_match.player1_set1 = 6
+        self.early_match.player2_set1 = 4
+        self.early_match.player1_set2 = 6
+        self.early_match.player2_set2 = 3
+        self.early_match.save()
+
+        response = self.client.post(
+            reverse("propose_result", kwargs={"pk": self.late_match.pk}),
+            self._proposal_payload,
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.late_match.result_proposals.count(), 1)
 
 
 class MatchDetailPlayerActionsRedirectTestCase(TestCase):

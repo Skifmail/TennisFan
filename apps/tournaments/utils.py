@@ -3,9 +3,24 @@
 Используются в views и в telegram_bot без циклических импортов.
 """
 
+from collections.abc import Iterable
 from datetime import datetime, timedelta
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
+if TYPE_CHECKING:
+    from apps.users.models import Player
+
+from django.db.models import (
+    Case,
+    DateTimeField,
+    F,
+    IntegerField,
+    Q,
+    QuerySet,
+    When,
+)
+from django.db.models.expressions import OrderBy
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -110,6 +125,203 @@ def recalculate_tournament_match_deadlines(tournament: Tournament) -> int:
         match.save(update_fields=["deadline"])
         updated += 1
     return updated
+
+
+_UPCOMING_MATCH_STATUSES = (
+    Match.MatchStatus.SCHEDULED,
+    Match.MatchStatus.IN_PROGRESS,
+)
+
+
+def annotate_match_effective_date(queryset: QuerySet[Match]) -> QuerySet[Match]:
+    """Добавить поле ``effective_date`` для сортировки матчей в списках.
+
+    Args:
+        queryset (QuerySet[Match]): Исходный queryset матчей.
+
+    Returns:
+        QuerySet[Match]: Queryset с аннотацией ``effective_date``.
+    """
+    if "effective_date" in queryset.query.annotations:
+        return queryset
+    return queryset.annotate(
+        effective_date=Coalesce(
+            "scheduled_datetime",
+            "deadline",
+            "completed_datetime",
+        ),
+    )
+
+
+def order_player_matches_for_display(queryset: QuerySet[Match]) -> QuerySet[Match]:
+    """Сортировка матчей игрока: ближайшие запланированные первыми.
+
+    Запланированные и идущие — по возрастанию ``effective_date``.
+    Завершённые и отменённые — по убыванию (свежие сверху).
+
+    Args:
+        queryset (QuerySet[Match]): Queryset матчей (можно без ``effective_date``).
+
+    Returns:
+        QuerySet[Match]: Отсортированный queryset.
+    """
+    qs = annotate_match_effective_date(queryset)
+    in_game = _UPCOMING_MATCH_STATUSES
+    return qs.annotate(
+        _player_match_list_group=Case(
+            When(status__in=in_game, then=0),
+            default=1,
+            output_field=IntegerField(),
+        ),
+        _player_match_sort_asc=Case(
+            When(status__in=in_game, then=F("effective_date")),
+            default=None,
+            output_field=DateTimeField(),
+        ),
+        _player_match_sort_desc=Case(
+            When(~Q(status__in=in_game), then=F("effective_date")),
+            default=None,
+            output_field=DateTimeField(),
+        ),
+    ).order_by(
+        "_player_match_list_group",
+        "_player_match_sort_asc",
+        OrderBy(F("_player_match_sort_desc"), descending=True, nulls_last=True),
+        "pk",
+    )
+
+
+_UNFINISHED_MATCH_STATUSES = (
+    Match.MatchStatus.SCHEDULED,
+    Match.MatchStatus.IN_PROGRESS,
+)
+
+
+def _player_tournament_matches_q(player: "Player") -> Q:
+    """Фильтр матчей турнира, в которых участвует игрок."""
+    return (
+        Q(player1=player)
+        | Q(player2=player)
+        | Q(team1__player1=player)
+        | Q(team1__player2=player)
+        | Q(team2__player1=player)
+        | Q(team2__player2=player)
+    )
+
+
+def find_blocking_earlier_tournament_match(
+    match: Match,
+    player: "Player",
+) -> Match | None:
+    """Найти более ранний незавершённый матч того же турнира.
+
+    Игрок не может внести результат, пока не завершены матчи с более ранним
+    дедлайном (или датой) в рамках одного турнира.
+
+    Args:
+        match (Match): Матч, для которого проверяется ввод результата.
+        player (Player): Игрок, вносящий результат.
+
+    Returns:
+        Match | None: Блокирующий матч или ``None``, если порядок соблюдён.
+    """
+    if not match.tournament_id:
+        return None
+    if match.match_type != Match.MatchType.TOURNAMENT:
+        return None
+    if match.status not in _UNFINISHED_MATCH_STATUSES:
+        return None
+
+    current_row = (
+        annotate_match_effective_date(Match.objects.filter(pk=match.pk))
+        .values_list("effective_date", "pk")
+        .first()
+    )
+    if not current_row or current_row[0] is None:
+        return None
+
+    current_date, current_pk = current_row
+    blocking = (
+        annotate_match_effective_date(
+            Match.objects.filter(
+                tournament_id=match.tournament_id,
+                match_type=Match.MatchType.TOURNAMENT,
+                status__in=_UNFINISHED_MATCH_STATUSES,
+            ).filter(_player_tournament_matches_q(player))
+        )
+        .filter(
+            Q(effective_date__lt=current_date)
+            | Q(effective_date=current_date, pk__lt=current_pk)
+        )
+        .select_related(
+            "player1__user",
+            "player2__user",
+            "team1__player1__user",
+            "team1__player2__user",
+            "team2__player1__user",
+            "team2__player2__user",
+        )
+        .order_by("effective_date", "pk")
+        .first()
+    )
+    return cast(Match | None, blocking)
+
+
+def format_tournament_match_order_block_message(
+    blocking_match: Match,
+    player: "Player",
+) -> str:
+    """Текст ошибки при нарушении порядка внесения результатов в турнире.
+
+    Args:
+        blocking_match (Match): Матч, который нужно завершить раньше.
+        player (Player): Игрок, которому показывается сообщение.
+
+    Returns:
+        str: Сообщение для UI или flash-сообщения.
+    """
+    if blocking_match.deadline:
+        date_label = timezone.localtime(blocking_match.deadline).strftime("%d.%m.%Y")
+    elif blocking_match.scheduled_datetime:
+        date_label = timezone.localtime(blocking_match.scheduled_datetime).strftime(
+            "%d.%m.%Y"
+        )
+    else:
+        date_label = "более раннюю дату"
+    opponents = get_match_opponents_for_player(blocking_match, player)
+    opponent_label = ", ".join(
+        p.user.get_full_name() or p.user.email or str(p) for p in opponents
+    )
+    if not opponent_label:
+        opponent_label = "соперником"
+    return (
+        f"Сначала завершите матч от {date_label} ({opponent_label}). "
+        "В турнире результаты вносятся по порядку дедлайнов."
+    )
+
+
+def attach_tournament_result_order_flags(
+    matches: Iterable[Match],
+    player: "Player",
+) -> None:
+    """Пометить матчи флагами блокировки ввода результата по порядку дат.
+
+    Args:
+        matches (Iterable[Match]): Список матчей игрока.
+        player (Player): Текущий игрок.
+
+    Returns:
+        None: Атрибуты ``result_order_blocked_by`` и ``result_order_block_message``
+        задаются на объектах матчей.
+    """
+    for match in matches:
+        blocker = find_blocking_earlier_tournament_match(match, player)
+        match.result_order_blocked_by = blocker
+        match.result_order_block_message = (
+            format_tournament_match_order_block_message(blocker, player)
+            if blocker
+            else ""
+        )
 
 
 def mark_tournament_bracket_generated(tournament: Tournament) -> None:

@@ -14,7 +14,6 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db.models import Q
-from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -543,8 +542,9 @@ def profile(request, pk):
     can_view_profile_stats = _can_view_profile_stats(request.user, player)
 
     from apps.tournaments.models import Match
+    from apps.tournaments.utils import order_player_matches_for_display
 
-    all_matches_qs = (
+    all_matches_qs = order_player_matches_for_display(
         Match.objects.filter(
             Q(player1=player)
             | Q(player2=player)
@@ -563,13 +563,7 @@ def profile(request, pk):
             "team2",
             "winner_team",
         )
-        .annotate(
-            effective_date=Coalesce(
-                "scheduled_datetime", "deadline", "completed_datetime"
-            ),
-        )
         .filter(tournament__club__isnull=True)
-        .order_by("-effective_date")
     )
 
     # ---------- Фильтрация по месяцу/году/статусу ----------

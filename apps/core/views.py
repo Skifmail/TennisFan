@@ -58,6 +58,7 @@ from apps.tournaments.platform_home import (
     attach_home_tournament_rows,
     club_filter_choices_for_tournament_lists,
     load_user_club_ids_for_platform_tournaments,
+    order_tournaments_active_first,
 )
 from apps.training.models import Coach
 from apps.users.models import Player, SkillLevel
@@ -1622,7 +1623,7 @@ def home(request):
     elif club_filter:
         tournaments = tournaments.filter(club__slug=club_filter)
 
-    tournaments = tournaments.order_by("start_date")
+    tournaments = order_tournaments_active_first(tournaments)
 
     paginator = Paginator(tournaments, 7)
     page_number = request.GET.get("page")

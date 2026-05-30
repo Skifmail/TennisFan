@@ -384,8 +384,9 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
             m.completed_datetime = timezone.now()
         m.save()
 
-    tournament.bracket_generated = True
-    tournament.save(update_fields=["bracket_generated"])
+    from .utils import mark_tournament_bracket_generated
+
+    mark_tournament_bracket_generated(tournament)
     total_matches = len(matches)
     logger.info(
         "FAN bracket created for %s: %d matches (n=%d, bracket_size=%d)",

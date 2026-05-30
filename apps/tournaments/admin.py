@@ -40,6 +40,7 @@ from .postpayment import (
     get_pending_postpayment_users,
     get_postpayment_progress,
     open_postpayment_window,
+    tournament_needs_fancoin_settlement,
     try_settle_pending_users_with_fancoin,
 )
 from .proposal_service import apply_proposal
@@ -111,10 +112,10 @@ def settle_postpayment_fancoin_action(modeladmin, request, queryset):
     """Проверить баланс FT и закрыть инвойсы без оплаты в рублях."""
     total = 0
     for tournament in queryset:
-        if tournament.bracket_generated:
-            messages.warning(
+        if not tournament_needs_fancoin_settlement(tournament):
+            messages.info(
                 request,
-                f"{tournament.name}: сетка уже сформирована, списание FT не требуется.",
+                f"{tournament.name}: все участники уже покрыты (FT, ₽ или клубный слот).",
             )
             continue
         settled = try_settle_pending_users_with_fancoin(tournament)
@@ -127,9 +128,12 @@ def settle_postpayment_fancoin_action(modeladmin, request, queryset):
                 f"Ожидают оплату в ₽: {progress['pending']}.",
             )
         else:
-            messages.info(
+            pending_users = get_pending_postpayment_users(tournament)
+            messages.warning(
                 request,
-                f"{tournament.name}: новых списаний FT нет (баланс недостаточен или уже оплачено).",
+                f"{tournament.name}: списание FT не выполнено для "
+                f"{len(pending_users)} участников — проверьте активную подписку "
+                f"и баланс (нужно минимум 3 FT).",
             )
     if total and queryset.count() > 1:
         messages.success(request, f"Всего списано FT у {total} участников.")

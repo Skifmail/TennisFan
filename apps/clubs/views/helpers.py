@@ -3,7 +3,6 @@ from typing import Any, cast
 
 from django.contrib import messages
 from django.db.models import Max, Min, Q
-from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
@@ -121,16 +120,11 @@ def _build_club_profile_context(
             "team2",
             "winner_team",
         )
-        .annotate(
-            effective_date=Coalesce(
-                "scheduled_datetime",
-                "deadline",
-                "completed_datetime",
-            ),
-        )
-        .order_by("-effective_date")
         .distinct()
     )
+    from apps.tournaments.utils import order_player_matches_for_display
+
+    all_matches_qs = order_player_matches_for_display(all_matches_qs)
 
     filter_year = request.GET.get("year")
     filter_month = request.GET.get("month")

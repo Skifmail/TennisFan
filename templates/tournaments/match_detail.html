@@ -149,6 +149,10 @@
                         </div>
                     </div>
                     {% endfor %}
+                    {% elif result_order_block_message %}
+                    <p class="text-secondary" style="font-size: var(--font-size-sm); margin: 0;">
+                        {{ result_order_block_message }}
+                    </p>
                     {% elif can_submit_result %}
                     <form method="post" action="{% url 'propose_result' match.pk %}" class="match-player-actions__form">
                         {% csrf_token %}

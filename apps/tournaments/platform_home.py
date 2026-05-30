@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from typing import TypeAlias
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, QuerySet, When
 from django.urls import reverse
 
 from apps.clubs.models import (
@@ -28,6 +28,43 @@ UserLike: TypeAlias = AbstractBaseUser | AnonymousUser
 # Специальные значения query-параметра ``club`` в списках турниров (главная, /tournaments/, таблицы).
 CLUB_FILTER_PLATFORM = "__platform__"
 CLUB_FILTER_CLUB_ONLY = "__club_only__"
+
+_IN_GAME_STATUSES = (
+    TournamentStatus.ACTIVE,
+    TournamentStatus.GROUP_STAGE,
+    TournamentStatus.PLAYOFFS,
+)
+
+
+def order_tournaments_active_first(
+    queryset: QuerySet[Tournament],
+    *,
+    then_by_start_date: bool = True,
+) -> QuerySet[Tournament]:
+    """Сортировка публичных списков: идущие турниры первыми.
+
+    Приоритет: активный / групповой этап / плей-офф → предстоящий → остальные.
+    Внутри группы — по ``start_date`` (по умолчанию по возрастанию).
+
+    Args:
+        queryset (QuerySet[Tournament]): Исходный queryset турниров.
+        then_by_start_date (bool): True — ``start_date`` по возрастанию,
+            False — по убыванию.
+
+    Returns:
+        QuerySet[Tournament]: Отсортированный queryset.
+    """
+    qs = queryset.annotate(
+        _list_status_priority=Case(
+            When(status__in=_IN_GAME_STATUSES, then=0),
+            When(status=TournamentStatus.UPCOMING, then=1),
+            default=2,
+            output_field=IntegerField(),
+        )
+    )
+    if then_by_start_date:
+        return qs.order_by("_list_status_priority", "start_date")
+    return qs.order_by("_list_status_priority", "-start_date")
 
 
 def club_filter_choices_for_tournament_lists():

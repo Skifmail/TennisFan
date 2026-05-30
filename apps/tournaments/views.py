@@ -64,6 +64,7 @@ from .platform_home import (
     CLUB_FILTER_CLUB_ONLY,
     CLUB_FILTER_PLATFORM,
     club_filter_choices_for_tournament_lists,
+    order_tournaments_active_first,
 )
 from .postpayment import (
     finalize_postpayment_window,
@@ -112,7 +113,13 @@ from .tvd import (
 from .tvd import (
     is_group_stage_complete as tvd_is_group_stage_complete,
 )
-from .utils import get_match_opponent_users
+from .utils import (
+    attach_tournament_result_order_flags,
+    find_blocking_earlier_tournament_match,
+    format_tournament_match_order_block_message,
+    get_match_opponent_users,
+    order_player_matches_for_display,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -364,7 +371,7 @@ def tournament_list(request):
     elif club_filter:
         tournaments = tournaments.filter(club__slug=club_filter)
 
-    tournaments = tournaments.order_by("-created_at")
+    tournaments = order_tournaments_active_first(tournaments)
     paginator = Paginator(tournaments, 20)
     page_number = request.GET.get("page")
     tournaments_page = paginator.get_page(page_number)
@@ -2759,11 +2766,22 @@ def match_detail(request, pk):
         ).select_related("proposer")
     )
     can_view_match_actions = bool(player and player in _match_participants(match))
+    result_order_blocker = (
+        find_blocking_earlier_tournament_match(match, player)
+        if player and can_view_match_actions
+        else None
+    )
+    result_order_block_message = (
+        format_tournament_match_order_block_message(result_order_blocker, player)
+        if result_order_blocker and player
+        else ""
+    )
     can_submit_result = bool(
         can_view_match_actions
         and match.status
         not in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
         and not pending_proposals
+        and not result_order_blocker
     )
 
     # Соперники для блока контактов (только для участников матча)
@@ -2782,6 +2800,7 @@ def match_detail(request, pk):
             "pending_proposals": pending_proposals,
             "can_view_match_actions": can_view_match_actions,
             "can_submit_result": can_submit_result,
+            "result_order_block_message": result_order_block_message,
             "next_url": next_url,
             "is_fan": _is_fan(match.tournament),
             "is_olympic": _is_olympic(match.tournament),
@@ -2841,7 +2860,7 @@ def my_matches(request):
         else:
             matches_qs = matches_qs.filter(match_type=Match.MatchType.SPARRING)
 
-        matches = list(matches_qs.order_by("deadline", "scheduled_datetime", "pk"))
+        matches = list(order_player_matches_for_display(matches_qs))
 
         proposals = MatchResultProposal.objects.filter(
             match__in=matches
@@ -2851,6 +2870,7 @@ def my_matches(request):
             if p.status == Match.ProposalStatus.PENDING:
                 pending_by_match.setdefault(p.match_id, []).append(p)
 
+        attach_tournament_result_order_flags(matches, player)
         for m in matches:
             m.pending_proposals = pending_by_match.get(m.id, [])
             m.has_pending = bool(m.pending_proposals)
@@ -2945,18 +2965,15 @@ def my_sparring_matches(request):
     if player is None:
         player = Player.objects.create(user=request.user)
 
-    matches = (
-        Match.objects.filter(
-            models.Q(player1=player) | models.Q(player2=player),
-            match_type=Match.MatchType.SPARRING,
-        )
-        .select_related(
-            "player1__user",
-            "player2__user",
-            "sparring_response__sparring_request",
-        )
-        .order_by("-scheduled_datetime", "-created_at")
+    matches_qs = Match.objects.filter(
+        models.Q(player1=player) | models.Q(player2=player),
+        match_type=Match.MatchType.SPARRING,
+    ).select_related(
+        "player1__user",
+        "player2__user",
+        "sparring_response__sparring_request",
     )
+    matches = list(order_player_matches_for_display(matches_qs))
 
     proposals = MatchResultProposal.objects.filter(match__in=matches).select_related(
         "proposer", "match"
@@ -3019,6 +3036,14 @@ def propose_result(request, pk):
             request,
             "По этому матчу уже отправлен результат и он ожидает подтверждения соперником. "
             "Если соперник отклонит результат и не отправит свой — вы сможете отправить результат снова.",
+        )
+        return redirect(_get_safe_next_url(request, fallback_url))
+
+    blocking_match = find_blocking_earlier_tournament_match(match, player)
+    if blocking_match:
+        messages.error(
+            request,
+            format_tournament_match_order_block_message(blocking_match, player),
         )
         return redirect(_get_safe_next_url(request, fallback_url))
 

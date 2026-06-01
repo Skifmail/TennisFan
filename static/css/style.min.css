@@ -9440,7 +9440,9 @@ body.has-fullscreen-loader {
     align-items: flex-start;
     gap: var(--spacing-xs);
     max-width: 11rem;
+    min-width: 0;
     line-height: 1.35;
+    overflow-wrap: break-word;
 }
 
 .match-details-value {
@@ -9630,9 +9632,9 @@ a.match-details-value__lead:hover {
 }
 
 @media (max-width: 640px) {
-    /* Строка «метка — значение» остаётся в двух колонках: меньше высоты блока */
+    /* Две колонки с равной долей: длинные метки переносятся, не наезжают на значение */
     .match-details-row {
-        grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: var(--spacing-sm);
     }
 
@@ -13379,7 +13381,7 @@ a.match-details-value__lead:hover {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
 }
 
 .live-results__vals--col {
@@ -13483,6 +13485,18 @@ a.match-details-value__lead:hover {
 
 .live-results__fallback-link:hover {
     text-decoration: underline;
+}
+
+/* Десктоп: чуть шире колонки имён, перенос только по словам */
+@media (min-width: 901px) {
+    .live-results__row {
+        grid-template-columns: minmax(128px, 1.12fr) minmax(74px, 90px) minmax(72px, 104px) minmax(74px, 90px) minmax(128px, 1.12fr);
+    }
+
+    .live-results__player1,
+    .live-results__player2 {
+        gap: var(--spacing-sm);
+    }
 }
 
 @media (width <= 900px) {
@@ -26186,6 +26200,553 @@ select.club-payments-form__control option {
     }
 }
 
+/* --------------------------------------------------------------------------
+   Лента активности платформы (Панель платформы)
+   -------------------------------------------------------------------------- */
+.club-dashboard-panel--activity {
+    margin-bottom: 18px;
+    background:
+        radial-gradient(circle at top right, rgba(16, 185, 129, 0.1), transparent 26%),
+        radial-gradient(circle at top left, rgba(201, 168, 76, 0.08), transparent 24%),
+        linear-gradient(180deg, rgba(4, 31, 22, 0.98), rgba(2, 19, 14, 0.98));
+}
+
+.club-dashboard-activity__summary {
+    margin: 8px 0 0;
+    color: rgba(226, 232, 240, 0.78);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.club-dashboard-panel--activity .club-dashboard-panel__header-actions {
+    align-items: flex-end;
+}
+
+.club-dashboard-panel--activity .club-dashboard-finance-action-btn {
+    min-width: 120px;
+    height: 40px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.club-dashboard-activity-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(160px, 1fr) 132px 132px auto;
+    align-items: end;
+    gap: 8px;
+    margin: 16px 0;
+}
+
+.club-dashboard-activity-filters__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.club-dashboard-activity-filters__label {
+    color: rgba(226, 232, 240, 0.68);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.club-dashboard-activity-filters__actions {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.club-dashboard-activity-filters .form-control {
+    width: 100%;
+    height: 40px;
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 0.9rem;
+    line-height: 1.2;
+    border-radius: 10px;
+    box-sizing: border-box;
+}
+
+.club-dashboard-activity-filters select.form-control {
+    appearance: none;
+    padding-right: 32px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23C9A84C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px 8px;
+}
+
+.club-dashboard-activity-filters input[type="date"].form-control {
+    padding-right: 8px;
+    color-scheme: dark;
+}
+
+.club-dashboard-activity-filters__btn {
+    height: 40px;
+    min-width: 96px;
+    padding: 0 16px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border-radius: 10px;
+    text-decoration: none;
+}
+
+@media (width <= 1100px) {
+    .club-dashboard-activity-filters {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .club-dashboard-activity-filters__field--name,
+    .club-dashboard-activity-filters__field--type {
+        grid-column: 1 / -1;
+    }
+
+    .club-dashboard-activity-filters__actions {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+    }
+}
+
+.club-dashboard-activity-scroll {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 12px;
+    max-height: 540px;
+    border: 1px solid rgba(201, 168, 76, 0.16);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.02);
+    overflow: hidden;
+}
+
+.club-dashboard-activity-scroll__rail {
+    position: relative;
+    align-self: stretch;
+    margin: 12px 2px 12px 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.club-dashboard-activity-scroll__thumb {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    min-height: 24px;
+    border-radius: 999px;
+    background: rgba(201, 168, 76, 0.55);
+    box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.2);
+    pointer-events: none;
+    will-change: transform, height;
+}
+
+.club-dashboard-activity {
+    max-height: 540px;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    --activity-badge-col: 15rem;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.club-dashboard-activity::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.club-dashboard-activity__head,
+.club-dashboard-activity__row {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) max-content minmax(0, 2.8fr) 58px;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 14px;
+    text-align: left;
+}
+
+.club-dashboard-activity__cell {
+    min-width: 0;
+}
+
+.club-dashboard-activity__head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: rgba(2, 19, 14, 0.97);
+    color: rgba(226, 232, 240, 0.6);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(201, 168, 76, 0.18);
+}
+
+.club-dashboard-activity__row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.9rem;
+    color: rgba(226, 232, 240, 0.9);
+}
+
+.club-dashboard-activity__row:last-child {
+    border-bottom: none;
+}
+
+.club-dashboard-activity__row:hover {
+    background: rgba(201, 168, 76, 0.06);
+}
+
+.club-dashboard-activity__cell--date {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.club-dashboard-activity__date {
+    color: #fefce8;
+    font-weight: 600;
+    font-size: 0.82rem;
+}
+
+.club-dashboard-activity__time {
+    color: rgba(226, 232, 240, 0.5);
+    font-size: 0.74rem;
+}
+
+.club-dashboard-activity__cell--actor {
+    color: #fefce8;
+    font-weight: 600;
+    font-size: 0.86rem;
+    line-height: 1.25;
+    word-break: break-word;
+    padding-right: 2px;
+}
+
+.club-dashboard-activity__cell--role {
+    padding-left: 0;
+    padding-right: 4px;
+}
+
+.club-dashboard-activity__cell--action {
+    display: grid;
+    grid-template-columns: var(--activity-badge-col) minmax(0, 1fr);
+    column-gap: 10px;
+    align-items: center;
+    min-width: 0;
+}
+
+.club-dashboard-activity__desc {
+    min-width: 0;
+    color: rgba(226, 232, 240, 0.72);
+    font-size: 0.82rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.club-dashboard-activity__desc a {
+    color: rgba(125, 211, 252, 0.92);
+    text-decoration: none;
+}
+
+.club-dashboard-activity__desc a:hover {
+    text-decoration: underline;
+}
+
+.club-dashboard-activity__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    width: max-content;
+    max-width: 100%;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.club-dashboard-activity__badge--payment {
+    color: #bbf7d0;
+    background: rgba(16, 185, 129, 0.16);
+    border-color: rgba(16, 185, 129, 0.4);
+}
+
+.club-dashboard-activity__badge--registration {
+    color: #bae6fd;
+    background: rgba(56, 189, 248, 0.14);
+    border-color: rgba(56, 189, 248, 0.36);
+}
+
+.club-dashboard-activity__badge--match {
+    color: #fde68a;
+    background: rgba(201, 168, 76, 0.16);
+    border-color: rgba(201, 168, 76, 0.42);
+}
+
+.club-dashboard-activity__badge--tournament {
+    color: #ddd6fe;
+    background: rgba(139, 92, 246, 0.16);
+    border-color: rgba(139, 92, 246, 0.4);
+}
+
+.club-dashboard-activity__badge--sparring {
+    color: #fbcfe8;
+    background: rgba(236, 72, 153, 0.14);
+    border-color: rgba(236, 72, 153, 0.36);
+}
+
+.club-dashboard-activity__badge--rejected {
+    color: #fecaca;
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.club-dashboard-activity__badge--club {
+    color: #99f6e4;
+    background: rgba(20, 184, 166, 0.14);
+    border-color: rgba(20, 184, 166, 0.38);
+}
+
+.club-dashboard-activity__badge--training {
+    color: #fed7aa;
+    background: rgba(249, 115, 22, 0.14);
+    border-color: rgba(249, 115, 22, 0.38);
+}
+
+.club-dashboard-activity__badge--comment {
+    color: #c7d2fe;
+    background: rgba(99, 102, 241, 0.14);
+    border-color: rgba(99, 102, 241, 0.36);
+}
+
+.club-dashboard-activity__badge--fancoin {
+    color: #fde68a;
+    background: rgba(245, 158, 11, 0.16);
+    border-color: rgba(245, 158, 11, 0.4);
+}
+
+.club-dashboard-activity__badge--default {
+    color: rgba(226, 232, 240, 0.85);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+.club-dashboard-activity__role {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    line-height: 1.35;
+}
+
+.club-dashboard-activity__role--admin {
+    color: #fde68a;
+    background: rgba(201, 168, 76, 0.2);
+    border-color: rgba(201, 168, 76, 0.55);
+}
+
+.club-dashboard-activity__role--coach {
+    color: #fed7aa;
+    background: rgba(249, 115, 22, 0.16);
+    border-color: rgba(249, 115, 22, 0.42);
+}
+
+.club-dashboard-activity__role--club_organizer {
+    color: #99f6e4;
+    background: rgba(20, 184, 166, 0.16);
+    border-color: rgba(20, 184, 166, 0.42);
+}
+
+.club-dashboard-activity__role--player {
+    color: #bae6fd;
+    background: rgba(56, 189, 248, 0.14);
+    border-color: rgba(56, 189, 248, 0.4);
+}
+
+.club-dashboard-activity__role--default {
+    color: rgba(226, 232, 240, 0.82);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.club-dashboard-activity__cell--amount {
+    text-align: right;
+    font-weight: 700;
+    color: #bbf7d0;
+    white-space: nowrap;
+}
+
+.club-dashboard-activity__amount-col {
+    text-align: right;
+}
+
+.club-dashboard-activity__dash {
+    color: rgba(226, 232, 240, 0.35);
+    font-weight: 400;
+}
+
+.club-dashboard-activity__pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.club-dashboard-activity__page-info {
+    color: rgba(226, 232, 240, 0.7);
+    font-size: 0.85rem;
+}
+
+@media (width <= 768px) {
+    .club-dashboard-activity {
+        --mob-badge-col: 11rem;
+    }
+
+    .club-dashboard-activity__head {
+        display: none;
+    }
+
+    .club-dashboard-activity__row {
+        grid-template-columns: minmax(104px, auto) minmax(0, 1fr) auto auto;
+        grid-template-rows: auto auto;
+        gap: 2px 6px;
+        padding: 9px 10px;
+        align-items: center;
+    }
+
+    .club-dashboard-activity__cell--date {
+        grid-column: 1;
+        grid-row: 1;
+        flex-direction: row;
+        gap: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .club-dashboard-activity__date {
+        font-size: 0.74rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+
+    .club-dashboard-activity__time {
+        font-size: 0.68rem;
+        flex-shrink: 0;
+    }
+
+    .club-dashboard-activity__cell--actor {
+        grid-column: 2;
+        grid-row: 1;
+        padding-right: 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.8rem;
+    }
+
+    .club-dashboard-activity__cell--role {
+        grid-column: 3;
+        grid-row: 1;
+        padding: 0;
+    }
+
+    .club-dashboard-activity__cell--amount {
+        grid-column: 4;
+        grid-row: 1;
+        text-align: right;
+        white-space: nowrap;
+        font-size: 0.76rem;
+    }
+
+    .club-dashboard-activity__cell--action {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        display: grid;
+        grid-template-columns: var(--mob-badge-col) minmax(0, 1fr);
+        column-gap: 6px;
+        align-items: center;
+    }
+
+    .club-dashboard-activity__badge {
+        font-size: 0.62rem;
+        padding: 2px 5px;
+        justify-self: start;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .club-dashboard-activity__desc {
+        min-width: 0;
+        font-size: 0.74rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .club-dashboard-activity-filters {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin: 10px 0;
+    }
+
+    .club-dashboard-activity-filters__field--name,
+    .club-dashboard-activity-filters__field--type {
+        grid-column: 1 / -1;
+    }
+
+    .club-dashboard-activity-filters__actions {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .club-dashboard-activity-filters .form-control {
+        height: 40px;
+        min-height: 40px;
+        padding: 0 10px;
+        font-size: 0.86rem;
+    }
+
+    .club-dashboard-activity-filters__label {
+        font-size: 0.64rem;
+    }
+
+    .club-dashboard-activity-filters__btn {
+        width: 100%;
+        min-width: 0;
+        height: 40px;
+        padding: 0 12px;
+        font-size: 0.86rem;
+    }
+}
+
 /* END club-dashboard.css */
 
 /* BEGIN modals.css */
@@ -27091,62 +27652,3 @@ select.club-payments-form__control option {
     color: #e5ffe8;
     font-weight: 600;
 }
-
-/* Лента активности платформы (Панель платформы) */
-.club-dashboard-panel--activity{margin-bottom:18px;background:radial-gradient(circle at top right,rgba(16,185,129,.1),transparent 26%),radial-gradient(circle at top left,rgba(201,168,76,.08),transparent 24%),linear-gradient(180deg,rgba(4,31,22,.98),rgba(2,19,14,.98))}
-.club-dashboard-activity__summary{margin:8px 0 0;color:rgba(226,232,240,.78);font-size:.9rem;line-height:1.5}
-.club-dashboard-panel--activity .club-dashboard-panel__header-actions{align-items:flex-end}
-.club-dashboard-panel--activity .club-dashboard-finance-action-btn{min-width:120px;height:40px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
-.club-dashboard-activity-filters{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(160px,1fr) 132px 132px auto;align-items:end;gap:8px;margin:16px 0}
-.club-dashboard-activity-filters__field{display:flex;flex-direction:column;gap:4px;min-width:0}
-.club-dashboard-activity-filters__label{color:rgba(226,232,240,.68);font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-.club-dashboard-activity-filters__actions{display:flex;gap:8px;align-items:stretch}
-.club-dashboard-activity-filters .form-control{width:100%;height:40px;min-height:40px;padding:0 12px;font-size:.9rem;line-height:1.2;border-radius:10px;box-sizing:border-box}
-.club-dashboard-activity-filters select.form-control{appearance:none;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23C9A84C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:12px 8px}
-.club-dashboard-activity-filters input[type=date].form-control{padding-right:8px;color-scheme:dark}
-.club-dashboard-activity-filters__btn{height:40px;min-width:96px;padding:0 16px;font-size:.88rem;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;border-radius:10px;text-decoration:none}
-@media (width <= 1100px){.club-dashboard-activity-filters{grid-template-columns:1fr 1fr}.club-dashboard-activity-filters__field--name,.club-dashboard-activity-filters__field--type{grid-column:1/-1}.club-dashboard-activity-filters__actions{grid-column:1/-1;justify-content:flex-start}}
-.club-dashboard-activity-scroll{display:grid;grid-template-columns:minmax(0,1fr) 12px;max-height:540px;border:1px solid rgba(201,168,76,.16);border-radius:18px;background:rgba(255,255,255,.02);overflow:hidden}
-.club-dashboard-activity-scroll__rail{position:relative;align-self:stretch;margin:12px 2px 12px 0;border-radius:999px;background:rgba(255,255,255,.08)}
-.club-dashboard-activity-scroll__thumb{position:absolute;left:0;right:0;top:0;min-height:24px;border-radius:999px;background:rgba(201,168,76,.55);box-shadow:0 0 0 1px rgba(201,168,76,.2);pointer-events:none;will-change:transform,height}
-.club-dashboard-activity{max-height:540px;overflow-x:hidden;overflow-y:scroll;border:none;border-radius:0;background:transparent;--activity-badge-col:15rem;scrollbar-width:none;-ms-overflow-style:none}
-.club-dashboard-activity::-webkit-scrollbar{display:none;width:0;height:0}
-.club-dashboard-activity__head,.club-dashboard-activity__row{display:grid;grid-template-columns:72px minmax(0,1fr) max-content minmax(0,2.8fr) 58px;gap:8px;align-items:center;padding:8px 14px;text-align:left}
-.club-dashboard-activity__cell{min-width:0}
-.club-dashboard-activity__head{position:sticky;top:0;z-index:1;background:rgba(2,19,14,.97);color:rgba(226,232,240,.6);font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid rgba(201,168,76,.18)}
-.club-dashboard-activity__row{border-bottom:1px solid rgba(255,255,255,.05);font-size:.9rem;color:rgba(226,232,240,.9)}
-.club-dashboard-activity__row:last-child{border-bottom:none}
-.club-dashboard-activity__row:hover{background:rgba(201,168,76,.06)}
-.club-dashboard-activity__cell--date{display:flex;flex-direction:column;line-height:1.15}
-.club-dashboard-activity__date{color:#fefce8;font-weight:600;font-size:.82rem}
-.club-dashboard-activity__time{color:rgba(226,232,240,.5);font-size:.74rem}
-.club-dashboard-activity__cell--actor{color:#fefce8;font-weight:600;font-size:.86rem;line-height:1.25;word-break:break-word;padding-right:2px}
-.club-dashboard-activity__cell--role{padding-left:0;padding-right:4px}
-.club-dashboard-activity__cell--action{display:grid;grid-template-columns:var(--activity-badge-col) minmax(0,1fr);column-gap:10px;align-items:center;min-width:0}
-.club-dashboard-activity__desc{min-width:0;color:rgba(226,232,240,.72);font-size:.82rem;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.club-dashboard-activity__desc a{color:rgba(125,211,252,.92);text-decoration:none}
-.club-dashboard-activity__desc a:hover{text-decoration:underline}
-.club-dashboard-activity__badge{display:inline-flex;align-items:center;justify-self:start;width:max-content;max-width:100%;padding:3px 8px;border-radius:999px;font-size:.72rem;font-weight:700;letter-spacing:.02em;border:1px solid transparent;white-space:nowrap}
-.club-dashboard-activity__badge--payment{color:#bbf7d0;background:rgba(16,185,129,.16);border-color:rgba(16,185,129,.4)}
-.club-dashboard-activity__badge--registration{color:#bae6fd;background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.36)}
-.club-dashboard-activity__badge--match{color:#fde68a;background:rgba(201,168,76,.16);border-color:rgba(201,168,76,.42)}
-.club-dashboard-activity__badge--tournament{color:#ddd6fe;background:rgba(139,92,246,.16);border-color:rgba(139,92,246,.4)}
-.club-dashboard-activity__badge--sparring{color:#fbcfe8;background:rgba(236,72,153,.14);border-color:rgba(236,72,153,.36)}
-.club-dashboard-activity__badge--rejected{color:#fecaca;background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.4)}
-.club-dashboard-activity__badge--club{color:#99f6e4;background:rgba(20,184,166,.14);border-color:rgba(20,184,166,.38)}
-.club-dashboard-activity__badge--training{color:#fed7aa;background:rgba(249,115,22,.14);border-color:rgba(249,115,22,.38)}
-.club-dashboard-activity__badge--comment{color:#c7d2fe;background:rgba(99,102,241,.14);border-color:rgba(99,102,241,.36)}
-.club-dashboard-activity__badge--fancoin{color:#fde68a;background:rgba(245,158,11,.16);border-color:rgba(245,158,11,.4)}
-.club-dashboard-activity__badge--default{color:rgba(226,232,240,.85);background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14)}
-.club-dashboard-activity__role{display:inline-flex;align-items:center;padding:1px 6px;border-radius:999px;font-size:.68rem;font-weight:700;letter-spacing:.01em;border:1px solid transparent;white-space:nowrap;line-height:1.35}
-.club-dashboard-activity__role--admin{color:#fde68a;background:rgba(201,168,76,.2);border-color:rgba(201,168,76,.55)}
-.club-dashboard-activity__role--coach{color:#fed7aa;background:rgba(249,115,22,.16);border-color:rgba(249,115,22,.42)}
-.club-dashboard-activity__role--club_organizer{color:#99f6e4;background:rgba(20,184,166,.16);border-color:rgba(20,184,166,.42)}
-.club-dashboard-activity__role--player{color:#bae6fd;background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.4)}
-.club-dashboard-activity__role--default{color:rgba(226,232,240,.82);background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.16)}
-.club-dashboard-activity__cell--amount{text-align:right;font-weight:700;color:#bbf7d0;white-space:nowrap}
-.club-dashboard-activity__amount-col{text-align:right}
-.club-dashboard-activity__dash{color:rgba(226,232,240,.35);font-weight:400}
-.club-dashboard-activity__pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px}
-.club-dashboard-activity__page-info{color:rgba(226,232,240,.7);font-size:.85rem}
-@media (width <= 768px){.club-dashboard-activity{--mob-badge-col:11rem}.club-dashboard-activity__head{display:none}.club-dashboard-activity__row{grid-template-columns:minmax(104px,auto) minmax(0,1fr) auto auto;grid-template-rows:auto auto;gap:2px 6px;padding:9px 10px;align-items:center}.club-dashboard-activity__cell--date{grid-column:1;grid-row:1;flex-direction:row;gap:4px;white-space:nowrap;overflow:hidden;min-width:0;max-width:100%}.club-dashboard-activity__date{font-size:.74rem;overflow:hidden;text-overflow:ellipsis;min-width:0}.club-dashboard-activity__time{font-size:.68rem;flex-shrink:0}.club-dashboard-activity__cell--actor{grid-column:2;grid-row:1;padding-right:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem}.club-dashboard-activity__cell--role{grid-column:3;grid-row:1;padding:0}.club-dashboard-activity__cell--amount{grid-column:4;grid-row:1;text-align:right;white-space:nowrap;font-size:.76rem}.club-dashboard-activity__cell--action{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:var(--mob-badge-col) minmax(0,1fr);column-gap:6px;align-items:center}.club-dashboard-activity__badge{font-size:.62rem;padding:2px 5px;justify-self:start;max-width:100%;overflow:hidden;text-overflow:ellipsis}.club-dashboard-activity__desc{min-width:0;font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.club-dashboard-activity-filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.club-dashboard-activity-filters__field--name,.club-dashboard-activity-filters__field--type{grid-column:1/-1}.club-dashboard-activity-filters__actions{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}.club-dashboard-activity-filters .form-control{height:40px;min-height:40px;padding:0 10px;font-size:.86rem}.club-dashboard-activity-filters__label{font-size:.64rem}.club-dashboard-activity-filters__btn{width:100%;min-width:0;height:40px;padding:0 12px;font-size:.86rem}}

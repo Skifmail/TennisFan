@@ -697,7 +697,7 @@
             <h3 class="bracket-round-title">{{ round_name }}{% if is_consolation and is_fan %} <span class="text-muted">(подвал)</span>{% elif is_consolation and is_olympic %} <span class="text-muted">(утешительная)</span>{% endif %}</h3>
             <div class="bracket-round-matches grid grid-2">
                 {% for match in round_matches %}
-                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
+                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card{% if match.status == 'completed' or match.status == 'walkover' %} match-card--completed{% endif %}">
                     <div class="match-header">
                         <span class="match-tournament">{{ match.round_name|default:"Матч" }}</span>
                         <span class="match-date">{% if match.deadline %}До {{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}</span>
@@ -744,7 +744,7 @@
             <h3 class="bracket-round-title">{{ round_name }}</h3>
             <div class="bracket-round-matches grid grid-2">
                 {% for match in round_matches %}
-                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
+                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card{% if match.status == 'completed' or match.status == 'walkover' %} match-card--completed{% endif %}">
                     <div class="match-header">
                         <span class="match-tournament">{{ match.round_name|default:"Матч" }}</span>
                         <span class="match-date">{% if match.deadline %}До {{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}</span>
@@ -787,7 +787,7 @@
     {% else %}
     <div class="grid grid-2">
         {% for match in matches %}
-        <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
+        <a href="{% url 'match_detail' pk=match.pk %}" class="match-card{% if match.status == 'completed' or match.status == 'walkover' %} match-card--completed{% endif %}">
             <div class="match-header">
                 <span class="match-tournament">{{ match.round_name|default:"Матч" }}</span>
                 <span class="match-date">{% if match.deadline %}{{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}</span>

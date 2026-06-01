@@ -38,33 +38,25 @@ _IN_GAME_STATUSES = (
 
 def order_tournaments_active_first(
     queryset: QuerySet[Tournament],
-    *,
-    then_by_start_date: bool = True,
 ) -> QuerySet[Tournament]:
-    """Сортировка публичных списков: идущие турниры первыми.
+    """Сортировка публичных списков: «в игре» первыми, остальные — по дате создания.
 
-    Приоритет: активный / групповой этап / плей-офф → предстоящий → остальные.
-    Внутри группы — по ``start_date`` (по умолчанию по возрастанию).
+    Сначала турниры в статусах active / group_stage / playoffs, затем все остальные.
+    Внутри каждой группы — от недавно созданных к более старым (``-created_at``).
 
     Args:
         queryset (QuerySet[Tournament]): Исходный queryset турниров.
-        then_by_start_date (bool): True — ``start_date`` по возрастанию,
-            False — по убыванию.
 
     Returns:
         QuerySet[Tournament]: Отсортированный queryset.
     """
-    qs = queryset.annotate(
+    return queryset.annotate(
         _list_status_priority=Case(
             When(status__in=_IN_GAME_STATUSES, then=0),
-            When(status=TournamentStatus.UPCOMING, then=1),
-            default=2,
+            default=1,
             output_field=IntegerField(),
         )
-    )
-    if then_by_start_date:
-        return qs.order_by("_list_status_priority", "start_date")
-    return qs.order_by("_list_status_priority", "-start_date")
+    ).order_by("_list_status_priority", "-created_at", "-pk")
 
 
 def club_filter_choices_for_tournament_lists():

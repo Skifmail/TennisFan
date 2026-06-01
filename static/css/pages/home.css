@@ -909,7 +909,7 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
 }
 
 .live-results__vals--col {
@@ -1013,6 +1013,18 @@
 
 .live-results__fallback-link:hover {
     text-decoration: underline;
+}
+
+/* Десктоп: чуть шире колонки имён, перенос только по словам */
+@media (min-width: 901px) {
+    .live-results__row {
+        grid-template-columns: minmax(128px, 1.12fr) minmax(74px, 90px) minmax(72px, 104px) minmax(74px, 90px) minmax(128px, 1.12fr);
+    }
+
+    .live-results__player1,
+    .live-results__player2 {
+        gap: var(--spacing-sm);
+    }
 }
 
 @media (width <= 900px) {

@@ -239,7 +239,9 @@
     align-items: flex-start;
     gap: var(--spacing-xs);
     max-width: 11rem;
+    min-width: 0;
     line-height: 1.35;
+    overflow-wrap: break-word;
 }
 
 .match-details-value {
@@ -429,9 +431,9 @@ a.match-details-value__lead:hover {
 }
 
 @media (max-width: 640px) {
-    /* Строка «метка — значение» остаётся в двух колонках: меньше высоты блока */
+    /* Две колонки с равной долей: длинные метки переносятся, не наезжают на значение */
     .match-details-row {
-        grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: var(--spacing-sm);
     }
 

@@ -1,3 +1,5 @@
+"""E2E: подтверждение email по ссылке."""
+
 from datetime import timedelta
 
 from django.core import mail

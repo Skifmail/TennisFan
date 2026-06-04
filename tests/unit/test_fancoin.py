@@ -1,4 +1,4 @@
-"""Тесты доменной логики FANcoin."""
+"""Юнит-тесты: доменная логика FANcoin."""
 
 from datetime import timedelta
 
@@ -24,14 +24,6 @@ class FancoinFlowTests(TestCase):
     """Проверить базовые сценарии работы FANcoin."""
 
     def setUp(self) -> None:
-        """Подготовить базовые объекты для тестов.
-
-        Args:
-            None: Используется контекст тестового класса.
-
-        Returns:
-            None: Создаёт тариф и пользователей.
-        """
         user_model = get_user_model()
         self.user = user_model.objects.create_user(
             email="first@example.com",
@@ -58,14 +50,6 @@ class FancoinFlowTests(TestCase):
         )
 
     def test_add_and_spend_fancoin(self) -> None:
-        """Проверить начисление и списание FANcoin.
-
-        Args:
-            None: Используется контекст теста.
-
-        Returns:
-            None: Проверки выполняются через assert.
-        """
         self.subscription.add_fancoin(self.tier.fancoin_per_purchase)
         self.subscription.refresh_from_db()
         self.assertEqual(self.subscription.fancoin_balance, 15)
@@ -79,14 +63,6 @@ class FancoinFlowTests(TestCase):
         self.assertEqual(self.subscription.fancoin_balance, 12)
 
     def test_spend_insufficient_balance(self) -> None:
-        """Проверить отказ списания при недостатке FANcoin.
-
-        Args:
-            None: Используется контекст теста.
-
-        Returns:
-            None: Проверки выполняются через assert.
-        """
         self.subscription.fancoin_balance = 2
         self.subscription.save(update_fields=["fancoin_balance"])
         spent = self.subscription.spend_fancoin(
@@ -98,14 +74,6 @@ class FancoinFlowTests(TestCase):
         self.assertEqual(self.subscription.fancoin_balance, 2)
 
     def test_charge_singles_sparring(self) -> None:
-        """Проверить списание FANcoin после завершённого одиночного спарринга.
-
-        Args:
-            None: Используется контекст теста.
-
-        Returns:
-            None: Проверки выполняются через assert.
-        """
         sub2 = UserSubscription.objects.create(
             user=self.user2,
             tier=self.tier,

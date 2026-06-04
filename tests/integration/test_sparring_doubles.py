@@ -1,8 +1,4 @@
-"""
-Тесты парного спарринга 2×2: отклики, формирование матча, рейтинг, дружеские матчи.
-"""
-
-from typing import cast
+"""Интеграционные тесты: парный спарринг 2×2."""
 
 from django.test import TestCase
 
@@ -22,32 +18,17 @@ from apps.sparring.models import (
     TeamSide,
 )
 from apps.tournaments.models import Match
-from apps.users.models import Player, User
-
-
-def _make_player(email_suffix: str, points: float = 1000.0) -> Player:
-    user = User.objects.create_user(
-        email=f"p_{email_suffix}@test.local",
-        password="x",
-    )
-    return cast(
-        Player,
-        Player.objects.create(
-            user=user,
-            total_points=points,
-            hidden_rating=points,
-        ),
-    )
+from tests.support.factories import make_player
 
 
 class DoublesRequestFlowTestCase(TestCase):
     """Создание заявки, отклик solo, принятие, добавление партнёра, подтверждение матча."""
 
     def setUp(self) -> None:
-        self.author = _make_player("author")
-        self.partner_a = _make_player("partner_a")
-        self.opp1 = _make_player("opp1")
-        self.opp2 = _make_player("opp2")
+        self.author = make_player(email_suffix="author")
+        self.partner_a = make_player(email_suffix="partner_a")
+        self.opp1 = make_player(email_suffix="opp1")
+        self.opp2 = make_player(email_suffix="opp2")
 
     def test_create_request_and_join_solo_then_accept(self) -> None:
         req = create_doubles_request(
@@ -163,10 +144,10 @@ class DoublesMatchRatingTestCase(TestCase):
     """Завершение парного спарринга: начисление очков и статистики; дружеский — без начисления."""
 
     def setUp(self) -> None:
-        self.p1 = _make_player("p1", 1000.0)
-        self.p2 = _make_player("p2", 1000.0)
-        self.p3 = _make_player("p3", 1000.0)
-        self.p4 = _make_player("p4", 1000.0)
+        self.p1 = make_player(email_suffix="p1", points=1000.0)
+        self.p2 = make_player(email_suffix="p2", points=1000.0)
+        self.p3 = make_player(email_suffix="p3", points=1000.0)
+        self.p4 = make_player(email_suffix="p4", points=1000.0)
 
     def test_completed_doubles_sparring_updates_stats_and_rating(self) -> None:
         req = create_doubles_request(

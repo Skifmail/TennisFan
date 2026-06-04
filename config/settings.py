@@ -24,7 +24,9 @@ if os.environ.get("DEBUG", "False").strip().lower() == "true":
 # ------------------------------------------------------------------------------
 
 DEBUG = os.environ.get("DEBUG", "False") == "True"
-TESTING = "test" in sys.argv
+# manage.py test передаёт «test» в argv; pytest — нет, иначе включается manifest staticfiles.
+_TEST_RUNNER = Path(sys.argv[0]).name
+TESTING = "test" in sys.argv or _TEST_RUNNER in ("pytest", "py.test")
 PROFILING = os.environ.get("PROFILING", "False") == "True"
 
 SECRET_KEY = os.environ.get("SECRET_KEY")

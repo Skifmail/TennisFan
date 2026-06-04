@@ -1,6 +1,4 @@
-"""
-Тесты публичного раздела тренировок и тренеров.
-"""
+"""E2E: публичный раздел тренировок и тренеров."""
 
 from django.test import TestCase
 from django.urls import reverse

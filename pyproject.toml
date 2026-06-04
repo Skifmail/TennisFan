@@ -33,6 +33,6 @@ disable_error_code = ["import-untyped"]
 module = [
     "apps.payments.yookassa_client",
     "apps.telegram_bot.management.commands.set_telegram_webhooks",
-    "apps.clubs.tests",
+    "tests.*",
 ]
 disable_error_code = ["import-untyped"]

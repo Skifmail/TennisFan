@@ -1,3 +1,5 @@
+"""Интеграционные тесты: сервис исходящей почты."""
+
 from datetime import date
 
 from django.core import mail

@@ -1,4 +1,4 @@
-"""Тесты приложения payments."""
+"""Юнит-тесты: подписи сущностей в журнале платежей."""
 
 from datetime import date
 
@@ -13,14 +13,6 @@ class PaymentItemLabelTestCase(TestCase):
     """Проверка формирования названий сущностей в журнале платежей."""
 
     def test_tournament_item_label_for_platform_tournament(self) -> None:
-        """Проверить подпись для платформенного турнира.
-
-        Args:
-            None: Используются данные, созданные в тестовой базе.
-
-        Returns:
-            None: Проверяет значение, возвращаемое `_get_item_label`.
-        """
         tournament = Tournament.objects.create(
             name="Весенний кубок",
             slug="vesenniy-kubok",
@@ -33,14 +25,6 @@ class PaymentItemLabelTestCase(TestCase):
         self.assertEqual(label, "Весенний кубок")
 
     def test_tournament_item_label_for_club_tournament(self) -> None:
-        """Проверить подпись для клубного турнира.
-
-        Args:
-            None: Используются данные, созданные в тестовой базе.
-
-        Returns:
-            None: Проверяет формат строки с названием клуба и турнира.
-        """
         club = Club.objects.create(
             name="Тестовый клуб",
             slug="test-club",

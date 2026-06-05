@@ -1,7 +1,7 @@
 {% extends "admin/base_site.html" %}
-{% load i18n static log %}
+{% load i18n static log admin_log_tags %}
 
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}"><link rel="stylesheet" href="{% static "admin/css/custom_dashboard.css" %}">{% endblock %}
 
 {% block coltype %}colMS{% endblock %}
 
@@ -34,33 +34,50 @@
     <ul class="actionlist">
       {% for entry in admin_log %}
       <li class="{% if entry.is_deletion %}deletelink{% elif entry.is_addition %}addlink{% elif entry.is_change %}changelink{% endif %}">
-        <span class="mini quiet">{{ entry.action_time|date:"d.m.Y H:i" }}</span>
-        —
-        {% if entry.is_addition %}
-          <span class="mini">{% translate "Добавлено" %}</span>
-        {% elif entry.is_change %}
-          <span class="mini">{% translate "Изменено" %}</span>
-        {% elif entry.is_deletion %}
-          <span class="mini">{% translate "Удалено" %}</span>
+        <div class="admin-action-entry__main">
+          <span class="mini quiet">{{ entry.action_time|date:"d.m.Y H:i" }}</span>
+          —
+          {% if entry.is_addition %}
+            <span class="mini">{% translate "Добавлено" %}</span>
+          {% elif entry.is_change %}
+            <span class="mini">{% translate "Изменено" %}</span>
+          {% elif entry.is_deletion %}
+            <span class="mini">{% translate "Удалено" %}</span>
+          {% endif %}
+          <br>
+          {% if entry.is_deletion or not entry.get_admin_url %}
+            {{ entry.object_repr }}
+          {% else %}
+            <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+          {% endif %}
+          <br>
+          {% if entry.content_type %}
+            <span class="mini quiet">{% filter capfirst %}{{ entry.content_type.name }}{% endfilter %}</span>
+          {% else %}
+            <span class="mini quiet">{% translate 'Unknown content' %}</span>
+          {% endif %}
+        </div>
+        {% with details=entry|admin_log_detail_lines %}
+        {% if details %}
+        <ul class="admin-action-entry__details">
+          {% for line in details %}
+          <li>{{ line }}</li>
+          {% endfor %}
+        </ul>
         {% endif %}
-        <br>
-        {% if entry.is_deletion or not entry.get_admin_url %}
-          {{ entry.object_repr }}
-        {% else %}
-          <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
-        {% endif %}
-        <br>
-        {% if entry.content_type %}
-          <span class="mini quiet">{% filter capfirst %}{{ entry.content_type.name }}{% endfilter %}</span>
-        {% else %}
-          <span class="mini quiet">{% translate 'Unknown content' %}</span>
-        {% endif %}
+        {% endwith %}
       </li>
       {% endfor %}
     </ul>
     <p class="mini quiet" style="margin: 0.75rem 0 0; padding: 0 0.5rem;">
-      Показаны последние 25 действий в админке под вашей учётной записью. Сюда не попадают
-      изменения вне этой панели (например, через API или бота).
+      Показаны последние 25 ваших действий. {% admin_log_count_for_user user as user_log_count %}{% admin_log_total_count as all_log_count %}
+      У вас в журнале {{ user_log_count }} {{ user_log_count|pluralize:"запись,записи,записей" }},
+      всего в базе {{ all_log_count }} {{ all_log_count|pluralize:"запись,записи,записей" }}
+      (хранятся без автоудаления). Сюда не попадают изменения вне админки (API, бот).
+      Для старых записей может отображаться только список полей без «было → стало».
+    </p>
+    <p style="margin: 0.75rem 0 0; padding: 0 0.5rem;">
+      <a href="{% url 'admin:core_adminactionlog_changelist' %}" class="button">Действия за всё время</a>
     </p>
     {% endif %}
   </div>

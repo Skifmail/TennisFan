@@ -5,6 +5,7 @@ Core models.
 import secrets
 
 from django.conf import settings
+from django.contrib.admin.models import LogEntry
 from django.db import models
 from django.utils import timezone
 
@@ -843,3 +844,21 @@ class PlatformDashboardSeen(models.Model):
             str: Email пользователя и время последнего просмотра.
         """
         return f"{self.user_id} @ {self.seen_at:%d.%m.%Y %H:%M}"
+
+
+class AdminActionLog(LogEntry):
+    """Прокси-модель для просмотра полного журнала действий Django admin."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Действие в админке"
+        verbose_name_plural = "Журнал действий"
+        ordering = ("-action_time", "-pk")
+
+    def __str__(self) -> str:
+        """Вернуть краткое представление записи журнала.
+
+        Returns:
+            str: Объект и время действия.
+        """
+        return f"{self.object_repr} ({self.action_time:%d.%m.%Y %H:%M})"

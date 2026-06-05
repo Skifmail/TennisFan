@@ -1337,7 +1337,7 @@ def robots_txt(request: Any) -> HttpResponse:
     return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
 
 
-def _build_recent_matches(limit: int = 10, days: int = 5):
+def _build_recent_matches(limit: int = 10, days: int = 90):
     """Последние завершённые матчи за N дней для виджета на главной."""
     since = timezone.now() - timedelta(days=days)
     matches = (
@@ -1571,7 +1571,7 @@ def _build_live_results_fallback_cards() -> list[dict[str, str]]:
             {
                 "title": "Матчи скоро появятся",
                 "description": (
-                    "Сейчас нет завершённых матчей за последние 5 дней. "
+                    "Сейчас нет завершённых матчей за последние 90 дней. "
                     "Проверьте турниры и запланируйте игру."
                 ),
                 "cta_label": "Перейти к турнирам",
@@ -1671,7 +1671,7 @@ def home(request):
         )
     ).order_by("-season_pts", "-total_points")[:10]
 
-    recent_matches = _build_recent_matches(limit=10, days=5)
+    recent_matches = _build_recent_matches(limit=10, days=90)
     upcoming_matches = _build_upcoming_matches(limit=10, days=30)
     live_results_fallback_cards = _build_live_results_fallback_cards()
 
@@ -1743,8 +1743,8 @@ def home(request):
 
 @require_safe
 def api_recent_matches(request):
-    """API: последние матчи за 5 дней для live-тикера."""
-    matches = _build_recent_matches(limit=10, days=5)
+    """API: последние матчи за 90 дней для live-тикера."""
+    matches = _build_recent_matches(limit=10, days=90)
     return JsonResponse({"matches": matches})
 
 

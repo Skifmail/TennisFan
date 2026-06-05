@@ -1,0 +1,40 @@
+#recent-actions-module .actionlist {
+  margin: 0;
+  padding: 0;
+}
+
+#recent-actions-module .actionlist li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  align-items: flex-start;
+  padding: 0.65rem 0.5rem;
+  border-bottom: 1px solid var(--hairline-color, #2a2a2a);
+}
+
+#recent-actions-module .actionlist li:last-child {
+  border-bottom: 0;
+}
+
+#recent-actions-module .admin-action-entry__main {
+  flex: 1 1 11rem;
+  min-width: 9rem;
+}
+
+#recent-actions-module .admin-action-entry__details {
+  flex: 1 1 13rem;
+  margin: 0;
+  padding: 0.15rem 0 0;
+  list-style: none;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--body-quiet-color, #aaa);
+}
+
+#recent-actions-module .admin-action-entry__details li + li {
+  margin-top: 0.2rem;
+}
+
+#recent-actions-module .admin-action-entry__details li {
+  word-break: break-word;
+}

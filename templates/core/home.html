@@ -555,7 +555,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     function renderFallbackCards(animateFirst) {
         if (fallbackCards.length === 0) {
-            listEl.innerHTML = '<div class="live-results__empty">Нет сыгранных матчей за последние 5 дней</div>';
+            listEl.innerHTML = '<div class="live-results__empty">Нет сыгранных матчей за последние 90 дней</div>';
             return;
         }
         listEl.innerHTML = fallbackCards.map(function(card, i) {

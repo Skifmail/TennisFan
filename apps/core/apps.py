@@ -18,5 +18,9 @@ class CoreConfig(AppConfig):
         """
         from . import signals  # noqa: F401
         from .activity_signals import register as register_activity_signals
+        from .admin_logging import patch_admin_detailed_logging
 
         register_activity_signals()
+        patch_admin_detailed_logging()
+
+        from . import admin_action_log  # noqa: F401

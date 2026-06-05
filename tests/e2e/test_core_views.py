@@ -80,6 +80,58 @@ class HomeRecentMatchesWidgetTestCase(TestCase):
         self.assertEqual(payload["matches"][0]["club_name"], club.name)
 
 
+class HomeUpcomingMatchesWidgetTestCase(TestCase):
+    """Виджет предстоящих матчей на главной."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.player1 = Player.objects.create(
+            user=User.objects.create_user(
+                email="home-upcoming-p1@test.local",
+                password="testpass123",
+                first_name="Кристина",
+                last_name="Козубова",
+            )
+        )
+        self.player2 = Player.objects.create(
+            user=User.objects.create_user(
+                email="home-upcoming-p2@test.local",
+                password="testpass123",
+                first_name="Вера",
+                last_name="Фильмакова",
+            )
+        )
+
+    def test_upcoming_matches_api_uses_deadline_when_scheduled_datetime_missing(
+        self,
+    ) -> None:
+        """Турнирные матчи без scheduled_datetime должны попадать в виджет по deadline."""
+        tournament = Tournament.objects.create(
+            name="Круговой Воскресенск",
+            slug="home-upcoming-rr",
+            city="Воскресенск",
+            start_date=timezone.now().date(),
+            format="round_robin",
+            status=TournamentStatus.ACTIVE,
+        )
+        match = Match.objects.create(
+            tournament=tournament,
+            player1=self.player1,
+            player2=self.player2,
+            status=Match.MatchStatus.SCHEDULED,
+            scheduled_datetime=None,
+            deadline=timezone.now() + timedelta(days=1),
+        )
+
+        response = self.client.get(reverse("api_upcoming_matches"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["matches"]), 1)
+        self.assertEqual(payload["matches"][0]["id"], match.pk)
+        self.assertIn("Козубова", payload["matches"][0]["player1"])
+
+
 class HomeTopPlayersVisibilityTestCase(TestCase):
     def setUp(self) -> None:
         self.client = Client()

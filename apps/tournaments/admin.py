@@ -2,7 +2,7 @@
 Tournaments admin configuration.
 """
 
-from typing import cast
+from typing import Any, cast
 
 from django import forms
 from django.contrib import admin, messages
@@ -871,6 +871,33 @@ class MatchAdminForm(forms.ModelForm):
             self.fields[name].help_text = (
                 "Количество выигранных геймов в сете. Игрок 1 и 2 — первая и вторая сторона в матче (см. выше)."
             )
+
+    def clean(self) -> dict[str, Any]:
+        """Проверить согласованность статуса, победителя и счёта.
+
+        Returns:
+            Очищенные данные формы.
+
+        Raises:
+            ValidationError: Если завершённый матч без победителя.
+        """
+        cleaned = cast(dict[str, Any], super().clean())
+        status = cleaned.get("status")
+        if status not in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
+            return cleaned
+
+        is_doubles = bool(cleaned.get("team1") and cleaned.get("team2"))
+        if is_doubles:
+            if not cleaned.get("winner_team"):
+                raise forms.ValidationError(
+                    "Для завершённого парного матча укажите победившую команду.",
+                )
+        elif not cleaned.get("winner"):
+            raise forms.ValidationError(
+                "Для завершённого матча укажите победителя. "
+                "Сначала выберите победителя и счёт, затем статус «Завершён».",
+            )
+        return cleaned
 
 
 @admin.register(Match)

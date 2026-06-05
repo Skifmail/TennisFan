@@ -24,6 +24,8 @@ venv/bin/python manage.py test tests.integration.test_payments_finalize tests.un
 
 venv/bin/python manage.py test tests.unit.test_rating_utils tests.unit.test_player_ratings_validation tests.integration.test_player_ratings tests.unit.test_users_forms tests.integration.test_users_notifications
 
+venv/bin/python manage.py test tests.integration.test_core_consent tests.integration.test_core_support_service tests.integration.test_telegram_smoke
+
 # Через pytest (нужен DJANGO_SETTINGS_MODULE из pytest.ini)
 venv/bin/pytest tests/
 ```
@@ -43,3 +45,11 @@ venv/bin/black tests/
 venv/bin/ruff check tests/ --fix
 venv/bin/mypy tests/
 ```
+
+##Проверить процент coverage
+```bash
+venv/bin/pytest tests/ \
+  --cov=apps \
+  --cov-report=term-missing \
+  --cov-report=html
+  ```

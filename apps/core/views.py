@@ -1410,15 +1410,22 @@ def _build_recent_matches(limit: int = 10, days: int = 5):
     return result
 
 
-def _build_upcoming_matches(limit: int = 10, days: int = 5):
-    """Предстоящие матчи на ближайшие N дней для виджета на главной."""
+def _build_upcoming_matches(limit: int = 10, days: int = 30):
+    """Предстоящие матчи на ближайшие N дней для виджета на главной.
+
+    Дата матча берётся из scheduled_datetime, а если его нет — из deadline
+    (так создаются большинство турнирных матчей).
+    """
     now = timezone.now()
     until = now + timedelta(days=days)
     matches = (
         Match.objects.filter(
             status__in=[Match.MatchStatus.SCHEDULED, Match.MatchStatus.IN_PROGRESS],
-            scheduled_datetime__gte=now,
-            scheduled_datetime__lte=until,
+        )
+        .annotate(event_datetime=Coalesce("scheduled_datetime", "deadline"))
+        .filter(
+            event_datetime__gte=now,
+            event_datetime__lte=until,
         )
         .select_related(
             "tournament__club",
@@ -1427,7 +1434,7 @@ def _build_upcoming_matches(limit: int = 10, days: int = 5):
             "team1__player1__user",
             "team2__player1__user",
         )
-        .order_by("scheduled_datetime", "pk")[:limit]
+        .order_by("event_datetime", "pk")[:limit]
     )
     result: list[dict[str, Any]] = []
     for m in matches:
@@ -1439,6 +1446,7 @@ def _build_upcoming_matches(limit: int = 10, days: int = 5):
             continue
         avatar1 = p1.avatar.url if (hasattr(p1, "avatar") and p1.avatar) else None
         avatar2 = p2.avatar.url if (hasattr(p2, "avatar") and p2.avatar) else None
+        event_dt = m.event_datetime
         result.append(
             {
                 "id": m.pk,
@@ -1457,8 +1465,8 @@ def _build_upcoming_matches(limit: int = 10, days: int = 5):
                 "p2_rating": float(p2.total_points),
                 "p2_rating_delta": 0.0,
                 "date": (
-                    m.scheduled_datetime.strftime("%d.%m.%Y %H:%M")
-                    if m.scheduled_datetime
+                    timezone.localtime(event_dt).strftime("%d.%m.%Y %H:%M")
+                    if event_dt
                     else ""
                 ),
                 "club_name": (
@@ -1664,7 +1672,7 @@ def home(request):
     ).order_by("-season_pts", "-total_points")[:10]
 
     recent_matches = _build_recent_matches(limit=10, days=5)
-    upcoming_matches = _build_upcoming_matches(limit=10, days=5)
+    upcoming_matches = _build_upcoming_matches(limit=10, days=30)
     live_results_fallback_cards = _build_live_results_fallback_cards()
 
     # Метрики для Hero-блока
@@ -1742,8 +1750,8 @@ def api_recent_matches(request):
 
 @require_safe
 def api_upcoming_matches(request):
-    """API: предстоящие матчи на ближайшие 5 дней для live-тикера."""
-    matches = _build_upcoming_matches(limit=10, days=5)
+    """API: предстоящие матчи на ближайшие 30 дней для live-тикера."""
+    matches = _build_upcoming_matches(limit=10, days=30)
     return JsonResponse({"matches": matches})
 
 

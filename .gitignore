@@ -48,3 +48,4 @@ media/
 .cursor/
 .planning/
 AGENTS.md
+htmlcov/

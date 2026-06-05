@@ -148,11 +148,26 @@ def update_player_stats(sender, instance, created, **kwargs):
         was_completed,
     )
 
-    if not is_completed or was_completed:
+    already_processed = instance.rating_status == Match.RatingCalcStatus.CALCULATED
+
+    if not is_completed:
+        logger.debug("Match %s: skipping - not completed", instance.pk)
+        return
+
+    # Повторная обработка: админ мог сначала сохранить статус «Завершён» без победителя,
+    # а на следующем сохранении winner уже есть, но was_completed=True блокировал расчёт.
+    if was_completed and already_processed:
         logger.debug(
-            "Match %s: skipping - not completed or already was completed", instance.pk
+            "Match %s: skipping - already completed and rating calculated",
+            instance.pk,
         )
         return
+
+    if was_completed and not already_processed:
+        logger.info(
+            "Match %s: re-processing completed match with pending rating",
+            instance.pk,
+        )
 
     # Перезагружаем матч с связанными объектами для правильной работы
     match = Match.objects.select_related(

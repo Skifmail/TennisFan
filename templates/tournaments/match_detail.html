@@ -131,21 +131,7 @@
                                     {% if proposal.player1_set3 is not None %} · 3-й сет {{ proposal.player1_set3 }}:{{ proposal.player2_set3 }}{% endif %}
                                 </div>
                             </div>
-                            {% if proposal.proposer != player %}
-                            <div class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">
-                                У вас есть 3 часа на подтверждение. Если не ответите, результат будет подтверждён автоматически.
-                            </div>
-                            <form method="post" action="{% url 'confirm_proposal' proposal.pk %}" class="match-proposal-card__form">
-                                {% csrf_token %}
-                                <input type="hidden" name="next" value="{{ next_url }}">
-                                <div class="match-proposal-card__form-row">
-                                    <button type="submit" name="action" value="accept" class="btn btn-primary match-proposal-card__btn">Подтвердить</button>
-                                    <button type="submit" name="action" value="reject" class="btn btn-ghost match-proposal-card__btn">Отклонить</button>
-                                </div>
-                            </form>
-                            {% else %}
-                            <span class="text-secondary match-proposal-card__waiting">Ожидание подтверждения соперником (3 часа)</span>
-                            {% endif %}
+                            <span class="text-secondary match-proposal-card__waiting">Результат применён</span>
                         </div>
                     </div>
                     {% endfor %}
@@ -191,7 +177,7 @@
                                 </div>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-primary">Отправить на подтверждение</button>
+                        <button type="submit" class="btn btn-primary">Сохранить результат</button>
                     </form>
                     {% else %}
                     <p class="text-secondary mb-0">Сейчас действие игрока недоступно.</p>

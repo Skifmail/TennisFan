@@ -1,7 +1,9 @@
 import logging
+from typing import Any
 
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 from .fan import (
     _is_fan,
@@ -32,6 +34,134 @@ from .tvd import (
 )
 
 logger = logging.getLogger(__name__)
+
+_MATCH_RESULT_FIELDS: tuple[str, ...] = (
+    "winner_id",
+    "winner_team_id",
+    "player1_set1",
+    "player2_set1",
+    "player1_set2",
+    "player2_set2",
+    "player1_set3",
+    "player2_set3",
+    "status",
+)
+
+
+def _match_result_snapshot(match: Match) -> dict[str, Any]:
+    """Снимок полей результата матча для отката при редактировании.
+
+    Args:
+        match: Матч до сохранения изменений.
+
+    Returns:
+        Словарь с полями результата и дельтами рейтинга.
+    """
+    return {
+        field_name: getattr(match, field_name) for field_name in _MATCH_RESULT_FIELDS
+    } | {
+        "rating_delta_player1": match.rating_delta_player1,
+        "rating_delta_player2": match.rating_delta_player2,
+        "rating_status": match.rating_status,
+    }
+
+
+def _match_result_changed(old: Match, new: Match) -> bool:
+    """Проверить, изменился ли результат завершённого матча.
+
+    Args:
+        old: Состояние матча до сохранения.
+        new: Сохраняемое состояние матча.
+
+    Returns:
+        True, если изменились счёт, победитель или статус.
+    """
+    return any(
+        getattr(old, field_name) != getattr(new, field_name)
+        for field_name in _MATCH_RESULT_FIELDS
+    )
+
+
+def _revert_player_rating(player: Any, delta: float) -> None:
+    """Откатить FAN-рейтинг игрока на величину прежней дельты матча.
+
+    Args:
+        player: Игрок.
+        delta: Ранее применённая дельта рейтинга за этот матч.
+
+    Returns:
+        None
+    """
+    from apps.users.rating_utils import rating_to_ntrp_level, rating_to_skill_level
+
+    if not player or getattr(player, "is_bye", False) or not delta:
+        return
+    new_rating = max(0.0, float(player.total_points) - float(delta))
+    player.hidden_rating = new_rating
+    player.total_points = new_rating
+    player.skill_level = rating_to_skill_level(new_rating)
+    player.ntrp_level = rating_to_ntrp_level(new_rating)
+    player.save(
+        update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
+    )
+
+
+def _revert_match_result_effects(snapshot: dict[str, Any], match: Match) -> None:
+    """Откатить рейтинг и matches_won перед пересчётом отредактированного матча.
+
+    Args:
+        snapshot: Снимок результата до редактирования.
+        match: Актуальное состояние матча после сохранения.
+
+    Returns:
+        None
+    """
+    from apps.users.models import Player
+
+    _revert_player_rating(match.player1, snapshot.get("rating_delta_player1") or 0.0)
+    _revert_player_rating(match.player2, snapshot.get("rating_delta_player2") or 0.0)
+
+    old_winner_id = snapshot.get("winner_id")
+    new_winner_id = match.winner_id
+    if old_winner_id == new_winner_id:
+        return
+
+    is_doubles = bool(match.team1_id and match.team2_id)
+    if is_doubles:
+        old_team_id = snapshot.get("winner_team_id")
+        new_team_id = match.winner_team_id
+        if old_team_id == new_team_id:
+            return
+        old_team = match.team1 if old_team_id == match.team1_id else match.team2
+        new_team = match.winner_team
+        if old_team:
+            for player in (old_team.player1, old_team.player2):
+                if (
+                    player
+                    and not getattr(player, "is_bye", False)
+                    and player.matches_won > 0
+                ):
+                    player.matches_won -= 1
+                    player.save(update_fields=["matches_won"])
+        if new_team:
+            for player in (new_team.player1, new_team.player2):
+                if player and not getattr(player, "is_bye", False):
+                    player.matches_won += 1
+                    player.save(update_fields=["matches_won"])
+        return
+
+    if old_winner_id:
+        old_winner = Player.objects.filter(pk=old_winner_id).first()
+        if (
+            old_winner
+            and not getattr(old_winner, "is_bye", False)
+            and old_winner.matches_won > 0
+        ):
+            old_winner.matches_won -= 1
+            old_winner.save(update_fields=["matches_won"])
+    if new_winner_id and match.winner and not getattr(match.winner, "is_bye", False):
+        match.winner.matches_won += 1
+        match.winner.save(update_fields=["matches_won"])
 
 
 @receiver(post_save, sender=Match)
@@ -100,10 +230,22 @@ def prepare_match_completion(sender, instance, **kwargs):
     1. Store old status to detect transitions.
     2. Mark completed matches as pending_calc for FAN rating.
     """
+    instance._result_changed = False
+    instance._old_match_snapshot = None
+
     if instance.pk:
         try:
             old_instance = Match.objects.get(pk=instance.pk)
             instance._old_status = old_instance.status
+            was_completed = old_instance.status in [
+                Match.MatchStatus.COMPLETED,
+                Match.MatchStatus.WALKOVER,
+            ]
+            if was_completed and _match_result_changed(old_instance, instance):
+                instance._result_changed = True
+                instance._old_match_snapshot = _match_result_snapshot(old_instance)
+                if old_instance.rating_status == Match.RatingCalcStatus.CALCULATED:
+                    instance.rating_status = Match.RatingCalcStatus.PENDING
         except Match.DoesNotExist:
             instance._old_status = None
     else:
@@ -116,11 +258,11 @@ def prepare_match_completion(sender, instance, **kwargs):
             Match.MatchStatus.COMPLETED,
             Match.MatchStatus.WALKOVER,
         ]
-        if (
-            not was_completed
-            and instance.rating_status == Match.RatingCalcStatus.NOT_APPLICABLE
-        ):
-            instance.rating_status = Match.RatingCalcStatus.PENDING
+        if not was_completed:
+            if instance.rating_status == Match.RatingCalcStatus.NOT_APPLICABLE:
+                instance.rating_status = Match.RatingCalcStatus.PENDING
+            if not instance.completed_datetime:
+                instance.completed_datetime = timezone.now()
 
 
 @receiver(post_save, sender=Match)
@@ -149,25 +291,11 @@ def update_player_stats(sender, instance, created, **kwargs):
     )
 
     already_processed = instance.rating_status == Match.RatingCalcStatus.CALCULATED
+    result_changed = bool(getattr(instance, "_result_changed", False))
 
     if not is_completed:
         logger.debug("Match %s: skipping - not completed", instance.pk)
         return
-
-    # Повторная обработка: админ мог сначала сохранить статус «Завершён» без победителя,
-    # а на следующем сохранении winner уже есть, но was_completed=True блокировал расчёт.
-    if was_completed and already_processed:
-        logger.debug(
-            "Match %s: skipping - already completed and rating calculated",
-            instance.pk,
-        )
-        return
-
-    if was_completed and not already_processed:
-        logger.info(
-            "Match %s: re-processing completed match with pending rating",
-            instance.pk,
-        )
 
     # Перезагружаем матч с связанными объектами для правильной работы
     match = Match.objects.select_related(
@@ -216,6 +344,33 @@ def update_player_stats(sender, instance, created, **kwargs):
             match.pk,
         )
         return
+
+    # Редактирование уже учтённого результата: откат + пересчёт без повторного +1 к matches_played
+    if result_changed:
+        snapshot = getattr(instance, "_old_match_snapshot", None)
+        if (
+            snapshot
+            and snapshot.get("rating_status") == Match.RatingCalcStatus.CALCULATED
+        ):
+            logger.info("Match %s: recalculating after result edit", match.pk)
+            _revert_match_result_effects(snapshot, match)
+            _apply_fan_shadow(match)
+        return
+
+    # Повторная обработка: админ мог сначала сохранить статус «Завершён» без победителя,
+    # а на следующем сохранении winner уже есть, но was_completed=True блокировал расчёт.
+    if was_completed and already_processed:
+        logger.debug(
+            "Match %s: skipping - already completed and rating calculated",
+            instance.pk,
+        )
+        return
+
+    if was_completed and not already_processed:
+        logger.info(
+            "Match %s: re-processing completed match with pending rating",
+            instance.pk,
+        )
 
     _walkover_loss = instance.is_walkover_loss()
 

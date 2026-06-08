@@ -3034,8 +3034,7 @@ def propose_result(request, pk):
     if match.result_proposals.filter(status=Match.ProposalStatus.PENDING).exists():
         messages.info(
             request,
-            "По этому матчу уже отправлен результат и он ожидает подтверждения соперником. "
-            "Если соперник отклонит результат и не отправит свой — вы сможете отправить результат снова.",
+            "По этому матчу уже внесён результат.",
         )
         return redirect(_get_safe_next_url(request, fallback_url))
 
@@ -3067,8 +3066,10 @@ def propose_result(request, pk):
         player2_set3=_to_int(request.POST.get("p2s3")),
     )
 
+    # Сразу применяем результат без ожидания подтверждения вторым игроком
+    apply_proposal(proposal)
+
     for opponent_user in get_match_opponent_users(match, player):
-        # Определяем текст сообщения в зависимости от типа матча
         if match.tournament:
             match_context = f"в турнире {match.tournament.name}"
         elif match.is_sparring():
@@ -3078,8 +3079,8 @@ def propose_result(request, pk):
 
         Notification.objects.create(
             user=opponent_user,
-            message=f"{player} предложил результат {match_context}. У вас 3 часа на подтверждение.",
-            url=reverse("my_matches"),
+            message=f"{player} внёс результат {match_context}. Матч завершён.",
+            url=reverse("match_detail", args=[match.pk]),
         )
 
     try:
@@ -3089,7 +3090,7 @@ def propose_result(request, pk):
     except Exception:
         pass
 
-    messages.success(request, "Результат отправлен на подтверждение сопернику.")
+    messages.success(request, "Результат сохранён. Матч завершён.")
     return redirect(_get_safe_next_url(request, fallback_url))
 
 

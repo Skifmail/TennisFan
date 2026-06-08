@@ -842,62 +842,303 @@ class TVDTournamentAdmin(admin.ModelAdmin):
             TournamentAllowedCategory.objects.create(tournament=obj, category=category)
 
 
+WINNER_SIDE_PLAYER1 = "player1"
+WINNER_SIDE_PLAYER2 = "player2"
+WINNER_SIDE_TEAM1 = "team1"
+WINNER_SIDE_TEAM2 = "team2"
+
+
+def _count_sets_won(cleaned: dict[str, Any]) -> tuple[int, int]:
+    """Подсчитать выигранные сеты у стороны 1 и 2.
+
+    Args:
+        cleaned: Очищенные данные формы матча.
+
+    Returns:
+        Кортеж (сеты_п1, сеты_п2).
+    """
+    sets_p1 = 0
+    sets_p2 = 0
+    for set_index in range(1, 4):
+        games_p1 = cleaned.get(f"player1_set{set_index}")
+        games_p2 = cleaned.get(f"player2_set{set_index}")
+        if games_p1 is None and games_p2 is None:
+            continue
+        if games_p1 is None or games_p2 is None:
+            raise forms.ValidationError(
+                f"В {set_index}-м сете укажите геймы обеих сторон или оставьте сет пустым.",
+            )
+        if games_p1 > games_p2:
+            sets_p1 += 1
+        elif games_p2 > games_p1:
+            sets_p2 += 1
+    return sets_p1, sets_p2
+
+
+def _score_entered(cleaned: dict[str, Any]) -> bool:
+    """Проверить, введён ли хотя бы один сет.
+
+    Args:
+        cleaned: Очищенные данные формы матча.
+
+    Returns:
+        True, если есть хотя бы одно значение счёта.
+    """
+    return any(
+        cleaned.get(f"player{side}_set{set_index}") is not None
+        for side in (1, 2)
+        for set_index in range(1, 4)
+    )
+
+
 class MatchAdminForm(forms.ModelForm):
-    """Форма матча с понятными подписями для счёта по сетам."""
+    """Упрощённая форма ввода результата матча в админке."""
+
+    winner_side = forms.ChoiceField(
+        label="Победитель",
+        required=False,
+        widget=forms.RadioSelect(attrs={"class": "match-admin-winner-options"}),
+        help_text="Выберите победителя из участников этого матча.",
+    )
 
     class Meta:
         model = Match
-        fields = "__all__"
+        fields = [
+            "tournament",
+            "round_name",
+            "deadline",
+            "player1",
+            "player2",
+            "team1",
+            "team2",
+            "player1_set1",
+            "player2_set1",
+            "player1_set2",
+            "player2_set2",
+            "player1_set3",
+            "player2_set3",
+            "status",
+            "completed_datetime",
+            "court",
+            "round_index",
+            "round_order",
+            "is_consolation",
+            "tvd_group",
+            "tvd_stage",
+            "next_match",
+            "loser_next_match",
+            "placement_min",
+            "placement_max",
+            "scheduled_datetime",
+            "points_player1",
+            "points_player2",
+            "match_type",
+            "rating_status",
+            "rating_delta_player1",
+            "rating_delta_player2",
+        ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.fields["player1_set1"].label = "Игрок 1 — 1‑й сет (геймы)"
-        self.fields["player2_set1"].label = "Игрок 2 — 1‑й сет (геймы)"
-        self.fields["player1_set2"].label = "Игрок 1 — 2‑й сет (геймы)"
-        self.fields["player2_set2"].label = "Игрок 2 — 2‑й сет (геймы)"
-        self.fields["player1_set3"].label = "Игрок 1 — 3‑й сет (геймы)"
-        self.fields["player2_set3"].label = "Игрок 2 — 3‑й сет (геймы)"
-        for _i, name in enumerate(
-            [
-                "player1_set1",
-                "player2_set1",
-                "player1_set2",
-                "player2_set2",
-                "player1_set3",
-                "player2_set3",
-            ],
-            1,
-        ):
-            self.fields[name].help_text = (
-                "Количество выигранных геймов в сете. Игрок 1 и 2 — первая и вторая сторона в матче (см. выше)."
+        self.is_doubles_match = bool(
+            self.instance.pk and self.instance.team1_id and self.instance.team2_id
+        )
+        self._configure_winner_side_field()
+        self._configure_score_labels()
+        self._hide_technical_fields()
+
+    def _configure_winner_side_field(self) -> None:
+        """Настроить выбор победителя только из участников матча."""
+        choices: list[tuple[str, str]] = [("", "— не выбран —")]
+        if self.is_doubles_match:
+            if self.instance.team1_id:
+                choices.append(
+                    (WINNER_SIDE_TEAM1, str(self.instance.team1)),
+                )
+            if self.instance.team2_id:
+                choices.append(
+                    (WINNER_SIDE_TEAM2, str(self.instance.team2)),
+                )
+            if self.instance.winner_team_id == self.instance.team1_id:
+                self.fields["winner_side"].initial = WINNER_SIDE_TEAM1
+            elif self.instance.winner_team_id == self.instance.team2_id:
+                self.fields["winner_side"].initial = WINNER_SIDE_TEAM2
+        else:
+            if self.instance.player1_id:
+                choices.append(
+                    (WINNER_SIDE_PLAYER1, str(self.instance.player1)),
+                )
+            if self.instance.player2_id:
+                choices.append(
+                    (WINNER_SIDE_PLAYER2, str(self.instance.player2)),
+                )
+            if self.instance.winner_id == self.instance.player1_id:
+                self.fields["winner_side"].initial = WINNER_SIDE_PLAYER1
+            elif self.instance.winner_id == self.instance.player2_id:
+                self.fields["winner_side"].initial = WINNER_SIDE_PLAYER2
+
+        self.fields["winner_side"].choices = choices
+        if len(choices) <= 1:
+            self.fields["winner_side"].help_text = (
+                "У матча не назначены оба участника — победителя выбрать нельзя."
             )
 
+    def _configure_score_labels(self) -> None:
+        """Понятные подписи для счёта по сетам."""
+        side1 = (
+            str(self.instance.team1)
+            if self.is_doubles_match and self.instance.team1_id
+            else str(self.instance.player1) if self.instance.player1_id else "Сторона 1"
+        )
+        side2 = (
+            str(self.instance.team2)
+            if self.is_doubles_match and self.instance.team2_id
+            else str(self.instance.player2) if self.instance.player2_id else "Сторона 2"
+        )
+        for set_index in range(1, 4):
+            self.fields[f"player1_set{set_index}"].label = (
+                f"{side1} — {set_index}-й сет"
+            )
+            self.fields[f"player2_set{set_index}"].label = (
+                f"{side2} — {set_index}-й сет"
+            )
+            self.fields[f"player1_set{set_index}"].help_text = ""
+            self.fields[f"player2_set{set_index}"].help_text = ""
+
+    def _hide_technical_fields(self) -> None:
+        """Скрыть служебные поля, не нужные при вводе результата."""
+        for field_name in (
+            "rating_delta_player1",
+            "rating_delta_player2",
+        ):
+            if field_name in self.fields:
+                self.fields[field_name].widget = forms.HiddenInput()
+
     def clean(self) -> dict[str, Any]:
-        """Проверить согласованность статуса, победителя и счёта.
+        """Проверить счёт, победителя и автоматически завершить матч.
 
         Returns:
             Очищенные данные формы.
 
         Raises:
-            ValidationError: Если завершённый матч без победителя.
+            ValidationError: При несогласованном или неполном результате.
         """
         cleaned = cast(dict[str, Any], super().clean())
-        status = cleaned.get("status")
-        if status not in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
+        winner_side = cleaned.get("winner_side") or ""
+        has_score = _score_entered(cleaned)
+        was_completed = self.instance.status in (
+            Match.MatchStatus.COMPLETED,
+            Match.MatchStatus.WALKOVER,
+        )
+
+        if winner_side and not has_score:
+            raise forms.ValidationError(
+                "Укажите счёт по сетам для выбранного победителя.",
+            )
+
+        if not has_score:
+            if winner_side:
+                raise forms.ValidationError("Укажите счёт по сетам.")
+            if was_completed and self.instance.winner_id:
+                raise forms.ValidationError(
+                    "Нельзя очистить счёт у уже завершённого матча. "
+                    "Введите новый результат целиком.",
+                )
             return cleaned
 
-        is_doubles = bool(cleaned.get("team1") and cleaned.get("team2"))
-        if is_doubles:
-            if not cleaned.get("winner_team"):
-                raise forms.ValidationError(
-                    "Для завершённого парного матча укажите победившую команду.",
-                )
-        elif not cleaned.get("winner"):
+        if cleaned.get("player1_set1") is None or cleaned.get("player2_set1") is None:
             raise forms.ValidationError(
-                "Для завершённого матча укажите победителя. "
-                "Сначала выберите победителя и счёт, затем статус «Завершён».",
+                "Для завершения матча укажите счёт первого сета (геймы обеих сторон).",
             )
+
+        sets_p1, sets_p2 = _count_sets_won(cleaned)
+        if sets_p1 == sets_p2:
+            raise forms.ValidationError(
+                "По введённому счёту нельзя определить победителя. "
+                "Проверьте геймы в сетах.",
+            )
+
+        if not winner_side:
+            if self.is_doubles_match:
+                winner_side = (
+                    WINNER_SIDE_TEAM1 if sets_p1 > sets_p2 else WINNER_SIDE_TEAM2
+                )
+            else:
+                winner_side = (
+                    WINNER_SIDE_PLAYER1 if sets_p1 > sets_p2 else WINNER_SIDE_PLAYER2
+                )
+            cleaned["winner_side"] = winner_side
+
+        if not winner_side:
+            raise forms.ValidationError("Выберите победителя.")
+
+        if self.is_doubles_match:
+            winner_team = (
+                cleaned.get("team1")
+                if winner_side == WINNER_SIDE_TEAM1
+                else cleaned.get("team2")
+            )
+            if winner_team is None:
+                raise forms.ValidationError("Выберите победившую команду.")
+            winner_won_more = (
+                winner_side == WINNER_SIDE_TEAM1 and sets_p1 > sets_p2
+            ) or (winner_side == WINNER_SIDE_TEAM2 and sets_p2 > sets_p1)
+        else:
+            winner = (
+                cleaned.get("player1")
+                if winner_side == WINNER_SIDE_PLAYER1
+                else cleaned.get("player2")
+            )
+            if winner is None:
+                raise forms.ValidationError("Выберите победителя из участников матча.")
+            winner_won_more = (
+                winner_side == WINNER_SIDE_PLAYER1 and sets_p1 > sets_p2
+            ) or (winner_side == WINNER_SIDE_PLAYER2 and sets_p2 > sets_p1)
+
+        if not winner_won_more:
+            raise forms.ValidationError(
+                "Счёт не соответствует выбранному победителю. "
+                "Проверьте геймы в сетах и выбор победителя.",
+            )
+
+        cleaned["_finalize_match"] = True
         return cleaned
+
+    def save(self, commit: bool = True) -> Match:
+        """Сохранить матч и записать победителя из winner_side.
+
+        Args:
+            commit: Сохранять ли объект в БД.
+
+        Returns:
+            Экземпляр Match.
+        """
+        instance = cast(Match, super().save(commit=False))
+        winner_side = self.cleaned_data.get("winner_side")
+        if winner_side == WINNER_SIDE_PLAYER1:
+            instance.winner = instance.player1
+            instance.winner_team = None
+        elif winner_side == WINNER_SIDE_PLAYER2:
+            instance.winner = instance.player2
+            instance.winner_team = None
+        elif winner_side == WINNER_SIDE_TEAM1:
+            instance.winner_team = instance.team1
+            instance.winner = instance.team1.player1 if instance.team1 else None
+        elif winner_side == WINNER_SIDE_TEAM2:
+            instance.winner_team = instance.team2
+            instance.winner = instance.team2.player1 if instance.team2 else None
+
+        if self.cleaned_data.get("_finalize_match"):
+            instance.status = Match.MatchStatus.COMPLETED
+            if not instance.completed_datetime:
+                instance.completed_datetime = timezone.now()
+            if instance.rating_status == Match.RatingCalcStatus.NOT_APPLICABLE:
+                instance.rating_status = Match.RatingCalcStatus.PENDING
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 @admin.register(Match)
@@ -905,6 +1146,7 @@ class MatchAdmin(admin.ModelAdmin):
     """Admin for Match model."""
 
     form = MatchAdminForm
+    change_form_template = "admin/tournaments/match/change_form.html"
     list_display = (
         "tournament",
         "round_name",
@@ -932,8 +1174,6 @@ class MatchAdmin(admin.ModelAdmin):
         "player2",
         "team1",
         "team2",
-        "winner",
-        "winner_team",
         "court",
         "next_match",
         "loser_next_match",
@@ -941,9 +1181,54 @@ class MatchAdmin(admin.ModelAdmin):
     )
     date_hierarchy = "scheduled_datetime"
 
-    fieldsets = (
+    _RESULT_FIELDSET = (
+        "Результат",
+        {
+            "fields": (
+                "winner_side",
+                ("player1_set1", "player2_set1"),
+                ("player1_set2", "player2_set2"),
+                ("player1_set3", "player2_set3"),
+            ),
+            "description": (
+                "Введите счёт и выберите победителя из участников матча. "
+                "При сохранении матч автоматически получит статус «Завершён», "
+                "обновится рейтинг и статистика игроков."
+            ),
+        },
+    )
+
+    _ADVANCED_FIELDSET = (
+        "Служебные поля",
+        {
+            "classes": ("collapse",),
+            "fields": (
+                "court",
+                "round_index",
+                "round_order",
+                "is_consolation",
+                "tvd_group",
+                "tvd_stage",
+                "next_match",
+                "loser_next_match",
+                "placement_min",
+                "placement_max",
+                "scheduled_datetime",
+                "match_type",
+                "status",
+                "completed_datetime",
+                "points_player1",
+                "points_player2",
+                "rating_status",
+                "rating_delta_player1",
+                "rating_delta_player2",
+            ),
+        },
+    )
+
+    _ADD_FIELDSETS = (
         (
-            "Турнир",
+            "Матч",
             {
                 "fields": (
                     "tournament",
@@ -952,52 +1237,89 @@ class MatchAdmin(admin.ModelAdmin):
                     "round_index",
                     "round_order",
                     "is_consolation",
-                    "tvd_group",
-                    "tvd_stage",
-                    "next_match",
-                    "loser_next_match",
-                    "placement_min",
-                    "placement_max",
-                )
-            },
-        ),
-        (
-            "Игроки / Команды",
-            {
-                "fields": (
                     "player1",
                     "player2",
                     "team1",
                     "team2",
-                    "winner",
-                    "winner_team",
-                )
-            },
-        ),
-        (
-            "Счёт по сетам",
-            {
-                "fields": (
-                    ("player1_set1", "player2_set1"),
-                    ("player1_set2", "player2_set2"),
-                    ("player1_set3", "player2_set3"),
-                ),
-                "description": "Игрок 1 и Игрок 2 — первая и вторая сторона в матче (см. блок выше). Укажите геймы в каждом сете (например 6 и 4 для счёта 6:4). Третий сет — только если играли тай-брейк или полный третий сет.",
-            },
-        ),
-        ("Очки рейтинга", {"fields": ("points_player1", "points_player2")}),
-        (
-            "Время",
-            {
-                "fields": (
-                    "scheduled_datetime",
                     "deadline",
-                    "completed_datetime",
+                    "scheduled_datetime",
                     "status",
-                )
+                ),
             },
         ),
+        _RESULT_FIELDSET,
+        _ADVANCED_FIELDSET,
     )
+
+    def get_fieldsets(
+        self,
+        request: Any,
+        obj: Match | None = None,
+    ) -> tuple[Any, ...]:
+        """Вернуть набор полей для создания или редактирования матча.
+
+        Args:
+            request: HTTP-запрос админки.
+            obj: Редактируемый матч или None при создании.
+
+        Returns:
+            Кортеж fieldsets Django admin.
+        """
+        if obj is None:
+            return self._ADD_FIELDSETS
+
+        match_fields: list[str] = [
+            "tournament",
+            "round_name",
+            "deadline",
+        ]
+        if obj.team1_id and obj.team2_id:
+            match_fields.extend(["team1", "team2"])
+        else:
+            match_fields.extend(["player1", "player2"])
+
+        return (
+            (
+                "Матч",
+                {"fields": tuple(match_fields)},
+            ),
+            self._RESULT_FIELDSET,
+            self._ADVANCED_FIELDSET,
+        )
+
+    def get_readonly_fields(
+        self,
+        request: Any,
+        obj: Match | None = None,
+    ) -> tuple[str, ...]:
+        """Заблокировать участников и контекст турнира при редактировании.
+
+        Args:
+            request: HTTP-запрос админки.
+            obj: Редактируемый матч или None при создании.
+
+        Returns:
+            Имена полей только для чтения.
+        """
+        if obj is None:
+            return ()
+        readonly: list[str] = [
+            "tournament",
+            "round_name",
+            "deadline",
+            "status",
+            "completed_datetime",
+            "points_player1",
+            "points_player2",
+            "rating_status",
+            "rating_delta_player1",
+            "rating_delta_player2",
+        ]
+        if obj.team1_id and obj.team2_id:
+            readonly.extend(["team1", "team2"])
+        else:
+            readonly.extend(["player1", "player2"])
+        return tuple(readonly)
 
 
 @admin.register(HeadToHead)

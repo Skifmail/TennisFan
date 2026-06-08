@@ -707,12 +707,13 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
             player1_set3=None,
             player2_set3=None,
         )
+        apply_proposal(proposal)
         tour_name = match.tournament.name if match.tournament else "спарринг"
         for opp_user in get_match_opponent_users(match, player):
             Notification.objects.create(
                 user=opp_user,
-                message=f"{player} предложил результат матча в турнире {tour_name}. У вас 3 часа на подтверждение.",
-                url=reverse("my_matches"),
+                message=f"{player} внёс результат матча в турнире {tour_name}. Матч завершён.",
+                url=reverse("match_detail", args=[match.pk]),
             )
         try:
             tg_notify.notify_result_proposal(proposal)
@@ -725,11 +726,10 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
         )
         bot.send_message(
             chat_id,
-            f"✅ Результат отправлен на подтверждение сопернику.\n\n"
-            f"Вы указали: <b>{result_text}</b>\n"
-            f"Ожидайте подтверждения в боте.",
+            f"✅ Результат сохранён. Матч завершён.\n\n"
+            f"Вы указали: <b>{result_text}</b>",
         )
-        _answer_callback(cq_id, "Результат отправлен")
+        _answer_callback(cq_id, "Результат сохранён")
         return True
 
     _answer_callback(cq_id, "Неизвестный тип результата.", show_alert=True)
@@ -2274,12 +2274,13 @@ def user_bot_webhook(request):
                     player1_set3=p1_s3,
                     player2_set3=p2_s3,
                 )
+                apply_proposal(proposal)
                 tour_name = match.tournament.name if match.tournament else "спарринг"
                 for opp_user in get_match_opponent_users(match, player):
                     Notification.objects.create(
                         user=opp_user,
-                        message=f"{player} предложил результат матча в турнире {tour_name}. У вас 3 часа на подтверждение.",
-                        url=reverse("my_matches"),
+                        message=f"{player} внёс результат матча в турнире {tour_name}. Матч завершён.",
+                        url=reverse("match_detail", args=[match.pk]),
                     )
                 try:
                     tg_notify.notify_result_proposal(proposal)
@@ -2288,7 +2289,7 @@ def user_bot_webhook(request):
                 cache.delete(cache_key)
                 bot.send_message(
                     chat_id,
-                    "✅ Результат отправлен на подтверждение сопернику. Ожидайте подтверждения в боте.",
+                    "✅ Результат сохранён. Матч завершён.",
                 )
                 return JsonResponse({"ok": True})
         cache.delete(cache_key)

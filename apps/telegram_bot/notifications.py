@@ -462,31 +462,16 @@ def notify_result_proposal(proposal) -> None:
             score = "—"
         warning_text = ""
 
+    tournament_name = match.tournament.name if match.tournament else "спарринг"
     text = (
-        f"📩 <b>{proposer} предложил результат матча</b>\n\n"
-        f"Турнир: {match.tournament.name}\n"
+        f"📩 <b>{proposer} внёс результат матча</b>\n\n"
+        f"Турнир: {tournament_name}\n"
         f"Результат: {result_text}\n"
         f"Счёт: {score}{warning_text}\n\n"
-        f"⏰ У вас есть <b>3 часа</b> на подтверждение или отклонение.\n"
-        f"Если не ответите в течение 3 часов, результат будет подтверждён автоматически.\n\n"
-        "Подтвердите или отклоните:"
+        "✅ Матч завершён."
     )
-    reply_markup = {
-        "inline_keyboard": [
-            [
-                {
-                    "text": "✅ Подтвердить",
-                    "callback_data": f"proposal_confirm_{proposal.pk}",
-                },
-                {
-                    "text": "❌ Отклонить",
-                    "callback_data": f"proposal_reject_{proposal.pk}",
-                },
-            ],
-        ],
-    }
     for user in get_match_opponent_users(match, proposer):
-        send_to_user_by_user(user, text, reply_markup=reply_markup)
+        send_to_user_by_user(user, text)
 
 
 def _proposal_score_text(proposal) -> str:

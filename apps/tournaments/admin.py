@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
-from apps.users.models import SkillLevel
+from apps.users.models import Player, SkillLevel
 from apps.users.skill_levels import skill_with_ntrp
 
 from .fan import generate_bracket
@@ -940,12 +940,74 @@ class MatchAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self._preserved_participant_ids = self._load_preserved_participant_ids()
         self.is_doubles_match = bool(
             self.instance.pk and self.instance.team1_id and self.instance.team2_id
         )
         self._configure_winner_side_field()
         self._configure_score_labels()
         self._hide_technical_fields()
+
+    def _load_preserved_participant_ids(self) -> dict[str, int | None]:
+        """Запомнить участников матча до clean() — readonly поля не приходят в POST.
+
+        Returns:
+            Словарь с ID player1, player2, team1, team2.
+        """
+        if not self.instance.pk:
+            return {}
+        return {
+            "player1_id": self.instance.player1_id,
+            "player2_id": self.instance.player2_id,
+            "team1_id": self.instance.team1_id,
+            "team2_id": self.instance.team2_id,
+        }
+
+    def _resolve_player(self, cleaned: dict[str, Any], side: int) -> Player | None:
+        """Вернуть игрока стороны матча из POST или из сохранённого снимка.
+
+        Args:
+            cleaned: Очищенные данные формы.
+            side: Номер стороны (1 или 2).
+
+        Returns:
+            Игрок или None.
+        """
+        field_name = f"player{side}"
+        player = cleaned.get(field_name)
+        if player is not None:
+            return cast(Player, player)
+        player_id = self._preserved_participant_ids.get(f"{field_name}_id")
+        if not player_id:
+            return None
+        return cast(
+            Player | None,
+            Player.objects.filter(pk=player_id).first(),
+        )
+
+    def _resolve_team(
+        self, cleaned: dict[str, Any], side: int
+    ) -> TournamentTeam | None:
+        """Вернуть команду стороны матча из POST или из сохранённого снимка.
+
+        Args:
+            cleaned: Очищенные данные формы.
+            side: Номер стороны (1 или 2).
+
+        Returns:
+            Команда или None.
+        """
+        field_name = f"team{side}"
+        team = cleaned.get(field_name)
+        if team is not None:
+            return cast(TournamentTeam, team)
+        team_id = self._preserved_participant_ids.get(f"{field_name}_id")
+        if not team_id:
+            return None
+        return cast(
+            TournamentTeam | None,
+            TournamentTeam.objects.filter(pk=team_id).first(),
+        )
 
     def _configure_winner_side_field(self) -> None:
         """Настроить выбор победителя только из участников матча."""
@@ -1073,22 +1135,18 @@ class MatchAdminForm(forms.ModelForm):
             raise forms.ValidationError("Выберите победителя.")
 
         if self.is_doubles_match:
-            winner_team = (
-                cleaned.get("team1")
-                if winner_side == WINNER_SIDE_TEAM1
-                else cleaned.get("team2")
-            )
+            team1 = self._resolve_team(cleaned, 1)
+            team2 = self._resolve_team(cleaned, 2)
+            winner_team = team1 if winner_side == WINNER_SIDE_TEAM1 else team2
             if winner_team is None:
                 raise forms.ValidationError("Выберите победившую команду.")
             winner_won_more = (
                 winner_side == WINNER_SIDE_TEAM1 and sets_p1 > sets_p2
             ) or (winner_side == WINNER_SIDE_TEAM2 and sets_p2 > sets_p1)
         else:
-            winner = (
-                cleaned.get("player1")
-                if winner_side == WINNER_SIDE_PLAYER1
-                else cleaned.get("player2")
-            )
+            player1 = self._resolve_player(cleaned, 1)
+            player2 = self._resolve_player(cleaned, 2)
+            winner = player1 if winner_side == WINNER_SIDE_PLAYER1 else player2
             if winner is None:
                 raise forms.ValidationError("Выберите победителя из участников матча.")
             winner_won_more = (
@@ -1114,19 +1172,34 @@ class MatchAdminForm(forms.ModelForm):
             Экземпляр Match.
         """
         instance = cast(Match, super().save(commit=False))
+
+        for field_name, field_id in self._preserved_participant_ids.items():
+            if field_id and not getattr(instance, field_name):
+                setattr(instance, field_name, field_id)
+
         winner_side = self.cleaned_data.get("winner_side")
         if winner_side == WINNER_SIDE_PLAYER1:
-            instance.winner = instance.player1
+            instance.winner_id = instance.player1_id
             instance.winner_team = None
         elif winner_side == WINNER_SIDE_PLAYER2:
-            instance.winner = instance.player2
+            instance.winner_id = instance.player2_id
             instance.winner_team = None
         elif winner_side == WINNER_SIDE_TEAM1:
-            instance.winner_team = instance.team1
-            instance.winner = instance.team1.player1 if instance.team1 else None
+            instance.winner_team_id = instance.team1_id
+            if instance.team1_id:
+                instance.winner_id = (
+                    TournamentTeam.objects.filter(pk=instance.team1_id)
+                    .values_list("player1_id", flat=True)
+                    .first()
+                )
         elif winner_side == WINNER_SIDE_TEAM2:
-            instance.winner_team = instance.team2
-            instance.winner = instance.team2.player1 if instance.team2 else None
+            instance.winner_team_id = instance.team2_id
+            if instance.team2_id:
+                instance.winner_id = (
+                    TournamentTeam.objects.filter(pk=instance.team2_id)
+                    .values_list("player1_id", flat=True)
+                    .first()
+                )
 
         if self.cleaned_data.get("_finalize_match"):
             instance.status = Match.MatchStatus.COMPLETED

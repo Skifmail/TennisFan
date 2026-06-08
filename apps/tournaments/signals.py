@@ -355,7 +355,12 @@ def update_player_stats(sender, instance, created, **kwargs):
             logger.info("Match %s: recalculating after result edit", match.pk)
             _revert_match_result_effects(snapshot, match)
             _apply_fan_shadow(match)
-        return
+            return
+        # Результат изменился, но рейтинг ещё не считался (типично: статус «Завершён» без победителя)
+        logger.debug(
+            "Match %s: result changed before first rating calc, continuing normal flow",
+            match.pk,
+        )
 
     # Повторная обработка: админ мог сначала сохранить статус «Завершён» без победителя,
     # а на следующем сохранении winner уже есть, но was_completed=True блокировал расчёт.

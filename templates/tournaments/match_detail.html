@@ -32,9 +32,9 @@
                 {% endif %}
             </div>
 
-            <div class="d-flex" style="align-items: center; justify-content: center; gap: var(--spacing-2xl); margin-bottom: var(--spacing-xl);">
+            <div class="d-flex match-detail-page__versus">
                 <!-- Player/Team 1 -->
-                <a href="{% player_profile_url match.get_side1_player %}" class="text-center" style="flex: 1; text-decoration: none; color: inherit;">
+                <a href="{% player_profile_url match.get_side1_player %}" class="text-center match-detail-page__side">
                     {% if match.team1 %}{% include 'includes/avatar.html' with avatar=match.team1.player1.avatar class="player-avatar" size="80" %}
                     {% else %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" size="80" %}{% endif %}
                     <div class="{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player1_display }}</div>
@@ -55,37 +55,42 @@
                     {% endif %}
                 </a>
 
-                <!-- Score -->
-                <div class="text-center">
-                    <div style="font-size: var(--font-size-3xl); font-weight: 800; display: flex; gap: var(--spacing-md);">
-                        {% if match.status == 'completed' %}
-                        <div>
-                            {% if match.player1_set1 is not None %}
-                            <div class="{% if match.player1_set1 > match.player2_set1 %}text-primary{% endif %}">{{ match.player1_set1 }}</div>
-                            <div class="{% if match.player2_set1 > match.player1_set1 %}text-primary{% endif %}">{{ match.player2_set1 }}</div>
-                            {% endif %}
+                <!-- Счёт и статус -->
+                <div class="text-center match-detail-page__center">
+                    {% if match.status == 'completed' or match.status == 'walkover' %}
+                    {% if match.player1_set1 is not None or match.player1_set2 is not None or match.player1_set3 is not None %}
+                    <div class="match-detail-page__scoreboard">
+                        {% if match.player1_set1 is not None %}
+                        <div class="match-detail-page__set">
+                            <span class="match-detail-page__set-games{% if match.player1_set1 > match.player2_set1 %} match-detail-page__set-games--won{% endif %}">{{ match.player1_set1 }}</span>
+                            <span class="match-detail-page__set-sep">:</span>
+                            <span class="match-detail-page__set-games{% if match.player2_set1 > match.player1_set1 %} match-detail-page__set-games--won{% endif %}">{{ match.player2_set1 }}</span>
                         </div>
+                        {% endif %}
                         {% if match.player1_set2 is not None %}
-                        <div>
-                            <div class="{% if match.player1_set2 > match.player2_set2 %}text-primary{% endif %}">{{ match.player1_set2 }}</div>
-                            <div class="{% if match.player2_set2 > match.player1_set2 %}text-primary{% endif %}">{{ match.player2_set2 }}</div>
+                        <div class="match-detail-page__set">
+                            <span class="match-detail-page__set-games{% if match.player1_set2 > match.player2_set2 %} match-detail-page__set-games--won{% endif %}">{{ match.player1_set2 }}</span>
+                            <span class="match-detail-page__set-sep">:</span>
+                            <span class="match-detail-page__set-games{% if match.player2_set2 > match.player1_set2 %} match-detail-page__set-games--won{% endif %}">{{ match.player2_set2 }}</span>
                         </div>
                         {% endif %}
                         {% if match.player1_set3 is not None %}
-                        <div>
-                            <div class="{% if match.player1_set3 > match.player2_set3 %}text-primary{% endif %}">{{ match.player1_set3 }}</div>
-                            <div class="{% if match.player2_set3 > match.player1_set3 %}text-primary{% endif %}">{{ match.player2_set3 }}</div>
+                        <div class="match-detail-page__set">
+                            <span class="match-detail-page__set-games{% if match.player1_set3 > match.player2_set3 %} match-detail-page__set-games--won{% endif %}">{{ match.player1_set3 }}</span>
+                            <span class="match-detail-page__set-sep">:</span>
+                            <span class="match-detail-page__set-games{% if match.player2_set3 > match.player1_set3 %} match-detail-page__set-games--won{% endif %}">{{ match.player2_set3 }}</span>
                         </div>
                         {% endif %}
-                        {% else %}
-                        <span class="text-muted">VS</span>
-                        {% endif %}
                     </div>
-                    <div class="mt-2 text-secondary" style="font-size: var(--font-size-sm);">{{ match.get_status_display }}</div>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-muted match-detail-page__vs">VS</span>
+                    {% endif %}
+                    <div class="mt-2 text-secondary match-detail-page__status">{{ match.get_status_display }}</div>
                 </div>
 
                 <!-- Player/Team 2 -->
-                <a href="{% player_profile_url match.get_side2_player %}" class="text-center" style="flex: 1; text-decoration: none; color: inherit;">
+                <a href="{% player_profile_url match.get_side2_player %}" class="text-center match-detail-page__side">
                     {% if match.team2 %}{% include 'includes/avatar.html' with avatar=match.team2.player1.avatar class="player-avatar" size="80" %}
                     {% else %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" size="80" %}{% endif %}
                     <div class="{% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player2_display }}</div>

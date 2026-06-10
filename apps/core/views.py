@@ -1337,7 +1337,54 @@ def robots_txt(request: Any) -> HttpResponse:
     return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")
 
 
-def _build_recent_matches(limit: int = 10, days: int = 90):
+MATCH_WIDGET_PERIOD_DAYS: dict[str, int] = {
+    "today": 1,
+    "week": 7,
+    "month": 30,
+    "all": 365,
+}
+
+MATCH_WIDGET_PERIOD_LIMITS: dict[str, int] = {
+    "today": 20,
+    "week": 30,
+    "month": 40,
+    "all": 50,
+}
+
+
+def _parse_match_widget_period(request: HttpRequest) -> str:
+    """Разобрать период фильтра виджета матчей на главной.
+
+    Args:
+        request: HTTP-запрос.
+
+    Returns:
+        Ключ периода: today, week, month или all.
+    """
+    period = cast(str, request.GET.get("period", "month"))
+    if period not in MATCH_WIDGET_PERIOD_DAYS:
+        return "month"
+    return period
+
+
+def _match_widget_query_params(request: HttpRequest) -> tuple[str, int, int]:
+    """Вернуть период, число дней и лимит записей для виджета матчей.
+
+    Args:
+        request: HTTP-запрос.
+
+    Returns:
+        Кортеж (period, days, limit).
+    """
+    period = _parse_match_widget_period(request)
+    return (
+        period,
+        MATCH_WIDGET_PERIOD_DAYS[period],
+        MATCH_WIDGET_PERIOD_LIMITS[period],
+    )
+
+
+def _build_recent_matches(limit: int = 40, days: int = 30):
     """Последние завершённые матчи за N дней для виджета на главной."""
     since = timezone.now() - timedelta(days=days)
     matches = (
@@ -1410,7 +1457,7 @@ def _build_recent_matches(limit: int = 10, days: int = 90):
     return result
 
 
-def _build_upcoming_matches(limit: int = 10, days: int = 30):
+def _build_upcoming_matches(limit: int = 40, days: int = 30):
     """Предстоящие матчи на ближайшие N дней для виджета на главной.
 
     Дата матча берётся из scheduled_datetime, а если его нет — из deadline
@@ -1671,8 +1718,14 @@ def home(request):
         )
     ).order_by("-season_pts", "-total_points")[:10]
 
-    recent_matches = _build_recent_matches(limit=10, days=90)
-    upcoming_matches = _build_upcoming_matches(limit=10, days=30)
+    _, recent_days, recent_limit = _match_widget_query_params(request)
+    upcoming_days = recent_days
+    upcoming_limit = recent_limit
+    recent_matches = _build_recent_matches(limit=recent_limit, days=recent_days)
+    upcoming_matches = _build_upcoming_matches(
+        limit=upcoming_limit,
+        days=upcoming_days,
+    )
     live_results_fallback_cards = _build_live_results_fallback_cards()
 
     # Метрики для Hero-блока
@@ -1742,17 +1795,19 @@ def home(request):
 
 
 @require_safe
-def api_recent_matches(request):
-    """API: последние матчи за 90 дней для live-тикера."""
-    matches = _build_recent_matches(limit=10, days=90)
-    return JsonResponse({"matches": matches})
+def api_recent_matches(request: HttpRequest) -> JsonResponse:
+    """API: последние матчи для виджета на главной с фильтром по периоду."""
+    period, days, limit = _match_widget_query_params(request)
+    matches = _build_recent_matches(limit=limit, days=days)
+    return JsonResponse({"matches": matches, "period": period})
 
 
 @require_safe
-def api_upcoming_matches(request):
-    """API: предстоящие матчи на ближайшие 30 дней для live-тикера."""
-    matches = _build_upcoming_matches(limit=10, days=30)
-    return JsonResponse({"matches": matches})
+def api_upcoming_matches(request: HttpRequest) -> JsonResponse:
+    """API: предстоящие матчи для виджета на главной с фильтром по периоду."""
+    period, days, limit = _match_widget_query_params(request)
+    matches = _build_upcoming_matches(limit=limit, days=days)
+    return JsonResponse({"matches": matches, "period": period})
 
 
 def rating(request):

@@ -193,7 +193,15 @@
 
         <div class="live-results" id="live-results" data-avatar-placeholder="{% static 'images/avatar_placeholder.png' %}">
             <div class="live-results__header">
-                <span class="live-results__title">Результаты матчей</span>
+                <div class="live-results__header-main">
+                    <span class="live-results__title">Результаты матчей</span>
+                    <div class="live-results__filters" id="live-results-filters" role="group" aria-label="Период">
+                        <button type="button" class="live-results__filter" data-period="today">За сегодня</button>
+                        <button type="button" class="live-results__filter" data-period="week">За неделю</button>
+                        <button type="button" class="live-results__filter live-results__filter--active" data-period="month">За месяц</button>
+                        <button type="button" class="live-results__filter" data-period="all">Все</button>
+                    </div>
+                </div>
                 <div class="live-results__tabs" role="tablist">
                     <button type="button" class="live-results__tab live-results__tab--active" data-tab="played" id="live-results-tab-played">
                         Сыгранные матчи
@@ -511,6 +519,13 @@ document.addEventListener('DOMContentLoaded', function() {
     var fallbackCards = [];
     var matches = [];
     var currentTab = 'played';
+    var currentPeriod = 'month';
+    var periodLabels = {
+        today: 'за сегодня',
+        week: 'за неделю',
+        month: 'за месяц',
+        all: ''
+    };
     try {
         if (dataEl && dataEl.textContent) {
             matchesPlayed = JSON.parse(dataEl.textContent);
@@ -535,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var src = url || placeholder;
         return '<img src="' + src + '" alt="" class="live-results__avatar">';
     }
-    function renderRow(m, isEntering) {
+    function renderRow(m) {
         var n1d = m.p1_ntrp_delta != null ? (m.p1_ntrp_delta > 0 ? '+' : '') + m.p1_ntrp_delta : '';
         var n2d = m.p2_ntrp_delta != null ? (m.p2_ntrp_delta > 0 ? '+' : '') + m.p2_ntrp_delta : '';
         var r1d = m.p1_rating_delta != null ? (m.p1_rating_delta > 0 ? '+' : '') + Math.round(m.p1_rating_delta) : '';
@@ -550,160 +565,103 @@ document.addEventListener('DOMContentLoaded', function() {
             '<span class="live-results__center"><span class="live-results__date">' + (m.date || '') + '</span><span class="live-results__score">' + ((m.score_column || m.score || '—').replace(/ /g, '\n')) + '</span>' + (m.club_name ? '<span class="live-results__club">' + m.club_name + '</span>' : '') + '</span>' +
             '<span class="live-results__vals live-results__vals--col live-results__vals--right"><span class="live-results__val live-results__val--' + cls(m.p2_ntrp_delta) + '">' + a2n + ' ' + (m.p2_ntrp != null ? m.p2_ntrp.toFixed(1) : '—') + (n2d ? '(' + n2d + ')' : '') + '</span><span class="live-results__val live-results__val--' + cls(m.p2_rating_delta) + '">' + a2r + ' ' + (m.p2_rating != null ? m.p2_rating.toFixed(1) : '—') + (r2d ? '(' + r2d + ')' : '') + '</span></span>' +
             '<span class="live-results__player2"><span class="live-results__name">' + (m.player2 || '') + '</span>' + avatarHtml(m.p2_avatar) + '</span></a>';
-        var wrapClass = 'live-results__row-wrap' + (isEntering ? ' live-results__row-wrap--entering' : '');
-        return '<div class="' + wrapClass + '">' + rowHtml + '</div>';
+        return '<div class="live-results__row-wrap">' + rowHtml + '</div>';
     }
-    function renderFallbackCards(animateFirst) {
+    function emptyMessage() {
+        var label = periodLabels[currentPeriod] || '';
+        if (currentTab === 'played') {
+            return label ? 'Нет сыгранных матчей ' + label : 'Нет сыгранных матчей';
+        }
+        return label ? 'Нет предстоящих матчей ' + label : 'Нет предстоящих матчей';
+    }
+    function renderFallbackCards() {
         if (fallbackCards.length === 0) {
-            listEl.innerHTML = '<div class="live-results__empty">Нет сыгранных матчей за последние 90 дней</div>';
+            listEl.innerHTML = '<div class="live-results__empty">' + emptyMessage() + '</div>';
             return;
         }
-        listEl.innerHTML = fallbackCards.map(function(card, i) {
-            var wrapClass = 'live-results__row-wrap' + (animateFirst && i === 0 ? ' live-results__row-wrap--entering' : '');
+        listEl.innerHTML = fallbackCards.map(function(card) {
             var cta = card.cta_url
                 ? '<a href="' + card.cta_url + '" class="live-results__fallback-link">' + (card.cta_label || 'Подробнее') + '</a>'
                 : '';
-            return '<div class="' + wrapClass + '"><div class="live-results__fallback-card">' +
+            return '<div class="live-results__row-wrap"><div class="live-results__fallback-card">' +
                 '<div class="live-results__fallback-title">' + (card.title || '') + '</div>' +
                 '<div class="live-results__fallback-description">' + (card.description || '') + '</div>' +
                 cta +
                 '</div></div>';
         }).join('');
-        if (animateFirst) {
-            var firstWrap = listEl.querySelector('.live-results__row-wrap--entering');
-            if (firstWrap) {
-                firstWrap.addEventListener('animationend', function onEnd() {
-                    firstWrap.classList.remove('live-results__row-wrap--entering');
-                    firstWrap.style.maxHeight = '';
-                    firstWrap.removeEventListener('animationend', onEnd);
-                });
-            }
-        }
     }
-    function renderAll(animateFirst) {
+    function renderAll() {
         syncPlayedTabLabel();
         if (matches.length === 0) {
-            if (currentTab === 'played') {
-                renderFallbackCards(animateFirst);
+            if (
+                currentTab === 'played'
+                && currentPeriod === 'month'
+                && fallbackCards.length > 0
+            ) {
+                renderFallbackCards();
                 return;
             }
-            listEl.innerHTML = '<div class="live-results__empty">Нет предстоящих матчей</div>';
+            listEl.innerHTML = '<div class="live-results__empty">' + emptyMessage() + '</div>';
             return;
         }
-        listEl.innerHTML = matches.map(function(m, i) { return renderRow(m, animateFirst && i === 0); }).join('');
-        if (animateFirst) {
-            var firstWrap = listEl.querySelector('.live-results__row-wrap--entering');
-            if (firstWrap) {
-                firstWrap.addEventListener('animationend', function onEnd() {
-                    firstWrap.classList.remove('live-results__row-wrap--entering');
-                    firstWrap.style.maxHeight = '';
-                    firstWrap.removeEventListener('animationend', onEnd);
-                });
-            }
+        listEl.innerHTML = matches.map(function(m) { return renderRow(m); }).join('');
+    }
+    function apiUrl(name, period) {
+        var base = name === 'played'
+            ? '{% url "api_recent_matches" %}'
+            : '{% url "api_upcoming_matches" %}';
+        return base + '?period=' + encodeURIComponent(period);
+    }
+    var isInitialLoad = true;
+    function loadMatches() {
+        if (!isInitialLoad) {
+            listEl.innerHTML = '<div class="live-results__empty live-results__empty--hint">Загрузка...</div>';
         }
-    }
-    function rotateTicker() {
-        if (currentTab === 'played') {
-            if (matchesPlayed.length > 1) {
-                matchesPlayed.unshift(matchesPlayed.pop());
-                matches = matchesPlayed.slice();
-                renderAll(true);
-                return;
-            }
-            if (matchesPlayed.length === 0 && fallbackCards.length > 1) {
-                fallbackCards.unshift(fallbackCards.pop());
-                renderAll(true);
-            }
-            return;
-        }
-        if (matchesUpcoming.length > 1) {
-            matchesUpcoming.unshift(matchesUpcoming.pop());
-            matches = matchesUpcoming.slice();
-            renderAll(true);
-        }
-    }
-    var rotationTimer = null;
-    function startRotation() {
-        if (rotationTimer !== null) return;
-        rotationTimer = setInterval(rotateTicker, 3000);
-    }
-    function stopRotation() {
-        if (rotationTimer === null) return;
-        clearInterval(rotationTimer);
-        rotationTimer = null;
-    }
-    function syncRotation() {
-        var shouldRotate = false;
-        if (currentTab === 'played') {
-            shouldRotate = matchesPlayed.length > 1 || (matchesPlayed.length === 0 && fallbackCards.length > 1);
-        } else {
-            shouldRotate = matchesUpcoming.length > 1;
-        }
-        if (shouldRotate) {
-            startRotation();
-            return;
-        }
-        stopRotation();
-    }
-    if (matches.length > 0) {
-        renderAll();
-        syncRotation();
-    } else {
-        renderFallbackCards(false);
-        syncRotation();
-    }
-    fetch('{% url "api_recent_matches" %}').then(function(r) { return r.json(); }).then(function(data) {
-        var ms = data.matches || [];
-        if (ms.length > 0) {
-            matchesPlayed = ms;
-            if (currentTab === 'played') {
-                matches = matchesPlayed.slice();
-            }
+        Promise.all([
+            fetch(apiUrl('played', currentPeriod)).then(function(r) { return r.json(); }),
+            fetch(apiUrl('upcoming', currentPeriod)).then(function(r) { return r.json(); })
+        ]).then(function(results) {
+            matchesPlayed = (results[0] && results[0].matches) || [];
+            matchesUpcoming = (results[1] && results[1].matches) || [];
+            matches = currentTab === 'played' ? matchesPlayed.slice() : matchesUpcoming.slice();
             renderAll();
-            syncRotation();
-            return;
-        }
-        syncPlayedTabLabel();
-        syncRotation();
-    }).catch(function(){});
-
-    fetch('{% url "api_upcoming_matches" %}').then(function(r) { return r.json(); }).then(function(data) {
-        var ms = data.matches || [];
-        if (ms.length > 0) {
-            matchesUpcoming = ms;
-            if (currentTab === 'upcoming') {
-                matches = matchesUpcoming.slice();
-                renderAll(false);
-            }
-            syncRotation();
-        }
-    }).catch(function(){});
-
+            isInitialLoad = false;
+        }).catch(function() {
+            listEl.innerHTML = '<div class="live-results__empty">Не удалось загрузить матчи</div>';
+            isInitialLoad = false;
+        });
+    }
+    function setPeriod(period) {
+        if (!period || period === currentPeriod) return;
+        currentPeriod = period;
+        document.querySelectorAll('.live-results__filter').forEach(function(btn) {
+            btn.classList.toggle(
+                'live-results__filter--active',
+                btn.getAttribute('data-period') === period
+            );
+        });
+        loadMatches();
+    }
     function setTab(tab) {
         if (tab === currentTab) return;
         currentTab = tab;
-        var tabs = document.querySelectorAll('.live-results__tab');
-        tabs.forEach(function(btn) {
-            if (btn.getAttribute('data-tab') === tab) {
-                btn.classList.add('live-results__tab--active');
-            } else {
-                btn.classList.remove('live-results__tab--active');
-            }
+        document.querySelectorAll('.live-results__tab').forEach(function(btn) {
+            btn.classList.toggle('live-results__tab--active', btn.getAttribute('data-tab') === tab);
         });
-        if (tab === 'played') {
-            matches = matchesPlayed.slice();
-            renderAll(false);
-        } else {
-            matches = matchesUpcoming.slice();
-            renderAll(false);
-        }
-        syncRotation();
+        matches = tab === 'played' ? matchesPlayed.slice() : matchesUpcoming.slice();
+        renderAll();
     }
 
+    loadMatches();
+
+    document.querySelectorAll('.live-results__filter').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            setPeriod(this.getAttribute('data-period') || 'month');
+        });
+    });
     document.querySelectorAll('.live-results__tab').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            var tab = this.getAttribute('data-tab') || 'played';
-            setTab(tab);
+            setTab(this.getAttribute('data-tab') || 'played');
         });
     });
 });

@@ -214,9 +214,12 @@
             <div class="live-results__list" id="live-results-list">
                 {% for m in recent_matches %}
                 <div class="live-results__row-wrap">
-                <a href="{{ m.match_url }}" class="live-results__row" data-match-id="{{ m.id }}">
-                    <span class="live-results__player1">
-                        {% include 'includes/avatar.html' with url=m.p1_avatar class="live-results__avatar" %}
+                <a href="{{ m.match_url }}" class="live-results__row{% if m.winner_side %} live-results__row--has-winner{% endif %}" data-match-id="{{ m.id }}">
+                    <span class="live-results__player live-results__player--left{% if m.winner_side == 'player1' %} live-results__player--winner{% endif %}">
+                        <span class="live-results__avatar-wrap">
+                            {% include 'includes/avatar.html' with url=m.p1_avatar class="live-results__avatar" %}
+                            {% if m.winner_side == 'player1' %}<span class="live-results__win-badge">WIN</span>{% endif %}
+                        </span>
                         <span class="live-results__name">{{ m.player1 }}</span>
                     </span>
                     <span class="live-results__vals live-results__vals--col">
@@ -234,9 +237,12 @@
                         <span class="live-results__val live-results__val--{% if m.p2_ntrp_delta > 0 %}up{% elif m.p2_ntrp_delta < 0 %}down{% else %}none{% endif %}">{% if m.p2_ntrp_delta > 0 %}↑{% elif m.p2_ntrp_delta < 0 %}↓{% endif %} {{ m.p2_ntrp|floatformat:1 }}{% if m.p2_ntrp_delta %}({% if m.p2_ntrp_delta > 0 %}+{% endif %}{{ m.p2_ntrp_delta }}){% endif %}</span>
                         <span class="live-results__val live-results__val--{% if m.p2_rating_delta > 0 %}up{% elif m.p2_rating_delta < 0 %}down{% else %}none{% endif %}">{% if m.p2_rating_delta > 0 %}↑{% elif m.p2_rating_delta < 0 %}↓{% endif %} {{ m.p2_rating|floatformat:1 }}{% if m.p2_rating_delta %}({% if m.p2_rating_delta > 0 %}+{% endif %}{{ m.p2_rating_delta }}){% endif %}</span>
                     </span>
-                    <span class="live-results__player2">
+                    <span class="live-results__player live-results__player--right{% if m.winner_side == 'player2' %} live-results__player--winner{% endif %}">
                         <span class="live-results__name">{{ m.player2 }}</span>
-                        {% include 'includes/avatar.html' with url=m.p2_avatar class="live-results__avatar" %}
+                        <span class="live-results__avatar-wrap">
+                            {% include 'includes/avatar.html' with url=m.p2_avatar class="live-results__avatar" %}
+                            {% if m.winner_side == 'player2' %}<span class="live-results__win-badge">WIN</span>{% endif %}
+                        </span>
                     </span>
                 </a>
                 </div>
@@ -550,21 +556,38 @@ document.addEventListener('DOMContentLoaded', function() {
         var src = url || placeholder;
         return '<img src="' + src + '" alt="" class="live-results__avatar">';
     }
+    function valLine(ntrp, rating, ntrpDelta, ratingDelta) {
+        var nd = ntrpDelta != null ? (ntrpDelta > 0 ? '+' : '') + ntrpDelta : '';
+        var rd = ratingDelta != null ? (ratingDelta > 0 ? '+' : '') + Math.round(ratingDelta) : '';
+        var an = (ntrpDelta || 0) > 0 ? '↑' : ((ntrpDelta || 0) < 0 ? '↓' : '');
+        var ar = (ratingDelta || 0) > 0 ? '↑' : ((ratingDelta || 0) < 0 ? '↓' : '');
+        return '<span class="live-results__val live-results__val--' + cls(ntrpDelta) + '">' + an + ' ' + (ntrp != null ? ntrp.toFixed(1) : '—') + (nd ? '(' + nd + ')' : '') + '</span>' +
+            '<span class="live-results__val live-results__val--' + cls(ratingDelta) + '">' + ar + ' ' + (rating != null ? rating.toFixed(1) : '—') + (rd ? '(' + rd + ')' : '') + '</span>';
+    }
+    function avatarWrapHtml(url, isWinner) {
+        var badge = isWinner ? '<span class="live-results__win-badge">WIN</span>' : '';
+        return '<span class="live-results__avatar-wrap">' + avatarHtml(url) + badge + '</span>';
+    }
+    function renderPlayer(side, m, winnerSide) {
+        var isLeft = side === 'player1';
+        var name = isLeft ? (m.player1 || '') : (m.player2 || '');
+        var avatar = isLeft ? m.p1_avatar : m.p2_avatar;
+        var isWinner = winnerSide === side;
+        var playerClass = 'live-results__player live-results__player--' + (isLeft ? 'left' : 'right') + (isWinner ? ' live-results__player--winner' : '');
+        var nameHtml = '<span class="live-results__name">' + name + '</span>';
+        var avatarBlock = avatarWrapHtml(avatar, isWinner);
+        var inner = isLeft ? avatarBlock + nameHtml : nameHtml + avatarBlock;
+        return '<span class="' + playerClass + '">' + inner + '</span>';
+    }
     function renderRow(m) {
-        var n1d = m.p1_ntrp_delta != null ? (m.p1_ntrp_delta > 0 ? '+' : '') + m.p1_ntrp_delta : '';
-        var n2d = m.p2_ntrp_delta != null ? (m.p2_ntrp_delta > 0 ? '+' : '') + m.p2_ntrp_delta : '';
-        var r1d = m.p1_rating_delta != null ? (m.p1_rating_delta > 0 ? '+' : '') + Math.round(m.p1_rating_delta) : '';
-        var r2d = m.p2_rating_delta != null ? (m.p2_rating_delta > 0 ? '+' : '') + Math.round(m.p2_rating_delta) : '';
-        var a1n = (m.p1_ntrp_delta || 0) > 0 ? '↑' : ((m.p1_ntrp_delta || 0) < 0 ? '↓' : '');
-        var a1r = (m.p1_rating_delta || 0) > 0 ? '↑' : ((m.p1_rating_delta || 0) < 0 ? '↓' : '');
-        var a2n = (m.p2_ntrp_delta || 0) > 0 ? '↑' : ((m.p2_ntrp_delta || 0) < 0 ? '↓' : '');
-        var a2r = (m.p2_rating_delta || 0) > 0 ? '↑' : ((m.p2_rating_delta || 0) < 0 ? '↓' : '');
-        var rowHtml = '<a href="' + (m.match_url || '#') + '" class="live-results__row" data-match-id="' + m.id + '">' +
-            '<span class="live-results__player1">' + avatarHtml(m.p1_avatar) + '<span class="live-results__name">' + (m.player1 || '') + '</span></span>' +
-            '<span class="live-results__vals live-results__vals--col"><span class="live-results__val live-results__val--' + cls(m.p1_ntrp_delta) + '">' + a1n + ' ' + (m.p1_ntrp != null ? m.p1_ntrp.toFixed(1) : '—') + (n1d ? '(' + n1d + ')' : '') + '</span><span class="live-results__val live-results__val--' + cls(m.p1_rating_delta) + '">' + a1r + ' ' + (m.p1_rating != null ? m.p1_rating.toFixed(1) : '—') + (r1d ? '(' + r1d + ')' : '') + '</span></span>' +
+        var winnerSide = m.winner_side || null;
+        var rowClass = 'live-results__row' + (winnerSide ? ' live-results__row--has-winner' : '');
+        var rowHtml = '<a href="' + (m.match_url || '#') + '" class="' + rowClass + '" data-match-id="' + m.id + '">' +
+            renderPlayer('player1', m, winnerSide) +
+            '<span class="live-results__vals live-results__vals--col">' + valLine(m.p1_ntrp, m.p1_rating, m.p1_ntrp_delta, m.p1_rating_delta) + '</span>' +
             '<span class="live-results__center"><span class="live-results__date">' + (m.date || '') + '</span><span class="live-results__score">' + ((m.score_column || m.score || '—').replace(/ /g, '\n')) + '</span>' + (m.club_name ? '<span class="live-results__club">' + m.club_name + '</span>' : '') + '</span>' +
-            '<span class="live-results__vals live-results__vals--col live-results__vals--right"><span class="live-results__val live-results__val--' + cls(m.p2_ntrp_delta) + '">' + a2n + ' ' + (m.p2_ntrp != null ? m.p2_ntrp.toFixed(1) : '—') + (n2d ? '(' + n2d + ')' : '') + '</span><span class="live-results__val live-results__val--' + cls(m.p2_rating_delta) + '">' + a2r + ' ' + (m.p2_rating != null ? m.p2_rating.toFixed(1) : '—') + (r2d ? '(' + r2d + ')' : '') + '</span></span>' +
-            '<span class="live-results__player2"><span class="live-results__name">' + (m.player2 || '') + '</span>' + avatarHtml(m.p2_avatar) + '</span></a>';
+            '<span class="live-results__vals live-results__vals--col live-results__vals--right">' + valLine(m.p2_ntrp, m.p2_rating, m.p2_ntrp_delta, m.p2_rating_delta) + '</span>' +
+            renderPlayer('player2', m, winnerSide) + '</a>';
         return '<div class="live-results__row-wrap">' + rowHtml + '</div>';
     }
     function emptyMessage() {

@@ -77,6 +77,50 @@ class HomeMatchWidgetPeriodTestCase(TestCase):
         self.assertEqual(len(payload["matches"]), 1)
         self.assertEqual(payload["matches"][0]["id"], recent.pk)
 
+    def test_winner_side_follows_score_when_winner_field_wrong(self) -> None:
+        """Победитель в виджете определяется по счёту, даже если winner в БД неверный."""
+        Match.objects.create(
+            tournament=self.tournament,
+            player1=self.player1,
+            player2=self.player2,
+            status=Match.MatchStatus.COMPLETED,
+            completed_datetime=timezone.now() - timedelta(hours=1),
+            winner=self.player2,
+            player1_set1=6,
+            player2_set1=2,
+            player1_set2=6,
+            player2_set2=1,
+            rating_delta_player1=15.0,
+            rating_delta_player2=-15.0,
+        )
+
+        response = self.client.get(reverse("api_recent_matches"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["matches"][0]["winner_side"], "player1")
+
+    def test_recent_matches_api_includes_winner_side(self) -> None:
+        """API сыгранных матчей возвращает сторону победителя для виджета."""
+        Match.objects.create(
+            tournament=self.tournament,
+            player1=self.player1,
+            player2=self.player2,
+            status=Match.MatchStatus.COMPLETED,
+            completed_datetime=timezone.now() - timedelta(hours=1),
+            winner=self.player1,
+            player1_set1=6,
+            player2_set1=2,
+            player1_set2=6,
+            player2_set2=1,
+            rating_delta_player1=15.0,
+            rating_delta_player2=-15.0,
+        )
+
+        response = self.client.get(reverse("api_recent_matches"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["matches"][0]["winner_side"], "player1")
+
     def test_upcoming_matches_week_excludes_far_future(self) -> None:
         """Предстоящие: период week не включает матч дальше 7 дней."""
         near = Match.objects.create(

@@ -1384,6 +1384,63 @@ def _match_widget_query_params(request: HttpRequest) -> tuple[str, int, int]:
     )
 
 
+def _live_results_sets_won(match: Match) -> tuple[int, int]:
+    """Подсчитать выигранные сеты у стороны 1 и 2.
+
+    Args:
+        match: Матч.
+
+    Returns:
+        Кортеж (сеты_п1, сеты_п2).
+    """
+    sets_p1 = 0
+    sets_p2 = 0
+    for set_index in range(1, 4):
+        games_p1 = getattr(match, f"player1_set{set_index}")
+        games_p2 = getattr(match, f"player2_set{set_index}")
+        if games_p1 is None or games_p2 is None:
+            continue
+        if games_p1 > games_p2:
+            sets_p1 += 1
+        elif games_p2 > games_p1:
+            sets_p2 += 1
+    return sets_p1, sets_p2
+
+
+def _live_results_winner_side(match: Match) -> str | None:
+    """Определить победившую сторону матча для виджета на главной.
+
+    Args:
+        match: Завершённый матч.
+
+    Returns:
+        ``player1``, ``player2`` или None, если победитель не определён.
+    """
+    sets_p1, sets_p2 = _live_results_sets_won(match)
+    if sets_p1 > sets_p2:
+        return "player1"
+    if sets_p2 > sets_p1:
+        return "player2"
+
+    if match.team1_id and match.team2_id and match.winner_team_id:
+        if match.winner_team_id == match.team1_id:
+            return "player1"
+        if match.winner_team_id == match.team2_id:
+            return "player2"
+    if match.winner_id:
+        if match.winner_id == match.player1_id:
+            return "player1"
+        if match.winner_id == match.player2_id:
+            return "player2"
+    delta1 = float(match.rating_delta_player1 or 0.0)
+    delta2 = float(match.rating_delta_player2 or 0.0)
+    if delta1 > 0 and delta2 <= 0:
+        return "player1"
+    if delta2 > 0 and delta1 <= 0:
+        return "player2"
+    return None
+
+
 def _build_recent_matches(limit: int = 40, days: int = 30):
     """Последние завершённые матчи за N дней для виджета на главной."""
     since = timezone.now() - timedelta(days=days)
@@ -1397,6 +1454,7 @@ def _build_recent_matches(limit: int = 40, days: int = 30):
             "player1__user",
             "player2__user",
             "winner__user",
+            "winner_team",
             "team1__player1__user",
             "team2__player1__user",
         )
@@ -1452,6 +1510,7 @@ def _build_recent_matches(limit: int = 40, days: int = 30):
                     else ""
                 ),
                 "match_url": f"/tournaments/match/{m.pk}/",
+                "winner_side": _live_results_winner_side(m),
             }
         )
     return result

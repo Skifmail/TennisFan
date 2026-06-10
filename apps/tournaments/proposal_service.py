@@ -3,6 +3,10 @@
 Используется в views и при сохранении заявки в админке (сигнал).
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from django.urls import reverse
 from django.utils import timezone
 
@@ -10,6 +14,207 @@ from apps.subscriptions.sparring_billing import charge_fancoin_for_completed_mat
 from apps.users.models import Notification
 
 from .models import Match, MatchResultProposal
+
+if TYPE_CHECKING:
+    from apps.users.models import Player
+
+
+class ProposalValidationError(ValueError):
+    """Несогласованный или неполный счёт в заявке на результат матча."""
+
+
+def count_sets_won_from_score(
+    player1_set1: int | None,
+    player2_set1: int | None,
+    player1_set2: int | None,
+    player2_set2: int | None,
+    player1_set3: int | None,
+    player2_set3: int | None,
+) -> tuple[int, int]:
+    """Подсчитать выигранные сеты у стороны 1 и 2.
+
+    Args:
+        player1_set1: Геймы стороны 1 в 1-м сете.
+        player2_set1: Геймы стороны 2 в 1-м сете.
+        player1_set2: Геймы стороны 1 во 2-м сете.
+        player2_set2: Геймы стороны 2 во 2-м сете.
+        player1_set3: Геймы стороны 1 в 3-м сете.
+        player2_set3: Геймы стороны 2 в 3-м сете.
+
+    Returns:
+        Кортеж (сеты_п1, сеты_п2).
+
+    Raises:
+        ProposalValidationError: Если в сете указаны геймы только одной стороны.
+    """
+    sets_p1 = 0
+    sets_p2 = 0
+    for games_p1, games_p2 in (
+        (player1_set1, player2_set1),
+        (player1_set2, player2_set2),
+        (player1_set3, player2_set3),
+    ):
+        if games_p1 is None and games_p2 is None:
+            continue
+        if games_p1 is None or games_p2 is None:
+            raise ProposalValidationError(
+                "В каждом сете укажите геймы обеих сторон или оставьте сет пустым.",
+            )
+        if games_p1 > games_p2:
+            sets_p1 += 1
+        elif games_p2 > games_p1:
+            sets_p2 += 1
+    return sets_p1, sets_p2
+
+
+def _proposer_is_side1(match: Match, proposer: Player) -> bool:
+    """Проверить, играет ли инициатор заявки за сторону 1 матча.
+
+    Args:
+        match: Матч.
+        proposer: Игрок, внёсший результат.
+
+    Returns:
+        True, если инициатор относится к player1/team1.
+    """
+    if match.team1_id and match.team2_id:
+        return bool(proposer in (match.team1.player1, match.team1.player2))
+    if match.is_doubles_sparring():
+        return bool(proposer in (match.player1, match.partner1))
+    return bool(proposer == match.player1)
+
+
+def derive_proposer_result_from_score(
+    match: Match,
+    proposer: Player,
+    *,
+    player1_set1: int | None,
+    player2_set1: int | None,
+    player1_set2: int | None,
+    player2_set2: int | None,
+    player1_set3: int | None,
+    player2_set3: int | None,
+) -> str:
+    """Определить WIN/LOSS инициатора по введённому счёту.
+
+    Args:
+        match: Матч.
+        proposer: Игрок, внёсший результат.
+        player1_set1: Геймы стороны 1 в 1-м сете.
+        player2_set1: Геймы стороны 2 в 1-м сете.
+        player1_set2: Геймы стороны 1 во 2-м сете.
+        player2_set2: Геймы стороны 2 во 2-м сете.
+        player1_set3: Геймы стороны 1 в 3-м сете.
+        player2_set3: Геймы стороны 2 в 3-м сете.
+
+    Returns:
+        Значение ``Match.ResultChoice`` (WIN или LOSS).
+
+    Raises:
+        ProposalValidationError: Если счёт неполный или ничейный по сетам.
+    """
+    if player1_set1 is None or player2_set1 is None:
+        raise ProposalValidationError(
+            "Укажите счёт первого сета (геймы обеих сторон).",
+        )
+    sets_p1, sets_p2 = count_sets_won_from_score(
+        player1_set1,
+        player2_set1,
+        player1_set2,
+        player2_set2,
+        player1_set3,
+        player2_set3,
+    )
+    if sets_p1 == sets_p2:
+        raise ProposalValidationError(
+            "По введённому счёту нельзя определить победителя. "
+            "Проверьте геймы в сетах.",
+        )
+    is_side1 = _proposer_is_side1(match, proposer)
+    proposer_won = (sets_p1 > sets_p2) if is_side1 else (sets_p2 > sets_p1)
+    return str(Match.ResultChoice.WIN if proposer_won else Match.ResultChoice.LOSS)
+
+
+def format_proposal_score(proposal: MatchResultProposal) -> str:
+    """Сформировать человекочитаемый счёт заявки.
+
+    Args:
+        proposal: Заявка на результат.
+
+    Returns:
+        Строка вида ``6:2 6:1`` или ``—``.
+    """
+    parts: list[str] = []
+    for set_index in range(1, 4):
+        games_p1 = getattr(proposal, f"player1_set{set_index}")
+        games_p2 = getattr(proposal, f"player2_set{set_index}")
+        if games_p1 is not None and games_p2 is not None:
+            parts.append(f"{games_p1}:{games_p2}")
+    return " ".join(parts) if parts else "—"
+
+
+def validate_proposal_score_consistency(proposal: MatchResultProposal) -> None:
+    """Проверить согласованность счёта и выбранного победителя в заявке.
+
+    Args:
+        proposal: Заявка на результат матча.
+
+    Returns:
+        None
+
+    Raises:
+        ProposalValidationError: Если победитель не соответствует счёту.
+    """
+    if proposal.result in (
+        Match.ResultChoice.WALKOVER_WIN,
+        Match.ResultChoice.WALKOVER_LOSS,
+    ):
+        return
+
+    match = proposal.match
+    sets_p1, sets_p2 = count_sets_won_from_score(
+        proposal.player1_set1,
+        proposal.player2_set1,
+        proposal.player1_set2,
+        proposal.player2_set2,
+        proposal.player1_set3,
+        proposal.player2_set3,
+    )
+    if proposal.player1_set1 is None or proposal.player2_set1 is None:
+        raise ProposalValidationError(
+            "Укажите счёт первого сета (геймы обеих сторон).",
+        )
+    if sets_p1 == sets_p2:
+        raise ProposalValidationError(
+            "По введённому счёту нельзя определить победителя.",
+        )
+
+    winner, _, walkover, winner_team, _ = _compute_result(proposal)
+    if walkover:
+        return
+
+    is_doubles = bool(match.team1_id and match.team2_id)
+    winner_won_more = (
+        (not is_doubles and winner == match.player1 and sets_p1 > sets_p2)
+        or (not is_doubles and winner == match.player2 and sets_p2 > sets_p1)
+        or (
+            is_doubles
+            and winner_team is not None
+            and winner_team.pk == match.team1_id
+            and sets_p1 > sets_p2
+        )
+        or (
+            is_doubles
+            and winner_team is not None
+            and winner_team.pk == match.team2_id
+            and sets_p2 > sets_p1
+        )
+    )
+    if not winner_won_more:
+        raise ProposalValidationError(
+            "Счёт не соответствует выбранному победителю. "
+            "Проверьте геймы в сетах и выбор «Кто победил?».",
+        )
 
 
 def _compute_result(proposal: MatchResultProposal):
@@ -194,6 +399,7 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     Применить подтверждённую заявку к матчу.
     Обновляет матч (winner, winner_team, score, status), отклоняет остальные заявки, отправляет уведомления.
     """
+    validate_proposal_score_consistency(proposal)
     match = proposal.match
     winner, loser, walkover, winner_team, loser_team = _compute_result(proposal)
 

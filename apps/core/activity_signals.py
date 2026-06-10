@@ -165,14 +165,19 @@ def register() -> None:
         return None
 
     def on_proposal_saved(sender, instance, created, **kwargs):
+        from apps.tournaments.proposal_service import format_proposal_score
+
         match = instance.match
         match_url = _safe_reverse("match_detail", pk=match.pk) if match else ""
         if created:
+            score_text = format_proposal_score(instance)
+            result_text = instance.get_result_display()
             log_activity(
                 event_type=EventType.MATCH_RESULT_PROPOSED,
                 actor=player_user(instance.proposer),
                 description=(
-                    f"Внёс результат матча: {match}"
+                    f"Внёс результат матча: {match}. "
+                    f"Выбор: {result_text}. Счёт: {score_text}"
                     if match
                     else "Внёс результат матча"
                 ),
@@ -180,10 +185,11 @@ def register() -> None:
                 dedupe_key=f"proposal_made:{instance.pk}",
                 created_at=getattr(instance, "created_at", None),
             )
-        if instance.status == Match.ProposalStatus.ACCEPTED:
-            confirmer = getattr(instance, "_confirmed_by_user", None)
-            if confirmer is None:
-                confirmer = _infer_confirmer_user(match, instance.proposer)
+        if (
+            instance.status == Match.ProposalStatus.ACCEPTED
+            and getattr(instance, "_confirmed_by_user", None) is not None
+        ):
+            confirmer = instance._confirmed_by_user
             log_activity(
                 event_type=EventType.MATCH_RESULT_CONFIRMED,
                 actor=confirmer,

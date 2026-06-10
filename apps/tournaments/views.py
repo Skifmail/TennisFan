@@ -75,7 +75,11 @@ from .postpayment import (
     open_postpayment_window,
     tournament_allows_postpayment_registration,
 )
-from .proposal_service import apply_proposal
+from .proposal_service import (
+    ProposalValidationError,
+    apply_proposal,
+    derive_proposer_result_from_score,
+)
 from .round_robin import (
     _is_round_robin,
     compute_standings,
@@ -3048,26 +3052,53 @@ def propose_result(request, pk):
 
     result = request.POST.get("result") or Match.ResultChoice.WIN
 
-    def _to_int(value):
+    def _to_int(value: str | None) -> int | None:
+        if value is None:
+            return None
         try:
             return int(value)
         except (TypeError, ValueError):
             return None
 
+    score_fields = {
+        "player1_set1": _to_int(request.POST.get("p1s1")),
+        "player1_set2": _to_int(request.POST.get("p1s2")),
+        "player1_set3": _to_int(request.POST.get("p1s3")),
+        "player2_set1": _to_int(request.POST.get("p2s1")),
+        "player2_set2": _to_int(request.POST.get("p2s2")),
+        "player2_set3": _to_int(request.POST.get("p2s3")),
+    }
+
+    walkover_results = (
+        Match.ResultChoice.WALKOVER_WIN,
+        Match.ResultChoice.WALKOVER_LOSS,
+    )
+    if result not in walkover_results:
+        try:
+            # Победитель определяется по счёту, а не по выпадающему списку
+            result = derive_proposer_result_from_score(
+                match,
+                player,
+                **score_fields,
+            )
+        except ProposalValidationError as exc:
+            messages.error(request, str(exc))
+            return redirect(_get_safe_next_url(request, fallback_url))
+
     proposal = MatchResultProposal.objects.create(
         match=match,
         proposer=player,
         result=result,
-        player1_set1=_to_int(request.POST.get("p1s1")),
-        player1_set2=_to_int(request.POST.get("p1s2")),
-        player1_set3=_to_int(request.POST.get("p1s3")),
-        player2_set1=_to_int(request.POST.get("p2s1")),
-        player2_set2=_to_int(request.POST.get("p2s2")),
-        player2_set3=_to_int(request.POST.get("p2s3")),
+        **score_fields,
     )
 
     # Сразу применяем результат без ожидания подтверждения вторым игроком
-    apply_proposal(proposal)
+    try:
+        apply_proposal(proposal)
+    except ProposalValidationError as exc:
+        proposal.delete()
+        messages.error(request, str(exc))
+        return redirect(_get_safe_next_url(request, fallback_url))
 
     for opponent_user in get_match_opponent_users(match, player):
         if match.tournament:

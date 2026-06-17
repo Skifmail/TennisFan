@@ -61,6 +61,7 @@ from apps.tournaments.platform_home import (
     order_tournaments_active_first,
 )
 from apps.training.models import Coach
+from apps.users.display import format_user_display_name
 from apps.users.models import Player, SkillLevel
 from apps.users.rating_utils import rating_to_ntrp_level
 
@@ -416,6 +417,90 @@ def _build_platform_activity_queryset(
     return qs, is_filtered, period_label, filters
 
 
+def _russian_plural_form_index(value: int) -> int:
+    """Возвращает индекс формы слова для русского склонения по числу.
+
+    Args:
+        value: Число, для которого подбирается форма.
+
+    Returns:
+        int: Индекс формы (0, 1 или 2).
+    """
+    numeric_value = abs(value)
+    remainder_100 = numeric_value % 100
+    remainder_10 = numeric_value % 10
+    if 11 <= remainder_100 <= 14:
+        return 2
+    if remainder_10 == 1:
+        return 0
+    if 2 <= remainder_10 <= 4:
+        return 1
+    return 2
+
+
+def _ru_pluralize(value: int, forms: tuple[str, str, str]) -> str:
+    """Возвращает правильную форму слова для русского языка.
+
+    Args:
+        value: Число для выбора формы.
+        forms: Три формы слова (1, 2–4, 5+).
+
+    Returns:
+        str: Одна из трёх форм слова.
+    """
+    return forms[_russian_plural_form_index(value)]
+
+
+def _ru_verb_by_count(value: int, singular: str, plural: str) -> str:
+    """Возвращает глагол в единственном или множественном числе.
+
+    Args:
+        value: Число, определяющее форму глагола.
+        singular: Форма для 1, 21, 31 и т.д.
+        plural: Форма для остальных чисел.
+
+    Returns:
+        str: Подходящая форма глагола.
+    """
+    return singular if _russian_plural_form_index(value) == 0 else plural
+
+
+def _format_expiring_player_subscriptions_attention(
+    subscriptions: list[UserSubscription],
+) -> tuple[str, list[dict[str, str]]]:
+    """Формирует описание и список игроков с истекающими подписками.
+
+    Args:
+        subscriptions: Активные подписки, заканчивающиеся в ближайшие 7 дней.
+
+    Returns:
+        tuple[str, list[dict[str, str]]]: Текст описания и записи для UI.
+    """
+    entries: list[dict[str, str]] = []
+    for subscription in subscriptions:
+        entries.append(
+            {
+                "name": format_user_display_name(subscription.user),
+                "meta": timezone.localtime(subscription.end_date).strftime("%d.%m.%Y"),
+                "url": reverse(
+                    "admin:subscriptions_usersubscription_change",
+                    args=[subscription.pk],
+                ),
+            }
+        )
+
+    count = len(subscriptions)
+    if count == 1:
+        subscription = subscriptions[0]
+        player_name = format_user_display_name(subscription.user)
+        end_date = timezone.localtime(subscription.end_date).strftime("%d.%m.%Y")
+        return f"Подписка игрока {player_name} закончится {end_date}.", entries
+
+    noun = _ru_pluralize(count, ("подписка", "подписки", "подписок"))
+    verb = _ru_verb_by_count(count, "заканчивается", "заканчиваются")
+    return f"{count} {noun} {verb} в ближайшие 7 дней.", entries
+
+
 @login_required
 def platform_dashboard(request: HttpRequest) -> HttpResponse:
     """Глобальный дашборд платформы для staff/superuser."""
@@ -527,11 +612,16 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         is_active=True,
         end_date__gt=now,
     ).count()
-    expiring_user_subscriptions_count = UserSubscription.objects.filter(
-        is_active=True,
-        end_date__gt=now,
-        end_date__lte=next_7_days,
-    ).count()
+    expiring_user_subscriptions = list(
+        UserSubscription.objects.filter(
+            is_active=True,
+            end_date__gt=now,
+            end_date__lte=next_7_days,
+        )
+        .select_related("user", "tier")
+        .order_by("end_date")
+    )
+    expiring_user_subscriptions_count = len(expiring_user_subscriptions)
     expiring_club_subscriptions_count = ClubSubscription.objects.filter(
         status=ClubSubscriptionStatus.ACTIVE,
         ends_at__gt=now,
@@ -842,7 +932,7 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         for point in growth_raw
     ]
 
-    attention_items: list[dict[str, str]] = []
+    attention_items: list[dict[str, Any]] = []
     if suspended_clubs_count:
         attention_items.append(
             {
@@ -906,11 +996,15 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
             }
         )
     if expiring_user_subscriptions_count:
+        expiring_description, expiring_entries = (
+            _format_expiring_player_subscriptions_attention(expiring_user_subscriptions)
+        )
         attention_items.append(
             {
                 "tone": "info",
                 "title": "Истекают подписки игроков",
-                "description": f"{expiring_user_subscriptions_count} пользовательских подписок закончатся в 7 дней.",
+                "description": expiring_description,
+                "entries": expiring_entries,
                 "action_label": "Подписки игроков",
                 "action_url": reverse(
                     "admin:subscriptions_usersubscription_changelist"
@@ -949,7 +1043,11 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         {
             "label": "Подписки игроков",
             "value": str(active_user_subscriptions),
-            "delta": f"{expiring_user_subscriptions_count} истекают скоро",
+            "delta": (
+                "1 истекает скоро"
+                if expiring_user_subscriptions_count == 1
+                else f"{expiring_user_subscriptions_count} истекают скоро"
+            ),
             "meta": "Активные пользовательские подписки",
             "tone": "default",
         },

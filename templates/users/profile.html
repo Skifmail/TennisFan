@@ -1601,12 +1601,21 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         var labels0 = progressData.map(function(d) { return d.date; });
         var wr0 = progressData.map(function(d) { return d.win_rate; });
         var winRateOpts = buildChartOptions('% побед', '%');
+        winRateOpts.layout = {
+            padding: {
+                top: 14,
+                right: 10,
+                bottom: 2,
+                left: 4
+            }
+        };
         winRateOpts.scales = {
             x: winRateOpts.scales.x,
             y: {
                 display: true,
                 beginAtZero: true,
                 max: 100,
+                grace: '8%',
                 border: { display: false },
                 grid: {
                     color: 'rgba(166, 130, 74, 0.10)',
@@ -1616,17 +1625,22 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                     color: 'rgba(224, 215, 193, 0.68)',
                     padding: 10,
                     callback: function(value) {
+                        if (value > 100) {
+                            return '';
+                        }
                         return value + '%';
                     }
                 }
             }
         };
+        var winRateDataset = createLineDataset(wr0, chartPalettes.winrate);
+        winRateDataset.clip = false;
         charts.winrate = new Chart(document.getElementById('chartProfileWinRate'), {
             type: 'line',
             options: winRateOpts,
             data: {
                 labels: labels0,
-                datasets: [createLineDataset(wr0, chartPalettes.winrate)]
+                datasets: [winRateDataset]
             }
         });
     }

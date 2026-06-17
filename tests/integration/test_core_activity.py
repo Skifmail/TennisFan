@@ -15,6 +15,7 @@ from apps.core.activity import log_activity
 from apps.core.models import PlatformActivityEvent
 from apps.payments.models import PaymentRecord
 from apps.users.models import Player, User
+from tests.support.factories import make_subscription
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -226,6 +227,24 @@ class PlatformActivityFeedTestCase(TestCase):
         content = response.content.decode("utf-8")
         self.assertIn("Статус", content)
         self.assertIn("Эдуард Экспортов", content)
+
+    def test_platform_dashboard_shows_expiring_player_subscription(self) -> None:
+        """Дашборд показывает игрока с истекающей подпиской и корректный текст."""
+        player_user = User.objects.create_user(
+            email="expiring-sub@test.local",
+            password="testpass123",
+            first_name="Александр",
+            last_name="Шевченко",
+        )
+        Player.objects.create(user=player_user)
+        make_subscription(player_user, duration_days=3)
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse("platform_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Александр Шевченко")
+        self.assertContains(response, "Подписка игрока Александр Шевченко закончится")
+        self.assertNotContains(response, "пользовательских подписок закончатся")
 
     def test_platform_activity_unseen_indicator(self) -> None:
         """Индикатор новых событий показывается до просмотра панели и скрывается после."""

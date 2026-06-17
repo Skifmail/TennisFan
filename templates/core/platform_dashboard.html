@@ -259,6 +259,20 @@
                         <div class="club-dashboard-alert__body">
                             <div class="club-dashboard-alert__title">{{ item.title }}</div>
                             <div class="club-dashboard-alert__description">{{ item.description }}</div>
+                            {% if item.entries %}
+                            <ul class="club-dashboard-persona-list club-dashboard-alert__entries">
+                                {% for entry in item.entries %}
+                                <li class="club-dashboard-persona-item">
+                                    {% if entry.url %}
+                                    <a href="{{ entry.url }}" class="club-dashboard-persona-item__name">{{ entry.name }}</a>
+                                    {% else %}
+                                    <span class="club-dashboard-persona-item__name">{{ entry.name }}</span>
+                                    {% endif %}
+                                    <span class="club-dashboard-persona-item__meta">до {{ entry.meta }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
                         </div>
                         <a href="{{ item.action_url }}" class="club-dashboard-alert__action">{{ item.action_label }}</a>
                     </div>

@@ -3392,6 +3392,19 @@
     line-height: 1.45;
 }
 
+.club-dashboard-alert__entries {
+    margin-top: 10px;
+}
+
+.club-dashboard-alert__entries .club-dashboard-persona-item__name {
+    color: #f8fafc;
+    text-decoration: none;
+}
+
+.club-dashboard-alert__entries a.club-dashboard-persona-item__name:hover {
+    color: #f7d98a;
+}
+
 .club-dashboard-empty-state {
     padding: 18px;
     border-radius: 22px;

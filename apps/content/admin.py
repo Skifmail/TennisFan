@@ -9,6 +9,7 @@ from django.urls import reverse
 
 from apps.comments.models import Comment
 
+from .forms import RulesSectionAdminForm
 from .models import (
     AboutUs,
     ContactItem,
@@ -169,6 +170,7 @@ class ContactPageAdmin(admin.ModelAdmin):
 class RulesSectionAdmin(admin.ModelAdmin):
     """Редактирование разделов правил (теннис, турниры, пользование сайтом)."""
 
+    form = RulesSectionAdminForm
     list_display = ("title", "slug", "updated_at")
     list_display_links = ("title", "slug")
     search_fields = ("title", "body")
@@ -178,7 +180,13 @@ class RulesSectionAdmin(admin.ModelAdmin):
             None,
             {
                 "fields": ("slug", "title", "body"),
-                "description": "Содержимое отображается на странице «Правила». Для раздела «Правила тенниса» ссылки на PDF не редактируются — они закреплены на странице.",
+                "description": (
+                    "Содержимое отображается на странице «Правила». "
+                    "Если поле пустое в БД, при открытии подставляется текст "
+                    "из шаблона-фолбэка — сохраните форму, чтобы зафиксировать "
+                    "его в базе. Для раздела «Правила тенниса» ссылки на PDF "
+                    "не редактируются — они закреплены на странице."
+                ),
             },
         ),
         ("Служебное", {"fields": ("updated_at",)}),

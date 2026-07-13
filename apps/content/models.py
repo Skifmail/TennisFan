@@ -312,9 +312,13 @@ class ContactItem(models.Model):
 class RulesSection(models.Model):
     """
     Редактируемый блок правил на странице «Правила».
+
     slug однозначно определяет раздел (tennis_rules, rules_fan, rules_round_robin,
-    rules_doubles, site_usage_rules). body — HTML-контент для вставки в шаблон.
-    Ссылки на PDF в разделе «Правила тенниса» остаются в шаблоне и не редактируются.
+    rules_olympic, rules_doubles, rules_seeding, rules_tvd, rating_rules,
+    rules_rating_algorithm, site_usage_rules). body — HTML-контент для вставки
+    в шаблон. Если body пустой, сайт и админка подставляют текст из шаблона-
+    фолбэка (см. ``apps.content.rules_defaults``). Ссылки на PDF в разделе
+    «Правила тенниса» остаются в шаблоне и не редактируются.
     """
 
     slug = models.SlugField("Код раздела", max_length=50, unique=True)

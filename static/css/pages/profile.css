@@ -229,6 +229,91 @@
 
 .profile-info__title {
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* Если есть кубки — имя и рейтинг поднимаются к верху фото, кубки прижаты к низу */
+.profile-info__header:has(.profile-info__trophies) {
+    align-items: stretch;
+}
+
+.profile-info__header:has(.profile-info__trophies) .profile-info__title {
+    justify-content: flex-start;
+    padding-top: var(--spacing-xs);
+}
+
+.profile-info__trophies {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--spacing-xs);
+    margin-top: auto;
+    padding-top: var(--spacing-sm);
+}
+
+.profile-trophy {
+    position: relative;
+    display: inline-flex;
+    line-height: 0;
+    text-decoration: none;
+    transition: transform 0.15s ease;
+}
+
+.profile-trophy:hover,
+.profile-trophy:focus-visible {
+    transform: translateY(-2px) scale(1.06);
+}
+
+.profile-trophy__img {
+    width: 36px;
+    height: 54px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 6px rgb(0 0 0 / 45%));
+}
+
+/* Всплывающая подсказка «N место в турнире «...»» */
+.profile-trophy::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%) translateY(4px);
+    width: max-content;
+    max-width: 240px;
+    padding: 6px 10px;
+    background: rgb(3 17 13 / 96%);
+    color: #f4e8cf;
+    border: 1px solid rgb(166 130 74 / 45%);
+    border-radius: 8px;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    white-space: normal;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 20;
+    transition:
+        opacity 0.15s ease,
+        transform 0.15s ease;
+}
+
+.profile-trophy:hover::after,
+.profile-trophy:focus-visible::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Первый кубок в ряду: подсказку не центрируем, чтобы не обрезалась слева */
+.profile-trophy:first-child::after {
+    left: 0;
+    transform: translateX(0) translateY(4px);
+}
+
+.profile-trophy:first-child:hover::after,
+.profile-trophy:first-child:focus-visible::after {
+    transform: translateX(0) translateY(0);
 }
 
 .profile-info__name {
@@ -989,9 +1074,18 @@
 }
 
 @media (width <= 600px) {
-    .profile-info__header {
+    /* Перебиваем align-items: stretch для шапки с кубками:
+       в колонке stretch растягивает фото на всю ширину */
+    .profile-info__header,
+    .profile-info__header:has(.profile-info__trophies) {
         flex-direction: column;
+        align-items: center;
         text-align: center;
+    }
+
+    .profile-info__header:has(.profile-info__trophies) .profile-info__title {
+        justify-content: center;
+        padding-top: 0;
     }
 
     .profile-info__avatar-link {
@@ -1001,6 +1095,12 @@
     .profile-info__badges {
         justify-content: center;
         gap: var(--spacing-xs);
+    }
+
+    .profile-info__trophies {
+        justify-content: center;
+        margin-top: 0;
+        padding-top: var(--spacing-xs);
     }
 
     .profile-info {

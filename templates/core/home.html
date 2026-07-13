@@ -381,14 +381,17 @@
                 <span class="player-rank">{{ forloop.counter }}</span>
                 {% include 'includes/avatar.html' with avatar=player.avatar %}
                 <div class="player-info">
-                    <div class="player-name-block">
-                        <span class="player-name">{{ player }}</span>
-                        {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
+                    <div class="player-info__text">
+                        <div class="player-name-block">
+                            <span class="player-name">{{ player }}</span>
+                            {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
+                        </div>
+                        <div class="player-info__meta">
+                            <span class="player-category">{{ player.get_skill_level_display }}</span>
+                            {% include 'includes/rating_badge.html' with player=player %}
+                        </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: var(--spacing-xs); flex-wrap: wrap;">
-                        <span class="player-category">{{ player.get_skill_level_display }}</span>
-                        {% include 'includes/rating_badge.html' with player=player %}
-                    </div>
+                    {% include 'includes/player_trophies_row.html' with trophies=player.trophies %}
                 </div>
                 <div class="player-stats">
                     {% include 'includes/rating_stat_value.html' with player=player stat_type='ntrp' value=player.ntrp_level %}

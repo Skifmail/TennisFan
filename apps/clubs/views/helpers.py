@@ -430,8 +430,13 @@ def _build_club_profile_context(
     except Exception:
         player_skills_data = None
 
+    from apps.tournaments.utils import get_player_trophies
+
+    player_trophies = get_player_trophies(player, club=club)
+
     return {
         "club": club,
+        "player_trophies": player_trophies,
         "is_club_panel": True,
         "is_club_profile": True,
         "player": player,

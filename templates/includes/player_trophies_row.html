@@ -1,0 +1,16 @@
+{% load static %}
+{% comment %}
+Ряд кубков игрока в карточках списков (рейтинг, топ на главной).
+Без ссылок: карточка сама является ссылкой, вложенные <a> недопустимы.
+Параметры: trophies — список PlayerTrophy.
+{% endcomment %}
+{% if trophies %}
+<div class="player-card__trophies" aria-label="Кубки за призовые места в турнирах">
+    {% for trophy in trophies %}
+    <span class="profile-trophy profile-trophy--sm"
+          data-tooltip="{{ trophy.place }} место в турнире «{{ trophy.tournament_name }}»">
+        <img src="{% static trophy.image_path %}" alt="Кубок за {{ trophy.place }} место" class="profile-trophy__img" loading="lazy">
+    </span>
+    {% endfor %}
+</div>
+{% endif %}

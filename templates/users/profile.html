@@ -58,6 +58,18 @@
                                 {% include 'includes/rating_badge.html' with player=player %}
                             </div>
                         </div>
+                        {% if player_trophies %}
+                        <div class="profile-info__trophies" aria-label="Кубки за призовые места в турнирах">
+                            {% for trophy in player_trophies %}
+                            <a href="{% url 'tournament_detail' slug=trophy.tournament_slug %}"
+                               class="profile-trophy"
+                               data-tooltip="{{ trophy.place }} место в турнире «{{ trophy.tournament_name }}»"
+                               aria-label="{{ trophy.place }} место в турнире «{{ trophy.tournament_name }}»">
+                                <img src="{% static trophy.image_path %}" alt="Кубок за {{ trophy.place }} место" class="profile-trophy__img" loading="lazy">
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
 

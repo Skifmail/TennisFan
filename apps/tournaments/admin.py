@@ -272,11 +272,11 @@ class TournamentTeamInline(admin.TabularInline):
 
 
 class TournamentPhotoInline(admin.TabularInline):
-    """Дополнительные фото турнира (до 4 штук, вместе с обложкой — до 5)."""
+    """Фото с турнира для галереи: количество не ограничено, с подписями."""
 
     model = TournamentPhoto
-    extra = 0
-    max_num = 4
+    extra = 1
+    fields = ("image", "caption", "order")
 
 
 class TournamentAdminForm(forms.ModelForm):

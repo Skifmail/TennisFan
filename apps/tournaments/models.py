@@ -416,8 +416,8 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         super().save(*args, **kwargs)
 
 
-class TournamentPhoto(models.Model):
-    """Дополнительное фото турнира для галереи (до 5 штук на турнир)."""
+class TournamentPhoto(CompressImageFieldsMixin, models.Model):
+    """Фото с турнира для галереи (количество не ограничено, с подписью)."""
 
     tournament = models.ForeignKey(
         Tournament,
@@ -430,6 +430,7 @@ class TournamentPhoto(models.Model):
         upload_to="tournaments/gallery/",
         validators=[validate_image_max_2mb],
     )
+    caption = models.CharField("Подпись", max_length=200, blank=True)
     order = models.PositiveSmallIntegerField(
         "Порядок",
         default=0,

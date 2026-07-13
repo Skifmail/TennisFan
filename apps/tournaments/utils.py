@@ -4,10 +4,12 @@
 """
 
 from collections.abc import Iterable
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from apps.clubs.models import Club
     from apps.users.models import Player
 
 from django.db.models import (
@@ -510,3 +512,116 @@ def get_match_opponent_users(match: Match, exclude_player) -> list:
         for p in get_match_opponents_for_player(match, exclude_player)
         if getattr(p, "user_id", None)
     ]
+
+
+@dataclass(frozen=True)
+class PlayerTrophy:
+    """Кубок игрока за призовое место в завершённом турнире.
+
+    Attributes:
+        place (int): Занятое место (1–3).
+        tournament_name (str): Название турнира.
+        tournament_slug (str): Слаг турнира для ссылки на его страницу.
+        date (date | None): Дата окончания (или начала) турнира.
+    """
+
+    place: int
+    tournament_name: str
+    tournament_slug: str
+    date: date | None
+
+    @property
+    def image_path(self) -> str:
+        """Путь к изображению кубка относительно каталога static.
+
+        Returns:
+            str: Относительный путь вида ``images/trophy-place-1.png``.
+        """
+        return f"images/trophy-place-{self.place}.png"
+
+
+def get_players_trophies_map(
+    player_ids: Iterable[int],
+    club: "Club | None" = None,
+) -> dict[int, list[PlayerTrophy]]:
+    """Собирает кубки за призовые места (1–3) для набора игроков одним запросом.
+
+    Место берётся из ``TournamentPlayerResult.place`` (олимпийская система,
+    круговой формат, ТВД). Для одноэтапной сетки, где место не записывается,
+    победитель основной сетки считается 1-м местом, финалист — 2-м.
+
+    Args:
+        player_ids (Iterable[int]): Идентификаторы игроков.
+        club (Club | None): Клуб для фильтрации турниров. ``None`` — только
+            платформенные турниры (без клуба).
+
+    Returns:
+        dict[int, list[PlayerTrophy]]: Кубки по id игрока; каждый список
+        отсортирован по месту (1-е выше), внутри места — от новых турниров
+        к старым.
+    """
+    from .models import TournamentPlayerResult
+
+    results = (
+        TournamentPlayerResult.objects.filter(
+            player_id__in=list(player_ids),
+            tournament__status=TournamentStatus.COMPLETED,
+        )
+        .filter(
+            Q(place__in=(1, 2, 3))
+            | Q(
+                place__isnull=True,
+                is_consolation=False,
+                round_eliminated__in=(
+                    TournamentPlayerResult.RoundEliminated.WINNER,
+                    TournamentPlayerResult.RoundEliminated.FINAL,
+                ),
+            )
+        )
+        .select_related("tournament")
+    )
+    if club is None:
+        results = results.filter(tournament__club__isnull=True)
+    else:
+        results = results.filter(tournament__club=club)
+
+    trophies_map: dict[int, list[PlayerTrophy]] = {}
+    for result in results:
+        place = result.place
+        if place is None:
+            # Одноэтапная сетка: место не записано, определяем по раунду вылета.
+            is_winner = (
+                result.round_eliminated == TournamentPlayerResult.RoundEliminated.WINNER
+            )
+            place = 1 if is_winner else 2
+        trophies_map.setdefault(result.player_id, []).append(
+            PlayerTrophy(
+                place=place,
+                tournament_name=result.tournament.name,
+                tournament_slug=result.tournament.slug,
+                date=result.tournament.end_date or result.tournament.start_date,
+            )
+        )
+    for trophies in trophies_map.values():
+        trophies.sort(
+            key=lambda t: (t.place, -(t.date.toordinal() if t.date else 0)),
+        )
+    return trophies_map
+
+
+def get_player_trophies(
+    player: "Player",
+    club: "Club | None" = None,
+) -> list[PlayerTrophy]:
+    """Собирает кубки игрока за призовые места (1–3) в завершённых турнирах.
+
+    Args:
+        player (Player): Игрок, для которого собираются кубки.
+        club (Club | None): Клуб для фильтрации турниров. ``None`` — только
+            платформенные турниры (без клуба).
+
+    Returns:
+        list[PlayerTrophy]: Кубки, отсортированные по месту (1-е выше),
+        внутри места — от новых турниров к старым.
+    """
+    return get_players_trophies_map([player.pk], club=club).get(player.pk, [])

@@ -279,7 +279,25 @@
 }
 
 .player-info {
+    display: flex;
     flex: 1;
+    align-items: center;
+    gap: var(--spacing-md);
+    min-width: 0;
+}
+
+.player-info__text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
+.player-info__meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
 }
 
 .player-info .player-name {
@@ -297,6 +315,44 @@
 .player-name-block .player-name {
     flex: none;
     margin-bottom: 0;
+}
+
+/* Кубки справа от имени и рейтинга.
+   Высота ≈ строка имени + отступ + строка категории/рейтинга. */
+.player-card__trophies {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 0;
+    flex-shrink: 0;
+}
+
+.player-card__trophies .profile-trophy--sm {
+    display: block;
+    line-height: 0;
+}
+
+.player-card__trophies .profile-trophy--sm .profile-trophy__img {
+    display: block;
+    width: auto;
+    /* Высота ≈ 90% от (имя + рейтинг); /0.86 компенсирует прозрачные поля PNG */
+    height: calc((var(--font-size-lg) * 1.35 + var(--spacing-xs) + 1.85rem) / 0.86 * 0.9);
+    object-fit: contain;
+}
+
+@media (width <= 768px) {
+    .player-info {
+        gap: var(--spacing-sm);
+    }
+
+    .player-card__trophies {
+        gap: 4px;
+    }
+
+    .player-card__trophies .profile-trophy--sm .profile-trophy__img {
+        height: calc((var(--font-size-base) * 1.35 + 1.6rem) / 0.86 * 0.9);
+    }
 }
 
 @media (width <= 992px) {

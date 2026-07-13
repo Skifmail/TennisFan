@@ -11277,6 +11277,43 @@ a.match-details-value__lead:hover {
     background: rgba(6, 22, 17, 0.95);
 }
 
+/* Desktop: информация слева, обложка справа (мобильная колонка без изменений) */
+@media (width > 992px) {
+    .tournament-detail-hero--with-media {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: var(--spacing-xl);
+        align-items: start;
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .tournament-detail-hero--with-media .tournament-detail-hero__info {
+        order: 1;
+        min-width: 0;
+    }
+
+    .tournament-detail-hero--with-media .tournament-detail-hero__media {
+        order: 2;
+        min-width: 0;
+        position: sticky;
+        top: 100px;
+    }
+
+    .tournament-detail-hero--with-media .tournament-gallery {
+        margin-bottom: 0;
+    }
+
+    .tournament-detail-hero--with-media .tournament-meta {
+        margin-bottom: 0;
+    }
+
+    /* В половине экрана три колонки meta слишком узкие — складываем вертикально */
+    .tournament-detail-hero--with-media .tournament-meta-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--spacing-md);
+    }
+}
+
 @media (width <= 768px) {
     .tournament-meta .card-body {
         padding: var(--spacing-md) var(--spacing-sm);

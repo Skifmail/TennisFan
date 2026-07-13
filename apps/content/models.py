@@ -5,8 +5,8 @@ Content models: News, Gallery, Pages.
 from typing import cast
 
 from django.db import models
-from django.utils.text import slugify
 
+from apps.content.utils import generate_unique_slug
 from apps.core.contact_utils import (
     build_max_url,
     build_telegram_url,
@@ -48,8 +48,14 @@ class News(CompressImageFieldsMixin, models.Model):
         return str(self.title)
 
     def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.title, allow_unicode=True)
+        """Сохраняет новость с гарантированно уникальным slug."""
+        self.slug = generate_unique_slug(
+            model=News,
+            name=str(self.title),
+            slug=self.slug,
+            instance=self,
+            fallback="news",
+        )
         super().save(*args, **kwargs)
 
 
@@ -111,8 +117,14 @@ class Gallery(CompressImageFieldsMixin, models.Model):
         return str(self.title)
 
     def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.title, allow_unicode=True)
+        """Сохраняет галерею с гарантированно уникальным slug."""
+        self.slug = generate_unique_slug(
+            model=Gallery,
+            name=str(self.title),
+            slug=self.slug,
+            instance=self,
+            fallback="gallery",
+        )
         super().save(*args, **kwargs)
 
     @property

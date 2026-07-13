@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ tournament.name }} — фото{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="mb-4">
+        <a href="{% url 'gallery_list' %}" class="text-secondary">&larr; Все галереи</a>
+    </div>
+
+    <h1 class="page-title" style="text-align: left;">{{ tournament.name }}</h1>
+    <p class="text-secondary mb-2">
+        {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
+        {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
+    </p>
+    <p class="text-muted mb-4">
+        {{ photos|length }} фото •
+        <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="tournament-meta-link">Страница турнира</a>
+    </p>
+
+    <div class="grid grid-4">
+        {% for photo in photos %}
+        <a href="{{ photo.image.url }}" class="js-lightbox card" style="overflow: hidden; text-decoration: none; color: inherit;"
+            data-lightbox-src="{{ photo.image.url }}" data-lightbox-caption="{{ photo.caption|default:'' }}" data-lightbox-group="tournament-{{ tournament.slug }}">
+            <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:'' }}"
+                style="width: 100%; aspect-ratio: 1; object-fit: cover;" loading="lazy" decoding="async">
+            {% if photo.caption %}
+            <div class="card-body" style="padding: var(--spacing-sm);">
+                <p class="text-secondary" style="font-size: var(--font-size-xs);">{{ photo.caption }}</p>
+            </div>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

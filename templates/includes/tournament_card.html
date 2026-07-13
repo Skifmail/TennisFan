@@ -8,9 +8,6 @@
                 {% if tournament.image %}
                 <div class="tournament-card-photos tournament-card__media">
                     <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img" loading="lazy" decoding="async">
-                    {% for photo in tournament.photos.all|slice:":2" %}
-                    <img src="{{ photo.image.url }}" alt="" class="tournament-img" loading="lazy" decoding="async">
-                    {% endfor %}
                 </div>
                 {% else %}
                 <div class="tournament-card-photos tournament-card__media">

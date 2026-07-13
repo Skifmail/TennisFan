@@ -39,46 +39,37 @@
     <div class="tournament-detail-hero{% if tournament.image or tournament.photos.all %} tournament-detail-hero--with-media{% endif %}">
         {% if tournament.image or tournament.photos.all %}
         <div class="tournament-detail-hero__media">
-            <div class="tournament-gallery" data-tournament-gallery>
-                <div class="tournament-gallery__main" data-gallery-main-view>
-                    <div class="tournament-gallery__bg-blur" data-gallery-bg></div>
-                    <img class="tournament-gallery__main-img"
-                         src=""
-                         alt="{{ tournament.name }}"
-                         data-gallery-main>
-                    <span class="tournament-gallery__counter" data-gallery-counter></span>
-                    <button type="button"
-                            class="tournament-gallery__arrow tournament-gallery__arrow--prev"
-                            data-gallery-prev
-                            aria-label="Предыдущее фото">
-                        &#8249;
-                    </button>
-                    <button type="button"
-                            class="tournament-gallery__arrow tournament-gallery__arrow--next"
-                            data-gallery-next
-                            aria-label="Следующее фото">
-                        &#8250;
-                    </button>
-                </div>
-                <div class="tournament-gallery__strip" data-gallery-strip>
-                    {% if tournament.image %}
-                    <button type="button"
-                            class="tournament-gallery__thumb tournament-gallery__thumb--active"
-                            data-gallery-thumb
-                            data-full-url="{{ tournament.image.url }}">
-                        <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}">
-                    </button>
-                    {% endif %}
+            {% if tournament.image %}
+            <a href="{{ tournament.image.url }}"
+               class="js-lightbox tournament-gallery__main tournament-cover"
+               data-lightbox-src="{{ tournament.image.url }}"
+               data-lightbox-caption="{{ tournament.name }}"
+               data-lightbox-group="tournament-cover">
+                <div class="tournament-gallery__bg-blur" style="background-image: url('{{ tournament.image.url }}');"></div>
+                <img class="tournament-gallery__main-img"
+                     src="{{ tournament.image.url }}"
+                     alt="{{ tournament.name }}">
+            </a>
+            {% endif %}
+            {% if tournament.photos.all %}
+            <div class="tournament-photos" aria-label="Фото с турнира">
+                <h3 class="tournament-photos__title">Фото с турнира</h3>
+                <div class="tournament-photos__grid">
                     {% for photo in tournament.photos.all %}
-                    <button type="button"
-                            class="tournament-gallery__thumb{% if not tournament.image and forloop.first %} tournament-gallery__thumb--active{% endif %}"
-                            data-gallery-thumb
-                            data-full-url="{{ photo.image.url }}">
-                        <img src="{{ photo.image.url }}" alt="{{ tournament.name }}">
-                    </button>
+                    <a href="{{ photo.image.url }}"
+                       class="js-lightbox tournament-photos__item"
+                       data-lightbox-src="{{ photo.image.url }}"
+                       data-lightbox-caption="{{ photo.caption|default:'' }}"
+                       data-lightbox-group="tournament-photos">
+                        <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:tournament.name }}" loading="lazy" decoding="async">
+                        {% if photo.caption %}
+                        <span class="tournament-photos__caption">{{ photo.caption }}</span>
+                        {% endif %}
+                    </a>
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
         </div>
         {% endif %}
 
@@ -325,13 +316,6 @@
             </div>
         </div>
     </div>
-
-    {% if tournament.image or tournament.photos.all %}
-    <div class="tournament-lightbox" data-gallery-lightbox>
-        <button type="button" class="tournament-lightbox__close" data-gallery-lightbox-close>&times;</button>
-        <img src="" alt="{{ tournament.name }}" data-gallery-lightbox-img>
-    </div>
-    {% endif %}
 
     {% if tournament.court %}
     <div class="card mb-4">
@@ -842,141 +826,4 @@
 {% block extra_js %}
 {{ block.super }}
 {% include "clubs/_cancel_tournament_modal.html" %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    var gallery = document.querySelector('[data-tournament-gallery]');
-    if (!gallery) {
-        return;
-    }
-
-    var mainView = gallery.querySelector('[data-gallery-main-view]');
-    var mainImage = gallery.querySelector('[data-gallery-main]');
-    var bgBlur = gallery.querySelector('[data-gallery-bg]');
-    var counter = gallery.querySelector('[data-gallery-counter]');
-    var strip = gallery.querySelector('[data-gallery-strip]');
-    var thumbButtons = gallery.querySelectorAll('[data-gallery-thumb]');
-    var prevBtn = gallery.querySelector('[data-gallery-prev]');
-    var nextBtn = gallery.querySelector('[data-gallery-next]');
-
-    if (!mainView || !mainImage || !bgBlur || !counter || !strip || !thumbButtons.length) {
-        return;
-    }
-
-    var photos = Array.prototype.map.call(thumbButtons, function (btn) {
-        return btn.getAttribute('data-full-url');
-    }).filter(function (url) { return !!url; });
-
-    if (!photos.length) {
-        return;
-    }
-
-    var currentIndex = 0;
-
-    function applyPhoto(idx, withAnimation) {
-        var url = photos[idx];
-        if (!url) {
-            return;
-        }
-        if (withAnimation) {
-            mainImage.classList.add('is-fading');
-            setTimeout(function () {
-                mainImage.src = url;
-                bgBlur.style.backgroundImage = 'url(' + url + ')';
-                counter.textContent = (idx + 1) + ' / ' + photos.length;
-                thumbButtons.forEach(function (btn, i) {
-                    btn.classList.toggle('tournament-gallery__thumb--active', i === idx);
-                });
-                mainImage.classList.remove('is-fading');
-            }, 200);
-        } else {
-            mainImage.src = url;
-            bgBlur.style.backgroundImage = 'url(' + url + ')';
-            counter.textContent = (idx + 1) + ' / ' + photos.length;
-            thumbButtons.forEach(function (btn, i) {
-                btn.classList.toggle('tournament-gallery__thumb--active', i === idx);
-            });
-        }
-
-        var activeThumb = thumbButtons[idx];
-        if (activeThumb && typeof activeThumb.scrollIntoView === 'function') {
-            activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        }
-    }
-
-    function goTo(offset) {
-        var nextIndex = (currentIndex + offset + photos.length) % photos.length;
-        currentIndex = nextIndex;
-        applyPhoto(currentIndex, true);
-    }
-
-    thumbButtons.forEach(function (button, index) {
-        button.addEventListener('click', function () {
-            currentIndex = index;
-            applyPhoto(currentIndex, true);
-        });
-    });
-
-    if (prevBtn) {
-        prevBtn.addEventListener('click', function (event) {
-            event.stopPropagation();
-            goTo(-1);
-        });
-    }
-    if (nextBtn) {
-        nextBtn.addEventListener('click', function (event) {
-            event.stopPropagation();
-            goTo(1);
-        });
-    }
-
-    var lightbox = document.querySelector('[data-gallery-lightbox]');
-    var lightboxImg = lightbox ? lightbox.querySelector('[data-gallery-lightbox-img]') : null;
-    var lightboxClose = lightbox ? lightbox.querySelector('[data-gallery-lightbox-close]') : null;
-
-    if (lightbox && lightboxImg) {
-        mainView.addEventListener('click', function (event) {
-            if (event.target.closest('[data-gallery-prev]') || event.target.closest('[data-gallery-next]')) {
-                return;
-            }
-            lightboxImg.src = photos[currentIndex];
-            lightbox.classList.add('tournament-lightbox--open');
-        });
-
-        function closeLightbox(event) {
-            if (!lightbox.classList.contains('tournament-lightbox--open')) {
-                return;
-            }
-            if (!event || event.target === lightbox || (event.target && event.target.hasAttribute('data-gallery-lightbox-close'))) {
-                lightbox.classList.remove('tournament-lightbox--open');
-            }
-        }
-
-        if (lightboxClose) {
-            lightboxClose.addEventListener('click', function (event) {
-                event.stopPropagation();
-                closeLightbox(event);
-            });
-        }
-
-        lightbox.addEventListener('click', closeLightbox);
-
-        document.addEventListener('keydown', function (event) {
-            if (!lightbox.classList.contains('tournament-lightbox--open')) {
-                return;
-            }
-            if (event.key === 'Escape') {
-                lightbox.classList.remove('tournament-lightbox--open');
-            } else if (event.key === 'ArrowLeft') {
-                goTo(-1);
-                lightboxImg.src = photos[currentIndex];
-            } else if (event.key === 'ArrowRight') {
-                goTo(1);
-                lightboxImg.src = photos[currentIndex];
-            }
-        });
-    }
-
-    applyPhoto(currentIndex, false);
-});
-</script>
 {% endblock %}

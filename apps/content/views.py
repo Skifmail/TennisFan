@@ -8,6 +8,7 @@ import markdown
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.contenttypes.models import ContentType
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -113,9 +114,30 @@ def news_detail(request, slug):
 
 
 def gallery_list(request):
-    """Gallery list page."""
+    """Страница списка фотогалерей.
+
+    Показывает ручные галереи (content.Gallery) и автогалереи турниров —
+    по одной на каждый турнир, в который загружены фото (TournamentPhoto).
+
+    Args:
+        request (HttpRequest): HTTP-запрос.
+
+    Returns:
+        HttpResponse: страница со списком галерей.
+    """
     galleries = Gallery.objects.filter(is_published=True).prefetch_related("photos")
-    return render(request, "content/gallery_list.html", {"galleries": galleries})
+    # Автогалереи: турниры, у которых есть хотя бы одно фото с турнира
+    tournament_galleries = (
+        Tournament.objects.filter(photos__isnull=False)
+        .distinct()
+        .prefetch_related("photos")
+        .order_by("-start_date", "-id")
+    )
+    return render(
+        request,
+        "content/gallery_list.html",
+        {"galleries": galleries, "tournament_galleries": tournament_galleries},
+    )
 
 
 def gallery_detail(request, slug):
@@ -124,6 +146,32 @@ def gallery_detail(request, slug):
         Gallery.objects.prefetch_related("photos"), slug=slug, is_published=True
     )
     return render(request, "content/gallery_detail.html", {"gallery": gallery})
+
+
+def tournament_gallery_detail(request, slug):
+    """Автогалерея турнира: фото, загруженные в турнир через админку.
+
+    Args:
+        request (HttpRequest): HTTP-запрос.
+        slug (str): slug турнира.
+
+    Returns:
+        HttpResponse: страница галереи турнира.
+
+    Raises:
+        Http404: если турнир не найден или в нём нет фото.
+    """
+    tournament = get_object_or_404(
+        Tournament.objects.prefetch_related("photos"), slug=slug
+    )
+    photos = list(tournament.photos.all())
+    if not photos:
+        raise Http404("У турнира нет фотографий")
+    return render(
+        request,
+        "content/tournament_gallery_detail.html",
+        {"tournament": tournament, "photos": photos},
+    )
 
 
 def page_detail(request, slug):

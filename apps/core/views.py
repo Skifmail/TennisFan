@@ -1864,16 +1864,27 @@ def home(request):
     from apps.tournaments.season_utils import annotate_season_pts
 
     rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
-    top_players = annotate_season_pts(
-        Player.objects.filter(
-            is_bye=False,
-            is_hidden_on_home=False,
-        )
-        .filter(rating_visibility_filter)
-        .select_related(
-            "user", "user__subscription", "user__subscription__tier", "season_points"
-        )
-    ).order_by("-season_pts", "-total_points")[:10]
+    top_players = list(
+        annotate_season_pts(
+            Player.objects.filter(
+                is_bye=False,
+                is_hidden_on_home=False,
+            )
+            .filter(rating_visibility_filter)
+            .select_related(
+                "user",
+                "user__subscription",
+                "user__subscription__tier",
+                "season_points",
+            )
+        ).order_by("-season_pts", "-total_points")[:10]
+    )
+
+    from apps.tournaments.utils import get_players_trophies_map
+
+    trophies_map = get_players_trophies_map(p.pk for p in top_players)
+    for p in top_players:
+        p.trophies = trophies_map.get(p.pk, [])
 
     _, recent_days, recent_limit = _match_widget_query_params(request)
     upcoming_days = recent_days
@@ -2005,6 +2016,12 @@ def rating(request):
     paginator = Paginator(players, 50)
     page_number = request.GET.get("page")
     players_page = paginator.get_page(page_number)
+
+    from apps.tournaments.utils import get_players_trophies_map
+
+    trophies_map = get_players_trophies_map(p.pk for p in players_page.object_list)
+    for p in players_page.object_list:
+        p.trophies = trophies_map.get(p.pk, [])
 
     city_options = (
         Player.objects.exclude(city__exact="")

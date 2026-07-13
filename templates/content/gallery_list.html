@@ -10,6 +10,21 @@
 
 <div class="container">
     <div class="grid grid-3">
+        {% for tournament in tournament_galleries %}
+        <a href="{% url 'tournament_gallery_detail' slug=tournament.slug %}" class="card">
+            {% if tournament.photos.first %}
+            <img src="{{ tournament.photos.first.image.url }}" alt="" class="card-image">
+            {% else %}
+            <div class="card-image" style="background: var(--color-bg-elevated);"></div>
+            {% endif %}
+            <div class="card-body">
+                <h3 class="card-title">{{ tournament.name }}</h3>
+                <p class="card-text">{{ tournament.photos.count }} фото</p>
+                <p class="text-muted mt-2" style="font-size: var(--font-size-xs);">{{ tournament.start_date|date:"d.m.Y" }}
+                </p>
+            </div>
+        </a>
+        {% endfor %}
         {% for gallery in galleries %}
         <a href="{% url 'gallery_detail' slug=gallery.slug %}" class="card">
             {% if gallery.cover_image %}
@@ -26,9 +41,10 @@
                 </p>
             </div>
         </a>
-        {% empty %}
-        <p class="text-secondary">Галереи пока нет.</p>
         {% endfor %}
+        {% if not galleries and not tournament_galleries %}
+        <p class="text-secondary">Галереи пока нет.</p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

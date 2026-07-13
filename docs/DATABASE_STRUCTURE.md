@@ -145,6 +145,18 @@ M2M: турнир ↔ игроки (участники).
 | tournament_id | FK → tournaments_tournament |
 | category | varchar(20) |
 
+### tournaments_tournamentphoto
+Фото с турнира для галереи (количество не ограничено). Показываются под обложкой на странице турнира и в разделе «Фото» как автогалерея турнира.
+
+| Поле | Тип |
+|------|-----|
+| id | PK |
+| tournament_id | FK → tournaments_tournament |
+| image | varchar(100) |
+| caption | varchar(200) |
+| order | smallint |
+| created_at | datetime |
+
 ### tournaments_tournamentteam
 Парная команда в турнире.
 

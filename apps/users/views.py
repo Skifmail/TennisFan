@@ -542,7 +542,10 @@ def profile(request, pk):
     can_view_profile_stats = _can_view_profile_stats(request.user, player)
 
     from apps.tournaments.models import Match
-    from apps.tournaments.utils import order_player_matches_for_display
+    from apps.tournaments.utils import (
+        get_player_trophies,
+        order_player_matches_for_display,
+    )
 
     all_matches_qs = order_player_matches_for_display(
         Match.objects.filter(
@@ -844,8 +847,11 @@ def profile(request, pk):
 
     is_rating_visible = bool(player.is_verified or player.avatar)
 
+    player_trophies = get_player_trophies(player)
+
     context = {
         "player": player,
+        "player_trophies": player_trophies,
         "recent_matches": recent_matches,
         "profile_progress_data": progress_data,
         "subscription_usage_percent": subscription_usage_percent,

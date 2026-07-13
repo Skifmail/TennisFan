@@ -354,7 +354,6 @@ def tournament_list(request):
             "allowed_categories",
             "teams__player1__user",
             "teams__player2__user",
-            "photos",
         )
     )
 
@@ -602,6 +601,7 @@ def tournament_detail(request, slug):
             "tvd_groups__matches__player1__user",
             "tvd_groups__matches__player2__user",
             "tvd_groups__matches__winner__user",
+            "photos",
         ),
         slug=slug,
     )

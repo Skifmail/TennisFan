@@ -241,10 +241,47 @@
 }
 
 /* --- Детальная страница турнирной таблицы --- */
-.tables-detail .tables-hero-image img {
-    max-width: 100%;
-    height: auto;
+.tables-detail .tables-hero__top {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-lg);
+}
+
+.tables-detail .tables-hero__meta {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.tables-detail .tables-hero-image {
+    flex: 0 0 auto;
+    width: 120px;
+    height: 90px;
     border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-bg-elevated);
+}
+
+.tables-detail .tables-hero-image img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.tables-detail .tables-hero__meta .page-title {
+    margin-top: 0;
+    margin-bottom: var(--spacing-xs);
+}
+
+@media (width <= 768px) {
+    .tables-detail .tables-hero__top {
+        gap: var(--spacing-md);
+    }
+
+    .tables-detail .tables-hero-image {
+        width: 88px;
+        height: 66px;
+    }
 }
 
 .tables-detail .tables-description {
@@ -276,6 +313,27 @@
     gap: var(--spacing-md);
 }
 
+.tables-detail .stats-cards-grid--rich {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.tables-detail .stat-card {
+    transition:
+        transform 0.25s ease,
+        border-color 0.25s ease,
+        box-shadow 0.25s ease;
+    border: 1px solid rgba(166, 130, 74, 0.18);
+    background:
+        linear-gradient(160deg, rgba(166, 130, 74, 0.08), transparent 55%),
+        rgba(6, 22, 17, 0.92);
+}
+
+.tables-detail .stat-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(166, 130, 74, 0.45);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
 .tables-detail .stat-card .card-body {
     text-align: center;
     padding: var(--spacing-lg);
@@ -286,11 +344,246 @@
     font-size: var(--font-size-2xl);
     font-weight: 700;
     color: var(--color-primary);
+    letter-spacing: 0.02em;
 }
 
 .tables-detail .stat-card-label {
     font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.tables-detail .stat-card-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #64748b;
+}
+
+.tables-detail .stat-card--progress .card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.tables-detail .stat-progress-ring {
+    position: relative;
+    width: 72px;
+    height: 72px;
+}
+
+.tables-detail .stat-progress-ring svg {
+    transform: rotate(-90deg);
+}
+
+.tables-detail .stat-progress-ring__track,
+.tables-detail .stat-progress-ring__value {
+    fill: none;
+    stroke-width: 6;
+}
+
+.tables-detail .stat-progress-ring__track {
+    stroke: rgba(148, 163, 184, 0.2);
+}
+
+.tables-detail .stat-progress-ring__value {
+    stroke: var(--color-primary);
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease-out;
+}
+
+.tables-detail .stat-card-value--ring {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+/* Инсайты */
+.tables-detail .tables-insights__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.tables-detail .tables-insight {
+    border: 1px solid rgba(166, 130, 74, 0.22);
+    background:
+        linear-gradient(135deg, rgba(166, 130, 74, 0.1), transparent 60%),
+        rgba(6, 22, 17, 0.95);
+    transition: transform 0.25s ease, border-color 0.25s ease;
+}
+
+.tables-detail .tables-insight:hover {
+    transform: translateY(-2px);
+    border-color: rgba(166, 130, 74, 0.5);
+}
+
+.tables-detail .tables-insight__title {
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #facc6b;
+}
+
+.tables-detail .tables-insight__text {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+}
+
+/* Тепловая карта */
+.tables-detail .tables-heatmap__table {
+    border-collapse: separate;
+    border-spacing: 3px;
+    min-width: 420px;
+    width: max-content;
+}
+
+.tables-detail .tables-heatmap__table th,
+.tables-detail .tables-heatmap__table td {
+    text-align: center;
+    font-size: 11px;
+    padding: 0;
+}
+
+.tables-detail .tables-heatmap__table thead th {
+    color: #94a3b8;
+    font-weight: 600;
+    min-width: 36px;
+}
+
+.tables-detail .tables-heatmap__row-label {
+    text-align: left !important;
+    padding-right: 8px !important;
+    white-space: nowrap;
+    max-width: 160px;
+}
+
+.tables-detail .tables-heatmap__idx {
+    display: inline-block;
+    min-width: 18px;
+    margin-right: 6px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.tables-detail .tables-heatmap__name {
+    color: #e2e8f0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tables-detail .tables-heatmap__cell {
+    width: 42px;
+    height: 36px;
+    border-radius: 6px;
+    line-height: 36px;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.tables-detail .tables-heatmap__cell--self {
+    background: rgba(255, 255, 255, 0.04);
+    color: #64748b;
+}
+
+.tables-detail .tables-heatmap__cell--empty {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.tables-detail .tables-heatmap__cell--win {
+    background: rgba(45, 90, 39, 0.55);
+    box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.25);
+}
+
+.tables-detail .tables-heatmap__cell--loss {
+    background: rgba(155, 58, 58, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.2);
+}
+
+/* Графики */
+.tables-detail .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.tables-detail .charts-grid--rich {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.tables-detail .chart-card {
+    border: 1px solid rgba(166, 130, 74, 0.18);
+    background: rgba(6, 22, 17, 0.92);
+    transition: border-color 0.25s ease, transform 0.25s ease;
+}
+
+.tables-detail .chart-card:hover {
+    border-color: rgba(166, 130, 74, 0.4);
+}
+
+.tables-detail .chart-card--wide {
+    grid-column: 1 / -1;
+}
+
+.tables-detail .chart-card .chart-title {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #e2e8f0;
+}
+
+.tables-detail .chart-subtitle {
+    margin: 0 0 var(--spacing-md);
+    font-size: var(--font-size-xs);
+    color: #64748b;
+}
+
+.tables-detail .chart-container {
+    position: relative;
+    height: 250px;
+}
+
+.tables-detail .chart-container--tall {
+    height: 300px;
+}
+
+/* Reveal-анимации секций */
+.tables-detail [data-reveal] {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+        opacity 0.55s ease,
+        transform 0.55s ease;
+}
+
+.tables-detail [data-reveal].is-revealed {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tables-detail [data-reveal] {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    .tables-detail .stat-card,
+    .tables-detail .tables-insight,
+    .tables-detail .chart-card {
+        transition: none;
+    }
 }
 
 .tables-detail .table-responsive {
@@ -341,30 +634,21 @@
 .tables-detail .player-avatar-sm {
     width: 32px;
     height: 32px;
-    border-radius: var(--radius-full);
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 32px;
+    max-height: 32px;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
     object-fit: cover;
+    object-position: center;
+    flex-shrink: 0;
     background: var(--color-bg-elevated);
 }
 
 .tables-detail .fan-points {
     font-weight: 600;
     color: var(--color-primary);
-}
-
-.tables-detail .charts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: var(--spacing-lg);
-}
-
-.tables-detail .chart-card .chart-title {
-    font-size: var(--font-size-lg);
-    margin-bottom: var(--spacing-md);
-}
-
-.tables-detail .chart-container {
-    position: relative;
-    height: 250px;
 }
 
 .tables-detail .matches-grid {
@@ -408,10 +692,16 @@
 .tables-detail .player-avatar-xs {
     width: 24px;
     height: 24px;
-    border-radius: var(--radius-full);
+    min-width: 24px;
+    min-height: 24px;
+    max-width: 24px;
+    max-height: 24px;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
     object-fit: cover;
-    background: var(--color-bg);
+    object-position: center;
     flex-shrink: 0;
+    background: var(--color-bg);
 }
 
 .tables-detail .match-mini-vs {

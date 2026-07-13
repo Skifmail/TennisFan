@@ -356,35 +356,21 @@
         min-width: 0;
     }
 
-    /* 1 кубок — справа от имени, как сейчас */
+    /* На мобилке кубки всегда под именем/рейтингом */
     .player-card__trophies {
-        gap: 3px;
-        flex: 0 1 auto;
-        max-width: min(42%, 7.5rem);
-    }
-
-    .player-card__trophies .profile-trophy--sm .profile-trophy__img {
-        height: calc((var(--font-size-base) * 1.35 + 1.6rem) / 0.86 * 0.75);
-    }
-
-    /* 2+ кубков — отдельной строкой под именем, чтобы не сжимать статистику */
-    .player-info:has(.profile-trophy:nth-child(2)) .player-card__trophies {
         flex: 1 1 100%;
         max-width: 100%;
+        gap: 3px;
         margin-top: 2px;
     }
 
-    .player-info:has(.profile-trophy:nth-child(2)) .profile-trophy--sm .profile-trophy__img {
+    .player-card__trophies .profile-trophy--sm .profile-trophy__img {
         height: 24px;
     }
 }
 
 @media (width <= 480px) {
     .player-card__trophies .profile-trophy--sm .profile-trophy__img {
-        height: 22px;
-    }
-
-    .player-info:has(.profile-trophy:nth-child(2)) .profile-trophy--sm .profile-trophy__img {
         height: 20px;
     }
 }

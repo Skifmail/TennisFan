@@ -90,6 +90,7 @@ from .round_robin import (
 from .round_robin import (
     generate_bracket as round_robin_generate_bracket,
 )
+from .tables_stats import build_tables_dashboard
 from .tvd import (
     TVD_STAGE_CONSOLATION_RR,
     TVD_STAGE_GROUP,
@@ -2508,6 +2509,11 @@ def tournament_tables_detail(request, slug):
                 "rating_points": fan_results_map.get(
                     row["team"].player1_id if row.get("team") else row["player"].id
                 ),
+                "matches": row.get("matches"),
+                "wins": row.get("wins"),
+                "losses": row.get("losses"),
+                "sets": row.get("sets"),
+                "games": row.get("games"),
             }
             for row in rr_standings
         ]
@@ -2646,28 +2652,28 @@ def tournament_tables_detail(request, slug):
             chart_round_labels.append(round_display.get(rk, rk))
             chart_round_data.append(round_points[rk])
 
-    # Рейтинг участников (для гистограммы)
-    ratings = [p.total_points for p in participants if p.total_points]
-    ratings_sorted = sorted(ratings, reverse=True)[:20]  # топ-20
-    ratings_labels = [f"Место {i}" for i in range(1, len(ratings_sorted) + 1)]
+    # Рейтинг участников (для гистограммы) — подписи = имена, не «Место N»
+    participants_by_rating = sorted(
+        [p for p in participants if p.total_points],
+        key=lambda p: -float(p.total_points or 0),
+    )[:20]
+    ratings_sorted = [float(p.total_points) for p in participants_by_rating]
+    ratings_labels = [str(p) for p in participants_by_rating]
 
-    show_chart_status = len(chart_status_labels) > 0
-    show_chart_rounds = (is_fan or is_tvd) and len(chart_round_labels) > 0
-    show_chart_ratings = len(ratings_sorted) > 0
-    tables_charts_config = json.dumps(
-        {
-            "colors": {
-                "primary": "#A6824A",
-                "accent": "#83530cd3",
-                "palette": ["#A6824A", "#83530c", "#2d5a27", "#6b7280", "#9ca3af"],
-                "border": "#16302B",
-            },
-            "status": {"labels": chart_status_labels, "data": chart_status_data},
-            "rounds": {"labels": chart_round_labels, "data": chart_round_data},
-            "ratings": {"labels": ratings_labels, "data": ratings_sorted},
-        },
-        ensure_ascii=False,
+    dashboard = build_tables_dashboard(
+        tournament,
+        is_round_robin=is_round_robin,
+        is_fan=is_fan,
+        is_tvd=is_tvd,
+        participants=participants,
+        chart_status_labels=chart_status_labels,
+        chart_status_data=chart_status_data,
+        chart_round_labels=chart_round_labels,
+        chart_round_data=chart_round_data,
+        ratings_labels=ratings_labels,
+        ratings_sorted=ratings_sorted,
     )
+    tables_charts_config = json.dumps(dashboard.charts, ensure_ascii=False)
 
     context = {
         "tournament": tournament,
@@ -2678,24 +2684,28 @@ def tournament_tables_detail(request, slug):
         "participants": participants,
         "standings": standings,
         "matches_by_round": matches_by_round,
-        "show_chart_status": show_chart_status,
-        "show_chart_rounds": show_chart_rounds,
-        "show_chart_ratings": show_chart_ratings,
+        "show_chart_status": dashboard.show_flags["show_chart_status"],
+        "show_chart_rounds": dashboard.show_flags["show_chart_rounds"],
+        "show_chart_ratings": dashboard.show_flags["show_chart_ratings"],
+        "show_chart_timeline": dashboard.show_flags["show_chart_timeline"],
+        "show_chart_sets": dashboard.show_flags["show_chart_sets"],
+        "show_chart_character": dashboard.show_flags["show_chart_character"],
+        "show_chart_deltas": dashboard.show_flags["show_chart_deltas"],
+        "show_insights": dashboard.show_flags["show_insights"],
+        "show_heatmap": dashboard.show_flags["show_heatmap"],
         "tables_charts_config": tables_charts_config,
-        "participants_count": len(participants),
-        "matches_total": main_matches.count(),
-        "matches_completed": main_matches.filter(
-            status__in=["completed", "walkover"]
-        ).count(),
-        "progress_pct": (
-            int(
-                100
-                * main_matches.filter(status__in=["completed", "walkover"]).count()
-                / main_matches.count()
-            )
-            if main_matches.count() > 0
-            else 0
-        ),
+        "insights": dashboard.insights,
+        "heatmap": dashboard.heatmap,
+        "participants_count": dashboard.kpi["participants_count"],
+        "matches_total": dashboard.kpi["matches_total"],
+        "matches_completed": dashboard.kpi["matches_completed"],
+        "progress_pct": dashboard.kpi["progress_pct"],
+        "kpi_sets_played": dashboard.kpi["sets_played"],
+        "kpi_games_total": dashboard.kpi["games_total"],
+        "kpi_avg_games": dashboard.kpi["avg_games"],
+        "kpi_three_set_pct": dashboard.kpi["three_set_pct"],
+        "kpi_tiebreaks": dashboard.kpi["tiebreaks"],
+        "kpi_walkovers": dashboard.kpi["walkovers"],
     }
     return render(request, "tournaments/tables_detail.html", context)
 

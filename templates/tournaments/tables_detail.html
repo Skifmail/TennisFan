@@ -11,48 +11,52 @@
         <a href="{% url 'tournament_tables_list' %}" class="text-secondary">&larr; Все турнирные таблицы</a>
     </div>
 
-    <!-- Hero: основная информация о турнире -->
-    <section class="tables-hero card mb-4">
+    <!-- Hero: основная информация о турнире (обложка компактная — фокус на данных) -->
+    <section class="tables-hero card mb-4" data-reveal>
         <div class="card-body">
-            {% if tournament.image %}
-            <div class="tables-hero-image mb-3">
-                <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}">
-            </div>
-            {% endif %}
-            <div class="d-flex gap-2 mb-2 flex-wrap">
-                {% if tournament.format == 'single_elimination' %}
-                <span class="player-category player-category--format-single_elimination" title="Турнир на выбывание с подвалом">{{ tournament.get_format_display }}</span>
-                {% elif tournament.format == 'olympic_consolation' %}
-                <span class="player-category player-category--format-olympic_consolation">Олимпийская система</span>
-                {% elif tournament.format == 'weekend_day' %}
-                <span class="player-category player-category--format-weekend_day">OneDay</span>
-                {% elif tournament.format == 'round_robin' %}
-                <span class="player-category player-category--format-round_robin">Круговой</span>
+            <div class="tables-hero__top">
+                {% if tournament.image %}
+                <div class="tables-hero-image">
+                    <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" loading="lazy" decoding="async">
+                </div>
                 {% endif %}
-                {% for ac in tournament.allowed_categories.all %}
-                <span class="player-category">{{ ac.category|skill_with_ntrp }}</span>
-                {% endfor %}
-                <span class="player-category">{{ tournament.get_gender_display }}</span>
-                <span class="player-category">{{ tournament.get_duration_display }}</span>
-                <span class="player-category">{{ tournament.get_status_display }}</span>
-                {% if tournament.entry_fee > 0 %}
-                <span class="player-category player-category--fee-plate">Взнос: {{ tournament.entry_fee|intcomma|cut:".00" }} ₽</span>
-                {% else %}
-                <span class="player-category player-category--fee-plate">Бесплатно</span>
-                {% endif %}
+                <div class="tables-hero__meta">
+                    <div class="d-flex gap-2 mb-2 flex-wrap">
+                        {% if tournament.format == 'single_elimination' %}
+                        <span class="player-category player-category--format-single_elimination" title="Турнир на выбывание с подвалом">{{ tournament.get_format_display }}</span>
+                        {% elif tournament.format == 'olympic_consolation' %}
+                        <span class="player-category player-category--format-olympic_consolation">Олимпийская система</span>
+                        {% elif tournament.format == 'weekend_day' %}
+                        <span class="player-category player-category--format-weekend_day">OneDay</span>
+                        {% elif tournament.format == 'round_robin' %}
+                        <span class="player-category player-category--format-round_robin">Круговой</span>
+                        {% endif %}
+                        {% for ac in tournament.allowed_categories.all %}
+                        <span class="player-category">{{ ac.category|skill_with_ntrp }}</span>
+                        {% endfor %}
+                        <span class="player-category">{{ tournament.get_gender_display }}</span>
+                        <span class="player-category">{{ tournament.get_duration_display }}</span>
+                        <span class="player-category">{{ tournament.get_status_display }}</span>
+                        {% if tournament.entry_fee > 0 %}
+                        <span class="player-category player-category--fee-plate">Взнос: {{ tournament.entry_fee|intcomma|cut:".00" }} ₽</span>
+                        {% else %}
+                        <span class="player-category player-category--fee-plate">Бесплатно</span>
+                        {% endif %}
+                    </div>
+                    <h1 class="page-title">{{ tournament.name }}</h1>
+                    <div class="tables-detail__host" aria-label="Организатор турнира">
+                        {% if tournament.club %}
+                        <a href="{% url 'clubs:club_public_detail' slug=tournament.club.slug %}" class="tournament-table__club-badge tournament-table__club-badge--host" title="{{ tournament.club.name }}">{{ tournament.club.name }}</a>
+                        {% else %}
+                        <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-secondary mb-0">
+                        {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
+                        {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
+                    </p>
+                </div>
             </div>
-            <h1 class="page-title">{{ tournament.name }}</h1>
-            <div class="tables-detail__host" aria-label="Организатор турнира">
-                {% if tournament.club %}
-                <a href="{% url 'clubs:club_public_detail' slug=tournament.club.slug %}" class="tournament-table__club-badge tournament-table__club-badge--host" title="{{ tournament.club.name }}">{{ tournament.club.name }}</a>
-                {% else %}
-                <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
-                {% endif %}
-            </div>
-            <p class="text-secondary mb-0">
-                {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
-                {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
-            </p>
             {% if tournament.description %}
             <div class="tables-description mt-3">
                 {{ tournament.description }}
@@ -73,39 +77,89 @@
         </div>
     </section>
 
-    <!-- Карточки статистики -->
-    <section class="tables-stats-cards mb-4">
-        <div class="stats-cards-grid">
+    <!-- KPI-дашборд -->
+    <section class="tables-stats-cards mb-4" data-reveal>
+        <div class="stats-cards-grid stats-cards-grid--rich">
+            <div class="stat-card card stat-card--progress">
+                <div class="card-body">
+                    <div class="stat-progress-ring" data-progress="{{ progress_pct }}" aria-hidden="true">
+                        <svg viewBox="0 0 72 72" width="72" height="72">
+                            <circle class="stat-progress-ring__track" cx="36" cy="36" r="30"></circle>
+                            <circle class="stat-progress-ring__value" cx="36" cy="36" r="30"></circle>
+                        </svg>
+                        <span class="stat-card-value stat-card-value--ring" data-count-up="{{ progress_pct }}" data-suffix="%">0%</span>
+                    </div>
+                    <span class="stat-card-label">Прогресс турнира</span>
+                </div>
+            </div>
             <div class="stat-card card">
                 <div class="card-body">
-                    <span class="stat-card-value">{{ participants_count }}</span>
+                    <span class="stat-card-value" data-count-up="{{ participants_count }}">0</span>
                     <span class="stat-card-label">Участников</span>
                 </div>
             </div>
             <div class="stat-card card">
                 <div class="card-body">
-                    <span class="stat-card-value">{{ matches_total }}</span>
-                    <span class="stat-card-label">Матчей всего</span>
-                </div>
-            </div>
-            <div class="stat-card card">
-                <div class="card-body">
-                    <span class="stat-card-value">{{ matches_completed }}</span>
+                    <span class="stat-card-value" data-count-up="{{ matches_completed }}">0</span>
                     <span class="stat-card-label">Матчей сыграно</span>
+                    <span class="stat-card-hint">из {{ matches_total }}</span>
                 </div>
             </div>
             <div class="stat-card card">
                 <div class="card-body">
-                    <span class="stat-card-value">{{ progress_pct }}%</span>
-                    <span class="stat-card-label">Прогресс</span>
+                    <span class="stat-card-value" data-count-up="{{ kpi_sets_played }}">0</span>
+                    <span class="stat-card-label">Сетов сыграно</span>
+                </div>
+            </div>
+            <div class="stat-card card">
+                <div class="card-body">
+                    <span class="stat-card-value" data-count-up="{{ kpi_games_total }}">0</span>
+                    <span class="stat-card-label">Геймов всего</span>
+                </div>
+            </div>
+            <div class="stat-card card">
+                <div class="card-body">
+                    <span class="stat-card-value" data-count-up="{{ kpi_avg_games }}" data-decimals="1">0</span>
+                    <span class="stat-card-label">Ср. геймов / матч</span>
+                </div>
+            </div>
+            <div class="stat-card card">
+                <div class="card-body">
+                    <span class="stat-card-value" data-count-up="{{ kpi_three_set_pct }}" data-suffix="%">0%</span>
+                    <span class="stat-card-label">Трёхсетовые</span>
+                </div>
+            </div>
+            <div class="stat-card card">
+                <div class="card-body">
+                    <span class="stat-card-value" data-count-up="{{ kpi_tiebreaks }}">0</span>
+                    <span class="stat-card-label">Тай-брейки</span>
+                    {% if kpi_walkovers %}
+                    <span class="stat-card-hint">тех. пор.: {{ kpi_walkovers }}</span>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </section>
 
+    {% if show_insights %}
+    <section class="tables-insights mb-4" data-reveal>
+        <h2 class="section-title mb-3">Интересные факты</h2>
+        <div class="tables-insights__grid">
+            {% for item in insights %}
+            <article class="tables-insight card">
+                <div class="card-body">
+                    <h3 class="tables-insight__title">{{ item.title }}</h3>
+                    <p class="tables-insight__text">{{ item.text }}</p>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
     {% if participants_count > 0 %}
     <!-- Турнирная таблица участников -->
-    <section class="tables-section card mb-4">
+    <section class="tables-section card mb-4" data-reveal>
         <div class="card-body">
             <h2 class="section-title mb-3">Турнирная таблица</h2>
             <div class="table-responsive">
@@ -121,8 +175,13 @@
                             {% elif is_olympic or is_tvd %}
                             <th>Очки за место</th>
                             {% elif is_round_robin %}
-                            <th>Очки (в турнире)</th>
-                            <th>Очки в рейтинг</th>
+                            <th>И</th>
+                            <th>В</th>
+                            <th>П</th>
+                            <th>Сеты</th>
+                            <th>Геймы</th>
+                            <th>Очки</th>
+                            <th>В рейтинг</th>
                             {% endif %}
                         </tr>
                     </thead>
@@ -152,6 +211,11 @@
                             {% elif is_olympic or is_tvd %}
                             <td class="fan-points">{{ s.fan_points }}</td>
                             {% elif is_round_robin %}
+                            <td>{{ s.matches|default:"0" }}</td>
+                            <td>{{ s.wins|default:"0" }}</td>
+                            <td>{{ s.losses|default:"0" }}</td>
+                            <td>{{ s.sets|default:"—" }}</td>
+                            <td>{{ s.games|default:"—" }}</td>
                             <td>{{ s.fan_points }}</td>
                             <td class="fan-points">{{ s.rating_points|default:"—" }}</td>
                             {% endif %}
@@ -164,9 +228,54 @@
     </section>
     {% endif %}
 
+    {% if show_heatmap and heatmap %}
+    <section class="tables-heatmap card mb-4" data-reveal>
+        <div class="card-body">
+            <h2 class="section-title mb-3">Матрица результатов</h2>
+            <div class="table-responsive">
+                <table class="tables-heatmap__table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            {% for label in heatmap.labels %}
+                            <th title="{{ label }}"><span>{{ forloop.counter }}</span></th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in heatmap.rows %}
+                        <tr>
+                            <th class="tables-heatmap__row-label" title="{{ row.label }}">
+                                <span class="tables-heatmap__idx">{{ row.index }}</span>
+                                <span class="tables-heatmap__name">{{ row.label }}</span>
+                            </th>
+                            {% for cell in row.cells %}
+                            <td class="tables-heatmap__cell tables-heatmap__cell--{{ cell.kind }}" title="{{ cell.text }}">{{ cell.text }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
     <!-- Графики -->
-    <section class="tables-charts mb-4">
-        <div class="charts-grid">
+    <section class="tables-charts mb-4" data-reveal>
+        <h2 class="section-title mb-3">Графики и показатели</h2>
+        <div class="charts-grid charts-grid--rich">
+            {% if show_chart_timeline %}
+            <div class="chart-card card chart-card--wide">
+                <div class="card-body">
+                    <h3 class="chart-title">Активность турнира</h3>
+                    <p class="chart-subtitle">Завершённые матчи по дням и накопительный итог</p>
+                    <div class="chart-container chart-container--tall">
+                        <canvas id="chartTimeline"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
             {% if show_chart_status %}
             <div class="chart-card card">
                 <div class="card-body">
@@ -177,12 +286,43 @@
                 </div>
             </div>
             {% endif %}
+            {% if show_chart_character %}
+            <div class="chart-card card">
+                <div class="card-body">
+                    <h3 class="chart-title">Характер побед</h3>
+                    <div class="chart-container">
+                        <canvas id="chartCharacter"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if show_chart_sets %}
+            <div class="chart-card card">
+                <div class="card-body">
+                    <h3 class="chart-title">Счета сетов</h3>
+                    <div class="chart-container">
+                        <canvas id="chartSetScores"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
             {% if show_chart_rounds %}
             <div class="chart-card card">
                 <div class="card-body">
                     <h3 class="chart-title">Распределение по раундам вылета</h3>
                     <div class="chart-container">
                         <canvas id="chartRounds"></canvas>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if show_chart_deltas %}
+            <div class="chart-card card chart-card--wide">
+                <div class="card-body">
+                    <h3 class="chart-title">Изменение рейтинга</h3>
+                    <p class="chart-subtitle">Кто набрал и кто потерял FAN-очки за турнир</p>
+                    <div class="chart-container chart-container--tall">
+                        <canvas id="chartRatingDeltas"></canvas>
                     </div>
                 </div>
             </div>
@@ -201,7 +341,7 @@
     </section>
 
     <!-- Матчи по раундам -->
-    <section class="tables-matches card mb-4">
+    <section class="tables-matches card mb-4" data-reveal>
         <div class="card-body">
             <h2 class="section-title mb-3">Матчи по раундам</h2>
             {% for round_name, is_consolation, round_matches in matches_by_round %}

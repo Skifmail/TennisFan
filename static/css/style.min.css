@@ -12581,20 +12581,28 @@ a.match-details-value__lead:hover {
 }
 
 /* Графики */
-.tables-detail .charts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+.tables-detail .charts-stack {
+    display: flex;
+    flex-direction: column;
     gap: var(--spacing-lg);
 }
 
-.tables-detail .charts-grid--rich {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+.tables-detail .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.tables-detail .charts-grid--compact {
+    /* Без wide-соседей auto-fit растягивает N карточек на всю ширину */
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .tables-detail .chart-card {
     border: 1px solid rgba(166, 130, 74, 0.18);
     background: rgba(6, 22, 17, 0.92);
     transition: border-color 0.25s ease, transform 0.25s ease;
+    min-width: 0;
 }
 
 .tables-detail .chart-card:hover {
@@ -12602,7 +12610,7 @@ a.match-details-value__lead:hover {
 }
 
 .tables-detail .chart-card--wide {
-    grid-column: 1 / -1;
+    width: 100%;
 }
 
 .tables-detail .chart-card .chart-title {
@@ -12627,6 +12635,18 @@ a.match-details-value__lead:hover {
 
 .tables-detail .chart-container--tall {
     height: 300px;
+}
+
+@media (max-width: 1100px) {
+    .tables-detail .charts-grid--compact {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .tables-detail .charts-grid--compact {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Reveal-анимации секций */
@@ -12763,10 +12783,16 @@ a.match-details-value__lead:hover {
 .tables-detail .player-avatar-xs {
     width: 24px;
     height: 24px;
-    border-radius: var(--radius-full);
+    min-width: 24px;
+    min-height: 24px;
+    max-width: 24px;
+    max-height: 24px;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
     object-fit: cover;
-    background: var(--color-bg);
+    object-position: center;
     flex-shrink: 0;
+    background: var(--color-bg);
 }
 
 .tables-detail .match-mini-vs {

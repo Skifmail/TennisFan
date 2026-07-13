@@ -3315,16 +3315,19 @@ form.club-filter-dropdown-open {
    Высота ≈ строка имени + отступ + строка категории/рейтинга. */
 .player-card__trophies {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
     margin-top: 0;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .player-card__trophies .profile-trophy--sm {
     display: block;
     line-height: 0;
+    flex: 0 0 auto;
 }
 
 .player-card__trophies .profile-trophy--sm .profile-trophy__img {
@@ -3338,14 +3341,45 @@ form.club-filter-dropdown-open {
 @media (width <= 768px) {
     .player-info {
         gap: var(--spacing-sm);
+        flex-wrap: wrap;
+        align-items: flex-start;
     }
 
+    .player-info__text {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    /* 1 кубок — справа от имени, как сейчас */
     .player-card__trophies {
-        gap: 4px;
+        gap: 3px;
+        flex: 0 1 auto;
+        max-width: min(42%, 7.5rem);
     }
 
     .player-card__trophies .profile-trophy--sm .profile-trophy__img {
-        height: calc((var(--font-size-base) * 1.35 + 1.6rem) / 0.86 * 0.9);
+        height: calc((var(--font-size-base) * 1.35 + 1.6rem) / 0.86 * 0.75);
+    }
+
+    /* 2+ кубков — отдельной строкой под именем, чтобы не сжимать статистику */
+    .player-info:has(.profile-trophy:nth-child(2)) .player-card__trophies {
+        flex: 1 1 100%;
+        max-width: 100%;
+        margin-top: 2px;
+    }
+
+    .player-info:has(.profile-trophy:nth-child(2)) .profile-trophy--sm .profile-trophy__img {
+        height: 24px;
+    }
+}
+
+@media (width <= 480px) {
+    .player-card__trophies .profile-trophy--sm .profile-trophy__img {
+        height: 22px;
+    }
+
+    .player-info:has(.profile-trophy:nth-child(2)) .profile-trophy--sm .profile-trophy__img {
+        height: 20px;
     }
 }
 

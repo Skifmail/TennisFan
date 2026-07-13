@@ -510,20 +510,28 @@
 }
 
 /* Графики */
-.tables-detail .charts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+.tables-detail .charts-stack {
+    display: flex;
+    flex-direction: column;
     gap: var(--spacing-lg);
 }
 
-.tables-detail .charts-grid--rich {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+.tables-detail .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.tables-detail .charts-grid--compact {
+    /* Без wide-соседей auto-fit растягивает N карточек на всю ширину */
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .tables-detail .chart-card {
     border: 1px solid rgba(166, 130, 74, 0.18);
     background: rgba(6, 22, 17, 0.92);
     transition: border-color 0.25s ease, transform 0.25s ease;
+    min-width: 0;
 }
 
 .tables-detail .chart-card:hover {
@@ -531,7 +539,7 @@
 }
 
 .tables-detail .chart-card--wide {
-    grid-column: 1 / -1;
+    width: 100%;
 }
 
 .tables-detail .chart-card .chart-title {
@@ -556,6 +564,12 @@
 
 .tables-detail .chart-container--tall {
     height: 300px;
+}
+
+@media (max-width: 640px) {
+    .tables-detail .charts-grid--compact {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Reveal-анимации секций */

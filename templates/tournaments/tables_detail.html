@@ -264,7 +264,7 @@
     <!-- Графики -->
     <section class="tables-charts mb-4" data-reveal>
         <h2 class="section-title mb-3">Графики и показатели</h2>
-        <div class="charts-grid charts-grid--rich">
+        <div class="charts-stack">
             {% if show_chart_timeline %}
             <div class="chart-card card chart-card--wide">
                 <div class="card-body">
@@ -276,46 +276,60 @@
                 </div>
             </div>
             {% endif %}
-            {% if show_chart_status %}
-            <div class="chart-card card">
-                <div class="card-body">
-                    <h3 class="chart-title">Статус матчей</h3>
-                    <div class="chart-container">
-                        <canvas id="chartStatus"></canvas>
+
+            <div class="charts-grid charts-grid--compact">
+                {% if show_chart_status %}
+                <div class="chart-card card">
+                    <div class="card-body">
+                        <h3 class="chart-title">Статус матчей</h3>
+                        <div class="chart-container">
+                            <canvas id="chartStatus"></canvas>
+                        </div>
                     </div>
                 </div>
-            </div>
-            {% endif %}
-            {% if show_chart_character %}
-            <div class="chart-card card">
-                <div class="card-body">
-                    <h3 class="chart-title">Характер побед</h3>
-                    <div class="chart-container">
-                        <canvas id="chartCharacter"></canvas>
+                {% endif %}
+                {% if show_chart_character %}
+                <div class="chart-card card">
+                    <div class="card-body">
+                        <h3 class="chart-title">Характер побед</h3>
+                        <div class="chart-container">
+                            <canvas id="chartCharacter"></canvas>
+                        </div>
                     </div>
                 </div>
-            </div>
-            {% endif %}
-            {% if show_chart_sets %}
-            <div class="chart-card card">
-                <div class="card-body">
-                    <h3 class="chart-title">Счета сетов</h3>
-                    <div class="chart-container">
-                        <canvas id="chartSetScores"></canvas>
+                {% endif %}
+                {% if show_chart_sets %}
+                <div class="chart-card card">
+                    <div class="card-body">
+                        <h3 class="chart-title">Счета сетов</h3>
+                        <div class="chart-container">
+                            <canvas id="chartSetScores"></canvas>
+                        </div>
                     </div>
                 </div>
-            </div>
-            {% endif %}
-            {% if show_chart_rounds %}
-            <div class="chart-card card">
-                <div class="card-body">
-                    <h3 class="chart-title">Распределение по раундам вылета</h3>
-                    <div class="chart-container">
-                        <canvas id="chartRounds"></canvas>
+                {% endif %}
+                {% if show_chart_rounds %}
+                <div class="chart-card card">
+                    <div class="card-body">
+                        <h3 class="chart-title">Раунды вылета</h3>
+                        <div class="chart-container">
+                            <canvas id="chartRounds"></canvas>
+                        </div>
                     </div>
                 </div>
+                {% endif %}
+                {% if show_chart_ratings %}
+                <div class="chart-card card">
+                    <div class="card-body">
+                        <h3 class="chart-title">Рейтинг участников</h3>
+                        <div class="chart-container">
+                            <canvas id="chartRatings"></canvas>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
+
             {% if show_chart_deltas %}
             <div class="chart-card card chart-card--wide">
                 <div class="card-body">
@@ -323,16 +337,6 @@
                     <p class="chart-subtitle">Кто набрал и кто потерял FAN-очки за турнир</p>
                     <div class="chart-container chart-container--tall">
                         <canvas id="chartRatingDeltas"></canvas>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-            {% if show_chart_ratings %}
-            <div class="chart-card card">
-                <div class="card-body">
-                    <h3 class="chart-title">Рейтинг участников (топ-20)</h3>
-                    <div class="chart-container">
-                        <canvas id="chartRatings"></canvas>
                     </div>
                 </div>
             </div>

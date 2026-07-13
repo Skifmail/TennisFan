@@ -66,6 +66,16 @@
     flex-shrink: 0;
 }
 
+.lightbox-counter {
+    margin: var(--spacing-xs) 0 0;
+    padding: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    letter-spacing: 0.08em;
+    text-align: center;
+    flex-shrink: 0;
+}
+
 .lightbox-close,
 .lightbox-prev,
 .lightbox-next {
@@ -84,6 +94,7 @@
     transition: background 0.2s;
     padding: 0;
     line-height: 1;
+    z-index: 1;
 }
 
 .lightbox-close:hover,
@@ -108,4 +119,22 @@
     right: var(--spacing-md);
     top: 50%;
     transform: translateY(-50%);
+}
+
+@media (width <= 768px) {
+    .lightbox-prev,
+    .lightbox-next {
+        width: 40px;
+        height: 40px;
+        font-size: 1.75rem;
+        background: rgb(166 130 74 / 55%);
+    }
+
+    .lightbox-prev {
+        left: 8px;
+    }
+
+    .lightbox-next {
+        right: 8px;
+    }
 }

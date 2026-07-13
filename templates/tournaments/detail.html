@@ -52,8 +52,8 @@
             </a>
             {% endif %}
             {% if tournament.photos.all %}
-            <div class="tournament-photos" aria-label="Фото с турнира">
-                <h3 class="tournament-photos__title">Фото с турнира</h3>
+            <div class="tournament-photos" aria-label="Фотогалерея">
+                <h3 class="tournament-photos__title">Фотогалерея</h3>
                 <div class="tournament-photos__grid">
                     {% for photo in tournament.photos.all %}
                     <a href="{{ photo.image.url }}"

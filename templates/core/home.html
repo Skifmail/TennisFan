@@ -99,6 +99,56 @@
         align-self: end;
     }
 
+    .home-section--actions .home-action-card__trophies {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 0.15rem;
+        width: 200px;
+    }
+
+    .home-section--actions .home-action-card__trophy {
+        margin: 0;
+        flex: 1;
+        min-width: 0;
+        text-align: center;
+        transition: transform 0.2s ease;
+        will-change: transform;
+    }
+
+    .home-section--actions .home-action-card__trophy-link {
+        display: block;
+        text-decoration: none;
+        line-height: 0;
+        cursor: pointer;
+    }
+
+    .home-section--actions .home-action-card__trophy:hover {
+        transform: translateY(-10px);
+    }
+
+    .home-section--actions .home-action-card__trophy--1 {
+        flex: 1.35;
+        transform: translateY(-6px);
+    }
+
+    .home-section--actions .home-action-card__trophy--1:hover {
+        transform: translateY(-16px);
+    }
+
+    .home-section--actions .home-action-card__trophy figcaption {
+        margin-top: 0.2rem;
+        color: var(--color-text-secondary);
+        font-size: 0.65rem;
+        line-height: 1.2;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+
+    .home-section--actions .home-action-card--awards .home-action-card__image-wrap {
+        width: 200px;
+    }
+
     @media (max-width: 900px) {
         .home-section--actions .home-actions-grid {
             grid-template-columns: 1fr;
@@ -124,6 +174,15 @@
 
         .home-section--actions .home-action-card__image-wrap {
             width: 120px;
+        }
+
+        .home-section--actions .home-action-card--awards .home-action-card__image-wrap,
+        .home-section--actions .home-action-card__trophies {
+            width: 132px;
+        }
+
+        .home-section--actions .home-action-card__trophy figcaption {
+            font-size: 0.55rem;
         }
 
         .home-section--actions .home-action-card__btn {
@@ -478,6 +537,45 @@
                 <h3 class="home-action-card__title">Прокачать рейтинг</h3>
                 <p class="home-action-card__text">Следи за очками сезона и ростом позиции в общем рейтинге игроков.</p>
                 <a href="{% url 'rating' %}" class="btn btn-outline home-action-card__btn">Открыть рейтинг</a>
+            </article>
+
+            <article class="home-action-card home-action-card--awards">
+                <div class="home-action-card__image-wrap home-action-card__trophies">
+                    <figure class="home-action-card__trophy home-action-card__trophy--2">
+                        <a href="{% static 'images/trophy-place-2.png' %}"
+                           class="js-lightbox home-action-card__trophy-link"
+                           data-lightbox-src="{% static 'images/trophy-place-2.png' %}"
+                           data-lightbox-group="home-awards">
+                            <img src="{% static 'images/trophy-place-2.png' %}" alt="Кубок за 2 место" class="home-action-card__image" loading="lazy">
+                        </a>
+                        <figcaption>2 место</figcaption>
+                    </figure>
+                    <figure class="home-action-card__trophy home-action-card__trophy--1">
+                        <a href="{% static 'images/trophy-place-1.png' %}"
+                           class="js-lightbox home-action-card__trophy-link"
+                           data-lightbox-src="{% static 'images/trophy-place-1.png' %}"
+                           data-lightbox-group="home-awards">
+                            <img src="{% static 'images/trophy-place-1.png' %}" alt="Кубок за 1 место" class="home-action-card__image" loading="lazy">
+                        </a>
+                        <figcaption>1 место</figcaption>
+                    </figure>
+                    <figure class="home-action-card__trophy home-action-card__trophy--3">
+                        <a href="{% static 'images/trophy-place-3.png' %}"
+                           class="js-lightbox home-action-card__trophy-link"
+                           data-lightbox-src="{% static 'images/trophy-place-3.png' %}"
+                           data-lightbox-group="home-awards">
+                            <img src="{% static 'images/trophy-place-3.png' %}" alt="Кубок за 3 место" class="home-action-card__image" loading="lazy">
+                        </a>
+                        <figcaption>3 место</figcaption>
+                    </figure>
+                </div>
+                <h3 class="home-action-card__title">Награды TennisFan</h3>
+                <p class="home-action-card__text">
+                    За призовые места в турнирах — виртуальные кубки TennisFan:
+                    золотой за 1-е, серебряный за 2-е и бронзовый за 3-е.
+                    Кубки сохраняются в Вашем профиле.
+                </p>
+                <a href="{% url 'tournament_list' %}" class="btn btn-outline home-action-card__btn">За кубками</a>
             </article>
         </div>
     </div>

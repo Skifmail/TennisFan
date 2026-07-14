@@ -329,12 +329,25 @@ def _build_bracket_standings(tournament, is_fan, is_olympic):
     return standings
 
 
-def tournament_list(request):
-    """List of tournaments. Формирование сеток выполняется по cron-задаче."""
+def tournament_list(request, *, archive: bool = False):
+    """Список турниров платформы и клубов.
 
+    Завершённые турниры по умолчанию скрыты и доступны через фильтр
+    «Завершённые» или отдельную страницу архива.
+
+    Args:
+        request (HttpRequest): HTTP-запрос со query-параметрами фильтров.
+        archive (bool): Если True — показывать только завершённые турниры.
+
+    Returns:
+        HttpResponse: Страница списка или архива турниров.
+    """
     city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
-    status = request.GET.get("status", "")
+    if archive:
+        status = TournamentStatus.COMPLETED
+    else:
+        status = request.GET.get("status", "")
     club_filter = (request.GET.get("club") or "").strip()
 
     # Турниры платформы и клубов (клубные — с отдельным CTA «Вступить в клуб»).
@@ -368,6 +381,9 @@ def tournament_list(request):
         ).distinct()
     if status:
         tournaments = tournaments.filter(status=status)
+    else:
+        # В общем списке завершённые не показываем — только по явному фильтру/архиву.
+        tournaments = tournaments.exclude(status=TournamentStatus.COMPLETED)
     if club_filter == CLUB_FILTER_PLATFORM:
         tournaments = tournaments.filter(club__isnull=True)
     elif club_filter == CLUB_FILTER_CLUB_ONLY:
@@ -525,8 +541,21 @@ def tournament_list(request):
         "list_club_filter": club_filter,
         "club_filter_choices": club_filter_choices_for_tournament_lists(),
         "category_choices": SkillLevel.choices,
+        "is_archive": archive,
     }
     return render(request, "tournaments/list.html", context)
+
+
+def tournament_archive(request):
+    """Архив завершённых турниров.
+
+    Args:
+        request (HttpRequest): HTTP-запрос со query-параметрами фильтров.
+
+    Returns:
+        HttpResponse: Страница архива завершённых турниров.
+    """
+    return tournament_list(request, archive=True)
 
 
 def _get_interclub_context(request, tournament):

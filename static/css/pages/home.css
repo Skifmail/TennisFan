@@ -1540,6 +1540,51 @@
     justify-content: center;
 }
 
+.home-action-card__trophies {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.15rem;
+}
+
+.home-action-card__trophy {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    transition: transform 0.2s ease;
+    will-change: transform;
+}
+
+.home-action-card__trophy-link {
+    display: block;
+    text-decoration: none;
+    line-height: 0;
+    cursor: pointer;
+}
+
+.home-action-card__trophy:hover {
+    transform: translateY(-10px);
+}
+
+.home-action-card__trophy--1 {
+    flex: 1.35;
+    transform: translateY(-6px);
+}
+
+.home-action-card__trophy--1:hover {
+    transform: translateY(-16px);
+}
+
+.home-action-card__trophy figcaption {
+    margin-top: 0.2rem;
+    color: var(--color-text-secondary);
+    font-size: 0.65rem;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
 @media (width <= 768px) {
     .section-header--stacked {
         align-items: stretch;

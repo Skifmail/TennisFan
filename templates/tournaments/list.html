@@ -1,16 +1,16 @@
 {% extends 'base.html' %}
 
-{% block title %}Турниры{% endblock %}
+{% block title %}{% if is_archive %}Архив турниров{% else %}Турниры{% endif %}{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">Турниры</h1>
-    <p class="page-subtitle">Расписание теннисных турниров</p>
+    <h1 class="page-title">{% if is_archive %}Архив турниров{% else %}Турниры{% endif %}</h1>
+    <p class="page-subtitle">{% if is_archive %}Завершённые теннисные турниры{% else %}Расписание теннисных турниров{% endif %}</p>
 </div>
 
 <div class="container">
     <!-- Filters -->
-    <form method="get" class="filter-bar">
+    <form method="get" class="filter-bar" {% if is_archive %}action="{% url 'tournament_archive' %}"{% endif %}>
         <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
         <select name="category" class="form-control" onchange="this.form.submit()">
             <option value="">Все категории</option>
@@ -18,12 +18,14 @@
             <option value="{{ value }}" {% if current_category == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
+        {% if not is_archive %}
         <select name="status" class="form-control" onchange="this.form.submit()">
             <option value="">Все статусы</option>
             <option value="upcoming" {% if current_status == 'upcoming' %}selected{% endif %}>Предстоящие</option>
             <option value="active" {% if current_status == 'active' %}selected{% endif %}>Активные</option>
             <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Завершённые</option>
         </select>
+        {% endif %}
         {% include 'includes/club_filter_select.html' with selected_club=list_club_filter|default:'' auto_submit=1 id_suffix='list' aria_label='Фильтр по клубу' %}
     </form>
 
@@ -31,7 +33,7 @@
         {% for tournament in tournaments %}
             {% include 'includes/tournament_card.html' with tournament=tournament %}
         {% empty %}
-        <p class="text-secondary">Турниры не найдены.</p>
+        <p class="text-secondary">{% if is_archive %}Завершённые турниры не найдены.{% else %}Турниры не найдены.{% endif %}</p>
         {% endfor %}
     </div>
     {% if tournaments_page and tournaments_page.paginator.num_pages > 1 %}
@@ -42,7 +44,7 @@
                 <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
                 {% else %}
                 <li class="pagination__item">
-                    <a href="?page={{ page_num }}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
+                    <a href="?page={{ page_num }}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_status and not is_archive %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
                 </li>
                 {% endif %}
             {% endfor %}

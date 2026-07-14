@@ -143,11 +143,26 @@ class TournamentListCardStateTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Вы записаны")
         self.assertContains(response, "Регистрация закрыта")
-        self.assertContains(response, "Турнир завершён")
+        self.assertNotContains(response, completed.name)
         self.assertContains(
             response,
             reverse("tournament_register", kwargs={"slug": open_tournament.slug}),
         )
+
+        completed_filter = self.client.get(
+            reverse("tournament_list"),
+            {"status": "completed"},
+            secure=True,
+        )
+        self.assertEqual(completed_filter.status_code, 200)
+        self.assertContains(completed_filter, completed.name)
+        self.assertContains(completed_filter, "Турнир завершён")
+
+        archive = self.client.get(reverse("tournament_archive"), secure=True)
+        self.assertEqual(archive.status_code, 200)
+        self.assertContains(archive, "Архив турниров")
+        self.assertContains(archive, completed.name)
+        self.assertNotContains(archive, open_tournament.name)
 
     def test_tournament_list_club_filter_limits_results(self) -> None:
         club = Club.objects.create(

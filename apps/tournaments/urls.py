@@ -8,6 +8,7 @@ from . import views
 
 urlpatterns = [
     path("", views.tournament_list, name="tournament_list"),
+    path("archive/", views.tournament_archive, name="tournament_archive"),
     path("tables/", views.tournament_tables_list, name="tournament_tables_list"),
     path(
         "tables/<slug:slug>/",

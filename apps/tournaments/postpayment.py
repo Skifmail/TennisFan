@@ -676,7 +676,7 @@ def sync_postpayment_invoices_deadline(tournament: Tournament) -> int:
     started_at = tournament.postpayment_window_started_at
     if started_at is None or not tournament.allow_postpayment:
         return 0
-    hours = int(tournament.postpayment_deadline_hours or 12)
+    hours = tournament.get_postpayment_deadline_hours()
     new_due_at = started_at + timedelta(hours=hours)
     now = timezone.now()
     updated = int(
@@ -952,7 +952,7 @@ def open_postpayment_window(tournament: Tournament) -> tuple[int, int]:
     if not pending_users:
         return 0, fancoin_settled
     now = timezone.now()
-    due_at = now + timedelta(hours=int(tournament.postpayment_deadline_hours or 12))
+    due_at = now + timedelta(hours=tournament.get_postpayment_deadline_hours())
     created_count = 0
     for user in pending_users:
         invoice, created = TournamentPostpaymentInvoice.objects.get_or_create(

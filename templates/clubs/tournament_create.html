@@ -211,7 +211,7 @@
                             {{ form.allow_postpayment }}
                             <span>
                                 <span class="club-tournament-create__toggle-title">{{ form.allow_postpayment.label }}</span>
-                                <span class="club-tournament-create__toggle-help">Разрешить регистрацию без немедленной оплаты взноса с окном постоплаты 12 часов.</span>
+                                <span class="club-tournament-create__toggle-help">Разрешить регистрацию без немедленной оплаты взноса. Срок постоплаты задаётся отдельно (по умолчанию 12 часов).</span>
                             </span>
                         </label>
                         {% for error in form.allow_postpayment.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}

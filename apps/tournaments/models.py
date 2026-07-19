@@ -205,22 +205,27 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         default=False,
         help_text=(
             "Разрешить регистрацию без немедленной оплаты вступительного взноса. "
-            "После дедлайна участникам без оплаты отправляется ссылка и даётся 12 часов."
+            "После дедлайна регистрации участникам без оплаты отправляется ссылка; "
+            "срок оплаты задаётся полем «Длительность окна постоплаты» ниже."
+        ),
+    )
+    postpayment_deadline_hours = models.PositiveSmallIntegerField(
+        "Длительность окна постоплаты (часы)",
+        default=12,
+        help_text=(
+            "Сколько часов есть на оплату после старта окна. "
+            "По умолчанию 12; можно увеличить (например, до 24). "
+            "При изменении сроки у активных инвойсов пересчитываются "
+            "от момента старта окна."
         ),
     )
     postpayment_window_started_at = models.DateTimeField(
         "Старт окна постоплаты",
         null=True,
         blank=True,
-        help_text="Когда запущено 12-часовое окно оплаты для участников без оплаты.",
-    )
-    postpayment_deadline_hours = models.PositiveSmallIntegerField(
-        "Длительность окна постоплаты (часы)",
-        default=12,
         help_text=(
-            "Через сколько часов после запуска окна неоплатившие удаляются. "
-            "При изменении значения сроки (due_at) у активных инвойсов "
-            "пересчитываются от момента старта окна."
+            "Фактическое время открытия окна (заполняется автоматически). "
+            "Конец окна = старт + длительность в часах."
         ),
     )
 
@@ -399,18 +404,42 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             return 0
         return int(max(0, self.max_participants - self.participants.count()))
 
+    def get_postpayment_deadline_hours(self) -> int:
+        """Вернуть длительность окна постоплаты в часах.
+
+        Returns:
+            int: Часы на оплату (минимум 1).
+        """
+        return max(1, int(self.postpayment_deadline_hours or 12))
+
+    def get_postpayment_window_ends_at(self):
+        """Вернуть момент окончания окна постоплаты.
+
+        Returns:
+            datetime | None: ``старт + длительность`` или ``None``, если окно не открыто.
+        """
+        from datetime import timedelta
+
+        started = self.postpayment_window_started_at
+        if started is None:
+            return None
+        return started + timedelta(hours=self.get_postpayment_deadline_hours())
+
     def save(self, *args, **kwargs) -> None:
         """Custom save to normalize duration and reset notification flag when дедлайн сдвинут."""
         from django.utils import timezone
 
         old_deadline_hours: int | None = None
+        old_status: str | None = None
         if self.pk:
-            old_deadline_hours = (
+            previous = (
                 type(self)
                 .objects.filter(pk=self.pk)
-                .values_list("postpayment_deadline_hours", flat=True)
+                .values_list("postpayment_deadline_hours", "status")
                 .first()
             )
+            if previous is not None:
+                old_deadline_hours, old_status = previous
 
         # ТВД (format=weekend_day) задаёт duration в админке; остальные — многодневные.
         if self.format != TournamentFormat.WEEKEND_DAY:
@@ -439,6 +468,15 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             from .postpayment import sync_postpayment_invoices_deadline
 
             sync_postpayment_invoices_deadline(self)
+
+        # Отменён → снова активный: сбросить «фантомные» покрытия FT и списать заново.
+        if (
+            old_status == TournamentStatus.CANCELLED
+            and self.status != TournamentStatus.CANCELLED
+        ):
+            from .cancel import restore_tournament_after_cancellation
+
+            restore_tournament_after_cancellation(self)
 
 
 class TournamentPhoto(CompressImageFieldsMixin, models.Model):

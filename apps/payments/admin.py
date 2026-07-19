@@ -16,7 +16,7 @@ class PaymentRecordAdmin(admin.ModelAdmin):
     """Журнал оплат: компактный список + экспорт в CSV."""
 
     list_display = (
-        "user",
+        "user_display",
         "payment_type",
         "item_label",
         "amount",
@@ -26,6 +26,8 @@ class PaymentRecordAdmin(admin.ModelAdmin):
         "autopay_enabled",
         "paid_at",
     )
+    list_display_links = ("user_display",)
+    list_select_related = ("user",)
     list_filter = (
         "payment_type",
         "status",
@@ -59,6 +61,18 @@ class PaymentRecordAdmin(admin.ModelAdmin):
         "created_at",
     )
     actions = ("export_as_csv",)
+
+    @admin.display(description="Пользователь", ordering="user__last_name")
+    def user_display(self, obj: PaymentRecord) -> str:
+        """Показать имя пользователя вместо email в списке оплат.
+
+        Args:
+            obj (PaymentRecord): Запись об оплате.
+
+        Returns:
+            str: Имя и фамилия или email, если ФИО пустые.
+        """
+        return str(obj.user.get_display_name())
 
     @admin.action(description="Выгрузить выбранные оплаты в CSV")
     def export_as_csv(

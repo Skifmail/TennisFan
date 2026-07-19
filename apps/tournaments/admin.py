@@ -707,7 +707,7 @@ class TournamentAdmin(admin.ModelAdmin):
         )
         btn_base = (
             "display:inline-flex; align-items:center; justify-content:center; "
-            "box-sizing:border-box; margin:0; padding:8px 12px; "
+            "box-sizing:border-box; margin:0 0 10px; padding:8px 12px; "
             "border-radius:6px; text-decoration:none; font-size:13px; "
             "font-weight:600; text-align:center; max-width:100%;"
         )
@@ -718,7 +718,7 @@ class TournamentAdmin(admin.ModelAdmin):
                 "'Списать FT у участников с достаточным балансом? "
                 "Инвойсы таких участников будут отменены.'"
                 ');" style="{} border:1px solid #8250df; '
-                'background:#fbefff; color:#8250df; width:100%;">'
+                'background:#fbefff; color:#8250df;">'
                 "Списать FT у участников с постоплатой</a>",
                 settle_url,
                 btn_base,
@@ -726,7 +726,7 @@ class TournamentAdmin(admin.ModelAdmin):
         else:
             settle_btn = format_html(
                 '<span style="{} border:1px solid #ccc; '
-                'background:#f6f8fa; color:#8c959f; width:100%;" '
+                'background:#f6f8fa; color:#8c959f;" '
                 'title="Нет участников для списания FT">'
                 "Списать FT — не требуется</span>",
                 btn_base,
@@ -790,26 +790,36 @@ class TournamentAdmin(admin.ModelAdmin):
                 )
             else:
                 confirm_btn = mark_safe("")
+            # На широком экране — 3 колонки в ряд; на узком flex переносит вниз.
             return cast(
                 str,
                 format_html(
                     '<div style="'
                     "box-sizing:border-box; width:100%; max-width:100%; "
-                    "margin:0 0 10px; padding:12px; "
+                    "margin:0 0 8px; padding:10px 12px; "
                     "border:1px solid #d0d7de; border-radius:8px; "
                     "background:var(--body-bg, #fff); "
+                    "display:flex; flex-wrap:wrap; gap:10px 20px; "
+                    "align-items:flex-start; "
                     'overflow-wrap:anywhere; word-break:break-word;">'
-                    '<div style="font-weight:600; font-size:14px; margin-bottom:8px;">'
-                    "{}</div>"
+                    '<div style="flex:1 1 170px; min-width:150px;">'
+                    '<div style="font-weight:600; font-size:14px; '
+                    'margin-bottom:6px;">{}</div>'
                     '<div style="display:flex; flex-wrap:wrap; gap:8px; '
-                    'align-items:center; margin-bottom:8px;">'
-                    "{}{}</div>"
+                    'align-items:center;">{}{}</div>'
+                    "</div>"
+                    '<div style="flex:1 1 200px; min-width:160px;">'
+                    '<div style="font-size:11px; color:#656d76; '
+                    'margin-bottom:4px;">Статус</div>'
                     '<div style="display:flex; flex-wrap:wrap; gap:8px; '
-                    'align-items:center; margin-bottom:8px;">'
-                    '<span style="font-size:12px; color:#656d76;">Статус:</span>'
-                    "{}{}</div>"
-                    '<div style="font-size:12px; color:#656d76; line-height:1.45;">'
-                    "<strong>Детали:</strong> {}</div>"
+                    'align-items:center;">{}{}</div>'
+                    "</div>"
+                    '<div style="flex:2 1 240px; min-width:180px;">'
+                    '<div style="font-size:11px; color:#656d76; '
+                    'margin-bottom:4px;">Детали</div>'
+                    '<div style="font-size:12px; color:#656d76; '
+                    'line-height:1.45;">{}</div>'
+                    "</div>"
                     "</div>",
                     row.display_name,
                     call_btn,
@@ -836,11 +846,11 @@ class TournamentAdmin(admin.ModelAdmin):
             _PAYMENT_STATUS_TONE_STYLES["warning"],
         )
         summary = format_html(
-            '<div style="margin-bottom:10px; font-size:13px; '
+            '<div style="margin-bottom:8px; font-size:13px; '
             'line-height:1.5; overflow-wrap:anywhere;">{}</div>{}',
             format_html_join(
-                "<br>",
-                "<span>{}</span>",
+                " · ",
+                "{}",
                 ((part,) for part in summary_parts),
             ),
             settle_btn,
@@ -850,7 +860,7 @@ class TournamentAdmin(admin.ModelAdmin):
             format_html(
                 '<div style="box-sizing:border-box; width:100%; max-width:100%; '
                 'overflow-x:hidden;">'
-                "{}<div style='margin-top:12px'>{}</div>{}"
+                "{}<div style='margin-top:4px'>{}</div>{}"
                 "</div>",
                 summary,
                 cards,

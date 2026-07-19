@@ -417,6 +417,8 @@ def tournament_list(request, *, archive: bool = False):
             ).values_list("club_id", flat=True)
         )
 
+    from apps.tournaments.platform_home import get_tournament_public_status_label
+
     for tournament in tournaments_page_list:
         tournament.card_action_label = "Записаться"
         tournament.card_action_url = None
@@ -425,6 +427,19 @@ def tournament_list(request, *, archive: bool = False):
         tournament.card_action_is_join_form = False
         tournament.card_join_club_slug = ""
         tournament.card_join_next_url = ""
+        if tournament.is_doubles():
+            current_slots_count = int(
+                getattr(tournament, "full_teams_count_annotated", 0)
+            )
+            max_slots = tournament.max_teams
+        else:
+            current_slots_count = int(getattr(tournament, "participants_count", 0))
+            max_slots = tournament.max_participants
+        tournament.current_slots_count = current_slots_count
+        tournament.is_full_annotated = bool(
+            max_slots and current_slots_count >= max_slots
+        )
+        tournament.card_status_label = get_tournament_public_status_label(tournament)
 
         if tournament.status == TournamentStatus.COMPLETED:
             tournament.card_action_label = "Турнир завершён"
@@ -435,20 +450,10 @@ def tournament_list(request, *, archive: bool = False):
         if tournament.status != TournamentStatus.UPCOMING:
             tournament.card_action_label = "Регистрация закрыта"
             continue
-        if tournament.bracket_generated:
+        if tournament.bracket_generated or tournament.postpayment_window_started_at:
             tournament.card_action_label = "Регистрация закрыта"
             continue
-        if tournament.is_doubles():
-            current_slots_count = int(
-                getattr(tournament, "full_teams_count_annotated", 0)
-            )
-            max_slots = tournament.max_teams
-        else:
-            current_slots_count = int(getattr(tournament, "participants_count", 0))
-            max_slots = tournament.max_participants
-        tournament.current_slots_count = current_slots_count
-        is_full = bool(max_slots and current_slots_count >= max_slots)
-        if is_full:
+        if tournament.is_full_annotated:
             tournament.card_action_label = "Мест нет"
             continue
 

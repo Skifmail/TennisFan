@@ -1844,12 +1844,6 @@ def home(request):
     pending_join_club_ids, member_club_ids = (
         load_user_club_ids_for_platform_tournaments(request.user)
     )
-    attach_home_tournament_rows(
-        tournaments_page.object_list,
-        request.user,
-        pending_join_club_ids=pending_join_club_ids,
-        member_club_ids=member_club_ids,
-    )
     for tournament in tournaments_page.object_list:
         if tournament.is_doubles():
             current_count = int(getattr(tournament, "full_teams_count_annotated", 0))
@@ -1859,6 +1853,12 @@ def home(request):
             max_slots = tournament.max_participants
         tournament.current_slots_count = current_count
         tournament.is_full_annotated = bool(max_slots and current_count >= max_slots)
+    attach_home_tournament_rows(
+        tournaments_page.object_list,
+        request.user,
+        pending_join_club_ids=pending_join_club_ids,
+        member_club_ids=member_club_ids,
+    )
 
     # Получаем топ игроков по сезонным очкам
     from apps.tournaments.season_utils import annotate_season_pts

@@ -19,8 +19,8 @@
             {% for tournament in tournaments_page %}
             <tr class="tournament-table__row" onclick="window.location.href='{% url 'tournament_detail' slug=tournament.slug %}'">
                 <td class="tournament-table__cell tournament-table__cell--status">
-                    <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }} tournament-status-badge--inline" title="{{ tournament.get_status_display }}">
-                        {% if tournament.status == 'upcoming' %}Идет набор{% elif tournament.status == 'active' %}В ИГРЕ{% elif tournament.status == 'cancelled' %}ОТМЕНЕН{% else %}ЗАВЕРШЕН{% endif %}
+                    <span class="tournament-status-badge tournament-status-badge--{{ tournament.status }} tournament-status-badge--inline" title="{{ tournament.card_status_label|default:tournament.get_status_display }}">
+                        {{ tournament.card_status_label|default:"—" }}
                     </span>
                 </td>
                 <td class="tournament-table__cell tournament-table__cell--club{% if tournament.club %} tournament-table__cell--club-host{% else %} tournament-table__cell--club-platform{% endif %}" onclick="event.stopPropagation();">

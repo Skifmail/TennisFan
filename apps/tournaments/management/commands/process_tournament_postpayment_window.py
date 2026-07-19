@@ -9,6 +9,7 @@ from apps.tournaments.postpayment import (
     get_postpayment_progress,
     send_1h_reminders,
     settle_postpayment_with_available_fancoin,
+    sync_postpayment_invoices_deadline,
 )
 
 
@@ -38,6 +39,8 @@ class Command(BaseCommand):
             postpayment_window_started_at__isnull=False,
         ).distinct()
         for tournament in tournaments:
+            # Подтянуть due_at из postpayment_deadline_hours (если админ продлил окно).
+            sync_postpayment_invoices_deadline(tournament)
             progress = get_postpayment_progress(tournament)
             is_completed = bool(progress["completed"])
             has_expired_pending = TournamentPostpaymentInvoice.objects.filter(

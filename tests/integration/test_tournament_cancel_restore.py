@@ -1,6 +1,7 @@
 """Интеграционные тесты: отмена турнира и восстановление статуса."""
 
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
@@ -17,6 +18,7 @@ from apps.tournaments.cancel import (
 )
 from apps.tournaments.models import (
     Tournament,
+    TournamentPostpaymentInvoice,
     TournamentRegistrationCoverage,
     TournamentStatus,
 )
@@ -137,3 +139,63 @@ class TournamentCancelRestoreTestCase(TestCase):
         self.assertEqual(settled, 1)
         self.sub.refresh_from_db()
         self.assertEqual(self.sub.fancoin_balance, 0)
+
+    def test_cancel_credits_ft_for_paid_postpayment(self) -> None:
+        """Оплата постоплаты в ₽ компенсируется начислением FT при отмене."""
+        payer = User.objects.create_user(email="paid-rub@test.local", password="x")
+        player = Player.objects.create(user=payer, skill_level=SkillLevel.AMATEUR)
+        self.tournament.participants.add(player)
+        tier = SubscriptionTier.objects.create(
+            name=f"tier-{payer.pk}",
+            display_name="Test",
+            fancoin_per_purchase=15,
+            duration_days=30,
+            is_visible=True,
+            is_unlimited=False,
+        )
+        sub = UserSubscription.objects.create(
+            user=payer,
+            tier=tier,
+            start_date=timezone.now(),
+            end_date=timezone.now() + timedelta(days=30),
+            fancoin_balance=0,
+            is_active=True,
+        )
+        due = timezone.now() + timedelta(hours=12)
+        TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=payer,
+            amount=Decimal("500.00"),
+            status=TournamentPostpaymentInvoice.Status.PAID,
+            due_at=due,
+            paid_at=timezone.now(),
+        )
+
+        cancel_tournament(self.tournament)
+
+        sub.refresh_from_db()
+        self.assertEqual(sub.fancoin_balance, TOURNAMENT_REGISTRATION_COST)
+        self.assertTrue(
+            FancoinTransaction.objects.filter(
+                user=payer,
+                reason=FancoinTransaction.Reason.TOURNAMENT_CANCEL,
+                direction=FancoinTransaction.Direction.REFUND,
+                tournament=self.tournament,
+                amount=TOURNAMENT_REGISTRATION_COST,
+            ).exists()
+        )
+
+        # Повторная отмена после восстановления не должна дублировать компенсацию.
+        self.tournament.status = TournamentStatus.UPCOMING
+        self.tournament.save(update_fields=["status", "updated_at"])
+        cancel_tournament(self.tournament)
+        sub.refresh_from_db()
+        self.assertEqual(sub.fancoin_balance, TOURNAMENT_REGISTRATION_COST)
+        self.assertEqual(
+            FancoinTransaction.objects.filter(
+                user=payer,
+                reason=FancoinTransaction.Reason.TOURNAMENT_CANCEL,
+                tournament=self.tournament,
+            ).count(),
+            1,
+        )

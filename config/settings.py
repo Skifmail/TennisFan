@@ -464,6 +464,10 @@ YANDEX_GEOCODER_REFERER = os.environ.get("YANDEX_GEOCODER_REFERER", "")
 # ------------------------------------------------------------------------------
 # CRON
 # ------------------------------------------------------------------------------
+# В Docker cron-задачи не наследуют env контейнера; cron-run-wrapper.py + cron.env.json
+# (см. cron-entrypoint.sh) и вывод в stdout контейнера.
+CRONTAB_COMMAND_PREFIX = "/app/cron-run-wrapper.py"
+CRONTAB_COMMAND_SUFFIX = ">> /proc/1/fd/1 2>> /proc/1/fd/2"
 
 CRONJOBS = [
     (
@@ -472,7 +476,7 @@ CRONJOBS = [
         ["generate_brackets_past_deadlines"],
     ),
     (
-        "*/5 * * * *",
+        "*/10 * * * *",
         "django.core.management.call_command",
         ["process_tournament_postpayment_window"],
     ),

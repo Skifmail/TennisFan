@@ -25,6 +25,10 @@ done
 
 echo "Database is ready!"
 
+echo "Saving environment for cron jobs..."
+python -c "import json, os; json.dump(dict(os.environ), open('/app/cron.env.json', 'w'), ensure_ascii=False)"
+chmod 600 /app/cron.env.json
+
 echo "Setting up cron jobs..."
 python manage.py crontab add
 

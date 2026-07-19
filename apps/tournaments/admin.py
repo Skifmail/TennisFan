@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 
 from apps.users.models import Player, SkillLevel
 from apps.users.skill_levels import skill_with_ntrp
@@ -711,7 +712,7 @@ class TournamentAdmin(admin.ModelAdmin):
                 settle_url,
             )
         else:
-            settle_btn = format_html(
+            settle_btn = mark_safe(
                 '<span style="'
                 "display:inline-block; margin:8px 0; padding:6px 12px; "
                 "border:1px solid #ccc; border-radius:6px; "
@@ -768,7 +769,7 @@ class TournamentAdmin(admin.ModelAdmin):
                     call_url,
                 )
             else:
-                call_btn = format_html(
+                call_btn = mark_safe(
                     '<span style="'
                     "display:inline-block; margin-right:8px; padding:2px 8px; "
                     "border:1px solid #ccc; border-radius:4px; "
@@ -783,7 +784,7 @@ class TournamentAdmin(admin.ModelAdmin):
                     timezone.localtime(row.called_at).strftime("%d.%m.%Y %H:%M"),
                 )
             else:
-                called_label = format_html(
+                called_label = mark_safe(
                     '<span style="color:#8c959f; font-size:12px; white-space:nowrap;">'
                     "не звонил</span>"
                 )

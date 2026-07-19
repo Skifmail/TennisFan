@@ -448,6 +448,7 @@ class TournamentAdmin(admin.ModelAdmin):
     readonly_fields = (
         "insufficient_participants_notified_at",
         "postpayment_window_started_at",
+        "postpayment_window_schedule_display",
         "participant_payment_status_display",
     )
     actions = [
@@ -665,7 +666,7 @@ class TournamentAdmin(admin.ModelAdmin):
         return HttpResponseRedirect(change_url)
 
     def participant_payment_status_display(self, obj: Tournament) -> str:
-        """HTML-таблица статусов оплаты участников.
+        """Карточки статусов оплаты участников (удобно на мобильных).
 
         Args:
             obj (Tournament): Редактируемый турнир.
@@ -691,11 +692,24 @@ class TournamentAdmin(admin.ModelAdmin):
             started = timezone.localtime(obj.postpayment_window_started_at).strftime(
                 "%d.%m.%Y %H:%M"
             )
-            summary_parts.append(f"окно открыто: {started}")
+            hours = obj.get_postpayment_deadline_hours()
+            ends_at = obj.get_postpayment_window_ends_at()
+            ends_text = (
+                timezone.localtime(ends_at).strftime("%d.%m.%Y %H:%M")
+                if ends_at
+                else "—"
+            )
+            summary_parts.append(f"окно: {started} → {ends_text} ({hours} ч)")
 
         settle_url = reverse(
             "admin:tournaments_tournament_postpayment_settle_fancoin",
             args=[obj.pk],
+        )
+        btn_base = (
+            "display:inline-flex; align-items:center; justify-content:center; "
+            "box-sizing:border-box; margin:0; padding:8px 12px; "
+            "border-radius:6px; text-decoration:none; font-size:13px; "
+            "font-weight:600; text-align:center; max-width:100%;"
         )
         needs_settle = tournament_needs_fancoin_settlement(obj)
         if needs_settle:
@@ -703,58 +717,25 @@ class TournamentAdmin(admin.ModelAdmin):
                 '<a href="{}" onclick="return confirm('
                 "'Списать FT у участников с достаточным балансом? "
                 "Инвойсы таких участников будут отменены.'"
-                ');" style="'
-                "display:inline-block; margin:8px 0; padding:6px 12px; "
-                "border:1px solid #8250df; border-radius:6px; "
-                "background:#fbefff; color:#8250df; text-decoration:none; "
-                'font-size:13px; font-weight:600; white-space:nowrap;">'
+                ');" style="{} border:1px solid #8250df; '
+                'background:#fbefff; color:#8250df; width:100%;">'
                 "Списать FT у участников с постоплатой</a>",
                 settle_url,
+                btn_base,
             )
         else:
-            settle_btn = mark_safe(
-                '<span style="'
-                "display:inline-block; margin:8px 0; padding:6px 12px; "
-                "border:1px solid #ccc; border-radius:6px; "
-                "background:#f6f8fa; color:#8c959f; font-size:13px; "
-                'white-space:nowrap;" title="Нет участников для списания FT">'
-                "Списать FT — не требуется</span>"
+            settle_btn = format_html(
+                '<span style="{} border:1px solid #ccc; '
+                'background:#f6f8fa; color:#8c959f; width:100%;" '
+                'title="Нет участников для списания FT">'
+                "Списать FT — не требуется</span>",
+                btn_base,
             )
 
-        def _status_cell(row: ParticipantPaymentStatus) -> str:
+        def _card(row: ParticipantPaymentStatus) -> str:
             tone_style = _PAYMENT_STATUS_TONE_STYLES.get(
                 row.status_tone, _PAYMENT_STATUS_TONE_STYLES["neutral"]
             )
-            status_html = format_html(
-                '<span style="{}">{}</span>',
-                tone_style,
-                row.status,
-            )
-            if row.status not in ADMIN_CONFIRMABLE_PAYMENT_STATUSES:
-                return cast(str, status_html)
-            confirm_url = reverse(
-                "admin:tournaments_tournament_postpayment_confirm",
-                args=[obj.pk, row.user_id],
-            )
-            confirm_btn = format_html(
-                '<a href="{}" onclick="return confirm('
-                "'Подтвердить участие без оплаты? "
-                "Статус станет зелёным, инвойс будет отменён.'"
-                ');" style="'
-                "display:inline-block; margin-left:8px; padding:2px 8px; "
-                "border:1px solid #1a7f37; border-radius:4px; "
-                "background:#dafbe1; color:#1a7f37; text-decoration:none; "
-                'font-size:12px; white-space:nowrap;" '
-                'title="Подтвердить участие без оплаты и отменить инвойс">'
-                "Подтвердить участие</a>",
-                confirm_url,
-            )
-            return cast(
-                str,
-                format_html("{}{}", status_html, confirm_btn),
-            )
-
-        def _participant_cell(row: ParticipantPaymentStatus) -> str:
             call_url = reverse(
                 "admin:tournaments_tournament_postpayment_call",
                 args=[obj.pk, row.user_id],
@@ -762,52 +743,90 @@ class TournamentAdmin(admin.ModelAdmin):
             if phone_to_tel_href(row.phone):
                 call_btn = format_html(
                     '<a href="{}" style="'
-                    "display:inline-block; margin-right:8px; padding:2px 8px; "
+                    "display:inline-flex; padding:6px 10px; "
                     "border:1px solid #0b5cad; border-radius:4px; "
                     "background:#e8f1fb; color:#0b5cad; text-decoration:none; "
-                    'font-size:12px; white-space:nowrap;">Позвонить</a>',
+                    'font-size:12px; font-weight:600;">Позвонить</a>',
                     call_url,
                 )
             else:
                 call_btn = mark_safe(
                     '<span style="'
-                    "display:inline-block; margin-right:8px; padding:2px 8px; "
+                    "display:inline-flex; padding:6px 10px; "
                     "border:1px solid #ccc; border-radius:4px; "
-                    "background:#f6f8fa; color:#8c959f; font-size:12px; "
-                    'white-space:nowrap;" title="Телефон не указан">'
-                    "Нет телефона</span>"
+                    "background:#f6f8fa; color:#8c959f; font-size:12px;"
+                    '" title="Телефон не указан">Нет телефона</span>'
                 )
             if row.called_at:
                 called_label = format_html(
-                    '<span style="color:#2da44e; font-size:12px; white-space:nowrap;">'
-                    "звонил: {}</span>",
+                    '<span style="color:#2da44e; font-size:12px;">звонил: {}</span>',
                     timezone.localtime(row.called_at).strftime("%d.%m.%Y %H:%M"),
                 )
             else:
                 called_label = mark_safe(
-                    '<span style="color:#8c959f; font-size:12px; white-space:nowrap;">'
-                    "не звонил</span>"
+                    '<span style="color:#8c959f; font-size:12px;">не звонил</span>'
                 )
+            status_html = format_html(
+                '<span style="{}">{}</span>',
+                tone_style,
+                row.status,
+            )
+            if row.status in ADMIN_CONFIRMABLE_PAYMENT_STATUSES:
+                confirm_url = reverse(
+                    "admin:tournaments_tournament_postpayment_confirm",
+                    args=[obj.pk, row.user_id],
+                )
+                confirm_btn = format_html(
+                    '<a href="{}" onclick="return confirm('
+                    "'Подтвердить участие без оплаты? "
+                    "Статус станет зелёным, инвойс будет отменён.'"
+                    ');" style="'
+                    "display:inline-flex; padding:6px 10px; "
+                    "border:1px solid #1a7f37; border-radius:4px; "
+                    "background:#dafbe1; color:#1a7f37; text-decoration:none; "
+                    'font-size:12px; font-weight:600;">'
+                    "Подтвердить участие</a>",
+                    confirm_url,
+                )
+            else:
+                confirm_btn = mark_safe("")
             return cast(
                 str,
                 format_html(
-                    '<div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">'
-                    "{}{}<span>{}</span></div>",
+                    '<div style="'
+                    "box-sizing:border-box; width:100%; max-width:100%; "
+                    "margin:0 0 10px; padding:12px; "
+                    "border:1px solid #d0d7de; border-radius:8px; "
+                    "background:var(--body-bg, #fff); "
+                    'overflow-wrap:anywhere; word-break:break-word;">'
+                    '<div style="font-weight:600; font-size:14px; margin-bottom:8px;">'
+                    "{}</div>"
+                    '<div style="display:flex; flex-wrap:wrap; gap:8px; '
+                    'align-items:center; margin-bottom:8px;">'
+                    "{}{}</div>"
+                    '<div style="display:flex; flex-wrap:wrap; gap:8px; '
+                    'align-items:center; margin-bottom:8px;">'
+                    '<span style="font-size:12px; color:#656d76;">Статус:</span>'
+                    "{}{}</div>"
+                    '<div style="font-size:12px; color:#656d76; line-height:1.45;">'
+                    "<strong>Детали:</strong> {}</div>"
+                    "</div>",
+                    row.display_name,
                     call_btn,
                     called_label,
-                    row.display_name,
+                    status_html,
+                    confirm_btn,
+                    row.details,
                 ),
             )
 
-        table_rows = format_html_join(
+        cards = format_html_join(
             "",
-            "<tr><td style='padding:6px; border-bottom:1px solid #eee'>{}</td>"
-            "<td style='padding:6px; border-bottom:1px solid #eee'>{}</td>"
-            "<td style='padding:6px; border-bottom:1px solid #eee'>{}</td></tr>",
-            ((_participant_cell(row), _status_cell(row), row.details) for row in rows),
+            "{}",
+            ((_card(row),) for row in rows),
         )
         legend = format_html(
-            "<p style='margin:8px 0 0; font-size:12px'>"
+            "<p style='margin:8px 0 0; font-size:12px; line-height:1.5'>"
             '<span style="{}">■</span> оплачено &nbsp; '
             '<span style="{}">■</span> ожидает оплату &nbsp; '
             '<span style="{}">■</span> ждёт окно постоплаты'
@@ -817,9 +836,10 @@ class TournamentAdmin(admin.ModelAdmin):
             _PAYMENT_STATUS_TONE_STYLES["warning"],
         )
         summary = format_html(
-            "<p><strong>{}</strong></p>{}",
+            '<div style="margin-bottom:10px; font-size:13px; '
+            'line-height:1.5; overflow-wrap:anywhere;">{}</div>{}',
             format_html_join(
-                "; ",
+                "<br>",
                 "<span>{}</span>",
                 ((part,) for part in summary_parts),
             ),
@@ -828,18 +848,12 @@ class TournamentAdmin(admin.ModelAdmin):
         return cast(
             str,
             format_html(
-                "{}"
-                '<table style="width:100%; border-collapse:collapse; margin-top:8px">'
-                "<thead><tr>"
-                '<th style="text-align:left; padding:6px; border-bottom:1px solid #ccc">'
-                "Участник</th>"
-                '<th style="text-align:left; padding:6px; border-bottom:1px solid #ccc">'
-                "Статус</th>"
-                '<th style="text-align:left; padding:6px; border-bottom:1px solid #ccc">'
-                "Детали</th>"
-                "</tr></thead><tbody>{}</tbody></table>{}",
+                '<div style="box-sizing:border-box; width:100%; max-width:100%; '
+                'overflow-x:hidden;">'
+                "{}<div style='margin-top:12px'>{}</div>{}"
+                "</div>",
                 summary,
-                table_rows,
+                cards,
                 legend,
             ),
         )
@@ -881,6 +895,38 @@ class TournamentAdmin(admin.ModelAdmin):
             )
         return super().changelist_view(request, extra_context=extra_context)
 
+    def postpayment_window_schedule_display(self, obj: Tournament) -> str:
+        """Показать расписание окна постоплаты (старт, длительность, конец).
+
+        Args:
+            obj (Tournament): Турнир.
+
+        Returns:
+            str: Текст для readonly-поля.
+        """
+        if not obj.pk:
+            return "—"
+        hours = obj.get_postpayment_deadline_hours()
+        if not obj.allow_postpayment:
+            return "Постоплата выключена."
+        if obj.postpayment_window_started_at is None:
+            return (
+                f"Окно ещё не открыто. После дедлайна регистрации участникам "
+                f"будет дано {hours} ч на оплату."
+            )
+        started = timezone.localtime(obj.postpayment_window_started_at)
+        ends_at = obj.get_postpayment_window_ends_at()
+        ends_text = (
+            timezone.localtime(ends_at).strftime("%d.%m.%Y %H:%M") if ends_at else "—"
+        )
+        return (
+            f"Старт: {started.strftime('%d.%m.%Y %H:%M')}; "
+            f"длительность: {hours} ч; "
+            f"оплатить до: {ends_text}."
+        )
+
+    postpayment_window_schedule_display.short_description = "Расписание окна постоплаты"
+
     fieldsets = (
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
         ("Формат турнира", {"fields": ("format", "variant")}),
@@ -897,14 +943,27 @@ class TournamentAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Постоплата: настройки окна",
+            {
+                "fields": (
+                    "allow_postpayment",
+                    "postpayment_deadline_hours",
+                    "postpayment_window_started_at",
+                    "postpayment_window_schedule_display",
+                ),
+                "description": (
+                    "Сначала включите постоплату и задайте длительность окна в часах. "
+                    "Старт заполняется автоматически при открытии окна; ниже видно, "
+                    "до какого времени нужно оплатить."
+                ),
+            },
+        ),
+        (
             "Общие поля (одноэтапная сетка, Олимпийская, Круговой)",
             {
                 "fields": (
                     "entry_fee",
                     "is_one_day",
-                    "allow_postpayment",
-                    "postpayment_window_started_at",
-                    "postpayment_deadline_hours",
                     "city",
                     "court",
                     "gender",

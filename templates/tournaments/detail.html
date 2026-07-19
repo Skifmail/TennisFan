@@ -94,7 +94,7 @@
                         {% if tournament.allow_postpayment %}
                         <span
                             class="tournament-card__chip tournament-card__chip--format"
-                            title="Постоплата: при отсутствии подписки/лимита можно зарегистрироваться без мгновенной оплаты. После старта окна постоплаты нужно оплатить взнос в течение 12 часов."
+                            title="Постоплата: при отсутствии подписки/лимита можно зарегистрироваться без мгновенной оплаты. После старта окна постоплаты нужно оплатить взнос в течение {{ tournament.get_postpayment_deadline_hours }} ч."
                         >ПОСТОПЛАТА</span>
                         {% endif %}
                         {% if tournament.status == 'active' %}

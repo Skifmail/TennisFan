@@ -59,4 +59,5 @@
 #   python manage.py reset_season_points
 #   python manage.py reset_season_points --dry-run
 #   python manage.py reset_season_points --force-season winter_2024
-#   python manage.py rollover_club_plan_slots
+#   python manage.py run_recurring_club_plan_payments
+#   python manage.py run_recurring_club_fee_payments

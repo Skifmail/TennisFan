@@ -525,6 +525,11 @@ CRONJOBS = [
         ["run_recurring_club_fee_payments"],
     ),
     (
+        "10 4 * * *",
+        "django.core.management.call_command",
+        ["run_recurring_club_plan_payments"],
+    ),
+    (
         "0 10 * * *",
         "django.core.management.call_command",
         ["send_subscription_expiry_reminders"],
@@ -553,11 +558,6 @@ CRONJOBS = [
         "0 3 * * *",
         "django.core.management.call_command",
         ["cleanup_suspended_clubs"],
-    ),
-    (
-        "0 1 1 * *",
-        "django.core.management.call_command",
-        ["rollover_club_plan_slots"],
     ),
 ]
 

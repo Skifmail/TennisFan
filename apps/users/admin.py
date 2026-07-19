@@ -538,6 +538,7 @@ class PlayerAdmin(admin.ModelAdmin):
 
     form = PlayerAdminForm
     inlines = (NtrpTestResultInline,)
+    ordering = ("-created_at",)
 
     list_display = (
         "user_email",

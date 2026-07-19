@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/local/bin/python
 """Обёртка для django-crontab: восстанавливает env Docker-контейнера."""
 
 from __future__ import annotations

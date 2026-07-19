@@ -118,8 +118,10 @@
         <aside class="tournament-card__aside">
             <div class="tournament-card__aside-statuses">
                 <span class="tournament-card__aside-pill tournament-card__aside-pill--type">{{ tournament.get_tournament_type_display }}</span>
-                <span class="tournament-status-badge tournament-status-badge--inline tournament-status-badge--{{ tournament.status }}" title="{{ tournament.get_status_display }}">
-                    {% if tournament.status == 'upcoming' %}Идёт набор{% elif tournament.status == 'active' %}В игре{% elif tournament.status == 'cancelled' %}Отменён{% else %}Завершён{% endif %}
+                <span class="tournament-status-badge tournament-status-badge--inline tournament-status-badge--{{ tournament.status }}" title="{{ tournament.card_status_label|default:tournament.get_status_display }}">
+                    {% if tournament.card_status_label %}
+                        {{ tournament.card_status_label }}
+                    {% elif tournament.status == 'upcoming' %}Идёт набор{% elif tournament.status == 'active' %}В игре{% elif tournament.status == 'cancelled' %}Отменён{% else %}Завершён{% endif %}
                 </span>
             </div>
             <div class="tournament-card__aside-action tournament-action">

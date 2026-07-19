@@ -544,7 +544,7 @@ class PlayerAdmin(admin.ModelAdmin):
         "user_email",
         "user_last_name",
         "user_first_name",
-        "is_bye",
+        "is_verified",
         "city",
         "skill_level_with_ntrp",
         "gender",
@@ -552,7 +552,7 @@ class PlayerAdmin(admin.ModelAdmin):
         "total_points",
         "matches_played",
         "matches_won",
-        "is_verified",
+        "is_bye",
         "is_legend",
         "is_hidden_on_home",
     )

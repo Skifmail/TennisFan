@@ -7,6 +7,7 @@ from typing import cast
 from django.conf import settings
 from django.db import models
 from django.db.models import Case, IntegerField, When
+from django.utils import timezone
 
 from apps.users.models import Player, SkillLevel
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
@@ -216,7 +217,11 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     postpayment_deadline_hours = models.PositiveSmallIntegerField(
         "Длительность окна постоплаты (часы)",
         default=12,
-        help_text="Через сколько часов после запуска окна неоплатившие удаляются.",
+        help_text=(
+            "Через сколько часов после запуска окна неоплатившие удаляются. "
+            "При изменении значения сроки (due_at) у активных инвойсов "
+            "пересчитываются от момента старта окна."
+        ),
     )
 
     gender = models.CharField(
@@ -398,6 +403,15 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         """Custom save to normalize duration and reset notification flag when дедлайн сдвинут."""
         from django.utils import timezone
 
+        old_deadline_hours: int | None = None
+        if self.pk:
+            old_deadline_hours = (
+                type(self)
+                .objects.filter(pk=self.pk)
+                .values_list("postpayment_deadline_hours", flat=True)
+                .first()
+            )
+
         # ТВД (format=weekend_day) задаёт duration в админке; остальные — многодневные.
         if self.format != TournamentFormat.WEEKEND_DAY:
             self.duration = TournamentDuration.MULTI_DAY
@@ -414,6 +428,17 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             if self.registration_deadline > timezone.now():
                 self.insufficient_participants_notified_at = None
         super().save(*args, **kwargs)
+
+        # Продление/сокращение окна постоплаты должно обновлять due_at инвойсов.
+        if (
+            old_deadline_hours is not None
+            and int(old_deadline_hours) != int(self.postpayment_deadline_hours or 12)
+            and self.postpayment_window_started_at is not None
+            and self.allow_postpayment
+        ):
+            from .postpayment import sync_postpayment_invoices_deadline
+
+            sync_postpayment_invoices_deadline(self)
 
 
 class TournamentPhoto(CompressImageFieldsMixin, models.Model):
@@ -633,6 +658,47 @@ class TournamentPostpaymentInvoice(models.Model):
 
     def __str__(self) -> str:
         return f"{self.tournament} — {self.user} ({self.get_status_display()})"
+
+
+class TournamentPostpaymentCallLog(models.Model):
+    """Отметка о звонке администратора участнику по постоплате.
+
+    Args:
+        models.Model: Базовый класс ORM.
+
+    Returns:
+        None: Экземпляр используется ORM.
+    """
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="postpayment_call_logs",
+        verbose_name="Турнир",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tournament_postpayment_call_logs",
+        verbose_name="Участник",
+    )
+    called_at = models.DateTimeField("Время звонка", default=timezone.now)
+    called_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tournament_postpayment_calls_made",
+        verbose_name="Кто звонил",
+    )
+
+    class Meta:
+        verbose_name = "Звонок по постоплате"
+        verbose_name_plural = "Звонки по постоплате"
+        unique_together = [("tournament", "user")]
+
+    def __str__(self) -> str:
+        return f"{self.tournament} — {self.user} ({self.called_at})"
 
 
 class TVDTournament(Tournament):

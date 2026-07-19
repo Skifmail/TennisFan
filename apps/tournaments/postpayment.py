@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Literal, cast
 
@@ -22,6 +22,7 @@ from apps.users.models import Notification
 from .cancel import cancel_tournament
 from .models import (
     Tournament,
+    TournamentPostpaymentCallLog,
     TournamentPostpaymentInvoice,
     TournamentRegistrationCoverage,
 )
@@ -33,6 +34,22 @@ logger = logging.getLogger(__name__)
 _SUBSCRIPTION_SLOT_COVERAGE = cast(
     TournamentRegistrationCoverage.CoverageType,
     TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
+)
+_ADMIN_GRANTED_COVERAGE = cast(
+    TournamentRegistrationCoverage.CoverageType,
+    TournamentRegistrationCoverage.CoverageType.ADMIN_GRANTED,
+)
+
+# Статусы, для которых админ может вручную подтвердить участие.
+ADMIN_CONFIRMABLE_PAYMENT_STATUSES: frozenset[str] = frozenset(
+    {
+        "Ожидает оплату (₽)",
+        "Не оплачен",
+        "Постоплата (окно не открыто)",
+        "Не оплатил (срок истёк)",
+        "Инвойс отменён",
+        "Без отметки оплаты",
+    }
 )
 
 
@@ -46,6 +63,8 @@ class ParticipantPaymentStatus:
         status (str): Краткий статус.
         details (str): Подробности.
         status_tone (PaymentStatusTone): Цветовая категория для админки.
+        phone (str): Телефон участника для ``tel:``-ссылки.
+        called_at (datetime | None): Время последнего отмеченного звонка.
     """
 
     user_id: int
@@ -53,6 +72,55 @@ class ParticipantPaymentStatus:
     status: str
     details: str
     status_tone: PaymentStatusTone = "neutral"
+    phone: str = ""
+    called_at: datetime | None = None
+
+
+def phone_to_tel_href(phone: str) -> str:
+    """Преобразовать телефон в значение ``href`` для ссылки ``tel:``.
+
+    Args:
+        phone (str): Телефон в произвольном формате.
+
+    Returns:
+        str: Строка вида ``tel:+79001234567`` или пустая, если номер невалиден.
+    """
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    if digits.startswith("8") and len(digits) == 11:
+        digits = "7" + digits[1:]
+    elif len(digits) == 10:
+        digits = "7" + digits
+    if len(digits) != 11:
+        return ""
+    return f"tel:+{digits}"
+
+
+def mark_postpayment_call(
+    tournament: Tournament,
+    user,
+    *,
+    called_by=None,
+) -> TournamentPostpaymentCallLog:
+    """Зафиксировать звонок администратора участнику по постоплате.
+
+    Args:
+        tournament (Tournament): Турнир.
+        user: Пользователь участника.
+        called_by: Администратор, который звонил (опционально).
+
+    Returns:
+        TournamentPostpaymentCallLog: Созданная или обновлённая отметка.
+    """
+    now = timezone.now()
+    log, _created = TournamentPostpaymentCallLog.objects.update_or_create(
+        tournament=tournament,
+        user=user,
+        defaults={
+            "called_at": now,
+            "called_by": called_by,
+        },
+    )
+    return cast(TournamentPostpaymentCallLog, log)
 
 
 def participant_payment_status_tone(status: str) -> PaymentStatusTone:
@@ -409,14 +477,11 @@ def _users_for_fancoin_settlement(tournament: Tournament) -> list:
     return list(user_by_id.values())
 
 
-def settle_postpayment_with_available_fancoin() -> int:
-    """Проверить FT у участников с открытым окном постоплаты (cron).
-
-    Args:
-        None: Параметры не требуются.
+def _collect_tournament_ids_for_fancoin_settlement() -> set[int]:
+    """Собрать ID турниров, где нужно периодически проверять списание FT.
 
     Returns:
-        int: Число участников, для которых выполнено покрытие FT в этом запуске.
+        set[int]: ID турниров с постоплатой и незакрытыми участниками.
     """
     tournament_ids: set[int] = set(
         TournamentPostpaymentInvoice.objects.filter(
@@ -430,6 +495,67 @@ def settle_postpayment_with_available_fancoin() -> int:
             postpayment_window_started_at__isnull=False,
         ).values_list("pk", flat=True)
     )
+    # До открытия окна: участник мог купить подписку после регистрации с постоплатой.
+    tournament_ids |= set(
+        Tournament.objects.filter(
+            allow_postpayment=True,
+            bracket_generated=False,
+            postpayment_window_started_at__isnull=True,
+        ).values_list("pk", flat=True)
+    )
+    return tournament_ids
+
+
+def try_settle_postpayment_for_user(user) -> int:
+    """Списать FT по постоплате для всех турниров пользователя при появлении баланса.
+
+    Вызывается после пополнения FT (покупка подписки и т.п.), чтобы не ждать cron.
+
+    Args:
+        user: Пользователь, у которого мог появиться баланс FT.
+
+    Returns:
+        int: Число турниров, где выполнено новое покрытие FT.
+    """
+    tournament_ids: set[int] = set(
+        TournamentPostpaymentInvoice.objects.filter(
+            user=user,
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+            tournament__allow_postpayment=True,
+        ).values_list("tournament_id", flat=True)
+    )
+    tournament_ids |= set(
+        Tournament.objects.filter(
+            allow_postpayment=True,
+            bracket_generated=False,
+            participants__user=user,
+        ).values_list("pk", flat=True)
+    )
+    settled = 0
+    for tournament in Tournament.objects.filter(pk__in=tournament_ids):
+        if not tournament_needs_fancoin_settlement(tournament):
+            continue
+        pending_users = get_pending_postpayment_users(tournament)
+        if not any(u.pk == user.pk for u in pending_users):
+            continue
+        with transaction.atomic():
+            settled += try_settle_pending_users_with_fancoin(
+                tournament,
+                users=[user],
+            )
+    return settled
+
+
+def settle_postpayment_with_available_fancoin() -> int:
+    """Проверить FT у участников с постоплатой (cron, каждые 10 минут).
+
+    Args:
+        None: Параметры не требуются.
+
+    Returns:
+        int: Число участников, для которых выполнено покрытие FT в этом запуске.
+    """
+    tournament_ids = _collect_tournament_ids_for_fancoin_settlement()
     total = 0
     for tournament in Tournament.objects.filter(pk__in=tournament_ids):
         users = _users_for_fancoin_settlement(tournament)
@@ -466,8 +592,130 @@ def mark_registration_covered(
     )
 
 
+def admin_confirm_postpayment_participation(
+    tournament: Tournament,
+    user,
+) -> bool:
+    """Подтвердить участие администратором: покрытие + отмена инвойса.
+
+    Args:
+        tournament (Tournament): Турнир.
+        user: Пользователь участника.
+
+    Returns:
+        bool: ``True``, если участие подтверждено (или уже было подтверждено).
+    """
+    if _user_already_settled_for_tournament(tournament, user):
+        _cancel_pending_postpayment_invoice(tournament, user)
+        return True
+    with transaction.atomic():
+        mark_registration_covered(
+            tournament,
+            user,
+            _ADMIN_GRANTED_COVERAGE,
+        )
+        cancelled = _cancel_pending_postpayment_invoice(tournament, user)
+    logger.info(
+        "Postpayment: участие подтверждено администратором для user_id=%s, "
+        "tournament=%s, cancelled_invoices=%s",
+        user.pk,
+        tournament.slug,
+        cancelled,
+    )
+    return True
+
+
+def _site_base_url() -> str:
+    """Вернуть абсолютный базовый URL сайта для ссылок в уведомлениях.
+
+    Returns:
+        str: Базовый URL без завершающего слэша.
+    """
+    from django.conf import settings
+
+    base = (getattr(settings, "TELEGRAM_BOT_SITE_BASE_URL", None) or "").strip()
+    if not base:
+        base = (getattr(settings, "SITE_URL", None) or "").strip()
+    if not base:
+        domain = getattr(settings, "SITE_DOMAIN", "tennisfan.ru")
+        base = f"https://{domain}"
+    return base.rstrip("/")
+
+
 def _payment_url(tournament: Tournament, invoice_id: int) -> str:
-    return f"{reverse('payment_preview')}?type=tournament&id={tournament.id}&invoice={invoice_id}"
+    """Собрать абсолютную ссылку на оплату постоплаты.
+
+    Args:
+        tournament (Tournament): Турнир.
+        invoice_id (int): ID инвойса постоплаты.
+
+    Returns:
+        str: Абсолютный URL страницы ``payment_preview``.
+    """
+    path = (
+        f"{reverse('payment_preview')}"
+        f"?type=tournament&id={tournament.id}&invoice={invoice_id}"
+    )
+    return f"{_site_base_url()}{path}"
+
+
+def sync_postpayment_invoices_deadline(tournament: Tournament) -> int:
+    """Пересчитать срок оплаты инвойсов после изменения длительности окна.
+
+    ``postpayment_deadline_hours`` на турнире — только настройка; фактический
+    срок хранится в ``TournamentPostpaymentInvoice.due_at`` и задаётся при
+    открытии окна. Без синхронизации продление 12→24 ч в админке не влияет
+    на уже созданные инвойсы.
+
+    Args:
+        tournament (Tournament): Турнир с открытым окном постоплаты.
+
+    Returns:
+        int: Число обновлённых инвойсов.
+    """
+    started_at = tournament.postpayment_window_started_at
+    if started_at is None or not tournament.allow_postpayment:
+        return 0
+    hours = int(tournament.postpayment_deadline_hours or 12)
+    new_due_at = started_at + timedelta(hours=hours)
+    now = timezone.now()
+    updated = int(
+        TournamentPostpaymentInvoice.objects.filter(
+            tournament=tournament,
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        ).update(due_at=new_due_at)
+    )
+    # Если окно снова в будущем — вернуть EXPIRED→PENDING участникам, ещё в турнире.
+    if new_due_at > now:
+        expired = TournamentPostpaymentInvoice.objects.filter(
+            tournament=tournament,
+            status=TournamentPostpaymentInvoice.Status.EXPIRED,
+        ).select_related("user")
+        participant_user_ids = {
+            int(uid)
+            for uid in tournament.participants.values_list("user_id", flat=True)
+        }
+        reopen_ids: list[int] = []
+        for invoice in expired:
+            if invoice.user_id in participant_user_ids:
+                reopen_ids.append(invoice.pk)
+        if reopen_ids:
+            updated += int(
+                TournamentPostpaymentInvoice.objects.filter(pk__in=reopen_ids).update(
+                    status=TournamentPostpaymentInvoice.Status.PENDING,
+                    due_at=new_due_at,
+                )
+            )
+    if updated:
+        logger.info(
+            "Postpayment: синхронизирован due_at для %s инвойсов турнира %s "
+            "(deadline_hours=%s, due_at=%s)",
+            updated,
+            tournament.slug,
+            hours,
+            new_due_at,
+        )
+    return updated
 
 
 def _send_postpayment_opened_notification(
@@ -549,6 +797,9 @@ def build_participant_payment_statuses(
     invoices = {
         row.user_id: row
         for row in tournament.postpayment_invoices.select_related("user")
+    }
+    call_times = {
+        row.user_id: row.called_at for row in tournament.postpayment_call_logs.all()
     }
     coverage_labels = {
         TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT: (
@@ -636,6 +887,8 @@ def build_participant_payment_statuses(
                 status=status,
                 details=details,
                 status_tone=participant_payment_status_tone(status),
+                phone=(getattr(user, "phone", "") or "").strip(),
+                called_at=call_times.get(user.pk),
             )
         )
     return rows

@@ -22,7 +22,8 @@ COPY . .
 
 COPY entrypoint.sh /entrypoint.sh
 COPY cron-entrypoint.sh /cron-entrypoint.sh
-RUN chmod +x /entrypoint.sh /cron-entrypoint.sh
+COPY cron-run-wrapper.py /app/cron-run-wrapper.py
+RUN chmod +x /entrypoint.sh /cron-entrypoint.sh /app/cron-run-wrapper.py
 
 EXPOSE 8000
 

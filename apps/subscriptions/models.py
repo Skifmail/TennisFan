@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from typing import Any, ClassVar, cast
 
@@ -6,6 +7,8 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
+
+logger = logging.getLogger(__name__)
 
 
 class SubscriptionTier(models.Model):
@@ -574,6 +577,15 @@ class UserSubscription(models.Model):
             return
         self.fancoin_balance += amount
         self.save(update_fields=["fancoin_balance"])
+        try:
+            from apps.tournaments.postpayment import try_settle_postpayment_for_user
+
+            try_settle_postpayment_for_user(self.user)
+        except Exception:
+            logger.exception(
+                "Не удалось автоматически списать FT по постоплате: user_id=%s",
+                self.user_id,
+            )
 
     def spend_fancoin(
         self,

@@ -14,18 +14,26 @@ from apps.subscriptions.models import (
 )
 from apps.tournaments.models import (
     Tournament,
+    TournamentPostpaymentCallLog,
     TournamentPostpaymentInvoice,
+    TournamentRegistrationCoverage,
 )
 from apps.tournaments.postpayment import (
     _SUBSCRIPTION_SLOT_COVERAGE,
+    _payment_url,
+    admin_confirm_postpayment_participation,
     build_participant_payment_statuses,
     finalize_postpayment_window,
     get_pending_postpayment_users,
+    mark_postpayment_call,
     mark_registration_covered,
     open_postpayment_window,
+    phone_to_tel_href,
     settle_postpayment_with_available_fancoin,
+    sync_postpayment_invoices_deadline,
     tournament_needs_fancoin_settlement,
     try_cover_registration_with_fancoin,
+    try_settle_postpayment_for_user,
 )
 from apps.users.models import Player, SkillLevel, User
 
@@ -193,6 +201,157 @@ class TournamentPostpaymentServiceTestCase(TestCase):
         tg_mock.assert_called_once()
         email_mock.assert_called_once()
         self.assertTrue(email_mock.call_args.kwargs["had_payment_request"])
+
+    def test_try_settle_postpayment_for_user_after_subscription_purchase(self) -> None:
+        """Покупка подписки с FT сразу закрывает pending-инвойс постоплаты."""
+        self.tournament.postpayment_window_started_at = timezone.now()
+        self.tournament.save(update_fields=["postpayment_window_started_at"])
+        TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=self.user,
+            amount=1000,
+            due_at=timezone.now() + timedelta(hours=12),
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        )
+        self._create_subscription_with_fancoin(self.user, 0)
+        sub = UserSubscription.objects.get(user=self.user)
+        sub.add_fancoin(TOURNAMENT_REGISTRATION_COST)
+        invoice = TournamentPostpaymentInvoice.objects.get(
+            tournament=self.tournament,
+            user=self.user,
+        )
+        self.assertEqual(invoice.status, TournamentPostpaymentInvoice.Status.CANCELLED)
+        self.assertTrue(
+            self.tournament.registration_coverages.filter(user=self.user).exists()
+        )
+
+    def test_try_settle_postpayment_for_user_before_window_open(self) -> None:
+        """FT списываются до открытия окна постоплаты, если баланс появился после регистрации."""
+        self._create_subscription_with_fancoin(self.user, TOURNAMENT_REGISTRATION_COST)
+        settled = try_settle_postpayment_for_user(self.user)
+        self.assertEqual(settled, 1)
+        self.assertTrue(
+            self.tournament.registration_coverages.filter(user=self.user).exists()
+        )
+        pending_users = get_pending_postpayment_users(self.tournament)
+        self.assertEqual({u.id for u in pending_users}, {self.user2.id})
+
+    def test_settle_postpayment_with_available_fancoin_before_window_open(self) -> None:
+        """Cron находит участников с FT до открытия окна постоплаты."""
+        self._create_subscription_with_fancoin(self.user, TOURNAMENT_REGISTRATION_COST)
+        settled = settle_postpayment_with_available_fancoin()
+        self.assertEqual(settled, 1)
+        self.assertTrue(
+            self.tournament.registration_coverages.filter(user=self.user).exists()
+        )
+
+    def test_extending_deadline_hours_updates_invoice_due_at(self) -> None:
+        """Продление окна постоплаты в турнире сдвигает due_at инвойсов."""
+        started = timezone.now() - timedelta(hours=15)
+        self.tournament.postpayment_window_started_at = started
+        self.tournament.postpayment_deadline_hours = 12
+        self.tournament.save(
+            update_fields=[
+                "postpayment_window_started_at",
+                "postpayment_deadline_hours",
+            ]
+        )
+        invoice = TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=self.user,
+            amount=1000,
+            due_at=started + timedelta(hours=12),
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        )
+        self.tournament.postpayment_deadline_hours = 24
+        self.tournament.save(update_fields=["postpayment_deadline_hours"])
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.due_at, started + timedelta(hours=24))
+        self.assertGreater(invoice.due_at, timezone.now())
+
+    def test_sync_reopens_expired_invoice_when_window_extended(self) -> None:
+        """При продлении окна EXPIRED-инвойс участника снова становится PENDING."""
+        started = timezone.now() - timedelta(hours=15)
+        self.tournament.postpayment_window_started_at = started
+        self.tournament.postpayment_deadline_hours = 24
+        self.tournament.save(
+            update_fields=[
+                "postpayment_window_started_at",
+                "postpayment_deadline_hours",
+            ]
+        )
+        invoice = TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=self.user,
+            amount=1000,
+            due_at=started + timedelta(hours=12),
+            status=TournamentPostpaymentInvoice.Status.EXPIRED,
+        )
+        updated = sync_postpayment_invoices_deadline(self.tournament)
+        self.assertEqual(updated, 1)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, TournamentPostpaymentInvoice.Status.PENDING)
+        self.assertEqual(invoice.due_at, started + timedelta(hours=24))
+
+    def test_payment_url_is_absolute(self) -> None:
+        """Ссылка на оплату постоплаты должна быть абсолютной."""
+        url = _payment_url(self.tournament, 42)
+        self.assertTrue(url.startswith("http"))
+        self.assertIn("invoice=42", url)
+        self.assertIn(str(self.tournament.id), url)
+
+    def test_phone_to_tel_href_normalizes_russian_numbers(self) -> None:
+        """Телефон нормализуется в tel:+7… для ссылки звонка."""
+        self.assertEqual(phone_to_tel_href("+7 (900) 123-45-67"), "tel:+79001234567")
+        self.assertEqual(phone_to_tel_href("89001234567"), "tel:+79001234567")
+        self.assertEqual(phone_to_tel_href(""), "")
+
+    def test_mark_postpayment_call_and_status_row(self) -> None:
+        """Отметка звонка сохраняется и попадает в статус участника."""
+        self.user.phone = "+79001112233"
+        self.user.save(update_fields=["phone"])
+        log = mark_postpayment_call(self.tournament, self.user, called_by=self.user)
+        self.assertIsInstance(log, TournamentPostpaymentCallLog)
+        rows = {
+            row.user_id: row
+            for row in build_participant_payment_statuses(self.tournament)
+        }
+        self.assertEqual(rows[self.user.id].phone, "+79001112233")
+        self.assertIsNotNone(rows[self.user.id].called_at)
+        self.assertIsNone(rows[self.user2.id].called_at)
+
+    def test_admin_confirm_postpayment_participation_cancels_invoice(self) -> None:
+        """Ручное подтверждение админом покрывает участие и отменяет инвойс."""
+        self.tournament.postpayment_window_started_at = timezone.now()
+        self.tournament.save(update_fields=["postpayment_window_started_at"])
+        TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=self.user,
+            amount=500,
+            due_at=timezone.now() + timedelta(hours=12),
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        )
+        ok = admin_confirm_postpayment_participation(self.tournament, self.user)
+        self.assertTrue(ok)
+        coverage = TournamentRegistrationCoverage.objects.get(
+            tournament=self.tournament,
+            user=self.user,
+        )
+        self.assertEqual(
+            coverage.coverage_type,
+            TournamentRegistrationCoverage.CoverageType.ADMIN_GRANTED,
+        )
+        invoice = TournamentPostpaymentInvoice.objects.get(
+            tournament=self.tournament,
+            user=self.user,
+        )
+        self.assertEqual(invoice.status, TournamentPostpaymentInvoice.Status.CANCELLED)
+        rows = {
+            row.user_id: row
+            for row in build_participant_payment_statuses(self.tournament)
+        }
+        self.assertEqual(rows[self.user.id].status, "Выдано администратором")
+        self.assertEqual(rows[self.user.id].status_tone, "success")
 
     def test_finalize_postpayment_regenerates_when_flag_without_matches(self) -> None:
 

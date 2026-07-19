@@ -6,7 +6,11 @@ from typing import Any, cast
 
 from django import forms
 from django.contrib import admin, messages
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.shortcuts import get_object_or_404
+from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
@@ -35,14 +39,18 @@ from .models import (
 )
 from .olympic_consolation import generate_bracket as generate_olympic_bracket
 from .postpayment import (
+    ADMIN_CONFIRMABLE_PAYMENT_STATUSES,
     ParticipantPaymentStatus,
     PaymentStatusTone,
+    admin_confirm_postpayment_participation,
     build_participant_payment_statuses,
     finalize_postpayment_window,
     format_postpayment_open_summary,
     get_pending_postpayment_users,
     get_postpayment_progress,
+    mark_postpayment_call,
     open_postpayment_window,
+    phone_to_tel_href,
     tournament_has_generated_matches,
     tournament_needs_fancoin_settlement,
     try_settle_pending_users_with_fancoin,
@@ -464,6 +472,197 @@ class TournamentAdmin(admin.ModelAdmin):
 
     allowed_skill_levels.short_description = "Уровень участников"
 
+    def get_urls(self):
+        """Добавить URL отметки звонка по постоплате.
+
+        Returns:
+            list: URL-паттерны админки турнира.
+        """
+        custom_urls = [
+            path(
+                "<path:object_id>/postpayment-call/<int:user_id>/",
+                self.admin_site.admin_view(self.mark_postpayment_call_view),
+                name="tournaments_tournament_postpayment_call",
+            ),
+            path(
+                "<path:object_id>/postpayment-confirm/<int:user_id>/",
+                self.admin_site.admin_view(self.confirm_postpayment_participation_view),
+                name="tournaments_tournament_postpayment_confirm",
+            ),
+            path(
+                "<path:object_id>/postpayment-settle-fancoin/",
+                self.admin_site.admin_view(self.settle_postpayment_fancoin_view),
+                name="tournaments_tournament_postpayment_settle_fancoin",
+            ),
+        ]
+        return custom_urls + super().get_urls()
+
+    def mark_postpayment_call_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        user_id: int,
+    ) -> HttpResponse:
+        """Отметить звонок участнику и открыть ``tel:``-ссылку.
+
+        Args:
+            request (HttpRequest): Запрос администратора.
+            object_id (str): ID турнира.
+            user_id (int): ID пользователя участника.
+
+        Returns:
+            HttpResponse: Редирект на ``tel:`` или обратно в карточку турнира.
+        """
+        tournament = get_object_or_404(Tournament, pk=object_id)
+        user = get_object_or_404(get_user_model(), pk=user_id)
+        mark_postpayment_call(tournament, user, called_by=request.user)
+        change_url = reverse(
+            "admin:tournaments_tournament_change",
+            args=[tournament.pk],
+        )
+        tel_href = phone_to_tel_href(getattr(user, "phone", "") or "")
+        if not tel_href:
+            self.message_user(
+                request,
+                (
+                    "Звонок отмечен, но у участника "
+                    f"«{user.get_full_name() or user.email}» нет валидного телефона."
+                ),
+                level=messages.WARNING,
+            )
+            return HttpResponseRedirect(change_url)
+        # Открываем dialer и возвращаем в карточку турнира с обновлённой отметкой.
+        return HttpResponse(
+            "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+            f"<meta http-equiv='refresh' content='0;url={change_url}'>"
+            f"<script>window.location.href={tel_href!r};</script>"
+            "</head><body>"
+            f"<p>Открываем звонок… <a href={change_url!r}>Вернуться</a></p>"
+            "</body></html>",
+            content_type="text/html; charset=utf-8",
+        )
+
+    def confirm_postpayment_participation_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        user_id: int,
+    ) -> HttpResponse:
+        """Подтвердить участие вручную: покрытие админом и отмена инвойса.
+
+        Args:
+            request (HttpRequest): Запрос администратора.
+            object_id (str): ID турнира.
+            user_id (int): ID пользователя участника.
+
+        Returns:
+            HttpResponse: Редирект обратно в карточку турнира.
+        """
+        tournament = get_object_or_404(Tournament, pk=object_id)
+        user = get_object_or_404(get_user_model(), pk=user_id)
+        display_name = user.get_full_name() or user.email or f"ID {user.pk}"
+        admin_confirm_postpayment_participation(tournament, user)
+        self.message_user(
+            request,
+            (
+                f"Участие «{display_name}» подтверждено администратором. "
+                "Инвойс постоплаты отменён (если был)."
+            ),
+            level=messages.SUCCESS,
+        )
+        tournament.refresh_from_db()
+        progress = get_postpayment_progress(tournament)
+        if tournament.postpayment_window_started_at is not None and bool(
+            progress["completed"]
+        ):
+            ok, msg = finalize_postpayment_window(tournament)
+            if ok:
+                self.message_user(
+                    request,
+                    f"Все оплаты закрыты — сетка сформирована. {msg}",
+                    level=messages.SUCCESS,
+                )
+            else:
+                self.message_user(
+                    request,
+                    f"Все оплаты закрыты, но сетку не удалось сформировать: {msg}",
+                    level=messages.WARNING,
+                )
+        return HttpResponseRedirect(
+            reverse("admin:tournaments_tournament_change", args=[tournament.pk])
+        )
+
+    def settle_postpayment_fancoin_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+    ) -> HttpResponse:
+        """Списать FT у участников с постоплатой для текущего турнира.
+
+        Args:
+            request (HttpRequest): Запрос администратора.
+            object_id (str): ID турнира.
+
+        Returns:
+            HttpResponse: Редирект обратно в карточку турнира.
+        """
+        tournament = get_object_or_404(Tournament, pk=object_id)
+        change_url = reverse(
+            "admin:tournaments_tournament_change",
+            args=[tournament.pk],
+        )
+        if not tournament_needs_fancoin_settlement(tournament):
+            self.message_user(
+                request,
+                "Все участники уже покрыты (FT, ₽ или клубный слот).",
+                level=messages.INFO,
+            )
+            return HttpResponseRedirect(change_url)
+
+        settled = try_settle_pending_users_with_fancoin(tournament)
+        progress = get_postpayment_progress(tournament)
+        if settled:
+            self.message_user(
+                request,
+                (
+                    f"Списано FT у {settled} участников. "
+                    f"Ожидают оплату в ₽: {progress['pending']}."
+                ),
+                level=messages.SUCCESS,
+            )
+        else:
+            pending_users = get_pending_postpayment_users(tournament)
+            self.message_user(
+                request,
+                (
+                    f"Списание FT не выполнено для {len(pending_users)} участников — "
+                    "проверьте активную подписку и баланс (нужно минимум 3 FT)."
+                ),
+                level=messages.WARNING,
+            )
+
+        tournament.refresh_from_db()
+        progress = get_postpayment_progress(tournament)
+        if (
+            settled
+            and tournament.postpayment_window_started_at is not None
+            and bool(progress["completed"])
+        ):
+            ok, msg = finalize_postpayment_window(tournament)
+            if ok:
+                self.message_user(
+                    request,
+                    f"Все оплаты закрыты — сетка сформирована. {msg}",
+                    level=messages.SUCCESS,
+                )
+            else:
+                self.message_user(
+                    request,
+                    f"Все оплаты закрыты, но сетку не удалось сформировать: {msg}",
+                    level=messages.WARNING,
+                )
+        return HttpResponseRedirect(change_url)
+
     def participant_payment_status_display(self, obj: Tournament) -> str:
         """HTML-таблица статусов оплаты участников.
 
@@ -493,16 +692,109 @@ class TournamentAdmin(admin.ModelAdmin):
             )
             summary_parts.append(f"окно открыто: {started}")
 
+        settle_url = reverse(
+            "admin:tournaments_tournament_postpayment_settle_fancoin",
+            args=[obj.pk],
+        )
+        needs_settle = tournament_needs_fancoin_settlement(obj)
+        if needs_settle:
+            settle_btn = format_html(
+                '<a href="{}" onclick="return confirm('
+                "'Списать FT у участников с достаточным балансом? "
+                "Инвойсы таких участников будут отменены.'"
+                ');" style="'
+                "display:inline-block; margin:8px 0; padding:6px 12px; "
+                "border:1px solid #8250df; border-radius:6px; "
+                "background:#fbefff; color:#8250df; text-decoration:none; "
+                'font-size:13px; font-weight:600; white-space:nowrap;">'
+                "Списать FT у участников с постоплатой</a>",
+                settle_url,
+            )
+        else:
+            settle_btn = format_html(
+                '<span style="'
+                "display:inline-block; margin:8px 0; padding:6px 12px; "
+                "border:1px solid #ccc; border-radius:6px; "
+                "background:#f6f8fa; color:#8c959f; font-size:13px; "
+                'white-space:nowrap;" title="Нет участников для списания FT">'
+                "Списать FT — не требуется</span>"
+            )
+
         def _status_cell(row: ParticipantPaymentStatus) -> str:
             tone_style = _PAYMENT_STATUS_TONE_STYLES.get(
                 row.status_tone, _PAYMENT_STATUS_TONE_STYLES["neutral"]
             )
+            status_html = format_html(
+                '<span style="{}">{}</span>',
+                tone_style,
+                row.status,
+            )
+            if row.status not in ADMIN_CONFIRMABLE_PAYMENT_STATUSES:
+                return cast(str, status_html)
+            confirm_url = reverse(
+                "admin:tournaments_tournament_postpayment_confirm",
+                args=[obj.pk, row.user_id],
+            )
+            confirm_btn = format_html(
+                '<a href="{}" onclick="return confirm('
+                "'Подтвердить участие без оплаты? "
+                "Статус станет зелёным, инвойс будет отменён.'"
+                ');" style="'
+                "display:inline-block; margin-left:8px; padding:2px 8px; "
+                "border:1px solid #1a7f37; border-radius:4px; "
+                "background:#dafbe1; color:#1a7f37; text-decoration:none; "
+                'font-size:12px; white-space:nowrap;" '
+                'title="Подтвердить участие без оплаты и отменить инвойс">'
+                "Подтвердить участие</a>",
+                confirm_url,
+            )
+            return cast(
+                str,
+                format_html("{}{}", status_html, confirm_btn),
+            )
+
+        def _participant_cell(row: ParticipantPaymentStatus) -> str:
+            call_url = reverse(
+                "admin:tournaments_tournament_postpayment_call",
+                args=[obj.pk, row.user_id],
+            )
+            if phone_to_tel_href(row.phone):
+                call_btn = format_html(
+                    '<a href="{}" style="'
+                    "display:inline-block; margin-right:8px; padding:2px 8px; "
+                    "border:1px solid #0b5cad; border-radius:4px; "
+                    "background:#e8f1fb; color:#0b5cad; text-decoration:none; "
+                    'font-size:12px; white-space:nowrap;">Позвонить</a>',
+                    call_url,
+                )
+            else:
+                call_btn = format_html(
+                    '<span style="'
+                    "display:inline-block; margin-right:8px; padding:2px 8px; "
+                    "border:1px solid #ccc; border-radius:4px; "
+                    "background:#f6f8fa; color:#8c959f; font-size:12px; "
+                    'white-space:nowrap;" title="Телефон не указан">'
+                    "Нет телефона</span>"
+                )
+            if row.called_at:
+                called_label = format_html(
+                    '<span style="color:#2da44e; font-size:12px; white-space:nowrap;">'
+                    "звонил: {}</span>",
+                    timezone.localtime(row.called_at).strftime("%d.%m.%Y %H:%M"),
+                )
+            else:
+                called_label = format_html(
+                    '<span style="color:#8c959f; font-size:12px; white-space:nowrap;">'
+                    "не звонил</span>"
+                )
             return cast(
                 str,
                 format_html(
-                    '<span style="{}">{}</span>',
-                    tone_style,
-                    row.status,
+                    '<div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">'
+                    "{}{}<span>{}</span></div>",
+                    call_btn,
+                    called_label,
+                    row.display_name,
                 ),
             )
 
@@ -511,7 +803,7 @@ class TournamentAdmin(admin.ModelAdmin):
             "<tr><td style='padding:6px; border-bottom:1px solid #eee'>{}</td>"
             "<td style='padding:6px; border-bottom:1px solid #eee'>{}</td>"
             "<td style='padding:6px; border-bottom:1px solid #eee'>{}</td></tr>",
-            ((row.display_name, _status_cell(row), row.details) for row in rows),
+            ((_participant_cell(row), _status_cell(row), row.details) for row in rows),
         )
         legend = format_html(
             "<p style='margin:8px 0 0; font-size:12px'>"
@@ -524,12 +816,13 @@ class TournamentAdmin(admin.ModelAdmin):
             _PAYMENT_STATUS_TONE_STYLES["warning"],
         )
         summary = format_html(
-            "<p><strong>{}</strong></p>",
+            "<p><strong>{}</strong></p>{}",
             format_html_join(
                 "; ",
                 "<span>{}</span>",
                 ((part,) for part in summary_parts),
             ),
+            settle_btn,
         )
         return cast(
             str,
@@ -596,7 +889,9 @@ class TournamentAdmin(admin.ModelAdmin):
                 "fields": ("participant_payment_status_display",),
                 "description": (
                     "Кто оплатил FT или рублями, кому отправлены уведомления, "
-                    "кто ещё должен оплатить. Обновите страницу после действий."
+                    "кто ещё должен оплатить. «Списать FT…» — проверить баланс "
+                    "и закрыть инвойсы. «Позвонить» / «Подтвердить участие» — "
+                    "по участнику. Обновите страницу после действий."
                 ),
             },
         ),

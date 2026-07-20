@@ -409,12 +409,18 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
         return redirect(redirect_url)
 
     elif payment_type == "tournament":
-        tournament_id_raw = (request.GET.get("id") or "").strip()
+        # В HTML писем ``&`` пишется как ``&amp;``; при копировании в адресную
+        # строку «как есть» Django видит ключи ``amp;id`` / ``amp;invoice``.
+        tournament_id_raw = (
+            request.GET.get("id") or request.GET.get("amp;id") or ""
+        ).strip()
+        invoice_id_raw = (
+            request.GET.get("invoice") or request.GET.get("amp;invoice") or ""
+        ).strip()
         try:
             tournament_id = int(tournament_id_raw)
         except (TypeError, ValueError) as err:
             raise Http404("Турнир не указан или ссылка повреждена") from err
-        invoice_id_raw = (request.GET.get("invoice") or "").strip()
         tournament = get_object_or_404(
             Tournament.objects.select_related("club"),
             pk=tournament_id,
@@ -422,10 +428,24 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
         invoice = None
         if invoice_id_raw:
             try:
-                invoice = TournamentPostpaymentInvoice.objects.select_related(
+                invoice_pk = int(invoice_id_raw)
+            except (TypeError, ValueError):
+                messages.error(request, "Ссылка на постоплату недействительна.")
+                return redirect("tournament_detail", slug=tournament.slug)
+            invoice = (
+                TournamentPostpaymentInvoice.objects.select_related(
                     "tournament", "user"
-                ).get(pk=int(invoice_id_raw), tournament=tournament, user=request.user)
-            except (TournamentPostpaymentInvoice.DoesNotExist, ValueError):
+                )
+                .filter(pk=invoice_pk, tournament=tournament)
+                .first()
+            )
+            if invoice is None:
+                messages.error(request, "Ссылка на постоплату недействительна.")
+                return redirect("tournament_detail", slug=tournament.slug)
+            is_staff_user = getattr(request.user, "is_staff", False) or getattr(
+                request.user, "is_superuser", False
+            )
+            if not is_staff_user and invoice.user_id != request.user.pk:
                 messages.error(request, "Ссылка на постоплату недействительна.")
                 return redirect("tournament_detail", slug=tournament.slug)
             if invoice.status == TournamentPostpaymentInvoice.Status.PAID:
@@ -451,10 +471,15 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
             )
             return redirect("tournament_detail", slug=tournament.slug)
 
-        # Админ не платит за турниры — сразу считаем участие подтверждённым
-        if request.user.is_authenticated and (
-            getattr(request.user, "is_staff", False)
-            or getattr(request.user, "is_superuser", False)
+        # Админ не платит за обычную регистрацию — но ссылку постоплаты
+        # (с invoice) можно открыть для проверки страницы оплаты.
+        if (
+            invoice is None
+            and request.user.is_authenticated
+            and (
+                getattr(request.user, "is_staff", False)
+                or getattr(request.user, "is_superuser", False)
+            )
         ):
             messages.success(
                 request,

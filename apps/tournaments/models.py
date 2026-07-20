@@ -677,6 +677,12 @@ class TournamentPostpaymentInvoice(models.Model):
         null=True,
         blank=True,
     )
+    payment_link_resent_at = models.DateTimeField(
+        "Повторная отправка ссылки",
+        null=True,
+        blank=True,
+        help_text="Время последней ручной повторной отправки ссылки на оплату.",
+    )
     status = models.CharField(
         "Статус",
         max_length=16,

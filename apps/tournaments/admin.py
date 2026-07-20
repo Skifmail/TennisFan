@@ -852,7 +852,7 @@ class TournamentAdmin(admin.ModelAdmin):
             if row.link_resent_at:
                 resend_label = format_html(
                     '<span style="color:#9a6700; font-size:12px;">'
-                    "ссылка ещё раз: {}</span>",
+                    "отправлено: {}</span>",
                     timezone.localtime(row.link_resent_at).strftime("%d.%m.%Y %H:%M"),
                 )
             else:

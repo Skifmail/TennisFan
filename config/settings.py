@@ -341,7 +341,7 @@ if SESSION_ENGINE == "django.contrib.sessions.backends.cache":
 # EMAIL
 # ------------------------------------------------------------------------------
 
-EMAIL_BACKEND = os.environ.get(
+EMAIL_BACKEND_INNER = os.environ.get(
     "EMAIL_BACKEND",
     (
         "django.core.mail.backends.console.EmailBackend"
@@ -349,6 +349,14 @@ EMAIL_BACKEND = os.environ.get(
         else "django.core.mail.backends.smtp.EmailBackend"
     ),
 )
+# Не допускаем рекурсию, если в env уже указан LoggingEmailBackend.
+if EMAIL_BACKEND_INNER == "apps.core.mail.LoggingEmailBackend":
+    EMAIL_BACKEND_INNER = (
+        "django.core.mail.backends.console.EmailBackend"
+        if DEBUG
+        else "django.core.mail.backends.smtp.EmailBackend"
+    )
+EMAIL_BACKEND = "apps.core.mail.LoggingEmailBackend"
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))

@@ -19,7 +19,10 @@ from apps.tournaments.models import Tournament
 from apps.users.models import EmailVerificationToken, Player, User
 
 
-@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+@override_settings(
+    EMAIL_BACKEND="apps.core.mail.LoggingEmailBackend",
+    EMAIL_BACKEND_INNER="django.core.mail.backends.locmem.EmailBackend",
+)
 class EmailServiceTestCase(TestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(

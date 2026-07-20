@@ -390,7 +390,7 @@ class TournamentPostpaymentServiceTestCase(TestCase):
             for row in build_participant_payment_statuses(self.tournament)
         }
         self.assertIsNotNone(rows[self.user.id].link_resent_at)
-        self.assertIn("ссылка ещё раз", rows[self.user.id].details)
+        self.assertIn("отправлено:", rows[self.user.id].details)
         ok_fail, _ = resend_postpayment_payment_link(self.tournament, self.user2)
         self.assertFalse(ok_fail)
 

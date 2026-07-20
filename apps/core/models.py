@@ -862,3 +862,54 @@ class AdminActionLog(LogEntry):
             str: Объект и время действия.
         """
         return f"{self.object_repr} ({self.action_time:%d.%m.%Y %H:%M})"
+
+
+class OutboundEmail(models.Model):
+    """Журнал исходящих электронных писем платформы.
+
+    Args:
+        models.Model: Базовый класс ORM.
+    """
+
+    class Status(models.TextChoices):
+        """Статус отправки письма."""
+
+        SENT = "sent", "Отправлено"
+        FAILED = "failed", "Ошибка"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="outbound_emails",
+        verbose_name="Пользователь",
+    )
+    to_email = models.EmailField("Кому", db_index=True)
+    from_email = models.CharField("От кого", max_length=254, blank=True)
+    subject = models.CharField("Тема", max_length=998, blank=True)
+    body_text = models.TextField("Текст", blank=True)
+    body_html = models.TextField("HTML", blank=True)
+    status = models.CharField(
+        "Статус",
+        max_length=16,
+        choices=Status.choices,
+        default=Status.SENT,
+        db_index=True,
+    )
+    error_message = models.TextField("Ошибка", blank=True)
+    sent_at = models.DateTimeField("Отправлено", default=timezone.now, db_index=True)
+
+    class Meta:
+        verbose_name = "Электронное письмо"
+        verbose_name_plural = "Электронные письма"
+        ordering = ("-sent_at", "-id")
+
+    def __str__(self) -> str:
+        """Краткое описание письма для админки.
+
+        Returns:
+            str: Тема, получатель и время.
+        """
+        subject = self.subject or "(без темы)"
+        return f"{subject} → {self.to_email} ({self.sent_at:%d.%m.%Y %H:%M})"

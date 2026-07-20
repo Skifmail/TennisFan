@@ -979,7 +979,7 @@ def build_participant_payment_statuses(
                 )
             if invoice.payment_link_resent_at:
                 details_parts.append(
-                    "ссылка ещё раз: "
+                    "отправлено: "
                     f"{timezone.localtime(invoice.payment_link_resent_at).strftime('%d.%m.%Y %H:%M')}"
                 )
             details = "; ".join(details_parts)

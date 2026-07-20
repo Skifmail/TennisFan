@@ -391,6 +391,7 @@ class TournamentPostpaymentInvoiceAdmin(admin.ModelAdmin):
         "created_at",
         "paid_at",
         "reminder_1h_sent_at",
+        "payment_link_resent_at",
         "yookassa_payment_id",
     )
 
@@ -848,7 +849,15 @@ class TournamentAdmin(admin.ModelAdmin):
                 )
             else:
                 resend_btn = mark_safe("")
-            action_btns = format_html("{}{}", confirm_btn, resend_btn)
+            if row.link_resent_at:
+                resend_label = format_html(
+                    '<span style="color:#9a6700; font-size:12px;">'
+                    "ссылка ещё раз: {}</span>",
+                    timezone.localtime(row.link_resent_at).strftime("%d.%m.%Y %H:%M"),
+                )
+            else:
+                resend_label = mark_safe("")
+            action_btns = format_html("{}{}{}", confirm_btn, resend_btn, resend_label)
             # На широком экране — 3 колонки в ряд; на узком flex переносит вниз.
             return cast(
                 str,
@@ -957,12 +966,35 @@ class TournamentAdmin(admin.ModelAdmin):
         )
         pending_total = pending_qs.count()
         if pending_total:
-            affected_tournaments = pending_qs.values("tournament_id").distinct().count()
+            tournaments = list(
+                Tournament.objects.filter(
+                    pk__in=pending_qs.values_list("tournament_id", flat=True).distinct()
+                )
+                .only("id", "name")
+                .order_by("name")
+            )
+            links = format_html_join(
+                ", ",
+                '<a href="{}">{}</a>',
+                (
+                    (
+                        reverse(
+                            "admin:tournaments_tournament_change",
+                            args=[tournament.pk],
+                        ),
+                        tournament.name,
+                    )
+                    for tournament in tournaments
+                ),
+            )
             self.message_user(
                 request,
-                (
-                    "Активна постоплата: ожидается оплата от "
-                    f"{pending_total} участников в {affected_tournaments} турнирах."
+                format_html(
+                    "Активна постоплата: ожидается оплата от {} участников "
+                    "в {} турнирах: {}.",
+                    pending_total,
+                    len(tournaments),
+                    links,
                 ),
                 level=messages.WARNING,
             )

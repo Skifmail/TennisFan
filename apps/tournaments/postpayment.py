@@ -72,6 +72,7 @@ class ParticipantPaymentStatus:
         status_tone (PaymentStatusTone): Цветовая категория для админки.
         phone (str): Телефон участника для ``tel:``-ссылки.
         called_at (datetime | None): Время последнего отмеченного звонка.
+        link_resent_at (datetime | None): Время последней повторной отправки ссылки.
     """
 
     user_id: int
@@ -81,6 +82,7 @@ class ParticipantPaymentStatus:
     status_tone: PaymentStatusTone = "neutral"
     phone: str = ""
     called_at: datetime | None = None
+    link_resent_at: datetime | None = None
 
 
 def phone_to_tel_href(phone: str) -> str:
@@ -832,6 +834,9 @@ def resend_postpayment_payment_link(
             getattr(user, "pk", None),
             tournament.slug,
         )
+    now = timezone.now()
+    invoice.payment_link_resent_at = now
+    invoice.save(update_fields=["payment_link_resent_at"])
     logger.info(
         "Postpayment: повторно отправлена ссылка user=%s tournament=%s invoice=%s "
         "email=%s",
@@ -972,6 +977,11 @@ def build_participant_payment_statuses(
                     "напоминание за 1 ч: "
                     f"{timezone.localtime(invoice.reminder_1h_sent_at).strftime('%d.%m.%Y %H:%M')}"
                 )
+            if invoice.payment_link_resent_at:
+                details_parts.append(
+                    "ссылка ещё раз: "
+                    f"{timezone.localtime(invoice.payment_link_resent_at).strftime('%d.%m.%Y %H:%M')}"
+                )
             details = "; ".join(details_parts)
         elif window_open:
             status = "Не оплачен"
@@ -991,6 +1001,9 @@ def build_participant_payment_statuses(
                 status_tone=participant_payment_status_tone(status),
                 phone=(getattr(user, "phone", "") or "").strip(),
                 called_at=call_times.get(user.pk),
+                link_resent_at=(
+                    invoice.payment_link_resent_at if invoice is not None else None
+                ),
             )
         )
     return rows

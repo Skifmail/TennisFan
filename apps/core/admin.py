@@ -9,7 +9,7 @@ from django.contrib import admin
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import path, reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from .models import (
@@ -55,6 +55,7 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         "status",
         "error_message",
         "sent_at",
+        "links_for_check",
         "body_preview",
         "body_text",
         "body_html",
@@ -67,6 +68,7 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         "from_email",
         "subject",
         "error_message",
+        "links_for_check",
         "body_preview",
         "body_text",
         "body_html",
@@ -115,6 +117,49 @@ class OutboundEmailAdmin(admin.ModelAdmin):
             )
         response["X-Frame-Options"] = "SAMEORIGIN"
         return response
+
+    @admin.display(description="Ссылки для проверки")
+    def links_for_check(self, obj: OutboundEmail) -> str:
+        """Показать кликабельные URL из письма (уже без ``&amp;``).
+
+        Args:
+            obj (OutboundEmail): Письмо.
+
+        Returns:
+            str: HTML со списком ссылок или прочерк.
+        """
+        import html as html_lib
+        import re
+        from urllib.parse import unquote
+
+        raw = obj.body_html or obj.body_text or ""
+        if not raw:
+            return "—"
+        found: list[str] = []
+        for match in re.finditer(
+            r"""href\s*=\s*["']([^"']+)["']""",
+            raw,
+            flags=re.IGNORECASE,
+        ):
+            url = html_lib.unescape(unquote(match.group(1))).strip()
+            if url and url not in found:
+                found.append(url)
+        if not found:
+            for match in re.finditer(r"https?://[^\s<>\"']+", raw):
+                url = html_lib.unescape(match.group(0).rstrip(").,;")).strip()
+                if url and url not in found:
+                    found.append(url)
+        if not found:
+            return "—"
+        return cast(
+            str,
+            format_html_join(
+                "",
+                '<div style="margin:0 0 8px;word-break:break-all;">'
+                '<a href="{0}" target="_blank" rel="noopener">{0}</a></div>',
+                ((url,) for url in found),
+            ),
+        )
 
     @admin.display(description="Тема", ordering="subject")
     def subject_short(self, obj: OutboundEmail) -> str:
@@ -284,13 +329,15 @@ class UserConsentAdmin(admin.ModelAdmin):
     """Журнал согласий пользователей (только просмотр)."""
 
     list_display = (
-        "user",
+        "user_display",
         "consent_type",
         "club",
         "document_version",
         "accepted_at",
         "ip_address",
     )
+    list_display_links = ("user_display",)
+    list_select_related = ("user",)
     list_filter = ("consent_type", "accepted_at")
     search_fields = (
         "user__email",
@@ -300,7 +347,7 @@ class UserConsentAdmin(admin.ModelAdmin):
         "document_version",
     )
     readonly_fields = (
-        "user",
+        "user_display",
         "consent_type",
         "club",
         "document_version",
@@ -308,6 +355,29 @@ class UserConsentAdmin(admin.ModelAdmin):
         "ip_address",
         "user_agent",
     )
+    fields = (
+        "user_display",
+        "consent_type",
+        "club",
+        "document_version",
+        "accepted_at",
+        "ip_address",
+        "user_agent",
+    )
+
+    @admin.display(description="Пользователь", ordering="user__last_name")
+    def user_display(self, obj: UserConsent) -> str:
+        """Показать имя пользователя вместо email.
+
+        Args:
+            obj (UserConsent): Запись согласия.
+
+        Returns:
+            str: Имя и фамилия или email, если ФИО пустые.
+        """
+        if not obj.user_id:
+            return "—"
+        return str(obj.user.get_display_name())
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False

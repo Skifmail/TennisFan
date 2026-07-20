@@ -32,10 +32,11 @@ class OutboundEmailAdmin(admin.ModelAdmin):
     list_display = (
         "sent_at",
         "to_email",
-        "user",
+        "user_display",
         "subject_short",
         "status",
     )
+    list_select_related = ("user",)
     list_filter = ("status", "sent_at")
     search_fields = (
         "to_email",
@@ -48,7 +49,7 @@ class OutboundEmailAdmin(admin.ModelAdmin):
     date_hierarchy = "sent_at"
     ordering = ("-sent_at", "-id")
     readonly_fields = (
-        "user",
+        "user_display",
         "to_email",
         "from_email",
         "subject",
@@ -63,7 +64,7 @@ class OutboundEmailAdmin(admin.ModelAdmin):
     fields = (
         "sent_at",
         "status",
-        "user",
+        "user_display",
         "to_email",
         "from_email",
         "subject",
@@ -73,6 +74,20 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         "body_text",
         "body_html",
     )
+
+    @admin.display(description="Пользователь", ordering="user__last_name")
+    def user_display(self, obj: OutboundEmail) -> str:
+        """Показать имя пользователя вместо email.
+
+        Args:
+            obj (OutboundEmail): Письмо.
+
+        Returns:
+            str: Имя и фамилия или email, если ФИО пустые; «—» без пользователя.
+        """
+        if not obj.user_id:
+            return "—"
+        return str(obj.user.get_display_name())
 
     def get_urls(self) -> list:
         """Добавить URL HTML-превью письма без двойного экранирования ссылок.

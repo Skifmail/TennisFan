@@ -162,7 +162,7 @@ def _notify_cancelled(
         refunded_ft=refunded_ft,
         reason=message,
     )
-    send_to_user_by_user(user, message)
+    send_to_user_by_user(user, message, skip_email=True)
     Notification.objects.create(
         user=user,
         message=message,

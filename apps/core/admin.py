@@ -7,8 +7,9 @@ from typing import cast
 
 from django.contrib import admin
 from django.http import HttpRequest, HttpResponse
+from django.shortcuts import get_object_or_404
+from django.urls import path, reverse
 from django.utils.html import format_html
-from django.utils.safestring import mark_safe
 
 from .models import (
     City,
@@ -70,6 +71,44 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         "body_html",
     )
 
+    def get_urls(self) -> list:
+        """Добавить URL HTML-превью письма без двойного экранирования ссылок.
+
+        Returns:
+            list: URL-паттерны админки.
+        """
+        custom = [
+            path(
+                "<path:object_id>/html-preview/",
+                self.admin_site.admin_view(self.html_preview_view),
+                name="core_outboundemail_html_preview",
+            ),
+        ]
+        return cast(list, custom + super().get_urls())
+
+    def html_preview_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+    ) -> HttpResponse:
+        """Отдать HTML тела письма для iframe в карточке админки.
+
+        Args:
+            request (HttpRequest): Запрос администратора.
+            object_id (str): ID записи ``OutboundEmail``.
+
+        Returns:
+            HttpResponse: HTML-тело письма.
+        """
+        obj = get_object_or_404(OutboundEmail, pk=object_id)
+        if obj.body_html:
+            return HttpResponse(obj.body_html, content_type="text/html; charset=utf-8")
+        text = escape(obj.body_text or "")
+        return HttpResponse(
+            f"<pre style='white-space:pre-wrap'>{text}</pre>",
+            content_type="text/html; charset=utf-8",
+        )
+
     @admin.display(description="Тема", ordering="subject")
     def subject_short(self, obj: OutboundEmail) -> str:
         """Краткая тема для списка.
@@ -93,24 +132,22 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         Returns:
             str: Safe HTML с iframe или текстом.
         """
-        if obj.body_html:
-            return cast(
-                str,
-                mark_safe(
-                    '<iframe sandbox="" srcdoc="'
-                    f"{escape(obj.body_html)}"
-                    '" style="width:100%;min-height:520px;border:1px solid #d0d7de;'
-                    'border-radius:8px;background:#fff;"></iframe>'
-                ),
+        if not obj.pk:
+            return "—"
+        if obj.body_html or obj.body_text:
+            preview_url = reverse(
+                "admin:core_outboundemail_html_preview",
+                args=[obj.pk],
             )
-        if obj.body_text:
             return cast(
                 str,
                 format_html(
-                    '<pre style="white-space:pre-wrap;max-height:520px;overflow:auto;'
-                    "padding:12px;border:1px solid #d0d7de;border-radius:8px;"
-                    'background:var(--body-bg,#fff);">{}</pre>',
-                    obj.body_text,
+                    '<iframe src="{}" '
+                    'sandbox="allow-popups allow-popups-to-escape-sandbox '
+                    'allow-top-navigation-by-user-activation" '
+                    'style="width:100%;min-height:520px;border:1px solid #d0d7de;'
+                    'border-radius:8px;background:#fff;"></iframe>',
+                    preview_url,
                 ),
             )
         return "—"

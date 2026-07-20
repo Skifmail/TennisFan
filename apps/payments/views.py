@@ -409,7 +409,11 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
         return redirect(redirect_url)
 
     elif payment_type == "tournament":
-        tournament_id = request.GET.get("id")
+        tournament_id_raw = (request.GET.get("id") or "").strip()
+        try:
+            tournament_id = int(tournament_id_raw)
+        except (TypeError, ValueError) as err:
+            raise Http404("Турнир не указан или ссылка повреждена") from err
         invoice_id_raw = (request.GET.get("invoice") or "").strip()
         tournament = get_object_or_404(
             Tournament.objects.select_related("club"),

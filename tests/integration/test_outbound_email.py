@@ -37,13 +37,19 @@ class OutboundEmailLogTestCase(TestCase):
         self.assertTrue(row.body_text)
 
     def test_admin_preview_renders_iframe(self) -> None:
-        """В карточке админки HTML показывается через iframe."""
+        """В карточке админки HTML показывается через iframe на preview-URL."""
         from django.contrib import admin as django_admin
+        from django.urls import reverse
 
         from apps.core.admin import OutboundEmailAdmin
 
         send_donation_thanks_email(self.user, "100")
         row = OutboundEmail.objects.get()
         preview = OutboundEmailAdmin(OutboundEmail, django_admin.site).body_preview(row)
+        preview_url = reverse(
+            "admin:core_outboundemail_html_preview",
+            args=[row.pk],
+        )
         self.assertIn("iframe", str(preview))
-        self.assertIn("srcdoc", str(preview))
+        self.assertIn(preview_url, str(preview))
+        self.assertNotIn("srcdoc", str(preview))

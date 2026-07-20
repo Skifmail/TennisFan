@@ -367,7 +367,7 @@ def _send_fancoin_settled_notification(
         f"Остаток FT: {balance}\n\n"
         f"Страница турнира: {tournament_url}"
     )
-    send_to_user_by_user(user, text)
+    send_to_user_by_user(user, text, skip_email=True)
     Notification.objects.create(
         user=user,
         message=(
@@ -750,7 +750,7 @@ def _send_postpayment_opened_notification(
         f"Оплатить до: {due_local}\n\n"
         f"Ссылка на оплату: {payment_url}"
     )
-    send_to_user_by_user(invoice.user, text)
+    send_to_user_by_user(invoice.user, text, skip_email=True)
     Notification.objects.create(
         user=invoice.user,
         message=(f"Оплатите участие в турнире «{tournament.name}» до {due_local}."),
@@ -808,7 +808,7 @@ def resend_postpayment_payment_link(
         f"Оплатить до: {due_local}\n\n"
         f"Ссылка на оплату: {payment_url}"
     )
-    send_to_user_by_user(invoice.user, text)
+    send_to_user_by_user(invoice.user, text, skip_email=True)
     Notification.objects.create(
         user=invoice.user,
         message=(
@@ -1116,7 +1116,7 @@ def send_1h_reminders() -> int:
             f"До конца срока оплаты турнира «{invoice.tournament.name}» остался 1 час.\n"
             f"Ссылка: {payment_url}"
         )
-        send_to_user_by_user(invoice.user, text)
+        send_to_user_by_user(invoice.user, text, skip_email=True)
         Notification.objects.create(
             user=invoice.user,
             message=(

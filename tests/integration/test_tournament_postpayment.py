@@ -376,6 +376,7 @@ class TournamentPostpaymentServiceTestCase(TestCase):
         self.assertTrue(ok)
         self.assertIn("повторно", msg.lower())
         send_mock.assert_called_once()
+        self.assertTrue(send_mock.call_args.kwargs.get("skip_email"))
         email_mock.assert_called_once()
         self.assertTrue(
             Notification.objects.filter(

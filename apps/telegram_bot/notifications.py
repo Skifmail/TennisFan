@@ -35,9 +35,27 @@ def get_chat_id_for_user(user) -> int | None:
         return None
 
 
-def send_to_user_by_user(user, text: str, reply_markup: dict | None = None) -> bool:
-    """Отправить сообщение пользователю по User (если привязан Telegram)."""
-    email_ok = _send_notification_email_to_user(user=user, text=text)
+def send_to_user_by_user(
+    user,
+    text: str,
+    reply_markup: dict | None = None,
+    *,
+    skip_email: bool = False,
+) -> bool:
+    """Отправить сообщение пользователю по User (если привязан Telegram).
+
+    Args:
+        user: Пользователь-получатель.
+        text (str): Текст сообщения (HTML для Telegram).
+        reply_markup (dict | None): Клавиатура Telegram.
+        skip_email (bool): Не дублировать на почту (если письмо уже уходит отдельно).
+
+    Returns:
+        bool: ``True``, если доставлено хотя бы в один канал.
+    """
+    email_ok = False
+    if not skip_email:
+        email_ok = _send_notification_email_to_user(user=user, text=text)
     chat_id = get_chat_id_for_user(user)
     if chat_id is None:
         return email_ok

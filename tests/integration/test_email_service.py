@@ -11,6 +11,9 @@ from apps.core.email_service import (
     send_phone_changed_email,
     send_tournament_entry_fancoin_confirmed_email,
     send_tournament_entry_receipt_email,
+    send_tournament_postpayment_1h_reminder_email,
+    send_tournament_postpayment_opened_email,
+    send_tournament_postpayment_resend_email,
 )
 from apps.tournaments.models import Tournament
 from apps.users.models import EmailVerificationToken, Player, User
@@ -71,6 +74,48 @@ class EmailServiceTestCase(TestCase):
         self.assertTrue(ok)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("оплата турнирного взноса", mail.outbox[0].subject.lower())
+
+    def test_send_tournament_postpayment_emails(self) -> None:
+        """Письма постоплаты: открытие окна, напоминание 1ч, повторная отправка."""
+        tournament = Tournament.objects.create(
+            name="Постоплата mail",
+            slug="test-mail-postpayment",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+        )
+        payment_url = "https://tennisfan.ru/pay/test"
+        self.assertTrue(
+            send_tournament_postpayment_opened_email(
+                self.user,
+                tournament,
+                amount="500",
+                due_at="20.07.2026 23:55",
+                payment_url=payment_url,
+            )
+        )
+        self.assertTrue(
+            send_tournament_postpayment_1h_reminder_email(
+                self.user,
+                tournament,
+                due_at="20.07.2026 23:55",
+                payment_url=payment_url,
+            )
+        )
+        self.assertTrue(
+            send_tournament_postpayment_resend_email(
+                self.user,
+                tournament,
+                amount="500",
+                due_at="20.07.2026 23:55",
+                payment_url=payment_url,
+            )
+        )
+        self.assertEqual(len(mail.outbox), 3)
+        subjects = " ".join(m.subject.lower() for m in mail.outbox)
+        self.assertIn("оплатите участие", subjects)
+        self.assertIn("1 час", subjects)
+        self.assertIn("напоминание", subjects)
 
     def test_send_phone_changed_email(self) -> None:
         ok = send_phone_changed_email(self.user, "+79990000000", "+79991111111")

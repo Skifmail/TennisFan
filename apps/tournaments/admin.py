@@ -41,6 +41,7 @@ from .models import (
 from .olympic_consolation import generate_bracket as generate_olympic_bracket
 from .postpayment import (
     ADMIN_CONFIRMABLE_PAYMENT_STATUSES,
+    ADMIN_RESENDABLE_PAYMENT_STATUSES,
     ParticipantPaymentStatus,
     PaymentStatusTone,
     admin_confirm_postpayment_participation,
@@ -52,6 +53,7 @@ from .postpayment import (
     mark_postpayment_call,
     open_postpayment_window,
     phone_to_tel_href,
+    resend_postpayment_payment_link,
     tournament_has_generated_matches,
     tournament_needs_fancoin_settlement,
     try_settle_pending_users_with_fancoin,
@@ -492,6 +494,11 @@ class TournamentAdmin(admin.ModelAdmin):
                 name="tournaments_tournament_postpayment_confirm",
             ),
             path(
+                "<path:object_id>/postpayment-resend-link/<int:user_id>/",
+                self.admin_site.admin_view(self.resend_postpayment_link_view),
+                name="tournaments_tournament_postpayment_resend_link",
+            ),
+            path(
                 "<path:object_id>/postpayment-settle-fancoin/",
                 self.admin_site.admin_view(self.settle_postpayment_fancoin_view),
                 name="tournaments_tournament_postpayment_settle_fancoin",
@@ -590,6 +597,35 @@ class TournamentAdmin(admin.ModelAdmin):
                     f"Все оплаты закрыты, но сетку не удалось сформировать: {msg}",
                     level=messages.WARNING,
                 )
+        return HttpResponseRedirect(
+            reverse("admin:tournaments_tournament_change", args=[tournament.pk])
+        )
+
+    def resend_postpayment_link_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        user_id: int,
+    ) -> HttpResponse:
+        """Повторно отправить участнику ссылку на оплату постоплаты.
+
+        Args:
+            request (HttpRequest): Запрос администратора.
+            object_id (str): ID турнира.
+            user_id (int): ID пользователя участника.
+
+        Returns:
+            HttpResponse: Редирект обратно в карточку турнира.
+        """
+        tournament = get_object_or_404(Tournament, pk=object_id)
+        user = get_object_or_404(get_user_model(), pk=user_id)
+        display_name = user.get_full_name() or user.email or f"ID {user.pk}"
+        ok, msg = resend_postpayment_payment_link(tournament, user)
+        self.message_user(
+            request,
+            f"«{display_name}»: {msg}",
+            level=messages.SUCCESS if ok else messages.WARNING,
+        )
         return HttpResponseRedirect(
             reverse("admin:tournaments_tournament_change", args=[tournament.pk])
         )
@@ -781,15 +817,38 @@ class TournamentAdmin(admin.ModelAdmin):
                     "'Подтвердить участие без оплаты? "
                     "Статус станет зелёным, инвойс будет отменён.'"
                     ');" style="'
-                    "display:inline-flex; padding:6px 10px; "
+                    "display:inline-flex; align-items:center; justify-content:center; "
+                    "box-sizing:border-box; padding:6px 10px; "
                     "border:1px solid #1a7f37; border-radius:4px; "
                     "background:#dafbe1; color:#1a7f37; text-decoration:none; "
-                    'font-size:12px; font-weight:600;">'
+                    "font-size:12px; font-weight:600; "
+                    'white-space:nowrap;">'
                     "Подтвердить участие</a>",
                     confirm_url,
                 )
             else:
                 confirm_btn = mark_safe("")
+            if row.status in ADMIN_RESENDABLE_PAYMENT_STATUSES:
+                resend_url = reverse(
+                    "admin:tournaments_tournament_postpayment_resend_link",
+                    args=[obj.pk, row.user_id],
+                )
+                resend_btn = format_html(
+                    '<a href="{}" onclick="return confirm('
+                    "'Отправить участнику ссылку на оплату ещё раз?'"
+                    ');" style="'
+                    "display:inline-flex; align-items:center; justify-content:center; "
+                    "box-sizing:border-box; padding:6px 10px; "
+                    "border:1px solid #9a6700; border-radius:4px; "
+                    "background:#fff8c5; color:#9a6700; text-decoration:none; "
+                    "font-size:12px; font-weight:600; "
+                    'white-space:nowrap;">'
+                    "Отправить ссылку ещё раз</a>",
+                    resend_url,
+                )
+            else:
+                resend_btn = mark_safe("")
+            action_btns = format_html("{}{}", confirm_btn, resend_btn)
             # На широком экране — 3 колонки в ряд; на узком flex переносит вниз.
             return cast(
                 str,
@@ -808,11 +867,15 @@ class TournamentAdmin(admin.ModelAdmin):
                     '<div style="display:flex; flex-wrap:wrap; gap:8px; '
                     'align-items:center;">{}{}</div>'
                     "</div>"
-                    '<div style="flex:1 1 200px; min-width:160px;">'
+                    '<div style="flex:1 1 220px; min-width:160px;">'
                     '<div style="font-size:11px; color:#656d76; '
                     'margin-bottom:4px;">Статус</div>'
+                    '<div style="display:flex; flex-direction:column; '
+                    'gap:8px; align-items:flex-start;">'
+                    "{}"
                     '<div style="display:flex; flex-wrap:wrap; gap:8px; '
-                    'align-items:center;">{}{}</div>'
+                    'align-items:center; width:100%;">{}</div>'
+                    "</div>"
                     "</div>"
                     '<div style="flex:2 1 240px; min-width:180px;">'
                     '<div style="font-size:11px; color:#656d76; '
@@ -825,7 +888,7 @@ class TournamentAdmin(admin.ModelAdmin):
                     call_btn,
                     called_label,
                     status_html,
-                    confirm_btn,
+                    action_btns,
                     row.details,
                 ),
             )
@@ -947,8 +1010,9 @@ class TournamentAdmin(admin.ModelAdmin):
                 "description": (
                     "Кто оплатил FT или рублями, кому отправлены уведомления, "
                     "кто ещё должен оплатить. «Списать FT…» — проверить баланс "
-                    "и закрыть инвойсы. «Позвонить» / «Подтвердить участие» — "
-                    "по участнику. Обновите страницу после действий."
+                    "и закрыть инвойсы. «Позвонить» / «Подтвердить участие» / "
+                    "«Отправить ссылку ещё раз» — по участнику. "
+                    "Обновите страницу после действий."
                 ),
             },
         ),

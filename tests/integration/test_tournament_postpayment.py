@@ -29,13 +29,14 @@ from apps.tournaments.postpayment import (
     mark_registration_covered,
     open_postpayment_window,
     phone_to_tel_href,
+    resend_postpayment_payment_link,
     settle_postpayment_with_available_fancoin,
     sync_postpayment_invoices_deadline,
     tournament_needs_fancoin_settlement,
     try_cover_registration_with_fancoin,
     try_settle_postpayment_for_user,
 )
-from apps.users.models import Player, SkillLevel, User
+from apps.users.models import Notification, Player, SkillLevel, User
 
 
 class TournamentPostpaymentServiceTestCase(TestCase):
@@ -352,6 +353,38 @@ class TournamentPostpaymentServiceTestCase(TestCase):
         }
         self.assertEqual(rows[self.user.id].status, "Выдано администратором")
         self.assertEqual(rows[self.user.id].status_tone, "success")
+
+    def test_resend_postpayment_payment_link(self) -> None:
+        """Повторная отправка ссылки работает только для PENDING-инвойса."""
+        self.tournament.postpayment_window_started_at = timezone.now()
+        self.tournament.save(update_fields=["postpayment_window_started_at"])
+        invoice = TournamentPostpaymentInvoice.objects.create(
+            tournament=self.tournament,
+            user=self.user,
+            amount=500,
+            due_at=timezone.now() + timedelta(hours=12),
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        )
+        with (
+            patch("apps.tournaments.postpayment.send_to_user_by_user") as send_mock,
+            patch(
+                "apps.core.email_service.send_tournament_postpayment_resend_email",
+                return_value=True,
+            ) as email_mock,
+        ):
+            ok, msg = resend_postpayment_payment_link(self.tournament, self.user)
+        self.assertTrue(ok)
+        self.assertIn("повторно", msg.lower())
+        send_mock.assert_called_once()
+        email_mock.assert_called_once()
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.user,
+                url=_payment_url(self.tournament, invoice.id),
+            ).exists()
+        )
+        ok_fail, _ = resend_postpayment_payment_link(self.tournament, self.user2)
+        self.assertFalse(ok_fail)
 
     def test_finalize_postpayment_regenerates_when_flag_without_matches(self) -> None:
 

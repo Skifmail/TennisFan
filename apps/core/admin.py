@@ -2,19 +2,130 @@
 Core admin.
 """
 
+from html import escape
+from typing import cast
+
 from django.contrib import admin
 from django.http import HttpRequest, HttpResponse
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 
 from .models import (
     City,
     FooterSocialLink,
     LegalAcceptanceLog,
+    OutboundEmail,
     PlatformActivityEvent,
     SupportMessage,
     SupportThread,
     TelegramTransferConsentLog,
     UserConsent,
 )
+
+
+@admin.register(OutboundEmail)
+class OutboundEmailAdmin(admin.ModelAdmin):
+    """Журнал всех исходящих писем: просмотр HTML и текста."""
+
+    list_display = (
+        "sent_at",
+        "to_email",
+        "user",
+        "subject_short",
+        "status",
+    )
+    list_filter = ("status", "sent_at")
+    search_fields = (
+        "to_email",
+        "subject",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+        "body_text",
+    )
+    date_hierarchy = "sent_at"
+    ordering = ("-sent_at", "-id")
+    readonly_fields = (
+        "user",
+        "to_email",
+        "from_email",
+        "subject",
+        "status",
+        "error_message",
+        "sent_at",
+        "body_preview",
+        "body_text",
+        "body_html",
+    )
+    fields = (
+        "sent_at",
+        "status",
+        "user",
+        "to_email",
+        "from_email",
+        "subject",
+        "error_message",
+        "body_preview",
+        "body_text",
+        "body_html",
+    )
+
+    @admin.display(description="Тема", ordering="subject")
+    def subject_short(self, obj: OutboundEmail) -> str:
+        """Краткая тема для списка.
+
+        Args:
+            obj (OutboundEmail): Письмо.
+
+        Returns:
+            str: Тема (обрезанная).
+        """
+        subject = obj.subject or "(без темы)"
+        return subject if len(subject) <= 80 else f"{subject[:77]}..."
+
+    @admin.display(description="Просмотр письма")
+    def body_preview(self, obj: OutboundEmail) -> str:
+        """HTML-превью письма в карточке админки.
+
+        Args:
+            obj (OutboundEmail): Письмо.
+
+        Returns:
+            str: Safe HTML с iframe или текстом.
+        """
+        if obj.body_html:
+            return cast(
+                str,
+                mark_safe(
+                    '<iframe sandbox="" srcdoc="'
+                    f"{escape(obj.body_html)}"
+                    '" style="width:100%;min-height:520px;border:1px solid #d0d7de;'
+                    'border-radius:8px;background:#fff;"></iframe>'
+                ),
+            )
+        if obj.body_text:
+            return cast(
+                str,
+                format_html(
+                    '<pre style="white-space:pre-wrap;max-height:520px;overflow:auto;'
+                    "padding:12px;border:1px solid #d0d7de;border-radius:8px;"
+                    'background:var(--body-bg,#fff);">{}</pre>',
+                    obj.body_text,
+                ),
+            )
+        return "—"
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Запретить ручное создание записей журнала."""
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: object = None) -> bool:
+        """Разрешить открытие карточки (поля только для чтения)."""
+        return True
+
+    def has_delete_permission(self, request: HttpRequest, obj: object = None) -> bool:
+        """Разрешить удаление старых писем суперпользователю."""
+        return bool(request.user and request.user.is_superuser)
 
 
 @admin.register(PlatformActivityEvent)

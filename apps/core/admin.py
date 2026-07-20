@@ -10,6 +10,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import path, reverse
 from django.utils.html import format_html
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from .models import (
     City,
@@ -86,6 +87,7 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         ]
         return cast(list, custom + super().get_urls())
 
+    @xframe_options_sameorigin
     def html_preview_view(
         self,
         request: HttpRequest,
@@ -102,12 +104,17 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         """
         obj = get_object_or_404(OutboundEmail, pk=object_id)
         if obj.body_html:
-            return HttpResponse(obj.body_html, content_type="text/html; charset=utf-8")
-        text = escape(obj.body_text or "")
-        return HttpResponse(
-            f"<pre style='white-space:pre-wrap'>{text}</pre>",
-            content_type="text/html; charset=utf-8",
-        )
+            response = HttpResponse(
+                obj.body_html, content_type="text/html; charset=utf-8"
+            )
+        else:
+            text = escape(obj.body_text or "")
+            response = HttpResponse(
+                f"<pre style='white-space:pre-wrap'>{text}</pre>",
+                content_type="text/html; charset=utf-8",
+            )
+        response["X-Frame-Options"] = "SAMEORIGIN"
+        return response
 
     @admin.display(description="Тема", ordering="subject")
     def subject_short(self, obj: OutboundEmail) -> str:

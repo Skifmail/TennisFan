@@ -52,6 +52,13 @@ ADMIN_CONFIRMABLE_PAYMENT_STATUSES: frozenset[str] = frozenset(
     }
 )
 
+# Статусы, для которых можно повторно отправить ссылку на оплату.
+ADMIN_RESENDABLE_PAYMENT_STATUSES: frozenset[str] = frozenset(
+    {
+        "Ожидает оплату (₽)",
+    }
+)
+
 
 @dataclass(frozen=True)
 class ParticipantPaymentStatus:
@@ -732,18 +739,113 @@ def _send_postpayment_opened_notification(
         None: Функция отправляет сообщения в каналы уведомлений.
     """
     payment_url = _payment_url(tournament, invoice.id)
+    due_local = timezone.localtime(invoice.due_at).strftime("%d.%m.%Y %H:%M")
+    amount_str = str(invoice.amount)
     text = (
         f"🎾 <b>Нужно оплатить участие в турнире</b>\n\n"
         f"Турнир: «{tournament.name}»\n"
-        f"Сумма: {invoice.amount} ₽\n"
-        f"Оплатить до: {timezone.localtime(invoice.due_at).strftime('%d.%m.%Y %H:%M')}\n\n"
+        f"Сумма: {amount_str} ₽\n"
+        f"Оплатить до: {due_local}\n\n"
         f"Ссылка на оплату: {payment_url}"
     )
     send_to_user_by_user(invoice.user, text)
     Notification.objects.create(
         user=invoice.user,
-        message=f"Оплатите участие в турнире «{tournament.name}» до {timezone.localtime(invoice.due_at).strftime('%d.%m.%Y %H:%M')}.",
+        message=(f"Оплатите участие в турнире «{tournament.name}» до {due_local}."),
         url=payment_url,
+    )
+    try:
+        from apps.core.email_service import send_tournament_postpayment_opened_email
+
+        send_tournament_postpayment_opened_email(
+            invoice.user,
+            tournament,
+            amount=amount_str,
+            due_at=due_local,
+            payment_url=payment_url,
+        )
+    except Exception:
+        logger.exception(
+            "Postpayment opened email failed: user=%s tournament=%s",
+            invoice.user_id,
+            tournament.slug,
+        )
+
+
+def resend_postpayment_payment_link(
+    tournament: Tournament,
+    user,
+) -> tuple[bool, str]:
+    """Повторно отправить ссылку на оплату участнику с PENDING-инвойсом.
+
+    Args:
+        tournament (Tournament): Турнир.
+        user: Пользователь участника.
+
+    Returns:
+        tuple[bool, str]: Успех и текст для сообщения администратору.
+    """
+    invoice = (
+        tournament.postpayment_invoices.filter(
+            user=user,
+            status=TournamentPostpaymentInvoice.Status.PENDING,
+        )
+        .select_related("user")
+        .first()
+    )
+    if invoice is None:
+        return False, "Нет активного инвойса постоплаты для повторной отправки."
+
+    payment_url = _payment_url(tournament, invoice.id)
+    due_local = timezone.localtime(invoice.due_at).strftime("%d.%m.%Y %H:%M")
+    amount_str = str(invoice.amount)
+    text = (
+        f"🔔 <b>Напоминание: оплатите участие</b>\n\n"
+        f"Турнир: «{tournament.name}»\n"
+        f"Сумма: {amount_str} ₽\n"
+        f"Оплатить до: {due_local}\n\n"
+        f"Ссылка на оплату: {payment_url}"
+    )
+    send_to_user_by_user(invoice.user, text)
+    Notification.objects.create(
+        user=invoice.user,
+        message=(
+            f"Напоминание: оплатите участие в турнире «{tournament.name}» "
+            f"до {due_local}."
+        ),
+        url=payment_url,
+    )
+    email_ok = False
+    try:
+        from apps.core.email_service import send_tournament_postpayment_resend_email
+
+        email_ok = send_tournament_postpayment_resend_email(
+            invoice.user,
+            tournament,
+            amount=amount_str,
+            due_at=due_local,
+            payment_url=payment_url,
+        )
+    except Exception:
+        logger.exception(
+            "Postpayment resend email failed: user=%s tournament=%s",
+            getattr(user, "pk", None),
+            tournament.slug,
+        )
+    logger.info(
+        "Postpayment: повторно отправлена ссылка user=%s tournament=%s invoice=%s "
+        "email=%s",
+        getattr(user, "pk", None),
+        tournament.slug,
+        invoice.pk,
+        email_ok,
+    )
+    if email_ok:
+        return True, "Ссылка на оплату отправлена повторно (почта, Telegram, ЛК)."
+    return (
+        True,
+        "Ссылка отправлена в Telegram и ЛК; письмо на почту не удалось "
+        "(проверьте email участника).",
     )
 
 
@@ -995,12 +1097,38 @@ def send_1h_reminders() -> int:
     total = 0
     for invoice in invoices:
         payment_url = _payment_url(invoice.tournament, invoice.id)
+        due_local = timezone.localtime(invoice.due_at).strftime("%d.%m.%Y %H:%M")
         text = (
             f"⏰ <b>Напоминание об оплате</b>\n\n"
             f"До конца срока оплаты турнира «{invoice.tournament.name}» остался 1 час.\n"
             f"Ссылка: {payment_url}"
         )
         send_to_user_by_user(invoice.user, text)
+        Notification.objects.create(
+            user=invoice.user,
+            message=(
+                f"Напоминание: до оплаты турнира «{invoice.tournament.name}» "
+                f"остался 1 час (до {due_local})."
+            ),
+            url=payment_url,
+        )
+        try:
+            from apps.core.email_service import (
+                send_tournament_postpayment_1h_reminder_email,
+            )
+
+            send_tournament_postpayment_1h_reminder_email(
+                invoice.user,
+                invoice.tournament,
+                due_at=due_local,
+                payment_url=payment_url,
+            )
+        except Exception:
+            logger.exception(
+                "Postpayment 1h email failed: user=%s tournament=%s",
+                invoice.user_id,
+                invoice.tournament.slug,
+            )
         invoice.reminder_1h_sent_at = now
         invoice.save(update_fields=["reminder_1h_sent_at"])
         total += 1

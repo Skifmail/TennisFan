@@ -266,6 +266,117 @@ def send_tournament_cancelled_email(
     )
 
 
+def send_tournament_postpayment_opened_email(
+    user: User,
+    tournament: Tournament,
+    *,
+    amount: str,
+    due_at: str,
+    payment_url: str,
+) -> bool:
+    """Отправить письмо об открытии окна постоплаты со ссылкой на оплату.
+
+    Args:
+        user (User): Получатель.
+        tournament (Tournament): Турнир.
+        amount (str): Сумма взноса.
+        due_at (str): Срок оплаты (локальное время, строка).
+        payment_url (str): Абсолютная ссылка на оплату.
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    return _send_html_email(
+        subject=f"TennisFan: оплатите участие в турнире «{tournament.name}»",
+        template_name="emails/tournament_postpayment_opened.html",
+        context={
+            "user": user,
+            "tournament": tournament,
+            "amount": amount,
+            "due_at": due_at,
+            "payment_url": payment_url,
+            "base_url": _get_site_base_url(),
+        },
+        recipient=email,
+    )
+
+
+def send_tournament_postpayment_1h_reminder_email(
+    user: User,
+    tournament: Tournament,
+    *,
+    due_at: str,
+    payment_url: str,
+) -> bool:
+    """Отправить письмо-напоминание за 1 час до конца постоплаты.
+
+    Args:
+        user (User): Получатель.
+        tournament (Tournament): Турнир.
+        due_at (str): Срок оплаты (локальное время, строка).
+        payment_url (str): Абсолютная ссылка на оплату.
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    return _send_html_email(
+        subject=f"TennisFan: остался 1 час на оплату «{tournament.name}»",
+        template_name="emails/tournament_postpayment_1h_reminder.html",
+        context={
+            "user": user,
+            "tournament": tournament,
+            "due_at": due_at,
+            "payment_url": payment_url,
+            "base_url": _get_site_base_url(),
+        },
+        recipient=email,
+    )
+
+
+def send_tournament_postpayment_resend_email(
+    user: User,
+    tournament: Tournament,
+    *,
+    amount: str,
+    due_at: str,
+    payment_url: str,
+) -> bool:
+    """Повторно отправить письмо со ссылкой на оплату постоплаты.
+
+    Args:
+        user (User): Получатель.
+        tournament (Tournament): Турнир.
+        amount (str): Сумма взноса.
+        due_at (str): Срок оплаты (локальное время, строка).
+        payment_url (str): Абсолютная ссылка на оплату.
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    return _send_html_email(
+        subject=f"TennisFan: напоминание об оплате «{tournament.name}»",
+        template_name="emails/tournament_postpayment_reminder.html",
+        context={
+            "user": user,
+            "tournament": tournament,
+            "amount": amount,
+            "due_at": due_at,
+            "payment_url": payment_url,
+            "base_url": _get_site_base_url(),
+        },
+        recipient=email,
+    )
+
+
 def send_tournament_entry_fancoin_confirmed_email(
     user: User,
     tournament: Tournament,

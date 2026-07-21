@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tennison-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-lc", "DEBUG=True ./venv/bin/python manage.py runserver 127.0.0.1:8001"],
+      "port": 8001
+    }
+  ]
+}

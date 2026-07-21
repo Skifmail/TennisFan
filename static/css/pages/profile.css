@@ -281,7 +281,8 @@
     bottom: calc(100% + 8px);
     transform: translateX(-50%) translateY(4px);
     width: max-content;
-    max-width: 240px;
+    max-width: min(240px, calc(100vw - 2rem));
+    box-sizing: border-box;
     padding: 6px 10px;
     background: rgb(3 17 13 / 96%);
     color: #f4e8cf;
@@ -305,14 +306,38 @@
     transform: translateX(-50%) translateY(0);
 }
 
-/* Первый кубок в ряду: подсказку не центрируем, чтобы не обрезалась слева */
-.profile-trophy:first-child::after {
+/* Первый кубок в ряду (не единственный): от левого края, чтобы не обрезалась слева */
+.profile-trophy:first-child:not(:only-child)::after {
     left: 0;
     transform: translateX(0) translateY(4px);
 }
 
-.profile-trophy:first-child:hover::after,
-.profile-trophy:first-child:focus-visible::after {
+.profile-trophy:first-child:not(:only-child):hover::after,
+.profile-trophy:first-child:not(:only-child):focus-visible::after {
+    transform: translateX(0) translateY(0);
+}
+
+/* Последний кубок в ряду (не единственный): от правого края, чтобы не уезжала вправо */
+.profile-trophy:last-child:not(:only-child)::after {
+    left: auto;
+    right: 0;
+    transform: translateX(0) translateY(4px);
+}
+
+.profile-trophy:last-child:not(:only-child):hover::after,
+.profile-trophy:last-child:not(:only-child):focus-visible::after {
+    transform: translateX(0) translateY(0);
+}
+
+/* Единственный кубок слева от имени (десктоп): от левого края кубка */
+.profile-trophy:only-child::after {
+    left: 0;
+    right: auto;
+    transform: translateX(0) translateY(4px);
+}
+
+.profile-trophy:only-child:hover::after,
+.profile-trophy:only-child:focus-visible::after {
     transform: translateX(0) translateY(0);
 }
 
@@ -1101,6 +1126,20 @@
         justify-content: center;
         margin-top: 0;
         padding-top: var(--spacing-xs);
+    }
+
+    /* Кубки по центру карточки: единственную подсказку тоже центрируем,
+       иначе left:0 уезжает за правый край экрана */
+    .profile-trophy:only-child::after {
+        left: 50%;
+        right: auto;
+        max-width: min(220px, calc(100vw - 2rem));
+        transform: translateX(-50%) translateY(4px);
+    }
+
+    .profile-trophy:only-child:hover::after,
+    .profile-trophy:only-child:focus-visible::after {
+        transform: translateX(-50%) translateY(0);
     }
 
     .profile-info {

@@ -1486,7 +1486,9 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
 
     function updateMetricCards(data, fanMatchData, seasonData) {
         var latestPoint = fanMatchData.length ? fanMatchData[fanMatchData.length - 1].points : null;
-        var pointDelta = fanMatchData.length > 1 ? latestPoint - fanMatchData[0].points : null;
+        var pointDelta = fanMatchData.length ? fanMatchData.reduce(function(total, item) {
+            return total + Number(item.fan_delta || 0);
+        }, 0) : null;
         setMetric(
             'chartProfilePoints',
             formatMetricValue(latestPoint, ' FAN', 1),

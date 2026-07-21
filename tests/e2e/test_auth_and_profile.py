@@ -2,6 +2,7 @@
 
 from datetime import date, timedelta
 
+from django.template.loader import get_template
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -77,6 +78,23 @@ class GlobalProfileIsolationTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Глобальный турнир")
         self.assertNotContains(response, "Клубный турнир")
+
+    def test_profile_rating_trend_sums_all_match_deltas(self) -> None:
+        """Тренд рейтинга учитывает изменение первого матча периода."""
+        template_source = get_template("users/profile.html").template.source
+
+        self.assertIn(
+            "fanMatchData.reduce(function(total, item)",
+            template_source,
+        )
+        self.assertIn(
+            "return total + Number(item.fan_delta || 0);",
+            template_source,
+        )
+        self.assertNotIn(
+            "latestPoint - fanMatchData[0].points",
+            template_source,
+        )
 
 
 class AuthEmailCaseInsensitiveLoginTestCase(TestCase):

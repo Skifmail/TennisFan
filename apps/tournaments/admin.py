@@ -777,6 +777,19 @@ class TournamentAdmin(admin.ModelAdmin):
                 "admin:tournaments_tournament_postpayment_call",
                 args=[obj.pk, row.user_id],
             )
+            profile_url = reverse(
+                "admin:users_player_change",
+                args=[row.player_id],
+            )
+            profile_btn = format_html(
+                '<a href="{}" style="'
+                "display:inline-flex; padding:3px 7px; "
+                "border:1px solid #0b5cad; border-radius:4px; "
+                "background:#e8f1fb; color:#0b5cad; text-decoration:none; "
+                'font-size:11px; font-weight:600; white-space:nowrap;">'
+                "В профиль →</a>",
+                profile_url,
+            )
             if phone_to_tel_href(row.phone):
                 call_btn = format_html(
                     '<a href="{}" style="'
@@ -871,8 +884,9 @@ class TournamentAdmin(admin.ModelAdmin):
                     "align-items:flex-start; "
                     'overflow-wrap:anywhere; word-break:break-word;">'
                     '<div style="flex:1 1 170px; min-width:150px;">'
-                    '<div style="font-weight:600; font-size:14px; '
-                    'margin-bottom:6px;">{}</div>'
+                    '<div style="display:flex; flex-wrap:wrap; gap:7px; '
+                    "align-items:center; font-weight:600; font-size:14px; "
+                    'margin-bottom:6px;">{}{}</div>'
                     '<div style="display:flex; flex-wrap:wrap; gap:8px; '
                     'align-items:center;">{}{}</div>'
                     "</div>"
@@ -894,6 +908,7 @@ class TournamentAdmin(admin.ModelAdmin):
                     "</div>"
                     "</div>",
                     row.display_name,
+                    profile_btn,
                     call_btn,
                     called_label,
                     status_html,

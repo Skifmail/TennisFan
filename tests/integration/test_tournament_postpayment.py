@@ -3,7 +3,9 @@
 from datetime import date, timedelta
 from unittest.mock import patch
 
+from django.contrib import admin
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
@@ -12,6 +14,7 @@ from apps.subscriptions.models import (
     SubscriptionTier,
     UserSubscription,
 )
+from apps.tournaments.admin import TournamentAdmin
 from apps.tournaments.models import (
     Tournament,
     TournamentPostpaymentCallLog,
@@ -456,7 +459,18 @@ class TournamentPostpaymentServiceTestCase(TestCase):
             for row in build_participant_payment_statuses(self.tournament)
         }
         self.assertIn("FT", rows[self.user.id].status)
+        self.assertEqual(rows[self.user.id].player_id, self.player.pk)
         self.assertEqual(rows[self.user.id].status_tone, "success")
         self.assertEqual(rows[self.user2.id].status, "Ожидает оплату (₽)")
         self.assertEqual(rows[self.user2.id].status_tone, "danger")
         self.assertIn("уведомление", rows[self.user2.id].details)
+
+    def test_admin_payment_card_links_to_player_profile(self) -> None:
+        """Карточка оплаты ведёт в профиль игрока внутри админ-панели."""
+        tournament_admin = TournamentAdmin(Tournament, admin.site)
+
+        html = tournament_admin.participant_payment_status_display(self.tournament)
+        profile_url = reverse("admin:users_player_change", args=[self.player.pk])
+
+        self.assertIn(f'href="{profile_url}"', html)
+        self.assertIn("В профиль →", html)

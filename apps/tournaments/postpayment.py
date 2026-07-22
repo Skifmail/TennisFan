@@ -66,6 +66,7 @@ class ParticipantPaymentStatus:
 
     Args:
         user_id (int): ID пользователя.
+        player_id (int | None): ID профиля игрока.
         display_name (str): Имя для отображения.
         status (str): Краткий статус.
         details (str): Подробности.
@@ -76,6 +77,7 @@ class ParticipantPaymentStatus:
     """
 
     user_id: int
+    player_id: int | None
     display_name: str
     status: str
     details: str
@@ -879,9 +881,9 @@ def _collect_tournament_participant_users(tournament: Tournament) -> list:
                 user_ids.add(int(user_id_2))
     user_model = get_user_model()
     return list(
-        user_model.objects.filter(id__in=user_ids).order_by(
-            "last_name", "first_name", "email"
-        )
+        user_model.objects.filter(id__in=user_ids)
+        .select_related("player")
+        .order_by("last_name", "first_name", "email")
     )
 
 
@@ -995,6 +997,7 @@ def build_participant_payment_statuses(
         rows.append(
             ParticipantPaymentStatus(
                 user_id=user.pk,
+                player_id=user.player.pk,
                 display_name=display_name,
                 status=status,
                 details=details,

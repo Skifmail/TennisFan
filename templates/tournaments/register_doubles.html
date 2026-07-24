@@ -62,7 +62,7 @@
                     <strong>Микст-турнир:</strong> В команде должны быть мужчина и женщина. Система покажет только игроков противоположного пола.
                 </div>
                 {% endif %}
-                <form method="get" action="{% url 'tournament_register_doubles' slug=tournament.slug %}" class="mb-3" id="partner-search-form">
+                <form method="get" action="{% url 'tournament_register_doubles' slug=tournament.slug %}" class="mb-3" id="partner-search-form" data-disable-auto-loading>
                     <div class="d-flex gap-2 flex-wrap">
                         <input type="text" name="q" class="form-control" placeholder="ID, имя, телефон или email" style="max-width: 300px;" value="{{ request.GET.q }}">
                         <button type="submit" class="btn btn-outline">Найти</button>

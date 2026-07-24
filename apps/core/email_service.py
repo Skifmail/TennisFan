@@ -67,6 +67,7 @@ def _send_html_email(
     template_name: str,
     context: dict[str, Any],
     recipient: str,
+    category: str = "",
 ) -> bool:
     """Отправить HTML-письмо с текстовой fallback-версией.
 
@@ -75,6 +76,7 @@ def _send_html_email(
         template_name (str): Путь к HTML-шаблону.
         context (dict[str, Any]): Контекст шаблона.
         recipient (str): Email получателя.
+        category (str): Раздел письма для журнала ``OutboundEmail``.
 
     Returns:
         bool: ``True`` при успешной отправке, иначе ``False``.
@@ -96,6 +98,8 @@ def _send_html_email(
             to=[recipient],
         )
         msg.attach_alternative(html_content, "text/html")
+        if category:
+            msg.outbound_category = category
         msg.send(fail_silently=False)
         return True
     except Exception as exc:
@@ -158,6 +162,7 @@ def send_welcome_email(user: User) -> bool:
             to=[email],
         )
         msg.attach_alternative(html_content, "text/html")
+        msg.outbound_category = "registration"
         msg.send(fail_silently=False)
         logger.info("send_welcome_email: sent to %s (user %s)", email, user.pk)
         return True
@@ -214,6 +219,7 @@ def send_subscription_pre_debit_notification(
             from_email=from_email,
             to=[email],
         )
+        msg.outbound_category = "subscription"
         msg.send(fail_silently=False)
         logger.info(
             "send_subscription_pre_debit_notification: sent to %s (user %s)",
@@ -263,6 +269,7 @@ def send_tournament_cancelled_email(
             "base_url": base_url,
         },
         recipient=email,
+        category="tournament",
     )
 
 
@@ -301,6 +308,7 @@ def send_tournament_postpayment_opened_email(
             "base_url": _get_site_base_url(),
         },
         recipient=email,
+        category="tournament",
     )
 
 
@@ -336,6 +344,7 @@ def send_tournament_postpayment_1h_reminder_email(
             "base_url": _get_site_base_url(),
         },
         recipient=email,
+        category="tournament",
     )
 
 
@@ -374,6 +383,7 @@ def send_tournament_postpayment_resend_email(
             "base_url": _get_site_base_url(),
         },
         recipient=email,
+        category="tournament",
     )
 
 
@@ -425,6 +435,7 @@ def send_tournament_entry_fancoin_confirmed_email(
             "base_url": base_url,
         },
         recipient=email,
+        category="tournament",
     )
 
 
@@ -461,6 +472,7 @@ def send_tournament_entry_receipt_email(
             "tournament_url": f"{base_url}{reverse('tournament_detail', args=[tournament.slug])}",
         },
         recipient=email,
+        category="tournament",
     )
 
 
@@ -505,6 +517,7 @@ def send_club_plan_receipt_email(
             ),
         },
         recipient=email,
+        category="subscription",
     )
 
 
@@ -535,6 +548,7 @@ def send_coach_application_decision_email(
             "approved": approved,
         },
         recipient=recipient,
+        category="other",
     )
 
 
@@ -563,6 +577,7 @@ def send_court_application_decision_email(
             "approved": approved,
         },
         recipient=recipient,
+        category="other",
     )
 
 
@@ -588,6 +603,7 @@ def send_donation_thanks_email(user: User, amount: str | None) -> bool:
             "paid_at": timezone.now(),
         },
         recipient=email,
+        category="subscription",
     )
 
 
@@ -623,6 +639,7 @@ def send_subscription_autorenew_failed_email(
             "profile_url": profile_url,
         },
         recipient=email,
+        category="subscription",
     )
 
 
@@ -650,6 +667,7 @@ def send_password_changed_email(user: User, request: HttpRequest | None = None) 
         template_name="emails/security_password_changed.html",
         context={"user": user, "event_at": timezone.now(), "ip_address": ip_address},
         recipient=email,
+        category="security",
     )
 
 
@@ -677,6 +695,7 @@ def send_phone_changed_email(user: User, old_phone: str, new_phone: str) -> bool
             "event_at": timezone.now(),
         },
         recipient=email,
+        category="security",
     )
 
 
@@ -713,4 +732,56 @@ def send_email_verification(user: User) -> bool:
         template_name="emails/email_verification.html",
         context={"user": user, "verify_url": verify_url, "expires_at": expires_at},
         recipient=email,
+        category="registration",
+    )
+
+
+def send_new_tournament_email(user: User, tournament: Tournament) -> bool:
+    """Отправить branded-письмо о старте нового турнира.
+
+    Args:
+        user (User): Получатель письма.
+        tournament (Tournament): Созданный турнир.
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    base_url = _get_site_base_url()
+    tournament_url = f"{base_url}{reverse('tournament_detail', args=[tournament.slug])}"
+    user_name = user.get_display_name() or user.email.split("@")[0]
+    start_str = (
+        tournament.start_date.strftime("%d.%m.%Y")
+        if getattr(tournament, "start_date", None)
+        else ""
+    )
+    city = getattr(tournament, "city", "") or ""
+    logo_url = f"{base_url}/static/images/logo.png"
+    support_email = getattr(settings, "DEFAULT_FROM_EMAIL", "tennis@tennisfan.ru")
+    from apps.users.skill_levels import skill_with_ntrp
+
+    category_codes = list(
+        tournament.allowed_categories.values_list("category", flat=True)
+    )
+    allowed_categories = [skill_with_ntrp(code) for code in category_codes]
+    return _send_html_email(
+        subject=f"TennisFan: новый турнир «{tournament.name}»",
+        template_name="emails/new_tournament.html",
+        context={
+            "user": user,
+            "user_name": user_name,
+            "tournament": tournament,
+            "tournament_name": tournament.name,
+            "tournament_url": tournament_url,
+            "start_date": start_str,
+            "city": city,
+            "allowed_categories": allowed_categories,
+            "base_url": base_url,
+            "logo_url": logo_url,
+            "support_email": support_email,
+        },
+        recipient=email,
+        category="new_tournament",
     )

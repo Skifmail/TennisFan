@@ -82,17 +82,24 @@
             <div class="tournament-card__line tournament-card__line--participants" role="group" aria-label="{% if tournament.variant == 'doubles' %}Команды{% else %}Участники{% endif %}">
                 {% if tournament.variant == 'doubles' %}
                     {% if tournament.teams.all %}
-                    <div class="tournament-card__participants-strip tournament-card__participants-strip--stacked">
-                        {% for team in tournament.teams.all|slice:":12" %}
+                    <div class="tournament-card__participants-strip tournament-card__participants-strip--teams">
+                        {% for team in tournament.teams.all|slice:":8" %}
                         <span
-                            class="tournament-card__avatar-wrap"
-                            title="{% if team.player2 %}{{ team.player1.user.last_name }} / {{ team.player2.user.last_name }}{% else %}{{ team.player1.user.get_full_name|default:team.player1.user.username }}{% endif %}"
+                            class="tournament-card__team-avatars"
+                            title="{% if team.player2 %}{{ team.player1.user.last_name }} / {{ team.player2.user.last_name }}{% else %}{{ team.player1.user.get_full_name|default:team.player1.user.username }} (ожидает партнёра){% endif %}"
                         >
-                            {% include 'includes/avatar.html' with avatar=team.player1.avatar class="player-avatar tournament-card__avatar-img" %}
+                            <span class="tournament-card__avatar-wrap">
+                                {% include 'includes/avatar.html' with avatar=team.player1.avatar class="player-avatar tournament-card__avatar-img" %}
+                            </span>
+                            {% if team.player2 %}
+                            <span class="tournament-card__avatar-wrap">
+                                {% include 'includes/avatar.html' with avatar=team.player2.avatar class="player-avatar tournament-card__avatar-img" %}
+                            </span>
+                            {% endif %}
                         </span>
                         {% endfor %}
-                        {% if tournament.teams_count|default:tournament.teams.count > 12 %}
-                        <span class="tournament-card__more-count">+{{ tournament.teams_count|default:tournament.teams.count|add:"-12" }}</span>
+                        {% if tournament.teams_count|default:tournament.teams.count > 8 %}
+                        <span class="tournament-card__more-count">+{{ tournament.teams_count|default:tournament.teams.count|add:"-8" }}</span>
                         {% endif %}
                     </div>
                     {% else %}

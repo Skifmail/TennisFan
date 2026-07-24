@@ -877,6 +877,18 @@ class OutboundEmail(models.Model):
         SENT = "sent", "Отправлено"
         FAILED = "failed", "Ошибка"
 
+    class Category(models.TextChoices):
+        """Раздел письма для фильтрации в админке."""
+
+        REGISTRATION = "registration", "Регистрация и подтверждение почты"
+        NEW_TOURNAMENT = "new_tournament", "Новые турниры"
+        TOURNAMENT = "tournament", "Турниры"
+        SUBSCRIPTION = "subscription", "Подписки и платежи"
+        SECURITY = "security", "Безопасность"
+        CLUBS = "clubs", "Клубы"
+        SUPPORT = "support", "Поддержка"
+        OTHER = "other", "Прочие"
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -890,6 +902,13 @@ class OutboundEmail(models.Model):
     subject = models.CharField("Тема", max_length=998, blank=True)
     body_text = models.TextField("Текст", blank=True)
     body_html = models.TextField("HTML", blank=True)
+    category = models.CharField(
+        "Раздел",
+        max_length=32,
+        choices=Category.choices,
+        default=Category.OTHER,
+        db_index=True,
+    )
     status = models.CharField(
         "Статус",
         max_length=16,
@@ -902,7 +921,7 @@ class OutboundEmail(models.Model):
 
     class Meta:
         verbose_name = "Электронное письмо"
-        verbose_name_plural = "Электронные письма"
+        verbose_name_plural = "Все письма"
         ordering = ("-sent_at", "-id")
 
     def __str__(self) -> str:
@@ -913,3 +932,75 @@ class OutboundEmail(models.Model):
         """
         subject = self.subject or "(без темы)"
         return f"{subject} → {self.to_email} ({self.sent_at:%d.%m.%Y %H:%M})"
+
+
+class RegistrationOutboundEmail(OutboundEmail):
+    """Прокси: письма регистрации и подтверждения email."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Письмо регистрации"
+        verbose_name_plural = "Регистрация и подтверждение почты"
+
+
+class NewTournamentOutboundEmail(OutboundEmail):
+    """Прокси: уведомления о новых турнирах."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Письмо о новом турнире"
+        verbose_name_plural = "Новые турниры"
+
+
+class TournamentOutboundEmail(OutboundEmail):
+    """Прокси: письма по турнирам (оплата, отмена, напоминания)."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Письмо по турниру"
+        verbose_name_plural = "Турниры"
+
+
+class SubscriptionOutboundEmail(OutboundEmail):
+    """Прокси: подписки, платежи и донаты."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Письмо подписки/платежа"
+        verbose_name_plural = "Подписки и платежи"
+
+
+class SecurityOutboundEmail(OutboundEmail):
+    """Прокси: security-письма аккаунта."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Письмо безопасности"
+        verbose_name_plural = "Безопасность"
+
+
+class ClubsOutboundEmail(OutboundEmail):
+    """Прокси: клубные письма."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Клубное письмо"
+        verbose_name_plural = "Клубы"
+
+
+class SupportOutboundEmail(OutboundEmail):
+    """Прокси: письма поддержки."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Письмо поддержки"
+        verbose_name_plural = "Поддержка"
+
+
+class OtherOutboundEmail(OutboundEmail):
+    """Прокси: прочие письма без отдельного раздела."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Прочее письмо"
+        verbose_name_plural = "Прочие"

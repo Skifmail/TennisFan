@@ -102,10 +102,17 @@ class LoggingEmailBackend(BaseEmailBackend):
                     body_html = str(content)
                     break
 
+            from apps.core.email_categories import classify_outbound_email
+
             user_model = get_user_model()
             now = timezone.now()
             status = (
                 OutboundEmail.Status.SENT if success else OutboundEmail.Status.FAILED
+            )
+            subject = str(getattr(message, "subject", "") or "")[:998]
+            category = classify_outbound_email(
+                category=str(getattr(message, "outbound_category", "") or ""),
+                subject=subject,
             )
             for to_email in recipients:
                 to_norm = (to_email or "").strip().lower()
@@ -116,9 +123,10 @@ class LoggingEmailBackend(BaseEmailBackend):
                     user=user,
                     to_email=to_norm or (to_email or ""),
                     from_email=str(getattr(message, "from_email", "") or ""),
-                    subject=str(getattr(message, "subject", "") or "")[:998],
+                    subject=subject,
                     body_text=str(getattr(message, "body", "") or ""),
                     body_html=body_html,
+                    category=category,
                     status=status,
                     error_message=(error or "")[:5000],
                     sent_at=now,

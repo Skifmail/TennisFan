@@ -24,3 +24,6 @@ class CoreConfig(AppConfig):
         patch_admin_detailed_logging()
 
         from . import admin_action_log  # noqa: F401
+        from .admin_email_menu import patch_outbound_email_admin_menu
+
+        patch_outbound_email_admin_menu()

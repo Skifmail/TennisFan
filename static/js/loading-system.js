@@ -5,6 +5,8 @@
     "use strict";
 
     var ACTIVE_BUTTONS = new WeakSet();
+    var BUTTON_LOADING_TIMEOUTS = new WeakMap();
+    var BUTTON_LOADING_SAFETY_MS = 12000;
     var PAGE_LOADER_ID = "global-fullscreen-loader";
     var PAGE_SPINNER_ID = "page-transition-spinner";
 
@@ -113,6 +115,14 @@
         return currentText + "...";
     }
 
+    function clearButtonLoadingTimeout(button) {
+        var timerId = BUTTON_LOADING_TIMEOUTS.get(button);
+        if (timerId) {
+            window.clearTimeout(timerId);
+            BUTTON_LOADING_TIMEOUTS.delete(button);
+        }
+    }
+
     function setButtonLoading(button, customText) {
         if (!button || ACTIVE_BUTTONS.has(button)) {
             return;
@@ -138,12 +148,21 @@
         button.disabled = true;
         button.setAttribute("aria-busy", "true");
         ACTIVE_BUTTONS.add(button);
+
+        // Если навигация зависла/оборвалась — вернуть кнопку, чтобы можно было повторить.
+        clearButtonLoadingTimeout(button);
+        var safetyTimer = window.setTimeout(function () {
+            resetButtonLoading(button);
+            hideLoader();
+        }, BUTTON_LOADING_SAFETY_MS);
+        BUTTON_LOADING_TIMEOUTS.set(button, safetyTimer);
     }
 
     function resetButtonLoading(button) {
         if (!button || !ACTIVE_BUTTONS.has(button)) {
             return;
         }
+        clearButtonLoadingTimeout(button);
         if (button.dataset.loadingOriginalHtml !== undefined) {
             button.innerHTML = button.dataset.loadingOriginalHtml;
         }
@@ -154,6 +173,17 @@
         delete button.dataset.loadingOriginalHtml;
         delete button.dataset.loadingOriginalMinWidth;
         ACTIVE_BUTTONS.delete(button);
+    }
+
+    function resetAllLoadingUi() {
+        hideLoader();
+        hidePageSpinner();
+        document.querySelectorAll("button.is-loading, .btn.is-loading").forEach(function (btn) {
+            resetButtonLoading(btn);
+        });
+        document.querySelectorAll("form[aria-busy='true']").forEach(function (form) {
+            form.removeAttribute("aria-busy");
+        });
     }
 
     function isOverlayPreferred(form, submitter) {
@@ -255,8 +285,9 @@
                 showPageSpinner();
             }
         });
+        // bfcache / возврат назад: сбросить зависшие спиннеры на кнопках.
         window.addEventListener("pageshow", function () {
-            hidePageSpinner();
+            resetAllLoadingUi();
         });
     }
 
@@ -274,6 +305,7 @@
         hideLoader: hideLoader,
         setButtonLoading: setButtonLoading,
         resetButtonLoading: resetButtonLoading,
+        resetAllLoadingUi: resetAllLoadingUi,
         showPageSpinner: showPageSpinner,
         hidePageSpinner: hidePageSpinner,
     };

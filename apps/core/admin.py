@@ -3,7 +3,7 @@ Core admin.
 """
 
 from html import escape
-from typing import cast
+from typing import ClassVar, cast
 
 from django.contrib import admin
 from django.http import HttpRequest, HttpResponse
@@ -14,13 +14,21 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from .models import (
     City,
+    ClubsOutboundEmail,
     FooterSocialLink,
     LegalAcceptanceLog,
+    NewTournamentOutboundEmail,
+    OtherOutboundEmail,
     OutboundEmail,
     PlatformActivityEvent,
+    RegistrationOutboundEmail,
+    SecurityOutboundEmail,
+    SubscriptionOutboundEmail,
     SupportMessage,
+    SupportOutboundEmail,
     SupportThread,
     TelegramTransferConsentLog,
+    TournamentOutboundEmail,
     UserConsent,
 )
 
@@ -34,10 +42,12 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         "to_email",
         "user_display",
         "subject_short",
+        "category",
         "status",
     )
     list_select_related = ("user",)
-    list_filter = ("status", "sent_at")
+    list_filter: ClassVar[tuple[str, ...]] = ("category", "status", "sent_at")
+    category_filter: ClassVar[str | None] = None
     search_fields = (
         "to_email",
         "subject",
@@ -53,6 +63,7 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         "to_email",
         "from_email",
         "subject",
+        "category",
         "status",
         "error_message",
         "sent_at",
@@ -64,6 +75,7 @@ class OutboundEmailAdmin(admin.ModelAdmin):
     fields = (
         "sent_at",
         "status",
+        "category",
         "user_display",
         "to_email",
         "from_email",
@@ -95,11 +107,12 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         Returns:
             list: URL-паттерны админки.
         """
+        opts = self.model._meta
         custom = [
             path(
                 "<path:object_id>/html-preview/",
                 self.admin_site.admin_view(self.html_preview_view),
-                name="core_outboundemail_html_preview",
+                name=f"{opts.app_label}_{opts.model_name}_html_preview",
             ),
         ]
         return cast(list, custom + super().get_urls())
@@ -119,7 +132,7 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         Returns:
             HttpResponse: HTML-тело письма.
         """
-        obj = get_object_or_404(OutboundEmail, pk=object_id)
+        obj = get_object_or_404(self.model, pk=object_id)
         if obj.body_html:
             response = HttpResponse(
                 obj.body_html, content_type="text/html; charset=utf-8"
@@ -202,8 +215,9 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         if not obj.pk:
             return "—"
         if obj.body_html or obj.body_text:
+            opts = self.model._meta
             preview_url = reverse(
-                "admin:core_outboundemail_html_preview",
+                f"admin:{opts.app_label}_{opts.model_name}_html_preview",
                 args=[obj.pk],
             )
             return cast(
@@ -219,6 +233,20 @@ class OutboundEmailAdmin(admin.ModelAdmin):
             )
         return "—"
 
+    def get_queryset(self, request: HttpRequest):
+        """Ограничить queryset разделом для proxy-моделей.
+
+        Args:
+            request (HttpRequest): Запрос администратора.
+
+        Returns:
+            QuerySet: Письма выбранного раздела или все письма.
+        """
+        qs = super().get_queryset(request)
+        if self.category_filter:
+            return qs.filter(category=self.category_filter)
+        return qs
+
     def has_add_permission(self, request: HttpRequest) -> bool:
         """Запретить ручное создание записей журнала."""
         return False
@@ -230,6 +258,68 @@ class OutboundEmailAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request: HttpRequest, obj: object = None) -> bool:
         """Разрешить удаление старых писем суперпользователю."""
         return bool(request.user and request.user.is_superuser)
+
+
+class _CategorizedOutboundEmailAdmin(OutboundEmailAdmin):
+    """Базовый админ раздела писем (proxy-модель)."""
+
+    list_filter: ClassVar[tuple[str, ...]] = ("status", "sent_at")
+
+
+@admin.register(RegistrationOutboundEmail)
+class RegistrationOutboundEmailAdmin(_CategorizedOutboundEmailAdmin):
+    """Раздел: регистрация и подтверждение почты."""
+
+    category_filter = "registration"
+
+
+@admin.register(NewTournamentOutboundEmail)
+class NewTournamentOutboundEmailAdmin(_CategorizedOutboundEmailAdmin):
+    """Раздел: уведомления о новых турнирах."""
+
+    category_filter = "new_tournament"
+
+
+@admin.register(TournamentOutboundEmail)
+class TournamentOutboundEmailAdmin(_CategorizedOutboundEmailAdmin):
+    """Раздел: письма по турнирам."""
+
+    category_filter = "tournament"
+
+
+@admin.register(SubscriptionOutboundEmail)
+class SubscriptionOutboundEmailAdmin(_CategorizedOutboundEmailAdmin):
+    """Раздел: подписки и платежи."""
+
+    category_filter = "subscription"
+
+
+@admin.register(SecurityOutboundEmail)
+class SecurityOutboundEmailAdmin(_CategorizedOutboundEmailAdmin):
+    """Раздел: безопасность аккаунта."""
+
+    category_filter = "security"
+
+
+@admin.register(ClubsOutboundEmail)
+class ClubsOutboundEmailAdmin(_CategorizedOutboundEmailAdmin):
+    """Раздел: клубные письма."""
+
+    category_filter = "clubs"
+
+
+@admin.register(SupportOutboundEmail)
+class SupportOutboundEmailAdmin(_CategorizedOutboundEmailAdmin):
+    """Раздел: поддержка."""
+
+    category_filter = "support"
+
+
+@admin.register(OtherOutboundEmail)
+class OtherOutboundEmailAdmin(_CategorizedOutboundEmailAdmin):
+    """Раздел: прочие письма."""
+
+    category_filter = "other"
 
 
 @admin.register(PlatformActivityEvent)

@@ -901,8 +901,77 @@ def _format_new_tournament_message(tournament) -> str:
     return "\n".join(parts)
 
 
+def _get_new_tournament_users(tournament) -> list:
+    """Вернуть пользователей для ЛК и email о новом турнире.
+
+    Args:
+        tournament: Созданный турнир.
+
+    Returns:
+        list: Список User (платформенный турнир — все игроки; клубный — активные члены).
+    """
+    from apps.users.models import User
+
+    if getattr(tournament, "club_id", None):
+        from apps.clubs.models import ClubMember, ClubMemberStatus
+
+        user_ids = list(
+            ClubMember.objects.filter(
+                club_id=tournament.club_id,
+                status=ClubMemberStatus.ACTIVE,
+            ).values_list("user_id", flat=True)
+        )
+        if not user_ids:
+            return []
+        return list(User.objects.filter(pk__in=user_ids).order_by("pk"))
+
+    return list(
+        User.objects.filter(player__isnull=False, player__is_bye=False)
+        .distinct()
+        .order_by("pk")
+    )
+
+
+def _notify_new_tournament_lk_and_email(tournament) -> tuple[int, int]:
+    """Создать ЛК-уведомления и отправить email о новом турнире.
+
+    Args:
+        tournament: Созданный турнир.
+
+    Returns:
+        tuple[int, int]: Число ЛК-уведомлений и успешно отправленных писем.
+    """
+    from django.urls import reverse
+
+    from apps.core.email_service import send_new_tournament_email
+    from apps.users.models import Notification
+
+    users = _get_new_tournament_users(tournament)
+    url = reverse("tournament_detail", args=[tournament.slug])
+    message_lk = f"Новый турнир: «{tournament.name}». Приглашаем принять участие!"
+    if len(message_lk) > 255:
+        message_lk = message_lk[:252] + "..."
+
+    lk_count = 0
+    email_count = 0
+    for user in users:
+        try:
+            Notification.objects.create(user=user, message=message_lk, url=url)
+            lk_count += 1
+        except Exception as exc:
+            logger.warning(
+                "New tournament LK notify failed for user %s: %s", user.pk, exc
+            )
+        try:
+            if send_new_tournament_email(user, tournament):
+                email_count += 1
+        except Exception as exc:
+            logger.warning("New tournament email failed for user %s: %s", user.pk, exc)
+    return lk_count, email_count
+
+
 def _get_new_tournament_recipients(tournament) -> list[UserTelegramLink]:
-    """Возвращает получателей уведомления о новом турнире."""
+    """Возвращает получателей Telegram-уведомления о новом турнире."""
     if getattr(tournament, "club_id", None):
         from apps.clubs.models import (
             ClubMember,
@@ -952,7 +1021,7 @@ def _get_new_tournament_recipients(tournament) -> list[UserTelegramLink]:
 
 
 def _send_new_tournament_notification(tournament_pk: int) -> None:
-    """В фоне отправить уведомление о новом турнире релевантным получателям."""
+    """В фоне отправить ЛК, email и Telegram о новом турнире."""
     from django.db import connection
 
     connection.close()
@@ -969,9 +1038,18 @@ def _send_new_tournament_notification(tournament_pk: int) -> None:
                 "New tournament notify: tournament pk=%s not found", tournament_pk
             )
             return
+
+        lk_count, email_count = _notify_new_tournament_lk_and_email(tournament)
+        logger.info(
+            "New tournament pk=%s: LK=%s email=%s",
+            tournament_pk,
+            lk_count,
+            email_count,
+        )
+
         if not bot.is_configured():
             logger.warning(
-                "New tournament notify: bot not configured (TELEGRAM_USER_BOT_TOKEN), pk=%s",
+                "New tournament notify: bot not configured, skip Telegram, pk=%s",
                 tournament_pk,
             )
             return
@@ -979,22 +1057,25 @@ def _send_new_tournament_notification(tournament_pk: int) -> None:
         total = len(links)
         if total == 0:
             logger.info(
-                "New tournament pk=%s: no eligible recipients, skip send",
+                "New tournament pk=%s: no Telegram recipients",
                 tournament_pk,
             )
             return
-        text = _format_new_tournament_message(tournament)
+        message_text = _format_new_tournament_message(tournament)
         sent = 0
         for link in links:
             try:
-                if bot.send_to_user(link.user_bot_chat_id, text):
+                if bot.send_to_user(link.user_bot_chat_id, message_text):
                     sent += 1
             except Exception as e:
                 logger.warning(
                     "New tournament notify to %s failed: %s", link.user_bot_chat_id, e
                 )
         logger.info(
-            "New tournament pk=%s notified to %s/%s users", tournament_pk, sent, total
+            "New tournament pk=%s Telegram notified %s/%s users",
+            tournament_pk,
+            sent,
+            total,
         )
     except Exception as e:
         logger.exception(
@@ -1068,12 +1149,10 @@ def notify_new_tournament_by_pk(tournament_pk: int) -> None:
     """
     Запуск рассылки о новом турнире по pk. Вызывать после transaction.on_commit(),
     чтобы турнир был уже закоммичен и виден в фоновом потоке.
+
+    Рассылка включает ЛК-уведомления и email всем релевантным игрокам;
+    Telegram — при настроенном боте.
     """
-    if not bot.is_configured():
-        logger.warning(
-            "notify_new_tournament_by_pk: bot not configured, pk=%s", tournament_pk
-        )
-        return
     logger.info("New tournament pk=%s, starting background notify", tournament_pk)
     thread = threading.Thread(
         target=_send_new_tournament_notification,

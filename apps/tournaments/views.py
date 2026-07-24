@@ -3773,25 +3773,43 @@ def tournament_register_doubles(request, slug):
     if request.method == "GET" and request.GET.get("q"):
         q = request.GET.get("q", "").strip()
         if q:
-            from django.db.models import Q
+            from django.db.models import CharField, Q, Value
+            from django.db.models.functions import Coalesce, Concat
 
             filters = (
                 Q(user__first_name__icontains=q)
                 | Q(user__last_name__icontains=q)
                 | Q(user__email__icontains=q)
                 | Q(user__phone__icontains=q)
+                | Q(_full_name__icontains=q)
             )
             if str(q).isdigit():
-                filters = filters | Q(id=int(q))
+                filters |= Q(id=int(q))
 
-            partner_queryset = Player.objects.filter(filters).exclude(id=player.id)
+            partner_queryset = (
+                Player.objects.filter(is_bye=False)
+                .exclude(id=player.id)
+                .annotate(
+                    _full_name=Concat(
+                        Coalesce("user__first_name", Value("")),
+                        Value(" "),
+                        Coalesce("user__last_name", Value("")),
+                        output_field=CharField(),
+                    )
+                )
+                .filter(filters)
+            )
             if tournament.club_id:
                 partner_queryset = partner_queryset.filter(
                     user__club_memberships__club=tournament.club,
                     user__club_memberships__status=ClubMemberStatus.ACTIVE,
                 )
 
-            all_results = list(partner_queryset.select_related("user").distinct()[:10])
+            all_results = list(
+                partner_queryset.select_related("user")
+                .distinct()
+                .order_by("user__last_name", "user__first_name")[:10]
+            )
 
             partner_search_results = all_results
 

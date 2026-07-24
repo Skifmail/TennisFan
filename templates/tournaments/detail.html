@@ -512,17 +512,32 @@
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--spacing-md);">
                 {% for participant in participants %}
                 {% if tournament.variant == 'doubles' %}
-                <div style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md);">
-                    {% include 'includes/avatar.html' with avatar=participant.player1.avatar class="player-avatar" size="48" %}
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px;">
-                            <a href="{% player_profile_url participant.player1 %}">{{ participant.player1 }}</a> <span class="text-secondary small">(УС: {{ participant.player1.ntrp_level|floatformat:1 }}, Р: {{ participant.player1.total_points|floatformat:0 }})</span>
-                            {% if participant.player2 %}
-                            / <a href="{% player_profile_url participant.player2 %}">{{ participant.player2 }}</a> <span class="text-secondary small">(УС: {{ participant.player2.ntrp_level|floatformat:1 }}, Р: {{ participant.player2.total_points|floatformat:0 }})</span>
-                            {% else %}
-                            <span class="text-muted">(ожидает партнёра)</span>
-                            {% endif %}
+                <div class="tournament-team-card">
+                    <div class="tournament-team-card__avatars{% if participant.player2 %} tournament-team-card__avatars--pair{% endif %}" aria-hidden="true">
+                        <span class="tournament-team-card__avatar-wrap">
+                            {% include 'includes/avatar.html' with avatar=participant.player1.avatar class="player-avatar tournament-team-card__avatar" size="48" %}
+                        </span>
+                        {% if participant.player2 %}
+                        <span class="tournament-team-card__avatar-wrap">
+                            {% include 'includes/avatar.html' with avatar=participant.player2.avatar class="player-avatar tournament-team-card__avatar" size="48" %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="tournament-team-card__players">
+                        <div class="tournament-team-card__player">
+                            <a href="{% player_profile_url participant.player1 %}">{{ participant.player1 }}</a>
+                            <span class="text-secondary small">(УС: {{ participant.player1.ntrp_level|floatformat:1 }}, Р: {{ participant.player1.total_points|floatformat:0 }})</span>
                         </div>
+                        {% if participant.player2 %}
+                        <div class="tournament-team-card__player">
+                            <a href="{% player_profile_url participant.player2 %}">{{ participant.player2 }}</a>
+                            <span class="text-secondary small">(УС: {{ participant.player2.ntrp_level|floatformat:1 }}, Р: {{ participant.player2.total_points|floatformat:0 }})</span>
+                        </div>
+                        {% else %}
+                        <div class="tournament-team-card__player tournament-team-card__player--waiting">
+                            <span class="text-muted">ожидает партнёра</span>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
                 {% else %}

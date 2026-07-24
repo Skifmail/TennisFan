@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def _on_tournament_created(sender, instance, created, **kwargs):
-    """При создании турнира — уведомить всех пользователей бота после коммита транзакции."""
+    """При создании турнира — ЛК, email и Telegram после коммита транзакции."""
     if created:
         pk = instance.pk
         logger.info(

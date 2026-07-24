@@ -102,6 +102,7 @@ def send_admin_support_notification(message: SupportMessage) -> bool:
         to=[admin_email],
     )
     msg.attach_alternative(html_content, "text/html")
+    msg.outbound_category = "support"
     try:
         _send_with_timeout(msg)
         return True
@@ -143,6 +144,7 @@ def send_user_support_reply(message: SupportMessage) -> bool:
         to=[user_email],
     )
     msg.attach_alternative(html_content, "text/html")
+    msg.outbound_category = "support"
     try:
         _send_with_timeout(msg)
         return True

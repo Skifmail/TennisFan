@@ -107,6 +107,7 @@ def _send_club_email(
             to=[recipient_email],
         )
         msg.attach_alternative(html_body, "text/html")
+        msg.outbound_category = "clubs"
         msg.send(fail_silently=False)
         logger.info(
             "club_email_sent | to=%s | subject=%s",

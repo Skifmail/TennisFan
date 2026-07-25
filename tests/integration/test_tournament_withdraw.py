@@ -33,8 +33,11 @@ from apps.tournaments.round_robin import (
     check_and_finalize_if_complete,
     generate_bracket,
 )
-from apps.tournaments.withdraw import withdraw_participant
-from apps.users.models import Player, SkillLevel, User
+from apps.tournaments.withdraw import (
+    _truncate_notification_message,
+    withdraw_participant,
+)
+from apps.users.models import Notification, Player, SkillLevel, User
 
 
 def _matches_for_player(player: Player):
@@ -290,6 +293,29 @@ class RoundRobinWithdrawTestCase(TestCase):
         )
         self.assertFalse(ok2)
         self.assertIn("уже снят", msg2)
+
+    def test_withdraw_lk_notification_fits_charfield(self) -> None:
+        """Длинное имя турнира + список матчей не ломает Notification.message."""
+        long_name = "Многодневный турнир " + ("Воскресенск " * 20)
+        self.tournament.name = long_name
+        self.tournament.save(update_fields=["name"])
+        leaver = self.players[0]
+
+        ok, msg = withdraw_participant(
+            self.tournament, player=leaver, withdrawn_by=self.admin
+        )
+        self.assertTrue(ok, msg)
+
+        notif = Notification.objects.filter(user=leaver.user).latest("created_at")
+        self.assertLessEqual(len(notif.message), 255)
+        self.assertTrue(notif.message.startswith("Вы сняты"))
+
+    def test_truncate_notification_message(self) -> None:
+        """Хелпер обрезает текст ровно до max_len."""
+        self.assertEqual(_truncate_notification_message("ok"), "ok")
+        truncated = _truncate_notification_message("а" * 300)
+        self.assertEqual(len(truncated), 255)
+        self.assertTrue(truncated.endswith("…"))
 
     def test_finalize_skips_place_points_for_withdrawn(self) -> None:
         """Снятый игрок не получает сезонные очки за место при финализации."""

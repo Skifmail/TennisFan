@@ -334,6 +334,16 @@ def _absolute_url(path: str) -> str:
         return path
 
 
+def _truncate_notification_message(text: str, *, max_len: int = 255) -> str:
+    """Обрезать текст под Notification.message (CharField max_length=255)."""
+    text = text.strip()
+    if len(text) <= max_len:
+        return text
+    if max_len <= 1:
+        return text[:max_len]
+    return text[: max_len - 1].rstrip() + "…"
+
+
 def _notify_withdrawn_user(
     user,
     tournament: Tournament,
@@ -361,15 +371,23 @@ def _notify_withdrawn_user(
 
     if refunded_ft:
         refund_part = f" На ваш баланс возвращено {TOURNAMENT_REGISTRATION_COST} FT."
+        refund_part_lk = refund_part
     elif refund_request is not None:
         refund_part = (
             " Взнос был оплачен — для возврата средств обратитесь к администратору."
         )
+        refund_part_lk = " Для возврата взноса обратитесь к администратору."
     else:
         refund_part = ""
+        refund_part_lk = ""
 
+    # Полный текст — в Telegram/email; в ЛК — короткий (max 255).
     message = f"Вы сняты с турнира «{tournament.name}».{lines_block}{refund_part}"
-    Notification.objects.create(user=user, message=message, url=url)
+    message_lk = _truncate_notification_message(
+        f"Вы сняты с турнира «{tournament.name}». "
+        f"Несыгранные матчи закрыты без игры.{refund_part_lk}"
+    )
+    Notification.objects.create(user=user, message=message_lk, url=url)
     try:
         send_to_user_by_user(user, message, skip_email=True)
     except Exception as e:
@@ -420,6 +438,10 @@ def _notify_opponents(
             f"Ваш матч с ним закрыт со статусом «Без игры» — вам присуждена "
             f"техническая победа ({match_line})."
         )
+        message_lk = _truncate_notification_message(
+            f"{withdrawn_label} снят с турнира «{tournament.name}». "
+            f"Матч закрыт без игры — вам тех. победа."
+        )
         opponent_users = _opponent_users_from_match(
             match,
             withdrawn_player=withdrawn_player,
@@ -427,7 +449,7 @@ def _notify_opponents(
         )
         for user in opponent_users:
             Notification.objects.create(
-                user=user, message=message, url=match_path or tournament_path
+                user=user, message=message_lk, url=match_path or tournament_path
             )
             try:
                 send_to_user_by_user(user, message, skip_email=True)

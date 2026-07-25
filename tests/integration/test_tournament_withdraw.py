@@ -373,37 +373,31 @@ class RoundRobinWithdrawTestCase(TestCase):
             self.assertEqual(float(opp.total_points), before[opp.pk][0])
 
     def test_revert_withdrawal_walkover_rating_effects(self) -> None:
-        """Откат восстанавливает FAN после ошибочно посчитанных walkover."""
+        """Откат восстанавливает FAN по всем walkover одного игрока (не только последнему)."""
         from apps.tournaments.withdraw import revert_withdrawal_walkover_rating_effects
 
         leaver = self.players[0]
-        # Сначала снимаем «правильно» (без рейтинга), затем искусственно
-        # симулируем старый баг: CALCULATED + дельты.
         ok, msg = withdraw_participant(
             self.tournament, player=leaver, withdrawn_by=self.admin
         )
         self.assertTrue(ok, msg)
 
-        walkover = (
+        walkovers = list(
             Match.objects.filter(
                 tournament=self.tournament,
                 status=Match.MatchStatus.WALKOVER,
             )
             .filter(_matches_for_player(leaver))
             .select_related("player1", "player2", "winner")
-            .first()
+            .order_by("pk")
         )
-        self.assertIsNotNone(walkover)
-        assert walkover is not None
+        self.assertGreaterEqual(len(walkovers), 2)
 
-        p1 = walkover.player1
-        p2 = walkover.player2
-        assert p1 is not None and p2 is not None
-        p1.total_points = 3000.0
-        p1.hidden_rating = 3000.0
-        p1.matches_played = 5
-        p1.matches_won = 2
-        p1.save(
+        leaver.total_points = 2000.0
+        leaver.hidden_rating = 2000.0
+        leaver.matches_played = 10
+        leaver.matches_won = 0
+        leaver.save(
             update_fields=[
                 "total_points",
                 "hidden_rating",
@@ -411,35 +405,42 @@ class RoundRobinWithdrawTestCase(TestCase):
                 "matches_won",
             ]
         )
-        p2.total_points = 2800.0
-        p2.hidden_rating = 2800.0
-        p2.matches_played = 5
-        p2.matches_won = 2
-        p2.save(
-            update_fields=[
-                "total_points",
-                "hidden_rating",
-                "matches_played",
-                "matches_won",
-            ]
-        )
-        Match.objects.filter(pk=walkover.pk).update(
-            rating_status=Match.RatingCalcStatus.CALCULATED,
-            rating_delta_player1=-100.0,
-            rating_delta_player2=80.0,
-        )
+
+        expected_rating = 2000.0
+        for i, walkover in enumerate(walkovers):
+            if walkover.player1_id == leaver.pk:
+                d1, d2 = -50.0 - i * 20.0, 40.0
+                expected_rating -= d1
+            else:
+                d1, d2 = 40.0, -50.0 - i * 20.0
+                expected_rating -= d2
+            Match.objects.filter(pk=walkover.pk).update(
+                rating_status=Match.RatingCalcStatus.CALCULATED,
+                rating_delta_player1=d1,
+                rating_delta_player2=d2,
+            )
+            opp = (
+                walkover.player2
+                if walkover.player1_id == leaver.pk
+                else walkover.player1
+            )
+            assert opp is not None
+            opp.matches_played = max(opp.matches_played, 5)
+            opp.matches_won = max(opp.matches_won, 2)
+            opp.save(update_fields=["matches_played", "matches_won"])
 
         fixed, _ = revert_withdrawal_walkover_rating_effects(tournament=self.tournament)
-        self.assertGreaterEqual(fixed, 1)
+        self.assertEqual(fixed, len(walkovers))
 
-        p1.refresh_from_db()
-        p2.refresh_from_db()
-        walkover.refresh_from_db()
-        self.assertEqual(float(p1.total_points), 3100.0)
-        self.assertEqual(float(p2.total_points), 2720.0)
-        self.assertEqual(p1.matches_played, 4)
-        self.assertEqual(p2.matches_played, 4)
-        self.assertEqual(walkover.rating_status, Match.RatingCalcStatus.NOT_APPLICABLE)
+        leaver.refresh_from_db()
+        self.assertAlmostEqual(float(leaver.total_points), expected_rating, places=1)
+        self.assertEqual(leaver.matches_played, 10 - len(walkovers))
+
+        for walkover in walkovers:
+            walkover.refresh_from_db()
+            self.assertEqual(
+                walkover.rating_status, Match.RatingCalcStatus.NOT_APPLICABLE
+            )
 
     def test_finalize_skips_place_points_for_withdrawn(self) -> None:
         """Снятый игрок не получает сезонные очки за место при финализации."""

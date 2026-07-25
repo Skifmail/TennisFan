@@ -96,6 +96,10 @@ def _revert_player_rating(player: Any, delta: float) -> None:
 
     if not player or getattr(player, "is_bye", False) or not delta:
         return
+    # При пакетном откате Player из select_related может держать старый total_points.
+    player.refresh_from_db(
+        fields=["total_points", "hidden_rating", "skill_level", "ntrp_level"]
+    )
     new_rating = max(0.0, float(player.total_points) - float(delta))
     player.hidden_rating = new_rating
     player.total_points = new_rating

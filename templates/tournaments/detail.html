@@ -532,6 +532,7 @@
                         <div class="tournament-team-card__player">
                             <a href="{% player_profile_url participant.player1 %}">{{ participant.player1 }}</a>
                             <span class="text-secondary small">(УС: {{ participant.player1.ntrp_level|floatformat:1 }}, Р: {{ participant.player1.total_points|floatformat:0 }})</span>
+                            {% if participant.id in withdrawn_team_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снята</span>{% endif %}
                         </div>
                         {% if participant.player2 %}
                         <div class="tournament-team-card__player">
@@ -549,8 +550,11 @@
                 <a href="{% player_profile_url participant %}" style="display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm); background: var(--color-bg-elevated); border-radius: var(--radius-md); transition: all var(--transition-fast); text-decoration: none;">
                     {% include 'includes/avatar.html' with avatar=participant.avatar class="player-avatar" size="48" %}
                     <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 500; color: var(--color-text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            {{ participant }}
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px; min-width: 0;">
+                            <span style="font-weight: 500; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                {{ participant }}
+                            </span>
+                            {% if participant.id in withdrawn_player_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снят</span>{% endif %}
                         </div>
                         {% with rating_changes=participant.get_rating_changes %}
                         <div class="tournament-participant-metrics">

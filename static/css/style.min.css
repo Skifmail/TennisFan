@@ -16270,6 +16270,7 @@ a.match-details-value__lead:hover {
 .round-robin-standings td:first-child+td {
     text-align: left;
     white-space: nowrap;
+    min-width: 12.5rem;
 }
 
 .round-robin-matrix .matrix-cell--diagonal {
@@ -16344,9 +16345,11 @@ a.match-details-value__lead:hover {
 
     .round-robin-matrix .matrix-player-cell,
     .round-robin-standings td:first-child+td {
-        max-width: 100px;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        /* Полное ФИО + бейдж «Снят»; таблица уже со horizontal scroll */
+        max-width: none;
+        min-width: 12.5rem;
+        overflow: visible;
+        text-overflow: unset;
         white-space: nowrap;
     }
 
@@ -16382,7 +16385,10 @@ a.match-details-value__lead:hover {
 
     .round-robin-matrix .matrix-player-cell,
     .round-robin-standings td:first-child+td {
-        max-width: 80px;
+        max-width: none;
+        min-width: 11.5rem;
+        overflow: visible;
+        text-overflow: unset;
     }
 
     .round-robin-matrix .matrix-col {

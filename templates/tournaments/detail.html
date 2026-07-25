@@ -585,18 +585,20 @@
                         <td class="matrix-player-cell">
                             {% if tournament.variant == 'doubles' %}
                             <a href="{% player_profile_url row.participant.player1 %}">{{ row.participant }}</a>
+                            {% if row.participant.id in withdrawn_team_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снят</span>{% endif %}
                             {% else %}
                             <a href="{% player_profile_url row.participant %}">{{ row.participant }}</a>
+                            {% if row.participant.id in withdrawn_player_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снят</span>{% endif %}
                             {% endif %}
                         </td>
                         {% for cell in row.cells %}
                         {% if forloop.counter0 == forloop.parentloop.counter0 %}
                         <td class="matrix-cell matrix-cell--diagonal">—</td>
                         {% else %}
-                        <td class="matrix-cell">
+                        <td class="matrix-cell{% if cell.walkover %} matrix-cell--walkover{% endif %}">
                             {% if cell.win is not None %}
                             <div class="matrix-cell-win">{{ cell.win }}</div>
-                            <div class="matrix-cell-games">{{ cell.games|default:"—" }}</div>
+                            <div class="matrix-cell-games">{% if cell.walkover %}Б/и{% else %}{{ cell.games|default:"—" }}{% endif %}</div>
                             {% else %}
                             —
                             {% endif %}
@@ -636,8 +638,10 @@
                         <td>
                             {% if row.team %}
                             <a href="{% player_profile_url row.team.player1 %}">{{ row.team }}</a>
+                            {% if row.team.id in withdrawn_team_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снят</span>{% endif %}
                             {% else %}
                             <a href="{% player_profile_url row.player %}">{{ row.player }}</a>
+                            {% if row.player.id in withdrawn_player_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снят</span>{% endif %}
                             {% endif %}
                         </td>
                         <td>{{ row.matches }}</td>
@@ -705,9 +709,9 @@
             <h3 class="bracket-round-title">{{ round_name }}{% if is_consolation and is_fan %} <span class="text-muted">(подвал)</span>{% elif is_consolation and is_olympic %} <span class="text-muted">(утешительная)</span>{% endif %}</h3>
             <div class="bracket-round-matches grid grid-2">
                 {% for match in round_matches %}
-                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card{% if match.status == 'completed' or match.status == 'walkover' %} match-card--completed{% endif %}">
+                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card{% if match.status == 'completed' %} match-card--completed{% elif match.status == 'walkover' %} match-card--walkover{% endif %}">
                     <div class="match-header">
-                        <span class="match-tournament">{{ match.round_name|default:"Матч" }}</span>
+                        <span class="match-tournament">{{ match.round_name|default:"Матч" }}{% if match.status == 'walkover' %} <span class="match-wo-label">Без игры</span>{% endif %}</span>
                         <span class="match-date">{% if match.deadline %}До {{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}</span>
                     </div>
                     {% if match.winner is None and match.status != 'completed' and match.status != 'walkover' %}
@@ -720,6 +724,7 @@
                             {% if match.team1 %}{% include 'includes/avatar.html' with avatar=match.team1.player1.avatar class="player-avatar" %}
                             {% else %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" %}{% endif %}
                             <span class="player-name">{{ match.get_player1_display }}</span>
+                            {% if match.team1 and match.team1_id in withdrawn_team_ids or match.player1_id in withdrawn_player_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снят</span>{% endif %}
                             {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% endif %}
                             <div class="match-score">
                                 {% if match.player1_set1 is not None %}<span class="set-score">{{ match.player1_set1 }}</span>{% endif %}
@@ -731,6 +736,7 @@
                             {% if match.team2 %}{% include 'includes/avatar.html' with avatar=match.team2.player1.avatar class="player-avatar" %}
                             {% else %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" %}{% endif %}
                             <span class="player-name">{{ match.get_player2_display }}</span>
+                            {% if match.team2 and match.team2_id in withdrawn_team_ids or match.player2_id in withdrawn_player_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снят</span>{% endif %}
                             {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% elif match.is_walkover_loss %}{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}<span class="retired-badge">Rt.</span>{% endif %}{% endif %}
                             <div class="match-score">
                                 {% if match.player2_set1 is not None %}<span class="set-score">{{ match.player2_set1 }}</span>{% endif %}
@@ -752,9 +758,9 @@
             <h3 class="bracket-round-title">{{ round_name }}</h3>
             <div class="bracket-round-matches grid grid-2">
                 {% for match in round_matches %}
-                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card{% if match.status == 'completed' or match.status == 'walkover' %} match-card--completed{% endif %}">
+                <a href="{% url 'match_detail' pk=match.pk %}" class="match-card{% if match.status == 'completed' %} match-card--completed{% elif match.status == 'walkover' %} match-card--walkover{% endif %}">
                     <div class="match-header">
-                        <span class="match-tournament">{{ match.round_name|default:"Матч" }}</span>
+                        <span class="match-tournament">{{ match.round_name|default:"Матч" }}{% if match.status == 'walkover' %} <span class="match-wo-label">Без игры</span>{% endif %}</span>
                         <span class="match-date">{% if match.deadline %}До {{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}</span>
                     </div>
                     {% if match.winner is None and match.status != 'completed' and match.status != 'walkover' %}
@@ -767,6 +773,7 @@
                             {% if match.team1 %}{% include 'includes/avatar.html' with avatar=match.team1.player1.avatar class="player-avatar" %}
                             {% else %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" %}{% endif %}
                             <span class="player-name">{{ match.get_player1_display }}</span>
+                            {% if match.team1 and match.team1_id in withdrawn_team_ids or match.player1_id in withdrawn_player_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снят</span>{% endif %}
                             {% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% endif %}
                             <div class="match-score">
                                 {% if match.player1_set1 is not None %}<span class="set-score">{{ match.player1_set1 }}</span>{% endif %}
@@ -778,6 +785,7 @@
                             {% if match.team2 %}{% include 'includes/avatar.html' with avatar=match.team2.player1.avatar class="player-avatar" %}
                             {% else %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" %}{% endif %}
                             <span class="player-name">{{ match.get_player2_display }}</span>
+                            {% if match.team2 and match.team2_id in withdrawn_team_ids or match.player2_id in withdrawn_player_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снят</span>{% endif %}
                             {% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}{% if match.status != 'scheduled' and match.status != 'in_progress' %}<span class="win-badge">WIN</span>{% endif %}{% elif match.is_walkover_loss %}{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}<span class="retired-badge">Rt.</span>{% endif %}{% endif %}
                             <div class="match-score">
                                 {% if match.player2_set1 is not None %}<span class="set-score">{{ match.player2_set1 }}</span>{% endif %}
@@ -795,9 +803,9 @@
     {% else %}
     <div class="grid grid-2">
         {% for match in matches %}
-        <a href="{% url 'match_detail' pk=match.pk %}" class="match-card{% if match.status == 'completed' or match.status == 'walkover' %} match-card--completed{% endif %}">
+        <a href="{% url 'match_detail' pk=match.pk %}" class="match-card{% if match.status == 'completed' %} match-card--completed{% elif match.status == 'walkover' %} match-card--walkover{% endif %}">
             <div class="match-header">
-                <span class="match-tournament">{{ match.round_name|default:"Матч" }}</span>
+                <span class="match-tournament">{{ match.round_name|default:"Матч" }}{% if match.status == 'walkover' %} <span class="match-wo-label">Без игры</span>{% endif %}</span>
                 <span class="match-date">{% if match.deadline %}{{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}</span>
             </div>
             {% if match.winner is None and match.status != 'completed' and match.status != 'walkover' %}

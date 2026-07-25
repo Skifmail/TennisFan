@@ -702,6 +702,7 @@ class FancoinTransaction(models.Model):
     class Reason(models.TextChoices):
         TOURNAMENT_REGISTRATION = "tournament_registration", "Регистрация на турнир"
         TOURNAMENT_CANCEL = "tournament_cancel", "Отмена турнира"
+        TOURNAMENT_WITHDRAWAL = "tournament_withdrawal", "Снятие с турнира"
         SPARRING_SINGLES = "sparring_singles", "Состоявшийся одиночный спарринг"
         SPARRING_DOUBLES = "sparring_doubles", "Состоявшийся парный спарринг"
         SPARRING_TEAM = "sparring_team", "Состоявшийся командный спарринг"

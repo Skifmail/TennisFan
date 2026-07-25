@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Снятие с турнира</title>
+</head>
+<body>
+    <p>Здравствуйте, {{ user.get_full_name|default:user.email }}!</p>
+    <p>Вы сняты с турнира «{{ tournament.name }}».</p>
+    {% if match_lines %}
+    <p>Ваши несыгранные матчи закрыты со статусом <b>«Без игры»</b> (техническая победа соперникам):</p>
+    <ul>
+        {% for line in match_lines %}
+        <li>{{ line }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>Несыгранных матчей на момент снятия не осталось.</p>
+    {% endif %}
+    {% if refunded_ft %}
+    <p><b>На ваш баланс возвращено {{ refunded_ft }} FT.</b></p>
+    {% elif has_entry_refund %}
+    <p>Взнос за участие был оплачен — для возврата средств обратитесь к администратору.</p>
+    {% endif %}
+    <p><a href="{{ tournament_url }}">Открыть страницу турнира</a></p>
+    <p>С уважением,<br>Команда TennisFan</p>
+</body>
+</html>

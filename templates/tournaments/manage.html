@@ -107,6 +107,18 @@
                             <button type="submit" class="btn btn-sm btn-outline btn-danger-text">Удалить команду</button>
                         </form>
                     </div>
+                    {% elif can_withdraw_participants %}
+                    <div class="manage-list-item-action">
+                        {% if t.pk in withdrawn_team_ids %}
+                        <span class="badge text-bg-secondary">Снята</span>
+                        {% else %}
+                        <form action="{% url 'tournament_manage_withdraw_participant' slug=tournament.slug %}" method="post" class="d-inline" onsubmit="return confirm('Снять команду с турнира? Несыгранные матчи будут закрыты тех. победой соперникам. FT вернутся только если у команды ещё не было сыгранных матчей.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="team_id" value="{{ t.pk }}">
+                            <button type="submit" class="btn btn-sm btn-outline btn-danger-text">Снять команду</button>
+                        </form>
+                        {% endif %}
+                    </div>
                     {% endif %}
                 </li>
                 {% endfor %}
@@ -170,6 +182,7 @@
                     <div class="manage-list-item-content">
                         <a href="{% player_profile_url p %}">{{ p }}</a>
                         <span class="text-secondary"> (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</span>
+                        {% if p.pk in withdrawn_player_ids %}<span class="badge text-bg-secondary ms-1">Снят</span>{% endif %}
                     </div>
                     {% if not tournament.bracket_generated %}
                     <div class="manage-list-item-action">
@@ -178,6 +191,18 @@
                             <input type="hidden" name="player_id" value="{{ p.pk }}">
                             <button type="submit" class="btn btn-sm btn-outline btn-danger-text">Удалить участника</button>
                         </form>
+                    </div>
+                    {% elif can_withdraw_participants %}
+                    <div class="manage-list-item-action">
+                        {% if p.pk in withdrawn_player_ids %}
+                        <span class="badge text-bg-secondary">Снят</span>
+                        {% else %}
+                        <form action="{% url 'tournament_manage_withdraw_participant' slug=tournament.slug %}" method="post" class="d-inline" onsubmit="return confirm('Снять участника с турнира? Несыгранные матчи будут закрыты тех. победой соперникам. FT вернутся только если у игрока ещё не было сыгранных матчей.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="player_id" value="{{ p.pk }}">
+                            <button type="submit" class="btn btn-sm btn-outline btn-danger-text">Снять участника</button>
+                        </form>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </li>

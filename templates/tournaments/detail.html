@@ -162,9 +162,14 @@
                 <span class="tournament-card-badge-slot__brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
                 {% endif %}
             </div>
-            <p class="text-secondary mb-4">
+            <p class="text-secondary mb-4 d-flex flex-wrap align-items-center gap-2">
                 {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
                 {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
+                {% if can_manage_tournament %}
+                <span class="btn-manage-tournament-wrap">
+                    <a href="{% url 'tournament_manage' slug=tournament.slug %}" class="btn btn-manage-tournament">Управление турниром</a>
+                </span>
+                {% endif %}
             </p>
 
             <div class="card mb-4 tournament-meta">

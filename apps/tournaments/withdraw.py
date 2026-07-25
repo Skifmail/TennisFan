@@ -244,22 +244,183 @@ def _apply_withdrawal_walkover(
     *,
     winner_team: TournamentTeam | None = None,
 ) -> None:
-    """Оформить тех. победу сопернику при снятии участника (без счёта 6:0)."""
+    """Оформить тех. победу сопернику при снятии (без FAN и без счёта 6:0).
+
+    Использует QuerySet.update(), чтобы не запускать сигнал update_player_stats:
+    снятие не должно менять рейтинг и matches_played/matches_won.
+    """
     is_doubles = bool(match.team1_id and match.team2_id)
+    update_kwargs: dict = {
+        "status": Match.MatchStatus.WALKOVER,
+        "completed_datetime": timezone.now(),
+        "rating_status": Match.RatingCalcStatus.NOT_APPLICABLE,
+        "rating_delta_player1": 0.0,
+        "rating_delta_player2": 0.0,
+    }
     if is_doubles and winner_team is not None:
-        match.winner_team = winner_team
-        match.winner = winner_team.player1
+        update_kwargs["winner_team_id"] = winner_team.pk
+        update_kwargs["winner_id"] = winner_team.player1_id
     else:
-        match.winner = winner
-    match.status = Match.MatchStatus.WALKOVER
-    match.completed_datetime = timezone.now()
-    update_fields = ["winner", "status", "completed_datetime"]
-    if is_doubles:
-        update_fields.append("winner_team")
-    match.save(update_fields=update_fields)
+        update_kwargs["winner_id"] = winner.pk
+        update_kwargs["winner_team_id"] = None
+
+    Match.objects.filter(pk=match.pk).update(**update_kwargs)
+    match.refresh_from_db()
     match.result_proposals.filter(status=Match.ProposalStatus.PENDING).update(
         status=Match.ProposalStatus.REJECTED
     )
+
+
+def _match_has_set_scores(match: Match) -> bool:
+    """Есть ли хотя бы один сет с заполненным счётом."""
+    for i in (1, 2, 3):
+        if (
+            getattr(match, f"player1_set{i}") is not None
+            or getattr(match, f"player2_set{i}") is not None
+        ):
+            return True
+    return False
+
+
+def _revert_player_stats_for_walkover(
+    match: Match,
+    *,
+    player: Player,
+    was_winner: bool,
+) -> None:
+    """Откатить matches_played / matches_won после ошибочного walkover-снятия."""
+    if not player or getattr(player, "is_bye", False):
+        return
+    player.refresh_from_db()
+    fields: list[str] = []
+    if player.matches_played > 0:
+        player.matches_played -= 1
+        fields.append("matches_played")
+    if was_winner and player.matches_won > 0:
+        player.matches_won -= 1
+        fields.append("matches_won")
+    if fields:
+        player.save(update_fields=fields)
+
+
+def revert_withdrawal_walkover_rating_effects(
+    *,
+    tournament: Tournament | None = None,
+    dry_run: bool = False,
+) -> tuple[int, list[str]]:
+    """Откатить FAN и статистику матчей по walkover, созданным при снятии.
+
+    Критерий: WALKOVER без сетов, rating_status=CALCULATED, участник снят
+    (TournamentWithdrawal) в этом турнире.
+
+    Args:
+        tournament: Ограничить одним турниром (иначе все).
+        dry_run: Только перечислить, не менять данные.
+
+    Returns:
+        tuple: (число матчей, сообщения по каждому).
+    """
+    from apps.tournaments.signals import _revert_player_rating
+
+    qs = Match.objects.filter(
+        status=Match.MatchStatus.WALKOVER,
+        rating_status=Match.RatingCalcStatus.CALCULATED,
+        tournament__isnull=False,
+    ).select_related(
+        "player1",
+        "player2",
+        "winner",
+        "team1__player1",
+        "team1__player2",
+        "team2__player1",
+        "team2__player2",
+        "winner_team",
+        "tournament",
+    )
+    if tournament is not None:
+        qs = qs.filter(tournament=tournament)
+
+    messages: list[str] = []
+    fixed = 0
+    for match in qs.order_by("-completed_datetime", "-pk"):
+        if _match_has_set_scores(match):
+            continue
+        if match.is_walkover_loss():
+            continue
+        t = match.tournament
+        if t is None:
+            continue
+
+        withdrawn_ids = set(
+            TournamentWithdrawal.objects.filter(
+                tournament=t, player_id__isnull=False
+            ).values_list("player_id", flat=True)
+        )
+        withdrawn_team_ids = set(
+            TournamentWithdrawal.objects.filter(
+                tournament=t, team_id__isnull=False
+            ).values_list("team_id", flat=True)
+        )
+        involves_withdrawn = False
+        if match.team1_id and match.team2_id:
+            involves_withdrawn = bool(
+                {match.team1_id, match.team2_id} & withdrawn_team_ids
+            )
+        else:
+            involves_withdrawn = bool(
+                {match.player1_id, match.player2_id} & withdrawn_ids
+            )
+        if not involves_withdrawn:
+            continue
+
+        d1 = float(match.rating_delta_player1 or 0.0)
+        d2 = float(match.rating_delta_player2 or 0.0)
+        msg = f"match={match.pk} tournament={t.slug} " f"Δ1={d1:+.1f} Δ2={d2:+.1f}"
+        if dry_run:
+            messages.append(f"[dry-run] {msg}")
+            fixed += 1
+            continue
+
+        if match.team1_id and match.team2_id:
+            for p in (match.team1.player1, match.team1.player2):
+                _revert_player_rating(p, d1)
+                _revert_player_stats_for_walkover(
+                    match,
+                    player=p,
+                    was_winner=match.winner_team_id == match.team1_id,
+                )
+            for p in (match.team2.player1, match.team2.player2):
+                _revert_player_rating(p, d2)
+                _revert_player_stats_for_walkover(
+                    match,
+                    player=p,
+                    was_winner=match.winner_team_id == match.team2_id,
+                )
+        else:
+            _revert_player_rating(match.player1, d1)
+            _revert_player_rating(match.player2, d2)
+            if match.player1:
+                _revert_player_stats_for_walkover(
+                    match,
+                    player=match.player1,
+                    was_winner=match.winner_id == match.player1_id,
+                )
+            if match.player2:
+                _revert_player_stats_for_walkover(
+                    match,
+                    player=match.player2,
+                    was_winner=match.winner_id == match.player2_id,
+                )
+
+        Match.objects.filter(pk=match.pk).update(
+            rating_status=Match.RatingCalcStatus.NOT_APPLICABLE,
+            rating_delta_player1=0.0,
+            rating_delta_player2=0.0,
+        )
+        messages.append(f"reverted {msg}")
+        fixed += 1
+
+    return fixed, messages
 
 
 def _match_round_label(match: Match) -> str:

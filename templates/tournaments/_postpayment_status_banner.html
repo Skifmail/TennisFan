@@ -1,8 +1,8 @@
-{% if tournament.postpayment_window_started_at and postpayment_progress.total %}
+{% if tournament.postpayment_window_started_at and postpayment_progress.pending %}
 <div class="alert alert-warning mb-4" data-persist-messages="true">
     <strong>Постоплата активна.</strong>
-    Оплатили: {{ postpayment_progress.paid }} из {{ postpayment_progress.total }}.
-    {% if postpayment_progress.pending %}Ожидают оплату: {{ postpayment_progress.pending }}.{% endif %}
+    Оплатили: {{ postpayment_progress.paid }} из {{ postpayment_progress.paid|add:postpayment_progress.pending }}.
+    Ожидают оплату: {{ postpayment_progress.pending }}.
     {% if postpayment_invoices %}
     <div class="mt-2 small">
         {% for invoice in postpayment_invoices %}

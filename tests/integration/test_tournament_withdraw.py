@@ -317,6 +317,130 @@ class RoundRobinWithdrawTestCase(TestCase):
         self.assertEqual(len(truncated), 255)
         self.assertTrue(truncated.endswith("…"))
 
+    def test_withdraw_does_not_change_fan_rating_or_match_stats(self) -> None:
+        """Walkover при снятии не меняет FAN и matches_played/won."""
+        leaver = self.players[0]
+        opponents = self.players[1:]
+        for p in self.players:
+            p.hidden_rating = 2500.0 + p.pk
+            p.total_points = 2500.0 + p.pk
+            p.matches_played = 3
+            p.matches_won = 1
+            p.save(
+                update_fields=[
+                    "hidden_rating",
+                    "total_points",
+                    "matches_played",
+                    "matches_won",
+                ]
+            )
+
+        before = {
+            p.pk: (
+                float(p.total_points),
+                p.matches_played,
+                p.matches_won,
+            )
+            for p in self.players
+        }
+
+        ok, msg = withdraw_participant(
+            self.tournament, player=leaver, withdrawn_by=self.admin
+        )
+        self.assertTrue(ok, msg)
+
+        walkovers = Match.objects.filter(
+            tournament=self.tournament,
+            status=Match.MatchStatus.WALKOVER,
+        ).filter(_matches_for_player(leaver))
+        self.assertGreater(walkovers.count(), 0)
+        for m in walkovers:
+            self.assertEqual(m.rating_status, Match.RatingCalcStatus.NOT_APPLICABLE)
+            self.assertEqual(m.rating_delta_player1 or 0.0, 0.0)
+            self.assertEqual(m.rating_delta_player2 or 0.0, 0.0)
+
+        for p in self.players:
+            p.refresh_from_db()
+            rating, played, won = before[p.pk]
+            self.assertEqual(float(p.total_points), rating)
+            self.assertEqual(float(p.hidden_rating), rating)
+            self.assertEqual(p.matches_played, played)
+            self.assertEqual(p.matches_won, won)
+
+        # Соперники остались с прежним рейтингом (явная проверка по списку)
+        for opp in opponents:
+            opp.refresh_from_db()
+            self.assertEqual(float(opp.total_points), before[opp.pk][0])
+
+    def test_revert_withdrawal_walkover_rating_effects(self) -> None:
+        """Откат восстанавливает FAN после ошибочно посчитанных walkover."""
+        from apps.tournaments.withdraw import revert_withdrawal_walkover_rating_effects
+
+        leaver = self.players[0]
+        # Сначала снимаем «правильно» (без рейтинга), затем искусственно
+        # симулируем старый баг: CALCULATED + дельты.
+        ok, msg = withdraw_participant(
+            self.tournament, player=leaver, withdrawn_by=self.admin
+        )
+        self.assertTrue(ok, msg)
+
+        walkover = (
+            Match.objects.filter(
+                tournament=self.tournament,
+                status=Match.MatchStatus.WALKOVER,
+            )
+            .filter(_matches_for_player(leaver))
+            .select_related("player1", "player2", "winner")
+            .first()
+        )
+        self.assertIsNotNone(walkover)
+        assert walkover is not None
+
+        p1 = walkover.player1
+        p2 = walkover.player2
+        assert p1 is not None and p2 is not None
+        p1.total_points = 3000.0
+        p1.hidden_rating = 3000.0
+        p1.matches_played = 5
+        p1.matches_won = 2
+        p1.save(
+            update_fields=[
+                "total_points",
+                "hidden_rating",
+                "matches_played",
+                "matches_won",
+            ]
+        )
+        p2.total_points = 2800.0
+        p2.hidden_rating = 2800.0
+        p2.matches_played = 5
+        p2.matches_won = 2
+        p2.save(
+            update_fields=[
+                "total_points",
+                "hidden_rating",
+                "matches_played",
+                "matches_won",
+            ]
+        )
+        Match.objects.filter(pk=walkover.pk).update(
+            rating_status=Match.RatingCalcStatus.CALCULATED,
+            rating_delta_player1=-100.0,
+            rating_delta_player2=80.0,
+        )
+
+        fixed, _ = revert_withdrawal_walkover_rating_effects(tournament=self.tournament)
+        self.assertGreaterEqual(fixed, 1)
+
+        p1.refresh_from_db()
+        p2.refresh_from_db()
+        walkover.refresh_from_db()
+        self.assertEqual(float(p1.total_points), 3100.0)
+        self.assertEqual(float(p2.total_points), 2720.0)
+        self.assertEqual(p1.matches_played, 4)
+        self.assertEqual(p2.matches_played, 4)
+        self.assertEqual(walkover.rating_status, Match.RatingCalcStatus.NOT_APPLICABLE)
+
     def test_finalize_skips_place_points_for_withdrawn(self) -> None:
         """Снятый игрок не получает сезонные очки за место при финализации."""
         leaver = self.players[0]

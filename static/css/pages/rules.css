@@ -254,6 +254,20 @@
     color: var(--color-text-secondary);
 }
 
+.round-robin-matrix .matrix-cell--walkover {
+    background: rgb(239 68 68 / 12%);
+}
+
+.round-robin-matrix .matrix-cell--walkover .matrix-cell-win {
+    color: #f87171;
+}
+
+.round-robin-standings .withdrawn-badge,
+.round-robin-matrix .withdrawn-badge {
+    margin-left: 8px;
+}
+
+
 .round-robin-matrix .matrix-col {
     min-width: 50px;
 }

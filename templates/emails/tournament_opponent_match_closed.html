@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Матч закрыт без игры</title>
+</head>
+<body>
+    <p>Здравствуйте, {{ user.get_full_name|default:user.email }}!</p>
+    <p>Участник <b>{{ withdrawn_label }}</b> снят с турнира «{{ tournament.name }}».</p>
+    <p>Ваш матч с этим участником закрыт со статусом <b>«Без игры»</b> — вам присуждена техническая победа.</p>
+    {% if match_line %}
+    <p>Матч: {{ match_line }}</p>
+    {% endif %}
+    <p><a href="{{ tournament_url }}">Открыть страницу турнира</a></p>
+    {% if match_url %}<p><a href="{{ match_url }}">Открыть матч</a></p>{% endif %}
+    <p>С уважением,<br>Команда TennisFan</p>
+</body>
+</html>

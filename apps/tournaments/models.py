@@ -629,6 +629,85 @@ class TournamentRegistrationCoverage(models.Model):
         return f"{self.tournament} — {self.user} ({self.get_coverage_type_display()})"
 
 
+class TournamentWithdrawal(models.Model):
+    """Снятие участника/команды после старта кругового турнира.
+
+    Игрок остаётся в списке участников; несыгранные матчи закрываются
+    тех. победой соперникам. Запись нужна для идемпотентности, UI и
+    исключения из сезонных очков за место.
+
+    Args:
+        models.Model: Базовый класс ORM.
+
+    Returns:
+        None: Экземпляр используется ORM.
+    """
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="withdrawals",
+        verbose_name="Турнир",
+    )
+    player = models.ForeignKey(
+        "users.Player",
+        on_delete=models.CASCADE,
+        related_name="tournament_withdrawals",
+        verbose_name="Игрок",
+        null=True,
+        blank=True,
+    )
+    team = models.ForeignKey(
+        "TournamentTeam",
+        on_delete=models.CASCADE,
+        related_name="tournament_withdrawals",
+        verbose_name="Команда",
+        null=True,
+        blank=True,
+    )
+    withdrawn_at = models.DateTimeField("Снят", auto_now_add=True)
+    withdrawn_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tournament_withdrawals_made",
+        verbose_name="Кто снял",
+    )
+    fancoin_refunded = models.BooleanField(
+        "FT возвращены",
+        default=False,
+        help_text="True, если при снятии был возврат FT (не было сыгранных матчей).",
+    )
+
+    class Meta:
+        verbose_name = "Снятие с турнира"
+        verbose_name_plural = "Снятия с турниров"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tournament", "player"],
+                condition=models.Q(player__isnull=False),
+                name="uniq_tournament_withdrawal_player",
+            ),
+            models.UniqueConstraint(
+                fields=["tournament", "team"],
+                condition=models.Q(team__isnull=False),
+                name="uniq_tournament_withdrawal_team",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(player__isnull=False, team__isnull=True)
+                    | models.Q(player__isnull=True, team__isnull=False)
+                ),
+                name="tournament_withdrawal_player_xor_team",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        entity = self.team or self.player
+        return f"{self.tournament} — снят {entity}"
+
+
 class TournamentPostpaymentInvoice(models.Model):
     """Инвойс постоплаты для игрока, зарегистрированного без оплаты.
 

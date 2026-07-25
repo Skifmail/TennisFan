@@ -724,8 +724,9 @@ def get_match_matrix_for_entities(
             side1_won = m.winner_team_id == m.team1_id
         else:
             side1_won = m.winner_id == m.player1_id
-        cell_win = {"win": 1, "games": f"{g1}/{g2}"}
-        cell_loss = {"win": 0, "games": f"{g2}/{g1}"}
+        is_wo = m.status == Match.MatchStatus.WALKOVER
+        cell_win = {"win": 1, "games": f"{g1}/{g2}", "walkover": is_wo}
+        cell_loss = {"win": 0, "games": f"{g2}/{g1}", "walkover": is_wo}
         if side1_won:
             matrix[i][j] = cell_win
             matrix[j][i] = cell_loss
@@ -767,7 +768,10 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
 
     # Определяем игроков, у которых было тех. поражение (walkover_loss) в этом турнире.
     # Они НЕ получают очки за место, т.к. уже получили штраф -40 очков.
-    walkover_loss_player_ids: set[int] = set()
+    # Снятые участники (TournamentWithdrawal) — тоже без очков за место.
+    from .withdraw import get_withdrawn_player_ids
+
+    walkover_loss_player_ids: set[int] = set(get_withdrawn_player_ids(tournament))
     walkover_matches = main_matches.filter(status=Match.MatchStatus.WALKOVER)
     for wm in walkover_matches:
         if wm.is_walkover_loss():
@@ -784,7 +788,7 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
                     walkover_loss_player_ids.add(loser.pk)
     if walkover_loss_player_ids:
         logger.info(
-            "Round-robin %s: players with walkover_loss (no place-based points): %s",
+            "Round-robin %s: players with walkover_loss/withdrawn (no place-based points): %s",
             tournament.name,
             walkover_loss_player_ids,
         )

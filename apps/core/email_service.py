@@ -273,6 +273,88 @@ def send_tournament_cancelled_email(
     )
 
 
+def send_tournament_participant_withdrawn_email(
+    user: User,
+    tournament: Tournament,
+    *,
+    match_lines: list[str],
+    refunded_ft: int,
+    has_entry_refund: bool,
+) -> bool:
+    """Отправить письмо снятому участнику о закрытии матчей «Без игры».
+
+    Args:
+        user (User): Снятый участник.
+        tournament (Tournament): Турнир.
+        match_lines (list[str]): Строки с описанием закрытых матчей.
+        refunded_ft (int): Сколько FT возвращено (0 если не возвращали).
+        has_entry_refund (bool): Есть ли заявка на возврат денежного взноса.
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    base_url = _get_site_base_url()
+    return _send_html_email(
+        subject=f"TennisFan: вы сняты с турнира «{tournament.name}»",
+        template_name="emails/tournament_participant_withdrawn.html",
+        context={
+            "user": user,
+            "tournament": tournament,
+            "match_lines": match_lines,
+            "refunded_ft": refunded_ft,
+            "has_entry_refund": has_entry_refund,
+            "tournament_url": f"{base_url}{reverse('tournament_detail', args=[tournament.slug])}",
+            "base_url": base_url,
+        },
+        recipient=email,
+        category="tournament",
+    )
+
+
+def send_tournament_opponent_match_closed_email(
+    user: User,
+    tournament: Tournament,
+    *,
+    withdrawn_label: str,
+    match_line: str,
+    match_url: str,
+) -> bool:
+    """Отправить письмо сопернику о закрытии матча из-за снятия участника.
+
+    Args:
+        user (User): Соперник снятого участника.
+        tournament (Tournament): Турнир.
+        withdrawn_label (str): Имя снятого игрока/команды.
+        match_line (str): Описание матча.
+        match_url (str): Абсолютная ссылка на матч.
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    base_url = _get_site_base_url()
+    return _send_html_email(
+        subject=f"TennisFan: матч в турнире «{tournament.name}» закрыт без игры",
+        template_name="emails/tournament_opponent_match_closed.html",
+        context={
+            "user": user,
+            "tournament": tournament,
+            "withdrawn_label": withdrawn_label,
+            "match_line": match_line,
+            "match_url": match_url,
+            "tournament_url": f"{base_url}{reverse('tournament_detail', args=[tournament.slug])}",
+            "base_url": base_url,
+        },
+        recipient=email,
+        category="tournament",
+    )
+
+
 def send_tournament_postpayment_opened_email(
     user: User,
     tournament: Tournament,

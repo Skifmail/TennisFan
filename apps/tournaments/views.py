@@ -1045,6 +1045,11 @@ def tournament_detail(request, slug):
 
     interclub_ctx = _get_interclub_context(request, tournament)
 
+    from .withdraw import get_withdrawn_player_ids, get_withdrawn_team_ids
+
+    withdrawn_player_ids = get_withdrawn_player_ids(tournament)
+    withdrawn_team_ids = get_withdrawn_team_ids(tournament)
+
     context = {
         "tournament": tournament,
         "allowed_categories_sorted": sorted(
@@ -1118,6 +1123,8 @@ def tournament_detail(request, slug):
             tvd_rr_4_6_matrix_participants if is_tvd else None
         ),
         "can_manage_tournament": _can_manage_tournament(request, tournament),
+        "withdrawn_player_ids": withdrawn_player_ids,
+        "withdrawn_team_ids": withdrawn_team_ids,
     }
     context.update(_get_club_panel_context_for_tournament(request, tournament))
     if is_tvd:
@@ -1435,6 +1442,17 @@ def tournament_manage(request, slug):
         _get_players_available_to_add_queryset(tournament)[:300]
     )
 
+    from .withdraw import get_withdrawn_player_ids, get_withdrawn_team_ids
+
+    withdrawn_player_ids = get_withdrawn_player_ids(tournament)
+    withdrawn_team_ids = get_withdrawn_team_ids(tournament)
+    can_withdraw_participants = (
+        _is_round_robin(tournament)
+        and tournament.bracket_generated
+        and tournament.status
+        not in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED)
+    )
+
     context = {
         "tournament": tournament,
         "is_doubles_tvd": is_doubles,
@@ -1467,6 +1485,10 @@ def tournament_manage(request, slug):
         "can_cancel_tournament": tournament.status
         not in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED),
         "players_available_to_add": players_available_to_add,
+        "withdrawn_player_ids": withdrawn_player_ids,
+        "withdrawn_team_ids": withdrawn_team_ids,
+        "can_withdraw_participants": can_withdraw_participants,
+        "is_round_robin_manage": _is_round_robin(tournament),
     }
     context["postpayment_progress"] = get_postpayment_progress(tournament)
     context["postpayment_invoices"] = list(
@@ -2266,6 +2288,38 @@ def tournament_manage_remove_participant(request, slug):
             _notify_removed_participant_no_refund(request, user, tournament)
 
     messages.success(request, "Участник(и) удалены из турнира.")
+    return redirect("tournament_manage", slug=slug)
+
+
+@login_required
+def tournament_manage_withdraw_participant(request, slug):
+    """POST: снять участника после старта кругового турнира (walkover + условный FT)."""
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+
+    from .withdraw import withdraw_participant
+
+    team_id = _parse_int_post(request, "team_id")
+    player_id = _parse_int_post(request, "player_id")
+    if tournament.is_doubles() and team_id:
+        team = get_object_or_404(TournamentTeam, pk=team_id, tournament=tournament)
+        ok, msg = withdraw_participant(tournament, team=team, withdrawn_by=request.user)
+    elif not tournament.is_doubles() and player_id:
+        player = get_object_or_404(Player, pk=player_id)
+        ok, msg = withdraw_participant(
+            tournament, player=player, withdrawn_by=request.user
+        )
+    else:
+        messages.warning(request, "Укажите участника или команду для снятия.")
+        return redirect("tournament_manage", slug=slug)
+
+    if ok:
+        messages.success(request, msg)
+    else:
+        messages.error(request, msg)
     return redirect("tournament_manage", slug=slug)
 
 
@@ -3078,6 +3132,16 @@ def propose_result(request, pk):
     if player not in _match_participants(match):
         messages.error(request, "Вы не участвуете в этом матче.")
         return redirect(_get_safe_next_url(request, fallback_url))
+
+    if match.tournament_id:
+        from .withdraw import is_player_withdrawn
+
+        if is_player_withdrawn(match.tournament, player):
+            messages.error(
+                request,
+                "Вы сняты с турнира и не можете вносить результаты матчей.",
+            )
+            return redirect(_get_safe_next_url(request, fallback_url))
 
     if match.result_proposals.filter(status=Match.ProposalStatus.PENDING).exists():
         messages.info(

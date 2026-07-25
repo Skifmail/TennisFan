@@ -1,0 +1,2907 @@
+{
+  ".claude/launch.json": {
+    "mtime": 1784615190.8848627,
+    "ast_hash": "819e033c1948431b8772258ba4e462e6",
+    "semantic_hash": "819e033c1948431b8772258ba4e462e6"
+  },
+  ".stylelintrc.json": {
+    "mtime": 1770968348.6035342,
+    "ast_hash": "2563e869d01592ab9d92761d899442bb",
+    "semantic_hash": "2563e869d01592ab9d92761d899442bb"
+  },
+  "apps/__init__.py": {
+    "mtime": 1774427481.2873023,
+    "ast_hash": "3893cbd7b7e91be70ecbab2cb9022786",
+    "semantic_hash": "3893cbd7b7e91be70ecbab2cb9022786"
+  },
+  "apps/clubs/__init__.py": {
+    "mtime": 1773835025.7203643,
+    "ast_hash": "74ec3e45b733c0b902e9c87093389573",
+    "semantic_hash": "74ec3e45b733c0b902e9c87093389573"
+  },
+  "apps/clubs/admin.py": {
+    "mtime": 1777021491.976451,
+    "ast_hash": "42825a537a253433078df2683b18986e",
+    "semantic_hash": "42825a537a253433078df2683b18986e"
+  },
+  "apps/clubs/apps.py": {
+    "mtime": 1773835025.7203643,
+    "ast_hash": "e3e066095b0b20ee874e53ed20cfa473",
+    "semantic_hash": "e3e066095b0b20ee874e53ed20cfa473"
+  },
+  "apps/clubs/context_processors.py": {
+    "mtime": 1775634943.967591,
+    "ast_hash": "a36aec599223a7781dd315832c6af94d",
+    "semantic_hash": "a36aec599223a7781dd315832c6af94d"
+  },
+  "apps/clubs/finance_services.py": {
+    "mtime": 1774435841.9732783,
+    "ast_hash": "0767ecd2e14501a55e53e7e3d3906604",
+    "semantic_hash": "0767ecd2e14501a55e53e7e3d3906604"
+  },
+  "apps/clubs/forms.py": {
+    "mtime": 1777704687.3181682,
+    "ast_hash": "4b0f5ca3203d6f30fb62f81b368b4a73",
+    "semantic_hash": "4b0f5ca3203d6f30fb62f81b368b4a73"
+  },
+  "apps/clubs/management/__init__.py": {
+    "mtime": 1773835025.7213643,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/clubs/management/commands/__init__.py": {
+    "mtime": 1773835025.7213643,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/clubs/management/commands/cleanup_suspended_clubs.py": {
+    "mtime": 1773835025.7213643,
+    "ast_hash": "dbf675e72ac5120d6cab02b46a071d3f",
+    "semantic_hash": "dbf675e72ac5120d6cab02b46a071d3f"
+  },
+  "apps/clubs/management/commands/run_recurring_club_fee_payments.py": {
+    "mtime": 1774433914.090883,
+    "ast_hash": "b3360303e96b01bfe87a1ee5292c6bd6",
+    "semantic_hash": "b3360303e96b01bfe87a1ee5292c6bd6"
+  },
+  "apps/clubs/management/commands/run_recurring_club_plan_payments.py": {
+    "mtime": 1774434966.684149,
+    "ast_hash": "552e9527368cac7cdbd182b97cd86ba1",
+    "semantic_hash": "552e9527368cac7cdbd182b97cd86ba1"
+  },
+  "apps/clubs/management/commands/send_club_fee_reminders.py": {
+    "mtime": 1773835025.7213643,
+    "ast_hash": "14eacfbbd2f411ae321ec4e5107f64ad",
+    "semantic_hash": "14eacfbbd2f411ae321ec4e5107f64ad"
+  },
+  "apps/clubs/management/commands/send_club_subscription_reminders.py": {
+    "mtime": 1773835025.7213643,
+    "ast_hash": "41ce32b434806ea32cdc46f4c1b5c40d",
+    "semantic_hash": "41ce32b434806ea32cdc46f4c1b5c40d"
+  },
+  "apps/clubs/management/commands/send_club_tournament_reminders.py": {
+    "mtime": 1773835025.7213643,
+    "ast_hash": "d7ec97d792ce11da6ca96e6b567bd68f",
+    "semantic_hash": "d7ec97d792ce11da6ca96e6b567bd68f"
+  },
+  "apps/clubs/management/commands/suspend_expired_clubs.py": {
+    "mtime": 1775034176.4092557,
+    "ast_hash": "81b24e0a2a51bbda655fd41062a737bf",
+    "semantic_hash": "81b24e0a2a51bbda655fd41062a737bf"
+  },
+  "apps/clubs/migrations/0001_initial.py": {
+    "mtime": 1773835025.7223644,
+    "ast_hash": "bc3bc66269dbd9b360136a87ffc001f7",
+    "semantic_hash": "bc3bc66269dbd9b360136a87ffc001f7"
+  },
+  "apps/clubs/migrations/0002_pending_models.py": {
+    "mtime": 1773835025.7223644,
+    "ast_hash": "ed956c047c8abb191ff5b9f1725f42fb",
+    "semantic_hash": "ed956c047c8abb191ff5b9f1725f42fb"
+  },
+  "apps/clubs/migrations/0003_notification_models.py": {
+    "mtime": 1773835025.7223644,
+    "ast_hash": "4ed4cdc960cae2a79623ede9edcdee73",
+    "semantic_hash": "4ed4cdc960cae2a79623ede9edcdee73"
+  },
+  "apps/clubs/migrations/0004_platform_audit_and_settings.py": {
+    "mtime": 1773835025.7233644,
+    "ast_hash": "7203542397e3a58a38858fdede856f71",
+    "semantic_hash": "7203542397e3a58a38858fdede856f71"
+  },
+  "apps/clubs/migrations/0005_player_plan_models.py": {
+    "mtime": 1773835025.7233644,
+    "ast_hash": "5b0bc3677c361cf8969591fd65af146a",
+    "semantic_hash": "5b0bc3677c361cf8969591fd65af146a"
+  },
+  "apps/clubs/migrations/0006_add_platform_plan.py": {
+    "mtime": 1773835025.7233644,
+    "ast_hash": "85cc3264a95dab495bfe2f980469f7e8",
+    "semantic_hash": "85cc3264a95dab495bfe2f980469f7e8"
+  },
+  "apps/clubs/migrations/0007_populate_platform_plans.py": {
+    "mtime": 1773835025.7233644,
+    "ast_hash": "4983f7d4e825d1efb2cf207ad33f92f1",
+    "semantic_hash": "4983f7d4e825d1efb2cf207ad33f92f1"
+  },
+  "apps/clubs/migrations/0008_add_platform_plan_max_members.py": {
+    "mtime": 1773835025.7233644,
+    "ast_hash": "90cacc94091bba51d5146fdec0dd1afd",
+    "semantic_hash": "90cacc94091bba51d5146fdec0dd1afd"
+  },
+  "apps/clubs/migrations/0009_add_club_hero_image.py": {
+    "mtime": 1773835025.7233644,
+    "ast_hash": "43d0c47515131c926c391b2b07982e27",
+    "semantic_hash": "43d0c47515131c926c391b2b07982e27"
+  },
+  "apps/clubs/migrations/0010_remove_slots_from_plans.py": {
+    "mtime": 1773835025.7233644,
+    "ast_hash": "cb53d92ed8a953bca61436f1ec0bf20c",
+    "semantic_hash": "cb53d92ed8a953bca61436f1ec0bf20c"
+  },
+  "apps/clubs/migrations/0011_clubjoinrequest.py": {
+    "mtime": 1773842547.7056248,
+    "ast_hash": "f988e92ae2a246554b1f67c7ff96afcd",
+    "semantic_hash": "f988e92ae2a246554b1f67c7ff96afcd"
+  },
+  "apps/clubs/migrations/0012_clubmemberplan_bonus_tournaments_balance.py": {
+    "mtime": 1774344499.044962,
+    "ast_hash": "fac1155d4c349a9da4aa240f0e316ff7",
+    "semantic_hash": "fac1155d4c349a9da4aa240f0e316ff7"
+  },
+  "apps/clubs/migrations/0013_member_balance.py": {
+    "mtime": 1774433908.875809,
+    "ast_hash": "0ea56bd6c2e2be636bdd0b7942bd9d6e",
+    "semantic_hash": "0ea56bd6c2e2be636bdd0b7942bd9d6e"
+  },
+  "apps/clubs/migrations/0014_club_use_player_plans.py": {
+    "mtime": 1774358782.8810592,
+    "ast_hash": "c44cdfba893e593920c225498013ab7f",
+    "semantic_hash": "c44cdfba893e593920c225498013ab7f"
+  },
+  "apps/clubs/migrations/0015_clubplayerplan_duration_and_unlimited.py": {
+    "mtime": 1774436396.2594607,
+    "ast_hash": "d6c3ac848adfc09032571ac33cb92838",
+    "semantic_hash": "d6c3ac848adfc09032571ac33cb92838"
+  },
+  "apps/clubs/migrations/0016_alter_clubfeepayment_method_and_more.py": {
+    "mtime": 1774437104.230915,
+    "ast_hash": "9c32b0390f85e4b4cfb4652b185c89a7",
+    "semantic_hash": "9c32b0390f85e4b4cfb4652b185c89a7"
+  },
+  "apps/clubs/migrations/0017_club_legal_and_user_consent.py": {
+    "mtime": 1774457088.6301498,
+    "ast_hash": "13166f2865b30725da2d52c4ff9df76d",
+    "semantic_hash": "13166f2865b30725da2d52c4ff9df76d"
+  },
+  "apps/clubs/migrations/0018_clubplayerplan_registration_limit_period.py": {
+    "mtime": 1774617659.147557,
+    "ast_hash": "c73def1422dc4d015ded451d3be0ae3f",
+    "semantic_hash": "c73def1422dc4d015ded451d3be0ae3f"
+  },
+  "apps/clubs/migrations/0019_club_tournament_proxy.py": {
+    "mtime": 1775552136.8648217,
+    "ast_hash": "d279a6dfc6b34f60ce9d9d7578dc5951",
+    "semantic_hash": "d279a6dfc6b34f60ce9d9d7578dc5951"
+  },
+  "apps/clubs/migrations/__init__.py": {
+    "mtime": 1773835025.7233644,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/clubs/models.py": {
+    "mtime": 1777021491.9767919,
+    "ast_hash": "6bfb572d053eccb71b33c5ed158a583b",
+    "semantic_hash": "6bfb572d053eccb71b33c5ed158a583b"
+  },
+  "apps/clubs/navigation.py": {
+    "mtime": 1775634985.3428068,
+    "ast_hash": "99bbb8562a81a271bc2bf14156cba234",
+    "semantic_hash": "99bbb8562a81a271bc2bf14156cba234"
+  },
+  "apps/clubs/notifications.py": {
+    "mtime": 1784891536.7002323,
+    "ast_hash": "ad5b3ae1146f643d0dfe90ae69f436a5",
+    "semantic_hash": "ad5b3ae1146f643d0dfe90ae69f436a5"
+  },
+  "apps/clubs/payment_utils.py": {
+    "mtime": 1773835025.725729,
+    "ast_hash": "bc879a93fb07019b5b3bcfa098abf6c0",
+    "semantic_hash": "bc879a93fb07019b5b3bcfa098abf6c0"
+  },
+  "apps/clubs/plan_services.py": {
+    "mtime": 1777021491.9757159,
+    "ast_hash": "6a7f83543b89131590a432d29e16d57f",
+    "semantic_hash": "6a7f83543b89131590a432d29e16d57f"
+  },
+  "apps/clubs/services.py": {
+    "mtime": 1777029495.7131727,
+    "ast_hash": "48a89f350709e8afa52a6a5af4bdbde6",
+    "semantic_hash": "48a89f350709e8afa52a6a5af4bdbde6"
+  },
+  "apps/clubs/templatetags/__init__.py": {
+    "mtime": 1773915487.358049,
+    "ast_hash": "68b329da9893e34099c7d8ad5cb9c940",
+    "semantic_hash": "68b329da9893e34099c7d8ad5cb9c940"
+  },
+  "apps/clubs/templatetags/club_tags.py": {
+    "mtime": 1773915487.35869,
+    "ast_hash": "556eaab14048519bd4a26f344fe8d1d9",
+    "semantic_hash": "556eaab14048519bd4a26f344fe8d1d9"
+  },
+  "apps/clubs/urls.py": {
+    "mtime": 1775634943.967591,
+    "ast_hash": "c3e34dcefa50154e2c1c3dbc61d3c562",
+    "semantic_hash": "c3e34dcefa50154e2c1c3dbc61d3c562"
+  },
+  "apps/clubs/views.py": {
+    "mtime": 1774085939.369054,
+    "ast_hash": "c67166155918be342ccb996dd0216916",
+    "semantic_hash": "c67166155918be342ccb996dd0216916"
+  },
+  "apps/clubs/views/__init__.py": {
+    "mtime": 1775630492.733483,
+    "ast_hash": "a98c55089ce11c13e86e16782dc52380",
+    "semantic_hash": "a98c55089ce11c13e86e16782dc52380"
+  },
+  "apps/clubs/views/dashboard.py": {
+    "mtime": 1780133597.9774413,
+    "ast_hash": "6526b1832c6e74b52f535a7e53942e37",
+    "semantic_hash": "6526b1832c6e74b52f535a7e53942e37"
+  },
+  "apps/clubs/views/helpers.py": {
+    "mtime": 1783927676.431724,
+    "ast_hash": "d3d0beb7b9768e2ec808842d0b5f859f",
+    "semantic_hash": "d3d0beb7b9768e2ec808842d0b5f859f"
+  },
+  "apps/clubs/views/invites.py": {
+    "mtime": 1774435808.7435818,
+    "ast_hash": "2130abe98ecb20c9c1fbca04f3580b0e",
+    "semantic_hash": "2130abe98ecb20c9c1fbca04f3580b0e"
+  },
+  "apps/clubs/views/legal.py": {
+    "mtime": 1774460387.7505457,
+    "ast_hash": "cd7a7ebee926044bdf6512d868c74484",
+    "semantic_hash": "cd7a7ebee926044bdf6512d868c74484"
+  },
+  "apps/clubs/views/members.py": {
+    "mtime": 1774595625.5652409,
+    "ast_hash": "b20a8ff9af43dd38bc5aeb551694dc66",
+    "semantic_hash": "b20a8ff9af43dd38bc5aeb551694dc66"
+  },
+  "apps/clubs/views/payments.py": {
+    "mtime": 1774460162.069927,
+    "ast_hash": "3f94fec8afa8617c9732a58ec70cb712",
+    "semantic_hash": "3f94fec8afa8617c9732a58ec70cb712"
+  },
+  "apps/clubs/views/public.py": {
+    "mtime": 1777021491.9856474,
+    "ast_hash": "3b641eb2169efd184fc182e840719765",
+    "semantic_hash": "3b641eb2169efd184fc182e840719765"
+  },
+  "apps/clubs/views/rating.py": {
+    "mtime": 1775633297.2319896,
+    "ast_hash": "839a7b847d07d50b546a03a6982e3da3",
+    "semantic_hash": "839a7b847d07d50b546a03a6982e3da3"
+  },
+  "apps/clubs/views/subscription.py": {
+    "mtime": 1777705281.078921,
+    "ast_hash": "5457cdcc5c9215f90d57a99d2e330402",
+    "semantic_hash": "5457cdcc5c9215f90d57a99d2e330402"
+  },
+  "apps/comments/__init__.py": {
+    "mtime": 1768916613.9624195,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/comments/admin.py": {
+    "mtime": 1768916871.937887,
+    "ast_hash": "c8ae51bdf81cd52e6f39e142955bfa7f",
+    "semantic_hash": "c8ae51bdf81cd52e6f39e142955bfa7f"
+  },
+  "apps/comments/apps.py": {
+    "mtime": 1771948877.001678,
+    "ast_hash": "c4261d1d9808ce6b1074f71dad777d80",
+    "semantic_hash": "c4261d1d9808ce6b1074f71dad777d80"
+  },
+  "apps/comments/migrations/0001_initial.py": {
+    "mtime": 1771948877.0822806,
+    "ast_hash": "fedf6d5ced0b2882aacd229c6af23156",
+    "semantic_hash": "fedf6d5ced0b2882aacd229c6af23156"
+  },
+  "apps/comments/migrations/0002_initial.py": {
+    "mtime": 1771948877.0993807,
+    "ast_hash": "a5bb757699a98aae0afc051b822426a5",
+    "semantic_hash": "a5bb757699a98aae0afc051b822426a5"
+  },
+  "apps/comments/migrations/__init__.py": {
+    "mtime": 1768917809.5157876,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/comments/models.py": {
+    "mtime": 1768916869.4299996,
+    "ast_hash": "75362d5f5e29bb1ab07e77f67d34a2bb",
+    "semantic_hash": "75362d5f5e29bb1ab07e77f67d34a2bb"
+  },
+  "apps/content/__init__.py": {
+    "mtime": 1768916613.9594195,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/content/admin.py": {
+    "mtime": 1783953483.2710736,
+    "ast_hash": "8b2c04ff3699cb24cc6da195897573e6",
+    "semantic_hash": "8b2c04ff3699cb24cc6da195897573e6"
+  },
+  "apps/content/apps.py": {
+    "mtime": 1771948877.0226784,
+    "ast_hash": "b9a098a285beacf79146975d3aea8124",
+    "semantic_hash": "b9a098a285beacf79146975d3aea8124"
+  },
+  "apps/content/forms.py": {
+    "mtime": 1783953478.5719957,
+    "ast_hash": "d73cbcbb6cd59bd6a685db2772a2b096",
+    "semantic_hash": "d73cbcbb6cd59bd6a685db2772a2b096"
+  },
+  "apps/content/migrations/0001_initial.py": {
+    "mtime": 1771948877.4627063,
+    "ast_hash": "331d69e01cd6dab377c9d55c6419b923",
+    "semantic_hash": "331d69e01cd6dab377c9d55c6419b923"
+  },
+  "apps/content/migrations/0002_initial.py": {
+    "mtime": 1771948877.1854842,
+    "ast_hash": "48a86f6fd76302d9fc7291d9adde15b6",
+    "semantic_hash": "48a86f6fd76302d9fc7291d9adde15b6"
+  },
+  "apps/content/migrations/0003_add_about_us.py": {
+    "mtime": 1771948877.0806592,
+    "ast_hash": "3c6ca283b6d3bc58b66c0d80b6a85971",
+    "semantic_hash": "3c6ca283b6d3bc58b66c0d80b6a85971"
+  },
+  "apps/content/migrations/0004_add_contact_item.py": {
+    "mtime": 1771948877.2027586,
+    "ast_hash": "b60e9c4a5f12e223f61e51611393843b",
+    "semantic_hash": "b60e9c4a5f12e223f61e51611393843b"
+  },
+  "apps/content/migrations/0005_add_contact_page_and_max.py": {
+    "mtime": 1771948877.2549727,
+    "ast_hash": "d394d9f6833166826849904722583040",
+    "semantic_hash": "d394d9f6833166826849904722583040"
+  },
+  "apps/content/migrations/0006_add_contact_item_fk.py": {
+    "mtime": 1771948877.1214335,
+    "ast_hash": "c6c8614ccef15e526959ebab0984e3c4",
+    "semantic_hash": "c6c8614ccef15e526959ebab0984e3c4"
+  },
+  "apps/content/migrations/0007_remove_rules_page.py": {
+    "mtime": 1770029535.1853893,
+    "ast_hash": "873090a4f395b411ab9c61ee5548d286",
+    "semantic_hash": "873090a4f395b411ab9c61ee5548d286"
+  },
+  "apps/content/migrations/0008_rulessection.py": {
+    "mtime": 1771948877.1123974,
+    "ast_hash": "b80745742af5faae3b58b6256dff7b4c",
+    "semantic_hash": "b80745742af5faae3b58b6256dff7b4c"
+  },
+  "apps/content/migrations/0009_populate_rules_sections.py": {
+    "mtime": 1771948877.17731,
+    "ast_hash": "95f487f4133570f93754bb9635feeb1c",
+    "semantic_hash": "95f487f4133570f93754bb9635feeb1c"
+  },
+  "apps/content/migrations/0010_add_rules_olympic_section.py": {
+    "mtime": 1770194010.8586586,
+    "ast_hash": "38b9a3a12f320ab3648c2cdba84d7975",
+    "semantic_hash": "38b9a3a12f320ab3648c2cdba84d7975"
+  },
+  "apps/content/migrations/0011_add_rules_seeding_section.py": {
+    "mtime": 1770199058.5341756,
+    "ast_hash": "5c315e78b4c6f420d5338fb5a0f408b3",
+    "semantic_hash": "5c315e78b4c6f420d5338fb5a0f408b3"
+  },
+  "apps/content/migrations/0012_newsphoto.py": {
+    "mtime": 1771009333.5488312,
+    "ast_hash": "dac415894205ff6e7d1cba828b9e482c",
+    "semantic_hash": "dac415894205ff6e7d1cba828b9e482c"
+  },
+  "apps/content/migrations/0013_add_video_page.py": {
+    "mtime": 1771009333.8009496,
+    "ast_hash": "6abe24fca2a7e7edc98716c75c23fe81",
+    "semantic_hash": "6abe24fca2a7e7edc98716c75c23fe81"
+  },
+  "apps/content/migrations/0014_add_stringer_models.py": {
+    "mtime": 1771009333.901805,
+    "ast_hash": "00f894aa5ad460a0c3d5944cc7efc572",
+    "semantic_hash": "00f894aa5ad460a0c3d5944cc7efc572"
+  },
+  "apps/content/migrations/0015_add_stringer_company_fk.py": {
+    "mtime": 1771948877.1149879,
+    "ast_hash": "9d127329de7d7aa419eaedfc566b6641",
+    "semantic_hash": "9d127329de7d7aa419eaedfc566b6641"
+  },
+  "apps/content/migrations/0016_add_stringer_company_contact.py": {
+    "mtime": 1771948877.1828976,
+    "ast_hash": "6ae214a424d9f54ea84149d2801dfe01",
+    "semantic_hash": "6ae214a424d9f54ea84149d2801dfe01"
+  },
+  "apps/content/migrations/0017_alter_aboutus_options_alter_contactpage_options_and_more.py": {
+    "mtime": 1771948877.1424563,
+    "ast_hash": "8f13525ce8e9b1635afd5472520f6489",
+    "semantic_hash": "8f13525ce8e9b1635afd5472520f6489"
+  },
+  "apps/content/migrations/0018_rename_rules_fan_title.py": {
+    "mtime": 1771319585.9415193,
+    "ast_hash": "53efe6e5afe33bd7bf405171b4aea2eb",
+    "semantic_hash": "53efe6e5afe33bd7bf405171b4aea2eb"
+  },
+  "apps/content/migrations/0019_add_rules_rating_algorithm_section.py": {
+    "mtime": 1771343199.228485,
+    "ast_hash": "061647d429af2348259c08ea1bd1e81c",
+    "semantic_hash": "061647d429af2348259c08ea1bd1e81c"
+  },
+  "apps/content/migrations/0020_add_rules_tvd_section.py": {
+    "mtime": 1771839299.0193791,
+    "ast_hash": "057dca77a7cfd015f4e1e576a8f3fe61",
+    "semantic_hash": "057dca77a7cfd015f4e1e576a8f3fe61"
+  },
+  "apps/content/migrations/0021_populate_rules_section_bodies.py": {
+    "mtime": 1783953491.1932037,
+    "ast_hash": "7241c266fc8734560fbf7552af1d0dc6",
+    "semantic_hash": "7241c266fc8734560fbf7552af1d0dc6"
+  },
+  "apps/content/migrations/__init__.py": {
+    "mtime": 1768917809.5172517,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/content/models.py": {
+    "mtime": 1783953492.006217,
+    "ast_hash": "c8d6894d73f1b9864c9fa26418b346a8",
+    "semantic_hash": "c8d6894d73f1b9864c9fa26418b346a8"
+  },
+  "apps/content/rules_defaults.py": {
+    "mtime": 1783953471.0738692,
+    "ast_hash": "9eae9bed5cb807c08af207ca4fe2eb6f",
+    "semantic_hash": "9eae9bed5cb807c08af207ca4fe2eb6f"
+  },
+  "apps/content/urls_about.py": {
+    "mtime": 1769769116.9880745,
+    "ast_hash": "76edc685e5e2a2febf18edbc5ec796ea",
+    "semantic_hash": "76edc685e5e2a2febf18edbc5ec796ea"
+  },
+  "apps/content/urls_contacts.py": {
+    "mtime": 1769770484.1301987,
+    "ast_hash": "0290553bf3c170e054a48f7ae7ad503e",
+    "semantic_hash": "0290553bf3c170e054a48f7ae7ad503e"
+  },
+  "apps/content/urls_gallery.py": {
+    "mtime": 1784889652.4618373,
+    "ast_hash": "2e4f3b1a2b200355ec3a30e777cafdb4",
+    "semantic_hash": "2e4f3b1a2b200355ec3a30e777cafdb4"
+  },
+  "apps/content/urls_news.py": {
+    "mtime": 1771948877.1326175,
+    "ast_hash": "7fb3db687b4fa33989122d828b3f56fc",
+    "semantic_hash": "7fb3db687b4fa33989122d828b3f56fc"
+  },
+  "apps/content/urls_pages.py": {
+    "mtime": 1771948877.1809113,
+    "ast_hash": "9f1dfb30091b97a336946333bd99eecc",
+    "semantic_hash": "9f1dfb30091b97a336946333bd99eecc"
+  },
+  "apps/content/urls_stringers.py": {
+    "mtime": 1771948877.1512237,
+    "ast_hash": "6a886ffbfa1d258955de920ae2eb4e52",
+    "semantic_hash": "6a886ffbfa1d258955de920ae2eb4e52"
+  },
+  "apps/content/urls_videos.py": {
+    "mtime": 1771948877.1419146,
+    "ast_hash": "9c29a8139845a6b9cee7eec537355206",
+    "semantic_hash": "9c29a8139845a6b9cee7eec537355206"
+  },
+  "apps/content/utils.py": {
+    "mtime": 1783921887.9166846,
+    "ast_hash": "8e3ab4844339bee0d15d0ebec63148c9",
+    "semantic_hash": "8e3ab4844339bee0d15d0ebec63148c9"
+  },
+  "apps/content/views.py": {
+    "mtime": 1784889652.4618373,
+    "ast_hash": "a9910bf13df3d267feea6a57afe7ca86",
+    "semantic_hash": "a9910bf13df3d267feea6a57afe7ca86"
+  },
+  "apps/core/__init__.py": {
+    "mtime": 1768916613.9414191,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/core/activity.py": {
+    "mtime": 1780066299.5239825,
+    "ast_hash": "76c7f82ee4901d1e53b6d1c1ed0d64f2",
+    "semantic_hash": "76c7f82ee4901d1e53b6d1c1ed0d64f2"
+  },
+  "apps/core/activity_signals.py": {
+    "mtime": 1781083838.96081,
+    "ast_hash": "573f595ab8594c627ce799f17e70c44a",
+    "semantic_hash": "573f595ab8594c627ce799f17e70c44a"
+  },
+  "apps/core/admin.py": {
+    "mtime": 1784891554.6020513,
+    "ast_hash": "28006ea80faf956f034a9e773e4552cf",
+    "semantic_hash": "28006ea80faf956f034a9e773e4552cf"
+  },
+  "apps/core/admin_action_log.py": {
+    "mtime": 1780685708.167655,
+    "ast_hash": "107a63803fcaf78043da4875234cce0f",
+    "semantic_hash": "107a63803fcaf78043da4875234cce0f"
+  },
+  "apps/core/admin_email_menu.py": {
+    "mtime": 1784892595.6847718,
+    "ast_hash": "435691292460e2787e1cda44bb41935a",
+    "semantic_hash": "435691292460e2787e1cda44bb41935a"
+  },
+  "apps/core/admin_logging.py": {
+    "mtime": 1780685947.4069796,
+    "ast_hash": "0a262360f406c77d241b0516efbbfd6f",
+    "semantic_hash": "0a262360f406c77d241b0516efbbfd6f"
+  },
+  "apps/core/apps.py": {
+    "mtime": 1784892342.1679308,
+    "ast_hash": "c05589993a2fe7fcd27bc4ae7f8ba403",
+    "semantic_hash": "c05589993a2fe7fcd27bc4ae7f8ba403"
+  },
+  "apps/core/consent_utils.py": {
+    "mtime": 1774460302.6356618,
+    "ast_hash": "c3de20ca59aca8a1ce4568604b7be465",
+    "semantic_hash": "c3de20ca59aca8a1ce4568604b7be465"
+  },
+  "apps/core/contact_utils.py": {
+    "mtime": 1776068493.5950596,
+    "ast_hash": "60b8b15f73654c3ee69af574d1bf92d6",
+    "semantic_hash": "60b8b15f73654c3ee69af574d1bf92d6"
+  },
+  "apps/core/context_processors.py": {
+    "mtime": 1780066030.2337644,
+    "ast_hash": "4ac7c9cd46f780731ea0bf502d43eb13",
+    "semantic_hash": "4ac7c9cd46f780731ea0bf502d43eb13"
+  },
+  "apps/core/decorators.py": {
+    "mtime": 1779088260.7777421,
+    "ast_hash": "518dd69a3fdb2841f2041ff05df596b2",
+    "semantic_hash": "518dd69a3fdb2841f2041ff05df596b2"
+  },
+  "apps/core/email_categories.py": {
+    "mtime": 1784891554.6018305,
+    "ast_hash": "e46957876a0ac3527f5ae96d6d7512db",
+    "semantic_hash": "e46957876a0ac3527f5ae96d6d7512db"
+  },
+  "apps/core/email_service.py": {
+    "mtime": 1784891536.6997817,
+    "ast_hash": "db01204782fda9491dc01eec77275c39",
+    "semantic_hash": "db01204782fda9491dc01eec77275c39"
+  },
+  "apps/core/forms.py": {
+    "mtime": 1769597337.4934623,
+    "ast_hash": "e0e3f32b093c43fab8c0a6f3fd020dd7",
+    "semantic_hash": "e0e3f32b093c43fab8c0a6f3fd020dd7"
+  },
+  "apps/core/mail.py": {
+    "mtime": 1784890304.5437443,
+    "ast_hash": "76c4e6f9d3d092b27b05eb44fc012bc4",
+    "semantic_hash": "76c4e6f9d3d092b27b05eb44fc012bc4"
+  },
+  "apps/core/management/__init__.py": {
+    "mtime": 1768919798.5844948,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/core/management/commands/__init__.py": {
+    "mtime": 1768919798.5844948,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/core/management/commands/backfill_platform_activity.py": {
+    "mtime": 1780066209.9455116,
+    "ast_hash": "10055f7ff723504beaef01b09fc0b9eb",
+    "semantic_hash": "10055f7ff723504beaef01b09fc0b9eb"
+  },
+  "apps/core/management/commands/check_telegram_notify_cache.py": {
+    "mtime": 1772300342.6660807,
+    "ast_hash": "d867786ccde856add1bbeccecc1c0b1c",
+    "semantic_hash": "d867786ccde856add1bbeccecc1c0b1c"
+  },
+  "apps/core/management/commands/load_cities_from_csv.py": {
+    "mtime": 1777464873.883861,
+    "ast_hash": "074f7cb5f1e8ed6aef8e5384cac64b79",
+    "semantic_hash": "074f7cb5f1e8ed6aef8e5384cac64b79"
+  },
+  "apps/core/middleware.py": {
+    "mtime": 1776951198.3514311,
+    "ast_hash": "33ddbcd86d1ec8d0f3e284f89355b6d9",
+    "semantic_hash": "33ddbcd86d1ec8d0f3e284f89355b6d9"
+  },
+  "apps/core/migrations/0001_add_feedback_models.py": {
+    "mtime": 1771009333.592978,
+    "ast_hash": "563d05baf79e6db9c81c2a20b34a2ea4",
+    "semantic_hash": "563d05baf79e6db9c81c2a20b34a2ea4"
+  },
+  "apps/core/migrations/0002_support_telegram_models.py": {
+    "mtime": 1771009333.6439223,
+    "ast_hash": "f39deffdc071d59199acc0a4a465bf7d",
+    "semantic_hash": "f39deffdc071d59199acc0a4a465bf7d"
+  },
+  "apps/core/migrations/0003_supportmessage_admin_telegram_text.py": {
+    "mtime": 1770294824.649908,
+    "ast_hash": "967babc7cfaed19ebff4b816caf77c98",
+    "semantic_hash": "967babc7cfaed19ebff4b816caf77c98"
+  },
+  "apps/core/migrations/0004_add_user_bot_chat_id.py": {
+    "mtime": 1771948877.2142663,
+    "ast_hash": "acf6e7f39807269c1a50cf587cacebf8",
+    "semantic_hash": "acf6e7f39807269c1a50cf587cacebf8"
+  },
+  "apps/core/migrations/0005_telegramtransferconsentlog.py": {
+    "mtime": 1771948877.2469347,
+    "ast_hash": "f307b39b0eca4f3bfedd0264d04b550c",
+    "semantic_hash": "f307b39b0eca4f3bfedd0264d04b550c"
+  },
+  "apps/core/migrations/0006_add_guest_fields_to_support_message.py": {
+    "mtime": 1771948877.2780583,
+    "ast_hash": "b7f51bb897080985d968e087780e8316",
+    "semantic_hash": "b7f51bb897080985d968e087780e8316"
+  },
+  "apps/core/migrations/0007_add_guest_telegram_fields.py": {
+    "mtime": 1771948877.3463957,
+    "ast_hash": "074e145a043e6d969b785675164c50df",
+    "semantic_hash": "074e145a043e6d969b785675164c50df"
+  },
+  "apps/core/migrations/0008_footer_social_links.py": {
+    "mtime": 1771831997.4453948,
+    "ast_hash": "32eaa092b303b0978044fd47cdb156d0",
+    "semantic_hash": "32eaa092b303b0978044fd47cdb156d0"
+  },
+  "apps/core/migrations/0009_populate_footer_social_links.py": {
+    "mtime": 1771832006.5322495,
+    "ast_hash": "81eb77a5a4c5bb1290782d7e92d4cee0",
+    "semantic_hash": "81eb77a5a4c5bb1290782d7e92d4cee0"
+  },
+  "apps/core/migrations/0010_add_footer_social_link.py": {
+    "mtime": 1771832506.3542337,
+    "ast_hash": "9c7cfeff8731e0de5e3f0979a3c3cadb",
+    "semantic_hash": "9c7cfeff8731e0de5e3f0979a3c3cadb"
+  },
+  "apps/core/migrations/0011_migrate_to_footer_social_link.py": {
+    "mtime": 1771947694.6696033,
+    "ast_hash": "6aab4f2683bcdf98caa538b7db25a5b0",
+    "semantic_hash": "6aab4f2683bcdf98caa538b7db25a5b0"
+  },
+  "apps/core/migrations/0012_usertelegramlink_binding_token_nullable.py": {
+    "mtime": 1772015883.6262472,
+    "ast_hash": "ff90ca9b4d94f7d6ffb43b1b726e7020",
+    "semantic_hash": "ff90ca9b4d94f7d6ffb43b1b726e7020"
+  },
+  "apps/core/migrations/0013_city_model.py": {
+    "mtime": 1772541689.1905396,
+    "ast_hash": "33b02209ab453c472c4d0c01ef82bdae",
+    "semantic_hash": "33b02209ab453c472c4d0c01ef82bdae"
+  },
+  "apps/core/migrations/0014_support_admin_delivery.py": {
+    "mtime": 1772799344.2602272,
+    "ast_hash": "feb9d6321a8b8ef297086c53d47f2fa5",
+    "semantic_hash": "feb9d6321a8b8ef297086c53d47f2fa5"
+  },
+  "apps/core/migrations/0015_legalacceptancelog.py": {
+    "mtime": 1773152387.800378,
+    "ast_hash": "50208c519b8405cac82f801e247d20a3",
+    "semantic_hash": "50208c519b8405cac82f801e247d20a3"
+  },
+  "apps/core/migrations/0016_club_legal_and_user_consent.py": {
+    "mtime": 1774457088.643749,
+    "ast_hash": "6e754bf3f67d9c88ece05d215673a931",
+    "semantic_hash": "6e754bf3f67d9c88ece05d215673a931"
+  },
+  "apps/core/migrations/0017_support_threads_refactor.py": {
+    "mtime": 1777030945.5531294,
+    "ast_hash": "fca5fd84692d2aaa0cb1dd51e9ef7360",
+    "semantic_hash": "fca5fd84692d2aaa0cb1dd51e9ef7360"
+  },
+  "apps/core/migrations/0018_alter_supportthread_guest_email_and_more.py": {
+    "mtime": 1777032784.4251976,
+    "ast_hash": "cde0a0d58e8299aceb0e595185f7ce32",
+    "semantic_hash": "cde0a0d58e8299aceb0e595185f7ce32"
+  },
+  "apps/core/migrations/0019_supportmessage_edited_at.py": {
+    "mtime": 1777371935.7050703,
+    "ast_hash": "390c9dc54d85049cefe2c3c6b3edae33",
+    "semantic_hash": "390c9dc54d85049cefe2c3c6b3edae33"
+  },
+  "apps/core/migrations/0020_city_coordinates.py": {
+    "mtime": 1777463874.8478584,
+    "ast_hash": "2e75daf44a1fc2b93fbe62bb2a44019c",
+    "semantic_hash": "2e75daf44a1fc2b93fbe62bb2a44019c"
+  },
+  "apps/core/migrations/0021_platformactivityevent.py": {
+    "mtime": 1780060525.0036721,
+    "ast_hash": "39d3913ce75e66cddbb43b4358c4ff07",
+    "semantic_hash": "39d3913ce75e66cddbb43b4358c4ff07"
+  },
+  "apps/core/migrations/0022_platformactivityevent_actor_role_and_more.py": {
+    "mtime": 1780061910.0022671,
+    "ast_hash": "ec7c8e24478af2b0a496c0e9c8afd28d",
+    "semantic_hash": "ec7c8e24478af2b0a496c0e9c8afd28d"
+  },
+  "apps/core/migrations/0023_platformdashboardseen.py": {
+    "mtime": 1780064996.6639807,
+    "ast_hash": "dbbc3dc344353e545639653ce1d3ecb8",
+    "semantic_hash": "dbbc3dc344353e545639653ce1d3ecb8"
+  },
+  "apps/core/migrations/0024_platformdashboardseen_last_seen_event_id.py": {
+    "mtime": 1780065123.0248942,
+    "ast_hash": "a204901549f584f0031425c922f28aa0",
+    "semantic_hash": "a204901549f584f0031425c922f28aa0"
+  },
+  "apps/core/migrations/0025_admin_action_log_proxy.py": {
+    "mtime": 1780685551.2721243,
+    "ast_hash": "5b144dd125ec618bfce8249391671c2c",
+    "semantic_hash": "5b144dd125ec618bfce8249391671c2c"
+  },
+  "apps/core/migrations/0026_outbound_email.py": {
+    "mtime": 1784534748.1522865,
+    "ast_hash": "5f3c3625f53a705f0d07a756096954e3",
+    "semantic_hash": "5f3c3625f53a705f0d07a756096954e3"
+  },
+  "apps/core/migrations/0027_outbound_email_category.py": {
+    "mtime": 1784891504.100197,
+    "ast_hash": "158ee6e3bcd7245b7462d461f819657c",
+    "semantic_hash": "158ee6e3bcd7245b7462d461f819657c"
+  },
+  "apps/core/migrations/__init__.py": {
+    "mtime": 1770288079.2907984,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/core/models.py": {
+    "mtime": 1784891504.5041003,
+    "ast_hash": "1560fa9af98685177f3f8d13e59dbd2b",
+    "semantic_hash": "1560fa9af98685177f3f8d13e59dbd2b"
+  },
+  "apps/core/signals.py": {
+    "mtime": 1776951244.2325456,
+    "ast_hash": "e87b02ead3b0abf513f70db46925de08",
+    "semantic_hash": "e87b02ead3b0abf513f70db46925de08"
+  },
+  "apps/core/support_notifications.py": {
+    "mtime": 1784891536.7000258,
+    "ast_hash": "a1543de6653c103ce3247ecd8d81e0e3",
+    "semantic_hash": "a1543de6653c103ce3247ecd8d81e0e3"
+  },
+  "apps/core/support_service.py": {
+    "mtime": 1777373447.311197,
+    "ast_hash": "2bdd238ac71439abf1e8d3ec4463f8df",
+    "semantic_hash": "2bdd238ac71439abf1e8d3ec4463f8df"
+  },
+  "apps/core/telegram_notify.py": {
+    "mtime": 1777704236.258964,
+    "ast_hash": "689eae770e7f839bf5ec21b1fc2f4416",
+    "semantic_hash": "689eae770e7f839bf5ec21b1fc2f4416"
+  },
+  "apps/core/templatetags/__init__.py": {
+    "mtime": 1772611365.0858343,
+    "ast_hash": "60607335cffe169d712938d47fcd59fd",
+    "semantic_hash": "60607335cffe169d712938d47fcd59fd"
+  },
+  "apps/core/templatetags/admin_log_tags.py": {
+    "mtime": 1780685556.841438,
+    "ast_hash": "b907fa738a7f4c39150089a02a3d2853",
+    "semantic_hash": "b907fa738a7f4c39150089a02a3d2853"
+  },
+  "apps/core/templatetags/display_tags.py": {
+    "mtime": 1780051185.1624992,
+    "ast_hash": "e69a61e50edc8fd2c9b2739a29c66a39",
+    "semantic_hash": "e69a61e50edc8fd2c9b2739a29c66a39"
+  },
+  "apps/core/templatetags/skill_tags.py": {
+    "mtime": 1773146582.5940945,
+    "ast_hash": "df805a88dd43e04b4159097d690725ae",
+    "semantic_hash": "df805a88dd43e04b4159097d690725ae"
+  },
+  "apps/core/text_search.py": {
+    "mtime": 1775491706.543766,
+    "ast_hash": "e4198d2964b050e5dbca755a28833ea1",
+    "semantic_hash": "e4198d2964b050e5dbca755a28833ea1"
+  },
+  "apps/core/urls.py": {
+    "mtime": 1780066014.57262,
+    "ast_hash": "c533fff5054a5080f14ee4210c07bc55",
+    "semantic_hash": "c533fff5054a5080f14ee4210c07bc55"
+  },
+  "apps/core/views.py": {
+    "mtime": 1784481752.6002154,
+    "ast_hash": "7151c1d5cda32f84f29d40efb2a4faab",
+    "semantic_hash": "7151c1d5cda32f84f29d40efb2a4faab"
+  },
+  "apps/courts/__init__.py": {
+    "mtime": 1768916613.9494193,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/courts/admin.py": {
+    "mtime": 1777032239.7862287,
+    "ast_hash": "580a62dfc740735612790808a2d1eaca",
+    "semantic_hash": "580a62dfc740735612790808a2d1eaca"
+  },
+  "apps/courts/apps.py": {
+    "mtime": 1771948877.231875,
+    "ast_hash": "c4eb08df2b9d1a13522635491f616eb7",
+    "semantic_hash": "c4eb08df2b9d1a13522635491f616eb7"
+  },
+  "apps/courts/forms.py": {
+    "mtime": 1776761921.0381956,
+    "ast_hash": "f3db2b84b2df6609eaeb0f2ab9af9fab",
+    "semantic_hash": "f3db2b84b2df6609eaeb0f2ab9af9fab"
+  },
+  "apps/courts/geocoder.py": {
+    "mtime": 1771009269.9844236,
+    "ast_hash": "e0e48bd10c01213cf1e66217cb24d263",
+    "semantic_hash": "e0e48bd10c01213cf1e66217cb24d263"
+  },
+  "apps/courts/migrations/0001_initial.py": {
+    "mtime": 1771948877.6134,
+    "ast_hash": "aaa5c18e504679f93fd0fcaedb537318",
+    "semantic_hash": "aaa5c18e504679f93fd0fcaedb537318"
+  },
+  "apps/courts/migrations/0002_alter_court_city.py": {
+    "mtime": 1771948877.236682,
+    "ast_hash": "4102443a8e162ac84e730e3788e76254",
+    "semantic_hash": "4102443a8e162ac84e730e3788e76254"
+  },
+  "apps/courts/migrations/0003_add_court_application.py": {
+    "mtime": 1771948877.4923174,
+    "ast_hash": "8a4b3a268b7cb82196a2b0b309ef30d4",
+    "semantic_hash": "8a4b3a268b7cb82196a2b0b309ef30d4"
+  },
+  "apps/courts/migrations/0004_enrollment_contact_fields.py": {
+    "mtime": 1771948877.2725248,
+    "ast_hash": "1b309893ad0c5a733b364e914b437366",
+    "semantic_hash": "1b309893ad0c5a733b364e914b437366"
+  },
+  "apps/courts/migrations/0005_court_rating_and_extra_fields.py": {
+    "mtime": 1771009333.7177312,
+    "ast_hash": "9b89e5b191926a11408635dd4129e81a",
+    "semantic_hash": "9b89e5b191926a11408635dd4129e81a"
+  },
+  "apps/courts/migrations/0006_alter_court_image_alter_courtapplication_image.py": {
+    "mtime": 1771009333.6109166,
+    "ast_hash": "765e70e62ac0f99cfe81112ce726fff4",
+    "semantic_hash": "765e70e62ac0f99cfe81112ce726fff4"
+  },
+  "apps/courts/migrations/0007_surface_free_text.py": {
+    "mtime": 1772007494.6114044,
+    "ast_hash": "2b710d06dd43fbe9086ec028db34c39a",
+    "semantic_hash": "2b710d06dd43fbe9086ec028db34c39a"
+  },
+  "apps/courts/migrations/0008_court_extra_fields_and_rental_price_range.py": {
+    "mtime": 1772104677.7520585,
+    "ast_hash": "ba059deae94a38d646d8a13b6a285e11",
+    "semantic_hash": "ba059deae94a38d646d8a13b6a285e11"
+  },
+  "apps/courts/migrations/0009_courtphoto.py": {
+    "mtime": 1772612319.5867276,
+    "ast_hash": "ee9af9904cbd725275ded81d86d89154",
+    "semantic_hash": "ee9af9904cbd725275ded81d86d89154"
+  },
+  "apps/courts/migrations/0010_alter_courtphoto_image.py": {
+    "mtime": 1772723858.965102,
+    "ast_hash": "2af9834d3138566520ea03e3321016fb",
+    "semantic_hash": "2af9834d3138566520ea03e3321016fb"
+  },
+  "apps/courts/migrations/0011_courtapplication_is_outdoor.py": {
+    "mtime": 1776760512.303776,
+    "ast_hash": "f80bc979541b5580a7f294c57ebd1018",
+    "semantic_hash": "f80bc979541b5580a7f294c57ebd1018"
+  },
+  "apps/courts/migrations/0012_courtapplication_split_surface_fields.py": {
+    "mtime": 1776760616.4539158,
+    "ast_hash": "1dc9b65cc75f1dd4c7f2368a0206566e",
+    "semantic_hash": "1dc9b65cc75f1dd4c7f2368a0206566e"
+  },
+  "apps/courts/migrations/0013_court_split_surface_fields.py": {
+    "mtime": 1776839137.6504507,
+    "ast_hash": "b95cebe890f82b31c22232668b133e84",
+    "semantic_hash": "b95cebe890f82b31c22232668b133e84"
+  },
+  "apps/courts/migrations/__init__.py": {
+    "mtime": 1768917809.5125837,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/courts/models.py": {
+    "mtime": 1777032224.3400497,
+    "ast_hash": "4456e226fc7c6d5e0639502bbadaa2f5",
+    "semantic_hash": "4456e226fc7c6d5e0639502bbadaa2f5"
+  },
+  "apps/courts/urls.py": {
+    "mtime": 1771948877.298015,
+    "ast_hash": "4b1ce55bd79784e2264bb1da27e91ed9",
+    "semantic_hash": "4b1ce55bd79784e2264bb1da27e91ed9"
+  },
+  "apps/courts/views.py": {
+    "mtime": 1776759905.38475,
+    "ast_hash": "a1a4a409e123914e1eb5910abe2648cf",
+    "semantic_hash": "a1a4a409e123914e1eb5910abe2648cf"
+  },
+  "apps/legal/__init__.py": {
+    "mtime": 1769508703.8324852,
+    "ast_hash": "e802660dbea09e8e40dfcd4758f9b2ae",
+    "semantic_hash": "e802660dbea09e8e40dfcd4758f9b2ae"
+  },
+  "apps/legal/apps.py": {
+    "mtime": 1769508703.8516126,
+    "ast_hash": "c6a17c3053e50ed19cbafd46438bbaca",
+    "semantic_hash": "c6a17c3053e50ed19cbafd46438bbaca"
+  },
+  "apps/legal/urls.py": {
+    "mtime": 1777022925.6840637,
+    "ast_hash": "3fc99c05c499b65c678bdea0d8c0dbd4",
+    "semantic_hash": "3fc99c05c499b65c678bdea0d8c0dbd4"
+  },
+  "apps/legal/utils.py": {
+    "mtime": 1777022934.364709,
+    "ast_hash": "b51e6208f74a0d67635c3f2036994944",
+    "semantic_hash": "b51e6208f74a0d67635c3f2036994944"
+  },
+  "apps/legal/views.py": {
+    "mtime": 1777022921.1341476,
+    "ast_hash": "cfa1cd740091902b4d3d3c53a8895fc9",
+    "semantic_hash": "cfa1cd740091902b4d3d3c53a8895fc9"
+  },
+  "apps/navigation/__init__.py": {
+    "mtime": 1769591570.829387,
+    "ast_hash": "48c5c28b14d0cadb774a79df28498322",
+    "semantic_hash": "48c5c28b14d0cadb774a79df28498322"
+  },
+  "apps/navigation/admin.py": {
+    "mtime": 1771009285.3708482,
+    "ast_hash": "042f39b90ced3bccfe170e64da865cd0",
+    "semantic_hash": "042f39b90ced3bccfe170e64da865cd0"
+  },
+  "apps/navigation/apps.py": {
+    "mtime": 1776951233.583511,
+    "ast_hash": "e8883b1a716db28b4d675af110b40492",
+    "semantic_hash": "e8883b1a716db28b4d675af110b40492"
+  },
+  "apps/navigation/context_processors.py": {
+    "mtime": 1776951221.2855668,
+    "ast_hash": "067797526603a5d9568e105e611b73b6",
+    "semantic_hash": "067797526603a5d9568e105e611b73b6"
+  },
+  "apps/navigation/migrations/0001_initial.py": {
+    "mtime": 1771948877.4022548,
+    "ast_hash": "ab9d86643b96cea8fcdea8b511b63d01",
+    "semantic_hash": "ab9d86643b96cea8fcdea8b511b63d01"
+  },
+  "apps/navigation/migrations/0002_seed_menu_items.py": {
+    "mtime": 1769591594.692702,
+    "ast_hash": "fb2ed884c85e112389303b0428fb83ce",
+    "semantic_hash": "fb2ed884c85e112389303b0428fb83ce"
+  },
+  "apps/navigation/migrations/0003_add_tournament_tables_menu.py": {
+    "mtime": 1769694338.1745877,
+    "ast_hash": "54689f0f711154cd51f741e697b6d609",
+    "semantic_hash": "54689f0f711154cd51f741e697b6d609"
+  },
+  "apps/navigation/migrations/0004_add_match_schedule_menu.py": {
+    "mtime": 1769766045.7791789,
+    "ast_hash": "e538b51a8643c0d3e6ed3c33559487ef",
+    "semantic_hash": "e538b51a8643c0d3e6ed3c33559487ef"
+  },
+  "apps/navigation/migrations/0005_remove_match_schedule_menu.py": {
+    "mtime": 1769766045.7791789,
+    "ast_hash": "572e512ef2950d7cd2107ceaa9bf6614",
+    "semantic_hash": "572e512ef2950d7cd2107ceaa9bf6614"
+  },
+  "apps/navigation/migrations/0006_add_shop_menu.py": {
+    "mtime": 1769772367.6400857,
+    "ast_hash": "08a26b199630c8af322fe788eb20400a",
+    "semantic_hash": "08a26b199630c8af322fe788eb20400a"
+  },
+  "apps/navigation/migrations/0007_remove_rules_menu_item.py": {
+    "mtime": 1770029535.1841881,
+    "ast_hash": "51f82ff2eb970b9f5ab1b3be1d45df5c",
+    "semantic_hash": "51f82ff2eb970b9f5ab1b3be1d45df5c"
+  },
+  "apps/navigation/migrations/0008_add_rules_menu_item.py": {
+    "mtime": 1770030077.0630453,
+    "ast_hash": "3e0f15c610125b22b8ac49ea49ca275a",
+    "semantic_hash": "3e0f15c610125b22b8ac49ea49ca275a"
+  },
+  "apps/navigation/migrations/0009_add_stringers_menu_item.py": {
+    "mtime": 1771948877.4264169,
+    "ast_hash": "3527ecee266d0e5af1b926d60166a212",
+    "semantic_hash": "3527ecee266d0e5af1b926d60166a212"
+  },
+  "apps/navigation/migrations/__init__.py": {
+    "mtime": 1769591583.92856,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/navigation/models.py": {
+    "mtime": 1769591579.4905014,
+    "ast_hash": "32dd97be543a74af7323f142c88d6a4c",
+    "semantic_hash": "32dd97be543a74af7323f142c88d6a4c"
+  },
+  "apps/navigation/signals.py": {
+    "mtime": 1776951226.505797,
+    "ast_hash": "7f441e058ad5a08ddfc0c661311162b6",
+    "semantic_hash": "7f441e058ad5a08ddfc0c661311162b6"
+  },
+  "apps/payments/__init__.py": {
+    "mtime": 1769452256.9285946,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/payments/admin.py": {
+    "mtime": 1784484602.5658088,
+    "ast_hash": "a67f099de121832438bb38efcbbc24e6",
+    "semantic_hash": "a67f099de121832438bb38efcbbc24e6"
+  },
+  "apps/payments/apps.py": {
+    "mtime": 1771009333.6225238,
+    "ast_hash": "b27951572960d10164ec5d8aa3abc5c0",
+    "semantic_hash": "b27951572960d10164ec5d8aa3abc5c0"
+  },
+  "apps/payments/forms.py": {
+    "mtime": 1771009333.68893,
+    "ast_hash": "68b5073554c2895818a5897727b08af3",
+    "semantic_hash": "68b5073554c2895818a5897727b08af3"
+  },
+  "apps/payments/management/commands/run_recurring_subscription_payments.py": {
+    "mtime": 1777032198.4087384,
+    "ast_hash": "7ae0db5823d209c9289e5360d244f038",
+    "semantic_hash": "7ae0db5823d209c9289e5360d244f038"
+  },
+  "apps/payments/migrations/0001_initial.py": {
+    "mtime": 1773137750.5833747,
+    "ast_hash": "1f46a89737213fe59e927f07b0028a4a",
+    "semantic_hash": "1f46a89737213fe59e927f07b0028a4a"
+  },
+  "apps/payments/migrations/0002_paymentrecord.py": {
+    "mtime": 1773152387.8161504,
+    "ast_hash": "31da6aca5f8f4013aef8f3de4090e1f1",
+    "semantic_hash": "31da6aca5f8f4013aef8f3de4090e1f1"
+  },
+  "apps/payments/migrations/0003_savedpaymentmethod_club_plans.py": {
+    "mtime": 1774004475.2772367,
+    "ast_hash": "f7f65a3cb54f97e640e4a47353528e1c",
+    "semantic_hash": "f7f65a3cb54f97e640e4a47353528e1c"
+  },
+  "apps/payments/migrations/0004_savedpaymentmethod_club_scope.py": {
+    "mtime": 1774085931.6641054,
+    "ast_hash": "8221e3bd1bf33b9f3146f85aadf8833a",
+    "semantic_hash": "8221e3bd1bf33b9f3146f85aadf8833a"
+  },
+  "apps/payments/migrations/0005_savedpaymentmethod_club_fees.py": {
+    "mtime": 1774082919.2630079,
+    "ast_hash": "9301f26f43cfbca4af0eb1776baac623",
+    "semantic_hash": "9301f26f43cfbca4af0eb1776baac623"
+  },
+  "apps/payments/migrations/0006_alter_paymentrecord_payment_type.py": {
+    "mtime": 1774437104.2233875,
+    "ast_hash": "cf79f9eaba7f2ad4076a64e5985fcf5b",
+    "semantic_hash": "cf79f9eaba7f2ad4076a64e5985fcf5b"
+  },
+  "apps/payments/migrations/__init__.py": {
+    "mtime": 1773137750.486111,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/payments/models.py": {
+    "mtime": 1774346058.250281,
+    "ast_hash": "053911b8efe303795ac1a053e4a80f82",
+    "semantic_hash": "053911b8efe303795ac1a053e4a80f82"
+  },
+  "apps/payments/refactor.py": {
+    "mtime": 1779006455.225225,
+    "ast_hash": "6b0566f32b50c9bd96e3f05240ab3ef8",
+    "semantic_hash": "6b0566f32b50c9bd96e3f05240ab3ef8"
+  },
+  "apps/payments/urls.py": {
+    "mtime": 1779006013.7683403,
+    "ast_hash": "c59c4aace953c643f3d9e7749f0a1020",
+    "semantic_hash": "c59c4aace953c643f3d9e7749f0a1020"
+  },
+  "apps/payments/views.py": {
+    "mtime": 1784536170.1790123,
+    "ast_hash": "569c43f31e9df65aba67c90bfb37d614",
+    "semantic_hash": "569c43f31e9df65aba67c90bfb37d614"
+  },
+  "apps/payments/yookassa_client.py": {
+    "mtime": 1774458965.494138,
+    "ast_hash": "c7cd7ee4eff1e7e4b4c7fead43037059",
+    "semantic_hash": "c7cd7ee4eff1e7e4b4c7fead43037059"
+  },
+  "apps/player_ratings/__init__.py": {
+    "mtime": 1772032778.5820985,
+    "ast_hash": "2806924a52d767467ce113d9e10fd0da",
+    "semantic_hash": "2806924a52d767467ce113d9e10fd0da"
+  },
+  "apps/player_ratings/admin.py": {
+    "mtime": 1773067513.5906177,
+    "ast_hash": "62b92f16b853dc491ef13fbb9fe218f5",
+    "semantic_hash": "62b92f16b853dc491ef13fbb9fe218f5"
+  },
+  "apps/player_ratings/constants.py": {
+    "mtime": 1772032778.612072,
+    "ast_hash": "88dbda9b67552b1e14ecc89629c4a539",
+    "semantic_hash": "88dbda9b67552b1e14ecc89629c4a539"
+  },
+  "apps/player_ratings/enums.py": {
+    "mtime": 1772032829.0636415,
+    "ast_hash": "24d6db711f8d7816f63b580803def625",
+    "semantic_hash": "24d6db711f8d7816f63b580803def625"
+  },
+  "apps/player_ratings/management/__init__.py": {
+    "mtime": 1772035309.6752596,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/player_ratings/management/commands/__init__.py": {
+    "mtime": 1772035312.8905938,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/player_ratings/management/commands/seed_ratings_for_player.py": {
+    "mtime": 1772101945.4403172,
+    "ast_hash": "0b7412fe17fd5b060125ccbcb5de3cdc",
+    "semantic_hash": "0b7412fe17fd5b060125ccbcb5de3cdc"
+  },
+  "apps/player_ratings/migrations/0001_add_skill_rating_models.py": {
+    "mtime": 1772033392.5638776,
+    "ast_hash": "5dbb81acbf1629fc2bda7a64d258461f",
+    "semantic_hash": "5dbb81acbf1629fc2bda7a64d258461f"
+  },
+  "apps/player_ratings/migrations/0002_skillmetricconfig_alter_playerskillrating_accuracy_and_more.py": {
+    "mtime": 1772190886.8096414,
+    "ast_hash": "02f0331ca6cdc4391e3d323874cf52b5",
+    "semantic_hash": "02f0331ca6cdc4391e3d323874cf52b5"
+  },
+  "apps/player_ratings/migrations/0003_skillmetricconfig_display_on_page.py": {
+    "mtime": 1772191323.8544593,
+    "ast_hash": "407fd73ed81e76cd1a43e25c15ffdbd6",
+    "semantic_hash": "407fd73ed81e76cd1a43e25c15ffdbd6"
+  },
+  "apps/player_ratings/migrations/__init__.py": {
+    "mtime": 1772033392.247765,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/player_ratings/models.py": {
+    "mtime": 1772191247.32881,
+    "ast_hash": "c30691bb6a1ce5a8badb39311e409cc1",
+    "semantic_hash": "c30691bb6a1ce5a8badb39311e409cc1"
+  },
+  "apps/player_ratings/notifications.py": {
+    "mtime": 1772102280.6484356,
+    "ast_hash": "ad061a953592f7ed0b2d82404ca0d35b",
+    "semantic_hash": "ad061a953592f7ed0b2d82404ca0d35b"
+  },
+  "apps/player_ratings/services.py": {
+    "mtime": 1773063709.0281527,
+    "ast_hash": "848ecd1726e47c77717baef33f31be44",
+    "semantic_hash": "848ecd1726e47c77717baef33f31be44"
+  },
+  "apps/player_ratings/urls.py": {
+    "mtime": 1772033535.642719,
+    "ast_hash": "2e3870a6ab4f55336ca66651618dc9de",
+    "semantic_hash": "2e3870a6ab4f55336ca66651618dc9de"
+  },
+  "apps/player_ratings/views.py": {
+    "mtime": 1773062818.2752328,
+    "ast_hash": "0c328bc503bab3f1a2d972cc7027599a",
+    "semantic_hash": "0c328bc503bab3f1a2d972cc7027599a"
+  },
+  "apps/shop/__init__.py": {
+    "mtime": 1769772182.551079,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/shop/admin.py": {
+    "mtime": 1771948877.449711,
+    "ast_hash": "54cefff4e808fcc578ef524b4d584dc0",
+    "semantic_hash": "54cefff4e808fcc578ef524b4d584dc0"
+  },
+  "apps/shop/apps.py": {
+    "mtime": 1769772367.6455238,
+    "ast_hash": "607c73c029c14df19a65f4daab4b0bc9",
+    "semantic_hash": "607c73c029c14df19a65f4daab4b0bc9"
+  },
+  "apps/shop/forms.py": {
+    "mtime": 1772003390.9251363,
+    "ast_hash": "f7ad0557eb5541410508507b4bdf366d",
+    "semantic_hash": "f7ad0557eb5541410508507b4bdf366d"
+  },
+  "apps/shop/migrations/0001_initial.py": {
+    "mtime": 1771948877.6916223,
+    "ast_hash": "8353da85d3bbac3b02af772aa734715b",
+    "semantic_hash": "8353da85d3bbac3b02af772aa734715b"
+  },
+  "apps/shop/migrations/0002_alter_productphoto_image.py": {
+    "mtime": 1771009333.6729274,
+    "ast_hash": "dc822571b8e2d91fab4bf7feb07e1b63",
+    "semantic_hash": "dc822571b8e2d91fab4bf7feb07e1b63"
+  },
+  "apps/shop/migrations/__init__.py": {
+    "mtime": 1769772182.55116,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/shop/models.py": {
+    "mtime": 1771008922.6983216,
+    "ast_hash": "289b7a1b2125cb3e5898d309b59bd260",
+    "semantic_hash": "289b7a1b2125cb3e5898d309b59bd260"
+  },
+  "apps/shop/urls.py": {
+    "mtime": 1771948877.3468485,
+    "ast_hash": "a1875a4971cfb2f15c75cebc4040ac95",
+    "semantic_hash": "a1875a4971cfb2f15c75cebc4040ac95"
+  },
+  "apps/shop/views.py": {
+    "mtime": 1771009333.786947,
+    "ast_hash": "fdb30ed7d9fe25f27c498871f1fb6d6f",
+    "semantic_hash": "fdb30ed7d9fe25f27c498871f1fb6d6f"
+  },
+  "apps/sparring/__init__.py": {
+    "mtime": 1768916613.9524193,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/sparring/admin.py": {
+    "mtime": 1774882181.1213648,
+    "ast_hash": "1e6cfda41d67a3ade94a3a75f4a614ef",
+    "semantic_hash": "1e6cfda41d67a3ade94a3a75f4a614ef"
+  },
+  "apps/sparring/apps.py": {
+    "mtime": 1771948877.3693736,
+    "ast_hash": "9e0c44d9acb9e3478485525e28852d68",
+    "semantic_hash": "9e0c44d9acb9e3478485525e28852d68"
+  },
+  "apps/sparring/doubles_services.py": {
+    "mtime": 1777021543.7704284,
+    "ast_hash": "98b67f3ef738a7c08d7be3a6e66d4bf3",
+    "semantic_hash": "98b67f3ef738a7c08d7be3a6e66d4bf3"
+  },
+  "apps/sparring/forms.py": {
+    "mtime": 1775546781.816046,
+    "ast_hash": "e91f07287800026ecbc2f8277e1d2bff",
+    "semantic_hash": "e91f07287800026ecbc2f8277e1d2bff"
+  },
+  "apps/sparring/migrations/0001_initial.py": {
+    "mtime": 1771948877.5498521,
+    "ast_hash": "6d651bfd200f597887adf4cdf7b596bc",
+    "semantic_hash": "6d651bfd200f597887adf4cdf7b596bc"
+  },
+  "apps/sparring/migrations/0002_initial.py": {
+    "mtime": 1771948877.4675498,
+    "ast_hash": "b3c594bcd6c98e7b751814016510d0b0",
+    "semantic_hash": "b3c594bcd6c98e7b751814016510d0b0"
+  },
+  "apps/sparring/migrations/0003_alter_sparringrequest_desired_category.py": {
+    "mtime": 1771948877.479691,
+    "ast_hash": "127cda2d1f083a4853d8994a8518f1e1",
+    "semantic_hash": "127cda2d1f083a4853d8994a8518f1e1"
+  },
+  "apps/sparring/migrations/0004_alter_sparringrequest_city.py": {
+    "mtime": 1771948877.4284885,
+    "ast_hash": "2fadd4f41e55158c44c2141877fa58fa",
+    "semantic_hash": "2fadd4f41e55158c44c2141877fa58fa"
+  },
+  "apps/sparring/migrations/0005_alter_sparringrequest_desired_category.py": {
+    "mtime": 1771948877.499273,
+    "ast_hash": "5f4f5c6ce8163e9a7d63b76152b8146c",
+    "semantic_hash": "5f4f5c6ce8163e9a7d63b76152b8146c"
+  },
+  "apps/sparring/migrations/0006_add_sparring_response.py": {
+    "mtime": 1771948877.6353784,
+    "ast_hash": "41a1ecaad157e60f8b1c4fbf5a81e5ac",
+    "semantic_hash": "41a1ecaad157e60f8b1c4fbf5a81e5ac"
+  },
+  "apps/sparring/migrations/0007_add_detailed_preferences_and_response_status.py": {
+    "mtime": 1770999190.184899,
+    "ast_hash": "031793b4a7bc5bba3a686337ed32cd6a",
+    "semantic_hash": "031793b4a7bc5bba3a686337ed32cd6a"
+  },
+  "apps/sparring/migrations/0008_alter_sparringrequest_desired_category.py": {
+    "mtime": 1771343259.7789166,
+    "ast_hash": "e55ab595064c8c4849b719cd5c48b4ef",
+    "semantic_hash": "e55ab595064c8c4849b719cd5c48b4ef"
+  },
+  "apps/sparring/migrations/0009_add_is_friendly_to_sparring_request.py": {
+    "mtime": 1771353291.7919655,
+    "ast_hash": "43ad4b39c5c6faf3fc5b47881d717470",
+    "semantic_hash": "43ad4b39c5c6faf3fc5b47881d717470"
+  },
+  "apps/sparring/migrations/0010_add_match_type_and_preferred_gender.py": {
+    "mtime": 1771354416.8316226,
+    "ast_hash": "41cc29bf19efdfb755c0cf52cf7c3b90",
+    "semantic_hash": "41cc29bf19efdfb755c0cf52cf7c3b90"
+  },
+  "apps/sparring/migrations/0011_add_doubles_match_request_models.py": {
+    "mtime": 1771358767.2617774,
+    "ast_hash": "d117a2e42806b8e98d1b2d046944a79d",
+    "semantic_hash": "d117a2e42806b8e98d1b2d046944a79d"
+  },
+  "apps/sparring/migrations/0012_add_doubles_details_fields.py": {
+    "mtime": 1771522211.000965,
+    "ast_hash": "e26a55fb3fb4ade4a47cb6d912773a99",
+    "semantic_hash": "e26a55fb3fb4ade4a47cb6d912773a99"
+  },
+  "apps/sparring/migrations/0013_doublesmatchrequest_kind.py": {
+    "mtime": 1773129897.1687982,
+    "ast_hash": "3cdfc01ff1e874b2e4933e3ec3c7194a",
+    "semantic_hash": "3cdfc01ff1e874b2e4933e3ec3c7194a"
+  },
+  "apps/sparring/migrations/0014_sparring_invitation.py": {
+    "mtime": 1774885196.3152456,
+    "ast_hash": "a1314464e1763b8e228ae72e286eecda",
+    "semantic_hash": "a1314464e1763b8e228ae72e286eecda"
+  },
+  "apps/sparring/migrations/0015_rename_sparring_sp_inviter_4f8a1d_idx_sparring_sp_inviter_001ec2_idx_and_more.py": {
+    "mtime": 1776947120.8324158,
+    "ast_hash": "2b2ad54e80db7db83ed4888476ecff11",
+    "semantic_hash": "2b2ad54e80db7db83ed4888476ecff11"
+  },
+  "apps/sparring/migrations/__init__.py": {
+    "mtime": 1768917809.519212,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/sparring/models.py": {
+    "mtime": 1775546779.8431852,
+    "ast_hash": "f4d0976ae820b6ee6db228c503f6a3b5",
+    "semantic_hash": "f4d0976ae820b6ee6db228c503f6a3b5"
+  },
+  "apps/sparring/player_search.py": {
+    "mtime": 1774883358.9416442,
+    "ast_hash": "2ac5db7731fef4493efc4683dec802aa",
+    "semantic_hash": "2ac5db7731fef4493efc4683dec802aa"
+  },
+  "apps/sparring/services.py": {
+    "mtime": 1774885196.3009799,
+    "ast_hash": "eb1ae0884d55a0fd5ba25e1d2d60c3fb",
+    "semantic_hash": "eb1ae0884d55a0fd5ba25e1d2d60c3fb"
+  },
+  "apps/sparring/urls.py": {
+    "mtime": 1774882085.5841591,
+    "ast_hash": "e4ce22e9bba6e5aa9ead40bd5569d56d",
+    "semantic_hash": "e4ce22e9bba6e5aa9ead40bd5569d56d"
+  },
+  "apps/sparring/utils.py": {
+    "mtime": 1771009333.6905916,
+    "ast_hash": "e1ba11aeecf6d1b77962ce2bb6728b4c",
+    "semantic_hash": "e1ba11aeecf6d1b77962ce2bb6728b4c"
+  },
+  "apps/sparring/views.py": {
+    "mtime": 1779088354.8070803,
+    "ast_hash": "eca09a31fe4268461cc32e38a63f3f9f",
+    "semantic_hash": "eca09a31fe4268461cc32e38a63f3f9f"
+  },
+  "apps/subscriptions/__init__.py": {
+    "mtime": 1769448617.475794,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/subscriptions/admin.py": {
+    "mtime": 1779007603.3113692,
+    "ast_hash": "abc5c4bd9f9b05370c06b555f3debc5c",
+    "semantic_hash": "abc5c4bd9f9b05370c06b555f3debc5c"
+  },
+  "apps/subscriptions/apps.py": {
+    "mtime": 1771948877.4402456,
+    "ast_hash": "aa9de5caed0ee6f5619f80f316582399",
+    "semantic_hash": "aa9de5caed0ee6f5619f80f316582399"
+  },
+  "apps/subscriptions/fancoin.py": {
+    "mtime": 1777021400.7883618,
+    "ast_hash": "8e0ec960a9b57434bcf233d4bb99fcea",
+    "semantic_hash": "8e0ec960a9b57434bcf233d4bb99fcea"
+  },
+  "apps/subscriptions/management/__init__.py": {
+    "mtime": 1770735228.6665213,
+    "ast_hash": "caa0135f8f6d5e3dafe0d4955ca07b6a",
+    "semantic_hash": "caa0135f8f6d5e3dafe0d4955ca07b6a"
+  },
+  "apps/subscriptions/management/commands/__init__.py": {
+    "mtime": 1770735228.6661067,
+    "ast_hash": "72f19dba8e36a174e6fe49655bc24e54",
+    "semantic_hash": "72f19dba8e36a174e6fe49655bc24e54"
+  },
+  "apps/subscriptions/management/commands/send_subscription_expiry_reminders.py": {
+    "mtime": 1774006107.529091,
+    "ast_hash": "92923b7f28b33239350e82264f46a7a0",
+    "semantic_hash": "92923b7f28b33239350e82264f46a7a0"
+  },
+  "apps/subscriptions/migrations/0001_initial.py": {
+    "mtime": 1771948877.7626028,
+    "ast_hash": "7ec41e58f98172f590f3f160e0bec6eb",
+    "semantic_hash": "7ec41e58f98172f590f3f160e0bec6eb"
+  },
+  "apps/subscriptions/migrations/0002_set_has_sparring_for_paid_tiers.py": {
+    "mtime": 1769514781.6183593,
+    "ast_hash": "c825ebc2d650bd3455974ea3d0aec5a2",
+    "semantic_hash": "c825ebc2d650bd3455974ea3d0aec5a2"
+  },
+  "apps/subscriptions/migrations/0003_set_diamond_max_tournaments_to_100.py": {
+    "mtime": 1771948877.5385141,
+    "ast_hash": "75fb5dca0235f773fe9afc89645bcf2a",
+    "semantic_hash": "75fb5dca0235f773fe9afc89645bcf2a"
+  },
+  "apps/subscriptions/migrations/0004_add_cancelled_at.py": {
+    "mtime": 1771948877.5290627,
+    "ast_hash": "a9c9b0e4200994295b425a7e74a3d1ee",
+    "semantic_hash": "a9c9b0e4200994295b425a7e74a3d1ee"
+  },
+  "apps/subscriptions/migrations/0005_regionaltierprice.py": {
+    "mtime": 1771948877.544789,
+    "ast_hash": "e76c1e7b05f55626636b0bd2a2125bc5",
+    "semantic_hash": "e76c1e7b05f55626636b0bd2a2125bc5"
+  },
+  "apps/subscriptions/migrations/0006_add_original_price.py": {
+    "mtime": 1772016144.3987827,
+    "ast_hash": "ff4e8f0d6e0cb6ec4c6a276b728190a9",
+    "semantic_hash": "ff4e8f0d6e0cb6ec4c6a276b728190a9"
+  },
+  "apps/subscriptions/migrations/0007_add_original_price_ends_at.py": {
+    "mtime": 1772016242.7048464,
+    "ast_hash": "10d13e8fdc616803ea93b6cd2bdaaa91",
+    "semantic_hash": "10d13e8fdc616803ea93b6cd2bdaaa91"
+  },
+  "apps/subscriptions/migrations/0008_regional_tier_promo_fields.py": {
+    "mtime": 1772016553.2811527,
+    "ast_hash": "437500338450b1ec2a41d9337e82021e",
+    "semantic_hash": "437500338450b1ec2a41d9337e82021e"
+  },
+  "apps/subscriptions/migrations/0009_first_subscription_one_ruble.py": {
+    "mtime": 1772017578.2514875,
+    "ast_hash": "6557da5f9439225e157364b6d977a7c3",
+    "semantic_hash": "6557da5f9439225e157364b6d977a7c3"
+  },
+  "apps/subscriptions/migrations/0010_add_purchase_city.py": {
+    "mtime": 1772029990.02627,
+    "ast_hash": "2a6d7d33d4cc4663b36b483125da7761",
+    "semantic_hash": "2a6d7d33d4cc4663b36b483125da7761"
+  },
+  "apps/subscriptions/migrations/0011_alter_subscriptiontier_options_and_more.py": {
+    "mtime": 1773044277.7041986,
+    "ast_hash": "d28cc51a35e9643c6dbb3ea50b2930d1",
+    "semantic_hash": "d28cc51a35e9643c6dbb3ea50b2930d1"
+  },
+  "apps/subscriptions/migrations/0012_subscriptiontier_duration_days_and_more.py": {
+    "mtime": 1773045196.527408,
+    "ast_hash": "e90743e8ed8877d4ab01f01a2eff26dc",
+    "semantic_hash": "e90743e8ed8877d4ab01f01a2eff26dc"
+  },
+  "apps/subscriptions/migrations/0013_subscriptiontier_is_popular.py": {
+    "mtime": 1773045960.9365492,
+    "ast_hash": "0eb5378d5b3aca9ca1393153b575c839",
+    "semantic_hash": "0eb5378d5b3aca9ca1393153b575c839"
+  },
+  "apps/subscriptions/migrations/0014_add_card_theme.py": {
+    "mtime": 1773046528.0416842,
+    "ast_hash": "8f7c713415cf1fa3374faa60d49639c4",
+    "semantic_hash": "8f7c713415cf1fa3374faa60d49639c4"
+  },
+  "apps/subscriptions/migrations/0015_add_platinum_card_theme.py": {
+    "mtime": 1773046690.8301394,
+    "ast_hash": "61e91f4411f0c05083ff871f1190d8a7",
+    "semantic_hash": "61e91f4411f0c05083ff871f1190d8a7"
+  },
+  "apps/subscriptions/migrations/0016_subscription_registration_balance.py": {
+    "mtime": 1773069955.9411874,
+    "ast_hash": "ac6fbbbb2939e34b7616f991daf72924",
+    "semantic_hash": "ac6fbbbb2939e34b7616f991daf72924"
+  },
+  "apps/subscriptions/migrations/0017_remove_subscriptiontier_max_tournaments_and_more.py": {
+    "mtime": 1777021639.8745942,
+    "ast_hash": "a160a1853e0931e24584f5efc4b7654c",
+    "semantic_hash": "a160a1853e0931e24584f5efc4b7654c"
+  },
+  "apps/subscriptions/migrations/0018_alter_fancointransaction_options_and_more.py": {
+    "mtime": 1777032784.4282107,
+    "ast_hash": "7790bd23c9517cb726a8ddef0516226a",
+    "semantic_hash": "7790bd23c9517cb726a8ddef0516226a"
+  },
+  "apps/subscriptions/migrations/__init__.py": {
+    "mtime": 1769448687.52415,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/subscriptions/models.py": {
+    "mtime": 1784479284.6563625,
+    "ast_hash": "0866d471ab83ad8ba59ddf1e41a186c9",
+    "semantic_hash": "0866d471ab83ad8ba59ddf1e41a186c9"
+  },
+  "apps/subscriptions/sparring_billing.py": {
+    "mtime": 1777021913.9483972,
+    "ast_hash": "2b41868629873b99eada2e9df783cb5e",
+    "semantic_hash": "2b41868629873b99eada2e9df783cb5e"
+  },
+  "apps/subscriptions/urls.py": {
+    "mtime": 1771009333.7069936,
+    "ast_hash": "d9ef1c15e7750dc2cce295f75d0a3d19",
+    "semantic_hash": "d9ef1c15e7750dc2cce295f75d0a3d19"
+  },
+  "apps/subscriptions/utils.py": {
+    "mtime": 1777022605.561142,
+    "ast_hash": "0aa91b7ff70680229dc996a2c819b713",
+    "semantic_hash": "0aa91b7ff70680229dc996a2c819b713"
+  },
+  "apps/subscriptions/views.py": {
+    "mtime": 1779089059.6447008,
+    "ast_hash": "ef3fb9587dc51ef445dcd8ac91f3cfe3",
+    "semantic_hash": "ef3fb9587dc51ef445dcd8ac91f3cfe3"
+  },
+  "apps/telegram_bot/__init__.py": {
+    "mtime": 1770300759.597718,
+    "ast_hash": "bbe4df2cb80252a54c06fb0e70b49b7d",
+    "semantic_hash": "bbe4df2cb80252a54c06fb0e70b49b7d"
+  },
+  "apps/telegram_bot/admin.py": {
+    "mtime": 1771009334.0849032,
+    "ast_hash": "59c5fd4ad9bf43055031284a64520f3f",
+    "semantic_hash": "59c5fd4ad9bf43055031284a64520f3f"
+  },
+  "apps/telegram_bot/apps.py": {
+    "mtime": 1784890494.8204818,
+    "ast_hash": "2c26c8831d8ba9b81efc32b1f5f512be",
+    "semantic_hash": "2c26c8831d8ba9b81efc32b1f5f512be"
+  },
+  "apps/telegram_bot/management/__init__.py": {
+    "mtime": 1771948877.5042624,
+    "ast_hash": "c0b74cba0af097d402d3715f605437d2",
+    "semantic_hash": "c0b74cba0af097d402d3715f605437d2"
+  },
+  "apps/telegram_bot/management/commands/__init__.py": {
+    "mtime": 1771948877.5127063,
+    "ast_hash": "59d56da1d80ef092723d77e69ba15b33",
+    "semantic_hash": "59d56da1d80ef092723d77e69ba15b33"
+  },
+  "apps/telegram_bot/management/commands/set_telegram_webhooks.py": {
+    "mtime": 1777705984.850131,
+    "ast_hash": "495ca39fcd9944512659bfa02c39c96a",
+    "semantic_hash": "495ca39fcd9944512659bfa02c39c96a"
+  },
+  "apps/telegram_bot/management/commands/sync_private_chat_access.py": {
+    "mtime": 1771948877.6399593,
+    "ast_hash": "3243d371a5d1be8b85ef94386c2e80c0",
+    "semantic_hash": "3243d371a5d1be8b85ef94386c2e80c0"
+  },
+  "apps/telegram_bot/migrations/0001_add_telegram_broadcast.py": {
+    "mtime": 1771948877.6796637,
+    "ast_hash": "07c6f6a9b1232bdb220335091ec7499e",
+    "semantic_hash": "07c6f6a9b1232bdb220335091ec7499e"
+  },
+  "apps/telegram_bot/migrations/0002_alter_telegrambroadcast_image.py": {
+    "mtime": 1771009333.7510636,
+    "ast_hash": "13b7a2bdd2e724aa10c5698116ad12e2",
+    "semantic_hash": "13b7a2bdd2e724aa10c5698116ad12e2"
+  },
+  "apps/telegram_bot/migrations/__init__.py": {
+    "mtime": 1770306235.9542532,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/telegram_bot/models.py": {
+    "mtime": 1771009333.8164,
+    "ast_hash": "273ee1099fc1502c57b035b1e06ab970",
+    "semantic_hash": "273ee1099fc1502c57b035b1e06ab970"
+  },
+  "apps/telegram_bot/notifications.py": {
+    "mtime": 1784891504.9291422,
+    "ast_hash": "ffb51721e828155c134410f75eddb85e",
+    "semantic_hash": "ffb51721e828155c134410f75eddb85e"
+  },
+  "apps/telegram_bot/private_chat.py": {
+    "mtime": 1771948877.5742433,
+    "ast_hash": "1986749b1aae847ac8876b1fc1bff66a",
+    "semantic_hash": "1986749b1aae847ac8876b1fc1bff66a"
+  },
+  "apps/telegram_bot/services.py": {
+    "mtime": 1777705278.9238622,
+    "ast_hash": "134cbcafadbbc2700dc37ea90b410351",
+    "semantic_hash": "134cbcafadbbc2700dc37ea90b410351"
+  },
+  "apps/telegram_bot/telegram_http.py": {
+    "mtime": 1777706408.6049805,
+    "ast_hash": "ef59b61dbc4d1cf4fc3dfcdc649e9e8d",
+    "semantic_hash": "ef59b61dbc4d1cf4fc3dfcdc649e9e8d"
+  },
+  "apps/telegram_bot/urls.py": {
+    "mtime": 1770737797.6951663,
+    "ast_hash": "c7a2ea8f36b320b83c3bc83fcdf88615",
+    "semantic_hash": "c7a2ea8f36b320b83c3bc83fcdf88615"
+  },
+  "apps/telegram_bot/views.py": {
+    "mtime": 1780924640.0013363,
+    "ast_hash": "f50347f3ef9b45b64391c6e17b6efab0",
+    "semantic_hash": "f50347f3ef9b45b64391c6e17b6efab0"
+  },
+  "apps/tournaments/__init__.py": {
+    "mtime": 1768916613.9464192,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/tournaments/admin.py": {
+    "mtime": 1784701713.4828043,
+    "ast_hash": "3c27f72a7eac24258f51e36e714c80c4",
+    "semantic_hash": "3c27f72a7eac24258f51e36e714c80c4"
+  },
+  "apps/tournaments/apps.py": {
+    "mtime": 1771324496.7414327,
+    "ast_hash": "7576e7ca1bb462b7e6d7d47b88eec3f7",
+    "semantic_hash": "7576e7ca1bb462b7e6d7d47b88eec3f7"
+  },
+  "apps/tournaments/cancel.py": {
+    "mtime": 1784535320.181875,
+    "ast_hash": "378eab86ff6e91ecb4cfad436394d983",
+    "semantic_hash": "378eab86ff6e91ecb4cfad436394d983"
+  },
+  "apps/tournaments/fan.py": {
+    "mtime": 1780132328.9842458,
+    "ast_hash": "462e61c8804697150e77c14e09b94b7d",
+    "semantic_hash": "462e61c8804697150e77c14e09b94b7d"
+  },
+  "apps/tournaments/management/__init__.py": {
+    "mtime": 1769675193.800876,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/tournaments/management/commands/__init__.py": {
+    "mtime": 1769675194.501901,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/tournaments/management/commands/auto_accept_stale_proposals.py": {
+    "mtime": 1771009333.946914,
+    "ast_hash": "a90301e6e05f4734f46f0cec1e09c6af",
+    "semantic_hash": "a90301e6e05f4734f46f0cec1e09c6af"
+  },
+  "apps/tournaments/management/commands/clean_database.py": {
+    "mtime": 1771404512.9923608,
+    "ast_hash": "1de172e27e2b8c54d048fe6b8ffed46c",
+    "semantic_hash": "1de172e27e2b8c54d048fe6b8ffed46c"
+  },
+  "apps/tournaments/management/commands/debug_match_rating.py": {
+    "mtime": 1771344194.223901,
+    "ast_hash": "b448876b7157cf312fdf5effa79c5892",
+    "semantic_hash": "b448876b7157cf312fdf5effa79c5892"
+  },
+  "apps/tournaments/management/commands/fan_generate_past_deadlines.py": {
+    "mtime": 1771009333.8734624,
+    "ast_hash": "4fa976849e3625606ad761e8640c6c3d",
+    "semantic_hash": "4fa976849e3625606ad761e8640c6c3d"
+  },
+  "apps/tournaments/management/commands/fan_process_overdue_matches.py": {
+    "mtime": 1771009285.3758488,
+    "ast_hash": "1674fb6252aae8ec3d2348a9ae439045",
+    "semantic_hash": "1674fb6252aae8ec3d2348a9ae439045"
+  },
+  "apps/tournaments/management/commands/generate_brackets_past_deadlines.py": {
+    "mtime": 1771948877.5752473,
+    "ast_hash": "3918f8223b2d4e3c1d51f26742daa63a",
+    "semantic_hash": "3918f8223b2d4e3c1d51f26742daa63a"
+  },
+  "apps/tournaments/management/commands/generate_fan_bracket.py": {
+    "mtime": 1769676896.0418222,
+    "ast_hash": "b601665242384f205f6d59838ec2ceea",
+    "semantic_hash": "b601665242384f205f6d59838ec2ceea"
+  },
+  "apps/tournaments/management/commands/generate_olympic_bracket.py": {
+    "mtime": 1770194010.858672,
+    "ast_hash": "859acf423f0e6dd20f325cf3f982bf7e",
+    "semantic_hash": "859acf423f0e6dd20f325cf3f982bf7e"
+  },
+  "apps/tournaments/management/commands/monthly_rating_publish.py": {
+    "mtime": 1771948877.658204,
+    "ast_hash": "32f725ae21e53de34097035596ed05cf",
+    "semantic_hash": "32f725ae21e53de34097035596ed05cf"
+  },
+  "apps/tournaments/management/commands/olympic_process_overdue_matches.py": {
+    "mtime": 1770194010.8586586,
+    "ast_hash": "3b0830f31b47481cf8afd446a6acc4cf",
+    "semantic_hash": "3b0830f31b47481cf8afd446a6acc4cf"
+  },
+  "apps/tournaments/management/commands/process_tournament_postpayment_window.py": {
+    "mtime": 1784480093.7813184,
+    "ast_hash": "c35b86d93da9304bdd0603bfac81ba47",
+    "semantic_hash": "c35b86d93da9304bdd0603bfac81ba47"
+  },
+  "apps/tournaments/management/commands/reprocess_match_completion.py": {
+    "mtime": 1780676246.4173038,
+    "ast_hash": "56c33c1e44cc9c9356f670fd93be63bb",
+    "semantic_hash": "56c33c1e44cc9c9356f670fd93be63bb"
+  },
+  "apps/tournaments/management/commands/reset_season_points.py": {
+    "mtime": 1771009334.1426392,
+    "ast_hash": "f3c24e81771feac32351bee7ddb7c0c5",
+    "semantic_hash": "f3c24e81771feac32351bee7ddb7c0c5"
+  },
+  "apps/tournaments/management/commands/round_robin_process_overdue_matches.py": {
+    "mtime": 1771009285.3678477,
+    "ast_hash": "f5151edb012a4251d5f3c641d688a7a9",
+    "semantic_hash": "f5151edb012a4251d5f3c641d688a7a9"
+  },
+  "apps/tournaments/management/commands/send_deadline_reminders.py": {
+    "mtime": 1771948877.799238,
+    "ast_hash": "bdbe8bea23bf8d2e535572bb38a2a662",
+    "semantic_hash": "bdbe8bea23bf8d2e535572bb38a2a662"
+  },
+  "apps/tournaments/management/commands/send_tournament_start_reminders.py": {
+    "mtime": 1771948877.7310445,
+    "ast_hash": "88742cd01db02629986e959707e1081a",
+    "semantic_hash": "88742cd01db02629986e959707e1081a"
+  },
+  "apps/tournaments/migrations/0001_initial.py": {
+    "mtime": 1771948878.1547022,
+    "ast_hash": "12a369024d6cfd870b4f3fad2ab23127",
+    "semantic_hash": "12a369024d6cfd870b4f3fad2ab23127"
+  },
+  "apps/tournaments/migrations/0002_initial.py": {
+    "mtime": 1771948877.750506,
+    "ast_hash": "f80c9f6ac3be791dfd96423a6b0bd54c",
+    "semantic_hash": "f80c9f6ac3be791dfd96423a6b0bd54c"
+  },
+  "apps/tournaments/migrations/0003_tournament_duration_tournament_gender.py": {
+    "mtime": 1771948877.6542003,
+    "ast_hash": "2341e1b5438a54bb9a855e1d7b343e2e",
+    "semantic_hash": "2341e1b5438a54bb9a855e1d7b343e2e"
+  },
+  "apps/tournaments/migrations/0004_matchresultproposal.py": {
+    "mtime": 1771948877.8135858,
+    "ast_hash": "5594eb514c7653da1a7935f3df077c74",
+    "semantic_hash": "5594eb514c7653da1a7935f3df077c74"
+  },
+  "apps/tournaments/migrations/0005_remove_tournament_points_multiplier_and_more.py": {
+    "mtime": 1771948877.6806686,
+    "ast_hash": "4bfe2653182acc0252e0e9dbabbca641",
+    "semantic_hash": "4bfe2653182acc0252e0e9dbabbca641"
+  },
+  "apps/tournaments/migrations/0006_tournament_max_participants.py": {
+    "mtime": 1771948877.718046,
+    "ast_hash": "6f002e694feb34f6a26d3985d5251025",
+    "semantic_hash": "6f002e694feb34f6a26d3985d5251025"
+  },
+  "apps/tournaments/migrations/0007_alter_seasonrating_category_and_more.py": {
+    "mtime": 1771948877.7378755,
+    "ast_hash": "10fdba7461927a07012417a651af0358",
+    "semantic_hash": "10fdba7461927a07012417a651af0358"
+  },
+  "apps/tournaments/migrations/0008_alter_tournament_city.py": {
+    "mtime": 1771948877.6830742,
+    "ast_hash": "c7e55282b7416ba6971475e03d18b636",
+    "semantic_hash": "c7e55282b7416ba6971475e03d18b636"
+  },
+  "apps/tournaments/migrations/0009_tournament_entry_fee_tournament_is_one_day.py": {
+    "mtime": 1771948877.721259,
+    "ast_hash": "4da70071bd9b8043a66b7e2311e23c1d",
+    "semantic_hash": "4da70071bd9b8043a66b7e2311e23c1d"
+  },
+  "apps/tournaments/migrations/0010_alter_seasonrating_category_and_more.py": {
+    "mtime": 1771948877.7720146,
+    "ast_hash": "ca60b7b3fa2ae1ad7de9bcb278f800de",
+    "semantic_hash": "ca60b7b3fa2ae1ad7de9bcb278f800de"
+  },
+  "apps/tournaments/migrations/0011_fan_bracket_and_results.py": {
+    "mtime": 1771948878.1963966,
+    "ast_hash": "77f1f56c2f9b13915950ff1182c04fca",
+    "semantic_hash": "77f1f56c2f9b13915950ff1182c04fca"
+  },
+  "apps/tournaments/migrations/0012_add_match_schedule.py": {
+    "mtime": 1771948878.2315629,
+    "ast_hash": "2fdceb200020564359aaead1e0df7772",
+    "semantic_hash": "2fdceb200020564359aaead1e0df7772"
+  },
+  "apps/tournaments/migrations/0013_remove_match_schedule.py": {
+    "mtime": 1769766009.811343,
+    "ast_hash": "3e2495b7e32260a0e74afac4d9ddcbf2",
+    "semantic_hash": "3e2495b7e32260a0e74afac4d9ddcbf2"
+  },
+  "apps/tournaments/migrations/0014_remove_tournament_format_other.py": {
+    "mtime": 1770027288.9992366,
+    "ast_hash": "f268ca545c09189b0e695d367373b218",
+    "semantic_hash": "f268ca545c09189b0e695d367373b218"
+  },
+  "apps/tournaments/migrations/0015_add_round_robin_format.py": {
+    "mtime": 1770036673.7771213,
+    "ast_hash": "864a3ee60d47890dd33671e33dae4427",
+    "semantic_hash": "864a3ee60d47890dd33671e33dae4427"
+  },
+  "apps/tournaments/migrations/0016_add_doubles_variant.py": {
+    "mtime": 1771948878.0728312,
+    "ast_hash": "ab7105eb1fc4b8f8fb2a3d69be794bc8",
+    "semantic_hash": "ab7105eb1fc4b8f8fb2a3d69be794bc8"
+  },
+  "apps/tournaments/migrations/0017_olympic_consolation_format.py": {
+    "mtime": 1771009285.3648472,
+    "ast_hash": "d7fd6fd847bdfd29e420ebe439472229",
+    "semantic_hash": "d7fd6fd847bdfd29e420ebe439472229"
+  },
+  "apps/tournaments/migrations/0018_tournament_min_participants_insufficient_notified.py": {
+    "mtime": 1770195465.5314298,
+    "ast_hash": "6447da4c48ccea1b7efc4fa93c5f7262",
+    "semantic_hash": "6447da4c48ccea1b7efc4fa93c5f7262"
+  },
+  "apps/tournaments/migrations/0019_add_tournament_allowed_category.py": {
+    "mtime": 1771009333.980762,
+    "ast_hash": "752fa9e7510c712752c0716c9eb3ea40",
+    "semantic_hash": "752fa9e7510c712752c0716c9eb3ea40"
+  },
+  "apps/tournaments/migrations/0020_populate_allowed_categories.py": {
+    "mtime": 1771948877.7852225,
+    "ast_hash": "2a734f346da8d97cf6e80520c0a36b26",
+    "semantic_hash": "2a734f346da8d97cf6e80520c0a36b26"
+  },
+  "apps/tournaments/migrations/0021_remove_tournament_category.py": {
+    "mtime": 1770202673.656615,
+    "ast_hash": "efa5365bb00260f1060c28a32ffe02a4",
+    "semantic_hash": "efa5365bb00260f1060c28a32ffe02a4"
+  },
+  "apps/tournaments/migrations/0022_add_deadline_extension_request.py": {
+    "mtime": 1771009334.0318997,
+    "ast_hash": "8d6efc777ee7f5d8c4c775e5de34a8f5",
+    "semantic_hash": "8d6efc777ee7f5d8c4c775e5de34a8f5"
+  },
+  "apps/tournaments/migrations/0023_update_points_fields_help_text.py": {
+    "mtime": 1771948877.872435,
+    "ast_hash": "2ab7ae6aafc2ada5d57fc09b7d1d7c3c",
+    "semantic_hash": "2ab7ae6aafc2ada5d57fc09b7d1d7c3c"
+  },
+  "apps/tournaments/migrations/0024_improve_points_fields_descriptions.py": {
+    "mtime": 1771948877.8494873,
+    "ast_hash": "1dd6ee94648eb3971b065436b4d44c0e",
+    "semantic_hash": "1dd6ee94648eb3971b065436b4d44c0e"
+  },
+  "apps/tournaments/migrations/0025_add_rating_calc_fields.py": {
+    "mtime": 1771948877.8712356,
+    "ast_hash": "be0f5eb7ff32eddf43e195e6ea831710",
+    "semantic_hash": "be0f5eb7ff32eddf43e195e6ea831710"
+  },
+  "apps/tournaments/migrations/0026_add_season_points.py": {
+    "mtime": 1771948877.9335628,
+    "ast_hash": "7ee75d80cf6a939439ca5aca9b7296ef",
+    "semantic_hash": "7ee75d80cf6a939439ca5aca9b7296ef"
+  },
+  "apps/tournaments/migrations/0027_add_season_archive.py": {
+    "mtime": 1771948877.9022527,
+    "ast_hash": "ed6fb9c064318822f7976d85d74f8fcf",
+    "semantic_hash": "ed6fb9c064318822f7976d85d74f8fcf"
+  },
+  "apps/tournaments/migrations/0028_add_match_type_and_sparring_support.py": {
+    "mtime": 1770999190.2068353,
+    "ast_hash": "e9fef667d1c3ca5e059907148d3407e6",
+    "semantic_hash": "e9fef667d1c3ca5e059907148d3407e6"
+  },
+  "apps/tournaments/migrations/0029_rename_fan_format_display.py": {
+    "mtime": 1771319585.9415193,
+    "ast_hash": "d5f852e7ccb8e65f0221db52f6429f92",
+    "semantic_hash": "d5f852e7ccb8e65f0221db52f6429f92"
+  },
+  "apps/tournaments/migrations/0030_add_open_gender_category.py": {
+    "mtime": 1771320671.1879294,
+    "ast_hash": "f5445740017b853e2015435730a78ab0",
+    "semantic_hash": "f5445740017b853e2015435730a78ab0"
+  },
+  "apps/tournaments/migrations/0031_alter_tournamentplayerresult_options_and_more.py": {
+    "mtime": 1771343259.8187437,
+    "ast_hash": "26916f587fff0f8383bf95e358fcc1a5",
+    "semantic_hash": "26916f587fff0f8383bf95e358fcc1a5"
+  },
+  "apps/tournaments/migrations/0032_add_partner1_partner2_for_doubles_sparring.py": {
+    "mtime": 1771358294.0827053,
+    "ast_hash": "a1993dbb872063ae099f09d2a311a539",
+    "semantic_hash": "a1993dbb872063ae099f09d2a311a539"
+  },
+  "apps/tournaments/migrations/0033_alter_match_status.py": {
+    "mtime": 1771587610.524736,
+    "ast_hash": "7269203b189d42c54736ccb540709fe1",
+    "semantic_hash": "7269203b189d42c54736ccb540709fe1"
+  },
+  "apps/tournaments/migrations/0034_tvd_models.py": {
+    "mtime": 1771838281.0541553,
+    "ast_hash": "0575d065842eb9117f29f4673e1acd37",
+    "semantic_hash": "0575d065842eb9117f29f4673e1acd37"
+  },
+  "apps/tournaments/migrations/0035_tvd_group_member_team.py": {
+    "mtime": 1771860746.751767,
+    "ast_hash": "a2a5c41c2f7b8735c92abb53d654c698",
+    "semantic_hash": "a2a5c41c2f7b8735c92abb53d654c698"
+  },
+  "apps/tournaments/migrations/0036_add_tournament_entry_payment.py": {
+    "mtime": 1771918605.4633675,
+    "ast_hash": "03c955b13ab71c6253db15eab68e5dc6",
+    "semantic_hash": "03c955b13ab71c6253db15eab68e5dc6"
+  },
+  "apps/tournaments/migrations/0037_add_entry_refund_request.py": {
+    "mtime": 1771921194.1594734,
+    "ast_hash": "8164aff1742a77cfdebf5f8529333220",
+    "semantic_hash": "8164aff1742a77cfdebf5f8529333220"
+  },
+  "apps/tournaments/migrations/0038_add_tournament_court.py": {
+    "mtime": 1772007615.0190854,
+    "ast_hash": "41da2e1f61308bff26d20a9529b25fb4",
+    "semantic_hash": "41da2e1f61308bff26d20a9529b25fb4"
+  },
+  "apps/tournaments/migrations/0039_add_skill_rating_models.py": {
+    "mtime": 1772033392.517486,
+    "ast_hash": "4062cee837cd3deec909c61dd42081e6",
+    "semantic_hash": "4062cee837cd3deec909c61dd42081e6"
+  },
+  "apps/tournaments/migrations/0040_tournamentphoto.py": {
+    "mtime": 1772612319.6035354,
+    "ast_hash": "80ba78102aaa63b171426e007ca93b46",
+    "semantic_hash": "80ba78102aaa63b171426e007ca93b46"
+  },
+  "apps/tournaments/migrations/0041_alter_tournamentphoto_image.py": {
+    "mtime": 1772723858.965102,
+    "ast_hash": "a35762e5f6c92eb24b69f521a4ebbcb0",
+    "semantic_hash": "a35762e5f6c92eb24b69f521a4ebbcb0"
+  },
+  "apps/tournaments/migrations/0042_initial.py": {
+    "mtime": 1773835025.7330961,
+    "ast_hash": "7c541ef64995fdca7a8551defff79f1f",
+    "semantic_hash": "7c541ef64995fdca7a8551defff79f1f"
+  },
+  "apps/tournaments/migrations/0043_club_tournament_proxy.py": {
+    "mtime": 1775552136.8633528,
+    "ast_hash": "dff4de187c096fa7458650d0c2fd6fa8",
+    "semantic_hash": "dff4de187c096fa7458650d0c2fd6fa8"
+  },
+  "apps/tournaments/migrations/0044_alter_tournamentallowedcategory_options_and_more.py": {
+    "mtime": 1776946939.6322641,
+    "ast_hash": "193e8166bcad5b8d4ec71198d9db3c82",
+    "semantic_hash": "193e8166bcad5b8d4ec71198d9db3c82"
+  },
+  "apps/tournaments/migrations/0045_tournament_tournaments_status_9d8850_idx_and_more.py": {
+    "mtime": 1776951640.3758206,
+    "ast_hash": "e60982e1820cfc105d395d83d9db0bb8",
+    "semantic_hash": "e60982e1820cfc105d395d83d9db0bb8"
+  },
+  "apps/tournaments/migrations/0046_match_sparring_team_request.py": {
+    "mtime": 1777021622.5873423,
+    "ast_hash": "3cb49b00fde0de1f9931c815b3756b19",
+    "semantic_hash": "3cb49b00fde0de1f9931c815b3756b19"
+  },
+  "apps/tournaments/migrations/0047_tournamentphoto_caption.py": {
+    "mtime": 1783924513.4551456,
+    "ast_hash": "dbb09c6a843f69c07e4fb4a41ac3b2be",
+    "semantic_hash": "dbb09c6a843f69c07e4fb4a41ac3b2be"
+  },
+  "apps/tournaments/migrations/0048_tournament_postpayment_call_log.py": {
+    "mtime": 1784478673.2427497,
+    "ast_hash": "23bf803f09a7d6a6e8b0ec8c9690357f",
+    "semantic_hash": "23bf803f09a7d6a6e8b0ec8c9690357f"
+  },
+  "apps/tournaments/migrations/0049_clarify_postpayment_window_help_texts.py": {
+    "mtime": 1784481002.5725236,
+    "ast_hash": "6d716d83a2d8554de2f865b99e2e4e49",
+    "semantic_hash": "6d716d83a2d8554de2f865b99e2e4e49"
+  },
+  "apps/tournaments/migrations/0050_invoice_payment_link_resent_at.py": {
+    "mtime": 1784534108.3760982,
+    "ast_hash": "4d1f263a6b38648d11dcb1d1ce2aaed6",
+    "semantic_hash": "4d1f263a6b38648d11dcb1d1ce2aaed6"
+  },
+  "apps/tournaments/migrations/__init__.py": {
+    "mtime": 1768917809.5204768,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/tournaments/models.py": {
+    "mtime": 1784534086.0836313,
+    "ast_hash": "5c70579283819a494241d11605e2f5f9",
+    "semantic_hash": "5c70579283819a494241d11605e2f5f9"
+  },
+  "apps/tournaments/olympic_consolation.py": {
+    "mtime": 1780132328.9789665,
+    "ast_hash": "8f6ab3d95f55217bf06b5313860ea5ee",
+    "semantic_hash": "8f6ab3d95f55217bf06b5313860ea5ee"
+  },
+  "apps/tournaments/platform_home.py": {
+    "mtime": 1784481744.4029531,
+    "ast_hash": "547faf3915cf5cf327fbeee80a8f3f54",
+    "semantic_hash": "547faf3915cf5cf327fbeee80a8f3f54"
+  },
+  "apps/tournaments/postpayment.py": {
+    "mtime": 1784701705.7748287,
+    "ast_hash": "75f7a94e9545f196f76105e64daa9850",
+    "semantic_hash": "75f7a94e9545f196f76105e64daa9850"
+  },
+  "apps/tournaments/proposal_service.py": {
+    "mtime": 1781084361.598747,
+    "ast_hash": "7bf2f033814b0826dab2c610b7a99c3c",
+    "semantic_hash": "7bf2f033814b0826dab2c610b7a99c3c"
+  },
+  "apps/tournaments/rating.py": {
+    "mtime": 1771319805.1974537,
+    "ast_hash": "d6aac80ed0ea6f20291726da48d4b853",
+    "semantic_hash": "d6aac80ed0ea6f20291726da48d4b853"
+  },
+  "apps/tournaments/round_robin.py": {
+    "mtime": 1780132328.9932458,
+    "ast_hash": "f9a4b89a2bb7e54409f8f7861f23f0f3",
+    "semantic_hash": "f9a4b89a2bb7e54409f8f7861f23f0f3"
+  },
+  "apps/tournaments/season_utils.py": {
+    "mtime": 1779893080.3684795,
+    "ast_hash": "28e08daed3a24e0931f7156ba855da3a",
+    "semantic_hash": "28e08daed3a24e0931f7156ba855da3a"
+  },
+  "apps/tournaments/signals.py": {
+    "mtime": 1784889652.4618373,
+    "ast_hash": "1f347293dc718f9bc30a3e7b6be3a8e8",
+    "semantic_hash": "1f347293dc718f9bc30a3e7b6be3a8e8"
+  },
+  "apps/tournaments/solo_teams.py": {
+    "mtime": 1777022586.738911,
+    "ast_hash": "f42e4dfc8b8a1eeeb399990543cbf8c4",
+    "semantic_hash": "f42e4dfc8b8a1eeeb399990543cbf8c4"
+  },
+  "apps/tournaments/tables_stats.py": {
+    "mtime": 1783934105.492071,
+    "ast_hash": "41415365342185b7e8c2595f01524134",
+    "semantic_hash": "41415365342185b7e8c2595f01524134"
+  },
+  "apps/tournaments/tvd.py": {
+    "mtime": 1780132073.3350272,
+    "ast_hash": "071cd4e89c2fb53f2a3ab52723a45866",
+    "semantic_hash": "071cd4e89c2fb53f2a3ab52723a45866"
+  },
+  "apps/tournaments/urls.py": {
+    "mtime": 1784889652.4528375,
+    "ast_hash": "11f9fa373d0cfb965c59d2bc9308d567",
+    "semantic_hash": "11f9fa373d0cfb965c59d2bc9308d567"
+  },
+  "apps/tournaments/utils.py": {
+    "mtime": 1784889652.4618373,
+    "ast_hash": "ff8adf8bd7ee1396c0dd1b001ccb7a4f",
+    "semantic_hash": "ff8adf8bd7ee1396c0dd1b001ccb7a4f"
+  },
+  "apps/tournaments/views.py": {
+    "mtime": 1784891262.112536,
+    "ast_hash": "8090087cf6714254d9402e6ae40a9214",
+    "semantic_hash": "8090087cf6714254d9402e6ae40a9214"
+  },
+  "apps/training/__init__.py": {
+    "mtime": 1768916613.9564195,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/training/admin.py": {
+    "mtime": 1777032228.5810263,
+    "ast_hash": "053b73fe0739414b0ce8935041067230",
+    "semantic_hash": "053b73fe0739414b0ce8935041067230"
+  },
+  "apps/training/apps.py": {
+    "mtime": 1771948877.9204173,
+    "ast_hash": "ee0637823670f29952cddb750d7396a8",
+    "semantic_hash": "ee0637823670f29952cddb750d7396a8"
+  },
+  "apps/training/forms.py": {
+    "mtime": 1776068544.908173,
+    "ast_hash": "04b99a04c13c2d979d9ab8e81d95d629",
+    "semantic_hash": "04b99a04c13c2d979d9ab8e81d95d629"
+  },
+  "apps/training/migrations/0001_initial.py": {
+    "mtime": 1771948878.6659245,
+    "ast_hash": "eb141996c16bd122203fb5cb24c4007a",
+    "semantic_hash": "eb141996c16bd122203fb5cb24c4007a"
+  },
+  "apps/training/migrations/0002_initial.py": {
+    "mtime": 1771948877.9838805,
+    "ast_hash": "03729816a5abe0ff97c6a83b5d25ec32",
+    "semantic_hash": "03729816a5abe0ff97c6a83b5d25ec32"
+  },
+  "apps/training/migrations/0003_alter_training_target_category.py": {
+    "mtime": 1771948878.0280454,
+    "ast_hash": "c185c5829e0d7a7c8de96ceb46302451",
+    "semantic_hash": "c185c5829e0d7a7c8de96ceb46302451"
+  },
+  "apps/training/migrations/0004_alter_coach_city_alter_training_city.py": {
+    "mtime": 1771948878.0665967,
+    "ast_hash": "28505e36ced4e74199c6c2bc708053ef",
+    "semantic_hash": "28505e36ced4e74199c6c2bc708053ef"
+  },
+  "apps/training/migrations/0005_map_training_skill_level.py": {
+    "mtime": 1771948878.1090555,
+    "ast_hash": "78b26476824b5b7bdcca920c46080a07",
+    "semantic_hash": "78b26476824b5b7bdcca920c46080a07"
+  },
+  "apps/training/migrations/0006_alter_training_skill_level.py": {
+    "mtime": 1771948878.1128733,
+    "ast_hash": "78a0d6b3e9350a97ebad4e844fc68bfb",
+    "semantic_hash": "78a0d6b3e9350a97ebad4e844fc68bfb"
+  },
+  "apps/training/migrations/0007_alter_training_target_category.py": {
+    "mtime": 1771948878.1770053,
+    "ast_hash": "a00ed7044054566cddb3c7d08fe015f9",
+    "semantic_hash": "a00ed7044054566cddb3c7d08fe015f9"
+  },
+  "apps/training/migrations/0008_add_coach_max_contact.py": {
+    "mtime": 1771948878.1746476,
+    "ast_hash": "419cb8c4c5d19f1181134ecc276f950d",
+    "semantic_hash": "419cb8c4c5d19f1181134ecc276f950d"
+  },
+  "apps/training/migrations/0009_add_coach_application.py": {
+    "mtime": 1771948878.363209,
+    "ast_hash": "d5dddc4c5cf840699a96c1d039a828e0",
+    "semantic_hash": "d5dddc4c5cf840699a96c1d039a828e0"
+  },
+  "apps/training/migrations/0010_enrollment_contact_fields.py": {
+    "mtime": 1771948878.2224424,
+    "ast_hash": "cb91929729a9dbc5c190120f2af445ff",
+    "semantic_hash": "cb91929729a9dbc5c190120f2af445ff"
+  },
+  "apps/training/migrations/0011_coach_user_enrollment_contact.py": {
+    "mtime": 1771948878.3082268,
+    "ast_hash": "8562ccd36ef7fc0fd4a55ae13c227b9e",
+    "semantic_hash": "8562ccd36ef7fc0fd4a55ae13c227b9e"
+  },
+  "apps/training/migrations/0012_alter_coach_photo_alter_coachapplication_photo_and_more.py": {
+    "mtime": 1771009334.0810213,
+    "ast_hash": "e65385b452f798550091918354d8b99b",
+    "semantic_hash": "e65385b452f798550091918354d8b99b"
+  },
+  "apps/training/migrations/0013_alter_training_skill_level_and_more.py": {
+    "mtime": 1771343259.794028,
+    "ast_hash": "0f27479e7419c766323b7e6e95f56b4d",
+    "semantic_hash": "0f27479e7419c766323b7e6e95f56b4d"
+  },
+  "apps/training/migrations/0014_alter_training_target_category.py": {
+    "mtime": 1771587610.5246928,
+    "ast_hash": "fa59a4b12a26e58b61be092f9ea9d9a0",
+    "semantic_hash": "fa59a4b12a26e58b61be092f9ea9d9a0"
+  },
+  "apps/training/migrations/0015_training_multiple_courts.py": {
+    "mtime": 1772105176.2871277,
+    "ast_hash": "c40f9b68f32c64d675aef291cff1cd28",
+    "semantic_hash": "c40f9b68f32c64d675aef291cff1cd28"
+  },
+  "apps/training/migrations/0016_multi_types_levels_price_range.py": {
+    "mtime": 1772533289.49454,
+    "ast_hash": "906e17a9c505e04ed70680d8a786d89b",
+    "semantic_hash": "906e17a9c505e04ed70680d8a786d89b"
+  },
+  "apps/training/migrations/0017_type_prices_json.py": {
+    "mtime": 1772541689.3771226,
+    "ast_hash": "29d74c6d0b1944e77de92ea6474619b8",
+    "semantic_hash": "29d74c6d0b1944e77de92ea6474619b8"
+  },
+  "apps/training/migrations/0018_training_court_has_extra_fee.py": {
+    "mtime": 1773128039.6035483,
+    "ast_hash": "69a61c85412c10b972706139c4cbe801",
+    "semantic_hash": "69a61c85412c10b972706139c4cbe801"
+  },
+  "apps/training/migrations/0019_alter_trainingenrollment_player.py": {
+    "mtime": 1774437104.222933,
+    "ast_hash": "f3594c4ff5a8b2255ae571ad34e93bc7",
+    "semantic_hash": "f3594c4ff5a8b2255ae571ad34e93bc7"
+  },
+  "apps/training/migrations/0020_alter_coach_max_contact.py": {
+    "mtime": 1776947120.830076,
+    "ast_hash": "565bf30705b25ccb7e6019d71408027f",
+    "semantic_hash": "565bf30705b25ccb7e6019d71408027f"
+  },
+  "apps/training/migrations/__init__.py": {
+    "mtime": 1768917809.523362,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/training/models.py": {
+    "mtime": 1777032209.8963168,
+    "ast_hash": "dd46ed3561e7d9bfc1c0851a2eb8cba1",
+    "semantic_hash": "dd46ed3561e7d9bfc1c0851a2eb8cba1"
+  },
+  "apps/training/urls.py": {
+    "mtime": 1771948878.2344396,
+    "ast_hash": "d8ccb54cf8c55e1d883d8d45bf0c09d2",
+    "semantic_hash": "d8ccb54cf8c55e1d883d8d45bf0c09d2"
+  },
+  "apps/training/views.py": {
+    "mtime": 1775491463.885941,
+    "ast_hash": "b2a9f8faa92c397942597d514095d2f5",
+    "semantic_hash": "b2a9f8faa92c397942597d514095d2f5"
+  },
+  "apps/training/widgets.py": {
+    "mtime": 1773128039.6596868,
+    "ast_hash": "03858a9fd12f8a4109cdd7097881fd16",
+    "semantic_hash": "03858a9fd12f8a4109cdd7097881fd16"
+  },
+  "apps/users/__init__.py": {
+    "mtime": 1768916613.9444191,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/users/admin.py": {
+    "mtime": 1784484772.5489554,
+    "ast_hash": "d0603ea743e06abc1d53946a9e0fca6a",
+    "semantic_hash": "d0603ea743e06abc1d53946a9e0fca6a"
+  },
+  "apps/users/apps.py": {
+    "mtime": 1776951269.5101075,
+    "ast_hash": "72226a1b4e4a929b0db83ca5ae330cc2",
+    "semantic_hash": "72226a1b4e4a929b0db83ca5ae330cc2"
+  },
+  "apps/users/context_processors.py": {
+    "mtime": 1780066014.5726278,
+    "ast_hash": "b76b4e4589396a545f2d181fed4a19d7",
+    "semantic_hash": "b76b4e4589396a545f2d181fed4a19d7"
+  },
+  "apps/users/display.py": {
+    "mtime": 1780051100.7207944,
+    "ast_hash": "0052a35a304a2d8b84f369617923aacc",
+    "semantic_hash": "0052a35a304a2d8b84f369617923aacc"
+  },
+  "apps/users/forms.py": {
+    "mtime": 1777032477.3601372,
+    "ast_hash": "34aabddcb2bca85fe9c70a13599fe3be",
+    "semantic_hash": "34aabddcb2bca85fe9c70a13599fe3be"
+  },
+  "apps/users/management/__init__.py": {
+    "mtime": 1769686590.6738954,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/users/management/commands/__init__.py": {
+    "mtime": 1769686590.6738954,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/users/management/commands/create_test_players.py": {
+    "mtime": 1771947694.6705608,
+    "ast_hash": "41a9b354db3298dcbee72dd1748edb62",
+    "semantic_hash": "41a9b354db3298dcbee72dd1748edb62"
+  },
+  "apps/users/management/commands/ensure_bye_player.py": {
+    "mtime": 1771948878.316071,
+    "ast_hash": "572641e0fe9f5fe12bdc72884ede269b",
+    "semantic_hash": "572641e0fe9f5fe12bdc72884ede269b"
+  },
+  "apps/users/migrations/0001_initial.py": {
+    "mtime": 1771948878.5949411,
+    "ast_hash": "787f504e93a0bb47b0146f976f3a91bb",
+    "semantic_hash": "787f504e93a0bb47b0146f976f3a91bb"
+  },
+  "apps/users/migrations/0002_player_birth_date_player_forehand_player_gender_and_more.py": {
+    "mtime": 1771009334.174917,
+    "ast_hash": "ded32dd73cac17292063cfe325c9da2e",
+    "semantic_hash": "ded32dd73cac17292063cfe325c9da2e"
+  },
+  "apps/users/migrations/0003_notification.py": {
+    "mtime": 1771948878.3222568,
+    "ast_hash": "c593e3a935c9a117394843ba305edbfb",
+    "semantic_hash": "c593e3a935c9a117394843ba305edbfb"
+  },
+  "apps/users/migrations/0004_map_skill_level_to_ntrp.py": {
+    "mtime": 1771009285.3728485,
+    "ast_hash": "ea18b6b8b60e1811583506af472bf62d",
+    "semantic_hash": "ea18b6b8b60e1811583506af472bf62d"
+  },
+  "apps/users/migrations/0005_alter_player_category_alter_player_skill_level.py": {
+    "mtime": 1771948878.384314,
+    "ast_hash": "2e325e6ef3cca4bdd40dca55d2d67650",
+    "semantic_hash": "2e325e6ef3cca4bdd40dca55d2d67650"
+  },
+  "apps/users/migrations/0006_alter_player_city.py": {
+    "mtime": 1771948878.3446774,
+    "ast_hash": "c595fefcd5520efb4f34a01e50714bda",
+    "semantic_hash": "c595fefcd5520efb4f34a01e50714bda"
+  },
+  "apps/users/migrations/0007_map_skill_level_to_labels.py": {
+    "mtime": 1771009334.213833,
+    "ast_hash": "0471d449f504902d4ac40fddbc5cb4ad",
+    "semantic_hash": "0471d449f504902d4ac40fddbc5cb4ad"
+  },
+  "apps/users/migrations/0008_alter_player_skill_level.py": {
+    "mtime": 1771948878.3573604,
+    "ast_hash": "757c7584bf4574bee92b18e21383ce1a",
+    "semantic_hash": "757c7584bf4574bee92b18e21383ce1a"
+  },
+  "apps/users/migrations/0009_map_categories_to_skilllevel.py": {
+    "mtime": 1771948878.4305131,
+    "ast_hash": "7de2a7fb64c0e52da44b233772566204",
+    "semantic_hash": "7de2a7fb64c0e52da44b233772566204"
+  },
+  "apps/users/migrations/0010_alter_player_category.py": {
+    "mtime": 1771948878.3965344,
+    "ast_hash": "cef42ec58c997cb085a6ba411a68a303",
+    "semantic_hash": "cef42ec58c997cb085a6ba411a68a303"
+  },
+  "apps/users/migrations/0011_add_player_max_contact.py": {
+    "mtime": 1771948878.3985054,
+    "ast_hash": "ccb655b0af72af9e529e791a94cacacc",
+    "semantic_hash": "ccb655b0af72af9e529e791a94cacacc"
+  },
+  "apps/users/migrations/0012_remove_player_category.py": {
+    "mtime": 1771948878.3994539,
+    "ast_hash": "9b45c6ec56493e9ff505e983bbaf32f0",
+    "semantic_hash": "9b45c6ec56493e9ff505e983bbaf32f0"
+  },
+  "apps/users/migrations/0013_alter_player_skill_level.py": {
+    "mtime": 1771948878.42343,
+    "ast_hash": "6988e01dbb6a324c247186deea620d02",
+    "semantic_hash": "6988e01dbb6a324c247186deea620d02"
+  },
+  "apps/users/migrations/0014_registration_optional_fields_forehand_label.py": {
+    "mtime": 1771948878.5262144,
+    "ast_hash": "1152b6dc39bdcae1293202263684eeed",
+    "semantic_hash": "1152b6dc39bdcae1293202263684eeed"
+  },
+  "apps/users/migrations/0015_player_is_bye.py": {
+    "mtime": 1771948878.4218144,
+    "ast_hash": "b8c68e016a4c80e4a0f767f9ec7008de",
+    "semantic_hash": "b8c68e016a4c80e4a0f767f9ec7008de"
+  },
+  "apps/users/migrations/0016_create_bye_player.py": {
+    "mtime": 1771009285.3718483,
+    "ast_hash": "b0ccdab9763fd5c1b8fe3adb9a2e8b7a",
+    "semantic_hash": "b0ccdab9763fd5c1b8fe3adb9a2e8b7a"
+  },
+  "apps/users/migrations/0017_add_deadline_extension_request.py": {
+    "mtime": 1771009334.2093527,
+    "ast_hash": "07303dfdceff34680fd23104ff326e27",
+    "semantic_hash": "07303dfdceff34680fd23104ff326e27"
+  },
+  "apps/users/migrations/0018_update_ntrp_to_strength_level.py": {
+    "mtime": 1771948878.4680374,
+    "ast_hash": "361b5db6ff99bf69d3351a97f37b5cc5",
+    "semantic_hash": "361b5db6ff99bf69d3351a97f37b5cc5"
+  },
+  "apps/users/migrations/0019_add_hidden_rating.py": {
+    "mtime": 1771948878.4370556,
+    "ast_hash": "8f00f9d4a557ef6abb6cf7f755203e56",
+    "semantic_hash": "8f00f9d4a557ef6abb6cf7f755203e56"
+  },
+  "apps/users/migrations/0020_init_hidden_rating_from_total_points.py": {
+    "mtime": 1771948878.4490027,
+    "ast_hash": "f5729f839d1782d97e63747c819a501e",
+    "semantic_hash": "f5729f839d1782d97e63747c819a501e"
+  },
+  "apps/users/migrations/0021_change_total_points_to_float.py": {
+    "mtime": 1771948878.447539,
+    "ast_hash": "ac053a8ec2669dd5d45a958174fac39d",
+    "semantic_hash": "ac053a8ec2669dd5d45a958174fac39d"
+  },
+  "apps/users/migrations/0022_set_is_verified_default_true.py": {
+    "mtime": 1771948878.4682043,
+    "ast_hash": "8c60de7e266eb595da6ffce1dfd00823",
+    "semantic_hash": "8c60de7e266eb595da6ffce1dfd00823"
+  },
+  "apps/users/migrations/0023_rename_advanced_to_masters.py": {
+    "mtime": 1771318196.4510944,
+    "ast_hash": "87005c73c3c44e8c6947297a684d05ae",
+    "semantic_hash": "87005c73c3c44e8c6947297a684d05ae"
+  },
+  "apps/users/migrations/0024_alter_player_total_points.py": {
+    "mtime": 1771343259.776452,
+    "ast_hash": "30534b1e6caca796ff5e222666cae3ad",
+    "semantic_hash": "30534b1e6caca796ff5e222666cae3ad"
+  },
+  "apps/users/migrations/0025_update_ntrp_default_to_1_5.py": {
+    "mtime": 1771587438.3595185,
+    "ast_hash": "53b0e5dbc538e2e4c889b30ed686dab4",
+    "semantic_hash": "53b0e5dbc538e2e4c889b30ed686dab4"
+  },
+  "apps/users/migrations/0026_has_ever_paid_subscription.py": {
+    "mtime": 1772017579.1870172,
+    "ast_hash": "fcc6a6d94d69b4e16521d19f34601e63",
+    "semantic_hash": "fcc6a6d94d69b4e16521d19f34601e63"
+  },
+  "apps/users/migrations/0027_ntrp_test_result.py": {
+    "mtime": 1772713729.6878018,
+    "ast_hash": "64b83120c40bd15580ffbe7456891644",
+    "semantic_hash": "64b83120c40bd15580ffbe7456891644"
+  },
+  "apps/users/migrations/0028_player_is_hidden_on_home.py": {
+    "mtime": 1775629457.2431011,
+    "ast_hash": "a94d1fcd6f48c20d31ddc456d902a7dd",
+    "semantic_hash": "a94d1fcd6f48c20d31ddc456d902a7dd"
+  },
+  "apps/users/migrations/0029_player_is_verified_default_false.py": {
+    "mtime": 1776761509.7909353,
+    "ast_hash": "b9311e9532104f964816acc6c7724d64",
+    "semantic_hash": "b9311e9532104f964816acc6c7724d64"
+  },
+  "apps/users/migrations/0030_alter_player_max_contact.py": {
+    "mtime": 1776947120.825475,
+    "ast_hash": "f04f9034e2b940bb3c834dcc30901230",
+    "semantic_hash": "f04f9034e2b940bb3c834dcc30901230"
+  },
+  "apps/users/migrations/0031_player_users_playe_is_bye_fd7aa1_idx_and_more.py": {
+    "mtime": 1776951640.372221,
+    "ast_hash": "b09ef22b9d27ae2b6fab4333ba7ef96f",
+    "semantic_hash": "b09ef22b9d27ae2b6fab4333ba7ef96f"
+  },
+  "apps/users/migrations/0032_user_email_verified_emailverificationtoken.py": {
+    "mtime": 1777032474.2614467,
+    "ast_hash": "99f6336b98dd837c4d4ed78a5f7ed199",
+    "semantic_hash": "99f6336b98dd837c4d4ed78a5f7ed199"
+  },
+  "apps/users/migrations/__init__.py": {
+    "mtime": 1768917809.5257719,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "apps/users/models.py": {
+    "mtime": 1780051104.3008823,
+    "ast_hash": "f628053985d2b10b003f21db9b8f424f",
+    "semantic_hash": "f628053985d2b10b003f21db9b8f424f"
+  },
+  "apps/users/rating_utils.py": {
+    "mtime": 1773043663.4464211,
+    "ast_hash": "e3452554f990fa3f26596935b55f6e0f",
+    "semantic_hash": "e3452554f990fa3f26596935b55f6e0f"
+  },
+  "apps/users/signals.py": {
+    "mtime": 1780066014.5727103,
+    "ast_hash": "b18e509421e394a7226ffe0924182bb5",
+    "semantic_hash": "b18e509421e394a7226ffe0924182bb5"
+  },
+  "apps/users/skill_levels.py": {
+    "mtime": 1773043719.206693,
+    "ast_hash": "6528f0fdf1bd8c51f32e2f831ae1073f",
+    "semantic_hash": "6528f0fdf1bd8c51f32e2f831ae1073f"
+  },
+  "apps/users/urls.py": {
+    "mtime": 1777032318.8450747,
+    "ast_hash": "84cd9b3e4109248e9d3e62b93b6781a4",
+    "semantic_hash": "84cd9b3e4109248e9d3e62b93b6781a4"
+  },
+  "apps/users/views.py": {
+    "mtime": 1783927656.318426,
+    "ast_hash": "6c76ad421c1b1d5b1bdbf28f983af5d5",
+    "semantic_hash": "6c76ad421c1b1d5b1bdbf28f983af5d5"
+  },
+  "config/__init__.py": {
+    "mtime": 1770026142.194855,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "config/asgi.py": {
+    "mtime": 1771349808.2030365,
+    "ast_hash": "b1e5907fce7fd1f116556338834857bf",
+    "semantic_hash": "b1e5907fce7fd1f116556338834857bf"
+  },
+  "config/settings.py": {
+    "mtime": 1784534738.3254097,
+    "ast_hash": "af1f9dce4450a68549e3aec523ca8709",
+    "semantic_hash": "af1f9dce4450a68549e3aec523ca8709"
+  },
+  "config/sitemaps.py": {
+    "mtime": 1772531355.817797,
+    "ast_hash": "0d32aa1f86c835c83ea0f6e6b152d909",
+    "semantic_hash": "0d32aa1f86c835c83ea0f6e6b152d909"
+  },
+  "config/urls.py": {
+    "mtime": 1776951189.4154556,
+    "ast_hash": "f406f509d134bba896fe1477d094b638",
+    "semantic_hash": "f406f509d134bba896fe1477d094b638"
+  },
+  "config/validators.py": {
+    "mtime": 1771949355.384609,
+    "ast_hash": "4a781ea92360568e61deea985e9b27d0",
+    "semantic_hash": "4a781ea92360568e61deea985e9b27d0"
+  },
+  "config/wsgi.py": {
+    "mtime": 1771349808.2030365,
+    "ast_hash": "b6c6891f4fa4bcd4cf8d5c23b44e373c",
+    "semantic_hash": "b6c6891f4fa4bcd4cf8d5c23b44e373c"
+  },
+  "cron-entrypoint.sh": {
+    "mtime": 1784477957.4049773,
+    "ast_hash": "f1f1dd707832433341c04dafb6a31ae9",
+    "semantic_hash": "f1f1dd707832433341c04dafb6a31ae9"
+  },
+  "cron-run-wrapper.py": {
+    "mtime": 1784479549.672953,
+    "ast_hash": "eff256216be85a504698f3063fb44144",
+    "semantic_hash": "eff256216be85a504698f3063fb44144"
+  },
+  "entrypoint.sh": {
+    "mtime": 1777705979.7725794,
+    "ast_hash": "88e456be9a0c61a82073f31ce16af91f",
+    "semantic_hash": "88e456be9a0c61a82073f31ce16af91f"
+  },
+  "logging_config.py": {
+    "mtime": 1772001091.4327948,
+    "ast_hash": "e871a0bcb071e81642bcce6751ed8f5c",
+    "semantic_hash": "e871a0bcb071e81642bcce6751ed8f5c"
+  },
+  "manage.py": {
+    "mtime": 1771349807.9561718,
+    "ast_hash": "cbdc8eb0ab8381aed6fdba99d6f181f6",
+    "semantic_hash": "cbdc8eb0ab8381aed6fdba99d6f181f6"
+  },
+  "package.json": {
+    "mtime": 1776951526.453403,
+    "ast_hash": "cb5182c62043dbb25a9a4dc808a6b88d",
+    "semantic_hash": "cb5182c62043dbb25a9a4dc808a6b88d"
+  },
+  "pyproject.toml": {
+    "mtime": 1780553674.0453408,
+    "ast_hash": "86a3285102ab898c8cacd762a08110a5",
+    "semantic_hash": "86a3285102ab898c8cacd762a08110a5"
+  },
+  "scripts/build_css_bundle.py": {
+    "mtime": 1776953469.681705,
+    "ast_hash": "8fb0b196316c91fcb6a4f068c0252a0e",
+    "semantic_hash": "8fb0b196316c91fcb6a4f068c0252a0e"
+  },
+  "static/admin/js/custom_nav_sidebar.js": {
+    "mtime": 1773997350.7103584,
+    "ast_hash": "97a35b0f0a0a27e634c0925e5119efab",
+    "semantic_hash": "97a35b0f0a0a27e634c0925e5119efab"
+  },
+  "static/js/admin_broadcast.js": {
+    "mtime": 1770310478.461271,
+    "ast_hash": "3826596a6952baaa58003881751eec6d",
+    "semantic_hash": "3826596a6952baaa58003881751eec6d"
+  },
+  "static/js/admin_tournament.js": {
+    "mtime": 1775546787.163261,
+    "ast_hash": "af5895eb4e273293d6729abff3d91006",
+    "semantic_hash": "af5895eb4e273293d6729abff3d91006"
+  },
+  "static/js/admin_training_courts_search.js": {
+    "mtime": 1772536351.2993834,
+    "ast_hash": "569f485995d40a1ca240be6b2a60b60e",
+    "semantic_hash": "569f485995d40a1ca240be6b2a60b60e"
+  },
+  "static/js/city_autocomplete.js": {
+    "mtime": 1777449335.1379983,
+    "ast_hash": "ca424306f4cdba1c053e06e1449c0c0c",
+    "semantic_hash": "ca424306f4cdba1c053e06e1449c0c0c"
+  },
+  "static/js/club_filter_select.js": {
+    "mtime": 1775578479.129441,
+    "ast_hash": "f3e016fe31f8a9d44207a5a4041ca1d9",
+    "semantic_hash": "f3e016fe31f8a9d44207a5a4041ca1d9"
+  },
+  "static/js/cookie_consent.js": {
+    "mtime": 1770390345.8477051,
+    "ast_hash": "556e9f6bfd9aab7c7ae28de0e9c47ee6",
+    "semantic_hash": "556e9f6bfd9aab7c7ae28de0e9c47ee6"
+  },
+  "static/js/feedback_widget.js": {
+    "mtime": 1777372573.7185574,
+    "ast_hash": "ab2aaa7b83356e355c6f68b90540cc92",
+    "semantic_hash": "ab2aaa7b83356e355c6f68b90540cc92"
+  },
+  "static/js/lightbox.js": {
+    "mtime": 1784022883.4126196,
+    "ast_hash": "8c822e15cd2ddfaa4aa4fac8307f630c",
+    "semantic_hash": "8c822e15cd2ddfaa4aa4fac8307f630c"
+  },
+  "static/js/loading-system.js": {
+    "mtime": 1784891231.1292174,
+    "ast_hash": "b06f166d52f6a4105db6693bcb80ee84",
+    "semantic_hash": "b06f166d52f6a4105db6693bcb80ee84"
+  },
+  "static/js/main.js": {
+    "mtime": 1777449821.5990057,
+    "ast_hash": "2cf9ef02c3617f39147f70be4cd4d04c",
+    "semantic_hash": "2cf9ef02c3617f39147f70be4cd4d04c"
+  },
+  "static/js/phone_input.js": {
+    "mtime": 1772001938.6149807,
+    "ast_hash": "56e5463fe2abe11e65ca4a1596dbe446",
+    "semantic_hash": "56e5463fe2abe11e65ca4a1596dbe446"
+  },
+  "static/js/rating_chart.js": {
+    "mtime": 1779893941.6394706,
+    "ast_hash": "f23a377f08be0093b2d2e636ee183f64",
+    "semantic_hash": "f23a377f08be0093b2d2e636ee183f64"
+  },
+  "static/js/tournament_tables_detail.js": {
+    "mtime": 1783933334.429793,
+    "ast_hash": "6f03940c934afcca42a601c769bb2aa6",
+    "semantic_hash": "6f03940c934afcca42a601c769bb2aa6"
+  },
+  "tests/__init__.py": {
+    "mtime": 1780553636.4803257,
+    "ast_hash": "a6692293197f939a1a4b1fa9fba6b2f6",
+    "semantic_hash": "a6692293197f939a1a4b1fa9fba6b2f6"
+  },
+  "tests/e2e/__init__.py": {
+    "mtime": 1780553636.6731842,
+    "ast_hash": "ae4722bd4f10e7a39ac7a0e5c7260d03",
+    "semantic_hash": "ae4722bd4f10e7a39ac7a0e5c7260d03"
+  },
+  "tests/e2e/test_auth_and_profile.py": {
+    "mtime": 1784619244.6312313,
+    "ast_hash": "f3b98d1e5afd471c73ac61a1a0809588",
+    "semantic_hash": "f3b98d1e5afd471c73ac61a1a0809588"
+  },
+  "tests/e2e/test_club_payments.py": {
+    "mtime": 1780555859.2153172,
+    "ast_hash": "5942590b9b18d8c32ce332f340f2229f",
+    "semantic_hash": "5942590b9b18d8c32ce332f340f2229f"
+  },
+  "tests/e2e/test_club_tournament_payments.py": {
+    "mtime": 1780558152.7254786,
+    "ast_hash": "8978cf389c00c627a15d03cc6cc0357b",
+    "semantic_hash": "8978cf389c00c627a15d03cc6cc0357b"
+  },
+  "tests/e2e/test_clubs_views.py": {
+    "mtime": 1780558153.0637712,
+    "ast_hash": "a06e20777d0ac48a2725fcff84962c92",
+    "semantic_hash": "a06e20777d0ac48a2725fcff84962c92"
+  },
+  "tests/e2e/test_core_views.py": {
+    "mtime": 1780676246.881467,
+    "ast_hash": "a9b8cb1147c3a5fd4135d6e4b24a0b2d",
+    "semantic_hash": "a9b8cb1147c3a5fd4135d6e4b24a0b2d"
+  },
+  "tests/e2e/test_email_verification.py": {
+    "mtime": 1780553671.3885572,
+    "ast_hash": "e74010f5a3d9156ef48621b0d182535f",
+    "semantic_hash": "e74010f5a3d9156ef48621b0d182535f"
+  },
+  "tests/e2e/test_tournament_club_registration.py": {
+    "mtime": 1780554246.1915252,
+    "ast_hash": "914ae2cb5fcced8aef4dff6119fcf993",
+    "semantic_hash": "914ae2cb5fcced8aef4dff6119fcf993"
+  },
+  "tests/e2e/test_tournament_views.py": {
+    "mtime": 1784023528.6316035,
+    "ast_hash": "74fc02ff80ecee873fca891702f23926",
+    "semantic_hash": "74fc02ff80ecee873fca891702f23926"
+  },
+  "tests/e2e/test_training.py": {
+    "mtime": 1780553671.3878164,
+    "ast_hash": "600da11870f052ee6a20d8e01d08f812",
+    "semantic_hash": "600da11870f052ee6a20d8e01d08f812"
+  },
+  "tests/integration/__init__.py": {
+    "mtime": 1780553636.6546593,
+    "ast_hash": "0b35a8898999daa537d89ae5b42a0d7a",
+    "semantic_hash": "0b35a8898999daa537d89ae5b42a0d7a"
+  },
+  "tests/integration/test_club_plans.py": {
+    "mtime": 1780554246.1895254,
+    "ast_hash": "ff338ad77f402e1384ba4c34d48be15f",
+    "semantic_hash": "ff338ad77f402e1384ba4c34d48be15f"
+  },
+  "tests/integration/test_core_activity.py": {
+    "mtime": 1781705507.6482103,
+    "ast_hash": "c92bc3a0b1845bfdb7fff90f835cc730",
+    "semantic_hash": "c92bc3a0b1845bfdb7fff90f835cc730"
+  },
+  "tests/integration/test_core_consent.py": {
+    "mtime": 1784889652.4618373,
+    "ast_hash": "3b9a81dea0ef414e85f68ead6b5ea664",
+    "semantic_hash": "3b9a81dea0ef414e85f68ead6b5ea664"
+  },
+  "tests/integration/test_core_support_service.py": {
+    "mtime": 1784889652.4578373,
+    "ast_hash": "c4cda8692d8898e5c7d829b119f89671",
+    "semantic_hash": "c4cda8692d8898e5c7d829b119f89671"
+  },
+  "tests/integration/test_email_service.py": {
+    "mtime": 1784534772.7630837,
+    "ast_hash": "7c29ba2434bc39cf5729c83a10fb8afb",
+    "semantic_hash": "7c29ba2434bc39cf5729c83a10fb8afb"
+  },
+  "tests/integration/test_outbound_email.py": {
+    "mtime": 1784535479.7647357,
+    "ast_hash": "e87a8dea4b31da9be2b050efae1398b0",
+    "semantic_hash": "e87a8dea4b31da9be2b050efae1398b0"
+  },
+  "tests/integration/test_payments_finalize.py": {
+    "mtime": 1780558153.0597713,
+    "ast_hash": "56faff9422f07f71aba6c29ace23b2cd",
+    "semantic_hash": "56faff9422f07f71aba6c29ace23b2cd"
+  },
+  "tests/integration/test_player_ratings.py": {
+    "mtime": 1780558153.0587711,
+    "ast_hash": "0351196aad6ed46273afb7297e6d1c5a",
+    "semantic_hash": "0351196aad6ed46273afb7297e6d1c5a"
+  },
+  "tests/integration/test_sparring_doubles.py": {
+    "mtime": 1780554246.1905253,
+    "ast_hash": "db0ad39a971213ea67b6d29b69cb6f69",
+    "semantic_hash": "db0ad39a971213ea67b6d29b69cb6f69"
+  },
+  "tests/integration/test_subscription_models.py": {
+    "mtime": 1780557282.359385,
+    "ast_hash": "0e41ef0590542103ab74d77a4eb6f32e",
+    "semantic_hash": "0e41ef0590542103ab74d77a4eb6f32e"
+  },
+  "tests/integration/test_telegram_notifications.py": {
+    "mtime": 1780554244.2165496,
+    "ast_hash": "9b67b23a31dc2eebbda5258f1d31882d",
+    "semantic_hash": "9b67b23a31dc2eebbda5258f1d31882d"
+  },
+  "tests/integration/test_telegram_smoke.py": {
+    "mtime": 1784889652.4578373,
+    "ast_hash": "329b077dc0b9e04b59484dab059136b4",
+    "semantic_hash": "329b077dc0b9e04b59484dab059136b4"
+  },
+  "tests/integration/test_tournament_cancel_restore.py": {
+    "mtime": 1784482501.4096029,
+    "ast_hash": "9c10229706ebc94d32bc8a636b96f1ee",
+    "semantic_hash": "9c10229706ebc94d32bc8a636b96f1ee"
+  },
+  "tests/integration/test_tournament_postpayment.py": {
+    "mtime": 1784701728.596591,
+    "ast_hash": "7239355f2a81ddb33c28dad78d75dcbb",
+    "semantic_hash": "7239355f2a81ddb33c28dad78d75dcbb"
+  },
+  "tests/integration/test_tournament_tvd.py": {
+    "mtime": 1780554246.1935253,
+    "ast_hash": "e3f1b1b2a026ba268bf271ee86843e1e",
+    "semantic_hash": "e3f1b1b2a026ba268bf271ee86843e1e"
+  },
+  "tests/integration/test_users_notifications.py": {
+    "mtime": 1780558001.212942,
+    "ast_hash": "7259db5bf548906ab7704be47d0454c4",
+    "semantic_hash": "7259db5bf548906ab7704be47d0454c4"
+  },
+  "tests/support/__init__.py": {
+    "mtime": 1780553636.858458,
+    "ast_hash": "afc1d2be509420c68a1fd93d841dd7e5",
+    "semantic_hash": "afc1d2be509420c68a1fd93d841dd7e5"
+  },
+  "tests/support/factories.py": {
+    "mtime": 1780557987.4468687,
+    "ast_hash": "91490509f924904b8f1a5b7b1fd3e07d",
+    "semantic_hash": "91490509f924904b8f1a5b7b1fd3e07d"
+  },
+  "tests/support/matches.py": {
+    "mtime": 1780557987.4118686,
+    "ast_hash": "f774a17af33265a59c7c8a26f4a85a70",
+    "semantic_hash": "f774a17af33265a59c7c8a26f4a85a70"
+  },
+  "tests/unit/__init__.py": {
+    "mtime": 1780553636.4803257,
+    "ast_hash": "91a605cb7b7ba8774ff2c518ff49eb74",
+    "semantic_hash": "91a605cb7b7ba8774ff2c518ff49eb74"
+  },
+  "tests/unit/test_admin_action_log.py": {
+    "mtime": 1780685785.4140363,
+    "ast_hash": "656bfbb35d7e3e6c8f67d5dd2854daac",
+    "semantic_hash": "656bfbb35d7e3e6c8f67d5dd2854daac"
+  },
+  "tests/unit/test_admin_logging.py": {
+    "mtime": 1780685910.4827254,
+    "ast_hash": "64cae843e65dec4a50792c8fb06f6dc8",
+    "semantic_hash": "64cae843e65dec4a50792c8fb06f6dc8"
+  },
+  "tests/unit/test_club_forms.py": {
+    "mtime": 1780555637.7003162,
+    "ast_hash": "9f92ff948aa54d70da393f022093dbe9",
+    "semantic_hash": "9f92ff948aa54d70da393f022093dbe9"
+  },
+  "tests/unit/test_display_name.py": {
+    "mtime": 1780558152.7290707,
+    "ast_hash": "f6d348872d50050eb044a99013c21704",
+    "semantic_hash": "f6d348872d50050eb044a99013c21704"
+  },
+  "tests/unit/test_fancoin.py": {
+    "mtime": 1780553671.3889647,
+    "ast_hash": "1ffbdd08c8b0373e94f7e1bae9854a66",
+    "semantic_hash": "1ffbdd08c8b0373e94f7e1bae9854a66"
+  },
+  "tests/unit/test_gallery_slug.py": {
+    "mtime": 1783921897.9087198,
+    "ast_hash": "47dcd56d8fc87cca0edb78244e610cb1",
+    "semantic_hash": "47dcd56d8fc87cca0edb78244e610cb1"
+  },
+  "tests/unit/test_home_match_widget_period.py": {
+    "mtime": 1781086449.4383678,
+    "ast_hash": "7c1cc8fab2e39c682f0470f0900a1a38",
+    "semantic_hash": "7c1cc8fab2e39c682f0470f0900a1a38"
+  },
+  "tests/unit/test_match_admin_form.py": {
+    "mtime": 1780926728.107924,
+    "ast_hash": "e5127aaa21b2630fd8f5699207f1b3eb",
+    "semantic_hash": "e5127aaa21b2630fd8f5699207f1b3eb"
+  },
+  "tests/unit/test_match_completion_reprocess.py": {
+    "mtime": 1780675717.3625278,
+    "ast_hash": "a24bcaa78becddd1aa5ea786c30184c5",
+    "semantic_hash": "a24bcaa78becddd1aa5ea786c30184c5"
+  },
+  "tests/unit/test_match_result_recalc.py": {
+    "mtime": 1780926041.2230327,
+    "ast_hash": "3e450b31d8d27024aefc7816a92165c4",
+    "semantic_hash": "3e450b31d8d27024aefc7816a92165c4"
+  },
+  "tests/unit/test_new_tournament_notify.py": {
+    "mtime": 1784890419.3671823,
+    "ast_hash": "4346b8b1f760a96c7e6fa9aaf0b482fb",
+    "semantic_hash": "4346b8b1f760a96c7e6fa9aaf0b482fb"
+  },
+  "tests/unit/test_payments_labels.py": {
+    "mtime": 1780553671.3876746,
+    "ast_hash": "9fbe3b3950c4032dd8de2506b7beed07",
+    "semantic_hash": "9fbe3b3950c4032dd8de2506b7beed07"
+  },
+  "tests/unit/test_player_ratings_validation.py": {
+    "mtime": 1780557991.759249,
+    "ast_hash": "c22501bd050e0405d7d83cc1c8b71d48",
+    "semantic_hash": "c22501bd050e0405d7d83cc1c8b71d48"
+  },
+  "tests/unit/test_private_chat_access.py": {
+    "mtime": 1780554245.5369084,
+    "ast_hash": "cb808548cf2e924885516f367c29ce95",
+    "semantic_hash": "cb808548cf2e924885516f367c29ce95"
+  },
+  "tests/unit/test_proposal_score_validation.py": {
+    "mtime": 1781083849.9946096,
+    "ast_hash": "557689789b75bd2839998187968e1542",
+    "semantic_hash": "557689789b75bd2839998187968e1542"
+  },
+  "tests/unit/test_rating_utils.py": {
+    "mtime": 1780558152.8019261,
+    "ast_hash": "2050a8aa43826e089912e391e4f2e313",
+    "semantic_hash": "2050a8aa43826e089912e391e4f2e313"
+  },
+  "tests/unit/test_round_robin_overdue.py": {
+    "mtime": 1780675497.9548483,
+    "ast_hash": "f0ed6e2b88312b4d2895fa8734c862bf",
+    "semantic_hash": "f0ed6e2b88312b4d2895fa8734c862bf"
+  },
+  "tests/unit/test_rules_section_defaults.py": {
+    "mtime": 1783953535.7499142,
+    "ast_hash": "3110837d1ba096e85aeff7912f272ad9",
+    "semantic_hash": "3110837d1ba096e85aeff7912f272ad9"
+  },
+  "tests/unit/test_subscription_utils.py": {
+    "mtime": 1780558152.8571856,
+    "ast_hash": "a9cc3753331815cd3897f475386fc45e",
+    "semantic_hash": "a9cc3753331815cd3897f475386fc45e"
+  },
+  "tests/unit/test_telegram_config.py": {
+    "mtime": 1780554241.2892027,
+    "ast_hash": "67e94fb0f68f406c25b4a388d8085ce1",
+    "semantic_hash": "67e94fb0f68f406c25b4a388d8085ce1"
+  },
+  "tests/unit/test_tournament_brackets_full.py": {
+    "mtime": 1780554246.1915252,
+    "ast_hash": "91febb015e093f20ae0f25a4feb62331",
+    "semantic_hash": "91febb015e093f20ae0f25a4feb62331"
+  },
+  "tests/unit/test_tournament_brackets_meta.py": {
+    "mtime": 1780554246.1905253,
+    "ast_hash": "6ec8fb7753df471c56875d3350ec1306",
+    "semantic_hash": "6ec8fb7753df471c56875d3350ec1306"
+  },
+  "tests/unit/test_tournament_ordering.py": {
+    "mtime": 1780554246.1905253,
+    "ast_hash": "1657823d66a317dfc61005bb76bc495c",
+    "semantic_hash": "1657823d66a317dfc61005bb76bc495c"
+  },
+  "tests/unit/test_tournament_public_status.py": {
+    "mtime": 1784481777.652994,
+    "ast_hash": "437e1b7e54a78bf54e503cb4f831f4f8",
+    "semantic_hash": "437e1b7e54a78bf54e503cb4f831f4f8"
+  },
+  "tests/unit/test_users_forms.py": {
+    "mtime": 1780558153.0587711,
+    "ast_hash": "b4bfd6b03e7057d30da8407aa22d95c3",
+    "semantic_hash": "b4bfd6b03e7057d30da8407aa22d95c3"
+  },
+  "static/video/hero_video.mp4": {
+    "mtime": 1771501313.919447,
+    "ast_hash": "d2d116697064ab9f0fda1eb756cc682a",
+    "semantic_hash": "d2d116697064ab9f0fda1eb756cc682a"
+  },
+  "static/video/logotip.MP4": {
+    "mtime": 1772703534.6972947,
+    "ast_hash": "62f464a7f73ff2edbd7707c484ec719e",
+    "semantic_hash": "62f464a7f73ff2edbd7707c484ec719e"
+  },
+  "static/video/video_404.mp4": {
+    "mtime": 1768998685.0813549,
+    "ast_hash": "ffb6fdc6e122c7d8b4a57c6e508bba2a",
+    "semantic_hash": "ffb6fdc6e122c7d8b4a57c6e508bba2a"
+  }
+}

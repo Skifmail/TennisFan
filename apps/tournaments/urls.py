@@ -123,6 +123,11 @@ urlpatterns = [
         views.tournament_manage_remove_participant,
         name="tournament_manage_remove_participant",
     ),
+    path(
+        "<slug:slug>/manage/withdraw-participant/",
+        views.tournament_manage_withdraw_participant,
+        name="tournament_manage_withdraw_participant",
+    ),
     path("<slug:slug>/", views.tournament_detail, name="tournament_detail"),
     path("match/<int:pk>/", views.match_detail, name="match_detail"),
 ]

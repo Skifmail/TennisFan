@@ -427,12 +427,10 @@
                     <div class="subscription-info__limit">
                         <div class="subscription-info__row">
                             <span class="subscription-info__label">Баланс FT:</span>
-                            {% if player.user.subscription.tier.is_unlimited %}
+                            {% if player.user.subscription.tier.is_unlimited and player.user.subscription.is_valid %}
                             <span>Безлимит</span>
-                            {% elif player.user.subscription.tier.fancoin_per_purchase > 0 %}
-                            <span>{{ player.user.subscription.get_fancoin_balance }}</span>
                             {% else %}
-                            <span>Не включено в тариф</span>
+                            <span>{{ player.user.subscription.get_fancoin_balance }}</span>
                             {% endif %}
                         </div>
                         {% if not player.user.subscription.tier.is_unlimited and player.user.subscription.tier.fancoin_per_purchase > 0 %}
@@ -503,8 +501,19 @@
                 </div>
 
                 {% elif not is_club_profile %}
-                <div class="alert alert-warning profile-info__subscription-alert">
-                    У вас нет активной платной подписки. <a href="{% url 'pricing' %}">Купить</a>
+                <div class="subscription-info profile-info__subscription">
+                    <div class="subscription-info__limit">
+                        <div class="subscription-info__row">
+                            <span class="subscription-info__label">Баланс FT:</span>
+                            <span>0</span>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning profile-info__subscription-alert mb-0">
+                        У вас нет активной платной подписки. <a href="{% url 'pricing' %}">Купить</a>
+                    </div>
+                    <div class="subscription-info__actions">
+                        <a href="{% url 'pricing' %}" class="btn btn-sm btn-outline" style="width: 100%;">Выбрать тариф</a>
+                    </div>
                 </div>
                 {% endif %}
                 {% endif %}

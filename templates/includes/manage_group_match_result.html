@@ -2,6 +2,12 @@
     {% if tournament.status == "cancelled" or tournament.status == "completed" %}
     <div class="bracket-match-pending">В этом статусе турнира редактирование результатов недоступно.</div>
     {% else %}
+    <form action="{% url 'tournament_manage_match_deadline' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-deadline-form">
+        {% csrf_token %}
+        <label class="bracket-deadline-label" for="deadline-{{ match.pk }}">Дедлайн</label>
+        <input id="deadline-{{ match.pk }}" type="date" name="deadline" class="bracket-deadline-input" value="{% if match.deadline %}{{ match.deadline|date:'Y-m-d' }}{% endif %}" required>
+        <button type="submit" class="btn btn-sm btn-outline-primary bracket-deadline-btn">Изменить дедлайн</button>
+    </form>
     <form action="{% url 'tournament_manage_match_result' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-form">
         {% csrf_token %}
         <div class="bracket-match-players">

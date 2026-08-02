@@ -187,9 +187,9 @@
     <div class="messages-container"{% if persist_messages %} data-persist-messages="true"{% endif %}>
         <div class="container">
             {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}">
-                {{ message }}
-                <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+            <div class="alert alert-{{ message.tags }}" role="status">
+                <span class="alert-text">{{ message }}</span>
+                <button type="button" class="alert-close" aria-label="Закрыть" onclick="this.parentElement.remove()">×</button>
             </div>
             {% endfor %}
         </div>

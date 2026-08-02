@@ -3,6 +3,7 @@
 Используются в views и в telegram_bot без циклических импортов.
 """
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from apps.clubs.models import Club
     from apps.users.models import Player
 
+from django.conf import settings
 from django.db.models import (
     Case,
     DateTimeField,
@@ -27,6 +29,8 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from .models import Match, Tournament, TournamentStatus
+
+logger = logging.getLogger(__name__)
 
 SLUG_MAX_LENGTH = 50
 SUFFIX_RESERVED = 4
@@ -625,3 +629,79 @@ def get_player_trophies(
         внутри места — от новых турниров к старым.
     """
     return get_players_trophies_map([player.pk], club=club).get(player.pk, [])
+
+
+def notify_participants_match_deadline_changed(
+    match: Match,
+    *,
+    old_deadline,
+    new_deadline,
+) -> tuple[int, int]:
+    """Уведомить участников матча об изменении дедлайна (ЛК + email).
+
+    Args:
+        match (Match): Матч с обновлённым дедлайном.
+        old_deadline: Предыдущий дедлайн (datetime | None).
+        new_deadline: Новый дедлайн (datetime | None).
+
+    Returns:
+        tuple[int, int]: ``(число уведомлений в ЛК, число отправленных писем)``.
+    """
+    from django.urls import reverse
+
+    from apps.core.email_service import send_match_deadline_changed_email
+    from apps.users.models import Notification
+
+    tournament = match.tournament
+    if tournament is None:
+        return 0, 0
+
+    new_str = (
+        timezone.localtime(new_deadline).strftime("%d.%m.%Y") if new_deadline else "—"
+    )
+    old_str = (
+        timezone.localtime(old_deadline).strftime("%d.%m.%Y") if old_deadline else ""
+    )
+    match_path = reverse("match_detail", kwargs={"pk": match.pk})
+    base_url = getattr(settings, "TELEGRAM_BOT_SITE_BASE_URL", "").strip().rstrip("/")
+    if not base_url:
+        domain = getattr(settings, "SITE_DOMAIN", "tennisfan.ru")
+        base_url = f"https://{domain}"
+    match_url = f"{base_url}{match_path}"
+
+    tour_name = tournament.name or "турнир"
+    if len(tour_name) > 60:
+        tour_name = tour_name[:57] + "..."
+    msg_lk = f"Дедлайн матча в турнире «{tour_name}» изменён: до {new_str}."
+    if len(msg_lk) > 255:
+        msg_lk = msg_lk[:252] + "..."
+
+    notified = 0
+    emailed = 0
+    for user in dict.fromkeys(get_match_participant_users(match)):
+        try:
+            Notification.objects.create(user=user, message=msg_lk, url=match_path)
+            notified += 1
+        except Exception:
+            logger.exception(
+                "Не удалось создать уведомление о дедлайне для user=%s match=%s",
+                getattr(user, "pk", None),
+                match.pk,
+            )
+        try:
+            if send_match_deadline_changed_email(
+                user,
+                tournament,
+                new_deadline_str=new_str,
+                old_deadline_str=old_str,
+                round_name=match.round_name or "",
+                match_url=match_url,
+            ):
+                emailed += 1
+        except Exception:
+            logger.exception(
+                "Не удалось отправить email о дедлайне user=%s match=%s",
+                getattr(user, "pk", None),
+                match.pk,
+            )
+    return notified, emailed

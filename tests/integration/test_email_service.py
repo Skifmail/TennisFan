@@ -8,6 +8,7 @@ from django.test import TestCase, override_settings
 from apps.core.email_service import (
     send_donation_thanks_email,
     send_email_verification,
+    send_match_deadline_changed_email,
     send_phone_changed_email,
     send_tournament_entry_fancoin_confirmed_email,
     send_tournament_entry_receipt_email,
@@ -132,3 +133,23 @@ class EmailServiceTestCase(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         token = EmailVerificationToken.objects.get(user=self.user, used_at__isnull=True)
         self.assertIn(token.token, mail.outbox[0].alternatives[0][0])
+
+    def test_send_match_deadline_changed_email(self) -> None:
+        tournament = Tournament.objects.create(
+            name="Дедлайн email",
+            slug="deadline-email-test",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+        )
+        ok = send_match_deadline_changed_email(
+            self.user,
+            tournament,
+            new_deadline_str="15.09.2026",
+            old_deadline_str="08.09.2026",
+            round_name="Тур 2",
+            match_url="https://tennisfan.ru/tournaments/match/1/",
+        )
+        self.assertTrue(ok)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("изменён дедлайн", mail.outbox[0].subject.lower())

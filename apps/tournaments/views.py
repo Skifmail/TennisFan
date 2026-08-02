@@ -1133,14 +1133,28 @@ def tournament_detail(request, slug):
 
 
 def _group_matches_by_round(matches):
-    """Group matches into ordered list of (round_name, [matches]) tuples."""
+    """Сгруппировать матчи по турам с дедлайном тура.
+
+    Args:
+        matches: Итерируемая последовательность матчей (уже отсортированных).
+
+    Returns:
+        list[tuple[str, list, datetime | None]]: Кортежи
+        ``(название тура, матчи тура, дедлайн тура)``. Дедлайн — первый
+        непустой ``deadline`` среди матчей тура (у всех матчей тура он
+        обычно одинаковый).
+    """
     from collections import OrderedDict
 
     rounds: OrderedDict[str, list] = OrderedDict()
     for m in matches:
         key = m.round_name or m.tvd_stage
         rounds.setdefault(key, []).append(m)
-    return list(rounds.items())
+    result: list[tuple[str, list, object]] = []
+    for name, round_matches in rounds.items():
+        deadline = next((m.deadline for m in round_matches if m.deadline), None)
+        result.append((name, round_matches, deadline))
+    return result
 
 
 def _can_manage_tournament(request, tournament):
@@ -2483,6 +2497,66 @@ def tournament_manage_match_result(request, slug, pk):
         messages.success(
             request, "Результат сохранён. Участникам отправлены уведомления."
         )
+    return redirect("tournament_manage", slug=slug)
+
+
+@login_required
+def tournament_manage_match_deadline(request, slug, pk):
+    """POST: вручную изменить дедлайн незавершённого матча на странице управления."""
+    from datetime import datetime, time
+
+    from django.utils import timezone
+
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    match = get_object_or_404(Match, tournament=tournament, pk=pk)
+    if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
+        messages.warning(
+            request,
+            "В отменённом или завершённом турнире изменение дедлайна недоступно.",
+        )
+        return redirect("tournament_manage", slug=slug)
+    if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
+        messages.warning(
+            request,
+            "Нельзя изменить дедлайн у завершённого матча.",
+        )
+        return redirect("tournament_manage", slug=slug)
+
+    raw = (request.POST.get("deadline") or "").strip()
+    if not raw:
+        messages.warning(request, "Укажите дату дедлайна.")
+        return redirect("tournament_manage", slug=slug)
+    try:
+        deadline_date = datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        messages.warning(request, "Некорректная дата дедлайна.")
+        return redirect("tournament_manage", slug=slug)
+
+    old_deadline = match.deadline
+    match.deadline = timezone.make_aware(
+        datetime.combine(deadline_date, time(23, 59, 59))
+    )
+    match.save(update_fields=["deadline"])
+
+    from .utils import notify_participants_match_deadline_changed
+
+    notified, emailed = notify_participants_match_deadline_changed(
+        match,
+        old_deadline=old_deadline,
+        new_deadline=match.deadline,
+    )
+    messages.success(
+        request,
+        (
+            f"Дедлайн матча обновлён: до {deadline_date.strftime('%d.%m.%Y')}. "
+            f"Уведомления отправлены участникам "
+            f"(личный кабинет: {notified}, email: {emailed})."
+        ),
+    )
     return redirect("tournament_manage", slug=slug)
 
 

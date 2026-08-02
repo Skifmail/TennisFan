@@ -4,9 +4,14 @@
     <section class="bracket-round">
         <h3 class="bracket-section-title">Основная сетка</h3>
         <div class="bracket-container">
-            {% for round_name, round_matches in main_rounds %}
+            {% for round_name, round_matches, round_deadline in main_rounds %}
             <div class="bracket-round-col">
-                <div class="bracket-round-header">{{ round_name }}</div>
+                <div class="bracket-round-header">
+                    {{ round_name }}
+                    {% if round_deadline %}
+                    <span class="bracket-round-deadline">до {{ round_deadline|date:"d.m.Y" }}</span>
+                    {% endif %}
+                </div>
                 <div class="bracket-round-body">
                     {% for match in round_matches %}
                     <div class="bracket-match {% if match.status == 'completed' or match.status == 'walkover' %}bracket-match--done{% endif %}">
@@ -44,9 +49,14 @@
     <section class="bracket-round" style="margin-top: 2rem;">
         <h3 class="bracket-section-title">Утешительная сетка</h3>
         <div class="bracket-container">
-            {% for round_name, round_matches in consolation_rounds %}
+            {% for round_name, round_matches, round_deadline in consolation_rounds %}
             <div class="bracket-round-col">
-                <div class="bracket-round-header">{{ round_name }}</div>
+                <div class="bracket-round-header">
+                    {{ round_name }}
+                    {% if round_deadline %}
+                    <span class="bracket-round-deadline">до {{ round_deadline|date:"d.m.Y" }}</span>
+                    {% endif %}
+                </div>
                 <div class="bracket-round-body">
                     {% for match in round_matches %}
                     <div class="bracket-match {% if match.status == 'completed' or match.status == 'walkover' %}bracket-match--done{% endif %}">

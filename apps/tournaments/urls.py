@@ -94,6 +94,11 @@ urlpatterns = [
         name="tournament_manage_match_result",
     ),
     path(
+        "<slug:slug>/manage/match/<int:pk>/deadline/",
+        views.tournament_manage_match_deadline,
+        name="tournament_manage_match_deadline",
+    ),
+    path(
         "<slug:slug>/manage/search-participants/",
         views.tournament_manage_search_participants,
         name="tournament_manage_search_participants",

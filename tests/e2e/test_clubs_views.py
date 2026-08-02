@@ -31,7 +31,7 @@ from apps.clubs.models import (
 from apps.clubs.plan_services import (
     purchase_member_plan,
 )
-from apps.core.models import UserTelegramLink
+from apps.core.models import OutboundEmail, UserTelegramLink
 from apps.payments.models import PaymentRecord, SavedPaymentMethod
 from apps.subscriptions.models import SubscriptionTier, UserSubscription
 from apps.tournaments.models import (
@@ -690,6 +690,144 @@ class ClubTournamentManagementViewsTestCase(TestCase):
             secure=True,
         )
         self.assertEqual(response.status_code, 200)
+
+    @override_settings(
+        EMAIL_BACKEND="apps.core.mail.LoggingEmailBackend",
+        EMAIL_BACKEND_INNER="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_manage_can_change_individual_match_deadline(self) -> None:
+        """На странице управления можно вручную сменить дедлайн незавершённого матча."""
+        tournament = Tournament.objects.create(
+            name="Турнир с дедлайном матча",
+            slug="manage-match-deadline",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            status=TournamentStatus.ACTIVE,
+            entry_fee=0,
+            bracket_generated=True,
+        )
+        p1 = Player.objects.create(
+            user=User.objects.create_user(
+                email="dl-p1@test.local", password="testpass123"
+            )
+        )
+        p2 = Player.objects.create(
+            user=User.objects.create_user(
+                email="dl-p2@test.local", password="testpass123"
+            )
+        )
+        old_deadline = timezone.now() + timedelta(days=3)
+        match = Match.objects.create(
+            tournament=tournament,
+            round_name="Тур 1",
+            round_index=1,
+            player1=p1,
+            player2=p2,
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=old_deadline,
+        )
+
+        manage_resp = self.client.get(
+            reverse("tournament_manage", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+        self.assertEqual(manage_resp.status_code, 200)
+        self.assertContains(manage_resp, "Изменить дедлайн")
+        self.assertContains(
+            manage_resp,
+            reverse(
+                "tournament_manage_match_deadline",
+                kwargs={"slug": tournament.slug, "pk": match.pk},
+            ),
+        )
+
+        new_date = (date.today() + timedelta(days=14)).isoformat()
+        response = self.client.post(
+            reverse(
+                "tournament_manage_match_deadline",
+                kwargs={"slug": tournament.slug, "pk": match.pk},
+            ),
+            {"deadline": new_date},
+            secure=True,
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        match.refresh_from_db()
+        self.assertEqual(
+            timezone.localtime(match.deadline).date(), date.fromisoformat(new_date)
+        )
+        self.assertContains(response, "Дедлайн матча обновлён")
+        self.assertContains(response, "Уведомления отправлены участникам")
+        deadline_notifs_p1 = Notification.objects.filter(
+            user=p1.user, message__startswith="Дедлайн матча"
+        )
+        deadline_notifs_p2 = Notification.objects.filter(
+            user=p2.user, message__startswith="Дедлайн матча"
+        )
+        self.assertEqual(deadline_notifs_p1.count(), 1)
+        self.assertEqual(deadline_notifs_p2.count(), 1)
+        notif = deadline_notifs_p1.get()
+        self.assertIn("изменён", notif.message)
+        self.assertEqual(notif.url, reverse("match_detail", kwargs={"pk": match.pk}))
+        deadline_emails = OutboundEmail.objects.filter(
+            subject__icontains="изменён дедлайн",
+            category=OutboundEmail.Category.TOURNAMENT,
+        )
+        self.assertEqual(deadline_emails.count(), 2)
+        self.assertTrue(deadline_emails.filter(to_email="dl-p1@test.local").exists())
+        self.assertTrue(deadline_emails.filter(to_email="dl-p2@test.local").exists())
+        self.assertIn("Новый дедлайн", deadline_emails.first().body_html)
+
+    def test_manage_cannot_change_deadline_for_completed_match(self) -> None:
+        """У завершённого матча дедлайн через manage менять нельзя."""
+        tournament = Tournament.objects.create(
+            name="Завершённый матч дедлайн",
+            slug="manage-match-deadline-done",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            status=TournamentStatus.ACTIVE,
+            entry_fee=0,
+            bracket_generated=True,
+        )
+        p1 = Player.objects.create(
+            user=User.objects.create_user(
+                email="dl-done-p1@test.local", password="testpass123"
+            )
+        )
+        p2 = Player.objects.create(
+            user=User.objects.create_user(
+                email="dl-done-p2@test.local", password="testpass123"
+            )
+        )
+        old_deadline = timezone.now() + timedelta(days=3)
+        match = Match.objects.create(
+            tournament=tournament,
+            round_name="Тур 1",
+            round_index=1,
+            player1=p1,
+            player2=p2,
+            status=Match.MatchStatus.COMPLETED,
+            winner=p1,
+            deadline=old_deadline,
+            completed_datetime=timezone.now(),
+        )
+
+        response = self.client.post(
+            reverse(
+                "tournament_manage_match_deadline",
+                kwargs={"slug": tournament.slug, "pk": match.pk},
+            ),
+            {"deadline": (date.today() + timedelta(days=20)).isoformat()},
+            secure=True,
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        match.refresh_from_db()
+        self.assertEqual(match.deadline, old_deadline)
 
     def test_tournament_detail_uses_club_navigation_for_club_member(self) -> None:
         tournament = Tournament.objects.create(

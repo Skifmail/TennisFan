@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Дедлайн матча изменён</title>
+</head>
+<body>
+    <p>Здравствуйте, {{ user.get_full_name|default:user.email }}!</p>
+    <p>Администратор изменил дедлайн вашего матча в турнире «{{ tournament.name }}».</p>
+    {% if old_deadline_str %}
+    <p>Было: до {{ old_deadline_str }}</p>
+    {% endif %}
+    <p><b>Новый дедлайн: до {{ new_deadline_str }}</b></p>
+    {% if round_name %}<p>Тур: {{ round_name }}</p>{% endif %}
+    <p><a href="{{ match_url }}">Открыть матч</a></p>
+    <p><a href="{{ tournament_url }}">Страница турнира</a></p>
+    <p>С уважением,<br>Команда TennisFan</p>
+</body>
+</html>

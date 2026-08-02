@@ -355,6 +355,50 @@ def send_tournament_opponent_match_closed_email(
     )
 
 
+def send_match_deadline_changed_email(
+    user: User,
+    tournament: Tournament,
+    *,
+    new_deadline_str: str,
+    old_deadline_str: str = "",
+    round_name: str = "",
+    match_url: str = "",
+) -> bool:
+    """Отправить письмо участнику об изменении дедлайна матча.
+
+    Args:
+        user (User): Получатель письма.
+        tournament (Tournament): Турнир матча.
+        new_deadline_str (str): Новый дедлайн (строка для отображения).
+        old_deadline_str (str): Предыдущий дедлайн (строка), если был.
+        round_name (str): Название тура.
+        match_url (str): Абсолютная ссылка на матч.
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    base_url = _get_site_base_url()
+    return _send_html_email(
+        subject=f"TennisFan: изменён дедлайн матча в «{tournament.name}»",
+        template_name="emails/match_deadline_changed.html",
+        context={
+            "user": user,
+            "tournament": tournament,
+            "new_deadline_str": new_deadline_str,
+            "old_deadline_str": old_deadline_str,
+            "round_name": round_name,
+            "match_url": match_url,
+            "tournament_url": f"{base_url}{reverse('tournament_detail', args=[tournament.slug])}",
+            "base_url": base_url,
+        },
+        recipient=email,
+        category="tournament",
+    )
+
+
 def send_tournament_postpayment_opened_email(
     user: User,
     tournament: Tournament,

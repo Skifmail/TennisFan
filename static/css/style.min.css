@@ -18182,6 +18182,14 @@ a.match-details-value__lead:hover {
 
 .bracket-deadline-btn {
     white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.bracket-deadline-btn:disabled,
+.bracket-deadline-btn[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 .bracket-match-form {

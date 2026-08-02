@@ -609,5 +609,31 @@
     });
 })();
 </script>
+<script>
+(function() {
+    document.querySelectorAll('[data-deadline-form]').forEach(function(form) {
+        var input = form.querySelector('.bracket-deadline-input');
+        var btn = form.querySelector('.bracket-deadline-btn');
+        if (!input || !btn) return;
+        function syncDeadlineBtn() {
+            var initial = input.getAttribute('data-initial-deadline') || '';
+            var current = (input.value || '').trim();
+            var changed = !!current && current !== initial;
+            btn.disabled = !changed;
+            btn.setAttribute('aria-disabled', changed ? 'false' : 'true');
+        }
+        input.addEventListener('input', syncDeadlineBtn);
+        input.addEventListener('change', syncDeadlineBtn);
+        form.addEventListener('submit', function(e) {
+            syncDeadlineBtn();
+            if (btn.disabled) {
+                e.preventDefault();
+            }
+        });
+        syncDeadlineBtn();
+    });
+})();
+</script>
+
 {% endblock %}
 {% endblock %}

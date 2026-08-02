@@ -735,6 +735,9 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         )
         self.assertEqual(manage_resp.status_code, 200)
         self.assertContains(manage_resp, "Изменить дедлайн")
+        self.assertContains(manage_resp, "bracket-deadline-btn")
+        self.assertContains(manage_resp, "disabled")
+        self.assertContains(manage_resp, "data-initial-deadline")
         self.assertContains(
             manage_resp,
             reverse(
@@ -779,6 +782,78 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         self.assertTrue(deadline_emails.filter(to_email="dl-p1@test.local").exists())
         self.assertTrue(deadline_emails.filter(to_email="dl-p2@test.local").exists())
         self.assertIn("Новый дедлайн", deadline_emails.first().body_html)
+
+    @override_settings(
+        EMAIL_BACKEND="apps.core.mail.LoggingEmailBackend",
+        EMAIL_BACKEND_INNER="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_manage_same_deadline_does_not_notify(self) -> None:
+        """Повторная отправка той же даты не шлёт уведомления участникам."""
+        tournament = Tournament.objects.create(
+            name="Тот же дедлайн",
+            slug="manage-same-deadline",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            status=TournamentStatus.ACTIVE,
+            entry_fee=0,
+            bracket_generated=True,
+        )
+        p1 = Player.objects.create(
+            user=User.objects.create_user(
+                email="same-dl-p1@test.local", password="testpass123"
+            )
+        )
+        p2 = Player.objects.create(
+            user=User.objects.create_user(
+                email="same-dl-p2@test.local", password="testpass123"
+            )
+        )
+        from datetime import datetime
+        from datetime import time as dt_time
+
+        deadline = timezone.make_aware(
+            datetime.combine(date.today() + timedelta(days=7), dt_time(23, 59, 59))
+        )
+        match = Match.objects.create(
+            tournament=tournament,
+            round_name="Тур 1",
+            round_index=1,
+            player1=p1,
+            player2=p2,
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=deadline,
+        )
+        same_date = timezone.localtime(deadline).date().isoformat()
+        before_notifs = Notification.objects.filter(
+            message__startswith="Дедлайн матча"
+        ).count()
+        before_emails = OutboundEmail.objects.filter(
+            subject__icontains="изменён дедлайн"
+        ).count()
+
+        response = self.client.post(
+            reverse(
+                "tournament_manage_match_deadline",
+                kwargs={"slug": tournament.slug, "pk": match.pk},
+            ),
+            {"deadline": same_date},
+            secure=True,
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Дедлайн не изменился")
+        match.refresh_from_db()
+        self.assertEqual(match.deadline, deadline)
+        self.assertEqual(
+            Notification.objects.filter(message__startswith="Дедлайн матча").count(),
+            before_notifs,
+        )
+        self.assertEqual(
+            OutboundEmail.objects.filter(subject__icontains="изменён дедлайн").count(),
+            before_emails,
+        )
 
     def test_manage_cannot_change_deadline_for_completed_match(self) -> None:
         """У завершённого матча дедлайн через manage менять нельзя."""

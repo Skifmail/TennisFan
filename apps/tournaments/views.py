@@ -2537,6 +2537,14 @@ def tournament_manage_match_deadline(request, slug, pk):
         return redirect("tournament_manage", slug=slug)
 
     old_deadline = match.deadline
+    old_date = timezone.localtime(old_deadline).date() if old_deadline else None
+    if old_date is not None and deadline_date == old_date:
+        messages.info(
+            request,
+            "Дедлайн не изменился — уведомления участникам не отправлялись.",
+        )
+        return redirect("tournament_manage", slug=slug)
+
     match.deadline = timezone.make_aware(
         datetime.combine(deadline_date, time(23, 59, 59))
     )

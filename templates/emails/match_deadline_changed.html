@@ -8,7 +8,7 @@
     <p>Здравствуйте, {{ user.get_full_name|default:user.email }}!</p>
     <p>Администратор изменил дедлайн вашего матча в турнире «{{ tournament.name }}».</p>
     {% if old_deadline_str %}
-    <p>Было: до {{ old_deadline_str }}</p>
+    <p>Старый дедлайн: {{ old_deadline_str }}</p>
     {% endif %}
     <p><b>Новый дедлайн: до {{ new_deadline_str }}</b></p>
     {% if round_name %}<p>Тур: {{ round_name }}</p>{% endif %}

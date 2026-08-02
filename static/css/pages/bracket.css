@@ -243,24 +243,27 @@
 .bracket-match-deadline-form {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
     padding: 0.45rem 0.75rem;
     border-bottom: 1px solid rgba(166, 130, 74, 0.2);
     background: rgba(1, 43, 28, 0.35);
+    min-width: 0;
 }
 
 .bracket-deadline-label {
     font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
     white-space: nowrap;
+    flex: 0 0 auto;
 }
 
 .bracket-deadline-input {
-    flex: 1 1 8rem;
-    min-width: 8rem;
-    max-width: 11rem;
-    padding: 0.25rem 0.4rem;
+    flex: 0 1 auto;
+    width: 8.25rem;
+    min-width: 7.5rem;
+    max-width: 8.5rem;
+    padding: 0.25rem 0.3rem;
     font-size: var(--font-size-xs);
     color: var(--color-text);
     background: var(--color-bg-card);
@@ -270,7 +273,10 @@
 
 .bracket-deadline-btn {
     white-space: nowrap;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.7rem;
 }
 
 .bracket-deadline-btn:disabled,

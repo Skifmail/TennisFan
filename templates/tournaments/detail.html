@@ -36,8 +36,8 @@
         {% endif %}
     </div>
 
-    <div class="tournament-detail-hero{% if tournament.image or tournament.photos.all or is_active_tournament_participant %} tournament-detail-hero--with-media{% endif %}">
-        {% if tournament.image or tournament.photos.all or is_active_tournament_participant %}
+    <div class="tournament-detail-hero{% if tournament.image or tournament.photos.all or show_tournament_photo_upload_ui %} tournament-detail-hero--with-media{% endif %}">
+        {% if tournament.image or tournament.photos.all or show_tournament_photo_upload_ui %}
         <div class="tournament-detail-hero__media">
             {% if tournament.image %}
             <a href="{{ tournament.image.url }}"
@@ -51,11 +51,11 @@
                      alt="{{ tournament.name }}">
             </a>
             {% endif %}
-            {% if tournament.photos.all or is_active_tournament_participant %}
+            {% if tournament.photos.all or show_tournament_photo_upload_ui %}
             <div class="tournament-photos" aria-label="Фотогалерея">
                 <div class="tournament-photos__header">
                     <h3 class="tournament-photos__title">Фотогалерея</h3>
-                    {% if is_active_tournament_participant %}
+                    {% if show_tournament_photo_upload_ui %}
                     <div class="tournament-photos__actions">
                         {% if can_upload_tournament_photo %}
                         <details class="tournament-photos__upload">
@@ -73,9 +73,11 @@
                                     <span>Подпись</span>
                                     <input type="text" name="caption" maxlength="200" placeholder="Необязательно" class="form-control">
                                 </label>
+                                {% if not can_manage_tournament_photos %}
                                 <p class="tournament-photos__upload-hint">
                                     Загружено {{ participant_photo_count }} из {{ participant_photo_limit }} ваших фото.
                                 </p>
+                                {% endif %}
                                 <button type="submit" class="btn btn-primary btn-sm">Загрузить</button>
                             </form>
                         </details>
@@ -114,7 +116,7 @@
                     </div>
                     {% endfor %}
                 </div>
-                {% elif is_active_tournament_participant %}
+                {% elif show_tournament_photo_upload_ui %}
                 <p class="tournament-photos__empty">Пока нет фото. Будьте первым — добавьте снимок с турнира.</p>
                 {% endif %}
             </div>

@@ -1202,19 +1202,23 @@ def _get_participant_photo_context(request, tournament):
     """Контекст загрузки фото для страницы турнира."""
     player = _get_request_player(request)
     count = 0
-    can_upload = False
+    can_upload_as_participant = False
     is_active_participant = False
+    can_manage = _can_manage_tournament(request, tournament)
     if player:
         is_active_participant = is_active_tournament_participant(tournament, player)
         count = get_participant_photo_count(tournament, player)
-        can_upload = can_participant_upload_photo(tournament, player)
+        can_upload_as_participant = can_participant_upload_photo(tournament, player)
 
     limit = TournamentPhoto.PARTICIPANT_PHOTO_LIMIT
+    limit_reached = is_active_participant and not can_manage and count >= limit
     return {
-        "can_upload_tournament_photo": can_upload,
+        "can_upload_tournament_photo": can_upload_as_participant or can_manage,
+        "can_manage_tournament_photos": can_manage,
+        "show_tournament_photo_upload_ui": is_active_participant or can_manage,
         "participant_photo_count": count,
         "participant_photo_limit": limit,
-        "participant_photo_limit_reached": is_active_participant and count >= limit,
+        "participant_photo_limit_reached": limit_reached,
         "is_active_tournament_participant": is_active_participant,
         "current_player": player,
     }
@@ -1222,15 +1226,11 @@ def _get_participant_photo_context(request, tournament):
 
 @login_required
 def tournament_photo_upload(request, slug):
-    """Загрузка фото участником турнира в галерею."""
+    """Загрузка фото участником или управляющим турнира в галерею."""
     if request.method != "POST":
         return redirect("tournament_detail", slug=slug)
 
     player = _get_request_player(request)
-    if not player:
-        from django.http import HttpResponseForbidden
-
-        return HttpResponseForbidden("Профиль игрока не найден.")
 
     form = TournamentPhotoUploadForm(request.POST, request.FILES)
     if not form.is_valid():
@@ -1244,20 +1244,30 @@ def tournament_photo_upload(request, slug):
             Tournament.objects.select_for_update(),
             slug=slug,
         )
-        if not is_active_tournament_participant(tournament, player):
+        can_manage = _can_manage_tournament(request, tournament)
+        is_participant = bool(
+            player and is_active_tournament_participant(tournament, player)
+        )
+
+        if not can_manage and not is_participant:
             from django.http import HttpResponseForbidden
 
             return HttpResponseForbidden(
-                "Загружать фото могут только участники турнира."
+                "Загружать фото могут участники турнира или администраторы."
             )
 
-        if not can_participant_upload_photo(tournament, player):
-            messages.error(
-                request,
-                "Вы загрузили максимальное количество фото "
-                f"({TournamentPhoto.PARTICIPANT_PHOTO_LIMIT}).",
-            )
-            return redirect("tournament_detail", slug=slug)
+        if not can_manage:
+            if not player:
+                from django.http import HttpResponseForbidden
+
+                return HttpResponseForbidden("Профиль игрока не найден.")
+            if not can_participant_upload_photo(tournament, player):
+                messages.error(
+                    request,
+                    "Вы загрузили максимальное количество фото "
+                    f"({TournamentPhoto.PARTICIPANT_PHOTO_LIMIT}).",
+                )
+                return redirect("tournament_detail", slug=slug)
 
         TournamentPhoto.objects.create(
             tournament=tournament,

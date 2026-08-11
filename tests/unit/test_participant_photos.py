@@ -233,7 +233,44 @@ class ParticipantPhotoViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertTrue(TournamentPhoto.objects.filter(pk=other_photo.pk).exists())
 
+    def test_staff_manager_can_upload_without_participation(self) -> None:
+        staff = User.objects.create_user(
+            email="staff-photos@test.local",
+            password="testpass123",
+            is_staff=True,
+        )
+        Player.objects.create(user=staff)
+        self.client.force_login(staff)
+
+        detail = self.client.get(self.detail_url, secure=True)
+        self.assertContains(detail, "Добавить фото")
+        self.assertNotContains(detail, "ваших фото")
+
+        response = self.client.post(
+            self.upload_url,
+            {"image": _make_test_image("staff.jpg"), "caption": "Орг"},
+            secure=True,
+        )
+        self.assertRedirects(response, self.detail_url, fetch_redirect_response=False)
+        self.assertEqual(TournamentPhoto.objects.count(), 1)
+
+        # Лимит участников на управляющих не действует.
+        for i in range(TournamentPhoto.PARTICIPANT_PHOTO_LIMIT + 1):
+            response = self.client.post(
+                self.upload_url,
+                {"image": _make_test_image(f"staff-extra-{i}.jpg")},
+                secure=True,
+            )
+            self.assertRedirects(
+                response, self.detail_url, fetch_redirect_response=False
+            )
+        self.assertGreater(
+            TournamentPhoto.objects.count(),
+            TournamentPhoto.PARTICIPANT_PHOTO_LIMIT,
+        )
+
     def test_non_participant_does_not_see_upload_button(self) -> None:
+
         self.client.force_login(self.other_user)
         response = self.client.get(self.detail_url, secure=True)
         self.assertNotContains(response, "Добавить фото")

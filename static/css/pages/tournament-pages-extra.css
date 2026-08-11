@@ -957,3 +957,102 @@
     font-weight: 600;
     background: var(--color-bg-elevated);
 }
+
+
+.tournament-photos__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.tournament-photos__actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.tournament-photos__upload {
+    position: relative;
+}
+
+.tournament-photos__upload-toggle {
+    list-style: none;
+    cursor: pointer;
+}
+
+.tournament-photos__upload-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.tournament-photos__upload-form {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 5;
+    width: min(280px, 90vw);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-elevated);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.tournament-photos__upload-label {
+    display: grid;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.tournament-photos__upload-hint {
+    margin: 0;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.tournament-photos__limit-msg {
+    margin: 0;
+    font-size: 11px;
+    color: #94a3b8;
+    max-width: 220px;
+    text-align: right;
+}
+
+.tournament-photos__empty {
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.tournament-photos__item-wrap {
+    position: relative;
+}
+
+.tournament-photos__delete-form {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 2;
+}
+
+.tournament-photos__delete-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.72);
+    color: #f8fafc;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.tournament-photos__delete-btn:hover {
+    background: rgba(220, 38, 38, 0.9);
+}

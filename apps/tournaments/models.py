@@ -482,6 +482,8 @@ class Tournament(CompressImageFieldsMixin, models.Model):
 class TournamentPhoto(CompressImageFieldsMixin, models.Model):
     """Фото с турнира для галереи (количество не ограничено, с подписью)."""
 
+    PARTICIPANT_PHOTO_LIMIT = 3
+
     tournament = models.ForeignKey(
         Tournament,
         on_delete=models.CASCADE,
@@ -498,6 +500,14 @@ class TournamentPhoto(CompressImageFieldsMixin, models.Model):
         "Порядок",
         default=0,
         help_text="Меньшее число — раньше в галерее.",
+    )
+    uploaded_by = models.ForeignKey(
+        "users.Player",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tournament_photos",
+        verbose_name="Загрузил",
     )
     created_at = models.DateTimeField("Создано", auto_now_add=True)
 

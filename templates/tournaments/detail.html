@@ -36,8 +36,8 @@
         {% endif %}
     </div>
 
-    <div class="tournament-detail-hero{% if tournament.image or tournament.photos.all %} tournament-detail-hero--with-media{% endif %}">
-        {% if tournament.image or tournament.photos.all %}
+    <div class="tournament-detail-hero{% if tournament.image or tournament.photos.all or is_active_tournament_participant %} tournament-detail-hero--with-media{% endif %}">
+        {% if tournament.image or tournament.photos.all or is_active_tournament_participant %}
         <div class="tournament-detail-hero__media">
             {% if tournament.image %}
             <a href="{{ tournament.image.url }}"
@@ -51,23 +51,72 @@
                      alt="{{ tournament.name }}">
             </a>
             {% endif %}
-            {% if tournament.photos.all %}
+            {% if tournament.photos.all or is_active_tournament_participant %}
             <div class="tournament-photos" aria-label="Фотогалерея">
-                <h3 class="tournament-photos__title">Фотогалерея</h3>
+                <div class="tournament-photos__header">
+                    <h3 class="tournament-photos__title">Фотогалерея</h3>
+                    {% if is_active_tournament_participant %}
+                    <div class="tournament-photos__actions">
+                        {% if can_upload_tournament_photo %}
+                        <details class="tournament-photos__upload">
+                            <summary class="btn btn-outline btn-sm tournament-photos__upload-toggle">Добавить фото</summary>
+                            <form method="post"
+                                  action="{% url 'tournament_photo_upload' slug=tournament.slug %}"
+                                  enctype="multipart/form-data"
+                                  class="tournament-photos__upload-form">
+                                {% csrf_token %}
+                                <label class="tournament-photos__upload-label">
+                                    <span>Фото</span>
+                                    <input type="file" name="image" accept="image/*" required class="form-control">
+                                </label>
+                                <label class="tournament-photos__upload-label">
+                                    <span>Подпись</span>
+                                    <input type="text" name="caption" maxlength="200" placeholder="Необязательно" class="form-control">
+                                </label>
+                                <p class="tournament-photos__upload-hint">
+                                    Загружено {{ participant_photo_count }} из {{ participant_photo_limit }} ваших фото.
+                                </p>
+                                <button type="submit" class="btn btn-primary btn-sm">Загрузить</button>
+                            </form>
+                        </details>
+                        {% elif participant_photo_limit_reached %}
+                        <button type="button" class="btn btn-outline btn-sm" disabled title="Вы загрузили максимальное количество фото">
+                            Добавить фото
+                        </button>
+                        <p class="tournament-photos__limit-msg">Вы загрузили максимальное количество фото ({{ participant_photo_limit }}).</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% if tournament.photos.all %}
                 <div class="tournament-photos__grid">
                     {% for photo in tournament.photos.all %}
-                    <a href="{{ photo.image.url }}"
-                       class="js-lightbox tournament-photos__item"
-                       data-lightbox-src="{{ photo.image.url }}"
-                       data-lightbox-caption="{{ photo.caption|default:'' }}"
-                       data-lightbox-group="tournament-photos">
-                        <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:tournament.name }}" loading="lazy" decoding="async">
-                        {% if photo.caption %}
-                        <span class="tournament-photos__caption">{{ photo.caption }}</span>
+                    <div class="tournament-photos__item-wrap">
+                        <a href="{{ photo.image.url }}"
+                           class="js-lightbox tournament-photos__item"
+                           data-lightbox-src="{{ photo.image.url }}"
+                           data-lightbox-caption="{{ photo.caption|default:'' }}"
+                           data-lightbox-group="tournament-photos">
+                            <img src="{{ photo.image.url }}" alt="{{ photo.caption|default:tournament.name }}" loading="lazy" decoding="async">
+                            {% if photo.caption %}
+                            <span class="tournament-photos__caption">{{ photo.caption }}</span>
+                            {% endif %}
+                        </a>
+                        {% if current_player and photo.uploaded_by_id == current_player.id %}
+                        <form method="post"
+                              action="{% url 'tournament_photo_delete' slug=tournament.slug pk=photo.pk %}"
+                              class="tournament-photos__delete-form"
+                              onsubmit="return confirm('Удалить это фото?');">
+                            {% csrf_token %}
+                            <button type="submit" class="tournament-photos__delete-btn" aria-label="Удалить фото">×</button>
+                        </form>
                         {% endif %}
-                    </a>
+                    </div>
                     {% endfor %}
                 </div>
+                {% elif is_active_tournament_participant %}
+                <p class="tournament-photos__empty">Пока нет фото. Будьте первым — добавьте снимок с турнира.</p>
+                {% endif %}
             </div>
             {% endif %}
         </div>

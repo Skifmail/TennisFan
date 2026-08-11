@@ -133,6 +133,16 @@ urlpatterns = [
         views.tournament_manage_withdraw_participant,
         name="tournament_manage_withdraw_participant",
     ),
+    path(
+        "<slug:slug>/photos/upload/",
+        views.tournament_photo_upload,
+        name="tournament_photo_upload",
+    ),
+    path(
+        "<slug:slug>/photos/<int:pk>/delete/",
+        views.tournament_photo_delete,
+        name="tournament_photo_delete",
+    ),
     path("<slug:slug>/", views.tournament_detail, name="tournament_detail"),
     path("match/<int:pk>/", views.match_detail, name="match_detail"),
 ]

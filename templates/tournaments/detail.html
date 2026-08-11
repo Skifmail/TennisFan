@@ -65,10 +65,21 @@
                                   enctype="multipart/form-data"
                                   class="tournament-photos__upload-form">
                                 {% csrf_token %}
-                                <label class="tournament-photos__upload-label">
+                                <div class="tournament-photos__upload-label">
                                     <span>Фото</span>
-                                    <input type="file" name="image" accept="image/*" required class="form-control">
-                                </label>
+                                    <div class="tournament-photos__file-picker" data-file-picker>
+                                        <input id="tournament-photo-upload-input"
+                                               type="file"
+                                               name="image"
+                                               accept="image/*"
+                                               required
+                                               class="tournament-photos__file-picker-input">
+                                        <label for="tournament-photo-upload-input" class="tournament-photos__file-picker-btn">
+                                            Выберите файл
+                                        </label>
+                                        <span class="tournament-photos__file-picker-name" data-file-name>Файл не выбран</span>
+                                    </div>
+                                </div>
                                 <label class="tournament-photos__upload-label">
                                     <span>Подпись</span>
                                     <input type="text" name="caption" maxlength="200" placeholder="Необязательно" class="form-control">
@@ -108,9 +119,13 @@
                         <form method="post"
                               action="{% url 'tournament_photo_delete' slug=tournament.slug pk=photo.pk %}"
                               class="tournament-photos__delete-form"
-                              onsubmit="return confirm('Удалить это фото?');">
+                              data-photo-delete-form>
                             {% csrf_token %}
-                            <button type="submit" class="tournament-photos__delete-btn" aria-label="Удалить фото" title="Удалить">×</button>
+                            <button type="button"
+                                    class="tournament-photos__delete-btn"
+                                    data-photo-delete-open
+                                    aria-label="Удалить фото"
+                                    title="Удалить">×</button>
                         </form>
                         {% endif %}
                     </figure>
@@ -119,6 +134,34 @@
                 {% elif show_tournament_photo_upload_ui %}
                 <p class="tournament-photos__empty">Пока нет фото. Будьте первым — добавьте снимок с турнира.</p>
                 {% endif %}
+                <div id="tournament-photo-delete-modal"
+                     class="modal-overlay club-confirm-modal"
+                     style="display:none;"
+                     aria-hidden="true">
+                    <div class="modal-dialog club-confirm-modal__dialog"
+                         role="dialog"
+                         aria-modal="true"
+                         aria-labelledby="tournament-photo-delete-title"
+                         aria-describedby="tournament-photo-delete-text">
+                        <div class="club-confirm-modal__eyebrow">Подтверждение</div>
+                        <h3 id="tournament-photo-delete-title" class="modal-dialog__title club-confirm-modal__title">Удалить фото?</h3>
+                        <p id="tournament-photo-delete-text" class="modal-dialog__text club-confirm-modal__text">
+                            Фото будет удалено из галереи турнира. Это действие нельзя отменить.
+                        </p>
+                        <div class="modal-dialog__actions club-confirm-modal__actions">
+                            <button type="button"
+                                    class="btn btn-sm club-confirm-modal__btn club-confirm-modal__btn--secondary"
+                                    data-photo-delete-close>
+                                Отмена
+                            </button>
+                            <button type="button"
+                                    class="btn btn-sm btn-danger club-confirm-modal__btn club-confirm-modal__btn--primary"
+                                    data-photo-delete-confirm>
+                                Удалить
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             {% endif %}
         </div>
@@ -909,4 +952,60 @@
 {% block extra_js %}
 {{ block.super }}
 {% include "clubs/_cancel_tournament_modal.html" %}
+<script>
+(function () {
+    var modal = document.getElementById('tournament-photo-delete-modal');
+    if (!modal) return;
+
+    var pendingForm = null;
+
+    function openModal(form) {
+        pendingForm = form;
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        var confirmBtn = modal.querySelector('[data-photo-delete-confirm]');
+        if (confirmBtn) confirmBtn.focus();
+    }
+
+    function closeModal() {
+        pendingForm = null;
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    document.querySelectorAll('[data-photo-delete-open]').forEach(function (btn) {
+        btn.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            var form = btn.closest('[data-photo-delete-form]');
+            if (form) openModal(form);
+        });
+    });
+
+    modal.querySelectorAll('[data-photo-delete-close]').forEach(function (btn) {
+        btn.addEventListener('click', closeModal);
+    });
+
+    var confirmBtn = modal.querySelector('[data-photo-delete-confirm]');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function () {
+            if (pendingForm) {
+                var form = pendingForm;
+                pendingForm = null;
+                form.submit();
+            }
+        });
+    }
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal) closeModal();
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.style.display !== 'none') {
+            closeModal();
+        }
+    });
+})();
+</script>
 {% endblock %}

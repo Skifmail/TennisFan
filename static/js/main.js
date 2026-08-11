@@ -188,9 +188,9 @@ document.addEventListener('DOMContentLoaded', function() {
     initDesktopFooterState();
     window.addEventListener('resize', initDesktopFooterState);
 
-    // Club invites: показываем имя выбранного файла рядом с кнопкой
-    document.querySelectorAll('.club-invites-file-picker').forEach(function(picker) {
-        var input = picker.querySelector('.club-invites-file-picker__input');
+    // Кастомный file picker: русские подписи + имя выбранного файла
+    document.querySelectorAll('[data-file-picker], .club-invites-file-picker').forEach(function(picker) {
+        var input = picker.querySelector('input[type="file"]');
         var nameEl = picker.querySelector('[data-file-name]');
         if (!input || !nameEl) return;
         var fallbackName = nameEl.textContent || 'Файл не выбран';

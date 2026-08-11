@@ -13278,7 +13278,7 @@ a.match-details-value__lead:hover {
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: #94a3b8;
-    margin: 0 0 var(--spacing-sm);
+    margin: 0;
 }
 
 /*
@@ -13286,6 +13286,7 @@ a.match-details-value__lead:hover {
  * Повторяющийся паттерн из 6 фото (площадь 12 ячеек = ровно 3 ряда):
  *   1-е — большое 2x2, 2-е — вертикальное 1x2, 3-е и 4-е — маленькие 1x1,
  *   5-е и 6-е — широкие 2x1.
+ * Спан применяется к __item-wrap (прямым детям грида).
  */
 .tournament-photos__grid {
     display: grid;
@@ -13295,46 +13296,56 @@ a.match-details-value__lead:hover {
     gap: 8px;
 }
 
-.tournament-photos__item:nth-child(6n+1) {
+.tournament-photos__item-wrap:nth-child(6n+1) {
     grid-column: span 2;
     grid-row: span 2;
 }
 
-.tournament-photos__item:nth-child(6n+2) {
+.tournament-photos__item-wrap:nth-child(6n+2) {
     grid-row: span 2;
 }
 
-.tournament-photos__item:nth-child(6n+5),
-.tournament-photos__item:nth-child(6n) {
+.tournament-photos__item-wrap:nth-child(6n+5),
+.tournament-photos__item-wrap:nth-child(6n) {
     grid-column: span 2;
 }
 
 /* Хвостовые элементы растягиваем, чтобы в конце коллажа не оставалось дыр */
-.tournament-photos__item:nth-child(6n+1):last-child {
+.tournament-photos__item-wrap:nth-child(6n+1):last-child {
     grid-column: 1 / -1;
 }
 
-.tournament-photos__item:nth-child(6n+2):last-child {
+.tournament-photos__item-wrap:nth-child(6n+2):last-child {
     grid-column: span 2;
 }
 
-.tournament-photos__item:nth-child(6n+3):last-child {
+.tournament-photos__item-wrap:nth-child(6n+3):last-child {
     grid-row: span 2;
 }
 
-.tournament-photos__item:nth-child(6n+5):last-child {
+.tournament-photos__item-wrap:nth-child(6n+5):last-child {
     grid-column: 1 / -1;
 }
 
 /* Единственное фото — во всю ширину и повыше */
-.tournament-photos__item:only-child {
+.tournament-photos__item-wrap:only-child {
     grid-column: 1 / -1;
     grid-row: span 3;
+}
+
+.tournament-photos__item-wrap {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    margin: 0;
 }
 
 .tournament-photos__item {
     position: relative;
     display: block;
+    width: 100%;
+    height: 100%;
     border-radius: var(--radius-sm);
     overflow: hidden;
     background: var(--color-bg-elevated);
@@ -13394,6 +13405,167 @@ a.match-details-value__lead:hover {
     color: var(--color-primary);
     font-weight: 600;
     background: var(--color-bg-elevated);
+}
+
+
+.tournament-photos__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.tournament-photos__actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    max-width: 320px;
+    margin-left: auto;
+}
+
+.tournament-photos__upload {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.tournament-photos__upload-toggle {
+    list-style: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+}
+
+.tournament-photos__upload-toggle::-webkit-details-marker {
+    display: none;
+}
+
+/* Форма в потоке документа — не перекрывает сетку фото */
+.tournament-photos__upload-form {
+    position: static;
+    width: 100%;
+    max-width: 320px;
+    margin: 0 0 var(--spacing-md);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-elevated);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    display: grid;
+    gap: var(--spacing-sm);
+    box-sizing: border-box;
+}
+
+.tournament-photos__upload[open] {
+    align-items: stretch;
+}
+
+.tournament-photos__upload[open] .tournament-photos__upload-toggle {
+    align-self: flex-end;
+}
+
+.tournament-photos__upload-label {
+    display: grid;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    min-width: 0;
+}
+
+.tournament-photos__upload-label .form-control {
+    max-width: 100%;
+}
+
+.tournament-photos__upload-hint {
+    margin: 0;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.tournament-photos__limit-msg {
+    margin: 0;
+    font-size: 11px;
+    color: #94a3b8;
+    max-width: 220px;
+    text-align: right;
+    align-self: flex-end;
+}
+
+.tournament-photos__empty {
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.tournament-photos__delete-form {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 3;
+    margin: 0;
+}
+
+.tournament-photos__delete-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.78);
+    color: #f8fafc;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.tournament-photos__delete-btn:hover {
+    background: rgba(220, 38, 38, 0.9);
+}
+
+@media (width <= 768px) {
+    .tournament-photos__header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tournament-photos__actions {
+        max-width: none;
+        margin-left: 0;
+        align-items: stretch;
+    }
+
+    .tournament-photos__upload {
+        align-items: stretch;
+    }
+
+    .tournament-photos__upload-toggle {
+        justify-content: center;
+        width: 100%;
+    }
+
+    .tournament-photos__upload-form {
+        max-width: none;
+        margin-bottom: var(--spacing-md);
+    }
+
+    .tournament-photos__limit-msg {
+        max-width: none;
+        text-align: left;
+        align-self: stretch;
+    }
+
+    .tournament-photos__delete-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 15px;
+    }
 }
 
 /* END tournament-pages-extra.css */

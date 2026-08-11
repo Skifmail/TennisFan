@@ -93,7 +93,7 @@
                 {% if tournament.photos.all %}
                 <div class="tournament-photos__grid">
                     {% for photo in tournament.photos.all %}
-                    <div class="tournament-photos__item-wrap">
+                    <figure class="tournament-photos__item-wrap">
                         <a href="{{ photo.image.url }}"
                            class="js-lightbox tournament-photos__item"
                            data-lightbox-src="{{ photo.image.url }}"
@@ -110,10 +110,10 @@
                               class="tournament-photos__delete-form"
                               onsubmit="return confirm('Удалить это фото?');">
                             {% csrf_token %}
-                            <button type="submit" class="tournament-photos__delete-btn" aria-label="Удалить фото">×</button>
+                            <button type="submit" class="tournament-photos__delete-btn" aria-label="Удалить фото" title="Удалить">×</button>
                         </form>
                         {% endif %}
-                    </div>
+                    </figure>
                     {% endfor %}
                 </div>
                 {% elif show_tournament_photo_upload_ui %}

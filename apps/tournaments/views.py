@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count, Min, Prefetch, Q
 from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404, redirect, render
@@ -45,12 +45,14 @@ from apps.users.models import Notification, Player, SkillLevel
 from .cancel import cancel_tournament
 from .fan import _is_fan
 from .fan import generate_bracket as fan_generate_bracket
+from .forms import TournamentPhotoUploadForm
 from .models import (
     Match,
     MatchResultProposal,
     Tournament,
     TournamentEntryPayment,
     TournamentEntryRefundRequest,
+    TournamentPhoto,
     TournamentPlayerResult,
     TournamentPostpaymentInvoice,
     TournamentRegistrationCoverage,
@@ -60,6 +62,13 @@ from .models import (
 )
 from .olympic_consolation import _is_olympic
 from .olympic_consolation import generate_bracket as olympic_generate_bracket
+from .photo_services import (
+    can_participant_delete_photo,
+    can_participant_upload_photo,
+    get_next_photo_order,
+    get_participant_photo_count,
+    is_active_tournament_participant,
+)
 from .platform_home import (
     CLUB_FILTER_CLUB_ONLY,
     CLUB_FILTER_PLATFORM,
@@ -636,7 +645,7 @@ def tournament_detail(request, slug):
             "tvd_groups__matches__player1__user",
             "tvd_groups__matches__player2__user",
             "tvd_groups__matches__winner__user",
-            "photos",
+            "photos__uploaded_by",
         ),
         slug=slug,
     )
@@ -1125,6 +1134,7 @@ def tournament_detail(request, slug):
         "can_manage_tournament": _can_manage_tournament(request, tournament),
         "withdrawn_player_ids": withdrawn_player_ids,
         "withdrawn_team_ids": withdrawn_team_ids,
+        **_get_participant_photo_context(request, tournament),
     }
     context.update(_get_club_panel_context_for_tournament(request, tournament))
     if is_tvd:
@@ -1179,6 +1189,112 @@ def _can_manage_tournament(request, tournament):
     if tournament.club_id:
         return user_can_manage_club(request.user, tournament.club)
     return bool(request.user.is_staff)
+
+
+def _get_request_player(request):
+    """Получить профиль игрока текущего пользователя."""
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return None
+    return getattr(request.user, "player", None)
+
+
+def _get_participant_photo_context(request, tournament):
+    """Контекст загрузки фото для страницы турнира."""
+    player = _get_request_player(request)
+    count = 0
+    can_upload = False
+    is_active_participant = False
+    if player:
+        is_active_participant = is_active_tournament_participant(tournament, player)
+        count = get_participant_photo_count(tournament, player)
+        can_upload = can_participant_upload_photo(tournament, player)
+
+    limit = TournamentPhoto.PARTICIPANT_PHOTO_LIMIT
+    return {
+        "can_upload_tournament_photo": can_upload,
+        "participant_photo_count": count,
+        "participant_photo_limit": limit,
+        "participant_photo_limit_reached": is_active_participant and count >= limit,
+        "is_active_tournament_participant": is_active_participant,
+        "current_player": player,
+    }
+
+
+@login_required
+def tournament_photo_upload(request, slug):
+    """Загрузка фото участником турнира в галерею."""
+    if request.method != "POST":
+        return redirect("tournament_detail", slug=slug)
+
+    player = _get_request_player(request)
+    if not player:
+        from django.http import HttpResponseForbidden
+
+        return HttpResponseForbidden("Профиль игрока не найден.")
+
+    form = TournamentPhotoUploadForm(request.POST, request.FILES)
+    if not form.is_valid():
+        for errors in form.errors.values():
+            for error in errors:
+                messages.error(request, error)
+        return redirect("tournament_detail", slug=slug)
+
+    with transaction.atomic():
+        tournament = get_object_or_404(
+            Tournament.objects.select_for_update(),
+            slug=slug,
+        )
+        if not is_active_tournament_participant(tournament, player):
+            from django.http import HttpResponseForbidden
+
+            return HttpResponseForbidden(
+                "Загружать фото могут только участники турнира."
+            )
+
+        if not can_participant_upload_photo(tournament, player):
+            messages.error(
+                request,
+                "Вы загрузили максимальное количество фото "
+                f"({TournamentPhoto.PARTICIPANT_PHOTO_LIMIT}).",
+            )
+            return redirect("tournament_detail", slug=slug)
+
+        TournamentPhoto.objects.create(
+            tournament=tournament,
+            image=form.cleaned_data["image"],
+            caption=form.cleaned_data.get("caption", ""),
+            order=get_next_photo_order(tournament),
+            uploaded_by=player,
+        )
+
+    messages.success(request, "Фото добавлено в галерею турнира.")
+    return redirect("tournament_detail", slug=slug)
+
+
+@login_required
+def tournament_photo_delete(request, slug, pk):
+    """Удаление своего фото участником турнира."""
+    if request.method != "POST":
+        return redirect("tournament_detail", slug=slug)
+
+    player = _get_request_player(request)
+    if not player:
+        from django.http import HttpResponseForbidden
+
+        return HttpResponseForbidden("Профиль игрока не найден.")
+
+    tournament = get_object_or_404(Tournament, slug=slug)
+    photo = get_object_or_404(TournamentPhoto, pk=pk, tournament=tournament)
+
+    if not can_participant_delete_photo(photo, player):
+        from django.http import HttpResponseForbidden
+
+        return HttpResponseForbidden("Можно удалять только свои фото.")
+
+    photo.image.delete(save=False)
+    photo.delete()
+    messages.success(request, "Фото удалено.")
+    return redirect("tournament_detail", slug=slug)
 
 
 def _tournament_manage_get_any_tournament(request, slug):

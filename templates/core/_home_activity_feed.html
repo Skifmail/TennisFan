@@ -4,6 +4,9 @@
             <h2 class="section-title home-activity__title" id="home-activity-title">
                 <span class="home-activity__live" aria-hidden="true"></span>
                 События платформы
+                {% if home_activity_new_count %}
+                <span class="home-activity__new-badge">{{ home_activity_new_label }}</span>
+                {% endif %}
             </h2>
         </div>
 
@@ -11,21 +14,13 @@
         <div
             class="home-activity"
             data-home-activity
-            style="--home-activity-count: {{ home_activity_events|length }}"
+            data-latest-id="{{ home_activity_latest_id }}"
+            data-seen-cookie="{{ home_activity_seen_cookie }}"
         >
             <div class="home-activity__list">
-                <div class="home-activity__track">
-                    <div class="home-activity__group">
-                        {% for event in home_activity_events %}
-                        {% include 'core/_home_activity_row.html' with event=event index=forloop.counter0 only %}
-                        {% endfor %}
-                    </div>
-                    <div class="home-activity__group home-activity__group--clone" aria-hidden="true" inert>
-                        {% for event in home_activity_events %}
-                        {% include 'core/_home_activity_row.html' with event=event is_clone='1' only %}
-                        {% endfor %}
-                    </div>
-                </div>
+                {% for event in home_activity_events %}
+                {% include 'core/_home_activity_row.html' with event=event index=forloop.counter0 only %}
+                {% endfor %}
             </div>
         </div>
         {% else %}
@@ -35,26 +30,42 @@
         {% endif %}
     </div>
 </section>
+{% if home_activity_new_count %}
+<a href="#home-activity" class="home-activity-nudge" data-home-activity-nudge>
+    <span class="home-activity-nudge__dot" aria-hidden="true"></span>
+    Появились новые события — посмотреть
+</a>
+{% endif %}
 <script>
 (function () {
     var root = document.querySelector("[data-home-activity]");
-    if (!root) {
-        return;
-    }
-    var list = root.querySelector(".home-activity__list");
-    var track = root.querySelector(".home-activity__track");
-    if (!list || !track) {
-        return;
+    var nudge = document.querySelector("[data-home-activity-nudge]");
+
+    function markSeen() {
+        if (!root) {
+            return;
+        }
+        var latest = root.getAttribute("data-latest-id");
+        var cookieName = root.getAttribute("data-seen-cookie") || "home_activity_seen";
+        if (latest) {
+            var secure = window.location.protocol === "https:" ? "; secure" : "";
+            document.cookie = cookieName + "=" + encodeURIComponent(latest)
+                + "; path=/; max-age=31536000; samesite=lax" + secure;
+        }
+        if (nudge) {
+            nudge.remove();
+        }
     }
 
     function reveal() {
-        root.classList.add("home-activity--inview");
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-            return;
+        if (root) {
+            root.classList.add("home-activity--inview");
         }
-        if (track.scrollHeight > list.clientHeight + 12) {
-            root.classList.add("home-activity--ticker");
-        }
+        markSeen();
+    }
+
+    if (!root) {
+        return;
     }
 
     if ("IntersectionObserver" in window) {

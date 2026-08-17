@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
+from django.http import HttpResponse
 from django.utils import timezone
 
 from apps.core.models import PlatformActivityEvent, PlatformDashboardSeen
@@ -26,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 PLATFORM_ACTIVITY_UNSEEN_CACHE_PREFIX = "platform_activity_unseen"
 HOME_ACTIVITY_FEED_LIMIT = 25
+HOME_ACTIVITY_SEEN_COOKIE = "home_activity_seen"
+HOME_ACTIVITY_SEEN_MAX_AGE = 60 * 60 * 24 * 365
 
 ActivityEventType = str | PlatformActivityEvent.EventType | tuple[str, ...]
 
@@ -307,4 +310,94 @@ def get_public_home_activity_events(
         .exclude(actor_id__in=hidden_user_ids)
         .select_related("actor", "actor__player")
         .order_by("-created_at", "-id")[: max(1, int(limit))]
+    )
+
+
+def parse_home_activity_seen_id(raw: str | None) -> int | None:
+    """Разобрать cookie с id последнего просмотренного события ленты.
+
+    Args:
+        raw: Сырое значение cookie или ``None``, если cookie ещё нет.
+
+    Returns:
+        int | None: Id события либо ``None`` для первого визита.
+    """
+    if raw is None or raw == "":
+        return None
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return None
+
+
+def format_new_home_activity_label(count: int) -> str:
+    """Собрать подпись бейджа новых событий с русской формой числительного.
+
+    Args:
+        count: Количество новых событий.
+
+    Returns:
+        str: Например «1 новое» или «5 новых». Пустая строка, если новых нет.
+    """
+    total = max(0, int(count))
+    if total == 0:
+        return ""
+    mod10 = total % 10
+    mod100 = total % 100
+    if mod10 == 1 and mod100 != 11:
+        word = "новое"
+    elif mod10 in {2, 3, 4} and mod100 not in {12, 13, 14}:
+        word = "новых"
+    else:
+        word = "новых"
+    return f"{total} {word}"
+
+
+def annotate_home_activity_new_events(
+    events: list[PlatformActivityEvent],
+    *,
+    seen_id: int | None,
+) -> int:
+    """Пометить события, появившиеся после последнего просмотра ленты.
+
+    Первый визит (``seen_id is None``) ничего не подсвечивает: иначе вся лента
+    выглядела бы как непрочитанная.
+
+    Args:
+        events: События публичной ленты.
+        seen_id: Id последнего просмотренного события или ``None``.
+
+    Returns:
+        int: Сколько событий в выборке считаются новыми.
+    """
+    new_count = 0
+    for event in events:
+        is_new = seen_id is not None and event.id > seen_id
+        event.is_new = is_new
+        if is_new:
+            new_count += 1
+    return new_count
+
+
+def set_home_activity_seen_cookie(
+    response: HttpResponse,
+    event_id: int,
+    *,
+    secure: bool,
+) -> None:
+    """Записать cookie с последним просмотренным событием ленты на главной.
+
+    Args:
+        response: HTTP-ответ, в который пишется cookie.
+        event_id: Id события, до которого лента считается просмотренной.
+        secure: Ставить флаг Secure (для HTTPS).
+    """
+    response.set_cookie(
+        HOME_ACTIVITY_SEEN_COOKIE,
+        str(int(event_id)),
+        max_age=HOME_ACTIVITY_SEEN_MAX_AGE,
+        path="/",
+        samesite="Lax",
+        secure=secure,
+        httponly=False,
     )

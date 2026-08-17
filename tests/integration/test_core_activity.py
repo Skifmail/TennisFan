@@ -11,7 +11,7 @@ from apps.clubs.models import (
     Club,
     ClubJoinRequest,
 )
-from apps.core.activity import log_activity
+from apps.core.activity import HOME_ACTIVITY_SEEN_COOKIE, log_activity
 from apps.core.models import PlatformActivityEvent
 from apps.payments.models import PaymentRecord
 from apps.users.models import Player, User
@@ -392,3 +392,59 @@ class PlatformActivityFeedTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Кирилл Фотов")
         self.assertContains(response, "Кубок ленты")
+
+    def test_first_home_visit_does_not_mark_feed_as_new(self) -> None:
+        """Первый заход только запоминает ленту и не орёт «всё новое»."""
+        user = User.objects.create_user(
+            email="home-feed-first-visit@test.local",
+            password="testpass123",
+            first_name="Первый",
+            last_name="Визит",
+        )
+        Player.objects.create(user=user)
+
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["home_activity_new_count"], 0)
+        self.assertNotContains(response, "home-activity__row--new")
+        self.assertNotContains(response, "Появились новые события")
+        self.assertIn(HOME_ACTIVITY_SEEN_COOKIE, response.cookies)
+        latest_id = max(event.id for event in response.context["home_activity_events"])
+        self.assertEqual(
+            response.cookies[HOME_ACTIVITY_SEEN_COOKIE].value, str(latest_id)
+        )
+
+    def test_returning_visitor_sees_new_home_activity(self) -> None:
+        """После новых событий возвращающийся посетитель видит бейдж и плашку."""
+        old_user = User.objects.create_user(
+            email="home-feed-seen-old@test.local",
+            password="testpass123",
+            first_name="Старый",
+            last_name="След",
+        )
+        Player.objects.create(user=old_user)
+        seen_event = (
+            PlatformActivityEvent.objects.filter(
+                event_type__in=PlatformActivityEvent.PUBLIC_FEED_EVENT_TYPES
+            )
+            .order_by("-id")
+            .first()
+        )
+        self.assertIsNotNone(seen_event)
+
+        new_user = User.objects.create_user(
+            email="home-feed-seen-new@test.local",
+            password="testpass123",
+            first_name="Свежий",
+            last_name="Игрок",
+        )
+        Player.objects.create(user=new_user)
+
+        self.client.cookies[HOME_ACTIVITY_SEEN_COOKIE] = str(seen_event.id)
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(response.context["home_activity_new_count"], 1)
+        self.assertContains(response, "home-activity__row--new")
+        self.assertContains(response, "Появились новые события")
+        self.assertContains(response, "Свежий Игрок")
+        self.assertNotIn(HOME_ACTIVITY_SEEN_COOKIE, response.cookies)

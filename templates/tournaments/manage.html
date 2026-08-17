@@ -634,6 +634,122 @@
     });
 })();
 </script>
+<div id="walkover-confirm-modal" class="modal-overlay club-confirm-modal" style="display:none;" aria-hidden="true">
+    <div class="modal-dialog club-confirm-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="walkover-confirm-title" aria-describedby="walkover-confirm-text">
+        <div class="club-confirm-modal__eyebrow">Подтверждение</div>
+        <h3 id="walkover-confirm-title" class="modal-dialog__title club-confirm-modal__title">Проставить Walkover (неявку)?</h3>
+        <p id="walkover-confirm-text" class="modal-dialog__text club-confirm-modal__text">Выбранному участнику будет засчитана неявка.</p>
+        <div class="walkover-confirm-modal__fields">
+            <label class="walkover-confirm-modal__label" for="walkover-penalty-input">Штраф, очки рейтинга</label>
+            <input id="walkover-penalty-input" class="walkover-confirm-modal__input" type="number" min="0" step="1" value="40" inputmode="decimal">
+            <label class="walkover-confirm-modal__check">
+                <input id="walkover-skip-penalty" type="checkbox">
+                Не начислять штраф
+            </label>
+        </div>
+        <div class="modal-dialog__actions club-confirm-modal__actions">
+            <button type="button" class="btn btn-sm club-confirm-modal__btn club-confirm-modal__btn--secondary" data-walkover-cancel>Отмена</button>
+            <button type="button" class="btn btn-sm btn-primary club-confirm-modal__btn club-confirm-modal__btn--primary" data-walkover-confirm>Проставить</button>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    var modal = document.getElementById('walkover-confirm-modal');
+    var textEl = document.getElementById('walkover-confirm-text');
+    var penaltyInput = document.getElementById('walkover-penalty-input');
+    var skipInput = document.getElementById('walkover-skip-penalty');
+    if (!modal || !textEl || !penaltyInput || !skipInput) return;
+    var confirmBtn = modal.querySelector('[data-walkover-confirm]');
+    if (!confirmBtn) return;
+    var pendingForm = null;
+    var defaultPenalty = '40';
+
+    function syncPenaltyEnabled() {
+        var skip = skipInput.checked;
+        penaltyInput.disabled = skip;
+        penaltyInput.setAttribute('aria-disabled', skip ? 'true' : 'false');
+    }
+
+    function closeModal() {
+        pendingForm = null;
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function openModal(form, playerName) {
+        pendingForm = form;
+        defaultPenalty = form.getAttribute('data-default-penalty') || '40';
+        penaltyInput.value = defaultPenalty;
+        skipInput.checked = false;
+        syncPenaltyEnabled();
+        textEl.textContent = playerName
+            ? 'Игроку «' + playerName + '» будет засчитана неявка (Walkover).'
+            : 'Выбранному участнику будет засчитана неявка (Walkover).';
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        penaltyInput.focus();
+        penaltyInput.select();
+    }
+
+    skipInput.addEventListener('change', syncPenaltyEnabled);
+
+    document.querySelectorAll('[data-walkover-form]').forEach(function(form) {
+        var btn = form.querySelector('.bracket-walkover-btn');
+        var radios = form.querySelectorAll('input[type="radio"]');
+        if (!btn || !radios.length) return;
+        function selectedRadio() {
+            return form.querySelector('input[type="radio"]:checked');
+        }
+        function syncWalkoverBtn() {
+            var selected = selectedRadio();
+            btn.disabled = !selected;
+            btn.setAttribute('aria-disabled', selected ? 'false' : 'true');
+        }
+        radios.forEach(function(radio) {
+            radio.addEventListener('change', syncWalkoverBtn);
+        });
+        form.addEventListener('submit', function(e) {
+            var selected = selectedRadio();
+            if (!selected) {
+                e.preventDefault();
+                syncWalkoverBtn();
+                return;
+            }
+            e.preventDefault();
+            openModal(form, (selected.getAttribute('data-player-name') || '').trim());
+        });
+        syncWalkoverBtn();
+    });
+
+    confirmBtn.addEventListener('click', function() {
+        if (!pendingForm) return;
+        var form = pendingForm;
+        var skip = skipInput.checked;
+        var penaltyField = form.querySelector('[data-walkover-penalty]');
+        var skipField = form.querySelector('[data-walkover-skip]');
+        if (penaltyField) {
+            penaltyField.value = skip ? '0' : (penaltyInput.value || defaultPenalty);
+        }
+        if (skipField) {
+            skipField.value = skip ? '1' : '';
+        }
+        closeModal();
+        form.submit();
+    });
+
+    modal.addEventListener('click', function(event) {
+        if (event.target === modal || event.target.hasAttribute('data-walkover-cancel')) {
+            closeModal();
+        }
+    });
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && modal.style.display !== 'none') {
+            closeModal();
+        }
+    });
+})();
+</script>
 
 {% endblock %}
 {% endblock %}

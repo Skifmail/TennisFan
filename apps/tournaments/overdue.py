@@ -73,7 +73,7 @@ def _build_overdue_lk_message(match: Match) -> str:
     msg = (
         f"Просрочен дедлайн матча {match.get_player1_display()} — "
         f"{match.get_player2_display()} в «{tournament_name}». "
-        "Продлите дедлайн или проставьте Walkover."
+        "Продлите дедлайн или проставьте Walkover (неявку)."
     )
     if len(msg) > 255:
         return msg[:252] + "..."
@@ -172,23 +172,37 @@ def notify_overdue_matches_for_formats(formats: list[str]) -> tuple[int, int]:
     return notified, skipped
 
 
+def resolve_no_show_penalty(penalty: float | None) -> float:
+    """Вернуть величину штрафа за неявку в очках рейтинга.
+
+    ``None`` означает значение по умолчанию ``WALKOVER_NO_SHOW_PENALTY``.
+    Отрицательные числа принимаются по модулю: ``-25`` и ``25`` дают штраф 25.
+    """
+    if penalty is None:
+        return float(WALKOVER_NO_SHOW_PENALTY)
+    return abs(float(penalty))
+
+
 def apply_no_show_walkover(
     match: Match,
     *,
     loser: Player | None = None,
     loser_team: TournamentTeam | None = None,
     notify: bool = True,
+    penalty: float | None = None,
 ) -> None:
-    """Проставить Walkover за неявку: без счёта, штраф только неявившемуся.
+    """Проставить Walkover (неявку): без счёта, штраф только неявившемуся.
 
-    Победителю ставится 0 к рейтингу, проигравшему — фиксированный штраф
-    ``WALKOVER_NO_SHOW_PENALTY``. Матч получает статус «Без игры».
+    Победителю ставится 0 к рейтингу, проигравшему — ``penalty``
+    (по умолчанию ``WALKOVER_NO_SHOW_PENALTY``). Ноль означает, что штраф
+    не начисляется. Матч получает статус «Без игры».
 
     Args:
         match: Незавершённый матч.
         loser: Игрок, которому засчитывается неявка (одиночный матч).
         loser_team: Команда, которой засчитывается неявка (парный матч).
         notify: Отправлять уведомления участникам о результате.
+        penalty: Сумма штрафа в очках; ``None`` — значение по умолчанию.
 
     Raises:
         ValueError: Если не указан проигравший или он не участвует в матче.
@@ -199,7 +213,7 @@ def apply_no_show_walkover(
     is_doubles = bool(match.team1_id and match.team2_id)
     if is_doubles:
         if loser_team is None:
-            raise ValueError("Для парного матча укажите команду с Walkover.")
+            raise ValueError("Для парного матча укажите команду с Walkover (неявкой).")
         if loser_team.pk not in (match.team1_id, match.team2_id):
             raise ValueError("Команда не участвует в этом матче.")
         winner_team = match.team2 if loser_team.pk == match.team1_id else match.team1
@@ -207,13 +221,15 @@ def apply_no_show_walkover(
         match.winner = winner_team.player1 if winner_team else None
     else:
         if loser is None:
-            raise ValueError("Укажите игрока с Walkover.")
+            raise ValueError("Укажите игрока с Walkover (неявкой).")
         if loser.pk not in (match.player1_id, match.player2_id):
             raise ValueError("Игрок не участвует в этом матче.")
         winner = match.player2 if loser.pk == match.player1_id else match.player1
         match.winner = winner
         match.winner_team = None
 
+    resolved_penalty = resolve_no_show_penalty(penalty)
+    match._no_show_penalty = resolved_penalty
     match.status = Match.MatchStatus.WALKOVER
     match.completed_datetime = timezone.now()
     match.rating_status = Match.RatingCalcStatus.PENDING
@@ -241,7 +257,7 @@ def apply_no_show_walkover(
         "No-show walkover: match %s, winner %s, penalty %.0f",
         match.pk,
         match.winner_id,
-        WALKOVER_NO_SHOW_PENALTY,
+        resolved_penalty,
     )
 
 

@@ -318,6 +318,8 @@ def update_player_stats(sender, instance, created, **kwargs):
         "winner_team__player2",
         "sparring_response__sparring_request",
     ).get(pk=instance.pk)
+    if hasattr(instance, "_no_show_penalty"):
+        match._no_show_penalty = instance._no_show_penalty
 
     winner = match.winner
     winner_team = match.winner_team
@@ -503,10 +505,10 @@ def _apply_fixed_rating_delta(player, delta: float) -> None:
 
 
 def _apply_no_show_walkover_rating(match: Match) -> None:
-    """Walkover без игры: −40 неявившемуся, 0 победителю, без FAN-расчёта."""
+    """Walkover (неявка) без игры: штраф неявившемуся, 0 победителю, без FAN."""
     from .rating import WALKOVER_NO_SHOW_PENALTY
 
-    penalty = WALKOVER_NO_SHOW_PENALTY
+    penalty = float(getattr(match, "_no_show_penalty", WALKOVER_NO_SHOW_PENALTY))
     is_doubles_sparring = bool(match.partner1_id and match.partner2_id)
     is_doubles = bool(match.team1_id and match.team2_id) or is_doubles_sparring
 

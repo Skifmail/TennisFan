@@ -1,19 +1,37 @@
 {% if match.player1_id or match.team1_id %}
 {% if match.is_deadline_overdue %}
-<p class="bracket-overdue-note">Дедлайн истёк. Продлите дедлайн выше или проставьте Walkover (неявку) одному из участников: у него −40 рейтинга, у соперника 0, матч закроется без игры.</p>
+<p class="bracket-overdue-note">Дедлайн истёк. Продлите дедлайн выше или проставьте Walkover (неявку) одному из участников. Штраф задаётся в окне подтверждения (по умолчанию −40), у соперника 0, матч закроется без игры.</p>
 {% endif %}
-<form action="{% url 'tournament_manage_match_walkover' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-walkover-form">
+<form action="{% url 'tournament_manage_match_walkover' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-walkover-form" data-walkover-form data-default-penalty="40">
     {% csrf_token %}
-    <div class="bracket-winner-row">
-        <span class="bracket-winner-label">Walkover (неявка):</span>
+    <input type="hidden" name="walkover_penalty" value="40" data-walkover-penalty>
+    <input type="hidden" name="skip_penalty" value="" data-walkover-skip>
+    <span class="bracket-winner-label">Walkover (неявка)</span>
+    <div class="bracket-winner-choices">
         {% if match.team1_id and match.team2_id %}
-        <label class="bracket-radio"><input type="radio" name="walkover_loser_team_id" value="{{ match.team1_id }}" required> {{ match.get_player1_display }}</label>
-        <label class="bracket-radio"><input type="radio" name="walkover_loser_team_id" value="{{ match.team2_id }}" required> {{ match.get_player2_display }}</label>
+        <label class="bracket-radio">
+            <input type="radio" name="walkover_loser_team_id" value="{{ match.team1_id }}" data-player-name="{{ match.get_player1_display }}" required>
+            {{ match.get_player1_display }}
+        </label>
+        <label class="bracket-radio">
+            <input type="radio" name="walkover_loser_team_id" value="{{ match.team2_id }}" data-player-name="{{ match.get_player2_display }}" required>
+            {{ match.get_player2_display }}
+        </label>
         {% else %}
-        {% if match.player1_id %}<label class="bracket-radio"><input type="radio" name="walkover_loser_id" value="{{ match.player1_id }}" required> {{ match.get_player1_display }}</label>{% endif %}
-        {% if match.player2_id %}<label class="bracket-radio"><input type="radio" name="walkover_loser_id" value="{{ match.player2_id }}" required> {{ match.get_player2_display }}</label>{% endif %}
+        {% if match.player1_id %}
+        <label class="bracket-radio">
+            <input type="radio" name="walkover_loser_id" value="{{ match.player1_id }}" data-player-name="{{ match.get_player1_display }}" required>
+            {{ match.get_player1_display }}
+        </label>
+        {% endif %}
+        {% if match.player2_id %}
+        <label class="bracket-radio">
+            <input type="radio" name="walkover_loser_id" value="{{ match.player2_id }}" data-player-name="{{ match.get_player2_display }}" required>
+            {{ match.get_player2_display }}
+        </label>
+        {% endif %}
         {% endif %}
     </div>
-    <button type="submit" class="btn btn-sm btn-secondary bracket-submit-btn">Проставить Walkover</button>
+    <button type="submit" class="btn btn-sm btn-primary bracket-submit-btn bracket-walkover-btn" disabled aria-disabled="true">Проставить Walkover (неявку)</button>
 </form>
 {% endif %}

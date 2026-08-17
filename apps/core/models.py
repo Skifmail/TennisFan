@@ -584,6 +584,7 @@ class PlatformActivityEvent(models.Model):
         SUBSCRIPTION_CANCELLED = "subscription_cancelled", "Отмена подписки"
         FANCOIN_CHARGE = "fancoin_charge", "Списание FAN-коинов"
         FANCOIN_REFUND = "fancoin_refund", "Возврат FAN-коинов"
+        PHOTO_ADDED = "photo_added", "Добавлено фото"
 
     #: Типы событий, относящиеся к оплатам (для подсветки и группировки в UI).
     PAYMENT_EVENT_TYPES = frozenset(
@@ -593,6 +594,27 @@ class PlatformActivityEvent(models.Model):
             EventType.PAYMENT_CLUB_FEE,
             EventType.PAYMENT_TOURNAMENT,
             EventType.PAYMENT_DONATION,
+        }
+    )
+
+    #: События, которые можно показать всем посетителям главной страницы.
+    PUBLIC_FEED_EVENT_TYPES = frozenset(
+        {
+            EventType.REGISTRATION,
+            EventType.TOURNAMENT_REGISTERED,
+            EventType.MATCH_RESULT_PROPOSED,
+            EventType.MATCH_RESULT_CONFIRMED,
+            EventType.SPARRING_CREATED,
+            EventType.SPARRING_APPLIED,
+            EventType.SPARRING_APPROVED,
+            EventType.DOUBLES_CREATED,
+            EventType.DOUBLES_JOIN_REQUESTED,
+            EventType.DOUBLES_JOIN_APPROVED,
+            EventType.CLUB_JOINED,
+            EventType.TRAINING_PUBLISHED,
+            EventType.TRAINING_ENROLLED,
+            EventType.COMMENT_ADDED,
+            EventType.PHOTO_ADDED,
         }
     )
 
@@ -741,7 +763,7 @@ class PlatformActivityEvent(models.Model):
 
         Returns:
             str: Один из «payment», «registration», «match», «tournament»,
-            «sparring», «default».
+            «sparring», «photo», «default».
         """
         et = self.EventType
         if self.is_payment:
@@ -786,12 +808,46 @@ class PlatformActivityEvent(models.Model):
             return "training"
         if self.event_type == et.COMMENT_ADDED:
             return "comment"
+        if self.event_type == et.PHOTO_ADDED:
+            return "photo"
         if self.event_type in {
             et.FANCOIN_CHARGE,
             et.FANCOIN_REFUND,
         }:
             return "fancoin"
         return "default"
+
+    def get_public_target_url(self) -> str:
+        """Вернуть публичную ссылку события, скрывая адреса админки.
+
+        Returns:
+            str: Относительный URL для посетителей сайта либо пустая строка.
+        """
+        url = (self.target_url or "").strip()
+        if not url:
+            return ""
+        if url.startswith("/admin/") or url.startswith("admin/"):
+            return ""
+        return url
+
+    def get_actor_profile_url(self) -> str:
+        """Вернуть URL публичного профиля действующего лица.
+
+        Returns:
+            str: Ссылка на профиль игрока либо пустая строка.
+        """
+        actor = self.actor
+        if actor is None:
+            return ""
+        player = getattr(actor, "player", None)
+        if player is None or getattr(player, "is_bye", False):
+            return ""
+        from django.urls import reverse
+
+        try:
+            return str(reverse("profile", kwargs={"pk": player.pk}))
+        except Exception:  # noqa: BLE001
+            return ""
 
     def get_amount_display(self) -> str:
         """Отформатировать сумму с символом валюты.

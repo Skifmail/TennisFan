@@ -60,6 +60,7 @@ class Command(BaseCommand):
         self._backfill_clubs()
         self._backfill_coaches_and_trainings()
         self._backfill_comments()
+        self._backfill_photos()
         self._backfill_fancoin()
         self._backfill_subscription_cancellations()
         created_after = PlatformActivityEvent.objects.count()
@@ -546,6 +547,33 @@ class Command(BaseCommand):
             )
             count += 1
         self.stdout.write(f"  Комментарии: обработано {count}")
+
+    def _backfill_photos(self) -> None:
+        """Создать события по фотографиям, загруженным в турниры."""
+        from apps.tournaments.models import TournamentPhoto
+
+        count = 0
+        photos: QuerySet = TournamentPhoto.objects.select_related(
+            "tournament", "uploaded_by__user"
+        )
+        for photo in photos.iterator():
+            tournament = photo.tournament
+            if tournament is None:
+                continue
+            gallery_url = _safe_reverse(
+                "tournament_gallery_detail", slug=tournament.slug
+            ) or _safe_reverse("tournament_detail", slug=tournament.slug)
+            log_activity(
+                event_type=EventType.PHOTO_ADDED,
+                actor=player_user(photo.uploaded_by),
+                description=f"Добавил фото в турнир «{tournament.name}»",
+                target_url=gallery_url,
+                metadata={"tournament_id": tournament.pk, "photo_id": photo.pk},
+                dedupe_key=f"tournament_photo:{photo.pk}",
+                created_at=getattr(photo, "created_at", None),
+            )
+            count += 1
+        self.stdout.write(f"  Фото турниров: обработано {count}")
 
     def _backfill_fancoin(self) -> None:
         """Создать события по списаниям и возвратам FAN-коинов."""

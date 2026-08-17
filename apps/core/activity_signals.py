@@ -79,6 +79,7 @@ def register() -> None:
         Match,
         MatchResultProposal,
         Tournament,
+        TournamentPhoto,
         TournamentTeam,
     )
     from apps.training.models import CoachApplication, Training, TrainingEnrollment
@@ -715,5 +716,35 @@ def register() -> None:
         on_subscription_saved,
         sender=UserSubscription,
         dispatch_uid="activity_subscription_saved",
+        weak=False,
+    )
+
+    # ------------------------------------------------------------------
+    # Фотографии турниров (публичная галерея)
+    # ------------------------------------------------------------------
+    def on_tournament_photo_created(sender, instance, created, **kwargs):
+        if not created:
+            return
+        tournament = instance.tournament
+        if tournament is None:
+            return
+        gallery_url = _safe_reverse(
+            "tournament_gallery_detail", slug=tournament.slug
+        ) or _safe_reverse("tournament_detail", slug=tournament.slug)
+        actor = player_user(getattr(instance, "uploaded_by", None))
+        log_activity(
+            event_type=EventType.PHOTO_ADDED,
+            actor=actor,
+            description=f"Добавил фото в турнир «{tournament.name}»",
+            target_url=gallery_url,
+            metadata={"tournament_id": tournament.pk, "photo_id": instance.pk},
+            dedupe_key=f"tournament_photo:{instance.pk}",
+            created_at=getattr(instance, "created_at", None),
+        )
+
+    post_save.connect(
+        on_tournament_photo_created,
+        sender=TournamentPhoto,
+        dispatch_uid="activity_tournament_photo",
         weak=False,
     )

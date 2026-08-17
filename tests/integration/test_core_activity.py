@@ -275,3 +275,118 @@ class PlatformActivityFeedTestCase(TestCase):
         )
         response = self.client.get(reverse("home"))
         self.assertTrue(response.context["platform_activity_unseen"])
+
+    def test_home_shows_public_activity_and_hides_private_events(self) -> None:
+        """На главной видна публичная лента без оплат, отклонений и сумм."""
+        player_user = User.objects.create_user(
+            email="home-feed-player@test.local",
+            password="testpass123",
+            first_name="Никита",
+            last_name="Лентов",
+        )
+        Player.objects.create(user=player_user)
+        log_activity(
+            event_type=PlatformActivityEvent.EventType.SPARRING_CREATED,
+            actor=player_user,
+            description="Создал заявку на спарринг (Казань)",
+            target_url="/sparring/",
+            dedupe_key=f"test:home-sparring-{uuid.uuid4()}",
+        )
+        log_activity(
+            event_type=PlatformActivityEvent.EventType.PAYMENT_DONATION,
+            actor=player_user,
+            description="Секретный донат 777",
+            amount=Decimal("777.00"),
+            dedupe_key=f"test:home-payment-{uuid.uuid4()}",
+        )
+        log_activity(
+            event_type=PlatformActivityEvent.EventType.MATCH_RESULT_REJECTED,
+            actor=player_user,
+            description="Отклонил результат матча скрытно",
+            dedupe_key=f"test:home-reject-{uuid.uuid4()}",
+        )
+
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Лента активности")
+        self.assertContains(response, "Никита Лентов")
+        self.assertContains(response, "Создал заявку на спарринг (Казань)")
+        self.assertContains(response, "Зарегистрировался на платформе")
+        self.assertNotContains(response, "Секретный донат 777")
+        self.assertNotContains(response, "Отклонил результат матча скрытно")
+        self.assertNotContains(response, "777 ₽")
+        events = list(response.context["home_activity_events"])
+        event_types = {event.event_type for event in events}
+        self.assertIn(PlatformActivityEvent.EventType.REGISTRATION, event_types)
+        self.assertIn(PlatformActivityEvent.EventType.SPARRING_CREATED, event_types)
+        self.assertNotIn(PlatformActivityEvent.EventType.PAYMENT_DONATION, event_types)
+        self.assertNotIn(
+            PlatformActivityEvent.EventType.MATCH_RESULT_REJECTED, event_types
+        )
+
+    def test_home_activity_does_not_expose_admin_urls(self) -> None:
+        """Публичная лента не ведёт в админку даже если в журнале admin-ссылка."""
+        user = User.objects.create_user(
+            email="home-feed-admin-url@test.local",
+            password="testpass123",
+            first_name="Ольга",
+            last_name="Публичная",
+        )
+        Player.objects.create(user=user)
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ольга Публичная")
+        self.assertNotContains(response, 'href="/admin/')
+
+    def test_tournament_photo_creates_public_activity_event(self) -> None:
+        """Загрузка фото в турнир попадает в журнал и на главную."""
+        import io
+        from datetime import date
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        from apps.tournaments.models import Tournament, TournamentPhoto
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (800, 600), color=(120, 180, 90)).save(
+            buffer, format="JPEG", quality=85
+        )
+        buffer.seek(0)
+
+        owner = User.objects.create_user(
+            email="home-feed-photo@test.local",
+            password="testpass123",
+            first_name="Кирилл",
+            last_name="Фотов",
+        )
+        player = Player.objects.create(user=owner)
+        tournament = Tournament.objects.create(
+            name="Кубок ленты",
+            slug="activity-feed-photo-cup",
+            city="Москва",
+            start_date=date.today(),
+            format="round_robin",
+        )
+        TournamentPhoto.objects.create(
+            tournament=tournament,
+            image=SimpleUploadedFile(
+                "feed-photo.jpg",
+                buffer.read(),
+                content_type="image/jpeg",
+            ),
+            uploaded_by=player,
+        )
+
+        event = PlatformActivityEvent.objects.filter(
+            event_type=PlatformActivityEvent.EventType.PHOTO_ADDED,
+            actor=owner,
+        ).first()
+        self.assertIsNotNone(event)
+        self.assertIn("Кубок ленты", event.description)
+        self.assertIn("фото", event.description.lower())
+
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Кирилл Фотов")
+        self.assertContains(response, "Кубок ленты")

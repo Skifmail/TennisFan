@@ -955,44 +955,13 @@ def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
 
 
 def process_overdue_match(match: Match) -> tuple[bool, str]:
-    """
-    Обработать просроченный матч кругового турнира: тех. победа сильнейшему по рейтингу.
-    Проверяет, завершён ли турнир после обработки матча.
-    Возвращает (успех, сообщение).
+    """Обработать просроченный матч кругового турнира: уведомить администраторов.
+
+    Returns:
+        Пара (успех, сообщение).
     """
     if not _is_round_robin(match.tournament):
         return False, "Не круговой турнир."
-    if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-        return False, "Матч уже завершён."
-    if not match.deadline or match.deadline > timezone.now():
-        return False, "Дедлайн не истёк."
+    from .overdue import notify_admins_match_deadline_overdue
 
-    is_doubles = match.tournament.is_doubles() and match.team1_id and match.team2_id
-    if is_doubles:
-        if getattr(match.team1.player1, "is_bye", False) and getattr(
-            match.team2.player1, "is_bye", False
-        ):
-            return False, "Служебный матч."
-    else:
-        if getattr(match.player1, "is_bye", False) and getattr(
-            match.player2, "is_bye", False
-        ):
-            return False, "Служебный матч."
-
-    winner = _overdue_winner_round_robin(match)
-    if winner is None:
-        return False, "Не удалось определить победителя по рейтингу."
-    apply_overdue_walkover_round_robin(match, winner)
-
-    # Проверяем, завершён ли турнир после этого матча
-    check_and_finalize_if_complete(match.tournament)
-
-    match_display = (
-        f"{match.team1} vs {match.team2}"
-        if is_doubles
-        else f"{match.player1} vs {match.player2}"
-    )
-    return (
-        True,
-        f"Матч {match.pk} ({match_display}): тех. победа {winner} (дедлайн истёк).",
-    )
+    return notify_admins_match_deadline_overdue(match)

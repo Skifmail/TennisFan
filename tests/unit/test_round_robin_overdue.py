@@ -1,4 +1,4 @@
-"""Юнит-тесты: просроченные матчи кругового турнира (тех. победа по рейтингу)."""
+"""Юнит-тесты: просроченные матчи кругового турнира (уведомление администратора)."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ class OverdueWinnerRoundRobinTestCase(TestCase):
 
 
 class ProcessOverdueRoundRobinMatchTestCase(TestCase):
-    """Обработка просроченного матча: статус, победитель, пересчёт рейтинга без счёта."""
+    """Обработка просроченного матча: уведомление админа, матч не закрывается."""
 
     def setUp(self) -> None:
         self.strong = make_player(
@@ -98,15 +98,27 @@ class ProcessOverdueRoundRobinMatchTestCase(TestCase):
         self.rating_before_strong = float(self.strong.total_points)
         self.rating_before_weak = float(self.weak.total_points)
 
-    def test_process_overdue_assigns_walkover_to_stronger_player(self) -> None:
+    def test_process_overdue_notifies_admin_without_closing_match(self) -> None:
+        from apps.users.models import Notification, User
+
+        admin = User.objects.create_user(
+            email="rr-overdue-admin@test.local",
+            password="testpass123",
+            is_staff=True,
+        )
+
         ok, msg = process_overdue_match(self.match)
 
         self.assertTrue(ok, msg)
         self.match.refresh_from_db()
-        self.assertEqual(self.match.status, Match.MatchStatus.WALKOVER)
-        self.assertEqual(self.match.winner_id, self.strong.pk)
-        self.assertFalse(self.match.is_walkover_loss())
-        self.assertIsNone(self.match.player1_set1)
+        self.assertEqual(self.match.status, Match.MatchStatus.SCHEDULED)
+        self.assertIsNone(self.match.winner_id)
+        self.assertIsNotNone(self.match.deadline_overdue_notified_at)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=admin, message__contains="Просрочен дедлайн"
+            ).exists()
+        )
 
     def test_process_overdue_skips_when_deadline_not_passed(self) -> None:
         self.match.deadline = timezone.now() + timedelta(days=1)
@@ -119,8 +131,16 @@ class ProcessOverdueRoundRobinMatchTestCase(TestCase):
         self.match.refresh_from_db()
         self.assertEqual(self.match.status, Match.MatchStatus.SCHEDULED)
 
-    def test_process_overdue_recalculates_rating_without_score(self) -> None:
-        """При 0 геймов FAN даёт S=0 обоим — рейтинг снижается, штрафа −40 нет."""
+    def test_process_overdue_does_not_change_rating(self) -> None:
+        """Просрочка только уведомляет админа, рейтинг игроков не меняется."""
+        from apps.users.models import User
+
+        User.objects.create_user(
+            email="rr-overdue-admin2@test.local",
+            password="testpass123",
+            is_staff=True,
+        )
+
         ok, _ = process_overdue_match(self.match)
         self.assertTrue(ok)
 
@@ -128,13 +148,12 @@ class ProcessOverdueRoundRobinMatchTestCase(TestCase):
         self.weak.refresh_from_db()
         self.match.refresh_from_db()
 
-        self.assertLess(self.strong.total_points, self.rating_before_strong)
-        self.assertLess(self.weak.total_points, self.rating_before_weak)
-        self.assertEqual(self.strong.matches_won, 1)
+        self.assertEqual(self.strong.total_points, self.rating_before_strong)
+        self.assertEqual(self.weak.total_points, self.rating_before_weak)
+        self.assertEqual(self.strong.matches_won, 0)
         self.assertEqual(self.weak.matches_won, 0)
-        self.assertEqual(self.strong.matches_played, 16)
-        self.assertEqual(self.weak.matches_played, 16)
-        self.assertIsNotNone(self.match.rating_delta_player1)
-        self.assertIsNotNone(self.match.rating_delta_player2)
-        self.assertLess(self.match.rating_delta_player1, 0)
-        self.assertLess(self.match.rating_delta_player2, 0)
+        self.assertEqual(self.strong.matches_played, 15)
+        self.assertEqual(self.weak.matches_played, 15)
+        self.assertEqual(
+            self.match.rating_status, Match.RatingCalcStatus.NOT_APPLICABLE
+        )

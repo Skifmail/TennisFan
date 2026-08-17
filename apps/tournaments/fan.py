@@ -755,33 +755,13 @@ def apply_overdue_walkover(match: Match, winner: Player) -> None:
 
 
 def process_overdue_match(match: Match) -> tuple[bool, str]:
-    """
-    Обработать просроченный FAN-матч: тех. победа сильнейшему по рейтингу, продвижение, подвал, финализация.
-    Возвращает (успех, сообщение).
+    """Обработать просроченный FAN-матч: уведомить администраторов, результат не ставить.
+
+    Returns:
+        Пара (успех, сообщение).
     """
     if not _is_fan(match.tournament):
         return False, "Не FAN."
-    if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-        return False, "Матч уже завершён."
-    if not match.deadline or match.deadline > timezone.now():
-        return False, "Дедлайн не истёк."
-    if getattr(match.player1, "is_bye", False) and getattr(
-        match.player2, "is_bye", False
-    ):
-        return False, "Служебный матч."
+    from .overdue import notify_admins_match_deadline_overdue
 
-    winner = _overdue_winner(match)
-    if winner is None:
-        return False, "Не удалось определить победителя."
-    apply_overdue_walkover(match, winner)
-
-    # При просрочке не начисляем очки проигравшему
-    advance_winner_and_award_loser(match, skip_points=True)
-    if match.round_index == 1 and not match.is_consolation:
-        ensure_consolation_created(match.tournament)
-    finalize_tournament(match.tournament)
-
-    return (
-        True,
-        f"Матч {match.pk} ({match.player1} vs {match.player2}): тех. победа {winner} (дедлайн истёк).",
-    )
+    return notify_admins_match_deadline_overdue(match)

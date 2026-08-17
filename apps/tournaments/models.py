@@ -1098,6 +1098,15 @@ class Match(models.Model):
         blank=True,
         help_text="До этой даты матч должен быть сыгран (одноэтапная сетка).",
     )
+    deadline_overdue_notified_at = models.DateTimeField(
+        "Админы уведомлены о просрочке",
+        null=True,
+        blank=True,
+        help_text=(
+            "Когда администраторам отправили уведомление о просроченном дедлайне. "
+            "Сбрасывается при продлении дедлайна."
+        ),
+    )
     next_match = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,
@@ -1334,13 +1343,46 @@ class Match(models.Model):
                 sets.append(f"{s1}:{s2}")
         return " ".join(sets) if sets else "—"
 
+    def has_set_scores(self) -> bool:
+        """Есть ли хотя бы один сет с заполненным счётом."""
+        for i in (1, 2, 3):
+            if (
+                getattr(self, f"player1_set{i}") is not None
+                or getattr(self, f"player2_set{i}") is not None
+            ):
+                return True
+        return False
+
+    def is_deadline_overdue(self) -> bool:
+        """Дедлайн истёк, а матч ещё не завершён."""
+        if not self.deadline:
+            return False
+        if self.status in (
+            self.MatchStatus.COMPLETED,
+            self.MatchStatus.WALKOVER,
+            self.MatchStatus.CANCELLED,
+        ):
+            return False
+        return bool(self.deadline <= timezone.now())
+
+    def is_no_show_walkover(self) -> bool:
+        """Walkover без счёта: матч не состоялся (неявка), не Retired.
+
+        Снятие участника помечает рейтинг как NOT_APPLICABLE и сюда не входит.
+        """
+        if self.status != self.MatchStatus.WALKOVER:
+            return False
+        if self.rating_status == self.RatingCalcStatus.NOT_APPLICABLE:
+            return False
+        return not self.has_set_scores()
+
     def is_walkover_loss(self) -> bool:
         """
         Проверка, является ли матч тех.поражением (Retired).
         Покрывает оба случая:
         - WALKOVER_LOSS (игрок признал, что не может играть)
         - WALKOVER_WIN (соперник заявил, что оппонент не вышел)
-        В обоих случаях проигравший получает штраф.
+        В обоих случаях проигравший получает штраф FAN + 40.
         """
         # Проверяем через принятые proposals
         if self.result_proposals.filter(

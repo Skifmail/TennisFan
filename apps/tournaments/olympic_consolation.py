@@ -503,59 +503,9 @@ def finalize_olympic(tournament: Tournament) -> tuple[bool, str]:
 
 
 def process_overdue_match(match: Match) -> tuple[bool, str]:
-    """Обработать просроченный матч олимпийской системы: тех. победа, продвижение, утешительные, финализация."""
+    """Обработать просроченный матч олимпийской системы: уведомить администраторов."""
     if not _is_olympic(match.tournament):
         return False, "Не олимпийский турнир."
-    from .fan import _overdue_winner, apply_overdue_walkover
+    from .overdue import notify_admins_match_deadline_overdue
 
-    if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-        return False, "Матч уже завершён."
-    if not match.deadline or match.deadline > timezone.now():
-        return False, "Дедлайн не истёк."
-    if (
-        match.player1
-        and match.player2
-        and getattr(match.player1, "is_bye", False)
-        and getattr(match.player2, "is_bye", False)
-    ):
-        return False, "Служебный матч."
-
-    if match.is_consolation:
-        if match.team1_id and match.team2_id:
-            a, b = match.team1, match.team2
-            bye_team = getattr(a.player1, "is_bye", False) or getattr(
-                b.player1, "is_bye", False
-            )
-        else:
-            a, b = match.player1, match.player2
-            bye_team = (getattr(a, "is_bye", False) if a else False) or (
-                getattr(b, "is_bye", False) if b else False
-            )
-        if bye_team:
-            return False, "В утешительном матче участвует BYE."
-        if match.team1_id and match.team2_id:
-            t1_pts = match.team1.player1.total_points + (
-                match.team1.player2.total_points if match.team1.player2_id else 0
-            )
-            t2_pts = match.team2.player1.total_points + (
-                match.team2.player2.total_points if match.team2.player2_id else 0
-            )
-            winner_entity = match.team1 if t1_pts >= t2_pts else match.team2
-            winner = winner_entity.player1
-        else:
-            winner = _overdue_winner(match)
-            winner_entity = winner
-        apply_overdue_walkover(match, winner)
-        if match.team1_id and match.team2_id:
-            match.winner_team = winner_entity
-            match.save(update_fields=["winner_team"])
-        # При просрочке не начисляем очки
-        advance_winner_olympic(match, skip_points=True)
-        return True, f"Матч {match.pk}: тех. победа (олимпийская система)."
-    else:
-        winner = _overdue_winner(match)
-        if winner is not None:
-            apply_overdue_walkover(match, winner)
-        # При просрочке не начисляем очки
-        advance_winner_olympic(match, skip_points=True)
-        return True, f"Матч {match.pk}: тех. победа (олимпийская система)."
+    return notify_admins_match_deadline_overdue(match)

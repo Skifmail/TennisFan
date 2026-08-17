@@ -780,7 +780,9 @@ def notify_match_deadline_reminder(match, days_left: int) -> None:
         f"{tournament_info}\n"
         f"Этап: {match.round_name or '—'}\n"
         f"{side1} — {side2}\n"
-        f"Дедлайн: {deadline_str}"
+        f"Дедлайн: {deadline_str}\n\n"
+        "Если матч не сыграют до дедлайна, администратор может проставить "
+        "Walkover (неявку): −40 очков рейтинга неявившемуся."
     )
     reply_markup = {
         "inline_keyboard": [

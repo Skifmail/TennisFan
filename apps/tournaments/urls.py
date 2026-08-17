@@ -99,6 +99,11 @@ urlpatterns = [
         name="tournament_manage_match_deadline",
     ),
     path(
+        "<slug:slug>/manage/match/<int:pk>/walkover/",
+        views.tournament_manage_match_walkover,
+        name="tournament_manage_match_walkover",
+    ),
+    path(
         "<slug:slug>/manage/search-participants/",
         views.tournament_manage_search_participants,
         name="tournament_manage_search_participants",

@@ -622,3 +622,24 @@
         text-align: left;
     }
 }
+
+.bracket-match--overdue {
+    outline: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+.bracket-overdue-note {
+    margin: 0;
+    padding: 0.45rem 0.75rem;
+    font-size: var(--font-size-xs);
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.08);
+    border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.bracket-walkover-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid rgba(166, 130, 74, 0.2);
+}

@@ -22,9 +22,9 @@
                 <p class="text-muted mt-2">
                     {% if match.deadline %}Дедлайн: {{ match.deadline|date:"d.m.Y" }}{% elif match.scheduled_datetime %}{{ match.scheduled_datetime|date:"d.m.Y H:i" }}{% else %}—{% endif %}
                 </p>
-                {% if is_fan and match.deadline and match.status != 'completed' and match.status != 'walkover' %}
+                {% if match.deadline and match.status != 'completed' and match.status != 'walkover' %}
                 <p class="text-muted mt-1" style="font-size: var(--font-size-sm);">
-                    Если матч не сыгран до дедлайна, тех. победа присуждается игроку с более высоким рейтингом.
+                    Если матч не сыгран до дедлайна, администратор получит уведомление и сможет продлить дедлайн или проставить Walkover (неявку: −40 очков неявившемуся, 0 сопернику).
                 </p>
                 {% endif %}
                 {% if match.court %}
@@ -38,7 +38,7 @@
                     {% if match.team1 %}{% include 'includes/avatar.html' with avatar=match.team1.player1.avatar class="player-avatar" size="80" %}
                     {% else %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" size="80" %}{% endif %}
                     <div class="{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player1_display }}</div>
-                    {% if match.is_walkover_loss %}{% if match.team1 and match.winner_team == match.team2 or match.player1 and match.winner == match.player2 %}<span class="retired-badge">Rt.</span>{% endif %}{% endif %}
+                    {% if match.is_walkover_loss %}{% if match.team1 and match.winner_team == match.team2 or match.player1 and match.winner == match.player2 %}<span class="retired-badge">Rt.</span>{% endif %}{% elif match.is_no_show_walkover %}{% if match.team1 and match.winner_team == match.team2 or match.player1 and match.winner == match.player2 %}<span class="walkover-badge">Wo.</span>{% endif %}{% endif %}
                     {% if match.status == 'completed' or match.status == 'walkover' %}
                     <div class="mt-1 match-points-display">
                         {% if match.is_friendly_sparring %}
@@ -94,7 +94,7 @@
                     {% if match.team2 %}{% include 'includes/avatar.html' with avatar=match.team2.player1.avatar class="player-avatar" size="80" %}
                     {% else %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" size="80" %}{% endif %}
                     <div class="{% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player2_display }}</div>
-                    {% if match.is_walkover_loss %}{% if match.team2 and match.winner_team == match.team1 or match.player2 and match.winner == match.player1 %}<span class="retired-badge">Rt.</span>{% endif %}{% endif %}
+                    {% if match.is_walkover_loss %}{% if match.team2 and match.winner_team == match.team1 or match.player2 and match.winner == match.player1 %}<span class="retired-badge">Rt.</span>{% endif %}{% elif match.is_no_show_walkover %}{% if match.team2 and match.winner_team == match.team1 or match.player2 and match.winner == match.player1 %}<span class="walkover-badge">Wo.</span>{% endif %}{% endif %}
                     {% if match.status == 'completed' or match.status == 'walkover' %}
                     <div class="mt-1 match-points-display">
                         {% if match.is_friendly_sparring %}

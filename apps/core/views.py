@@ -65,7 +65,7 @@ from apps.users.display import format_user_display_name
 from apps.users.models import Player, SkillLevel
 from apps.users.rating_utils import rating_to_ntrp_level
 
-from .activity import mark_platform_dashboard_seen
+from .activity import get_public_home_activity_events, mark_platform_dashboard_seen
 from .forms import FeedbackForm
 from .models import City, PlatformActivityEvent, SupportMessage, SupportThread
 from .support_notifications import (
@@ -1951,6 +1951,7 @@ def home(request):
         "gender_choices": TournamentGender.choices,
         "duration_choices": TournamentDuration.choices,
         "club_filter_choices": club_filter_choices_for_tournament_lists(),
+        "home_activity_events": get_public_home_activity_events(),
     }
 
     if (

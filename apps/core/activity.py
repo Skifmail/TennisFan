@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 PLATFORM_ACTIVITY_UNSEEN_CACHE_PREFIX = "platform_activity_unseen"
+HOME_ACTIVITY_FEED_LIMIT = 25
 
 ActivityEventType = str | PlatformActivityEvent.EventType | tuple[str, ...]
 
@@ -278,3 +279,32 @@ def mark_platform_dashboard_seen(user: User) -> None:
         },
     )
     cache.delete(f"{PLATFORM_ACTIVITY_UNSEEN_CACHE_PREFIX}:{user.pk}:{latest_event_id}")
+
+
+def get_public_home_activity_events(
+    *,
+    limit: int = HOME_ACTIVITY_FEED_LIMIT,
+) -> list[PlatformActivityEvent]:
+    """Вернуть последние публичные события для ленты на главной странице.
+
+    В выборку не попадают оплаты, отклонения, заявки и прочие события,
+    которые не предназначены для просмотра другими посетителями сайта.
+    Игроки, скрытые с главной (``is_hidden_on_home``), тоже не показываются.
+
+    Args:
+        limit: Максимальное число записей в ленте.
+
+    Returns:
+        list[PlatformActivityEvent]: Свежие публичные события по убыванию даты.
+    """
+    from apps.users.models import Player
+
+    hidden_user_ids = Player.objects.filter(is_hidden_on_home=True).values("user_id")
+    return list(
+        PlatformActivityEvent.objects.filter(
+            event_type__in=PlatformActivityEvent.PUBLIC_FEED_EVENT_TYPES
+        )
+        .exclude(actor_id__in=hidden_user_ids)
+        .select_related("actor", "actor__player")
+        .order_by("-created_at", "-id")[: max(1, int(limit))]
+    )

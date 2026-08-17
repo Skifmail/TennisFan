@@ -308,7 +308,9 @@ class PlatformActivityFeedTestCase(TestCase):
 
         response = self.client.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Лента активности")
+        self.assertContains(response, "События платформы")
+        self.assertNotContains(response, "Сейчас на платформе")
+        self.assertNotContains(response, "Лента активности")
         self.assertContains(response, "Никита Лентов")
         self.assertContains(response, "Создал заявку на спарринг (Казань)")
         self.assertContains(response, "Зарегистрировался на платформе")

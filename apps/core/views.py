@@ -65,7 +65,15 @@ from apps.users.display import format_user_display_name
 from apps.users.models import Player, SkillLevel
 from apps.users.rating_utils import rating_to_ntrp_level
 
-from .activity import get_public_home_activity_events, mark_platform_dashboard_seen
+from .activity import (
+    HOME_ACTIVITY_SEEN_COOKIE,
+    annotate_home_activity_new_events,
+    format_new_home_activity_label,
+    get_public_home_activity_events,
+    mark_platform_dashboard_seen,
+    parse_home_activity_seen_id,
+    set_home_activity_seen_cookie,
+)
 from .forms import FeedbackForm
 from .models import City, PlatformActivityEvent, SupportMessage, SupportThread
 from .support_notifications import (
@@ -1928,6 +1936,16 @@ def home(request):
 
     hero_stats = cache.get_or_set("home_hero_stats:v3", _build_hero_stats, timeout=300)
 
+    home_activity_events = get_public_home_activity_events()
+    home_activity_seen_id = parse_home_activity_seen_id(
+        request.COOKIES.get(HOME_ACTIVITY_SEEN_COOKIE)
+    )
+    home_activity_new_count = annotate_home_activity_new_events(
+        home_activity_events,
+        seen_id=home_activity_seen_id,
+    )
+    home_activity_latest_id = home_activity_events[0].id if home_activity_events else 0
+
     context = {
         "filtered_tournaments": tournaments_page.object_list,
         "tournaments_page": tournaments_page,
@@ -1951,16 +1969,30 @@ def home(request):
         "gender_choices": TournamentGender.choices,
         "duration_choices": TournamentDuration.choices,
         "club_filter_choices": club_filter_choices_for_tournament_lists(),
-        "home_activity_events": get_public_home_activity_events(),
+        "home_activity_events": home_activity_events,
+        "home_activity_new_count": home_activity_new_count,
+        "home_activity_new_label": format_new_home_activity_label(
+            home_activity_new_count
+        ),
+        "home_activity_latest_id": home_activity_latest_id,
+        "home_activity_seen_cookie": HOME_ACTIVITY_SEEN_COOKIE,
     }
 
     if (
         request.headers.get("x-requested-with") == "XMLHttpRequest"
         and request.GET.get("partial") == "tournaments"
     ):
-        return render(request, "core/_home_tournaments.html", context)
+        response = render(request, "core/_home_tournaments.html", context)
+    else:
+        response = render(request, "core/home.html", context)
 
-    return render(request, "core/home.html", context)
+    if home_activity_seen_id is None and home_activity_latest_id:
+        set_home_activity_seen_cookie(
+            response,
+            home_activity_latest_id,
+            secure=request.is_secure(),
+        )
+    return response
 
 
 @require_safe

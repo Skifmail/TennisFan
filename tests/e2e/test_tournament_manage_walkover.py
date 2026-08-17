@@ -64,6 +64,54 @@ class TournamentManageWalkoverTestCase(TestCase):
         self.assertEqual(self.p1.total_points, 2800.0)
         self.assertEqual(self.p2.total_points, 2600.0 - WALKOVER_NO_SHOW_PENALTY)
 
+    def test_post_walkover_uses_custom_penalty_amount(self) -> None:
+        url = reverse(
+            "tournament_manage_match_walkover",
+            kwargs={"slug": self.tournament.slug, "pk": self.match.pk},
+        )
+
+        response = self.client.post(
+            url,
+            {"walkover_loser_id": str(self.p2.pk), "walkover_penalty": "25"},
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.match.refresh_from_db()
+        self.assertEqual(self.p1.total_points, 2800.0)
+        self.assertEqual(self.p2.total_points, 2575.0)
+        self.assertEqual(self.match.rating_delta_player2, -25.0)
+
+    def test_post_walkover_skip_penalty_leaves_rating_unchanged(self) -> None:
+        url = reverse(
+            "tournament_manage_match_walkover",
+            kwargs={"slug": self.tournament.slug, "pk": self.match.pk},
+        )
+
+        response = self.client.post(
+            url,
+            {
+                "walkover_loser_id": str(self.p2.pk),
+                "walkover_penalty": "40",
+                "skip_penalty": "1",
+            },
+            secure=True,
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.match.refresh_from_db()
+        self.assertEqual(self.match.status, Match.MatchStatus.WALKOVER)
+        self.assertEqual(self.p1.total_points, 2800.0)
+        self.assertEqual(self.p2.total_points, 2600.0)
+        self.assertEqual(self.match.rating_delta_player1, 0.0)
+        self.assertEqual(self.match.rating_delta_player2, 0.0)
+
     def test_extending_deadline_clears_overdue_notification_flag(self) -> None:
         url = reverse(
             "tournament_manage_match_deadline",
@@ -79,3 +127,19 @@ class TournamentManageWalkoverTestCase(TestCase):
         self.match.refresh_from_db()
         self.assertIsNone(self.match.deadline_overdue_notified_at)
         self.assertEqual(self.match.status, Match.MatchStatus.SCHEDULED)
+
+    def test_manage_page_walkover_button_disabled_until_player_chosen(self) -> None:
+        url = reverse("tournament_manage", kwargs={"slug": self.tournament.slug})
+
+        response = self.client.get(url, secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("data-walkover-form", html)
+        self.assertIn("bracket-walkover-btn", html)
+        self.assertIn("disabled", html)
+        self.assertIn("data-player-name", html)
+        self.assertIn("Проставить Walkover (неявку)", html)
+        self.assertIn("walkover-confirm-modal", html)
+        self.assertIn("Не начислять штраф", html)
+        self.assertIn("walkover-penalty-input", html)

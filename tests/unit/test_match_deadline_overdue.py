@@ -126,6 +126,28 @@ class ApplyNoShowWalkoverTestCase(TestCase):
         self.assertEqual(self.match.rating_delta_player1, 0.0)
         self.assertEqual(self.match.rating_delta_player2, -WALKOVER_NO_SHOW_PENALTY)
 
+    def test_walkover_custom_penalty_is_applied_to_no_show_player(self) -> None:
+        apply_no_show_walkover(self.match, loser=self.p2, penalty=15.0)
+
+        self.match.refresh_from_db()
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.assertEqual(self.p1.total_points, 3000.0)
+        self.assertEqual(self.p2.total_points, 2485.0)
+        self.assertEqual(self.match.rating_delta_player2, -15.0)
+
+    def test_walkover_zero_penalty_does_not_change_rating(self) -> None:
+        apply_no_show_walkover(self.match, loser=self.p2, penalty=0.0)
+
+        self.match.refresh_from_db()
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.assertEqual(self.match.status, Match.MatchStatus.WALKOVER)
+        self.assertEqual(self.p1.total_points, 3000.0)
+        self.assertEqual(self.p2.total_points, 2500.0)
+        self.assertEqual(self.match.rating_delta_player1, 0.0)
+        self.assertEqual(self.match.rating_delta_player2, 0.0)
+
 
 class ReplaceNoShowWalkoverTestCase(TestCase):
     """Откат авто-FAN walkover и повторная простановка Walkover за неявку."""

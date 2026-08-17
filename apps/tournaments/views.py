@@ -2473,6 +2473,23 @@ def _parse_int_post(request, key, default=None):
         return default
 
 
+def _parse_walkover_penalty(request) -> float:
+    """Прочитать штраф Walkover (неявки) из POST: skip_penalty или сумма."""
+    from .overdue import resolve_no_show_penalty
+    from .rating import WALKOVER_NO_SHOW_PENALTY
+
+    skip = str(request.POST.get("skip_penalty") or "").strip().lower()
+    if skip in ("1", "on", "true", "yes"):
+        return 0.0
+    raw = request.POST.get("walkover_penalty")
+    if raw is None or str(raw).strip() == "":
+        return float(WALKOVER_NO_SHOW_PENALTY)
+    try:
+        return resolve_no_show_penalty(float(str(raw).replace(",", ".")))
+    except (TypeError, ValueError):
+        return float(WALKOVER_NO_SHOW_PENALTY)
+
+
 @login_required
 def tournament_manage_match_result(request, slug, pk):
     """POST: внести результат матча (score1/score2, winner_id/winner_team_id). Опционально walkover=1 — тех. результат (неявка/просрочка)."""
@@ -2717,6 +2734,7 @@ def tournament_manage_match_walkover(request, slug, pk):
         return redirect("tournament_manage", slug=slug)
 
     is_doubles_match = bool(match.team1_id and match.team2_id)
+    penalty = _parse_walkover_penalty(request)
     try:
         if is_doubles_match:
             loser_team_id = _parse_int_post(request, "walkover_loser_team_id")
@@ -2726,32 +2744,35 @@ def tournament_manage_match_walkover(request, slug, pk):
             ):
                 messages.warning(
                     request,
-                    "Укажите команду, которой засчитывается Walkover.",
+                    "Укажите команду, которой засчитывается Walkover (неявка).",
                 )
                 return redirect("tournament_manage", slug=slug)
             loser_team = match.team1 if loser_team_id == match.team1_id else match.team2
-            apply_no_show_walkover(match, loser_team=loser_team)
+            apply_no_show_walkover(match, loser_team=loser_team, penalty=penalty)
         else:
             loser_id = _parse_int_post(request, "walkover_loser_id")
             if not loser_id or loser_id not in (match.player1_id, match.player2_id):
                 messages.warning(
                     request,
-                    "Укажите игрока, которому засчитывается Walkover.",
+                    "Укажите игрока, которому засчитывается Walkover (неявка).",
                 )
                 return redirect("tournament_manage", slug=slug)
             loser = match.player1 if loser_id == match.player1_id else match.player2
-            apply_no_show_walkover(match, loser=loser)
+            apply_no_show_walkover(match, loser=loser, penalty=penalty)
     except ValueError as exc:
         messages.warning(request, str(exc))
         return redirect("tournament_manage", slug=slug)
 
-    messages.success(
-        request,
-        (
-            "Walkover (неявка) проставлен: −40 неявившемуся, 0 сопернику. "
-            "Матч закрыт без игры."
-        ),
-    )
+    if penalty == 0:
+        success = (
+            "Walkover (неявка) проставлен: штраф не начислен. Матч закрыт без игры."
+        )
+    else:
+        success = (
+            f"Walkover (неявка) проставлен: −{penalty:g} неявившемуся, "
+            "0 сопернику. Матч закрыт без игры."
+        )
+    messages.success(request, success)
     return redirect("tournament_manage", slug=slug)
 
 

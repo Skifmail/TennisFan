@@ -200,3 +200,40 @@
         justify-content: center;
     }
 }
+
+.walkover-confirm-modal__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-top: var(--spacing-md);
+}
+
+.walkover-confirm-modal__label {
+    font-size: var(--font-size-sm);
+    color: rgb(255 255 255 / 86%);
+}
+
+.walkover-confirm-modal__input {
+    width: 100%;
+    max-width: 10rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 8px;
+    border: 1px solid rgb(212 168 84 / 35%);
+    background: rgb(0 0 0 / 28%);
+    color: #fff;
+    font-size: var(--font-size-sm);
+}
+
+.walkover-confirm-modal__input:disabled,
+.walkover-confirm-modal__input[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.walkover-confirm-modal__check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--font-size-sm);
+    color: rgb(255 255 255 / 86%);
+}

@@ -18561,15 +18561,23 @@ a.match-details-value__lead:hover {
 
 .bracket-winner-row {
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
 }
 
 .bracket-winner-label {
     font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
     white-space: nowrap;
+}
+
+.bracket-winner-choices {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.9rem;
+    width: 100%;
 }
 
 .bracket-radio {
@@ -18591,6 +18599,7 @@ a.match-details-value__lead:hover {
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+    flex-wrap: nowrap;
 }
 
 .bracket-walkover {
@@ -18600,6 +18609,8 @@ a.match-details-value__lead:hover {
     align-items: center;
     gap: 0.25rem;
     cursor: pointer;
+    white-space: nowrap;
+    flex: 0 0 auto;
 }
 
 .bracket-walkover input[type="checkbox"] {
@@ -18792,9 +18803,31 @@ a.match-details-value__lead:hover {
 .bracket-walkover-form {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.45rem 0.75rem;
+    align-items: stretch;
+    gap: 0.45rem;
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid rgba(166, 130, 74, 0.2);
+}
+
+.bracket-walkover-btn {
+    width: 100%;
+}
+
+.bracket-walkover-btn:disabled,
+.bracket-walkover-btn[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+@media (width <= 480px) {
+    .bracket-submit-row {
+        flex-wrap: wrap;
+    }
+
+    .bracket-submit-row .bracket-submit-btn {
+        width: 100%;
+    }
 }
 
 /* END bracket.css */
@@ -28337,6 +28370,43 @@ select.club-payments-form__control option {
         width: 100%;
         justify-content: center;
     }
+}
+
+.walkover-confirm-modal__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-top: var(--spacing-md);
+}
+
+.walkover-confirm-modal__label {
+    font-size: var(--font-size-sm);
+    color: rgb(255 255 255 / 86%);
+}
+
+.walkover-confirm-modal__input {
+    width: 100%;
+    max-width: 10rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 8px;
+    border: 1px solid rgb(212 168 84 / 35%);
+    background: rgb(0 0 0 / 28%);
+    color: #fff;
+    font-size: var(--font-size-sm);
+}
+
+.walkover-confirm-modal__input:disabled,
+.walkover-confirm-modal__input[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.walkover-confirm-modal__check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--font-size-sm);
+    color: rgb(255 255 255 / 86%);
 }
 
 /* END modals.css */

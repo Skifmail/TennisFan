@@ -408,15 +408,23 @@
 
 .bracket-winner-row {
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
 }
 
 .bracket-winner-label {
     font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
     white-space: nowrap;
+}
+
+.bracket-winner-choices {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.9rem;
+    width: 100%;
 }
 
 .bracket-radio {
@@ -438,6 +446,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+    flex-wrap: nowrap;
 }
 
 .bracket-walkover {
@@ -447,6 +456,8 @@
     align-items: center;
     gap: 0.25rem;
     cursor: pointer;
+    white-space: nowrap;
+    flex: 0 0 auto;
 }
 
 .bracket-walkover input[type="checkbox"] {
@@ -639,7 +650,29 @@
 .bracket-walkover-form {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.45rem 0.75rem;
+    align-items: stretch;
+    gap: 0.45rem;
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid rgba(166, 130, 74, 0.2);
+}
+
+.bracket-walkover-btn {
+    width: 100%;
+}
+
+.bracket-walkover-btn:disabled,
+.bracket-walkover-btn[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+@media (width <= 480px) {
+    .bracket-submit-row {
+        flex-wrap: wrap;
+    }
+
+    .bracket-submit-row .bracket-submit-btn {
+        width: 100%;
+    }
 }

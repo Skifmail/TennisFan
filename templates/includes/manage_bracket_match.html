@@ -82,14 +82,16 @@
         </div>
         <div class="bracket-match-actions">
             <div class="bracket-winner-row">
-                <span class="bracket-winner-label">Победитель:</span>
-                {% if match.team1_id and match.team2_id %}
-                <label class="bracket-radio"><input type="radio" name="winner_team_id" value="{{ match.team1_id }}" required> {{ match.get_player1_display }}</label>
-                <label class="bracket-radio"><input type="radio" name="winner_team_id" value="{{ match.team2_id }}" required> {{ match.get_player2_display }}</label>
-                {% else %}
-                {% if match.player1_id %}<label class="bracket-radio"><input type="radio" name="winner_id" value="{{ match.player1_id }}" required> {{ match.get_player1_display }}</label>{% endif %}
-                {% if match.player2_id %}<label class="bracket-radio"><input type="radio" name="winner_id" value="{{ match.player2_id }}" required> {{ match.get_player2_display }}</label>{% endif %}
-                {% endif %}
+                <span class="bracket-winner-label">Победитель</span>
+                <div class="bracket-winner-choices">
+                    {% if match.team1_id and match.team2_id %}
+                    <label class="bracket-radio"><input type="radio" name="winner_team_id" value="{{ match.team1_id }}" required> {{ match.get_player1_display }}</label>
+                    <label class="bracket-radio"><input type="radio" name="winner_team_id" value="{{ match.team2_id }}" required> {{ match.get_player2_display }}</label>
+                    {% else %}
+                    {% if match.player1_id %}<label class="bracket-radio"><input type="radio" name="winner_id" value="{{ match.player1_id }}" required> {{ match.get_player1_display }}</label>{% endif %}
+                    {% if match.player2_id %}<label class="bracket-radio"><input type="radio" name="winner_id" value="{{ match.player2_id }}" required> {{ match.get_player2_display }}</label>{% endif %}
+                    {% endif %}
+                </div>
             </div>
             <div class="bracket-submit-row">
                 <label class="bracket-walkover"><input type="checkbox" name="walkover" value="1"> Тех. результат</label>

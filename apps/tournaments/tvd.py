@@ -7,8 +7,6 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, cast
 
-from django.utils import timezone
-
 from apps.users.models import Player
 
 from .models import (
@@ -2146,51 +2144,9 @@ def check_and_finalize(tournament: Tournament) -> tuple[bool, str]:
 
 
 def process_overdue_match(match: Match) -> tuple[bool, str]:
-    """Тех. победа при просрочке дедлайна; продвижение по сетке."""
+    """Уведомить администраторов о просрочке дедлайна ТВД-матча."""
     if not match.tournament_id or not _is_tvd(match.tournament):
         return False, "Не ТВД-матч."
-    if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-        return False, "Матч уже завершён."
-    if not match.deadline or match.deadline > timezone.now():
-        return False, "Дедлайн не истёк."
+    from .overdue import notify_admins_match_deadline_overdue
 
-    from .fan import _overdue_winner, apply_overdue_walkover
-
-    if match.tvd_stage == TVD_STAGE_GROUP:
-        if match.team1_id and match.team2_id:
-            # Парный групповой матч: победитель по среднему рейтингу команды
-            t1, t2 = match.team1, match.team2
-            r1, r2 = _team_rating(t1), _team_rating(t2)
-            if r1 > r2 or (r1 == r2 and t1.pk < t2.pk):
-                winner_team = t1
-            else:
-                winner_team = t2
-            match.winner_team = winner_team
-            match.winner = winner_team.player1
-            match.status = Match.MatchStatus.WALKOVER
-            match.completed_datetime = timezone.now()
-            match.save(
-                update_fields=["winner_team", "winner", "status", "completed_datetime"]
-            )
-        else:
-            winner = _overdue_winner(match)
-            if not winner:
-                return False, "Не удалось определить победителя."
-            apply_overdue_walkover(match, winner)
-        recalculate_group_standings(match.tvd_group)
-        return True, f"Матч {match.pk}: тех. победа (группа), таблица пересчитана."
-    else:
-        winner = _overdue_winner(match)
-        if not winner:
-            return False, "Не удалось определить победителя."
-        apply_overdue_walkover(match, winner)
-        if match.team1_id and match.team2_id:
-            match.winner_team = (
-                match.team1
-                if match.winner_id == match.team1.player1_id
-                else match.team2
-            )
-            match.save(update_fields=["winner_team"])
-        advance_winner(match)
-        check_and_finalize(match.tournament)
-        return True, f"Матч {match.pk}: тех. победа (плей-офф)."
+    return notify_admins_match_deadline_overdue(match)

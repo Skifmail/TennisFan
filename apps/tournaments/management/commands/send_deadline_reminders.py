@@ -2,14 +2,16 @@
 Напоминания о дедлайне матча за 2 и 1 день.
 
 Выбирает матчи, у которых deadline попадает в окно «через 2 дня» (47–49 ч)
-и «через 1 день» (23–25 ч), и отправляет участникам сообщение в Telegram
-(пользовательский бот) с кнопками «Внести результат», «Мои матчи», «Запросить продление».
+и «через 1 день» (23–25 ч), и отправляет участникам напоминание:
+Telegram, личный кабинет и email. В тексте — предупреждение о Walkover (−40).
 
 Запуск: python manage.py send_deadline_reminders
 
 Рекомендуется добавить в cron раз в день (например в 09:00):
   0 9 * * * cd /path && python manage.py send_deadline_reminders
 """
+
+from __future__ import annotations
 
 import logging
 from datetime import timedelta
@@ -18,6 +20,7 @@ from django.core.management.base import BaseCommand
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.email_service import send_match_deadline_reminder_email
 from apps.telegram_bot import notifications as tg
 from apps.telegram_bot import services as bot_services
 from apps.tournaments.models import Match
@@ -31,122 +34,159 @@ HOURS_LOW_2 = 47
 HOURS_HIGH_2 = 49
 HOURS_LOW_1 = 23
 HOURS_HIGH_1 = 25
+LK_MESSAGE_MAX_LEN = 255
+
+
+def build_deadline_reminder_lk_message(
+    *,
+    tournament_name: str,
+    days_left: int,
+    deadline_str: str,
+) -> str:
+    """Текст напоминания в личный кабинет (лимит 255 символов).
+
+    Args:
+        tournament_name: Название турнира.
+        days_left: Осталось дней (1 или 2).
+        deadline_str: Дедлайн для отображения.
+
+    Returns:
+        Сообщение не длиннее ``LK_MESSAGE_MAX_LEN``.
+    """
+    left = "1 день" if days_left == 1 else f"{days_left} дня"
+    msg = (
+        f"Walkover (−40 за неявку) возможен, если матч не сыграют до дедлайна. "
+        f"«{tournament_name}»: осталось {left} ({deadline_str}). Мои матчи."
+    )
+    if len(msg) > LK_MESSAGE_MAX_LEN:
+        return msg[: LK_MESSAGE_MAX_LEN - 3] + "..."
+    return msg
+
+
+def _notify_match_participants(match: Match, days_left: int) -> None:
+    """Отправить Telegram, ЛК и email участникам одного матча."""
+    tg.notify_match_deadline_reminder(match, days_left=days_left)
+    deadline_str = match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else ""
+    tournament_name = match.tournament.name if match.tournament_id else "матч"
+    msg = build_deadline_reminder_lk_message(
+        tournament_name=tournament_name,
+        days_left=days_left,
+        deadline_str=deadline_str,
+    )
+    url = reverse("my_matches")
+    base_url = ""
+    try:
+        from apps.core.email_service import _get_site_base_url
+
+        base_url = _get_site_base_url()
+    except Exception:
+        logger.exception("deadline reminder: base url")
+    match_url = f"{base_url}{reverse('match_detail', args=[match.pk])}"
+    for user in get_match_participant_users(match):
+        try:
+            Notification.objects.create(user=user, message=msg, url=url)
+        except Exception as exc:
+            logger.warning(
+                "Notification deadline %sd user %s: %s",
+                days_left,
+                user.pk,
+                exc,
+            )
+        try:
+            send_match_deadline_reminder_email(
+                user,
+                match,
+                days_left=days_left,
+                match_url=match_url,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Email deadline %sd user %s: %s",
+                days_left,
+                user.pk,
+                exc,
+            )
 
 
 class Command(BaseCommand):
-    help = "Отправить напоминания о дедлайне матча за 2 и 1 день в Telegram участникам."
+    """Напоминания о дедлайне: Telegram, ЛК и email, со штрафом за неявку."""
 
-    def add_arguments(self, parser):
+    help = (
+        "Отправить напоминания о дедлайне матча за 2 и 1 день "
+        "(Telegram, ЛК, email) с предупреждением о Walkover (−40)."
+    )
+
+    def add_arguments(self, parser) -> None:
+        """Аргументы CLI."""
         parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Не отправлять сообщения, только вывести матчи.",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options) -> None:
+        """Найти матчи в окнах 2 дня / 1 день и уведомить участников."""
         dry_run = options.get("dry_run", False)
-        if not dry_run and not bot_services.is_configured():
+        telegram_ok = bot_services.is_configured()
+        if not dry_run and not telegram_ok:
             self.stdout.write(
-                "Telegram user bot не настроен (TELEGRAM_USER_BOT_TOKEN)."
+                "Telegram user bot не настроен — "
+                "напоминания в Telegram пропущены, ЛК и email будут отправлены."
             )
-            return
 
         now = timezone.now()
-
-        # Окно «через 2 дня»: deadline в [now+47h, now+49h]
-        low_2 = now + timedelta(hours=HOURS_LOW_2)
-        high_2 = now + timedelta(hours=HOURS_HIGH_2)
         matches_2d = list(
             Match.objects.filter(
                 deadline__isnull=False,
-                deadline__gte=low_2,
-                deadline__lte=high_2,
+                deadline__gte=now + timedelta(hours=HOURS_LOW_2),
+                deadline__lte=now + timedelta(hours=HOURS_HIGH_2),
                 status=Match.MatchStatus.SCHEDULED,
             ).select_related("tournament", "player1", "player2", "team1", "team2")
         )
-
-        # Окно «через 1 день»: deadline в [now+23h, now+25h]
-        low_1 = now + timedelta(hours=HOURS_LOW_1)
-        high_1 = now + timedelta(hours=HOURS_HIGH_1)
         matches_1d = list(
             Match.objects.filter(
                 deadline__isnull=False,
-                deadline__gte=low_1,
-                deadline__lte=high_1,
+                deadline__gte=now + timedelta(hours=HOURS_LOW_1),
+                deadline__lte=now + timedelta(hours=HOURS_HIGH_1),
                 status=Match.MatchStatus.SCHEDULED,
             ).select_related("tournament", "player1", "player2", "team1", "team2")
         )
 
         sent_2 = 0
         sent_1 = 0
-
         for match in matches_2d:
             if dry_run:
                 self.stdout.write(
                     f"  [2d] Матч #{match.pk} {match} дедлайн {match.deadline}"
                 )
-            else:
-                try:
-                    tg.notify_match_deadline_reminder(match, days_left=2)
-                    sent_2 += 1
-                    # Уведомление в ЛК (личный кабинет), сообщение до 255 символов
-                    deadline_str = (
-                        match.deadline.strftime("%d.%m.%Y %H:%M")
-                        if match.deadline
-                        else ""
-                    )
-                    msg = f"До дедлайна матча «{match.tournament.name}» 2 дня ({deadline_str}). Внесите результат: Мои матчи."
-                    if len(msg) > 255:
-                        msg = msg[:252] + "..."
-                    url = reverse("my_matches")
-                    for user in get_match_participant_users(match):
-                        try:
-                            Notification.objects.create(user=user, message=msg, url=url)
-                        except Exception as e:
-                            logger.warning(
-                                "Notification deadline 2d user %s: %s", user.pk, e
-                            )
-                except Exception as e:
-                    logger.exception(
-                        "send_deadline_reminder 2d match %s: %s", match.pk, e
-                    )
-
+                continue
+            try:
+                _notify_match_participants(match, days_left=2)
+                sent_2 += 1
+            except Exception as exc:
+                logger.exception(
+                    "send_deadline_reminder 2d match %s: %s", match.pk, exc
+                )
         for match in matches_1d:
             if dry_run:
                 self.stdout.write(
                     f"  [1d] Матч #{match.pk} {match} дедлайн {match.deadline}"
                 )
-            else:
-                try:
-                    tg.notify_match_deadline_reminder(match, days_left=1)
-                    sent_1 += 1
-                    # Уведомление в ЛК (личный кабинет), сообщение до 255 символов
-                    deadline_str = (
-                        match.deadline.strftime("%d.%m.%Y %H:%M")
-                        if match.deadline
-                        else ""
-                    )
-                    msg = f"До дедлайна матча «{match.tournament.name}» 1 день ({deadline_str}). Внесите результат: Мои матчи."
-                    if len(msg) > 255:
-                        msg = msg[:252] + "..."
-                    url = reverse("my_matches")
-                    for user in get_match_participant_users(match):
-                        try:
-                            Notification.objects.create(user=user, message=msg, url=url)
-                        except Exception as e:
-                            logger.warning(
-                                "Notification deadline 1d user %s: %s", user.pk, e
-                            )
-                except Exception as e:
-                    logger.exception(
-                        "send_deadline_reminder 1d match %s: %s", match.pk, e
-                    )
+                continue
+            try:
+                _notify_match_participants(match, days_left=1)
+                sent_1 += 1
+            except Exception as exc:
+                logger.exception(
+                    "send_deadline_reminder 1d match %s: %s", match.pk, exc
+                )
 
         if dry_run:
             self.stdout.write(
-                f"Dry-run: матчей за 2 дня: {len(matches_2d)}, за 1 день: {len(matches_1d)}"
+                f"Dry-run: матчей за 2 дня: {len(matches_2d)}, "
+                f"за 1 день: {len(matches_1d)}"
             )
-        else:
-            self.stdout.write(
-                f"Напоминаний отправлено: за 2 дня — {sent_2}, за 1 день — {sent_1}."
-            )
+            return
+        self.stdout.write(
+            f"Напоминаний отправлено: за 2 дня — {sent_2}, за 1 день — {sent_1}."
+        )

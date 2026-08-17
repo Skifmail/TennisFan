@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Напоминание о дедлайне матча</title>
+</head>
+<body>
+    <p>Здравствуйте, {{ user.get_full_name|default:user.email }}!</p>
+    <p>До дедлайна вашего матча в турнире «{{ tournament.name }}» осталось <b>{{ days_label }}</b>.</p>
+    {% if round_name %}<p>Тур: {{ round_name }}</p>{% endif %}
+    <p>{{ player1 }} — {{ player2 }}</p>
+    <p><b>Дедлайн: до {{ deadline_str }}</b></p>
+    <p>Пожалуйста, сыграйте матч и внесите результат. Если матч не будет сыгран до дедлайна, администратор может проставить <b>Walkover (неявку)</b>: у неявившегося игрока будет снято <b>40 очков</b> рейтинга, у соперника — 0.</p>
+    <p><a href="{{ match_url }}">Открыть матч</a></p>
+    <p><a href="{{ tournament_url }}">Страница турнира</a></p>
+    <p>С уважением,<br>Команда TennisFan</p>
+</body>
+</html>

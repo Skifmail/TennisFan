@@ -1,0 +1,19 @@
+{% if match.player1_id or match.team1_id %}
+{% if match.is_deadline_overdue %}
+<p class="bracket-overdue-note">Дедлайн истёк. Продлите дедлайн выше или проставьте Walkover (неявку) одному из участников: у него −40 рейтинга, у соперника 0, матч закроется без игры.</p>
+{% endif %}
+<form action="{% url 'tournament_manage_match_walkover' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-walkover-form">
+    {% csrf_token %}
+    <div class="bracket-winner-row">
+        <span class="bracket-winner-label">Walkover (неявка):</span>
+        {% if match.team1_id and match.team2_id %}
+        <label class="bracket-radio"><input type="radio" name="walkover_loser_team_id" value="{{ match.team1_id }}" required> {{ match.get_player1_display }}</label>
+        <label class="bracket-radio"><input type="radio" name="walkover_loser_team_id" value="{{ match.team2_id }}" required> {{ match.get_player2_display }}</label>
+        {% else %}
+        {% if match.player1_id %}<label class="bracket-radio"><input type="radio" name="walkover_loser_id" value="{{ match.player1_id }}" required> {{ match.get_player1_display }}</label>{% endif %}
+        {% if match.player2_id %}<label class="bracket-radio"><input type="radio" name="walkover_loser_id" value="{{ match.player2_id }}" required> {{ match.get_player2_display }}</label>{% endif %}
+        {% endif %}
+    </div>
+    <button type="submit" class="btn btn-sm btn-secondary bracket-submit-btn">Проставить Walkover</button>
+</form>
+{% endif %}

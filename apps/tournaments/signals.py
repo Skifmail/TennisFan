@@ -382,6 +382,7 @@ def update_player_stats(sender, instance, created, **kwargs):
         )
 
     _walkover_loss = instance.is_walkover_loss()
+    skip_season_points = _walkover_loss or instance.is_no_show_walkover()
 
     # ------------------------------------------------------------------
     # 1) Update matches_played / matches_won for all formats
@@ -454,11 +455,11 @@ def update_player_stats(sender, instance, created, **kwargs):
         return
 
     if t and _is_olympic(t):
-        advance_winner_olympic(match, skip_points=_walkover_loss)
+        advance_winner_olympic(match, skip_points=skip_season_points)
         if match.round_index >= 1 and not match.is_consolation:
             ensure_consolation_created_for_round(t, match.round_index)
     elif t and _is_fan(t):
-        advance_winner_and_award_loser(match, skip_points=_walkover_loss)
+        advance_winner_and_award_loser(match, skip_points=skip_season_points)
         if match.round_index == 1 and not match.is_consolation:
             ensure_consolation_created(t)
         finalize_tournament(t)
@@ -470,6 +471,75 @@ def update_player_stats(sender, instance, created, **kwargs):
         else:
             tvd_advance_winner(match)
         tvd_check_and_finalize(t)
+
+
+def _apply_fixed_rating_delta(player, delta: float) -> None:
+    """Изменить рейтинг игрока на фиксированную дельту и обновить уровень силы.
+
+    Args:
+        player: Игрок или None (bye пропускается).
+        delta: Изменение рейтинга (может быть отрицательным).
+    """
+    from apps.users.rating_utils import rating_to_ntrp_level, rating_to_skill_level
+
+    if player is None or getattr(player, "is_bye", False):
+        return
+    old_rating = float(player.total_points)
+    new_rating = max(0.0, old_rating + float(delta))
+    player.hidden_rating = new_rating
+    player.total_points = float(new_rating)
+    player.skill_level = rating_to_skill_level(new_rating)
+    player.ntrp_level = rating_to_ntrp_level(new_rating)
+    player.save(
+        update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
+    )
+    logger.info(
+        "Player %s: фиксированная дельта рейтинга %.1f (%.1f -> %.1f)",
+        player.pk,
+        delta,
+        old_rating,
+        new_rating,
+    )
+
+
+def _apply_no_show_walkover_rating(match: Match) -> None:
+    """Walkover без игры: −40 неявившемуся, 0 победителю, без FAN-расчёта."""
+    from .rating import WALKOVER_NO_SHOW_PENALTY
+
+    penalty = WALKOVER_NO_SHOW_PENALTY
+    is_doubles_sparring = bool(match.partner1_id and match.partner2_id)
+    is_doubles = bool(match.team1_id and match.team2_id) or is_doubles_sparring
+
+    if is_doubles_sparring:
+        side1_won = match.winner_id in (match.player1_id, match.partner1_id)
+        delta1 = 0.0 if side1_won else -penalty
+        delta2 = -penalty if side1_won else 0.0
+        for player in (match.player1, match.partner1):
+            _apply_fixed_rating_delta(player, delta1)
+        for player in (match.player2, match.partner2):
+            _apply_fixed_rating_delta(player, delta2)
+    elif is_doubles:
+        side1_won = match.winner_team_id == match.team1_id
+        delta1 = 0.0 if side1_won else -penalty
+        delta2 = -penalty if side1_won else 0.0
+        if match.team1:
+            for player in (match.team1.player1, match.team1.player2):
+                _apply_fixed_rating_delta(player, delta1)
+        if match.team2:
+            for player in (match.team2.player1, match.team2.player2):
+                _apply_fixed_rating_delta(player, delta2)
+    else:
+        p1_won = match.winner_id == match.player1_id
+        delta1 = 0.0 if p1_won else -penalty
+        delta2 = -penalty if p1_won else 0.0
+        _apply_fixed_rating_delta(match.player1, delta1)
+        _apply_fixed_rating_delta(match.player2, delta2)
+
+    Match.objects.filter(pk=match.pk).update(
+        rating_delta_player1=delta1,
+        rating_delta_player2=delta2,
+        rating_status=Match.RatingCalcStatus.CALCULATED,
+    )
 
 
 def _apply_fan_shadow(match: Match) -> None:
@@ -541,6 +611,14 @@ def _apply_fan_shadow(match: Match) -> None:
 
     if getattr(p1, "is_bye", False) or getattr(p2, "is_bye", False):
         logger.debug("_apply_fan_shadow: match %s has bye players, skipping", match.pk)
+        return
+
+    if match.is_no_show_walkover():
+        logger.info(
+            "_apply_fan_shadow: match %s no-show walkover, фиксированный штраф",
+            match.pk,
+        )
+        _apply_no_show_walkover_rating(match)
         return
 
     # K-factor определяется по количеству матчей ДО этого матча

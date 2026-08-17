@@ -31,6 +31,7 @@ K_STABLE: int = 50  # K-factor after 10+ matches
 CALIBRATION_THRESHOLD: int = 10  # Number of matches before K stabilises
 GAMES_WEIGHT: float = 0.7  # Weight of game percentage in S
 WIN_BONUS_WEIGHT: float = 0.3  # Weight of match-win bonus in S
+WALKOVER_NO_SHOW_PENALTY: float = 40.0  # Штраф неявившемуся при Walkover без игры
 
 
 # ---------------------------------------------------------------------------

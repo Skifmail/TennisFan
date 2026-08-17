@@ -29,6 +29,23 @@ class RulesDefaultsTests(TestCase):
         """Неизвестный slug даёт пустую строку."""
         self.assertEqual(get_default_rules_body("unknown_section"), "")
 
+    def test_format_rules_document_walkover_on_no_show_and_overdue(self) -> None:
+        """Walkover за неявку и просрочку дедлайна описан в правилах форматов."""
+        slugs = (
+            "rules_fan",
+            "rules_round_robin",
+            "rules_olympic",
+            "rules_tvd",
+            "rating_rules",
+        )
+        for slug in slugs:
+            body = get_default_rules_body(slug)
+            self.assertIn("Walkover", body, msg=slug)
+            self.assertIn("неявк", body.lower(), msg=slug)
+            self.assertIn("просроч", body.lower(), msg=slug)
+            self.assertIn("40", body, msg=slug)
+            self.assertNotIn("обработан автоматически", body, msg=slug)
+
 
 class RulesSectionAdminFormTests(TestCase):
     """Форма админки подставляет дефолт при пустом body."""

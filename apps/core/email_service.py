@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from django.http import HttpRequest
 
     from apps.courts.models import CourtApplication
-    from apps.tournaments.models import Tournament
+    from apps.tournaments.models import Match, Tournament
     from apps.training.models import CoachApplication
     from apps.users.models import User
 
@@ -392,6 +392,108 @@ def send_match_deadline_changed_email(
             "round_name": round_name,
             "match_url": match_url,
             "tournament_url": f"{base_url}{reverse('tournament_detail', args=[tournament.slug])}",
+            "base_url": base_url,
+        },
+        recipient=email,
+        category="tournament",
+    )
+
+
+def send_match_deadline_reminder_email(
+    user: User,
+    match: Match,
+    *,
+    days_left: int,
+    match_url: str = "",
+) -> bool:
+    """Напомнить участнику о дедлайне матча и возможном штрафе за неявку.
+
+    Args:
+        user: Получатель.
+        match: Матч с приближающимся дедлайном.
+        days_left: Осталось дней до дедлайна (1 или 2).
+        match_url: Абсолютная ссылка на матч.
+
+    Returns:
+        True, если письмо отправлено.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    tournament = match.tournament
+    if tournament is None:
+        return False
+    base_url = _get_site_base_url()
+    deadline_str = ""
+    if match.deadline:
+        deadline_str = timezone.localtime(match.deadline).strftime("%d.%m.%Y %H:%M")
+    days_label = "1 день" if days_left == 1 else f"{days_left} дня"
+    match_path = reverse("match_detail", args=[match.pk])
+    return _send_html_email(
+        subject=(f"TennisFan: до дедлайна матча {days_label} — «{tournament.name}»"),
+        template_name="emails/match_deadline_reminder.html",
+        context={
+            "user": user,
+            "tournament": tournament,
+            "match": match,
+            "days_left": days_left,
+            "days_label": days_label,
+            "deadline_str": deadline_str,
+            "player1": match.get_player1_display(),
+            "player2": match.get_player2_display(),
+            "round_name": match.round_name,
+            "match_url": match_url or f"{base_url}{match_path}",
+            "tournament_url": (
+                f"{base_url}{reverse('tournament_detail', args=[tournament.slug])}"
+            ),
+            "base_url": base_url,
+        },
+        recipient=email,
+        category="tournament",
+    )
+
+
+def send_match_deadline_overdue_admin_email(
+    user: User,
+    match: Match,
+    *,
+    manage_url: str = "",
+) -> bool:
+    """Отправить администратору письмо о просроченном дедлайне матча.
+
+    Args:
+        user: Получатель (сотрудник платформы или админ клуба).
+        match: Просроченный матч.
+        manage_url: Относительная ссылка на управление турниром.
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    tournament = match.tournament
+    if tournament is None:
+        return False
+    base_url = _get_site_base_url()
+    deadline_str = ""
+    if match.deadline:
+        deadline_str = timezone.localtime(match.deadline).strftime("%d.%m.%Y")
+    match_path = reverse("match_detail", args=[match.pk])
+    manage_path = manage_url or reverse("tournament_manage", args=[tournament.slug])
+    return _send_html_email(
+        subject=f"TennisFan: просрочен дедлайн матча в «{tournament.name}»",
+        template_name="emails/match_deadline_overdue_admin.html",
+        context={
+            "user": user,
+            "tournament": tournament,
+            "match": match,
+            "player1": match.get_player1_display(),
+            "player2": match.get_player2_display(),
+            "round_name": match.round_name,
+            "deadline_str": deadline_str,
+            "match_url": f"{base_url}{match_path}",
+            "manage_url": f"{base_url}{manage_path}",
             "base_url": base_url,
         },
         recipient=email,

@@ -1,6 +1,7 @@
 """Интеграционные тесты: парный спарринг 2×2."""
 
-from django.test import TestCase
+from django.test import Client, TestCase
+from django.urls import reverse
 
 from apps.sparring.doubles_services import (
     accept_join_request,
@@ -14,6 +15,7 @@ from apps.sparring.doubles_services import (
 )
 from apps.sparring.models import (
     DoublesJoinRequestStatus,
+    DoublesMatchKind,
     DoublesMatchRequestStatus,
     TeamSide,
 )
@@ -138,6 +140,95 @@ class DoublesRequestFlowTestCase(TestCase):
         cancel_match_request(match_request_id=req.pk, cancelled_by=self.author)
         req.refresh_from_db()
         self.assertEqual(req.status, DoublesMatchRequestStatus.CANCELLED)
+
+
+class DoublesListRosterTestCase(TestCase):
+    """В списке парного и командного спарринга видны фото и имена зарегистрированных."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        self.author = make_player(
+            email_suffix="author_list",
+            first_name="Леонид",
+            last_name="Ермолаев",
+        )
+        self.partner = make_player(
+            email_suffix="partner_list",
+            first_name="Оксана",
+            last_name="Ермолаева",
+        )
+        self.opp1 = make_player(
+            email_suffix="opp1_list",
+            first_name="Иван",
+            last_name="Иванов",
+        )
+        self.pending = make_player(
+            email_suffix="pending_list",
+            first_name="Пётр",
+            last_name="Петров",
+        )
+
+    def _accept_opponent(self, req) -> None:
+        create_join_request(
+            match_request_id=req.pk,
+            created_by=self.opp1,
+            target_side=TeamSide.OPPONENT[0],
+            players=[self.opp1],
+        )
+        jr = req.join_requests.get(status=DoublesJoinRequestStatus.PENDING)
+        accept_join_request(
+            match_request_id=req.pk,
+            join_request_id=jr.pk,
+            accepted_by=self.author,
+        )
+        create_join_request(
+            match_request_id=req.pk,
+            created_by=self.pending,
+            target_side=TeamSide.OPPONENT[0],
+            players=[self.pending],
+        )
+
+    def _assert_registered_roster(self, html: str) -> None:
+        self.assertIn("sparring-card__roster", html)
+        self.assertIn("Леонид Ермолаев", html)
+        self.assertIn("Оксана Ермолаева", html)
+        self.assertIn("Иван Иванов", html)
+        self.assertNotIn("Пётр Петров", html)
+        self.assertGreaterEqual(html.count("sparring-card__member-avatar"), 3)
+        self.assertGreaterEqual(html.count("sparring-card__member-name"), 3)
+
+    def test_doubles_list_shows_registered_members_with_photos(self) -> None:
+        req = create_doubles_request(
+            created_by=self.author,
+            city="Раменское",
+            partner=self.partner,
+        )
+        self._accept_opponent(req)
+
+        response = self.client.get(
+            reverse("sparring_list"),
+            {"type": "doubles"},
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self._assert_registered_roster(response.content.decode())
+
+    def test_team_list_shows_registered_members_with_photos(self) -> None:
+        req = create_doubles_request(
+            created_by=self.author,
+            city="Раменское",
+            partner=self.partner,
+            kind=DoublesMatchKind.TEAM,
+        )
+        self._accept_opponent(req)
+
+        response = self.client.get(
+            reverse("sparring_list"),
+            {"type": "team"},
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self._assert_registered_roster(response.content.decode())
 
 
 class DoublesMatchRatingTestCase(TestCase):

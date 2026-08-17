@@ -1,0 +1,45 @@
+{% comment %}
+Ростер зарегистрированных участников парного/командного спарринга.
+Ожидает DoublesMatchRequest в переменной req с prefetch teams__members__player__user.
+{% endcomment %}
+<div class="sparring-card__roster" role="group" aria-label="Зарегистрированные участники">
+    <div class="sparring-card__team">
+        <p class="sparring-card__team-label">Команда автора</p>
+        <ul class="sparring-card__members">
+            {% if req.author_team %}
+                {% for tm in req.author_team.members.all %}
+                <li class="sparring-card__member">
+                    <a href="{% url 'profile' pk=tm.player.pk %}" class="sparring-card__member-link">
+                        {% include 'includes/avatar.html' with avatar=tm.player.avatar class="player-avatar sparring-card__member-avatar" %}
+                        <span class="sparring-card__member-name">{{ tm.player }}</span>
+                    </a>
+                </li>
+                {% empty %}
+                <li class="sparring-card__member sparring-card__member--empty">Пока никого</li>
+                {% endfor %}
+            {% else %}
+                <li class="sparring-card__member sparring-card__member--empty">Пока никого</li>
+            {% endif %}
+        </ul>
+    </div>
+    <span class="sparring-card__roster-vs" aria-hidden="true">vs</span>
+    <div class="sparring-card__team">
+        <p class="sparring-card__team-label">Команда соперников</p>
+        <ul class="sparring-card__members">
+            {% if req.opponent_team %}
+                {% for tm in req.opponent_team.members.all %}
+                <li class="sparring-card__member">
+                    <a href="{% url 'profile' pk=tm.player.pk %}" class="sparring-card__member-link">
+                        {% include 'includes/avatar.html' with avatar=tm.player.avatar class="player-avatar sparring-card__member-avatar" %}
+                        <span class="sparring-card__member-name">{{ tm.player }}</span>
+                    </a>
+                </li>
+                {% empty %}
+                <li class="sparring-card__member sparring-card__member--empty">Пока никого</li>
+                {% endfor %}
+            {% else %}
+                <li class="sparring-card__member sparring-card__member--empty">Пока никого</li>
+            {% endif %}
+        </ul>
+    </div>
+</div>

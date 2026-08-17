@@ -80,7 +80,10 @@
                     {% if author_team %}
                         {% for tm in author_team.members.all %}
                         <li class="d-flex align-items-center gap-2">
-                            <a href="{% url 'profile' pk=tm.player_id %}">{{ tm.player }}</a>
+                            <a href="{% url 'profile' pk=tm.player_id %}" class="sparring-card__member-link">
+                                {% include 'includes/avatar.html' with avatar=tm.player.avatar class="player-avatar sparring-card__member-avatar" %}
+                                <span class="sparring-card__member-name">{{ tm.player }}</span>
+                            </a>
                             {% if tm.is_captain %}<span class="badge" style="font-size: 0.7rem;">капитан</span>{% endif %}
                             {% if can_edit_teams and not tm.is_captain %}
                             <form method="post" action="{% url 'doubles_remove_member' pk=doubles_request.pk %}" class="d-inline">
@@ -113,7 +116,10 @@
                     {% if opponent_team %}
                         {% for tm in opponent_team.members.all %}
                         <li class="d-flex align-items-center gap-2">
-                            <a href="{% url 'profile' pk=tm.player_id %}">{{ tm.player }}</a>
+                            <a href="{% url 'profile' pk=tm.player_id %}" class="sparring-card__member-link">
+                                {% include 'includes/avatar.html' with avatar=tm.player.avatar class="player-avatar sparring-card__member-avatar" %}
+                                <span class="sparring-card__member-name">{{ tm.player }}</span>
+                            </a>
                             {% if can_edit_teams %}
                             <form method="post" action="{% url 'doubles_remove_member' pk=doubles_request.pk %}" class="d-inline">
                                 {% csrf_token %}

@@ -2,6 +2,8 @@
 Sparring models.
 """
 
+from typing import cast
+
 from django.db import models
 
 from apps.users.models import Player, SkillLevel
@@ -349,6 +351,23 @@ class DoublesMatchRequest(models.Model):
 
     def __str__(self) -> str:
         return f"Парный спарринг #{self.pk} ({self.get_status_display()})"
+
+    def _team_for_side(self, side: str) -> "DoublesTeam | None":
+        """Вернуть команду заявки по стороне без лишнего запроса при prefetch."""
+        for team in self.teams.all():
+            if team.side == side:
+                return cast("DoublesTeam", team)
+        return None
+
+    @property
+    def author_team(self) -> "DoublesTeam | None":
+        """Команда автора, если уже создана."""
+        return self._team_for_side(cast(str, TeamSide.AUTHOR))
+
+    @property
+    def opponent_team(self) -> "DoublesTeam | None":
+        """Команда соперников, если уже создана."""
+        return self._team_for_side(cast(str, TeamSide.OPPONENT))
 
 
 class DoublesTeam(models.Model):

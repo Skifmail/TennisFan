@@ -17488,6 +17488,92 @@ a.match-details-value__lead:hover {
     grid-template-columns: minmax(0, 1fr) auto;
 }
 
+/* Парный и командный спарринг: ростер вместо одного аватара автора */
+.sparring-card__layout--roster {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.sparring-card__roster {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: var(--spacing-sm);
+    align-items: start;
+    margin-bottom: var(--spacing-sm);
+}
+
+.sparring-card__team {
+    min-width: 0;
+}
+
+.sparring-card__team-label {
+    margin: 0 0 var(--spacing-xs);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+
+.sparring-card__members {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.sparring-card__member {
+    min-width: 0;
+}
+
+.sparring-card__member-link {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-width: 0;
+    text-decoration: none;
+    color: var(--color-text);
+}
+
+.sparring-card__member-link:hover .sparring-card__member-name {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.sparring-card__member-avatar {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    flex-shrink: 0;
+}
+
+.sparring-card__member-name {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sparring-card__member--empty {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    padding: 0.35rem 0;
+}
+
+.sparring-card__roster-vs {
+    align-self: center;
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-muted);
+    padding-top: 1.1rem;
+}
+
 .sparring-card__col--main {
     min-width: 0;
 }
@@ -17626,6 +17712,20 @@ a.match-details-value__lead:hover {
 
     .sparring-card__layout--my-request {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sparring-card__layout--roster {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sparring-card__roster {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--spacing-sm);
+    }
+
+    .sparring-card__roster-vs {
+        justify-self: start;
+        padding-top: 0;
     }
 
     .sparring-card__col--cta {

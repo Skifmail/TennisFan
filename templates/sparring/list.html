@@ -180,19 +180,10 @@
                     <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
                     {% endif %}
                 </div>
-                <div class="sparring-card__layout">
-                    <div class="sparring-card__col sparring-card__col--avatar">
-                        {% include 'includes/avatar.html' with avatar=req.created_by.avatar class="player-avatar sparring-card__avatar" %}
-                    </div>
+                <div class="sparring-card__layout sparring-card__layout--roster">
                     <div class="sparring-card__col sparring-card__col--main">
-                        <div class="sparring-card__headline player-name-block">
-                            <a href="{% url 'profile' pk=req.created_by.pk %}" class="player-name">{{ req.created_by }}</a>
-                            {% include 'includes/subscription_badge.html' with tier=req.created_by.paid_subscription_tier %}
-                        </div>
+                        {% include 'includes/sparring_doubles_roster.html' with req=req %}
                         <div class="sparring-card__chips">
-                            <span class="player-category sparring-card__chip">{{ req.created_by.get_skill_level_display }}</span>
-                            <span class="player-category sparring-card__chip sparring-card__chip--muted" title="Уровень силы (NTRP)">Сила {{ req.created_by.ntrp_level }}</span>
-                            <span class="player-category sparring-card__chip sparring-card__chip--muted" title="Рейтинг FAN">Рейтинг {{ req.created_by.total_points|floatformat:0 }}</span>
                             {% if req.desired_level %}
                             <span class="sparring-desired-category">Партнёры: {{ req.get_desired_level_display }}</span>
                             {% endif %}
@@ -223,7 +214,6 @@
                                 {% endif %}
                             </span>
                             {% endif %}
-                            <span class="sparring-card__detail-line">Команда: {% for team in req.teams.all %}{% if team.side == 'author' %}{% for tm in team.members.all %}{{ tm.player }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}{% endfor %}</span>
                         </div>
                     </div>
                     <div class="sparring-card__col sparring-card__col--cta">
@@ -253,19 +243,10 @@
                     <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
                     {% endif %}
                 </div>
-                <div class="sparring-card__layout">
-                    <div class="sparring-card__col sparring-card__col--avatar">
-                        {% include 'includes/avatar.html' with avatar=req.created_by.avatar class="player-avatar sparring-card__avatar" %}
-                    </div>
+                <div class="sparring-card__layout sparring-card__layout--roster">
                     <div class="sparring-card__col sparring-card__col--main">
-                        <div class="sparring-card__headline player-name-block">
-                            <a href="{% url 'profile' pk=req.created_by.pk %}" class="player-name">{{ req.created_by }}</a>
-                            {% include 'includes/subscription_badge.html' with tier=req.created_by.paid_subscription_tier %}
-                        </div>
+                        {% include 'includes/sparring_doubles_roster.html' with req=req %}
                         <div class="sparring-card__chips">
-                            <span class="player-category sparring-card__chip">{{ req.created_by.get_skill_level_display }}</span>
-                            <span class="player-category sparring-card__chip sparring-card__chip--muted" title="Уровень силы (NTRP)">Сила {{ req.created_by.ntrp_level }}</span>
-                            <span class="player-category sparring-card__chip sparring-card__chip--muted" title="Рейтинг FAN">Рейтинг {{ req.created_by.total_points|floatformat:0 }}</span>
                             {% if req.desired_level %}
                             <span class="sparring-desired-category">Партнёры: {{ req.get_desired_level_display }}</span>
                             {% endif %}
@@ -296,7 +277,6 @@
                                 {% endif %}
                             </span>
                             {% endif %}
-                            <span class="sparring-card__detail-line">Команды формируются из 4 игроков: автор и откликнувшиеся.</span>
                         </div>
                     </div>
                     <div class="sparring-card__col sparring-card__col--cta">

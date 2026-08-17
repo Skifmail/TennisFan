@@ -1,47 +1,31 @@
 <section class="section home-section home-section--activity" id="home-activity" aria-labelledby="home-activity-title">
     <div class="container">
         <div class="section-header">
-            <div>
-                <p class="home-activity__eyebrow">Сейчас на платформе</p>
-                <h2 class="section-title" id="home-activity-title">Лента активности</h2>
-            </div>
+            <h2 class="section-title home-activity__title" id="home-activity-title">
+                <span class="home-activity__live" aria-hidden="true"></span>
+                События платформы
+            </h2>
         </div>
 
         {% if home_activity_events %}
-        <div class="home-activity" data-home-activity>
-            <div class="home-activity__head">
-                <span>Дата</span>
-                <span>Кто</span>
-                <span>Событие</span>
-            </div>
+        <div
+            class="home-activity"
+            data-home-activity
+            style="--home-activity-count: {{ home_activity_events|length }}"
+        >
             <div class="home-activity__list">
-                {% for event in home_activity_events %}
-                <article class="home-activity__row">
-                    <div class="home-activity__cell home-activity__cell--date">
-                        <span class="home-activity__date">{{ event.created_at|date:"d.m.Y" }}</span>
-                        <span class="home-activity__time">{{ event.created_at|date:"H:i" }}</span>
+                <div class="home-activity__track">
+                    <div class="home-activity__group">
+                        {% for event in home_activity_events %}
+                        {% include 'core/_home_activity_row.html' with event=event index=forloop.counter0 only %}
+                        {% endfor %}
                     </div>
-                    <div class="home-activity__cell home-activity__cell--actor">
-                        {% if event.get_actor_profile_url %}
-                        <a href="{{ event.get_actor_profile_url }}" class="home-activity__actor">{{ event.get_actor_display }}</a>
-                        {% else %}
-                        <span class="home-activity__actor">{{ event.get_actor_display }}</span>
-                        {% endif %}
+                    <div class="home-activity__group home-activity__group--clone" aria-hidden="true" inert>
+                        {% for event in home_activity_events %}
+                        {% include 'core/_home_activity_row.html' with event=event is_clone='1' only %}
+                        {% endfor %}
                     </div>
-                    <div class="home-activity__cell home-activity__cell--action">
-                        <span class="club-dashboard-activity__badge club-dashboard-activity__badge--{{ event.get_tone }}">{{ event.get_event_type_display }}</span>
-                        {% if event.description %}
-                        <span class="home-activity__desc">
-                            {% if event.get_public_target_url %}
-                            <a href="{{ event.get_public_target_url }}">{{ event.description }}</a>
-                            {% else %}
-                            {{ event.description }}
-                            {% endif %}
-                        </span>
-                        {% endif %}
-                    </div>
-                </article>
-                {% endfor %}
+                </div>
             </div>
         </div>
         {% else %}
@@ -51,3 +35,39 @@
         {% endif %}
     </div>
 </section>
+<script>
+(function () {
+    var root = document.querySelector("[data-home-activity]");
+    if (!root) {
+        return;
+    }
+    var list = root.querySelector(".home-activity__list");
+    var track = root.querySelector(".home-activity__track");
+    if (!list || !track) {
+        return;
+    }
+
+    function reveal() {
+        root.classList.add("home-activity--inview");
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            return;
+        }
+        if (track.scrollHeight > list.clientHeight + 12) {
+            root.classList.add("home-activity--ticker");
+        }
+    }
+
+    if ("IntersectionObserver" in window) {
+        var observer = new IntersectionObserver(function (entries) {
+            if (!entries.some(function (entry) { return entry.isIntersecting; })) {
+                return;
+            }
+            reveal();
+            observer.disconnect();
+        }, { threshold: 0.18 });
+        observer.observe(root);
+        return;
+    }
+    reveal();
+})();
+</script>

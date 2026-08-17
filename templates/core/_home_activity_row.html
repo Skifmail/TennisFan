@@ -1,0 +1,25 @@
+<article class="home-activity__row"{% if not is_clone %} style="--i: {{ index }}"{% endif %}>
+    <div class="home-activity__cell home-activity__cell--date">
+        <span class="home-activity__date">{{ event.created_at|date:"d.m.Y" }}</span>
+        <span class="home-activity__time">{{ event.created_at|date:"H:i" }}</span>
+    </div>
+    <div class="home-activity__cell home-activity__cell--actor">
+        {% if event.get_actor_profile_url %}
+        <a href="{{ event.get_actor_profile_url }}" class="home-activity__actor"{% if is_clone %} tabindex="-1"{% endif %}>{{ event.get_actor_display }}</a>
+        {% else %}
+        <span class="home-activity__actor">{{ event.get_actor_display }}</span>
+        {% endif %}
+    </div>
+    <div class="home-activity__cell home-activity__cell--action">
+        <span class="club-dashboard-activity__badge club-dashboard-activity__badge--{{ event.get_tone }}">{{ event.get_event_type_display }}</span>
+        {% if event.description %}
+        <span class="home-activity__desc">
+            {% if event.get_public_target_url %}
+            <a href="{{ event.get_public_target_url }}"{% if is_clone %} tabindex="-1"{% endif %}>{{ event.description }}</a>
+            {% else %}
+            {{ event.description }}
+            {% endif %}
+        </span>
+        {% endif %}
+    </div>
+</article>

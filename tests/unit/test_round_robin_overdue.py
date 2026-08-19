@@ -63,7 +63,7 @@ class OverdueWinnerRoundRobinTestCase(TestCase):
 
 
 class ProcessOverdueRoundRobinMatchTestCase(TestCase):
-    """Обработка просроченного матча: уведомление админа, матч не закрывается."""
+    """Обработка просроченного матча: RT 0:0, победа сильнейшему, без штрафа."""
 
     def setUp(self) -> None:
         self.strong = make_player(
@@ -95,10 +95,12 @@ class ProcessOverdueRoundRobinMatchTestCase(TestCase):
             status=Match.MatchStatus.SCHEDULED,
             deadline=timezone.now() - timedelta(hours=2),
         )
+        self.tournament.participants.add(self.strong, self.weak)
         self.rating_before_strong = float(self.strong.total_points)
         self.rating_before_weak = float(self.weak.total_points)
 
-    def test_process_overdue_notifies_admin_without_closing_match(self) -> None:
+    def test_process_overdue_assigns_auto_rt_to_higher_rated(self) -> None:
+        from apps.tournaments.round_robin import compute_standings
         from apps.users.models import Notification, User
 
         admin = User.objects.create_user(
@@ -111,14 +113,24 @@ class ProcessOverdueRoundRobinMatchTestCase(TestCase):
 
         self.assertTrue(ok, msg)
         self.match.refresh_from_db()
-        self.assertEqual(self.match.status, Match.MatchStatus.SCHEDULED)
-        self.assertIsNone(self.match.winner_id)
+        self.assertEqual(self.match.status, Match.MatchStatus.WALKOVER)
+        self.assertTrue(self.match.is_deadline_auto_rt())
+        self.assertEqual(self.match.winner_id, self.strong.pk)
         self.assertIsNotNone(self.match.deadline_overdue_notified_at)
         self.assertTrue(
             Notification.objects.filter(
                 user=admin, message__contains="Просрочен дедлайн"
             ).exists()
         )
+        self.strong.refresh_from_db()
+        self.weak.refresh_from_db()
+        self.assertEqual(self.strong.total_points, self.rating_before_strong)
+        self.assertEqual(self.weak.total_points, self.rating_before_weak)
+        standings = compute_standings(self.tournament)
+        by_id = {row["player"].pk: row for row in standings if row.get("player")}
+        self.assertEqual(by_id[self.strong.pk]["wins"], 1)
+        self.assertEqual(by_id[self.weak.pk]["wins"], 0)
+        self.assertEqual(by_id[self.weak.pk]["losses"], 1)
 
     def test_process_overdue_skips_when_deadline_not_passed(self) -> None:
         self.match.deadline = timezone.now() + timedelta(days=1)
@@ -132,7 +144,7 @@ class ProcessOverdueRoundRobinMatchTestCase(TestCase):
         self.assertEqual(self.match.status, Match.MatchStatus.SCHEDULED)
 
     def test_process_overdue_does_not_change_rating(self) -> None:
-        """Просрочка только уведомляет админа, рейтинг игроков не меняется."""
+        """Просрочка закрывает матч RT 0:0 без движения рейтинга силы."""
         from apps.users.models import User
 
         User.objects.create_user(
@@ -150,10 +162,6 @@ class ProcessOverdueRoundRobinMatchTestCase(TestCase):
 
         self.assertEqual(self.strong.total_points, self.rating_before_strong)
         self.assertEqual(self.weak.total_points, self.rating_before_weak)
-        self.assertEqual(self.strong.matches_won, 0)
-        self.assertEqual(self.weak.matches_won, 0)
-        self.assertEqual(self.strong.matches_played, 15)
-        self.assertEqual(self.weak.matches_played, 15)
-        self.assertEqual(
-            self.match.rating_status, Match.RatingCalcStatus.NOT_APPLICABLE
-        )
+        self.assertEqual(self.match.winner_id, self.strong.pk)
+        self.assertEqual(self.match.rating_delta_player1, 0.0)
+        self.assertEqual(self.match.rating_delta_player2, 0.0)

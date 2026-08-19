@@ -312,6 +312,12 @@ def recalculate_group_standings(group: TVDGroup) -> None:
             status__in=(Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER),
         ).select_related("team1", "team2")
         for m in matches:
+            if m.is_mutual_no_show_walkover() and m.team1_id and m.team2_id:
+                t1_id, t2_id = m.team1_id, m.team2_id
+                if t1_id in members and t2_id in members:
+                    members[t1_id].losses += 1
+                    members[t2_id].losses += 1
+                continue
             if not m.winner_team_id or not m.team1_id or not m.team2_id:
                 continue
             t1_id, t2_id = m.team1_id, m.team2_id
@@ -366,6 +372,12 @@ def recalculate_group_standings(group: TVDGroup) -> None:
             status__in=(Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER),
         ).select_related("player1", "player2")
         for m in matches:
+            if m.is_mutual_no_show_walkover() and m.player1_id and m.player2_id:
+                p1_id, p2_id = m.player1_id, m.player2_id
+                if p1_id in members and p2_id in members:
+                    members[p1_id].losses += 1
+                    members[p2_id].losses += 1
+                continue
             if not m.winner_id or not m.player1_id or not m.player2_id:
                 continue
             p1_id, p2_id = m.player1_id, m.player2_id
@@ -2144,7 +2156,7 @@ def check_and_finalize(tournament: Tournament) -> tuple[bool, str]:
 
 
 def process_overdue_match(match: Match) -> tuple[bool, str]:
-    """Уведомить администраторов о просрочке дедлайна ТВД-матча."""
+    """Проставить Walkover обоим и уведомить администраторов о просрочке ТВД-матча."""
     if not match.tournament_id or not _is_tvd(match.tournament):
         return False, "Не ТВД-матч."
     from .overdue import notify_admins_match_deadline_overdue

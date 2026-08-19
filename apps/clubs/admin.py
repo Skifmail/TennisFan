@@ -17,6 +17,7 @@ from django.urls import path
 from django.utils import timezone
 
 from apps.tournaments.admin import TournamentAdmin
+from apps.tournaments.platform_home import order_with_cancelled_last
 
 from .models import (
     Club,
@@ -619,7 +620,10 @@ class ClubTournamentAdmin(TournamentAdmin):
             QuerySet с ``club__isnull=False`` и ``select_related`` для клуба и корта.
         """
         qs = admin.ModelAdmin.get_queryset(self, request)
-        return qs.filter(club__isnull=False).select_related("club", "court")
+        return order_with_cancelled_last(
+            qs.filter(club__isnull=False).select_related("club", "court"),
+            "-start_date",
+        )
 
     def get_list_display(self, request: HttpRequest) -> tuple[str, ...]:
         """Добавить колонку «Клуб» после названия."""

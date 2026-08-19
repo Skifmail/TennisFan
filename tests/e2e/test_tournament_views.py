@@ -292,6 +292,14 @@ class TournamentPublicListOrderingTestCase(TestCase):
             format="single_elimination",
             status=TournamentStatus.UPCOMING,
         )
+        self.cancelled = Tournament.objects.create(
+            name="Отменённый Королёв тест",
+            slug="ordering-cancelled-rr",
+            city="Москва",
+            start_date=date.today() + timedelta(days=60),
+            format="round_robin",
+            status=TournamentStatus.CANCELLED,
+        )
 
     def test_tournament_list_shows_active_before_upcoming(self) -> None:
         response = self.client.get(reverse("tournament_list"), secure=True)
@@ -300,6 +308,19 @@ class TournamentPublicListOrderingTestCase(TestCase):
         self.assertLess(
             content.index(self.active.name),
             content.index(self.upcoming.name),
+        )
+
+    def test_tournament_list_shows_cancelled_last(self) -> None:
+        response = self.client.get(reverse("tournament_list"), secure=True)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertLess(
+            content.index(self.active.name),
+            content.index(self.cancelled.name),
+        )
+        self.assertLess(
+            content.index(self.upcoming.name),
+            content.index(self.cancelled.name),
         )
 
     def test_home_shows_active_before_upcoming(self) -> None:
@@ -402,7 +423,9 @@ class MatchDetailPlayerActionsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Действия игрока")
-        self.assertContains(response, "Отправить на подтверждение")
+        self.assertContains(response, "Сохранить результат")
+        self.assertContains(response, "Неявка соперника")
+        self.assertContains(response, "Моя неявка")
 
 
 @override_settings(

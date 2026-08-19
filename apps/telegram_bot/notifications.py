@@ -448,22 +448,24 @@ def notify_result_proposal(proposal) -> None:
     is_walkover_win = result_val == "walkover_win"
 
     if is_walkover_win:
-        # Proposer заявляет тех. победу → получатель (соперник) проигрывает
-        result_text = "Тех. победа (соперник заявляет, что вы не вышли)"
-        score = "6:0 6:0"
+        # Proposer заявляет неявку соперника → получатель проигрывает
+        result_text = "Неявка (соперник заявляет, что вы не вышли на матч)"
+        score = "без счёта"
         warning_text = (
-            "\n\n⚠️ <b>Внимание!</b> Если вы подтвердите:\n"
-            "• Из вашего рейтинга будет вычтено <b>40 очков</b>\n"
-            "• Счёт будет записан как <b>6:0 6:0</b> в пользу соперника"
+            "\n\n⚠️ <b>Внимание!</b> Матч записан как несостоявшийся:\n"
+            "• Из вашего рейтинга вычтено <b>40 очков</b>\n"
+            "• Счёт не записывается\n"
+            "• Если это ошибка — обратитесь к администратору турнира, "
+            "он может изменить результат"
         )
     elif is_walkover_loss:
-        # Proposer признаёт своё тех. поражение → получатель выигрывает
-        result_text = "Тех. поражение (соперник признаёт, что не вышел)"
-        score = "6:0 6:0 в вашу пользу"
+        # Proposer признаёт свою неявку → получатель выигрывает
+        result_text = "Неявка (соперник признаёт, что не вышел на матч)"
+        score = "без счёта"
         warning_text = (
-            "\n\n✅ Соперник признаёт тех. поражение.\n"
-            "• Из рейтинга <b>соперника</b> будет вычтено <b>40 очков</b>\n"
-            "• Счёт: <b>6:0 6:0</b> в вашу пользу"
+            "\n\n✅ Соперник признаёт неявку.\n"
+            "• Из рейтинга <b>соперника</b> вычтено <b>40 очков</b>\n"
+            "• Вам засчитана победа без изменения рейтинга"
         )
     else:
         result_text = proposal.get_result_display()
@@ -543,6 +545,60 @@ def _proposal_result_text(proposal) -> str:
         return str(result_val or "—")
 
 
+def _player_side_index(match, player) -> int | None:
+    """Определить сторону игрока в матче.
+
+    Args:
+        match: Объект ``Match``.
+        player: Игрок, чью сторону нужно определить.
+
+    Returns:
+        1 или 2 для первой и второй стороны, None — если игрок не участвует.
+    """
+    if match.team1_id and match.team2_id:
+        if match.team1 and player in (match.team1.player1, match.team1.player2):
+            return 1
+        if match.team2 and player in (match.team2.player1, match.team2.player2):
+            return 2
+        return None
+    if player and player.pk in (match.player1_id, match.partner1_id):
+        return 1
+    if player and player.pk in (match.player2_id, match.partner2_id):
+        return 2
+    return None
+
+
+def _no_show_penalty_text(match, player) -> str:
+    """Текст о штрафе за неявку для конкретного участника.
+
+    Args:
+        match: Матч со статусом Walkover без счёта.
+        player: Игрок — получатель уведомления.
+
+    Returns:
+        Строка со сведениями о штрафе или пустая строка.
+    """
+    side = _player_side_index(match, player)
+    if side is None:
+        return ""
+    side1_no_show, side2_no_show = match.get_no_show_sides()
+    player_no_show = side1_no_show if side == 1 else side2_no_show
+    opponent_no_show = side2_no_show if side == 1 else side1_no_show
+    if player_no_show and opponent_no_show:
+        return (
+            "\n\n⚠️ <b>Неявка обеим сторонам:</b> из рейтинга силы каждого "
+            "участника вычтено <b>40 очков</b>."
+        )
+    if player_no_show:
+        return (
+            "\n\n⚠️ <b>Неявка:</b> из вашего рейтинга силы вычтено " "<b>40 очков</b>."
+        )
+    return (
+        "\n\nℹ️ Сопернику засчитана неявка: из его рейтинга силы вычтено "
+        "<b>40 очков</b>."
+    )
+
+
 def _get_penalty_text_for_player(match, player) -> str:
     """
     Получить текст о штрафе для конкретного игрока.
@@ -554,6 +610,9 @@ def _get_penalty_text_for_player(match, player) -> str:
     Returns:
         Строка с информацией о штрафе или пустая строка, если штраф не применяется
     """
+    if match.is_no_show_walkover():
+        return _no_show_penalty_text(match, player)
+
     if not match.is_walkover_loss():
         return ""
 
@@ -781,8 +840,11 @@ def notify_match_deadline_reminder(match, days_left: int) -> None:
         f"Этап: {match.round_name or '—'}\n"
         f"{side1} — {side2}\n"
         f"Дедлайн: {deadline_str}\n\n"
-        "Если матч не сыграют до дедлайна, администратор может проставить "
-        "Walkover (неявку): −40 очков рейтинга неявившемуся."
+        "Если матч не сыграют до дедлайна, обоим будет Walkover (неявка): "
+        "−40 очков рейтинга каждому.\n\n"
+        "Матч не может состояться по вине соперника? Нажмите «Внести "
+        "результат» и отметьте неявку — счёт вводить не нужно, −40 очков "
+        "получит только неявившаяся сторона."
     )
     reply_markup = {
         "inline_keyboard": [

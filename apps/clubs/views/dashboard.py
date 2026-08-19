@@ -26,6 +26,7 @@ from apps.tournaments.models import (
     TournamentTeam,
     TournamentVariant,
 )
+from apps.tournaments.platform_home import order_with_cancelled_last
 from apps.tournaments.utils import (
     find_blocking_earlier_tournament_match,
     format_tournament_match_order_block_message,
@@ -966,9 +967,9 @@ def my_tournaments(request: HttpRequest) -> HttpResponse:
                 | Q(teams__player1=player)
                 | Q(teams__player2=player)
             )
-            .order_by("start_date")
             .distinct()
         )
+        qs = order_with_cancelled_last(qs, "start_date")
     if status_filter == "upcoming":
         qs = qs.filter(status="upcoming")
     elif status_filter == "active":
@@ -1371,7 +1372,7 @@ def club_tournaments_list(request: HttpRequest, slug: str) -> HttpResponse:
     else:
         variant_filter = ""
 
-    tournaments = tournaments.distinct().order_by("-start_date")
+    tournaments = order_with_cancelled_last(tournaments.distinct(), "-start_date")
     paginator = Paginator(tournaments, 20)
     page_number = request.GET.get("page")
     tournaments_page = paginator.get_page(page_number)

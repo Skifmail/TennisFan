@@ -1107,6 +1107,16 @@ class Match(models.Model):
             "Сбрасывается при продлении дедлайна."
         ),
     )
+    walkover_no_show_side1 = models.BooleanField(
+        "Неявка стороны 1",
+        default=False,
+        help_text="Walkover (неявка) игроку 1 / команде 1.",
+    )
+    walkover_no_show_side2 = models.BooleanField(
+        "Неявка стороны 2",
+        default=False,
+        help_text="Walkover (неявка) игроку 2 / команде 2.",
+    )
     next_match = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,
@@ -1365,6 +1375,27 @@ class Match(models.Model):
             return False
         return bool(self.deadline <= timezone.now())
 
+    def is_all_zero_score(self) -> bool:
+        """Счёт состоит только из нулей (технический RT по дедлайну)."""
+        has_set = False
+        for i in (1, 2, 3):
+            s1 = getattr(self, f"player1_set{i}")
+            s2 = getattr(self, f"player2_set{i}")
+            if s1 is None and s2 is None:
+                continue
+            has_set = True
+            if int(s1 or 0) != 0 or int(s2 or 0) != 0:
+                return False
+        return has_set
+
+    def is_deadline_auto_rt(self) -> bool:
+        """Автоматический Retired по истечении дедлайна: 0:0, без штрафа рейтинга."""
+        return self.status == self.MatchStatus.WALKOVER and self.is_all_zero_score()
+
+    def shows_rt_badge(self) -> bool:
+        """Показывать бейдж Rt.: Retired 6:0 или авто-RT по дедлайну."""
+        return self.is_walkover_loss() or self.is_deadline_auto_rt()
+
     def is_no_show_walkover(self) -> bool:
         """Walkover без счёта: матч не состоялся (неявка), не Retired.
 
@@ -1376,14 +1407,76 @@ class Match(models.Model):
             return False
         return not self.has_set_scores()
 
+    def get_no_show_sides(self) -> tuple[bool, bool]:
+        """Какие стороны отмечены Walkover (неявкой).
+
+        Если флаги ещё не заполнены (старые матчи), выводит стороны из победителя:
+        нет победителя — обе стороны, иначе неявка у проигравшего.
+        """
+        if self.walkover_no_show_side1 or self.walkover_no_show_side2:
+            return bool(self.walkover_no_show_side1), bool(self.walkover_no_show_side2)
+        if not self.is_no_show_walkover():
+            return False, False
+        if self.winner_id is None and self.winner_team_id is None:
+            return True, True
+        if self.team1_id and self.team2_id:
+            return (
+                self.winner_team_id == self.team2_id,
+                self.winner_team_id == self.team1_id,
+            )
+        return (
+            self.winner_id == self.player2_id,
+            self.winner_id == self.player1_id,
+        )
+
+    def is_mutual_no_show_walkover(self) -> bool:
+        """Walkover (неявка) обеим сторонам: нет победителя, оба получают штраф."""
+        side1, side2 = self.get_no_show_sides()
+        return self.is_no_show_walkover() and side1 and side2
+
+    def displayed_walkover_penalty(self, side: int) -> float:
+        """Штраф стороны для формы управления (модуль дельты или 40 по умолчанию)."""
+        from .rating import WALKOVER_NO_SHOW_PENALTY
+
+        side1, side2 = self.get_no_show_sides()
+        flagged = side1 if side == 1 else side2
+        delta = self.rating_delta_player1 if side == 1 else self.rating_delta_player2
+        if flagged:
+            amount = abs(float(delta or 0.0))
+            return amount if amount else float(WALKOVER_NO_SHOW_PENALTY)
+        return float(WALKOVER_NO_SHOW_PENALTY)
+
+    @property
+    def walkover_penalty_display_side1(self) -> str:
+        """Штраф стороны 1 для input value."""
+        return f"{self.displayed_walkover_penalty(1):g}"
+
+    @property
+    def walkover_penalty_display_side2(self) -> str:
+        """Штраф стороны 2 для input value."""
+        return f"{self.displayed_walkover_penalty(2):g}"
+
+    @property
+    def walkover_side1_checked(self) -> bool:
+        """Сторона 1 отмечена неявкой."""
+        return self.get_no_show_sides()[0]
+
+    @property
+    def walkover_side2_checked(self) -> bool:
+        """Сторона 2 отмечена неявкой."""
+        return self.get_no_show_sides()[1]
+
     def is_walkover_loss(self) -> bool:
         """
-        Проверка, является ли матч тех.поражением (Retired).
-        Покрывает оба случая:
-        - WALKOVER_LOSS (игрок признал, что не может играть)
-        - WALKOVER_WIN (соперник заявил, что оппонент не вышел)
-        В обоих случаях проигравший получает штраф FAN + 40.
+        Проверка, является ли матч тех.поражением (Retired): матч начался,
+        но не был доигран, счёт записан как 6:0 6:0. Проигравший получает
+        штраф FAN + 40.
+
+        Неявка (Walkover без счёта) сюда не входит: у неё фиксированный штраф
+        и отдельная ветка расчёта рейтинга.
         """
+        if self.is_no_show_walkover():
+            return False
         # Проверяем через принятые proposals
         if self.result_proposals.filter(
             status=Match.ProposalStatus.ACCEPTED,

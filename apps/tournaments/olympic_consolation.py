@@ -503,7 +503,7 @@ def finalize_olympic(tournament: Tournament) -> tuple[bool, str]:
 
 
 def process_overdue_match(match: Match) -> tuple[bool, str]:
-    """Обработать просроченный матч олимпийской системы: уведомить администраторов."""
+    """Обработать просроченный матч олимпийской системы: Walkover обоим и уведомление."""
     if not _is_olympic(match.tournament):
         return False, "Не олимпийский турнир."
     from .overdue import notify_admins_match_deadline_overdue

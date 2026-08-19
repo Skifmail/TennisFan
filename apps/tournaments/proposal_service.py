@@ -23,6 +23,48 @@ class ProposalValidationError(ValueError):
     """Несогласованный или неполный счёт в заявке на результат матча."""
 
 
+NO_SHOW_HINT = (
+    "Матч не состоялся? Не вводите счёт 0:0 — выберите «Тех. победа: соперник "
+    "не явился» или «Тех. поражение: я не явился». Неявившейся стороне "
+    "автоматически спишется 40 очков рейтинга."
+)
+
+
+def is_all_zero_score(
+    player1_set1: int | None,
+    player2_set1: int | None,
+    player1_set2: int | None,
+    player2_set2: int | None,
+    player1_set3: int | None,
+    player2_set3: int | None,
+) -> bool:
+    """Проверить, что во всех заполненных сетах стоит 0:0.
+
+    Такой «технический» счёт игроки пытаются вводить при неявке соперника.
+
+    Args:
+        player1_set1: Геймы стороны 1 в 1-м сете.
+        player2_set1: Геймы стороны 2 в 1-м сете.
+        player1_set2: Геймы стороны 1 во 2-м сете.
+        player2_set2: Геймы стороны 2 во 2-м сете.
+        player1_set3: Геймы стороны 1 в 3-м сете.
+        player2_set3: Геймы стороны 2 в 3-м сете.
+
+    Returns:
+        True, если хотя бы один сет заполнен и все заполненные сеты равны 0:0.
+    """
+    values = (
+        player1_set1,
+        player2_set1,
+        player1_set2,
+        player2_set2,
+        player1_set3,
+        player2_set3,
+    )
+    filled = [value for value in values if value is not None]
+    return bool(filled) and all(value == 0 for value in filled)
+
+
 def count_sets_won_from_score(
     player1_set1: int | None,
     player2_set1: int | None,
@@ -117,6 +159,15 @@ def derive_proposer_result_from_score(
         raise ProposalValidationError(
             "Укажите счёт первого сета (геймы обеих сторон).",
         )
+    if is_all_zero_score(
+        player1_set1,
+        player2_set1,
+        player1_set2,
+        player2_set2,
+        player1_set3,
+        player2_set3,
+    ):
+        raise ProposalValidationError(NO_SHOW_HINT)
     sets_p1, sets_p2 = count_sets_won_from_score(
         player1_set1,
         player2_set1,
@@ -184,6 +235,15 @@ def validate_proposal_score_consistency(proposal: MatchResultProposal) -> None:
         raise ProposalValidationError(
             "Укажите счёт первого сета (геймы обеих сторон).",
         )
+    if is_all_zero_score(
+        proposal.player1_set1,
+        proposal.player2_set1,
+        proposal.player1_set2,
+        proposal.player2_set2,
+        proposal.player1_set3,
+        proposal.player2_set3,
+    ):
+        raise ProposalValidationError(NO_SHOW_HINT)
     if sets_p1 == sets_p2:
         raise ProposalValidationError(
             "По введённому счёту нельзя определить победителя.",
@@ -336,7 +396,21 @@ def notify_participants_match_result_confirmed(
                     and p in (match.player2, match.partner2)
                 )
             )
-            if walkover:
+            if walkover and match.is_mutual_no_show_walkover():
+                msg = (
+                    "Матч не состоялся: Walkover (неявка) обоим участникам, "
+                    "−40 очков рейтинга каждому."
+                )
+            elif walkover and match.is_no_show_walkover():
+                msg = (
+                    "Матч не состоялся: соперник не явился. Вам засчитана победа."
+                    if is_winner
+                    else (
+                        "Матч не состоялся: вам засчитана неявка, "
+                        "−40 очков рейтинга."
+                    )
+                )
+            elif walkover:
                 msg = (
                     "Результат матча подтверждён: тех. победа (соперник снялся)."
                     if is_winner
@@ -394,61 +468,92 @@ def notify_participants_match_result_confirmed(
         logger.warning("notify_players_to_rate_match failed: %s", e)
 
 
-def apply_proposal(proposal: MatchResultProposal) -> None:
-    """
-    Применить подтверждённую заявку к матчу.
-    Обновляет матч (winner, winner_team, score, status), отклоняет остальные заявки, отправляет уведомления.
-    """
-    validate_proposal_score_consistency(proposal)
-    match = proposal.match
-    winner, loser, walkover, winner_team, loser_team = _compute_result(proposal)
+def no_show_sides_from_proposal(proposal: MatchResultProposal) -> tuple[bool, bool]:
+    """Определить стороны неявки по заявке игрока.
 
-    # При тех.поражении / тех.победе записываем счёт 6:0 6:0 в пользу победителя
-    is_walkover_retired = proposal.result in (
-        Match.ResultChoice.WALKOVER_LOSS,
-        Match.ResultChoice.WALKOVER_WIN,
-    )
-    if is_walkover_retired:
-        # Определяем, кто победитель для записи счёта 6:0 6:0
-        if winner == match.player1 or (winner_team and winner_team == match.team1):
-            match.player1_set1 = 6
-            match.player2_set1 = 0
-            match.player1_set2 = 6
-            match.player2_set2 = 0
-            match.player1_set3 = None
-            match.player2_set3 = None
-        else:
-            match.player1_set1 = 0
-            match.player2_set1 = 6
-            match.player1_set2 = 0
-            match.player2_set2 = 6
-            match.player1_set3 = None
-            match.player2_set3 = None
-    else:
-        # Для обычных матчей используем счёт из proposal
-        for field in [
-            "player1_set1",
-            "player2_set1",
-            "player1_set2",
-            "player2_set2",
-            "player1_set3",
-            "player2_set3",
-        ]:
-            setattr(match, field, getattr(proposal, field))
+    ``WALKOVER_LOSS`` — не явился сам инициатор, ``WALKOVER_WIN`` — соперник.
+
+    Args:
+        proposal: Заявка с результатом тех. победы или тех. поражения.
+
+    Returns:
+        Пара флагов (неявка_стороны_1, неявка_стороны_2).
+    """
+    proposer_is_side1 = _proposer_is_side1(proposal.match, proposal.proposer)
+    proposer_no_show = proposal.result == Match.ResultChoice.WALKOVER_LOSS
+    side1_no_show = proposer_is_side1 == proposer_no_show
+    return side1_no_show, not side1_no_show
+
+
+def _apply_no_show_from_proposal(proposal: MatchResultProposal) -> None:
+    """Проставить Walkover (неявку) по заявке игрока: штраф только неявившемуся.
+
+    Args:
+        proposal: Заявка с результатом тех. победы или тех. поражения.
+
+    Raises:
+        ProposalValidationError: Если неявку нельзя проставить для этого матча.
+    """
+    from .overdue import apply_no_show_walkover
+
+    side1_no_show, side2_no_show = no_show_sides_from_proposal(proposal)
+    try:
+        apply_no_show_walkover(
+            proposal.match,
+            side1_no_show=side1_no_show,
+            side2_no_show=side2_no_show,
+            notify=False,
+        )
+    except ValueError as exc:
+        raise ProposalValidationError(str(exc)) from exc
+
+
+def _apply_played_result(proposal: MatchResultProposal) -> None:
+    """Записать в матч сыгранный результат со счётом по сетам."""
+    match = proposal.match
+    winner, _loser, _walkover, winner_team, _loser_team = _compute_result(proposal)
+
+    for field in (
+        "player1_set1",
+        "player2_set1",
+        "player1_set2",
+        "player2_set2",
+        "player1_set3",
+        "player2_set3",
+    ):
+        setattr(match, field, getattr(proposal, field))
 
     match.winner = winner
     if winner_team is not None:
         match.winner_team = winner_team
-    match.status = (
-        Match.MatchStatus.WALKOVER if walkover else Match.MatchStatus.COMPLETED
-    )
+    match.status = Match.MatchStatus.COMPLETED
     match.completed_datetime = (
         match.completed_datetime or match.scheduled_datetime or timezone.now()
     )
-
-    # Mark match for FAN rating calculation
     match.rating_status = Match.RatingCalcStatus.PENDING
     match.save()
+
+
+def apply_proposal(proposal: MatchResultProposal) -> None:
+    """
+    Применить подтверждённую заявку к матчу.
+    Обновляет матч (winner, winner_team, score, status), отклоняет остальные заявки, отправляет уведомления.
+
+    Тех. победа и тех. поражение означают, что матч не состоялся: он получает
+    статус Walkover без счёта, а штраф −40 достаётся только неявившейся стороне.
+    """
+    validate_proposal_score_consistency(proposal)
+    match = proposal.match
+    is_no_show = proposal.result in (
+        Match.ResultChoice.WALKOVER_LOSS,
+        Match.ResultChoice.WALKOVER_WIN,
+    )
+
+    if is_no_show:
+        _apply_no_show_from_proposal(proposal)
+    else:
+        _apply_played_result(proposal)
+
     charge_fancoin_for_completed_match(match)
 
     match.result_proposals.exclude(pk=proposal.pk).update(
@@ -458,4 +563,4 @@ def apply_proposal(proposal: MatchResultProposal) -> None:
     proposal.save(update_fields=["status"])
 
     match.refresh_from_db()
-    notify_participants_match_result_confirmed(match, walkover=is_walkover_retired)
+    notify_participants_match_result_confirmed(match, walkover=is_no_show)

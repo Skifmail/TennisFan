@@ -74,6 +74,7 @@ from .platform_home import (
     CLUB_FILTER_PLATFORM,
     club_filter_choices_for_tournament_lists,
     order_tournaments_active_first,
+    order_with_cancelled_last,
 )
 from .postpayment import (
     finalize_postpayment_window,
@@ -2490,6 +2491,32 @@ def _parse_walkover_penalty(request) -> float:
         return float(WALKOVER_NO_SHOW_PENALTY)
 
 
+def _post_flag(request, key: str) -> bool:
+    """True, если POST-флаг отмечен."""
+    return str(request.POST.get(key) or "").strip().lower() in (
+        "1",
+        "on",
+        "true",
+        "yes",
+    )
+
+
+def _parse_walkover_side_penalty(request, side: int) -> float:
+    """Штраф одной стороны: skip_penalty_sideN или walkover_penalty_sideN."""
+    from .overdue import resolve_no_show_penalty
+    from .rating import WALKOVER_NO_SHOW_PENALTY
+
+    if _post_flag(request, f"skip_penalty_side{side}"):
+        return 0.0
+    raw = request.POST.get(f"walkover_penalty_side{side}")
+    if raw is None or str(raw).strip() == "":
+        return _parse_walkover_penalty(request)
+    try:
+        return resolve_no_show_penalty(float(str(raw).replace(",", ".")))
+    except (TypeError, ValueError):
+        return float(WALKOVER_NO_SHOW_PENALTY)
+
+
 @login_required
 def tournament_manage_match_result(request, slug, pk):
     """POST: внести результат матча (score1/score2, winner_id/winner_team_id). Опционально walkover=1 — тех. результат (неявка/просрочка)."""
@@ -2656,18 +2683,28 @@ def tournament_manage_match_deadline(request, slug, pk):
     if tournament is None:
         return redirect("tournament_list")
     match = get_object_or_404(Match, tournament=tournament, pk=pk)
-    if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
+    if tournament.status == TournamentStatus.CANCELLED:
         messages.warning(
             request,
-            "В отменённом или завершённом турнире изменение дедлайна недоступно.",
+            "В отменённом турнире изменение дедлайна недоступно.",
+        )
+        return redirect("tournament_manage", slug=slug)
+    if (
+        tournament.status == TournamentStatus.COMPLETED
+        and not match.is_deadline_auto_rt()
+    ):
+        messages.warning(
+            request,
+            "В завершённом турнире изменение дедлайна недоступно.",
         )
         return redirect("tournament_manage", slug=slug)
     if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-        messages.warning(
-            request,
-            "Нельзя изменить дедлайн у завершённого матча.",
-        )
-        return redirect("tournament_manage", slug=slug)
+        if not match.is_deadline_auto_rt():
+            messages.warning(
+                request,
+                "Нельзя изменить дедлайн у завершённого матча.",
+            )
+            return redirect("tournament_manage", slug=slug)
 
     raw = (request.POST.get("deadline") or "").strip()
     if not raw:
@@ -2692,7 +2729,12 @@ def tournament_manage_match_deadline(request, slug, pk):
         datetime.combine(deadline_date, time(23, 59, 59))
     )
     match.deadline_overdue_notified_at = None
-    match.save(update_fields=["deadline", "deadline_overdue_notified_at"])
+    if match.is_deadline_auto_rt():
+        from .overdue import revert_deadline_auto_rt
+
+        revert_deadline_auto_rt(match)
+    else:
+        match.save(update_fields=["deadline", "deadline_overdue_notified_at"])
 
     from .utils import notify_participants_match_deadline_changed
 
@@ -2714,7 +2756,7 @@ def tournament_manage_match_deadline(request, slug, pk):
 
 @login_required
 def tournament_manage_match_walkover(request, slug, pk):
-    """POST: проставить Walkover (неявку) выбранному участнику."""
+    """POST: проставить или изменить Walkover (неявку) одной или обеим сторонам."""
     from .overdue import apply_no_show_walkover
 
     if request.method != "POST":
@@ -2723,56 +2765,100 @@ def tournament_manage_match_walkover(request, slug, pk):
     if tournament is None:
         return redirect("tournament_list")
     match = get_object_or_404(Match, tournament=tournament, pk=pk)
-    if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
+    is_edit = match.is_no_show_walkover() or match.is_deadline_auto_rt()
+    if tournament.status == TournamentStatus.CANCELLED:
         messages.warning(
             request,
-            "В отменённом или завершённом турнире изменение результатов недоступно.",
+            "В отменённом турнире изменение результатов недоступно.",
+        )
+        return redirect("tournament_manage", slug=slug)
+    if tournament.status == TournamentStatus.COMPLETED and not is_edit:
+        messages.warning(
+            request,
+            "В завершённом турнире изменение результатов недоступно.",
         )
         return redirect("tournament_manage", slug=slug)
     if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-        messages.warning(request, "Матч уже завершён.")
-        return redirect("tournament_manage", slug=slug)
+        if not is_edit:
+            messages.warning(request, "Матч уже завершён.")
+            return redirect("tournament_manage", slug=slug)
 
     is_doubles_match = bool(match.team1_id and match.team2_id)
-    penalty = _parse_walkover_penalty(request)
+    side1 = _post_flag(request, "walkover_side1")
+    side2 = _post_flag(request, "walkover_side2")
+    penalty_side1 = _parse_walkover_side_penalty(request, 1)
+    penalty_side2 = _parse_walkover_side_penalty(request, 2)
     try:
-        if is_doubles_match:
-            loser_team_id = _parse_int_post(request, "walkover_loser_team_id")
-            if not loser_team_id or loser_team_id not in (
-                match.team1_id,
-                match.team2_id,
-            ):
-                messages.warning(
-                    request,
-                    "Укажите команду, которой засчитывается Walkover (неявка).",
+        if not side1 and not side2:
+            if is_doubles_match:
+                loser_team_id = _parse_int_post(request, "walkover_loser_team_id")
+                if not loser_team_id or loser_team_id not in (
+                    match.team1_id,
+                    match.team2_id,
+                ):
+                    messages.warning(
+                        request,
+                        "Отметьте участника или команду с Walkover (неявкой).",
+                    )
+                    return redirect("tournament_manage", slug=slug)
+                loser_team = (
+                    match.team1 if loser_team_id == match.team1_id else match.team2
                 )
-                return redirect("tournament_manage", slug=slug)
-            loser_team = match.team1 if loser_team_id == match.team1_id else match.team2
-            apply_no_show_walkover(match, loser_team=loser_team, penalty=penalty)
+                apply_no_show_walkover(
+                    match,
+                    loser_team=loser_team,
+                    penalty=_parse_walkover_penalty(request),
+                    replace=is_edit,
+                )
+            else:
+                loser_id = _parse_int_post(request, "walkover_loser_id")
+                if not loser_id or loser_id not in (
+                    match.player1_id,
+                    match.player2_id,
+                ):
+                    messages.warning(
+                        request,
+                        "Отметьте участника с Walkover (неявкой).",
+                    )
+                    return redirect("tournament_manage", slug=slug)
+                loser = match.player1 if loser_id == match.player1_id else match.player2
+                apply_no_show_walkover(
+                    match,
+                    loser=loser,
+                    penalty=_parse_walkover_penalty(request),
+                    replace=is_edit,
+                )
         else:
-            loser_id = _parse_int_post(request, "walkover_loser_id")
-            if not loser_id or loser_id not in (match.player1_id, match.player2_id):
-                messages.warning(
-                    request,
-                    "Укажите игрока, которому засчитывается Walkover (неявка).",
-                )
-                return redirect("tournament_manage", slug=slug)
-            loser = match.player1 if loser_id == match.player1_id else match.player2
-            apply_no_show_walkover(match, loser=loser, penalty=penalty)
+            apply_no_show_walkover(
+                match,
+                side1_no_show=side1,
+                side2_no_show=side2,
+                penalty_side1=penalty_side1 if side1 else 0.0,
+                penalty_side2=penalty_side2 if side2 else 0.0,
+                replace=is_edit,
+            )
     except ValueError as exc:
         messages.warning(request, str(exc))
         return redirect("tournament_manage", slug=slug)
 
-    if penalty == 0:
-        success = (
-            "Walkover (неявка) проставлен: штраф не начислен. Матч закрыт без игры."
-        )
+    match.refresh_from_db()
+    s1, s2 = match.get_no_show_sides()
+    d1 = abs(float(match.rating_delta_player1 or 0.0))
+    d2 = abs(float(match.rating_delta_player2 or 0.0))
+    parts = []
+    if s1:
+        parts.append(f"{match.get_player1_display()} −{d1:g}")
+    if s2:
+        parts.append(f"{match.get_player2_display()} −{d2:g}")
+    verb = "сохранён" if is_edit else "проставлен"
+    if s1 and s2:
+        extra = "победителя нет."
     else:
-        success = (
-            f"Walkover (неявка) проставлен: −{penalty:g} неявившемуся, "
-            "0 сопернику. Матч закрыт без игры."
-        )
-    messages.success(request, success)
+        extra = "матч закрыт без игры."
+    messages.success(
+        request,
+        f"Walkover (неявка) {verb}: {', '.join(parts)}. {extra}",
+    )
     return redirect("tournament_manage", slug=slug)
 
 
@@ -2805,7 +2891,7 @@ def tournament_tables_list(request):
     elif club_filter:
         tournaments = tournaments.filter(club__slug=club_filter)
 
-    tournaments = list(tournaments.order_by("-start_date"))
+    tournaments = list(order_with_cancelled_last(tournaments, "-start_date"))
     # Добавляем статистику для каждого турнира
     for t in tournaments:
         main_matches = t.matches.filter(is_consolation=False)
@@ -3090,11 +3176,10 @@ def tournament_tables_detail(request, slug):
 
 def champions_league(request):
     """Champions League page."""
-    tournaments = (
-        Tournament.objects.filter(tournament_type=TournamentType.CHAMPIONS_LEAGUE)
-        .prefetch_related("allowed_categories")
-        .order_by("-start_date")
-    )
+    tournaments = Tournament.objects.filter(
+        tournament_type=TournamentType.CHAMPIONS_LEAGUE
+    ).prefetch_related("allowed_categories")
+    tournaments = order_with_cancelled_last(tournaments, "-start_date")
     return render(
         request, "tournaments/champions_league.html", {"tournaments": tournaments}
     )
@@ -3309,8 +3394,8 @@ def my_matches(request):
             ),
             nearest_deadline=Min("matches__deadline"),
         )
-        .order_by("-start_date")
     )
+    tournaments_qs = order_with_cancelled_last(tournaments_qs, "-start_date")
     if search_query:
         sq = (search_query or "").strip()
         if sq:

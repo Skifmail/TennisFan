@@ -24,7 +24,7 @@ from apps.core import telegram_notify as admin_notify
 from apps.core.models import TelegramTransferConsentLog, UserTelegramLink
 from apps.subscriptions.models import SubscriptionTier
 from apps.tournaments.models import DeadlineExtensionRequest, Match, MatchResultProposal
-from apps.tournaments.proposal_service import apply_proposal
+from apps.tournaments.proposal_service import ProposalValidationError, apply_proposal
 from apps.tournaments.utils import get_match_opponent_users, get_match_participants
 from apps.users.models import Notification, Player
 
@@ -83,6 +83,31 @@ def _parse_score_input(text: str):
             return None, "Геймы: от 0 до 7 (или до 10 в тайбрейке)"
         sets_list.append((ga, gb))
     return sets_list, None
+
+
+def _walkover_choice_keyboard(match_pk: int) -> dict:
+    """Клавиатура выбора стороны неявки для матча, который не состоялся.
+
+    Args:
+        match_pk: Идентификатор матча.
+
+    Returns:
+        Inline-клавиатура Telegram с двумя вариантами неявки.
+    """
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "✅ Соперник не явился",
+                    "callback_data": f"result_type_{match_pk}_walkover_win",
+                },
+                {
+                    "text": "❌ Я не явился (−40)",
+                    "callback_data": f"result_type_{match_pk}_walkover_loss",
+                },
+            ],
+        ]
+    }
 
 
 def _proposer_is_side1(match: Match, player: Player) -> bool:
@@ -571,20 +596,11 @@ def _handle_result_enter_callback(callback_query: dict) -> bool:
         "inline_keyboard": [
             [
                 {
-                    "text": "📝 Обычный матч (ввести счёт)",
+                    "text": "📝 Матч сыгран (ввести счёт)",
                     "callback_data": f"result_type_{match_pk}_normal",
                 }
             ],
-            [
-                {
-                    "text": "✅ Тех. победа (соперник не вышел)",
-                    "callback_data": f"result_type_{match_pk}_walkover_win",
-                },
-                {
-                    "text": "❌ Тех. поражение (мы не вышли)",
-                    "callback_data": f"result_type_{match_pk}_walkover_loss",
-                },
-            ],
+            *_walkover_choice_keyboard(match_pk)["inline_keyboard"],
         ]
     }
 
@@ -707,7 +723,13 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
             player1_set3=None,
             player2_set3=None,
         )
-        apply_proposal(proposal)
+        try:
+            apply_proposal(proposal)
+        except ProposalValidationError as exc:
+            proposal.delete()
+            bot.send_message(chat_id, f"❌ {exc}")
+            _answer_callback(cq_id, "Результат не сохранён", show_alert=True)
+            return True
         tour_name = match.tournament.name if match.tournament else "спарринг"
         for opp_user in get_match_opponent_users(match, player):
             Notification.objects.create(
@@ -720,13 +742,13 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
         except Exception as e:
             logger.exception("notify_result_proposal failed: %s", e)
         result_text = (
-            "техническую победу"
+            "неявку соперника — вам засчитана победа, сопернику −40 очков"
             if result_type == "walkover_win"
-            else "техническое поражение"
+            else "свою неявку — вам засчитано поражение и −40 очков"
         )
         bot.send_message(
             chat_id,
-            f"✅ Результат сохранён. Матч завершён.\n\n"
+            f"✅ Результат сохранён. Матч не состоялся (Walkover).\n\n"
             f"Вы указали: <b>{result_text}</b>",
         )
         _answer_callback(cq_id, "Результат сохранён")
@@ -2243,6 +2265,16 @@ def user_bot_webhook(request):
                         "Если соперник отклонит результат и не отправит свой — вы сможете отправить результат снова.",
                     )
                     return JsonResponse({"ok": True})
+                if all(games1 == 0 and games2 == 0 for games1, games2 in sets_list):
+                    cache.delete(cache_key)
+                    bot.send_message(
+                        chat_id,
+                        "❌ Счёт 0:0 не сохраняется как результат игры.\n\n"
+                        "Если матч не состоялся — отметьте неявку. "
+                        "Неявившейся стороне спишется <b>40 очков</b> рейтинга.",
+                        reply_markup=_walkover_choice_keyboard(match.pk),
+                    )
+                    return JsonResponse({"ok": True})
                 is_p1 = _proposer_is_side1(match, player)
                 p1_s1 = p1_s2 = p1_s3 = p2_s1 = p2_s2 = p2_s3 = None
                 for i, (a, b) in enumerate(sets_list):
@@ -2274,7 +2306,13 @@ def user_bot_webhook(request):
                     player1_set3=p1_s3,
                     player2_set3=p2_s3,
                 )
-                apply_proposal(proposal)
+                try:
+                    apply_proposal(proposal)
+                except ProposalValidationError as exc:
+                    proposal.delete()
+                    cache.delete(cache_key)
+                    bot.send_message(chat_id, f"❌ {exc}")
+                    return JsonResponse({"ok": True})
                 tour_name = match.tournament.name if match.tournament else "спарринг"
                 for opp_user in get_match_opponent_users(match, player):
                     Notification.objects.create(

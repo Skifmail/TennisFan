@@ -408,6 +408,8 @@ def send_match_deadline_reminder_email(
 ) -> bool:
     """Напомнить участнику о дедлайне матча и возможном штрафе за неявку.
 
+    Работает и для турнирных матчей, и для спаррингов без турнира.
+
     Args:
         user: Получатель.
         match: Матч с приближающимся дедлайном.
@@ -421,16 +423,15 @@ def send_match_deadline_reminder_email(
     if not email:
         return False
     tournament = match.tournament
-    if tournament is None:
-        return False
     base_url = _get_site_base_url()
     deadline_str = ""
     if match.deadline:
         deadline_str = timezone.localtime(match.deadline).strftime("%d.%m.%Y %H:%M")
     days_label = "1 день" if days_left == 1 else f"{days_left} дня"
     match_path = reverse("match_detail", args=[match.pk])
+    subject_suffix = f" — «{tournament.name}»" if tournament else " (спарринг)"
     return _send_html_email(
-        subject=(f"TennisFan: до дедлайна матча {days_label} — «{tournament.name}»"),
+        subject=f"TennisFan: до дедлайна матча {days_label}{subject_suffix}",
         template_name="emails/match_deadline_reminder.html",
         context={
             "user": user,
@@ -445,6 +446,8 @@ def send_match_deadline_reminder_email(
             "match_url": match_url or f"{base_url}{match_path}",
             "tournament_url": (
                 f"{base_url}{reverse('tournament_detail', args=[tournament.slug])}"
+                if tournament
+                else ""
             ),
             "base_url": base_url,
         },

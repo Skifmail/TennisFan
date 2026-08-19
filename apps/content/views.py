@@ -16,6 +16,7 @@ from apps.comments.models import Comment
 from apps.subscriptions.models import RegionalTierPrice, SubscriptionTier
 from apps.subscriptions.utils import user_can_read_comments, user_can_write_comments
 from apps.tournaments.models import Tournament
+from apps.tournaments.platform_home import order_with_cancelled_last
 from apps.users.models import Player
 
 from .forms import NewsCommentForm
@@ -131,7 +132,9 @@ def gallery_list(request):
         Tournament.objects.filter(photos__isnull=False)
         .distinct()
         .prefetch_related("photos")
-        .order_by("-start_date", "-id")
+    )
+    tournament_galleries = order_with_cancelled_last(
+        tournament_galleries, "-start_date", "-id"
     )
     return render(
         request,

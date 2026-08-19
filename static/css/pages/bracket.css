@@ -656,6 +656,43 @@
     border-bottom: 1px solid rgba(166, 130, 74, 0.2);
 }
 
+.bracket-walkover-sides {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.bracket-walkover-side {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.45rem 0.5rem;
+    border: 1px solid rgba(166, 130, 74, 0.22);
+    border-radius: 8px;
+}
+
+.bracket-walkover-penalty-label,
+.bracket-walkover-skip {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted, #c4b89a);
+}
+
+.bracket-walkover-penalty-input {
+    width: 4.5rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 6px;
+    border: 1px solid rgba(166, 130, 74, 0.35);
+    background: rgba(0, 0, 0, 0.25);
+    color: inherit;
+}
+
+.bracket-walkover-penalty-input:disabled {
+    opacity: 0.45;
+}
+
 .bracket-walkover-btn {
     width: 100%;
 }

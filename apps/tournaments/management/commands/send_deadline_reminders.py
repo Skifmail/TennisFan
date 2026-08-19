@@ -1,9 +1,14 @@
 """
 Напоминания о дедлайне матча за 2 и 1 день.
 
-Выбирает матчи, у которых deadline попадает в окно «через 2 дня» (47–49 ч)
-и «через 1 день» (23–25 ч), и отправляет участникам напоминание:
-Telegram, личный кабинет и email. В тексте — предупреждение о Walkover (−40).
+Выбирает матчи, дедлайн которых приходится на послезавтра или на завтра
+(по календарным суткам локальной таймзоны), и отправляет участникам
+напоминание: Telegram, личный кабинет и email. В тексте — предупреждение
+о Walkover (−40) и инструкция, как отметить неявку соперника.
+
+Окно считается по датам, а не по числу часов: дедлайны матчей приходятся
+на границу суток, поэтому «ровно 24 часа» до них не наступает ни в один
+из моментов ежедневного запуска.
 
 Запуск: python manage.py send_deadline_reminders
 
@@ -14,9 +19,10 @@ Telegram, личный кабинет и email. В тексте — предуп
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from django.core.management.base import BaseCommand
+from django.db.models import QuerySet
 from django.urls import reverse
 from django.utils import timezone
 
@@ -29,12 +35,27 @@ from apps.users.models import Notification
 
 logger = logging.getLogger(__name__)
 
-# Окна: напоминание «за 2 дня» — deadline через 47–49 ч, «за 1 день» — через 23–25 ч
-HOURS_LOW_2 = 47
-HOURS_HIGH_2 = 49
-HOURS_LOW_1 = 23
-HOURS_HIGH_1 = 25
 LK_MESSAGE_MAX_LEN = 255
+
+
+def matches_with_deadline_in_days(days_left: int) -> QuerySet[Match]:
+    """Отобрать запланированные матчи с дедлайном через ``days_left`` суток.
+
+    Args:
+        days_left: Сколько календарных дней осталось до дедлайна (1 или 2).
+
+    Returns:
+        QuerySet матчей, дедлайн которых приходится на нужную дату.
+    """
+    target_date = timezone.localdate() + timedelta(days=days_left)
+    day_start = timezone.make_aware(datetime.combine(target_date, time.min))
+    day_end = day_start + timedelta(days=1)
+    return Match.objects.filter(
+        deadline__isnull=False,
+        deadline__gte=day_start,
+        deadline__lt=day_end,
+        status=Match.MatchStatus.SCHEDULED,
+    ).select_related("tournament", "player1", "player2", "team1", "team2")
 
 
 def build_deadline_reminder_lk_message(
@@ -55,8 +76,9 @@ def build_deadline_reminder_lk_message(
     """
     left = "1 день" if days_left == 1 else f"{days_left} дня"
     msg = (
-        f"Walkover (−40 за неявку) возможен, если матч не сыграют до дедлайна. "
-        f"«{tournament_name}»: осталось {left} ({deadline_str}). Мои матчи."
+        f"Если матч не сыграют до дедлайна — RT 0:0, дальше проходит кто сильнее по рейтингу (рейтинг не меняется). "
+        f"«{tournament_name}»: осталось {left} ({deadline_str}). "
+        f"Матч срывает соперник? Внесите неявку в карточке матча."
     )
     if len(msg) > LK_MESSAGE_MAX_LEN:
         return msg[: LK_MESSAGE_MAX_LEN - 3] + "..."
@@ -134,23 +156,8 @@ class Command(BaseCommand):
                 "напоминания в Telegram пропущены, ЛК и email будут отправлены."
             )
 
-        now = timezone.now()
-        matches_2d = list(
-            Match.objects.filter(
-                deadline__isnull=False,
-                deadline__gte=now + timedelta(hours=HOURS_LOW_2),
-                deadline__lte=now + timedelta(hours=HOURS_HIGH_2),
-                status=Match.MatchStatus.SCHEDULED,
-            ).select_related("tournament", "player1", "player2", "team1", "team2")
-        )
-        matches_1d = list(
-            Match.objects.filter(
-                deadline__isnull=False,
-                deadline__gte=now + timedelta(hours=HOURS_LOW_1),
-                deadline__lte=now + timedelta(hours=HOURS_HIGH_1),
-                status=Match.MatchStatus.SCHEDULED,
-            ).select_related("tournament", "player1", "player2", "team1", "team2")
-        )
+        matches_2d = list(matches_with_deadline_in_days(2))
+        matches_1d = list(matches_with_deadline_in_days(1))
 
         sent_2 = 0
         sent_1 = 0

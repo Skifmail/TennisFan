@@ -45,6 +45,8 @@ _MATCH_RESULT_FIELDS: tuple[str, ...] = (
     "player1_set3",
     "player2_set3",
     "status",
+    "walkover_no_show_side1",
+    "walkover_no_show_side2",
 )
 
 
@@ -250,6 +252,10 @@ def prepare_match_completion(sender, instance, **kwargs):
                 instance._old_match_snapshot = _match_result_snapshot(old_instance)
                 if old_instance.rating_status == Match.RatingCalcStatus.CALCULATED:
                     instance.rating_status = Match.RatingCalcStatus.PENDING
+            elif was_completed and getattr(instance, "_force_wo_recalc", False):
+                instance._result_changed = True
+                instance._old_match_snapshot = _match_result_snapshot(old_instance)
+                instance.rating_status = Match.RatingCalcStatus.PENDING
         except Match.DoesNotExist:
             instance._old_status = None
     else:
@@ -264,7 +270,8 @@ def prepare_match_completion(sender, instance, **kwargs):
         ]
         if not was_completed:
             if instance.rating_status == Match.RatingCalcStatus.NOT_APPLICABLE:
-                instance.rating_status = Match.RatingCalcStatus.PENDING
+                if not instance.is_deadline_auto_rt():
+                    instance.rating_status = Match.RatingCalcStatus.PENDING
             if not instance.completed_datetime:
                 instance.completed_datetime = timezone.now()
 
@@ -320,12 +327,17 @@ def update_player_stats(sender, instance, created, **kwargs):
     ).get(pk=instance.pk)
     if hasattr(instance, "_no_show_penalty"):
         match._no_show_penalty = instance._no_show_penalty
+    if hasattr(instance, "_no_show_penalty_side1"):
+        match._no_show_penalty_side1 = instance._no_show_penalty_side1
+    if hasattr(instance, "_no_show_penalty_side2"):
+        match._no_show_penalty_side2 = instance._no_show_penalty_side2
 
     winner = match.winner
     winner_team = match.winner_team
     t = match.tournament
     # Парный матч: по командам (team1/team2) или по парному спаррингу (player1/partner1 vs player2/partner2)
     is_doubles = bool(match.team1_id and match.team2_id) or match.is_doubles_sparring()
+    mutual_no_show = match.is_mutual_no_show_walkover()
 
     logger.debug(
         "Match %s: winner=%s, winner_team=%s, is_doubles=%s, is_sparring=%s",
@@ -337,7 +349,7 @@ def update_player_stats(sender, instance, created, **kwargs):
     )
 
     # Для парного спарринга winner есть, winner_team нет
-    if not winner and not winner_team:
+    if not winner and not winner_team and not mutual_no_show:
         logger.warning(
             "Match %s: no winner or winner_team, skipping rating update", match.pk
         )
@@ -349,6 +361,42 @@ def update_player_stats(sender, instance, created, **kwargs):
             "Match %s: friendly sparring, skipping stats and rating update",
             match.pk,
         )
+        return
+
+    if match.is_deadline_auto_rt():
+        if was_completed:
+            logger.debug(
+                "Match %s: deadline auto RT already processed, skip",
+                match.pk,
+            )
+            return
+        logger.info(
+            "Match %s: deadline auto RT, skip FAN, advance winner",
+            match.pk,
+        )
+        skip_season_points = True
+        if match.is_sparring():
+            return
+        if t and _is_olympic(t):
+            advance_winner_olympic(match, skip_points=skip_season_points)
+            if match.round_index >= 1 and not match.is_consolation:
+                ensure_consolation_created_for_round(t, match.round_index)
+        elif t and _is_fan(t):
+            advance_winner_and_award_loser(match, skip_points=skip_season_points)
+            if match.round_index == 1 and not match.is_consolation:
+                ensure_consolation_created(t)
+            finalize_tournament(t)
+        elif t and _is_round_robin(t):
+            check_and_finalize_if_complete(t)
+        elif t and _is_tvd(t):
+            if (
+                getattr(match, "tvd_stage", None) == TVD_STAGE_GROUP
+                and match.tvd_group_id
+            ):
+                tvd_recalculate_group_standings(match.tvd_group)
+            else:
+                tvd_advance_winner(match)
+            tvd_check_and_finalize(t)
         return
 
     # Редактирование уже учтённого результата: откат + пересчёт без повторного +1 к matches_played
@@ -434,7 +482,25 @@ def update_player_stats(sender, instance, created, **kwargs):
                 p.matches_played += 1
                 p.save(update_fields=["matches_played"])
 
-    if match.is_doubles_sparring():
+    def _update_stats_mutual_no_show(match):
+        players = []
+        if match.team1_id and match.team2_id:
+            if match.team1:
+                players.extend([match.team1.player1, match.team1.player2])
+            if match.team2:
+                players.extend([match.team2.player1, match.team2.player2])
+        else:
+            players.extend(
+                [match.player1, match.player2, match.partner1, match.partner2]
+            )
+        for player in players:
+            if player and not getattr(player, "is_bye", False):
+                player.matches_played += 1
+                player.save(update_fields=["matches_played"])
+
+    if mutual_no_show:
+        _update_stats_mutual_no_show(match)
+    elif match.is_doubles_sparring():
         _update_stats_doubles_sparring(match)
     elif is_doubles:
         _update_stats_doubles(match)
@@ -457,20 +523,22 @@ def update_player_stats(sender, instance, created, **kwargs):
         return
 
     if t and _is_olympic(t):
-        advance_winner_olympic(match, skip_points=skip_season_points)
-        if match.round_index >= 1 and not match.is_consolation:
-            ensure_consolation_created_for_round(t, match.round_index)
+        if not mutual_no_show:
+            advance_winner_olympic(match, skip_points=skip_season_points)
+            if match.round_index >= 1 and not match.is_consolation:
+                ensure_consolation_created_for_round(t, match.round_index)
     elif t and _is_fan(t):
-        advance_winner_and_award_loser(match, skip_points=skip_season_points)
-        if match.round_index == 1 and not match.is_consolation:
-            ensure_consolation_created(t)
+        if not mutual_no_show:
+            advance_winner_and_award_loser(match, skip_points=skip_season_points)
+            if match.round_index == 1 and not match.is_consolation:
+                ensure_consolation_created(t)
         finalize_tournament(t)
     elif t and _is_round_robin(t):
         check_and_finalize_if_complete(t)
     elif t and _is_tvd(t):
         if getattr(match, "tvd_stage", None) == TVD_STAGE_GROUP and match.tvd_group_id:
             tvd_recalculate_group_standings(match.tvd_group)
-        else:
+        elif not mutual_no_show:
             tvd_advance_winner(match)
         tvd_check_and_finalize(t)
 
@@ -505,25 +573,45 @@ def _apply_fixed_rating_delta(player, delta: float) -> None:
 
 
 def _apply_no_show_walkover_rating(match: Match) -> None:
-    """Walkover (неявка) без игры: штраф неявившемуся, 0 победителю, без FAN."""
+    """Walkover (неявка) без игры: штраф отмеченным сторонам, без FAN."""
     from .rating import WALKOVER_NO_SHOW_PENALTY
 
-    penalty = float(getattr(match, "_no_show_penalty", WALKOVER_NO_SHOW_PENALTY))
+    default = float(getattr(match, "_no_show_penalty", WALKOVER_NO_SHOW_PENALTY))
+    side1, side2 = match.get_no_show_sides()
+    penalty1 = float(
+        getattr(match, "_no_show_penalty_side1", default if side1 else 0.0)
+    )
+    penalty2 = float(
+        getattr(match, "_no_show_penalty_side2", default if side2 else 0.0)
+    )
+    if not side1 and not side2:
+        # Старый односторонний WO: штраф проигравшему.
+        if (
+            match.winner_id == match.player1_id
+            or match.winner_team_id == match.team1_id
+        ):
+            penalty1, penalty2 = 0.0, default
+        else:
+            penalty1, penalty2 = default, 0.0
+    elif not side1:
+        penalty1 = 0.0
+    elif not side2:
+        penalty2 = 0.0
+    delta1 = -penalty1 if side1 or penalty1 else 0.0
+    delta2 = -penalty2 if side2 or penalty2 else 0.0
+    if not side1:
+        delta1 = 0.0
+    if not side2:
+        delta2 = 0.0
     is_doubles_sparring = bool(match.partner1_id and match.partner2_id)
     is_doubles = bool(match.team1_id and match.team2_id) or is_doubles_sparring
 
     if is_doubles_sparring:
-        side1_won = match.winner_id in (match.player1_id, match.partner1_id)
-        delta1 = 0.0 if side1_won else -penalty
-        delta2 = -penalty if side1_won else 0.0
         for player in (match.player1, match.partner1):
             _apply_fixed_rating_delta(player, delta1)
         for player in (match.player2, match.partner2):
             _apply_fixed_rating_delta(player, delta2)
     elif is_doubles:
-        side1_won = match.winner_team_id == match.team1_id
-        delta1 = 0.0 if side1_won else -penalty
-        delta2 = -penalty if side1_won else 0.0
         if match.team1:
             for player in (match.team1.player1, match.team1.player2):
                 _apply_fixed_rating_delta(player, delta1)
@@ -531,9 +619,6 @@ def _apply_no_show_walkover_rating(match: Match) -> None:
             for player in (match.team2.player1, match.team2.player2):
                 _apply_fixed_rating_delta(player, delta2)
     else:
-        p1_won = match.winner_id == match.player1_id
-        delta1 = 0.0 if p1_won else -penalty
-        delta2 = -penalty if p1_won else 0.0
         _apply_fixed_rating_delta(match.player1, delta1)
         _apply_fixed_rating_delta(match.player2, delta2)
 

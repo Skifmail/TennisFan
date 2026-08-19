@@ -195,6 +195,12 @@
 <section class="hero hero--premium">
     <div class="container hero-grid">
         <div class="hero-content hero-content--premium">
+            {% if home_activity_new_count %}
+            <a href="#home-activity" class="home-activity-nudge" data-home-activity-nudge>
+                <span class="home-activity-nudge__dot" aria-hidden="true"></span>
+                Новые события - посмотреть
+            </a>
+            {% endif %}
             <h1 class="hero-title hero-title--premium">Играй. Побеждай. Расти в рейтинге.</h1>
             <p class="hero-subtitle hero-subtitle--premium">Рейтинг любителей по всей России. Честная конкуренция. Настоящие турниры.</p>
             <div class="hero-buttons hero-buttons--premium">

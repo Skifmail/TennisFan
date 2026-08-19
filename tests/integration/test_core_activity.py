@@ -407,7 +407,7 @@ class PlatformActivityFeedTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["home_activity_new_count"], 0)
         self.assertNotContains(response, "home-activity__row--new")
-        self.assertNotContains(response, "Появились новые события")
+        self.assertNotContains(response, "Новые события - посмотреть")
         self.assertIn(HOME_ACTIVITY_SEEN_COOKIE, response.cookies)
         latest_id = max(event.id for event in response.context["home_activity_events"])
         self.assertEqual(
@@ -445,6 +445,6 @@ class PlatformActivityFeedTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertGreaterEqual(response.context["home_activity_new_count"], 1)
         self.assertContains(response, "home-activity__row--new")
-        self.assertContains(response, "Появились новые события")
+        self.assertContains(response, "Новые события - посмотреть")
         self.assertContains(response, "Свежий Игрок")
         self.assertNotIn(HOME_ACTIVITY_SEEN_COOKIE, response.cookies)

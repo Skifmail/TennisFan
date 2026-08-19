@@ -1,4 +1,4 @@
-"""Просрочка дедлайна: уведомление админа и Walkover за неявку."""
+"""Просрочка дедлайна: авто-RT по рейтингу и Walkover за неявку от клуба."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from apps.tournaments.overdue import (
     find_match_for_walkover_replace,
     notify_admins_match_deadline_overdue,
     replace_no_show_walkover,
+    revert_deadline_auto_rt,
 )
 from apps.tournaments.rating import WALKOVER_NO_SHOW_PENALTY
 from apps.users.models import Notification
@@ -26,7 +27,7 @@ from tests.support.factories import make_player, make_tournament, make_user
     EMAIL_BACKEND_INNER="django.core.mail.backends.locmem.EmailBackend",
 )
 class NotifyOverdueDeadlineTestCase(TestCase):
-    """Просроченный матч не закрывается, админ получает ЛК и письмо."""
+    """Просроченный матч закрывается RT 0:0, побеждает более высокий рейтинг."""
 
     def setUp(self) -> None:
         self.admin = make_user(
@@ -54,13 +55,25 @@ class NotifyOverdueDeadlineTestCase(TestCase):
             deadline=timezone.now() - timedelta(hours=2),
         )
 
-    def test_notify_creates_lk_and_email_without_closing_match(self) -> None:
+    def test_overdue_assigns_auto_rt_to_higher_rated_without_penalty(self) -> None:
         ok, msg = notify_admins_match_deadline_overdue(self.match)
 
         self.assertTrue(ok, msg)
         self.match.refresh_from_db()
-        self.assertEqual(self.match.status, Match.MatchStatus.SCHEDULED)
-        self.assertIsNone(self.match.winner_id)
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.assertEqual(self.match.status, Match.MatchStatus.WALKOVER)
+        self.assertTrue(self.match.is_deadline_auto_rt())
+        self.assertFalse(self.match.is_no_show_walkover())
+        self.assertEqual(self.match.winner_id, self.p1.pk)
+        self.assertEqual(self.match.player1_set1, 0)
+        self.assertEqual(self.match.player2_set1, 0)
+        self.assertEqual(self.match.player1_set2, 0)
+        self.assertEqual(self.match.player2_set2, 0)
+        self.assertEqual(self.p1.total_points, 3000.0)
+        self.assertEqual(self.p2.total_points, 2500.0)
+        self.assertEqual(self.match.rating_delta_player1, 0.0)
+        self.assertEqual(self.match.rating_delta_player2, 0.0)
         self.assertIsNotNone(self.match.deadline_overdue_notified_at)
         note = Notification.objects.get(user=self.admin)
         self.assertIn("Просрочен дедлайн", note.message)
@@ -70,7 +83,7 @@ class NotifyOverdueDeadlineTestCase(TestCase):
         ]
         self.assertEqual(len(overdue_mails), 1)
         self.assertIn(self.admin.email, overdue_mails[0].to)
-        self.assertIn("Walkover", overdue_mails[0].alternatives[0][0])
+        self.assertIn("RT", overdue_mails[0].alternatives[0][0])
 
     def test_second_notify_is_skipped(self) -> None:
         notify_admins_match_deadline_overdue(self.match)
@@ -78,8 +91,33 @@ class NotifyOverdueDeadlineTestCase(TestCase):
         ok, msg = notify_admins_match_deadline_overdue(self.match)
 
         self.assertFalse(ok)
-        self.assertIn("уже уведомлены", msg)
+        self.assertIn("уже", msg)
         self.assertEqual(Notification.objects.filter(user=self.admin).count(), 1)
+
+    def test_revert_auto_rt_returns_match_to_scheduled(self) -> None:
+        notify_admins_match_deadline_overdue(self.match)
+        self.match.refresh_from_db()
+        self.tournament.refresh_from_db()
+        self.assertEqual(self.tournament.status, TournamentStatus.COMPLETED)
+
+        revert_deadline_auto_rt(self.match)
+
+        self.match.refresh_from_db()
+        self.tournament.refresh_from_db()
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.assertEqual(self.match.status, Match.MatchStatus.SCHEDULED)
+        self.assertEqual(self.tournament.status, TournamentStatus.ACTIVE)
+        self.assertFalse(
+            self.tournament.fan_results.filter(place__isnull=False).exists()
+        )
+        self.assertIsNone(self.match.winner_id)
+        self.assertIsNone(self.match.player1_set1)
+        self.assertIsNone(self.match.completed_datetime)
+        self.assertIsNone(self.match.deadline_overdue_notified_at)
+        self.assertFalse(self.match.is_deadline_auto_rt())
+        self.assertEqual(self.p1.total_points, 3000.0)
+        self.assertEqual(self.p2.total_points, 2500.0)
 
 
 class ApplyNoShowWalkoverTestCase(TestCase):
@@ -147,6 +185,68 @@ class ApplyNoShowWalkoverTestCase(TestCase):
         self.assertEqual(self.p2.total_points, 2500.0)
         self.assertEqual(self.match.rating_delta_player1, 0.0)
         self.assertEqual(self.match.rating_delta_player2, 0.0)
+
+    def test_walkover_both_sides_has_no_winner(self) -> None:
+        apply_no_show_walkover(
+            self.match,
+            side1_no_show=True,
+            side2_no_show=True,
+            penalty_side1=WALKOVER_NO_SHOW_PENALTY,
+            penalty_side2=WALKOVER_NO_SHOW_PENALTY,
+        )
+
+        self.match.refresh_from_db()
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.assertIsNone(self.match.winner_id)
+        self.assertTrue(self.match.is_mutual_no_show_walkover())
+        self.assertEqual(self.p1.total_points, 3000.0 - WALKOVER_NO_SHOW_PENALTY)
+        self.assertEqual(self.p2.total_points, 2500.0 - WALKOVER_NO_SHOW_PENALTY)
+        self.assertEqual(self.match.rating_delta_player1, -WALKOVER_NO_SHOW_PENALTY)
+        self.assertEqual(self.match.rating_delta_player2, -WALKOVER_NO_SHOW_PENALTY)
+        self.assertEqual(self.p1.matches_won, 0)
+        self.assertEqual(self.p2.matches_won, 0)
+        self.assertEqual(self.p1.matches_played, 13)
+        self.assertEqual(self.p2.matches_played, 13)
+
+        from apps.tournaments.round_robin import compute_standings_for_entities
+
+        standings = compute_standings_for_entities(
+            self.tournament, [self.p1, self.p2], [self.match]
+        )
+        by_player = {row["player"].pk: row for row in standings}
+        self.assertEqual(by_player[self.p1.pk]["losses"], 1)
+        self.assertEqual(by_player[self.p2.pk]["losses"], 1)
+        self.assertEqual(by_player[self.p1.pk]["wins"], 0)
+        self.assertEqual(by_player[self.p2.pk]["wins"], 0)
+
+    def test_replace_walkover_changes_sides_and_penalties(self) -> None:
+        apply_no_show_walkover(
+            self.match,
+            side1_no_show=True,
+            side2_no_show=True,
+            penalty_side1=WALKOVER_NO_SHOW_PENALTY,
+            penalty_side2=WALKOVER_NO_SHOW_PENALTY,
+            notify=False,
+        )
+        apply_no_show_walkover(
+            self.match,
+            side1_no_show=False,
+            side2_no_show=True,
+            penalty_side2=15.0,
+            replace=True,
+            notify=False,
+        )
+
+        self.match.refresh_from_db()
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.assertEqual(self.match.winner_id, self.p1.pk)
+        self.assertFalse(self.match.is_mutual_no_show_walkover())
+        self.assertEqual(self.p1.total_points, 3000.0)
+        self.assertEqual(self.p2.total_points, 2485.0)
+        self.assertEqual(self.match.rating_delta_player1, 0.0)
+        self.assertEqual(self.match.rating_delta_player2, -15.0)
 
 
 class ReplaceNoShowWalkoverTestCase(TestCase):
@@ -286,8 +386,8 @@ class DeadlineReminderCopyTestCase(TestCase):
             days_left=2,
             deadline_str="17.08.2026 23:59",
         )
-        self.assertIn("Walkover", msg)
-        self.assertIn("−40", msg)
+        self.assertIn("RT", msg)
+        self.assertIn("рейтинг", msg)
         self.assertLessEqual(len(msg), LK_MESSAGE_MAX_LEN)
 
     def test_command_sends_email_with_penalty_warning(self) -> None:
@@ -318,9 +418,9 @@ class DeadlineReminderCopyTestCase(TestCase):
         ]
         self.assertGreaterEqual(len(reminder_mails), 2)
         body = reminder_mails[0].alternatives[0][0]
-        self.assertIn("Walkover", body)
+        self.assertIn("RT", body)
         self.assertIn("40", body)
         note = Notification.objects.filter(user=p1.user).first()
         self.assertIsNotNone(note)
         assert note is not None
-        self.assertIn("Walkover", note.message)
+        self.assertIn("RT", note.message)

@@ -59,6 +59,7 @@ from apps.tournaments.platform_home import (
     club_filter_choices_for_tournament_lists,
     load_user_club_ids_for_platform_tournaments,
     order_tournaments_active_first,
+    order_with_cancelled_last,
 )
 from apps.training.models import Coach
 from apps.users.display import format_user_display_name
@@ -607,10 +608,10 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         start_date__gte=previous_month_start,
         start_date__lte=previous_month_end,
     ).count()
-    upcoming_tournaments_qs = (
-        Tournament.objects.filter(start_date__gte=today)
-        .select_related("club")
-        .order_by("start_date", "registration_deadline")
+    upcoming_tournaments_qs = order_with_cancelled_last(
+        Tournament.objects.filter(start_date__gte=today).select_related("club"),
+        "start_date",
+        "registration_deadline",
     )
     nearest_tournaments_count = upcoming_tournaments_qs.filter(
         start_date__lte=next_14_days

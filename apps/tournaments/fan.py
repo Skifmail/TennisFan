@@ -755,7 +755,7 @@ def apply_overdue_walkover(match: Match, winner: Player) -> None:
 
 
 def process_overdue_match(match: Match) -> tuple[bool, str]:
-    """Обработать просроченный FAN-матч: уведомить администраторов, результат не ставить.
+    """Обработать просроченный FAN-матч: Walkover обоим и уведомление админов.
 
     Returns:
         Пара (успех, сообщение).

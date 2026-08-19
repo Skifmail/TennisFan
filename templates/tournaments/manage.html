@@ -235,7 +235,7 @@
                     {% with matches=group.matches.all %}
                     <div class="tvd-group-matches-row">
                     {% for match in matches %}
-                    {% if match.status == 'scheduled' or match.status == 'postponed' %}
+                    {% if match.status == 'scheduled' or match.status == 'postponed' or match.is_no_show_walkover %}
                     {% include 'includes/manage_group_match_result.html' with match=match tournament=tournament %}
                     {% endif %}
                     {% endfor %}
@@ -638,15 +638,7 @@
     <div class="modal-dialog club-confirm-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="walkover-confirm-title" aria-describedby="walkover-confirm-text">
         <div class="club-confirm-modal__eyebrow">Подтверждение</div>
         <h3 id="walkover-confirm-title" class="modal-dialog__title club-confirm-modal__title">Проставить Walkover (неявку)?</h3>
-        <p id="walkover-confirm-text" class="modal-dialog__text club-confirm-modal__text">Выбранному участнику будет засчитана неявка.</p>
-        <div class="walkover-confirm-modal__fields">
-            <label class="walkover-confirm-modal__label" for="walkover-penalty-input">Штраф, очки рейтинга</label>
-            <input id="walkover-penalty-input" class="walkover-confirm-modal__input" type="number" min="0" step="1" value="40" inputmode="decimal">
-            <label class="walkover-confirm-modal__check">
-                <input id="walkover-skip-penalty" type="checkbox">
-                Не начислять штраф
-            </label>
-        </div>
+        <p id="walkover-confirm-text" class="modal-dialog__text club-confirm-modal__text">Выбранным участникам будет засчитана неявка.</p>
         <div class="modal-dialog__actions club-confirm-modal__actions">
             <button type="button" class="btn btn-sm club-confirm-modal__btn club-confirm-modal__btn--secondary" data-walkover-cancel>Отмена</button>
             <button type="button" class="btn btn-sm btn-primary club-confirm-modal__btn club-confirm-modal__btn--primary" data-walkover-confirm>Проставить</button>
@@ -657,19 +649,11 @@
 (function() {
     var modal = document.getElementById('walkover-confirm-modal');
     var textEl = document.getElementById('walkover-confirm-text');
-    var penaltyInput = document.getElementById('walkover-penalty-input');
-    var skipInput = document.getElementById('walkover-skip-penalty');
-    if (!modal || !textEl || !penaltyInput || !skipInput) return;
+    var titleEl = document.getElementById('walkover-confirm-title');
+    if (!modal || !textEl) return;
     var confirmBtn = modal.querySelector('[data-walkover-confirm]');
     if (!confirmBtn) return;
     var pendingForm = null;
-    var defaultPenalty = '40';
-
-    function syncPenaltyEnabled() {
-        var skip = skipInput.checked;
-        penaltyInput.disabled = skip;
-        penaltyInput.setAttribute('aria-disabled', skip ? 'true' : 'false');
-    }
 
     function closeModal() {
         pendingForm = null;
@@ -677,63 +661,90 @@
         modal.setAttribute('aria-hidden', 'true');
     }
 
-    function openModal(form, playerName) {
-        pendingForm = form;
-        defaultPenalty = form.getAttribute('data-default-penalty') || '40';
-        penaltyInput.value = defaultPenalty;
-        skipInput.checked = false;
-        syncPenaltyEnabled();
-        textEl.textContent = playerName
-            ? 'Игроку «' + playerName + '» будет засчитана неявка (Walkover).'
-            : 'Выбранному участнику будет засчитана неявка (Walkover).';
-        modal.style.display = 'flex';
-        modal.setAttribute('aria-hidden', 'false');
-        penaltyInput.focus();
-        penaltyInput.select();
+    function selectedSides(form) {
+        return Array.prototype.slice.call(
+            form.querySelectorAll('[data-walkover-side]:checked')
+        );
     }
 
-    skipInput.addEventListener('change', syncPenaltyEnabled);
+    function syncSideRow(row) {
+        var box = row.querySelector('[data-walkover-side]');
+        var penaltyInput = row.querySelector('[data-walkover-penalty-input]');
+        var skipInput = row.querySelector('[data-walkover-skip-input]');
+        var on = !!(box && box.checked);
+        if (skipInput) skipInput.disabled = !on;
+        if (penaltyInput) {
+            var skip = on && skipInput && skipInput.checked;
+            penaltyInput.disabled = !on || skip;
+            penaltyInput.setAttribute('aria-disabled', penaltyInput.disabled ? 'true' : 'false');
+        }
+    }
+
+    function syncForm(form) {
+        var btn = form.querySelector('.bracket-walkover-btn');
+        form.querySelectorAll('[data-walkover-side-row]').forEach(syncSideRow);
+        if (!btn) return;
+        var selected = selectedSides(form);
+        btn.disabled = selected.length === 0;
+        btn.setAttribute('aria-disabled', selected.length ? 'false' : 'true');
+    }
+
+    function summary(form) {
+        return selectedSides(form).map(function(box) {
+            var row = box.closest('[data-walkover-side-row]');
+            var name = (box.getAttribute('data-player-name') || '').trim() || 'участник';
+            var skip = row && row.querySelector('[data-walkover-skip-input]');
+            var penalty = row && row.querySelector('[data-walkover-penalty-input]');
+            if (skip && skip.checked) {
+                return name + ' — без штрафа';
+            }
+            var amount = penalty && penalty.value ? penalty.value : '40';
+            return name + ' — штраф −' + amount;
+        }).join('; ');
+    }
+
+    function openModal(form) {
+        pendingForm = form;
+        var isEdit = (form.querySelector('.bracket-walkover-btn') || {}).textContent || '';
+        if (titleEl) {
+            titleEl.textContent = isEdit.indexOf('Сохранить') !== -1
+                ? 'Сохранить Walkover (неявку)?'
+                : 'Проставить Walkover (неявку)?';
+        }
+        textEl.textContent = summary(form) || 'Выбранным участникам будет засчитана неявка.';
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        confirmBtn.focus();
+    }
 
     document.querySelectorAll('[data-walkover-form]').forEach(function(form) {
-        var btn = form.querySelector('.bracket-walkover-btn');
-        var radios = form.querySelectorAll('input[type="radio"]');
-        if (!btn || !radios.length) return;
-        function selectedRadio() {
-            return form.querySelector('input[type="radio"]:checked');
-        }
-        function syncWalkoverBtn() {
-            var selected = selectedRadio();
-            btn.disabled = !selected;
-            btn.setAttribute('aria-disabled', selected ? 'false' : 'true');
-        }
-        radios.forEach(function(radio) {
-            radio.addEventListener('change', syncWalkoverBtn);
-        });
+        form.addEventListener('change', function() { syncForm(form); });
         form.addEventListener('submit', function(e) {
-            var selected = selectedRadio();
-            if (!selected) {
+            form.querySelectorAll('[data-walkover-penalty-input]').forEach(function(input) {
+                input.disabled = false;
+            });
+            if (!selectedSides(form).length) {
                 e.preventDefault();
-                syncWalkoverBtn();
+                syncForm(form);
                 return;
             }
             e.preventDefault();
-            openModal(form, (selected.getAttribute('data-player-name') || '').trim());
+            openModal(form);
         });
-        syncWalkoverBtn();
+        syncForm(form);
     });
 
     confirmBtn.addEventListener('click', function() {
         if (!pendingForm) return;
         var form = pendingForm;
-        var skip = skipInput.checked;
-        var penaltyField = form.querySelector('[data-walkover-penalty]');
-        var skipField = form.querySelector('[data-walkover-skip]');
-        if (penaltyField) {
-            penaltyField.value = skip ? '0' : (penaltyInput.value || defaultPenalty);
-        }
-        if (skipField) {
-            skipField.value = skip ? '1' : '';
-        }
+        form.querySelectorAll('[data-walkover-side-row]').forEach(function(row) {
+            var box = row.querySelector('[data-walkover-side]');
+            var skip = row.querySelector('[data-walkover-skip-input]');
+            var penalty = row.querySelector('[data-walkover-penalty-input]');
+            var on = !!(box && box.checked);
+            if (skip) skip.disabled = !on;
+            if (penalty) penalty.disabled = !on;
+        });
         closeModal();
         form.submit();
     });

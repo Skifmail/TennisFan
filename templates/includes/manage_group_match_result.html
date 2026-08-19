@@ -1,7 +1,12 @@
 <div id="match-{{ match.pk }}" class="manage-match-result bracket-match mt-3{% if match.is_deadline_overdue %} bracket-match--overdue{% endif %}">
-    {% if tournament.status == "cancelled" or tournament.status == "completed" %}
+    {% if tournament.status == "cancelled" %}
+    <div class="bracket-match-pending">В этом статусе турнира редактирование результатов недоступно.</div>
+    {% elif match.is_no_show_walkover %}
+    {% include 'includes/manage_match_walkover_form.html' with match=match tournament=tournament %}
+    {% elif tournament.status == "completed" %}
     <div class="bracket-match-pending">В этом статусе турнира редактирование результатов недоступно.</div>
     {% else %}
+    {% if not match.is_no_show_walkover %}
     <form action="{% url 'tournament_manage_match_deadline' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-deadline-form" data-deadline-form>
         {% csrf_token %}
         <label class="bracket-deadline-label" for="deadline-{{ match.pk }}">Дедлайн</label>
@@ -16,7 +21,9 @@
         >
         <button type="submit" class="btn btn-sm btn-primary bracket-submit-btn bracket-deadline-btn" disabled aria-disabled="true">Изменить дедлайн</button>
     </form>
+    {% endif %}
     {% include 'includes/manage_match_walkover_form.html' with match=match tournament=tournament %}
+    {% if not match.is_no_show_walkover %}
     <form action="{% url 'tournament_manage_match_result' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-form">
         {% csrf_token %}
         <div class="bracket-match-players">
@@ -77,5 +84,6 @@
             </div>
         </div>
     </form>
+    {% endif %}
     {% endif %}
 </div>

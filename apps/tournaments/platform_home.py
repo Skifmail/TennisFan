@@ -36,13 +36,41 @@ _IN_GAME_STATUSES = (
 )
 
 
+def order_with_cancelled_last(
+    queryset: QuerySet[Tournament],
+    *order_by: str,
+) -> QuerySet[Tournament]:
+    """Поставить отменённые турниры в конец списка.
+
+    Остальная сортировка (даты, pk и т.д.) сохраняется внутри групп
+    «не отменён» и «отменён».
+
+    Args:
+        queryset: Исходный queryset турниров.
+        *order_by: Поля сортировки после приоритета отмены.
+
+    Returns:
+        Отсортированный queryset: сначала действующие, затем cancelled.
+    """
+    if "_cancelled_last" not in queryset.query.annotations:
+        queryset = queryset.annotate(
+            _cancelled_last=Case(
+                When(status=TournamentStatus.CANCELLED, then=1),
+                default=0,
+                output_field=IntegerField(),
+            )
+        )
+    return queryset.order_by("_cancelled_last", *order_by)
+
+
 def order_tournaments_active_first(
     queryset: QuerySet[Tournament],
 ) -> QuerySet[Tournament]:
-    """Сортировка публичных списков: «в игре» первыми, остальные — по дате создания.
+    """Сортировка публичных списков: «в игре» первыми, отменённые — в конце.
 
-    Сначала турниры в статусах active / group_stage / playoffs, затем все остальные.
-    Внутри каждой группы — от недавно созданных к более старым (``-created_at``).
+    Сначала active / group_stage / playoffs, затем набор и завершённые,
+    отменённые всегда последние. Внутри группы — от новых к старым
+    (``-created_at``).
 
     Args:
         queryset (QuerySet[Tournament]): Исходный queryset турниров.
@@ -53,6 +81,7 @@ def order_tournaments_active_first(
     return queryset.annotate(
         _list_status_priority=Case(
             When(status__in=_IN_GAME_STATUSES, then=0),
+            When(status=TournamentStatus.CANCELLED, then=2),
             default=1,
             output_field=IntegerField(),
         )

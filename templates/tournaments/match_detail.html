@@ -24,7 +24,7 @@
                 </p>
                 {% if match.deadline and match.status != 'completed' and match.status != 'walkover' %}
                 <p class="text-muted mt-1" style="font-size: var(--font-size-sm);">
-                    Если матч не сыгран до дедлайна, администратор получит уведомление и сможет продлить дедлайн или проставить Walkover (неявку: −40 очков неявившемуся, 0 сопернику).
+                    Если матч не сыгран до дедлайна, обоим будет проставлен Walkover (неявка: −40 очков каждому). Администратор сможет изменить стороны и штраф.
                 </p>
                 {% endif %}
                 {% if match.court %}
@@ -38,7 +38,7 @@
                     {% if match.team1 %}{% include 'includes/avatar.html' with avatar=match.team1.player1.avatar class="player-avatar" size="80" %}
                     {% else %}{% include 'includes/avatar.html' with avatar=match.player1.avatar class="player-avatar" size="80" %}{% endif %}
                     <div class="{% if match.team1 and match.winner_team == match.team1 or match.player1 and match.winner == match.player1 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player1_display }}</div>
-                    {% if match.is_walkover_loss %}{% if match.team1 and match.winner_team == match.team2 or match.player1 and match.winner == match.player2 %}<span class="retired-badge">Rt.</span>{% endif %}{% elif match.is_no_show_walkover %}{% if match.team1 and match.winner_team == match.team2 or match.player1 and match.winner == match.player2 %}<span class="walkover-badge">Wo.</span>{% endif %}{% endif %}
+                    {% if match.shows_rt_badge %}{% if match.team1 and match.winner_team == match.team2 or match.player1 and match.winner == match.player2 %}<span class="retired-badge">Rt.</span>{% endif %}{% elif match.is_no_show_walkover %}{% if match.team1 and match.winner_team == match.team2 or match.player1 and match.winner == match.player2 %}<span class="walkover-badge">Wo.</span>{% endif %}{% endif %}
                     {% if match.status == 'completed' or match.status == 'walkover' %}
                     <div class="mt-1 match-points-display">
                         {% if match.is_friendly_sparring %}
@@ -94,7 +94,7 @@
                     {% if match.team2 %}{% include 'includes/avatar.html' with avatar=match.team2.player1.avatar class="player-avatar" size="80" %}
                     {% else %}{% include 'includes/avatar.html' with avatar=match.player2.avatar class="player-avatar" size="80" %}{% endif %}
                     <div class="{% if match.team2 and match.winner_team == match.team2 or match.player2 and match.winner == match.player2 %}text-primary{% endif %}" style="font-weight: 600;">{{ match.get_player2_display }}</div>
-                    {% if match.is_walkover_loss %}{% if match.team2 and match.winner_team == match.team1 or match.player2 and match.winner == match.player1 %}<span class="retired-badge">Rt.</span>{% endif %}{% elif match.is_no_show_walkover %}{% if match.team2 and match.winner_team == match.team1 or match.player2 and match.winner == match.player1 %}<span class="walkover-badge">Wo.</span>{% endif %}{% endif %}
+                    {% if match.shows_rt_badge %}{% if match.team2 and match.winner_team == match.team1 or match.player2 and match.winner == match.player1 %}<span class="retired-badge">Rt.</span>{% endif %}{% elif match.is_no_show_walkover %}{% if match.team2 and match.winner_team == match.team1 or match.player2 and match.winner == match.player1 %}<span class="walkover-badge">Wo.</span>{% endif %}{% endif %}
                     {% if match.status == 'completed' or match.status == 'walkover' %}
                     <div class="mt-1 match-points-display">
                         {% if match.is_friendly_sparring %}
@@ -153,14 +153,14 @@
                             <select name="result" class="form-control" id="match-result-select">
                                 <option value="win">Я (мы) победил(и)</option>
                                 <option value="loss">Соперник победил</option>
-                                <option value="walkover_win">Тех. победа мне — соперник не явился</option>
-                                <option value="walkover_loss">Тех. поражение мне — я не явился (−40 очков)</option>
+                                <option value="walkover_win">Неявка соперника — матч не состоялся</option>
+                                <option value="walkover_loss">Моя неявка — матч не состоялся (−40 очков мне)</option>
                             </select>
                             <p id="match-result-hint" class="text-muted mt-2" style="font-size: var(--font-size-sm); display: none;"></p>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="match-score-group">
                             <label class="form-label">Счёт по сетам</label>
-                            <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">Укажите, сколько геймов выиграла каждая сторона в каждом сете.</p>
+                            <p class="text-secondary" style="font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm);">Укажите, сколько геймов выиграла каждая сторона в каждом сете. Счёт 0:0 не принимается: если матч не состоялся, выберите неявку выше.</p>
                             <div class="match-score-input">
                                 <div class="match-score-input__row match-score-input__header">
                                     <span class="match-score-input__label"></span>
@@ -491,17 +491,21 @@
 (function () {
     const sel = document.getElementById('match-result-select');
     const hint = document.getElementById('match-result-hint');
+    const scoreGroup = document.getElementById('match-score-group');
     if (!sel || !hint) return;
 
     const hints = {
-        'walkover_win':  '⚠️ Соперник не явился на матч — вам засчитывается техническая победа. Из рейтинга соперника будет вычтено 40 очков.',
-        'walkover_loss': '⚠️ Вы не явились на матч — вам засчитывается техническое поражение. Из вашего рейтинга будет вычтено 40 очков.',
+        'walkover_win':  '⚠️ Матч не состоялся: соперник не явился. Счёт не вводится, из рейтинга соперника будет вычтено 40 очков.',
+        'walkover_loss': '⚠️ Матч не состоялся: вы не явились. Счёт не вводится, из вашего рейтинга будет вычтено 40 очков.',
     };
 
     function update() {
         const msg = hints[sel.value] || '';
         hint.textContent = msg;
         hint.style.display = msg ? 'block' : 'none';
+        if (scoreGroup) {
+            scoreGroup.style.display = msg ? 'none' : '';
+        }
     }
 
     sel.addEventListener('change', update);

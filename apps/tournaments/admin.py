@@ -39,6 +39,7 @@ from .models import (
     TVDTournament,
 )
 from .olympic_consolation import generate_bracket as generate_olympic_bracket
+from .platform_home import order_with_cancelled_last
 from .postpayment import (
     ADMIN_CONFIRMABLE_PAYMENT_STATUSES,
     ADMIN_RESENDABLE_PAYMENT_STATUSES,
@@ -970,7 +971,10 @@ class TournamentAdmin(admin.ModelAdmin):
             QuerySet с ``club`` равным NULL.
         """
         qs = super().get_queryset(request)
-        return qs.filter(club__isnull=True)
+        return order_with_cancelled_last(
+            qs.filter(club__isnull=True),
+            "-start_date",
+        )
 
     def changelist_view(self, request, extra_context=None):
         """Показать в админке статус активных окон постоплаты."""

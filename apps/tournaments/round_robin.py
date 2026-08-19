@@ -6,6 +6,7 @@ import logging
 from datetime import timedelta
 from typing import Any, cast
 
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
@@ -300,6 +301,16 @@ def compute_standings(tournament: Tournament) -> list[dict]:
             }
 
     for m in matches:
+        if m.is_mutual_no_show_walkover():
+            e1 = m.team1 if is_doubles else m.player1
+            e2 = m.team2 if is_doubles else m.player2
+            for ent in (e1, e2):
+                eid = _entity_id(ent)
+                if eid is None or eid not in stats:
+                    continue
+                stats[eid]["matches"] += 1
+                stats[eid]["losses"] += 1
+            continue
         w = _get_winner_entity(m, is_doubles)
         los = _get_loser_entity(m, is_doubles)
         if not w or not los:
@@ -517,7 +528,7 @@ def compute_standings_for_entities(
         m
         for m in matches
         if m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
-        and (m.winner_id or m.winner_team_id)
+        and (m.winner_id or m.winner_team_id or m.is_mutual_no_show_walkover())
     ]
     stats: dict[int, Any] = {}
     for e in entities:
@@ -551,6 +562,16 @@ def compute_standings_for_entities(
             }
 
     for m in completed:
+        if m.is_mutual_no_show_walkover():
+            e1 = m.team1 if is_doubles else m.player1
+            e2 = m.team2 if is_doubles else m.player2
+            for ent in (e1, e2):
+                eid = _entity_id(ent)
+                if eid is None or eid not in stats:
+                    continue
+                stats[eid]["matches"] += 1
+                stats[eid]["losses"] += 1
+            continue
         w = _get_winner_entity(m, is_doubles)
         los = _get_loser_entity(m, is_doubles)
         if not w or not los:
@@ -751,7 +772,11 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
         main_matches.filter(
             status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
         )
-        .exclude(winner__isnull=True)
+        .filter(
+            Q(winner_id__isnull=False)
+            | Q(winner_team_id__isnull=False)
+            | Q(walkover_no_show_side1=True, walkover_no_show_side2=True)
+        )
         .count()
     )
     if completed < total:
@@ -774,7 +799,26 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
     walkover_loss_player_ids: set[int] = set(get_withdrawn_player_ids(tournament))
     walkover_matches = main_matches.filter(status=Match.MatchStatus.WALKOVER)
     for wm in walkover_matches:
-        if wm.is_walkover_loss():
+        if wm.is_no_show_walkover():
+            # Неявка: без очков за место остаётся каждая отмеченная сторона
+            side1_no_show, side2_no_show = wm.get_no_show_sides()
+            if wm.team1_id and wm.team2_id:
+                for team, no_show in (
+                    (wm.team1, side1_no_show),
+                    (wm.team2, side2_no_show),
+                ):
+                    if not no_show or team is None:
+                        continue
+                    if team.player1_id:
+                        walkover_loss_player_ids.add(team.player1_id)
+                    if team.player2_id:
+                        walkover_loss_player_ids.add(team.player2_id)
+            else:
+                if side1_no_show and wm.player1_id:
+                    walkover_loss_player_ids.add(wm.player1_id)
+                if side2_no_show and wm.player2_id:
+                    walkover_loss_player_ids.add(wm.player2_id)
+        elif wm.is_walkover_loss():
             # Определяем проигравшего
             if wm.winner_team_id:
                 loser_team = wm.team2 if wm.winner_team_id == wm.team1_id else wm.team1
@@ -955,7 +999,7 @@ def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
 
 
 def process_overdue_match(match: Match) -> tuple[bool, str]:
-    """Обработать просроченный матч кругового турнира: уведомить администраторов.
+    """Обработать просроченный матч кругового турнира: Walkover обоим и уведомление.
 
     Returns:
         Пара (успех, сообщение).

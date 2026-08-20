@@ -80,9 +80,24 @@
             return;
         }
         nudge.setAttribute("data-nudge-bound", "1");
-        nudge.addEventListener("click", function () {
-            window.setTimeout(markSeen, 50);
-        });
+        nudge.addEventListener("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) {
+                e.stopImmediatePropagation();
+            }
+            document.querySelectorAll(".nav-dropdown.open").forEach(function (el) {
+                el.classList.remove("open");
+            });
+            document.querySelectorAll(".nav-menu-mobile.active, .nav-toggle.active").forEach(function (el) {
+                el.classList.remove("active");
+            });
+            var target = document.getElementById("home-activity");
+            if (target) {
+                target.scrollIntoView({ block: "start" });
+            }
+            window.setTimeout(markSeen, 400);
+        }, true);
     }
 
     function ensureNudge() {
@@ -153,9 +168,16 @@
         }
         done = true;
         persistSeen(latestId);
-        if (nudge && nudge.parentNode) {
-            nudge.parentNode.removeChild(nudge);
+        if (nudge) {
+            nudge.style.pointerEvents = "none";
+            nudge.style.visibility = "hidden";
+            var el = nudge;
             nudge = null;
+            window.setTimeout(function () {
+                if (el && el.parentNode) {
+                    el.parentNode.removeChild(el);
+                }
+            }, 400);
         }
         window.removeEventListener("scroll", onScroll);
     }

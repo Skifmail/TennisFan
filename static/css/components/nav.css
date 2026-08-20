@@ -489,11 +489,18 @@
     z-index: 1001;
 }
 
-.nav-dropdown:hover .nav-dropdown-content,
 .nav-dropdown.open .nav-dropdown-content {
     opacity: 1;
     visibility: visible;
     transform: translateY(0) scale(1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .nav-dropdown:hover .nav-dropdown-content {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .nav-dropdown-content li {

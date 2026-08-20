@@ -1630,6 +1630,10 @@ a.home-activity__actor:hover {
     min-width: 0;
 }
 
+.home-activity__cell--action-plain {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .home-activity__cell--action .club-dashboard-activity__badge {
     justify-self: start;
 }

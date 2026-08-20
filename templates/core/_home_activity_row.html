@@ -12,8 +12,10 @@
         <span class="home-activity__actor">{{ event.get_actor_display }}</span>
         {% endif %}
     </div>
-    <div class="home-activity__cell home-activity__cell--action">
+    <div class="home-activity__cell home-activity__cell--action{% if event.shows_brand_actor %} home-activity__cell--action-plain{% endif %}">
+        {% if not event.shows_brand_actor %}
         <span class="club-dashboard-activity__badge club-dashboard-activity__badge--{{ event.get_tone }}">{{ event.get_event_type_display }}</span>
+        {% endif %}
         <div class="home-activity__body">
             {% if event.description %}
             <span class="home-activity__desc">

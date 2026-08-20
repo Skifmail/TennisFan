@@ -45,6 +45,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             if (!isOpen) {
                 dropdown.classList.add('open');
+            } else {
+                userMenuToggle.blur();
             }
         });
         document.addEventListener('click', function(e) {

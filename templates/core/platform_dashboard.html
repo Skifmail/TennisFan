@@ -129,7 +129,9 @@
                         {% if event.actor_role %}<span class="club-dashboard-activity__role club-dashboard-activity__role--{{ event.get_role_modifier }}">{{ event.actor_role }}</span>{% else %}<span class="club-dashboard-activity__dash">—</span>{% endif %}
                     </div>
                     <div class="club-dashboard-activity__cell club-dashboard-activity__cell--action">
+                        {% if not event.shows_brand_actor %}
                         <span class="club-dashboard-activity__badge club-dashboard-activity__badge--{{ event.get_tone }}">{{ event.get_event_type_display }}</span>
+                        {% endif %}
                         {% if event.description %}
                         <span class="club-dashboard-activity__desc">
                             {% if event.target_url %}<a href="{{ event.target_url }}">{{ event.description }}</a>{% else %}{{ event.description }}{% endif %}

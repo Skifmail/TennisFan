@@ -479,6 +479,7 @@ class PlatformActivityFeedTestCase(TestCase):
         self.assertContains(home, "Tennis")
         self.assertContains(home, "Fan")
         self.assertNotContains(home, "Админ Платформы")
+        self.assertNotContains(home, "club-dashboard-activity__badge--announcement")
 
     def test_player_cannot_publish_announcement(self) -> None:
         """Обычный игрок не может писать в ленту от имени платформы."""

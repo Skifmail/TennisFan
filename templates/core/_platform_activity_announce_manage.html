@@ -1,0 +1,34 @@
+{% if event.shows_brand_actor %}
+{% if user.is_staff or user.is_superuser %}
+<div class="activity-announce-manage">
+    <details class="activity-announce-manage__edit">
+        <summary>Изменить</summary>
+        <form
+            method="post"
+            action="{% url 'platform_activity_announce_edit' event.pk %}"
+            class="activity-announce-manage__form"
+        >
+            {% csrf_token %}
+            {% if next_page %}
+            <input type="hidden" name="next" value="{{ next_page }}">
+            {% endif %}
+            <textarea name="message" class="form-control" rows="3" maxlength="500" required aria-label="Текст сообщения">{{ event.description }}</textarea>
+            <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
+        </form>
+    </details>
+    <form
+        method="post"
+        action="{% url 'platform_activity_announce_delete' event.pk %}"
+        class="activity-announce-manage__delete"
+        onsubmit="return confirm('Удалить это сообщение из ленты?');"
+    >
+        {% csrf_token %}
+        {% if next_page %}
+        <input type="hidden" name="next" value="{{ next_page }}">
+        {% endif %}
+        <button type="submit" class="btn btn-ghost btn-sm btn-danger-text">Удалить</button>
+    </form>
+</div>
+{% endif %}
+{% endif %}
+

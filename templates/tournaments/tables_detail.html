@@ -387,6 +387,10 @@
 </div>
 {% endblock %}
 
+{% block modals %}
+{% include "tournaments/_photo_upload_prompt.html" %}
+{% endblock %}
+
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script type="application/json" id="tournament-tables-charts-config">{{ tables_charts_config|safe }}</script>

@@ -448,3 +448,259 @@ class PlatformActivityFeedTestCase(TestCase):
         self.assertContains(response, "Новые события - посмотреть")
         self.assertContains(response, "Свежий Игрок")
         self.assertNotIn(HOME_ACTIVITY_SEEN_COOKIE, response.cookies)
+
+    def test_staff_announcement_appears_on_home_with_brand_badge(self) -> None:
+        """Админ публикует сообщение: на главной бейдж TennisFan, без личного имени."""
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse("platform_activity_announce"),
+            {"message": "Завтра вечером техническое обслуживание."},
+        )
+        self.assertEqual(response.status_code, 302)
+
+        event = PlatformActivityEvent.objects.filter(
+            event_type=PlatformActivityEvent.EventType.ADMIN_ANNOUNCEMENT
+        ).first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.description, "Завтра вечером техническое обслуживание.")
+        self.assertTrue(event.shows_brand_actor())
+
+        self.client.logout()
+        home = self.client.get(reverse("home"))
+        self.assertContains(home, "Завтра вечером техническое обслуживание.")
+        self.assertContains(home, "tf-brand-badge")
+        self.assertContains(home, "Tennis")
+        self.assertContains(home, "Fan")
+        self.assertNotContains(home, "Админ Платформы")
+
+    def test_player_cannot_publish_announcement(self) -> None:
+        """Обычный игрок не может писать в ленту от имени платформы."""
+        player_user = User.objects.create_user(
+            email="announce-player@test.local",
+            password="testpass123",
+            first_name="Игрок",
+            last_name="Безправ",
+        )
+        Player.objects.create(user=player_user)
+        self.client.force_login(player_user)
+        response = self.client.post(
+            reverse("platform_activity_announce"),
+            {"message": "Попытка спама в ленту"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            PlatformActivityEvent.objects.filter(
+                event_type=PlatformActivityEvent.EventType.ADMIN_ANNOUNCEMENT
+            ).exists()
+        )
+
+    def test_empty_announcement_is_rejected(self) -> None:
+        """Пустое сообщение не попадает в ленту."""
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse("platform_activity_announce"),
+            {"message": "   "},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            PlatformActivityEvent.objects.filter(
+                event_type=PlatformActivityEvent.EventType.ADMIN_ANNOUNCEMENT
+            ).exists()
+        )
+
+    def test_announcement_triggers_new_events_nudge(self) -> None:
+        """Новое объявление админа поднимает плашку новых событий."""
+        old_user = User.objects.create_user(
+            email="announce-seen-old@test.local",
+            password="testpass123",
+            first_name="Старый",
+            last_name="Визит",
+        )
+        Player.objects.create(user=old_user)
+        seen_event = (
+            PlatformActivityEvent.objects.filter(
+                event_type__in=PlatformActivityEvent.PUBLIC_FEED_EVENT_TYPES
+            )
+            .order_by("-id")
+            .first()
+        )
+        self.assertIsNotNone(seen_event)
+
+        self.client.force_login(self.staff)
+        self.client.post(
+            reverse("platform_activity_announce"),
+            {"message": "Открыта запись на новый турнир."},
+        )
+        self.client.logout()
+
+        anon = Client()
+        anon.cookies[HOME_ACTIVITY_SEEN_COOKIE] = str(seen_event.id)
+        home = anon.get(reverse("home"))
+        self.assertGreaterEqual(home.context["home_activity_new_count"], 1)
+        self.assertContains(home, "Новые события - посмотреть")
+        self.assertContains(home, "Открыта запись на новый турнир.")
+
+    def test_home_shows_announce_form_only_to_staff(self) -> None:
+        """Форма «Сообщение в ленту» на главной видна только админу."""
+        anon_home = self.client.get(reverse("home"))
+        self.assertEqual(anon_home.status_code, 200)
+        self.assertNotContains(anon_home, "Сообщение в ленту событий")
+        self.assertNotContains(anon_home, "platform/dashboard/activity/announce/")
+
+        player_user = User.objects.create_user(
+            email="home-announce-player@test.local",
+            password="testpass123",
+            first_name="Игрок",
+            last_name="Ленты",
+        )
+        Player.objects.create(user=player_user)
+        self.client.force_login(player_user)
+        player_home = self.client.get(reverse("home"))
+        self.assertNotContains(player_home, "Сообщение в ленту событий")
+        self.assertNotContains(player_home, "platform/dashboard/activity/announce/")
+
+        self.client.force_login(self.staff)
+        staff_home = self.client.get(reverse("home"))
+        self.assertContains(staff_home, "Сообщение в ленту событий")
+        self.assertContains(staff_home, "platform/dashboard/activity/announce/")
+        self.assertContains(staff_home, 'name="next"')
+        self.assertContains(staff_home, 'value="home"')
+
+    def test_staff_announcement_from_home_stays_on_home(self) -> None:
+        """Публикация с главной возвращает админа к ленте на главной."""
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse("platform_activity_announce"),
+            {
+                "message": "Сообщение с главной страницы.",
+                "next": "home",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/#home-activity")
+        self.assertTrue(
+            PlatformActivityEvent.objects.filter(
+                event_type=PlatformActivityEvent.EventType.ADMIN_ANNOUNCEMENT,
+                description="Сообщение с главной страницы.",
+            ).exists()
+        )
+
+    def _create_announcement(
+        self, text: str = "Официальное сообщение."
+    ) -> PlatformActivityEvent:
+        """Опубликовать объявление от лица staff и вернуть событие."""
+        self.client.force_login(self.staff)
+        self.client.post(
+            reverse("platform_activity_announce"),
+            {"message": text},
+        )
+        event = PlatformActivityEvent.objects.filter(
+            event_type=PlatformActivityEvent.EventType.ADMIN_ANNOUNCEMENT,
+            description=text,
+        ).first()
+        assert event is not None
+        return event
+
+    def test_staff_can_edit_announcement(self) -> None:
+        """Админ меняет текст своего сообщения, дата события не сдвигается."""
+        event = self._create_announcement("Старый текст объявления.")
+        created_at = event.created_at
+
+        response = self.client.post(
+            reverse("platform_activity_announce_edit", args=[event.pk]),
+            {"message": "Новый текст объявления.", "next": "home"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/#home-activity")
+        event.refresh_from_db()
+        self.assertEqual(event.description, "Новый текст объявления.")
+        self.assertEqual(event.created_at, created_at)
+
+        home = self.client.get(reverse("home"))
+        self.assertContains(home, "Новый текст объявления.")
+        self.assertNotContains(home, "Старый текст объявления.")
+
+    def test_staff_can_delete_announcement(self) -> None:
+        """Админ удаляет ручное сообщение из ленты."""
+        event = self._create_announcement("Сообщение к удалению.")
+        event_id = event.pk
+
+        response = self.client.post(
+            reverse("platform_activity_announce_delete", args=[event.pk]),
+            {"next": "home"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/#home-activity")
+        self.assertFalse(PlatformActivityEvent.objects.filter(pk=event_id).exists())
+
+        home = self.client.get(reverse("home"))
+        self.assertNotContains(home, "Сообщение к удалению.")
+
+    def test_player_cannot_edit_or_delete_announcement(self) -> None:
+        """Обычный игрок не может менять и удалять объявления платформы."""
+        event = self._create_announcement("Защищённое объявление.")
+        player_user = User.objects.create_user(
+            email="announce-edit-player@test.local",
+            password="testpass123",
+            first_name="Игрок",
+            last_name="Правки",
+        )
+        Player.objects.create(user=player_user)
+
+        self.client.force_login(player_user)
+        edit = self.client.post(
+            reverse("platform_activity_announce_edit", args=[event.pk]),
+            {"message": "Взлом ленты"},
+        )
+        delete = self.client.post(
+            reverse("platform_activity_announce_delete", args=[event.pk]),
+        )
+        self.assertEqual(edit.status_code, 302)
+        self.assertEqual(delete.status_code, 302)
+        event.refresh_from_db()
+        self.assertEqual(event.description, "Защищённое объявление.")
+        self.assertTrue(PlatformActivityEvent.objects.filter(pk=event.pk).exists())
+
+        home = self.client.get(reverse("home"))
+        self.assertContains(home, "Защищённое объявление.")
+        self.assertNotContains(home, "activity-announce-manage")
+
+    def test_staff_cannot_edit_non_announcement_event(self) -> None:
+        """Системные события ленты нельзя править как объявление."""
+        user = User.objects.create_user(
+            email="announce-reg@test.local",
+            password="testpass123",
+            first_name="Системный",
+            last_name="Игрок",
+        )
+        Player.objects.create(user=user)
+        event = PlatformActivityEvent.objects.filter(
+            event_type=PlatformActivityEvent.EventType.REGISTRATION,
+            actor=user,
+        ).first()
+        self.assertIsNotNone(event)
+        original = event.description
+
+        self.client.force_login(self.staff)
+        self.client.post(
+            reverse("platform_activity_announce_edit", args=[event.pk]),
+            {"message": "Подмена регистрации"},
+        )
+        self.client.post(
+            reverse("platform_activity_announce_delete", args=[event.pk]),
+        )
+        event.refresh_from_db()
+        self.assertEqual(event.description, original)
+        self.assertTrue(PlatformActivityEvent.objects.filter(pk=event.pk).exists())
+
+    def test_staff_home_shows_manage_controls_for_announcement(self) -> None:
+        """На главной у объявления админ видит Изменить и Удалить."""
+        event = self._create_announcement("Сообщение с кнопками управления.")
+        home = self.client.get(reverse("home"))
+        self.assertContains(home, "activity-announce-manage")
+        self.assertContains(
+            home, reverse("platform_activity_announce_edit", args=[event.pk])
+        )
+        self.assertContains(
+            home, reverse("platform_activity_announce_delete", args=[event.pk])
+        )

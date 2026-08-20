@@ -24,7 +24,7 @@ from django.core.validators import validate_email
 from django.db import models
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -71,11 +71,12 @@ from .activity import (
     annotate_home_activity_new_events,
     format_new_home_activity_label,
     get_public_home_activity_events,
+    log_activity,
     mark_platform_dashboard_seen,
     parse_home_activity_seen_id,
     set_home_activity_seen_cookie,
 )
-from .forms import FeedbackForm
+from .forms import FeedbackForm, PlatformActivityAnnounceForm
 from .models import City, PlatformActivityEvent, SupportMessage, SupportThread
 from .support_notifications import (
     send_admin_support_notification,
@@ -1223,6 +1224,167 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         "activity_filters": activity_filters,
     }
     return render(request, "core/platform_dashboard.html", context)
+
+
+def _is_platform_admin(user: Any) -> bool:
+    """Проверить, что пользователь может управлять лентой платформы.
+
+    Args:
+        user: Текущий пользователь запроса.
+
+    Returns:
+        bool: True для staff или superuser.
+    """
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
+    )
+
+
+def _announce_redirect_response(next_page: str) -> HttpResponse:
+    """Вернуть редирект после работы с объявлением в ленте.
+
+    Args:
+        next_page: ``home`` — к ленте на главной, иначе панель платформы.
+
+    Returns:
+        HttpResponse: Редирект на разрешённую страницу.
+    """
+    if next_page == "home":
+        return HttpResponseRedirect(f"{reverse('home')}#home-activity")
+    return redirect("platform_dashboard")
+
+
+def _get_admin_announcement(event_id: int) -> PlatformActivityEvent | None:
+    """Найти ручное сообщение админа в ленте.
+
+    Args:
+        event_id: Идентификатор события.
+
+    Returns:
+        PlatformActivityEvent | None: Объявление либо None, если это не оно.
+    """
+    try:
+        return cast(
+            PlatformActivityEvent,
+            PlatformActivityEvent.objects.get(
+                pk=event_id,
+                event_type=PlatformActivityEvent.EventType.ADMIN_ANNOUNCEMENT,
+            ),
+        )
+    except PlatformActivityEvent.DoesNotExist:
+        return None
+
+
+@login_required
+@require_http_methods(["POST"])
+def platform_activity_announce(request: HttpRequest) -> HttpResponse:
+    """Опубликовать официальное сообщение TennisFan в публичную ленту.
+
+    Args:
+        request: POST с полем ``message`` от staff-пользователя.
+            Опционально ``next=home`` — вернуться к ленте на главной.
+
+    Returns:
+        HttpResponse: Редирект на главную или панель платформы.
+    """
+    if not _is_platform_admin(request.user):
+        messages.error(
+            request, "Публиковать сообщения в ленту может только администратор."
+        )
+        return redirect("home")
+
+    form = PlatformActivityAnnounceForm(request.POST)
+    redirect_response = _announce_redirect_response(
+        (request.POST.get("next") or "").strip()
+    )
+    if not form.is_valid():
+        messages.error(request, "Введите текст сообщения.")
+        return redirect_response
+
+    log_activity(
+        event_type=PlatformActivityEvent.EventType.ADMIN_ANNOUNCEMENT,
+        actor=request.user,
+        actor_name="TennisFan",
+        actor_role="Админ",
+        description=form.cleaned_data["message"],
+    )
+    messages.success(request, "Сообщение опубликовано в ленте событий.")
+    return redirect_response
+
+
+@login_required
+@require_http_methods(["POST"])
+def platform_activity_announce_edit(
+    request: HttpRequest,
+    event_id: int,
+) -> HttpResponse:
+    """Изменить текст ручного сообщения в публичной ленте.
+
+    Args:
+        request: POST с полем ``message``.
+        event_id: Идентификатор объявления.
+
+    Returns:
+        HttpResponse: Редирект на главную или панель платформы.
+    """
+    if not _is_platform_admin(request.user):
+        messages.error(
+            request, "Редактировать сообщения в ленте может только администратор."
+        )
+        return redirect("home")
+
+    redirect_response = _announce_redirect_response(
+        (request.POST.get("next") or "").strip()
+    )
+    event = _get_admin_announcement(event_id)
+    if event is None:
+        messages.error(request, "Сообщение не найдено.")
+        return redirect_response
+
+    form = PlatformActivityAnnounceForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Введите текст сообщения.")
+        return redirect_response
+
+    event.description = form.cleaned_data["message"]
+    event.save(update_fields=["description"])
+    messages.success(request, "Сообщение обновлено.")
+    return redirect_response
+
+
+@login_required
+@require_http_methods(["POST"])
+def platform_activity_announce_delete(
+    request: HttpRequest,
+    event_id: int,
+) -> HttpResponse:
+    """Удалить ручное сообщение из публичной ленты.
+
+    Args:
+        request: POST от staff-пользователя.
+        event_id: Идентификатор объявления.
+
+    Returns:
+        HttpResponse: Редирект на главную или панель платформы.
+    """
+    if not _is_platform_admin(request.user):
+        messages.error(
+            request, "Удалять сообщения из ленты может только администратор."
+        )
+        return redirect("home")
+
+    redirect_response = _announce_redirect_response(
+        (request.POST.get("next") or "").strip()
+    )
+    event = _get_admin_announcement(event_id)
+    if event is None:
+        messages.error(request, "Сообщение не найдено.")
+        return redirect_response
+
+    event.delete()
+    messages.success(request, "Сообщение удалено из ленты.")
+    return redirect_response
 
 
 @login_required

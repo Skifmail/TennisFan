@@ -70,6 +70,8 @@
                 </div>
             </div>
 
+            {% include 'core/_platform_activity_announce_form.html' %}
+
             <form method="get" class="club-dashboard-activity-filters">
                 {% if selected_finance_year %}<input type="hidden" name="finance_year" value="{{ selected_finance_year }}">{% endif %}
                 {% if selected_finance_month %}<input type="hidden" name="finance_month" value="{{ selected_finance_month }}">{% endif %}
@@ -117,7 +119,11 @@
                         <span class="club-dashboard-activity__time">{{ event.created_at|date:"H:i" }}</span>
                     </div>
                     <div class="club-dashboard-activity__cell club-dashboard-activity__cell--actor">
+                        {% if event.shows_brand_actor %}
+                        {% include 'core/_tennisfan_brand_badge.html' %}
+                        {% else %}
                         {{ event.get_actor_display }}
+                        {% endif %}
                     </div>
                     <div class="club-dashboard-activity__cell club-dashboard-activity__cell--role">
                         {% if event.actor_role %}<span class="club-dashboard-activity__role club-dashboard-activity__role--{{ event.get_role_modifier }}">{{ event.actor_role }}</span>{% else %}<span class="club-dashboard-activity__dash">—</span>{% endif %}
@@ -129,6 +135,7 @@
                             {% if event.target_url %}<a href="{{ event.target_url }}">{{ event.description }}</a>{% else %}{{ event.description }}{% endif %}
                         </span>
                         {% endif %}
+                        {% include 'core/_platform_activity_announce_manage.html' %}
                     </div>
                     <div class="club-dashboard-activity__cell club-dashboard-activity__cell--amount">
                         {% if event.amount is not None %}{{ event.get_amount_display }}{% else %}<span class="club-dashboard-activity__dash">—</span>{% endif %}

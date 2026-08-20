@@ -52,6 +52,57 @@ def can_participant_delete_photo(photo: TournamentPhoto, player: Player) -> bool
     return bool(photo.uploaded_by_id == player.pk)
 
 
+def should_show_photo_upload_prompt(
+    tournament: Tournament, player: Player | None
+) -> bool:
+    """Нужно ли показать участнику напоминание загрузить фото.
+
+    Args:
+        tournament: Турнир, страницу которого открыл игрок.
+        player: Профиль текущего пользователя или ``None``.
+
+    Returns:
+        True, если турнир идёт, игрок в нём играет, своих фото ещё нет
+        и он не отключал напоминание.
+    """
+    from .models import TournamentPhotoPromptDismissal, TournamentStatus
+
+    if player is None:
+        return False
+    if tournament.status not in (
+        TournamentStatus.ACTIVE,
+        TournamentStatus.GROUP_STAGE,
+        TournamentStatus.PLAYOFFS,
+    ):
+        return False
+    if not is_active_tournament_participant(tournament, player):
+        return False
+    if get_participant_photo_count(tournament, player) > 0:
+        return False
+    return not TournamentPhotoPromptDismissal.objects.filter(
+        tournament=tournament,
+        player=player,
+    ).exists()
+
+
+def dismiss_photo_upload_prompt(tournament: Tournament, player: Player) -> None:
+    """Сохранить отказ от напоминания загрузить фото в этот турнир.
+
+    Args:
+        tournament: Турнир, для которого отключается напоминание.
+        player: Участник, который больше не хочет видеть окно.
+
+    Returns:
+        None
+    """
+    from .models import TournamentPhotoPromptDismissal
+
+    TournamentPhotoPromptDismissal.objects.get_or_create(
+        tournament=tournament,
+        player=player,
+    )
+
+
 def get_next_photo_order(tournament: Tournament) -> int:
     """Следующий порядковый номер для фото в галерее турнира."""
     last = tournament.photos.order_by("-order").values_list("order", flat=True).first()

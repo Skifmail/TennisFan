@@ -237,3 +237,39 @@
     font-size: var(--font-size-sm);
     color: rgb(255 255 255 / 86%);
 }
+
+.photo-upload-prompt__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.photo-upload-prompt__caption {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    color: rgb(218 225 220 / 92%);
+    font-size: var(--font-size-sm);
+}
+
+.photo-upload-prompt__caption .form-control {
+    background: rgb(0 0 0 / 28%);
+    border: 1px solid rgb(212 168 84 / 35%);
+    color: #f4efe6;
+}
+
+.photo-upload-prompt__check {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: rgb(218 225 220 / 92%);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    user-select: none;
+}
+
+.photo-upload-prompt__check input {
+    width: 1.05rem;
+    height: 1.05rem;
+    accent-color: rgb(212 168 84);
+}

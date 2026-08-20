@@ -1475,38 +1475,8 @@
     overflow: hidden;
 }
 
-.home-activity:not(.home-activity--empty)::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 200%;
-    height: 200%;
-    pointer-events: none;
-    z-index: 0;
-    background: conic-gradient(
-        from 0deg,
-        transparent 0deg,
-        transparent 300deg,
-        rgb(166 130 74 / 0%) 318deg,
-        rgb(212 179 106 / 45%) 336deg,
-        #f6e7b8 348deg,
-        rgb(212 179 106 / 85%) 356deg,
-        transparent 360deg
-    );
-    transform: translate(-50%, -50%);
-    will-change: transform;
-    animation: home-activity-border-spin 7s linear infinite;
-}
-
-.home-activity:not(.home-activity--empty)::after {
-    content: "";
-    position: absolute;
-    inset: 1.5px;
-    border-radius: inherit;
-    pointer-events: none;
-    z-index: 0;
-    background: linear-gradient(180deg, rgb(8 29 23 / 98%) 0%, rgb(6 21 17 / 98%) 100%);
+.home-activity:not(.home-activity--empty) {
+    animation: home-activity-pulse 5.2s ease-in-out infinite;
 }
 
 .home-activity__row {
@@ -1584,13 +1554,16 @@
     }
 }
 
-@keyframes home-activity-border-spin {
-    from {
-        transform: translate(-50%, -50%) rotate(0deg);
+@keyframes home-activity-pulse {
+    0%,
+    100% {
+        border-color: rgb(166 130 74 / 18%);
+        box-shadow: 0 10px 22px rgb(0 0 0 / 20%);
     }
 
-    to {
-        transform: translate(-50%, -50%) rotate(360deg);
+    50% {
+        border-color: rgb(212 179 106 / 36%);
+        box-shadow: 0 10px 22px rgb(0 0 0 / 20%), 0 0 16px rgb(212 179 106 / 10%);
     }
 }
 
@@ -1610,13 +1583,9 @@
     .home-activity__live,
     .home-activity-nudge,
     .home-activity-nudge__dot,
-    .home-activity:not(.home-activity--empty)::before,
+    .home-activity:not(.home-activity--empty),
     .home-activity--inview .home-activity__row {
         animation: none;
-    }
-
-    .home-activity:not(.home-activity--empty)::before {
-        will-change: auto;
     }
 
     .home-activity--inview .home-activity__row {

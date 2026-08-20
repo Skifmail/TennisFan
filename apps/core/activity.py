@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
 
@@ -307,7 +308,10 @@ def get_public_home_activity_events(
         PlatformActivityEvent.objects.filter(
             event_type__in=PlatformActivityEvent.PUBLIC_FEED_EVENT_TYPES
         )
-        .exclude(actor_id__in=hidden_user_ids)
+        .exclude(
+            Q(actor_id__in=hidden_user_ids)
+            & ~Q(event_type=PlatformActivityEvent.EventType.ADMIN_ANNOUNCEMENT)
+        )
         .select_related("actor", "actor__player")
         .order_by("-created_at", "-id")[: max(1, int(limit))]
     )

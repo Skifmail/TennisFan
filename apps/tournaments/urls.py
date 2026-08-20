@@ -144,6 +144,11 @@ urlpatterns = [
         name="tournament_photo_upload",
     ),
     path(
+        "<slug:slug>/photos/prompt-dismiss/",
+        views.tournament_photo_prompt_dismiss,
+        name="tournament_photo_prompt_dismiss",
+    ),
+    path(
         "<slug:slug>/photos/<int:pk>/delete/",
         views.tournament_photo_delete,
         name="tournament_photo_delete",

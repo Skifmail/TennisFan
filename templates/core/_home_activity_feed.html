@@ -10,6 +10,10 @@
             </h2>
         </div>
 
+        {% if user.is_staff or user.is_superuser %}
+        {% include 'core/_platform_activity_announce_form.html' with next_page='home' extra_class='home-activity-announce' %}
+        {% endif %}
+
         {% if home_activity_events %}
         <div
             class="home-activity"
@@ -19,7 +23,7 @@
         >
             <div class="home-activity__list">
                 {% for event in home_activity_events %}
-                {% include 'core/_home_activity_row.html' with event=event index=forloop.counter0 only %}
+                {% include 'core/_home_activity_row.html' with event=event index=forloop.counter0 next_page='home' %}
                 {% endfor %}
             </div>
         </div>

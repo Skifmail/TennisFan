@@ -520,6 +520,37 @@ class TournamentPhoto(CompressImageFieldsMixin, models.Model):
         return f"Фото турнира {self.tournament.name}"
 
 
+class TournamentPhotoPromptDismissal(models.Model):
+    """Отказ участника от напоминания загрузить фото в галерею турнира."""
+
+    tournament = models.ForeignKey(
+        Tournament,
+        on_delete=models.CASCADE,
+        related_name="photo_prompt_dismissals",
+        verbose_name="Турнир",
+    )
+    player = models.ForeignKey(
+        "users.Player",
+        on_delete=models.CASCADE,
+        related_name="tournament_photo_prompt_dismissals",
+        verbose_name="Игрок",
+    )
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Отказ от напоминания о фото"
+        verbose_name_plural = "Отказы от напоминания о фото"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tournament", "player"],
+                name="uniq_tournament_photo_prompt_dismissal",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.player} — не напоминать фото в {self.tournament}"
+
+
 class TournamentEntryPayment(models.Model):
     """Факт оплаты вступительного взноса пользователем за турнир (для проверки при добавлении админом)."""
 

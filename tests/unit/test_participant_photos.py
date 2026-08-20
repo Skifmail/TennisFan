@@ -9,12 +9,20 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from apps.tournaments.models import Tournament, TournamentPhoto, TournamentWithdrawal
+from apps.tournaments.models import (
+    Match,
+    Tournament,
+    TournamentPhoto,
+    TournamentPhotoPromptDismissal,
+    TournamentStatus,
+    TournamentWithdrawal,
+)
 from apps.tournaments.photo_services import (
     can_participant_delete_photo,
     can_participant_upload_photo,
     get_participant_photo_count,
     is_active_tournament_participant,
+    should_show_photo_upload_prompt,
 )
 from apps.users.models import Player, User
 from config.validators import MAX_IMAGE_SIZE_BYTES
@@ -289,3 +297,171 @@ class ParticipantPhotoViewsTestCase(TestCase):
         finally:
             photo.image.close()
         self.assertLessEqual(len(data), MAX_IMAGE_SIZE_BYTES)
+
+
+PROMPT_TEXT = "Поделитесь впечатлениями"
+
+
+class PhotoUploadPromptServiceTestCase(TestCase):
+    def setUp(self) -> None:
+        self.tournament = Tournament.objects.create(
+            name="Активный фото-турнир",
+            slug="active-photo-tournament",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.ACTIVE,
+        )
+        self.participant_user = User.objects.create_user(
+            email="prompt-participant@test.local",
+            password="testpass123",
+        )
+        self.participant = Player.objects.create(user=self.participant_user)
+        self.other = Player.objects.create(
+            user=User.objects.create_user(
+                email="prompt-other@test.local",
+                password="testpass123",
+            )
+        )
+        self.tournament.participants.add(self.participant)
+
+    def test_shows_for_active_participant_without_photos(self) -> None:
+        self.assertTrue(
+            should_show_photo_upload_prompt(self.tournament, self.participant)
+        )
+
+    def test_hides_for_upcoming_tournament(self) -> None:
+        self.tournament.status = TournamentStatus.UPCOMING
+        self.tournament.save(update_fields=["status"])
+        self.assertFalse(
+            should_show_photo_upload_prompt(self.tournament, self.participant)
+        )
+
+    def test_hides_for_completed_tournament(self) -> None:
+        self.tournament.status = TournamentStatus.COMPLETED
+        self.tournament.save(update_fields=["status"])
+        self.assertFalse(
+            should_show_photo_upload_prompt(self.tournament, self.participant)
+        )
+
+    def test_shows_for_group_stage_and_playoffs(self) -> None:
+        for status in (TournamentStatus.GROUP_STAGE, TournamentStatus.PLAYOFFS):
+            self.tournament.status = status
+            self.tournament.save(update_fields=["status"])
+            self.assertTrue(
+                should_show_photo_upload_prompt(self.tournament, self.participant),
+                msg=status,
+            )
+
+    def test_hides_for_non_participant(self) -> None:
+        self.assertFalse(should_show_photo_upload_prompt(self.tournament, self.other))
+
+    def test_hides_after_player_uploaded_photo(self) -> None:
+        TournamentPhoto.objects.create(
+            tournament=self.tournament,
+            image=_make_test_image("prompt.jpg"),
+            uploaded_by=self.participant,
+        )
+        self.assertFalse(
+            should_show_photo_upload_prompt(self.tournament, self.participant)
+        )
+
+    def test_hides_after_player_dismissed_prompt(self) -> None:
+        TournamentPhotoPromptDismissal.objects.create(
+            tournament=self.tournament,
+            player=self.participant,
+        )
+        self.assertFalse(
+            should_show_photo_upload_prompt(self.tournament, self.participant)
+        )
+
+
+class PhotoUploadPromptViewsTestCase(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        self.tournament = Tournament.objects.create(
+            name="Промпт views",
+            slug="photo-prompt-views",
+            city="Москва",
+            start_date=date.today(),
+            format="single_elimination",
+            status=TournamentStatus.ACTIVE,
+        )
+        self.participant_user = User.objects.create_user(
+            email="prompt-views@test.local",
+            password="testpass123",
+        )
+        self.participant = Player.objects.create(user=self.participant_user)
+        self.other_user = User.objects.create_user(
+            email="prompt-other-views@test.local",
+            password="testpass123",
+        )
+        Player.objects.create(user=self.other_user)
+        self.opponent = Player.objects.create(
+            user=User.objects.create_user(
+                email="prompt-opponent@test.local",
+                password="testpass123",
+            )
+        )
+        self.tournament.participants.add(self.participant, self.opponent)
+        self.detail_url = reverse(
+            "tournament_detail", kwargs={"slug": self.tournament.slug}
+        )
+        self.tables_url = reverse(
+            "tournament_tables_detail", kwargs={"slug": self.tournament.slug}
+        )
+        self.dismiss_url = reverse(
+            "tournament_photo_prompt_dismiss",
+            kwargs={"slug": self.tournament.slug},
+        )
+        self.match = Match.objects.create(
+            tournament=self.tournament,
+            player1=self.participant,
+            player2=self.opponent,
+            status=Match.MatchStatus.SCHEDULED,
+        )
+        self.match_url = reverse("match_detail", kwargs={"pk": self.match.pk})
+
+    def test_participant_sees_prompt_on_tournament_pages(self) -> None:
+        self.client.force_login(self.participant_user)
+        for url in (self.detail_url, self.match_url, self.tables_url):
+            response = self.client.get(url, secure=True)
+            self.assertContains(response, PROMPT_TEXT, msg_prefix=url)
+            self.assertContains(response, "Не напоминать больше", msg_prefix=url)
+            self.assertContains(response, "Позже", msg_prefix=url)
+
+    def test_non_participant_does_not_see_prompt(self) -> None:
+        self.client.force_login(self.other_user)
+        response = self.client.get(self.detail_url, secure=True)
+        self.assertNotContains(response, PROMPT_TEXT)
+
+    def test_dismiss_hides_prompt_on_next_visit(self) -> None:
+        self.client.force_login(self.participant_user)
+        response = self.client.post(self.dismiss_url, secure=True)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            TournamentPhotoPromptDismissal.objects.filter(
+                tournament=self.tournament,
+                player=self.participant,
+            ).exists()
+        )
+        detail = self.client.get(self.detail_url, secure=True)
+        self.assertNotContains(detail, PROMPT_TEXT)
+
+    def test_later_without_dismiss_shows_prompt_again(self) -> None:
+        self.client.force_login(self.participant_user)
+        first = self.client.get(self.detail_url, secure=True)
+        self.assertContains(first, PROMPT_TEXT)
+        second = self.client.get(self.detail_url, secure=True)
+        self.assertContains(second, PROMPT_TEXT)
+
+    def test_dismiss_requires_login(self) -> None:
+        response = self.client.post(self.dismiss_url, secure=True)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.url)
+
+    def test_non_participant_cannot_dismiss(self) -> None:
+        self.client.force_login(self.other_user)
+        response = self.client.post(self.dismiss_url, secure=True)
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(TournamentPhotoPromptDismissal.objects.exists())

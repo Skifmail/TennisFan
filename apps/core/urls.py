@@ -10,6 +10,21 @@ urlpatterns = [
     path("", views.home, name="home"),
     path("platform/dashboard/", views.platform_dashboard, name="platform_dashboard"),
     path(
+        "platform/dashboard/activity/announce/",
+        views.platform_activity_announce,
+        name="platform_activity_announce",
+    ),
+    path(
+        "platform/dashboard/activity/announce/<int:event_id>/edit/",
+        views.platform_activity_announce_edit,
+        name="platform_activity_announce_edit",
+    ),
+    path(
+        "platform/dashboard/activity/announce/<int:event_id>/delete/",
+        views.platform_activity_announce_delete,
+        name="platform_activity_announce_delete",
+    ),
+    path(
         "platform/dashboard/players/export/",
         views.platform_players_export,
         name="platform_players_export",

@@ -1259,6 +1259,134 @@
     padding-bottom: var(--spacing-xl);
 }
 
+.tf-brand-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.18rem 0.7rem 0.18rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid rgb(196 165 116 / 70%);
+    background: rgb(8 24 20 / 92%);
+    line-height: 1.2;
+}
+
+.tf-brand-badge__dot {
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 50%;
+    background: #c4a574;
+    flex-shrink: 0;
+}
+
+.tf-brand-badge__name {
+    color: #e8e4dc;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.tf-brand-badge__fan {
+    color: #c4a574;
+}
+
+.club-dashboard-activity__badge--announcement {
+    color: #f6e7b8;
+    background: rgba(201, 168, 76, 0.16);
+    border-color: rgba(201, 168, 76, 0.4);
+}
+
+.club-dashboard-announce {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+    margin: 0 0 16px;
+    padding: 14px;
+    border: 1px solid rgba(201, 168, 76, 0.28);
+    border-radius: 14px;
+    background: rgba(8, 24, 20, 0.72);
+}
+
+.club-dashboard-announce__label {
+    display: block;
+    margin: 0 0 8px;
+    color: rgba(232, 228, 220, 0.82);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.club-dashboard-announce textarea {
+    width: 100%;
+    min-height: 72px;
+    resize: vertical;
+}
+
+.club-dashboard-announce__submit {
+    height: 40px;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .club-dashboard-announce {
+        grid-template-columns: 1fr;
+    }
+}
+
+.home-activity-announce {
+    margin: 0 0 1rem;
+}
+
+.home-activity__body {
+    min-width: 0;
+}
+
+.activity-announce-manage {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.8rem;
+    align-items: center;
+    margin-top: 0.4rem;
+}
+
+.activity-announce-manage__edit {
+    min-width: 0;
+}
+
+.activity-announce-manage details[open] {
+    flex: 1 1 100%;
+}
+
+.activity-announce-manage summary {
+    cursor: pointer;
+    list-style: none;
+    color: #c4a574;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.activity-announce-manage summary::-webkit-details-marker {
+    display: none;
+}
+
+.activity-announce-manage__form {
+    display: grid;
+    gap: 0.45rem;
+    margin-top: 0.45rem;
+}
+
+.activity-announce-manage__form textarea {
+    width: 100%;
+    min-height: 4.5rem;
+    resize: vertical;
+}
+
+.activity-announce-manage__delete .btn {
+    padding: 0.15rem 0.45rem;
+    color: #fca5a5;
+}
+
 .home-activity__title {
     display: inline-flex;
     align-items: center;

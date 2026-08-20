@@ -585,6 +585,7 @@ class PlatformActivityEvent(models.Model):
         FANCOIN_CHARGE = "fancoin_charge", "Списание FAN-коинов"
         FANCOIN_REFUND = "fancoin_refund", "Возврат FAN-коинов"
         PHOTO_ADDED = "photo_added", "Добавлено фото"
+        ADMIN_ANNOUNCEMENT = "admin_announcement", "Сообщение"
 
     #: Типы событий, относящиеся к оплатам (для подсветки и группировки в UI).
     PAYMENT_EVENT_TYPES = frozenset(
@@ -615,6 +616,7 @@ class PlatformActivityEvent(models.Model):
             EventType.TRAINING_ENROLLED,
             EventType.COMMENT_ADDED,
             EventType.PHOTO_ADDED,
+            EventType.ADMIN_ANNOUNCEMENT,
         }
     )
 
@@ -763,7 +765,7 @@ class PlatformActivityEvent(models.Model):
 
         Returns:
             str: Один из «payment», «registration», «match», «tournament»,
-            «sparring», «photo», «default».
+            «sparring», «photo», «announcement», «default».
         """
         et = self.EventType
         if self.is_payment:
@@ -810,12 +812,22 @@ class PlatformActivityEvent(models.Model):
             return "comment"
         if self.event_type == et.PHOTO_ADDED:
             return "photo"
+        if self.event_type == et.ADMIN_ANNOUNCEMENT:
+            return "announcement"
         if self.event_type in {
             et.FANCOIN_CHARGE,
             et.FANCOIN_REFUND,
         }:
             return "fancoin"
         return "default"
+
+    def shows_brand_actor(self) -> bool:
+        """Нужно ли вместо ФИО показывать бейдж TennisFan.
+
+        Returns:
+            bool: True для официальных сообщений платформы.
+        """
+        return bool(self.event_type == self.EventType.ADMIN_ANNOUNCEMENT)
 
     def get_public_target_url(self) -> str:
         """Вернуть публичную ссылку события, скрывая адреса админки.
@@ -837,7 +849,7 @@ class PlatformActivityEvent(models.Model):
             str: Ссылка на профиль игрока либо пустая строка.
         """
         actor = self.actor
-        if actor is None:
+        if self.shows_brand_actor() or actor is None:
             return ""
         player = getattr(actor, "player", None)
         if player is None or getattr(player, "is_bye", False):

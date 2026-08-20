@@ -949,6 +949,10 @@
 </div>
 {% endblock %}
 
+{% block modals %}
+{% include "tournaments/_photo_upload_prompt.html" %}
+{% endblock %}
+
 {% block extra_js %}
 {{ block.super }}
 {% include "clubs/_cancel_tournament_modal.html" %}

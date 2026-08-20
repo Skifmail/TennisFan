@@ -1,0 +1,15 @@
+<form
+    method="post"
+    action="{% url 'platform_activity_announce' %}"
+    class="club-dashboard-announce{% if extra_class %} {{ extra_class }}{% endif %}"
+>
+    {% csrf_token %}
+    {% if next_page %}
+    <input type="hidden" name="next" value="{{ next_page }}">
+    {% endif %}
+    <label class="club-dashboard-announce__field">
+        <span class="club-dashboard-announce__label">Сообщение в ленту событий</span>
+        <textarea name="message" class="form-control" rows="3" maxlength="500" required placeholder="Текст, который увидят все посетители главной"></textarea>
+    </label>
+    <button type="submit" class="btn btn-primary club-dashboard-announce__submit">Отправить в ленту</button>
+</form>

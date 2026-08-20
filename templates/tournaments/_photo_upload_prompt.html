@@ -1,0 +1,156 @@
+{% if show_photo_upload_prompt and photo_prompt_tournament %}
+<div id="tournament-photo-upload-prompt"
+     class="modal-overlay club-confirm-modal photo-upload-prompt"
+     style="display:none;"
+     aria-hidden="true"
+     data-photo-prompt
+     data-tournament-id="{{ photo_prompt_tournament.pk }}"
+     data-dismiss-url="{% url 'tournament_photo_prompt_dismiss' slug=photo_prompt_tournament.slug %}">
+    <div class="modal-dialog club-confirm-modal__dialog photo-upload-prompt__dialog"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="photo-upload-prompt-title"
+         aria-describedby="photo-upload-prompt-text">
+        <div class="club-confirm-modal__eyebrow">Фотогалерея турнира</div>
+        <h3 id="photo-upload-prompt-title" class="modal-dialog__title club-confirm-modal__title">
+            Участвуете в этом турнире?
+        </h3>
+        <p id="photo-upload-prompt-text" class="modal-dialog__text club-confirm-modal__text">
+            Поделитесь впечатлениями — загрузите фотографии с турнира!
+        </p>
+        <form method="post"
+              action="{% url 'tournament_photo_upload' slug=photo_prompt_tournament.slug %}"
+              enctype="multipart/form-data"
+              class="photo-upload-prompt__form"
+              data-photo-prompt-form>
+            {% csrf_token %}
+            <div class="tournament-photos__file-picker photo-upload-prompt__picker" data-file-picker>
+                <input id="photo-prompt-upload-input"
+                       type="file"
+                       name="image"
+                       accept="image/*"
+                       required
+                       class="tournament-photos__file-picker-input">
+                <label for="photo-prompt-upload-input" class="tournament-photos__file-picker-btn">
+                    Выберите файл
+                </label>
+                <span class="tournament-photos__file-picker-name" data-file-name>Файл не выбран</span>
+            </div>
+            <label class="photo-upload-prompt__caption">
+                <span>Подпись</span>
+                <input type="text" name="caption" maxlength="200" placeholder="Необязательно" class="form-control">
+            </label>
+            <label class="photo-upload-prompt__check">
+                <input type="checkbox" data-photo-prompt-dont-remind>
+                <span>Не напоминать больше</span>
+            </label>
+            <div class="modal-dialog__actions club-confirm-modal__actions">
+                <button type="button"
+                        class="btn btn-sm club-confirm-modal__btn club-confirm-modal__btn--secondary"
+                        data-photo-prompt-later>
+                    Позже
+                </button>
+                <button type="submit"
+                        class="btn btn-sm btn-primary club-confirm-modal__btn club-confirm-modal__btn--primary">
+                    Загрузить
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+(function () {
+    var overlay = document.querySelector('[data-photo-prompt]');
+    if (!overlay) return;
+
+    var tournamentId = overlay.getAttribute('data-tournament-id');
+    var storageKey = 'tennison:photo-prompt-later:' + tournamentId;
+
+    try {
+        if (sessionStorage.getItem(storageKey) === '1') {
+            return;
+        }
+    } catch (err) {}
+
+    function showPrompt() {
+        overlay.style.display = 'flex';
+        overlay.setAttribute('aria-hidden', 'false');
+        var laterBtn = overlay.querySelector('[data-photo-prompt-later]');
+        if (laterBtn) laterBtn.focus();
+    }
+
+    function hidePrompt() {
+        overlay.style.display = 'none';
+        overlay.setAttribute('aria-hidden', 'true');
+    }
+
+    function markLater() {
+        try {
+            sessionStorage.setItem(storageKey, '1');
+        } catch (err) {}
+        hidePrompt();
+    }
+
+    function dontRemindChecked() {
+        var box = overlay.querySelector('[data-photo-prompt-dont-remind]');
+        return Boolean(box && box.checked);
+    }
+
+    function dismissThen(callback) {
+        var url = overlay.getAttribute('data-dismiss-url');
+        var csrf = overlay.querySelector('[name=csrfmiddlewaretoken]');
+        var body = new FormData();
+        if (csrf) {
+            body.append('csrfmiddlewaretoken', csrf.value);
+        }
+        fetch(url, {
+            method: 'POST',
+            body: body,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).finally(callback);
+    }
+
+    function closeAsLater() {
+        if (dontRemindChecked()) {
+            dismissThen(markLater);
+            return;
+        }
+        markLater();
+    }
+
+    var laterBtn = overlay.querySelector('[data-photo-prompt-later]');
+    if (laterBtn) {
+        laterBtn.addEventListener('click', closeAsLater);
+    }
+
+    overlay.addEventListener('click', function (event) {
+        if (event.target === overlay) {
+            closeAsLater();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && overlay.style.display !== 'none') {
+            closeAsLater();
+        }
+    });
+
+    var form = overlay.querySelector('[data-photo-prompt-form]');
+    if (form) {
+        form.addEventListener('submit', function (event) {
+            if (!dontRemindChecked() || form.getAttribute('data-dismissed') === '1') {
+                return;
+            }
+            event.preventDefault();
+            dismissThen(function () {
+                form.setAttribute('data-dismissed', '1');
+                form.submit();
+            });
+        });
+    }
+
+    showPrompt();
+})();
+</script>
+{% endif %}

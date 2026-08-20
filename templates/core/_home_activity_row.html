@@ -4,7 +4,9 @@
         <span class="home-activity__time">{{ event.created_at|date:"H:i" }}</span>
     </div>
     <div class="home-activity__cell home-activity__cell--actor">
-        {% if event.get_actor_profile_url %}
+        {% if event.shows_brand_actor %}
+        {% include 'core/_tennisfan_brand_badge.html' %}
+        {% elif event.get_actor_profile_url %}
         <a href="{{ event.get_actor_profile_url }}" class="home-activity__actor">{{ event.get_actor_display }}</a>
         {% else %}
         <span class="home-activity__actor">{{ event.get_actor_display }}</span>
@@ -12,14 +14,17 @@
     </div>
     <div class="home-activity__cell home-activity__cell--action">
         <span class="club-dashboard-activity__badge club-dashboard-activity__badge--{{ event.get_tone }}">{{ event.get_event_type_display }}</span>
-        {% if event.description %}
-        <span class="home-activity__desc">
-            {% if event.get_public_target_url %}
-            <a href="{{ event.get_public_target_url }}">{{ event.description }}</a>
-            {% else %}
-            {{ event.description }}
+        <div class="home-activity__body">
+            {% if event.description %}
+            <span class="home-activity__desc">
+                {% if event.get_public_target_url %}
+                <a href="{{ event.get_public_target_url }}">{{ event.description }}</a>
+                {% else %}
+                {{ event.description }}
+                {% endif %}
+            </span>
             {% endif %}
-        </span>
-        {% endif %}
+            {% include 'core/_platform_activity_announce_manage.html' %}
+        </div>
     </div>
 </article>

@@ -65,9 +65,11 @@ from .olympic_consolation import generate_bracket as olympic_generate_bracket
 from .photo_services import (
     can_participant_delete_photo,
     can_participant_upload_photo,
+    dismiss_photo_upload_prompt,
     get_next_photo_order,
     get_participant_photo_count,
     is_active_tournament_participant,
+    should_show_photo_upload_prompt,
 )
 from .platform_home import (
     CLUB_FILTER_CLUB_ONLY,
@@ -1222,6 +1224,17 @@ def _get_participant_photo_context(request, tournament):
         "participant_photo_limit_reached": limit_reached,
         "is_active_tournament_participant": is_active_participant,
         "current_player": player,
+        **_get_photo_upload_prompt_context(request, tournament),
+    }
+
+
+def _get_photo_upload_prompt_context(request, tournament):
+    """Контекст всплывающего напоминания загрузить фото с турнира."""
+    player = _get_request_player(request)
+    show = should_show_photo_upload_prompt(tournament, player)
+    return {
+        "show_photo_upload_prompt": show,
+        "photo_prompt_tournament": tournament if show else None,
     }
 
 
@@ -1306,6 +1319,26 @@ def tournament_photo_delete(request, slug, pk):
     photo.delete()
     messages.success(request, "Фото удалено.")
     return redirect("tournament_detail", slug=slug)
+
+
+@login_required
+def tournament_photo_prompt_dismiss(request, slug):
+    """Отключить напоминание загрузить фото в галерею этого турнира."""
+    if request.method != "POST":
+        return redirect("tournament_detail", slug=slug)
+
+    tournament = get_object_or_404(Tournament, slug=slug)
+    player = _get_request_player(request)
+    if not player or not is_active_tournament_participant(tournament, player):
+        from django.http import HttpResponseForbidden
+
+        return HttpResponseForbidden(
+            "Отключить напоминание может только участник турнира."
+        )
+
+    dismiss_photo_upload_prompt(tournament, player)
+    fallback = reverse("tournament_detail", kwargs={"slug": slug})
+    return redirect(_get_safe_next_url(request, fallback))
 
 
 def _tournament_manage_get_any_tournament(request, slug):
@@ -3170,6 +3203,7 @@ def tournament_tables_detail(request, slug):
         "kpi_three_set_pct": dashboard.kpi["three_set_pct"],
         "kpi_tiebreaks": dashboard.kpi["tiebreaks"],
         "kpi_walkovers": dashboard.kpi["walkovers"],
+        **_get_photo_upload_prompt_context(request, tournament),
     }
     return render(request, "tournaments/tables_detail.html", context)
 
@@ -3285,6 +3319,11 @@ def match_detail(request, pk):
             "season_points_player2": season_points_p2,
             "opponents": opponents,
             **_get_club_panel_context_for_tournament(request, match.tournament),
+            **(
+                _get_photo_upload_prompt_context(request, match.tournament)
+                if match.tournament_id
+                else {}
+            ),
         },
     )
 

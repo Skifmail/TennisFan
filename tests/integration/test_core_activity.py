@@ -407,7 +407,7 @@ class PlatformActivityFeedTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["home_activity_new_count"], 0)
         self.assertNotContains(response, "home-activity__row--new")
-        self.assertNotContains(response, "Новые события - посмотреть")
+        self.assertNotContains(response, 'class="home-activity-nudge"')
         self.assertIn(HOME_ACTIVITY_SEEN_COOKIE, response.cookies)
         latest_id = max(event.id for event in response.context["home_activity_events"])
         self.assertEqual(
@@ -415,11 +415,10 @@ class PlatformActivityFeedTestCase(TestCase):
         )
 
     def test_home_feed_script_requires_real_viewport_intersection(self) -> None:
-        """Скрипт ленты не должен верить голому isIntersecting — Safari на iPhone врёт."""
+        """Скрипт ленты помнит просмотр в localStorage и не снимает плашку на загрузке."""
         response = self.client.get(reverse("home"))
-        self.assertContains(response, "intersectionRatio")
+        self.assertContains(response, "localStorage")
         self.assertContains(response, "getBoundingClientRect")
-        self.assertContains(response, "visualViewport")
         self.assertContains(response, "scrollIntoView")
 
     def test_returning_visitor_sees_new_home_activity(self) -> None:

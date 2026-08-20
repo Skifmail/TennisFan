@@ -15030,6 +15030,11 @@ a.match-details-value__lead:hover {
     color: #fca5a5;
 }
 
+#home-activity,
+#platform-activity {
+    scroll-margin-top: calc(4.75rem + env(safe-area-inset-top, 0px));
+}
+
 .home-activity__title {
     display: inline-flex;
     align-items: center;
@@ -15052,19 +15057,26 @@ a.match-details-value__lead:hover {
 }
 
 .home-activity-nudge {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    margin: 0 0 var(--spacing-md);
+    width: max-content;
+    max-width: 100%;
+    margin: 0 auto var(--spacing-md);
     padding: 0.55rem 1.05rem;
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
     border-radius: 999px;
-    border: 1px solid rgb(74 222 128 / 55%);
-    background: rgb(22 101 52 / 55%);
+    border: 1px solid rgba(74, 222, 128, 0.7);
+    background: rgba(22, 101, 52, 0.72);
     color: #ecfdf5;
     font-size: 0.88rem;
     font-weight: 700;
     text-decoration: none;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
     animation: home-activity-nudge-pulse 1.8s ease-in-out infinite;
 }
 
@@ -15096,12 +15108,6 @@ a.match-details-value__lead:hover {
     animation: home-activity-live 2.1s ease-out infinite;
 }
 
-@property --home-activity-angle {
-    syntax: "<angle>";
-    inherits: false;
-    initial-value: 0deg;
-}
-
 .home-activity {
     position: relative;
     isolation: isolate;
@@ -15115,13 +15121,14 @@ a.match-details-value__lead:hover {
 .home-activity:not(.home-activity--empty)::before {
     content: "";
     position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1.5px;
+    top: 50%;
+    left: 50%;
+    width: 200%;
+    height: 200%;
     pointer-events: none;
-    z-index: 3;
+    z-index: 0;
     background: conic-gradient(
-        from var(--home-activity-angle),
+        from 0deg,
         transparent 0deg,
         transparent 300deg,
         rgb(166 130 74 / 0%) 318deg,
@@ -15130,15 +15137,19 @@ a.match-details-value__lead:hover {
         rgb(212 179 106 / 85%) 356deg,
         transparent 360deg
     );
-    mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-    mask-composite: exclude;
-    -webkit-mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
+    transform: translate(-50%, -50%);
+    will-change: transform;
     animation: home-activity-border-spin 7s linear infinite;
+}
+
+.home-activity:not(.home-activity--empty)::after {
+    content: "";
+    position: absolute;
+    inset: 1.5px;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(180deg, rgb(8 29 23 / 98%) 0%, rgb(6 21 17 / 98%) 100%);
 }
 
 .home-activity__row {
@@ -15217,8 +15228,12 @@ a.match-details-value__lead:hover {
 }
 
 @keyframes home-activity-border-spin {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+
     to {
-        --home-activity-angle: 360deg;
+        transform: translate(-50%, -50%) rotate(360deg);
     }
 }
 

@@ -55,7 +55,7 @@
             </aside>
         </section>
 
-        <section class="club-dashboard-panel club-dashboard-panel--activity">
+        <section class="club-dashboard-panel club-dashboard-panel--activity" id="platform-activity">
             <div class="club-dashboard-panel__header">
                 <div>
                     <p class="club-dashboard-panel__eyebrow">Активность платформы</p>
@@ -172,6 +172,7 @@
             </div>
             {% endif %}
         </section>
+        {% include 'core/_scroll_to_focus.html' with focus_value='activity' target_id='platform-activity' %}
 
         <section class="club-dashboard-kpi-grid">
             {% for card in summary_cards %}

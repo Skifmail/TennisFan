@@ -414,6 +414,14 @@ class PlatformActivityFeedTestCase(TestCase):
             response.cookies[HOME_ACTIVITY_SEEN_COOKIE].value, str(latest_id)
         )
 
+    def test_home_feed_script_requires_real_viewport_intersection(self) -> None:
+        """Скрипт ленты не должен верить голому isIntersecting — Safari на iPhone врёт."""
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, "intersectionRatio")
+        self.assertContains(response, "getBoundingClientRect")
+        self.assertContains(response, "visualViewport")
+        self.assertContains(response, "scrollIntoView")
+
     def test_returning_visitor_sees_new_home_activity(self) -> None:
         """После новых событий возвращающийся посетитель видит бейдж и плашку."""
         old_user = User.objects.create_user(
@@ -577,7 +585,7 @@ class PlatformActivityFeedTestCase(TestCase):
             },
         )
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, "/#home-activity")
+        self.assertEqual(response.url, "/?focus=home-activity")
         self.assertTrue(
             PlatformActivityEvent.objects.filter(
                 event_type=PlatformActivityEvent.EventType.ADMIN_ANNOUNCEMENT,
@@ -611,7 +619,7 @@ class PlatformActivityFeedTestCase(TestCase):
             {"message": "Новый текст объявления.", "next": "home"},
         )
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, "/#home-activity")
+        self.assertEqual(response.url, "/?focus=home-activity")
         event.refresh_from_db()
         self.assertEqual(event.description, "Новый текст объявления.")
         self.assertEqual(event.created_at, created_at)
@@ -630,7 +638,7 @@ class PlatformActivityFeedTestCase(TestCase):
             {"next": "home"},
         )
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, "/#home-activity")
+        self.assertEqual(response.url, "/?focus=home-activity")
         self.assertFalse(PlatformActivityEvent.objects.filter(pk=event_id).exists())
 
         home = self.client.get(reverse("home"))

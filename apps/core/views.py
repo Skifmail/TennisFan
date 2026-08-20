@@ -1246,13 +1246,14 @@ def _announce_redirect_response(next_page: str) -> HttpResponse:
 
     Args:
         next_page: ``home`` — к ленте на главной, иначе панель платформы.
+            Якорь в URL не используем: Safari на редиректе его отбрасывает.
 
     Returns:
         HttpResponse: Редирект на разрешённую страницу.
     """
     if next_page == "home":
-        return HttpResponseRedirect(f"{reverse('home')}#home-activity")
-    return redirect("platform_dashboard")
+        return HttpResponseRedirect(f"{reverse('home')}?focus=home-activity")
+    return HttpResponseRedirect(f"{reverse('platform_dashboard')}?focus=activity")
 
 
 def _get_admin_announcement(event_id: int) -> PlatformActivityEvent | None:

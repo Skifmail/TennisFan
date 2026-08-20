@@ -13870,7 +13870,7 @@ a.match-details-value__lead:hover {
     margin-top: 0;
     position: relative;
     background: transparent;
-    overflow: hidden;
+    overflow: visible;
     display: block;
 }
 
@@ -15057,16 +15057,17 @@ a.match-details-value__lead:hover {
 }
 
 .home-activity-nudge {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    width: max-content;
+    width: auto;
     max-width: 100%;
+    min-height: 2.4rem;
     margin: 0 auto var(--spacing-md);
     padding: 0.55rem 1.05rem;
     position: relative;
-    z-index: 2;
+    z-index: 5;
     flex-shrink: 0;
     border-radius: 999px;
     border: 1px solid rgba(74, 222, 128, 0.7);
@@ -15075,8 +15076,6 @@ a.match-details-value__lead:hover {
     font-size: 0.88rem;
     font-weight: 700;
     text-decoration: none;
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
     animation: home-activity-nudge-pulse 1.8s ease-in-out infinite;
 }
 

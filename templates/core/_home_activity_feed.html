@@ -40,17 +40,101 @@
     var root = document.querySelector("[data-home-activity]");
     var section = document.getElementById("home-activity");
     var nudge = document.querySelector("[data-home-activity-nudge]");
+    var cookieName = (root && root.getAttribute("data-seen-cookie")) || "home_activity_seen";
+    var latestId = root ? parseInt(root.getAttribute("data-latest-id") || "0", 10) : 0;
     var done = false;
-    var observer = null;
 
-    function viewportHeight() {
-        if (window.visualViewport && window.visualViewport.height) {
-            return window.visualViewport.height;
+    function readStoredSeen() {
+        var fromCookie = 0;
+        var match = document.cookie.match(
+            new RegExp("(?:^|; )" + cookieName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]*)")
+        );
+        if (match) {
+            fromCookie = parseInt(decodeURIComponent(match[1]), 10) || 0;
         }
-        return window.innerHeight || document.documentElement.clientHeight || 0;
+        var fromStore = 0;
+        try {
+            fromStore = parseInt(window.localStorage.getItem(cookieName) || "", 10) || 0;
+        } catch (err) {}
+        var values = [fromCookie, fromStore].filter(function (n) { return n > 0; });
+        if (!values.length) {
+            return null;
+        }
+        return Math.min.apply(null, values);
     }
 
-    function isFeedVisible() {
+    function persistSeen(id) {
+        if (!id) {
+            return;
+        }
+        var secure = window.location.protocol === "https:" ? "; secure" : "";
+        document.cookie = cookieName + "=" + encodeURIComponent(String(id))
+            + "; path=/; max-age=31536000; samesite=lax" + secure;
+        try {
+            window.localStorage.setItem(cookieName, String(id));
+        } catch (err) {}
+    }
+
+    function bindNudge() {
+        if (!nudge || nudge.getAttribute("data-nudge-bound")) {
+            return;
+        }
+        nudge.setAttribute("data-nudge-bound", "1");
+        nudge.addEventListener("click", function () {
+            window.setTimeout(markSeen, 50);
+        });
+    }
+
+    function ensureNudge() {
+        if (nudge) {
+            return;
+        }
+        if (!latestId) {
+            return;
+        }
+        var seen = readStoredSeen();
+        if (seen !== null && latestId <= seen) {
+            return;
+        }
+        var host = document.querySelector(".hero-content--premium");
+        if (!host) {
+            return;
+        }
+        var link = document.createElement("a");
+        link.href = "#home-activity";
+        link.className = "home-activity-nudge";
+        link.setAttribute("data-home-activity-nudge", "");
+        var dot = document.createElement("span");
+        dot.className = "home-activity-nudge__dot";
+        dot.setAttribute("aria-hidden", "true");
+        link.appendChild(dot);
+        link.appendChild(document.createTextNode("Новые события - посмотреть"));
+        host.insertBefore(link, host.firstChild);
+        nudge = link;
+    }
+
+    function viewportHeight() {
+        var values = [];
+        if (window.visualViewport && window.visualViewport.height) {
+            values.push(window.visualViewport.height);
+        }
+        if (window.innerHeight) {
+            values.push(window.innerHeight);
+        }
+        if (document.documentElement && document.documentElement.clientHeight) {
+            values.push(document.documentElement.clientHeight);
+        }
+        if (window.screen && window.screen.availHeight) {
+            values.push(window.screen.availHeight);
+        }
+        var usable = values.filter(function (v) { return v >= 200 && v <= 1400; });
+        if (usable.length) {
+            return Math.min.apply(null, usable);
+        }
+        return values.length ? Math.min.apply(null, values) : 0;
+    }
+
+    function isFeedInViewport() {
         var target = section || root;
         if (!target) {
             return false;
@@ -60,78 +144,39 @@
         if (vh <= 0) {
             return false;
         }
-        return Math.min(rect.bottom, vh) - Math.max(rect.top, 0) > 32;
-    }
-
-    function stopWatching() {
-        done = true;
-        if (observer) {
-            observer.disconnect();
-            observer = null;
-        }
-        window.removeEventListener("scroll", onScrollOrResize);
-        window.removeEventListener("resize", onScrollOrResize);
-        if (window.visualViewport) {
-            window.visualViewport.removeEventListener("resize", onScrollOrResize);
-            window.visualViewport.removeEventListener("scroll", onScrollOrResize);
-        }
+        return rect.top < vh - 64 && rect.bottom > 80;
     }
 
     function markSeen() {
-        if (!root) {
+        if (done) {
             return;
         }
-        var latest = root.getAttribute("data-latest-id");
-        var cookieName = root.getAttribute("data-seen-cookie") || "home_activity_seen";
-        if (latest) {
-            var secure = window.location.protocol === "https:" ? "; secure" : "";
-            document.cookie = cookieName + "=" + encodeURIComponent(latest)
-                + "; path=/; max-age=31536000; samesite=lax" + secure;
-        }
-        if (nudge) {
-            nudge.remove();
+        done = true;
+        persistSeen(latestId);
+        if (nudge && nudge.parentNode) {
+            nudge.parentNode.removeChild(nudge);
             nudge = null;
         }
+        window.removeEventListener("scroll", onScroll);
     }
 
-    function reveal() {
-        if (done || !isFeedVisible()) {
+    function onScroll() {
+        var y = window.pageYOffset || (window.visualViewport && window.visualViewport.pageTop) || 0;
+        if (y < 48) {
             return;
         }
         if (root) {
             root.classList.add("home-activity--inview");
         }
-        markSeen();
-        stopWatching();
+        if (isFeedInViewport()) {
+            markSeen();
+        }
     }
 
-    function onScrollOrResize() {
-        reveal();
+    ensureNudge();
+    bindNudge();
+    if (root) {
+        window.addEventListener("scroll", onScroll, { passive: true });
     }
-
-    if (!root) {
-        return;
-    }
-
-    if ("IntersectionObserver" in window) {
-        observer = new IntersectionObserver(function (entries) {
-            var entry = entries[0];
-            if (!entry || entry.intersectionRatio <= 0) {
-                return;
-            }
-            reveal();
-        }, { threshold: [0, 0.01, 0.15] });
-        observer.observe(section || root);
-    }
-
-    window.addEventListener("scroll", onScrollOrResize, { passive: true });
-    window.addEventListener("resize", onScrollOrResize, { passive: true });
-    if (window.visualViewport) {
-        window.visualViewport.addEventListener("resize", onScrollOrResize);
-        window.visualViewport.addEventListener("scroll", onScrollOrResize);
-    }
-    requestAnimationFrame(function () {
-        requestAnimationFrame(reveal);
-    });
 })();
 </script>

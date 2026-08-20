@@ -1,0 +1,51 @@
+<script>
+(function () {
+    var expected = "{{ focus_value|escapejs }}";
+    var targetId = "{{ target_id|escapejs }}";
+    var pinned = false;
+
+    function shouldPin() {
+        try {
+            return new URLSearchParams(window.location.search).get("focus") === expected;
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function pin() {
+        if (!shouldPin()) {
+            return;
+        }
+        if ("scrollRestoration" in history) {
+            history.scrollRestoration = "manual";
+        }
+        var target = document.getElementById(targetId);
+        if (!target) {
+            return;
+        }
+        target.scrollIntoView({ block: "start" });
+        pinned = true;
+    }
+
+    function cleanUrl() {
+        if (!pinned || !shouldPin() || !window.history || !window.history.replaceState) {
+            return;
+        }
+        var params = new URLSearchParams(window.location.search);
+        params.delete("focus");
+        var query = params.toString();
+        window.history.replaceState(
+            null,
+            "",
+            window.location.pathname + (query ? "?" + query : "")
+        );
+    }
+
+    pin();
+    window.addEventListener("pageshow", pin);
+    window.addEventListener("load", function () {
+        pin();
+        cleanUrl();
+    });
+})();
+</script>

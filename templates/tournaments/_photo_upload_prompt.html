@@ -63,15 +63,6 @@
     var overlay = document.querySelector('[data-photo-prompt]');
     if (!overlay) return;
 
-    var tournamentId = overlay.getAttribute('data-tournament-id');
-    var storageKey = 'tennison:photo-prompt-later:' + tournamentId;
-
-    try {
-        if (sessionStorage.getItem(storageKey) === '1') {
-            return;
-        }
-    } catch (err) {}
-
     function showPrompt() {
         overlay.style.display = 'flex';
         overlay.setAttribute('aria-hidden', 'false');
@@ -82,13 +73,6 @@
     function hidePrompt() {
         overlay.style.display = 'none';
         overlay.setAttribute('aria-hidden', 'true');
-    }
-
-    function markLater() {
-        try {
-            sessionStorage.setItem(storageKey, '1');
-        } catch (err) {}
-        hidePrompt();
     }
 
     function dontRemindChecked() {
@@ -113,10 +97,10 @@
 
     function closeAsLater() {
         if (dontRemindChecked()) {
-            dismissThen(markLater);
+            dismissThen(hidePrompt);
             return;
         }
-        markLater();
+        hidePrompt();
     }
 
     var laterBtn = overlay.querySelector('[data-photo-prompt-later]');

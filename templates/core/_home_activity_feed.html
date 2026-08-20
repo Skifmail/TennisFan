@@ -34,10 +34,48 @@
         {% endif %}
     </div>
 </section>
+{% include 'core/_scroll_to_focus.html' with focus_value='home-activity' target_id='home-activity' %}
 <script>
 (function () {
     var root = document.querySelector("[data-home-activity]");
+    var section = document.getElementById("home-activity");
     var nudge = document.querySelector("[data-home-activity-nudge]");
+    var done = false;
+    var observer = null;
+
+    function viewportHeight() {
+        if (window.visualViewport && window.visualViewport.height) {
+            return window.visualViewport.height;
+        }
+        return window.innerHeight || document.documentElement.clientHeight || 0;
+    }
+
+    function isFeedVisible() {
+        var target = section || root;
+        if (!target) {
+            return false;
+        }
+        var rect = target.getBoundingClientRect();
+        var vh = viewportHeight();
+        if (vh <= 0) {
+            return false;
+        }
+        return Math.min(rect.bottom, vh) - Math.max(rect.top, 0) > 32;
+    }
+
+    function stopWatching() {
+        done = true;
+        if (observer) {
+            observer.disconnect();
+            observer = null;
+        }
+        window.removeEventListener("scroll", onScrollOrResize);
+        window.removeEventListener("resize", onScrollOrResize);
+        if (window.visualViewport) {
+            window.visualViewport.removeEventListener("resize", onScrollOrResize);
+            window.visualViewport.removeEventListener("scroll", onScrollOrResize);
+        }
+    }
 
     function markSeen() {
         if (!root) {
@@ -52,14 +90,23 @@
         }
         if (nudge) {
             nudge.remove();
+            nudge = null;
         }
     }
 
     function reveal() {
+        if (done || !isFeedVisible()) {
+            return;
+        }
         if (root) {
             root.classList.add("home-activity--inview");
         }
         markSeen();
+        stopWatching();
+    }
+
+    function onScrollOrResize() {
+        reveal();
     }
 
     if (!root) {
@@ -67,16 +114,24 @@
     }
 
     if ("IntersectionObserver" in window) {
-        var observer = new IntersectionObserver(function (entries) {
-            if (!entries.some(function (entry) { return entry.isIntersecting; })) {
+        observer = new IntersectionObserver(function (entries) {
+            var entry = entries[0];
+            if (!entry || entry.intersectionRatio <= 0) {
                 return;
             }
             reveal();
-            observer.disconnect();
-        }, { threshold: 0.18 });
-        observer.observe(root);
-        return;
+        }, { threshold: [0, 0.01, 0.15] });
+        observer.observe(section || root);
     }
-    reveal();
+
+    window.addEventListener("scroll", onScrollOrResize, { passive: true });
+    window.addEventListener("resize", onScrollOrResize, { passive: true });
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", onScrollOrResize);
+        window.visualViewport.addEventListener("scroll", onScrollOrResize);
+    }
+    requestAnimationFrame(function () {
+        requestAnimationFrame(reveal);
+    });
 })();
 </script>

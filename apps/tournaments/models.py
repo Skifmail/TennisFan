@@ -1427,6 +1427,10 @@ class Match(models.Model):
         """Показывать бейдж Rt.: Retired 6:0 или авто-RT по дедлайну."""
         return self.is_walkover_loss() or self.is_deadline_auto_rt()
 
+    def can_reopen_by_deadline(self) -> bool:
+        """Матч можно вернуть в игру, сменив дедлайн (авто-RT или клубный WO)."""
+        return self.is_deadline_auto_rt() or self.is_no_show_walkover()
+
     def is_no_show_walkover(self) -> bool:
         """Walkover без счёта: матч не состоялся (неявка), не Retired.
 

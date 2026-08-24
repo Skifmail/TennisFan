@@ -609,8 +609,51 @@
     });
 })();
 </script>
+<div id="deadline-reopen-confirm-modal" class="modal-overlay club-confirm-modal" style="display:none;" aria-hidden="true">
+    <div class="modal-dialog club-confirm-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="deadline-reopen-confirm-title" aria-describedby="deadline-reopen-confirm-text">
+        <div class="club-confirm-modal__eyebrow">Подтверждение</div>
+        <h3 id="deadline-reopen-confirm-title" class="modal-dialog__title club-confirm-modal__title">Вернуть матч в запланированные?</h3>
+        <p id="deadline-reopen-confirm-text" class="modal-dialog__text club-confirm-modal__text">Технический результат будет снят. Участникам уйдут уведомления в личный кабинет и на email.</p>
+        <div class="modal-dialog__actions club-confirm-modal__actions">
+            <button type="button" class="btn btn-sm club-confirm-modal__btn club-confirm-modal__btn--secondary" data-deadline-reopen-cancel>Отмена</button>
+            <button type="button" class="btn btn-sm btn-primary club-confirm-modal__btn club-confirm-modal__btn--primary" data-deadline-reopen-confirm>Вернуть в игру</button>
+        </div>
+    </div>
+</div>
 <script>
 (function() {
+    var reopenModal = document.getElementById('deadline-reopen-confirm-modal');
+    var reopenText = document.getElementById('deadline-reopen-confirm-text');
+    var reopenTitle = document.getElementById('deadline-reopen-confirm-title');
+    var reopenConfirmBtn = reopenModal
+        ? reopenModal.querySelector('[data-deadline-reopen-confirm]')
+        : null;
+    var pendingDeadlineForm = null;
+
+    function closeReopenModal() {
+        pendingDeadlineForm = null;
+        if (!reopenModal) return;
+        reopenModal.style.display = 'none';
+        reopenModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function openReopenModal(form) {
+        pendingDeadlineForm = form;
+        var kind = form.getAttribute('data-deadline-reopen') || '';
+        if (reopenTitle) {
+            reopenTitle.textContent = 'Вернуть матч в запланированные?';
+        }
+        if (reopenText) {
+            reopenText.textContent = kind === 'wo'
+                ? 'Walkover (неявка) будет снят, штраф рейтинга откатится. Участникам уйдут уведомления в личный кабинет и на email.'
+                : 'Автоматический RT 0:0 будет снят. Участникам уйдут уведомления в личный кабинет и на email.';
+        }
+        if (!reopenModal) return;
+        reopenModal.style.display = 'flex';
+        reopenModal.setAttribute('aria-hidden', 'false');
+        if (reopenConfirmBtn) reopenConfirmBtn.focus();
+    }
+
     document.querySelectorAll('[data-deadline-form]').forEach(function(form) {
         var input = form.querySelector('.bracket-deadline-input');
         var btn = form.querySelector('.bracket-deadline-btn');
@@ -628,10 +671,39 @@
             syncDeadlineBtn();
             if (btn.disabled) {
                 e.preventDefault();
+                return;
+            }
+            if (form.getAttribute('data-deadline-reopen') && reopenModal) {
+                e.preventDefault();
+                openReopenModal(form);
             }
         });
         syncDeadlineBtn();
     });
+
+    if (reopenConfirmBtn) {
+        reopenConfirmBtn.addEventListener('click', function() {
+            if (!pendingDeadlineForm) return;
+            var form = pendingDeadlineForm;
+            closeReopenModal();
+            form.submit();
+        });
+    }
+    if (reopenModal) {
+        reopenModal.addEventListener('click', function(event) {
+            if (
+                event.target === reopenModal
+                || event.target.hasAttribute('data-deadline-reopen-cancel')
+            ) {
+                closeReopenModal();
+            }
+        });
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && reopenModal.style.display !== 'none') {
+                closeReopenModal();
+            }
+        });
+    }
 })();
 </script>
 <div id="walkover-confirm-modal" class="modal-overlay club-confirm-modal" style="display:none;" aria-hidden="true">

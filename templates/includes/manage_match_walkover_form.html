@@ -6,7 +6,7 @@
 <p class="bracket-overdue-note">Проставлен автоматический RT 0:0. Продлите дедлайн, чтобы снова открыть матч, или замените на Walkover (неявку) со штрафом.</p>
 {% endif %}
 {% if match.is_no_show_walkover %}
-<p class="bracket-overdue-note">Walkover (неявка) уже проставлен. Можно изменить, кому он засчитывается и какой штраф.</p>
+<p class="bracket-overdue-note">Walkover (неявка) уже проставлен. Можно изменить, кому он засчитывается и какой штраф. Продление дедлайна вернёт матч в запланированные и откатит штраф.</p>
 {% endif %}
 <form action="{% url 'tournament_manage_match_walkover' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-walkover-form" data-walkover-form data-default-penalty="40">
     {% csrf_token %}

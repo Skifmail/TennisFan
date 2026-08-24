@@ -41,7 +41,7 @@
         </div>
     </div>
     <div class="bracket-match-badge">RT</div>
-    <form action="{% url 'tournament_manage_match_deadline' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-deadline-form" data-deadline-form>
+    <form action="{% url 'tournament_manage_match_deadline' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-deadline-form" data-deadline-form{% if match.can_reopen_by_deadline %} data-deadline-reopen="{% if match.is_no_show_walkover %}wo{% else %}rt{% endif %}"{% endif %}>
         {% csrf_token %}
         <label class="bracket-deadline-label" for="deadline-{{ match.pk }}">Дедлайн</label>
         <input
@@ -66,6 +66,20 @@
         </div>
     </div>
     <div class="bracket-match-badge">WO</div>
+    <form action="{% url 'tournament_manage_match_deadline' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-deadline-form" data-deadline-form{% if match.can_reopen_by_deadline %} data-deadline-reopen="{% if match.is_no_show_walkover %}wo{% else %}rt{% endif %}"{% endif %}>
+        {% csrf_token %}
+        <label class="bracket-deadline-label" for="deadline-{{ match.pk }}">Дедлайн</label>
+        <input
+            id="deadline-{{ match.pk }}"
+            type="date"
+            name="deadline"
+            class="bracket-deadline-input"
+            value="{% if match.deadline %}{{ match.deadline|date:'Y-m-d' }}{% endif %}"
+            data-initial-deadline="{% if match.deadline %}{{ match.deadline|date:'Y-m-d' }}{% endif %}"
+            required
+        >
+        <button type="submit" class="btn btn-sm btn-primary bracket-submit-btn bracket-deadline-btn" disabled aria-disabled="true">Изменить дедлайн</button>
+    </form>
     {% include 'includes/manage_match_walkover_form.html' with match=match tournament=tournament %}
     {% elif match.status == 'completed' or match.status == 'walkover' %}
     <div class="bracket-match-players">
@@ -91,7 +105,7 @@
     {% if tournament.status == "cancelled" or tournament.status == "completed" %}
     <div class="bracket-match-pending">В этом статусе турнира редактирование результатов недоступно.</div>
     {% else %}
-    <form action="{% url 'tournament_manage_match_deadline' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-deadline-form" data-deadline-form>
+    <form action="{% url 'tournament_manage_match_deadline' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-deadline-form" data-deadline-form{% if match.can_reopen_by_deadline %} data-deadline-reopen="{% if match.is_no_show_walkover %}wo{% else %}rt{% endif %}"{% endif %}>
         {% csrf_token %}
         <label class="bracket-deadline-label" for="deadline-{{ match.pk }}">Дедлайн</label>
         <input

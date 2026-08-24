@@ -240,6 +240,42 @@ def revert_deadline_auto_rt(match: Match) -> None:
     logger.info("Reverted deadline auto RT: match %s", match.pk)
 
 
+def revert_no_show_walkover(match: Match) -> None:
+    """Откатить клубный Walkover (неявку): матч снова запланирован.
+
+    Штраф рейтинга и matches_played / matches_won возвращаются.
+    Продление дедлайна после неявки снова открывает матч.
+    """
+    if not match.is_no_show_walkover():
+        raise ValueError("Это не Walkover (неявка).")
+    old_winner_id = match.winner_id
+    old_winner_team_id = match.winner_team_id
+    _revert_old_walkover_effects(match)
+    match.status = Match.MatchStatus.SCHEDULED
+    match.winner = None
+    match.winner_team = None
+    match.completed_datetime = None
+    match.rating_status = Match.RatingCalcStatus.NOT_APPLICABLE
+    match.rating_delta_player1 = 0.0
+    match.rating_delta_player2 = 0.0
+    match.deadline_overdue_notified_at = None
+    match.walkover_no_show_side1 = False
+    match.walkover_no_show_side2 = False
+    for set_idx in (1, 2, 3):
+        setattr(match, f"player1_set{set_idx}", None)
+        setattr(match, f"player2_set{set_idx}", None)
+    match.save()
+    _sync_bracket_after_walkover_edit(
+        match,
+        old_winner_id=old_winner_id,
+        old_winner_team_id=old_winner_team_id,
+    )
+    if match.tournament_id:
+        tournament = Tournament.objects.get(pk=match.tournament_id)
+        _reopen_tournament_after_auto_rt_revert(tournament)
+    logger.info("Reverted no-show walkover: match %s", match.pk)
+
+
 def _reopen_tournament_after_auto_rt_revert(tournament: Tournament) -> None:
     """Вернуть турнир в ACTIVE и откатить очки за места после авто-RT.
 

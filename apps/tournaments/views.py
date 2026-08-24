@@ -2724,7 +2724,7 @@ def tournament_manage_match_deadline(request, slug, pk):
         return redirect("tournament_manage", slug=slug)
     if (
         tournament.status == TournamentStatus.COMPLETED
-        and not match.is_deadline_auto_rt()
+        and not match.can_reopen_by_deadline()
     ):
         messages.warning(
             request,
@@ -2732,7 +2732,7 @@ def tournament_manage_match_deadline(request, slug, pk):
         )
         return redirect("tournament_manage", slug=slug)
     if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-        if not match.is_deadline_auto_rt():
+        if not match.can_reopen_by_deadline():
             messages.warning(
                 request,
                 "Нельзя изменить дедлайн у завершённого матча.",
@@ -2766,6 +2766,10 @@ def tournament_manage_match_deadline(request, slug, pk):
         from .overdue import revert_deadline_auto_rt
 
         revert_deadline_auto_rt(match)
+    elif match.is_no_show_walkover():
+        from .overdue import revert_no_show_walkover
+
+        revert_no_show_walkover(match)
     else:
         match.save(update_fields=["deadline", "deadline_overdue_notified_at"])
 

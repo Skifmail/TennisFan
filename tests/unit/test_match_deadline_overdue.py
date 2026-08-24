@@ -16,6 +16,7 @@ from apps.tournaments.overdue import (
     notify_admins_match_deadline_overdue,
     replace_no_show_walkover,
     revert_deadline_auto_rt,
+    revert_no_show_walkover,
 )
 from apps.tournaments.rating import WALKOVER_NO_SHOW_PENALTY
 from apps.users.models import Notification
@@ -247,6 +248,31 @@ class ApplyNoShowWalkoverTestCase(TestCase):
         self.assertEqual(self.p2.total_points, 2485.0)
         self.assertEqual(self.match.rating_delta_player1, 0.0)
         self.assertEqual(self.match.rating_delta_player2, -15.0)
+
+    def test_revert_no_show_walkover_restores_rating_and_scheduled(self) -> None:
+        apply_no_show_walkover(self.match, loser=self.p2, notify=False)
+        self.match.refresh_from_db()
+        self.tournament.refresh_from_db()
+        self.assertEqual(self.match.status, Match.MatchStatus.WALKOVER)
+
+        revert_no_show_walkover(self.match)
+
+        self.match.refresh_from_db()
+        self.tournament.refresh_from_db()
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.assertEqual(self.match.status, Match.MatchStatus.SCHEDULED)
+        self.assertEqual(self.tournament.status, TournamentStatus.ACTIVE)
+        self.assertIsNone(self.match.winner_id)
+        self.assertFalse(self.match.is_no_show_walkover())
+        self.assertFalse(self.match.walkover_no_show_side1)
+        self.assertFalse(self.match.walkover_no_show_side2)
+        self.assertEqual(self.p1.total_points, 3000.0)
+        self.assertEqual(self.p2.total_points, 2500.0)
+        self.assertEqual(self.match.rating_delta_player1, 0.0)
+        self.assertEqual(self.match.rating_delta_player2, 0.0)
+        self.assertEqual(self.p1.matches_played, 12)
+        self.assertEqual(self.p2.matches_played, 12)
 
 
 class ReplaceNoShowWalkoverTestCase(TestCase):

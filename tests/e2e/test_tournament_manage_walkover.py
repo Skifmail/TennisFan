@@ -176,6 +176,35 @@ class TournamentManageWalkoverTestCase(TestCase):
         self.assertIn("Не начислять штраф", html)
         self.assertIn("walkover-penalty-input", html)
 
+    def test_extending_deadline_after_no_show_walkover_reopens_match(self) -> None:
+        from apps.tournaments.overdue import apply_no_show_walkover
+
+        apply_no_show_walkover(self.match, loser=self.p2, notify=False)
+        self.match.refresh_from_db()
+        self.assertTrue(self.match.is_no_show_walkover())
+
+        url = reverse(
+            "tournament_manage_match_deadline",
+            kwargs={"slug": self.tournament.slug, "pk": self.match.pk},
+        )
+        new_date = (date.today() + timedelta(days=10)).isoformat()
+        response = self.client.post(
+            url, {"deadline": new_date}, secure=True, follow=True
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.match.refresh_from_db()
+        self.tournament.refresh_from_db()
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.assertEqual(self.match.status, Match.MatchStatus.SCHEDULED)
+        self.assertEqual(self.tournament.status, TournamentStatus.ACTIVE)
+        self.assertIsNone(self.match.winner_id)
+        self.assertFalse(self.match.is_no_show_walkover())
+        self.assertIsNone(self.match.deadline_overdue_notified_at)
+        self.assertEqual(self.p1.total_points, 2800.0)
+        self.assertEqual(self.p2.total_points, 2600.0)
+
     def test_post_walkover_both_sides_assigns_penalty_to_each(self) -> None:
         url = reverse(
             "tournament_manage_match_walkover",
@@ -263,3 +292,9 @@ class TournamentManageWalkoverTestCase(TestCase):
         self.assertIn("Сохранить Walkover (неявку)", html)
         self.assertIn("walkover_side1", html)
         self.assertIn("checked", html)
+        self.assertIn("data-deadline-form", html)
+        self.assertIn("Изменить дедлайн", html)
+        self.assertIn('data-deadline-reopen="wo"', html)
+        self.assertIn("deadline-reopen-confirm-modal", html)
+        self.assertIn("Вернуть матч в запланированные?", html)
+        self.assertIn("Вернуть в игру", html)

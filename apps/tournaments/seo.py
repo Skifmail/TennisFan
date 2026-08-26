@@ -38,7 +38,7 @@ def build_tournament_sports_event_json(
     if getattr(tournament, "start_date_is_pending", False):
         description_parts.append("Старт после набора группы.")
     if getattr(tournament, "venue_is_pending", False):
-        description_parts.append("Корт уточним после набора группы.")
+        description_parts.append("Корт назначим ближе к старту.")
     raw_desc = (tournament.description or "").strip()
     if raw_desc:
         # Без HTML, усечём на уровне символов.

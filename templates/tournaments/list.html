@@ -17,7 +17,7 @@
         <div class="container tournaments-masthead__inner">
             <div class="tournaments-masthead__copy">
                 <h1 class="tournaments-masthead__title">{% if is_archive %}Архив турниров{% else %}{{ landing_heading|default:"Турниры" }}{% endif %}</h1>
-                <p class="tournaments-masthead__lede">{% if is_archive %}Завершённые турниры.{% else %}Набор по уровню. Место проведения появится после набора.{% endif %}</p>
+                <p class="tournaments-masthead__lede">{% if is_archive %}Завершённые турниры.{% else %}Играйте с соперниками своего уровня. Точное место проведения сообщим, когда завершится набор.{% endif %}</p>
             </div>
             {% if not is_archive %}
             {% include 'tournaments/_intro.html' %}

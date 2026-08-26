@@ -2,15 +2,23 @@
 
 {% block title %}Тренировки для взрослых{% endblock %}
 
+{% block meta_description %}Тренировки по теннису для взрослых в Москве и Московской области. Индивидуальные и групповые занятия с профессиональными тренерами.{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <h1 class="page-title">Тренировки для взрослых</h1>
-    <p class="page-subtitle">Индивидуальные и групповые занятия с профессиональными тренерами</p>
+    <p class="page-subtitle">{{ training_cities_label }}</p>
+    <p class="training-geo__lede">Индивидуальные и групповые занятия с профессиональными тренерами.</p>
 </div>
 
 <div class="container">
     <form method="get" class="filter-bar">
-        <input name="city" class="form-control" placeholder="Москва, Раменское, Жуковский, Воскресенск" value="{{ current_city }}" onchange="this.form.submit()">
+        <select name="city" class="form-control" onchange="this.form.submit()" aria-label="Город">
+            <option value="">Все города</option>
+            {% for city in training_cities %}
+            <option value="{{ city }}" {% if current_city == city %}selected{% endif %}>{{ city }}</option>
+            {% endfor %}
+        </select>
         <select name="type" class="form-control" onchange="this.form.submit()">
             <option value="">Все типы</option>
             <option value="individual" {% if current_type == 'individual' %}selected{% endif %}>Индивидуальные</option>
@@ -33,6 +41,28 @@
         <a href="{% url 'coach_list' %}" class="btn btn-outline btn--filter-size">Наши тренеры</a>
         {% if not user_is_coach %}<a href="{% url 'coach_application_create' %}" class="btn btn-primary btn--filter-size">Стать тренером</a>{% endif %}
     </div>
+
+    <section class="training-geo" aria-label="Города и корты">
+        <h2 class="training-geo__title">Корты</h2>
+        <div class="training-geo__cities">
+            {% for group in training_city_groups %}
+            <div class="training-geo__city">
+                <h3 class="training-geo__city-name">{{ group.city }}</h3>
+                {% if group.courts %}
+                <ul class="training-geo__courts">
+                    {% for court in group.courts %}
+                    <li>
+                        <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="training-geo__empty">Площадку уточним при записи.</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
 
     <div class="training-list-grid">
         {% for training in trainings %}

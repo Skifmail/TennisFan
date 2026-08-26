@@ -25,7 +25,7 @@
                         <h3 class="tournament-card__title">
                             <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="tournament-card__title-link">{{ tournament.name }}</a>
                         </h3>
-                        <span class="tournament-card__dates-muted">{% if tournament.start_date_is_pending %}Старт после набора группы{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}{% if tournament.venue_is_pending %} · место уточняется{% endif %}</span>
+                        <span class="tournament-card__dates-muted">{% if tournament.start_date_is_pending %}Старт после набора группы{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}</span>
                     </div>
                 </div>
             </div>
@@ -71,6 +71,9 @@
                 {% if tournament.court %}
                 <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
                 <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="tournament-card__meta-link" title="{{ tournament.court.address }}">{{ tournament.court.name }}</a>
+                {% elif tournament.venue_is_pending %}
+                <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
+                <span>корт уточним после набора</span>
                 {% endif %}
                 <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
                 <span>{{ tournament.get_gender_display }}</span>

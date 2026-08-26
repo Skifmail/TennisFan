@@ -177,9 +177,6 @@ def get_tournament_public_status_label(tournament: Tournament) -> str:
         return "Регистрация закрыта"
     if tournament_is_full_for_display(tournament):
         return "Мест нет"
-    # Корт часто не выбран заранее: сначала набор игроков, потом адрес.
-    if not getattr(tournament, "court_id", None):
-        return "Идёт набор, место будет определено с учётом удобства участников"
     return "Идёт набор"
 
 

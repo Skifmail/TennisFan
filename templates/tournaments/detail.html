@@ -506,10 +506,10 @@
         <div class="card-body">
             <h3 class="section-title mb-2">Как проходит турнир</h3>
             <ol class="tournament-howto text-secondary mb-0" style="padding-left: 1.25rem; max-width: 70ch;">
-                <li>Записываетесь в группу своего уровня — вход после авторизации и заполненного профиля.</li>
-                <li>Турнир стартует после набора группы{% if tournament.min_participants and not tournament.is_doubles %} (от {{ tournament.min_participants }} участников){% elif tournament.min_teams and tournament.is_doubles %} (от {{ tournament.min_teams }} команд){% endif %}{% if tournament.registration_deadline %}; запись до {{ tournament.registration_deadline|date:"d.m.Y" }}{% endif %}. Место проведения организатор подбирает с учётом участников.</li>
-                <li>Вы получаете список соперников. Корт и время каждого матча согласуете напрямую с соперником — удобные обоим.</li>
-                <li>Результат вносите на платформе; он идёт в рейтинг. На раунд обычно даётся {{ tournament.match_days_per_round }} дн.</li>
+                <li>Запишитесь в группу своего уровня.</li>
+                <li>Старт после набора{% if tournament.min_participants and not tournament.is_doubles %} (от {{ tournament.min_participants }} человек){% elif tournament.min_teams and tournament.is_doubles %} (от {{ tournament.min_teams }} пар){% endif %}{% if tournament.registration_deadline %}, запись до {{ tournament.registration_deadline|date:"d.m.Y" }}{% endif %}. Корт назначим под состав.</li>
+                <li>Соперников увидите в таблице. Корт и время матча договаривайтесь сами.</li>
+                <li>Счёт — на сайте, в рейтинг. На раунд обычно {{ tournament.match_days_per_round }} дн.</li>
             </ol>
         </div>
     </div>

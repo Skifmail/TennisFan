@@ -58,7 +58,7 @@
 
 .tournaments-masthead__lede {
     margin: 0;
-    max-width: 38ch;
+    max-width: 44ch;
     color: var(--color-text);
     font-size: var(--font-size-lg);
     font-weight: 400;
@@ -89,11 +89,13 @@
 }
 
 .tournaments-intro__how-toggle {
-    display: none;
-    cursor: pointer;
+    display: block;
+    margin: 0 0 0.9rem;
+    pointer-events: none;
+    cursor: default;
     color: var(--color-primary);
     font-family: var(--font-heading);
-    font-size: 0.9375rem;
+    font-size: 1rem;
     font-weight: 700;
     line-height: 1.3;
 }
@@ -233,7 +235,10 @@
         align-items: center;
         justify-content: space-between;
         min-height: 44px;
+        margin: 0;
         padding: 0 0.15rem;
+        pointer-events: auto;
+        cursor: pointer;
     }
 
     .tournaments-intro__how-toggle::after {

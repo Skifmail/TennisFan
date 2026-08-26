@@ -256,10 +256,12 @@ class PendingStartDateTestCase(TestCase):
 
         self.assertContains(response, "Старт после набора")
         self.assertContains(response, "tournaments-masthead")
-        self.assertContains(response, "Как проходит турнир")
+        self.assertContains(response, "Как всё устроено")
         self.assertContains(
-            response, "Набор по уровню. Место проведения появится после набора."
+            response,
+            "Играйте с соперниками своего уровня. Точное место проведения сообщим, когда завершится набор.",
         )
+        self.assertContains(response, "После игры внесите результат на сайт.")
         self.assertNotContains(response, "tournaments-intro__nav")
         self.assertNotContains(response, "набора группы")
         self.assertNotContains(response, "одну группу")
@@ -272,6 +274,11 @@ class PendingStartDateTestCase(TestCase):
         )
 
         self.assertContains(response, "старт после набора")
+        self.assertContains(
+            response, "Точный адрес сообщим, когда завершится набор участников."
+        )
+        self.assertContains(response, "Подайте заявку на турнир подходящего уровня.")
+        self.assertContains(response, "Регистрация открыта.")
         self.assertNotContains(response, self.tournament.end_date.strftime("%d.%m.%Y"))
 
     def test_detail_page_shows_dates_after_bracket(self) -> None:

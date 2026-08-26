@@ -1,24 +1,24 @@
 {% comment %}
-Про набор и корт. Заголовок страницы уже в H1, здесь его не повторяем.
+Как устроен набор. Заголовок страницы уже в H1.
+Регион и формат выбираются в форме фильтров ниже, без дубля чипами.
 {% endcomment %}
 <section class="tournaments-intro" aria-label="Как устроены турниры">
-    <p class="tournaments-intro__text">
-        В одну группу попадают игроки близкого уровня. Пока идёт набор, точного адреса часто нет:
-        место проведения появится, когда состав будет ясен.
-    </p>
-    <p class="tournaments-intro__text">
-        После старта соперники видны в таблице. Когда и где сыграть матч, договариваетесь сами.
-        Счёт вносите на сайте, он учитывается в рейтинге.
-    </p>
-
-    <nav class="tournaments-intro__nav" aria-label="Фильтр по региону и формату">
-        {% for option in region_options %}
-        <a href="{% url 'tournament_region_landing' region_slug=option.slug %}"
-           class="tournaments-intro__link{% if current_region == option.slug and not current_area %} tournaments-intro__link--active{% endif %}">{{ option.label }}</a>
-        {% endfor %}
-        <a href="{% url 'tournament_list' %}?variant=singles"
-           class="tournaments-intro__link{% if current_variant == 'singles' %} tournaments-intro__link--active{% endif %}">Одиночные</a>
-        <a href="{% url 'tournament_list' %}?variant=doubles"
-           class="tournaments-intro__link{% if current_variant == 'doubles' %} tournaments-intro__link--active{% endif %}">Парные</a>
-    </nav>
+    <div class="tournaments-intro__how">
+        <input type="checkbox" id="tournaments-how" class="tournaments-intro__how-check">
+        <label for="tournaments-how" class="tournaments-intro__how-toggle">Как проходит турнир</label>
+        <ul class="tournaments-intro__facts">
+            <li class="tournaments-intro__fact">
+                <span class="tournaments-intro__fact-label">Уровень</span>
+                <span class="tournaments-intro__fact-text">Турниры разделены по уровню, он указан на карточке.</span>
+            </li>
+            <li class="tournaments-intro__fact">
+                <span class="tournaments-intro__fact-label">Место</span>
+                <span class="tournaments-intro__fact-text">Пока идёт набор, точного адреса часто нет. Место проведения появится, когда соберется состав.</span>
+            </li>
+            <li class="tournaments-intro__fact">
+                <span class="tournaments-intro__fact-label">Матч</span>
+                <span class="tournaments-intro__fact-text">После старта соперники видны в таблице. Когда и где сыграть, договариваетесь с соперником. Контакты в деталях матча в кабинете. Счёт на сайте идёт в рейтинг.</span>
+            </li>
+        </ul>
+    </div>
 </section>

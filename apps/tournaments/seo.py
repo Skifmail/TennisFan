@@ -36,7 +36,7 @@ def build_tournament_sports_event_json(
 
     description_parts: list[str] = []
     if getattr(tournament, "start_date_is_pending", False):
-        description_parts.append("Старт после набора группы.")
+        description_parts.append("Старт после набора.")
     if getattr(tournament, "venue_is_pending", False):
         description_parts.append("Место проведения появится после набора.")
     raw_desc = (tournament.description or "").strip()

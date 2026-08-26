@@ -12,75 +12,102 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">{% if is_archive %}Архив турниров{% else %}{{ landing_heading|default:"Турниры" }}{% endif %}</h1>
-    <p class="page-subtitle">{% if is_archive %}Завершённые турниры{% else %}Набор по уровню. Место проведения появится после набора.{% endif %}</p>
-</div>
+<div class="tournaments-catalog">
+    <header class="tournaments-masthead">
+        <div class="container tournaments-masthead__inner">
+            <div class="tournaments-masthead__copy">
+                <h1 class="tournaments-masthead__title">{% if is_archive %}Архив турниров{% else %}{{ landing_heading|default:"Турниры" }}{% endif %}</h1>
+                <p class="tournaments-masthead__lede">{% if is_archive %}Завершённые турниры.{% else %}Набор по уровню. Место проведения появится после набора.{% endif %}</p>
+            </div>
+            {% if not is_archive %}
+            {% include 'tournaments/_intro.html' %}
+            {% endif %}
+        </div>
+    </header>
 
-<div class="container">
-    {% if not is_archive %}{% include 'tournaments/_intro.html' %}{% endif %}
+    <div class="container">
+        <form method="get" class="filter-bar tournaments-filters" action="{% if is_archive %}{% url 'tournament_archive' %}{% else %}{% url 'tournament_list' %}{% endif %}">
+            <div class="tournaments-filters__field">
+                <label class="tournaments-filters__label" for="tournament-filter-region">Регион</label>
+                <select name="region" id="tournament-filter-region" class="form-control" onchange="this.form.submit()" aria-label="Регион">
+                    <option value="">Москва и область</option>
+                    {% for option in region_options %}
+                    <option value="{{ option.slug }}" {% if current_region == option.slug %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if area_options %}
+            <div class="tournaments-filters__field">
+                <label class="tournaments-filters__label" for="tournament-filter-area">Зона или город</label>
+                <select name="area" id="tournament-filter-area" class="form-control" onchange="this.form.submit()" aria-label="Зона или город">
+                    <option value="">Все зоны и города</option>
+                    {% for area in area_options %}
+                    <option value="{{ area.slug }}" {% if current_area == area.slug %}selected{% endif %}>{{ area.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="tournaments-filters__field">
+                <label class="tournaments-filters__label" for="tournament-filter-variant">Формат</label>
+                <select name="variant" id="tournament-filter-variant" class="form-control" onchange="this.form.submit()" aria-label="Формат">
+                    <option value="">Одиночные и парные</option>
+                    {% for option in variant_options %}
+                    <option value="{{ option.slug }}" {% if current_variant == option.slug %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="tournaments-filters__field">
+                <label class="tournaments-filters__label" for="tournament-filter-city">Город</label>
+                <input name="city" id="tournament-filter-city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
+            </div>
+            <div class="tournaments-filters__field">
+                <label class="tournaments-filters__label" for="tournament-filter-category">Уровень</label>
+                <select name="category" id="tournament-filter-category" class="form-control" onchange="this.form.submit()" aria-label="Уровень игроков">
+                    <option value="">Все категории</option>
+                    {% for value, label in category_choices %}
+                    <option value="{{ value }}" {% if current_category == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if not is_archive %}
+            <div class="tournaments-filters__field">
+                <label class="tournaments-filters__label" for="tournament-filter-status">Статус</label>
+                <select name="status" id="tournament-filter-status" class="form-control" onchange="this.form.submit()">
+                    <option value="">Все статусы</option>
+                    <option value="upcoming" {% if current_status == 'upcoming' %}selected{% endif %}>Предстоящие</option>
+                    <option value="active" {% if current_status == 'active' %}selected{% endif %}>Активные</option>
+                    <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Завершённые</option>
+                </select>
+            </div>
+            {% endif %}
+            <div class="tournaments-filters__field">
+                <span class="tournaments-filters__label" id="tournament-filter-club-label">Клуб</span>
+                {% include 'includes/club_filter_select.html' with selected_club=list_club_filter|default:'' auto_submit=1 id_suffix='list' aria_label='Фильтр по клубу' %}
+            </div>
+        </form>
 
-    <!-- Filters -->
-    <form method="get" class="filter-bar" action="{% if is_archive %}{% url 'tournament_archive' %}{% else %}{% url 'tournament_list' %}{% endif %}">
-        <select name="region" class="form-control" onchange="this.form.submit()" aria-label="Регион">
-            <option value="">Москва и область</option>
-            {% for option in region_options %}
-            <option value="{{ option.slug }}" {% if current_region == option.slug %}selected{% endif %}>{{ option.label }}</option>
+        <div class="tournament-list">
+            {% for tournament in tournaments %}
+                {% include 'includes/tournament_card.html' with tournament=tournament %}
+            {% empty %}
+            <p class="text-secondary">{% if is_archive %}Завершённые турниры не найдены.{% else %}Турниры не найдены.{% endif %}</p>
             {% endfor %}
-        </select>
-        {% if area_options %}
-        <select name="area" class="form-control" onchange="this.form.submit()" aria-label="Зона или город">
-            <option value="">Все зоны и города</option>
-            {% for area in area_options %}
-            <option value="{{ area.slug }}" {% if current_area == area.slug %}selected{% endif %}>{{ area.name }}</option>
-            {% endfor %}
-        </select>
+        </div>
+        {% if tournaments_page and tournaments_page.paginator.num_pages > 1 %}
+        <div class="pagination pagination--center">
+            <ul class="pagination__list">
+                {% for page_num in tournaments_page.paginator.page_range %}
+                    {% if page_num == tournaments_page.number %}
+                    <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
+                    {% else %}
+                    <li class="pagination__item">
+                        <a href="?page={{ page_num }}{% if current_region %}&region={{ current_region }}{% endif %}{% if current_area %}&area={{ current_area }}{% endif %}{% if current_variant %}&variant={{ current_variant }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_status and not is_archive %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </div>
         {% endif %}
-        <select name="variant" class="form-control" onchange="this.form.submit()" aria-label="Формат">
-            <option value="">Одиночные и парные</option>
-            {% for option in variant_options %}
-            <option value="{{ option.slug }}" {% if current_variant == option.slug %}selected{% endif %}>{{ option.label }}</option>
-            {% endfor %}
-        </select>
-        <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
-        <select name="category" class="form-control" onchange="this.form.submit()" aria-label="Уровень игроков">
-            <option value="">Все категории</option>
-            {% for value, label in category_choices %}
-            <option value="{{ value }}" {% if current_category == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
-        {% if not is_archive %}
-        <select name="status" class="form-control" onchange="this.form.submit()">
-            <option value="">Все статусы</option>
-            <option value="upcoming" {% if current_status == 'upcoming' %}selected{% endif %}>Предстоящие</option>
-            <option value="active" {% if current_status == 'active' %}selected{% endif %}>Активные</option>
-            <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Завершённые</option>
-        </select>
-        {% endif %}
-        {% include 'includes/club_filter_select.html' with selected_club=list_club_filter|default:'' auto_submit=1 id_suffix='list' aria_label='Фильтр по клубу' %}
-    </form>
-
-    <div class="tournament-list">
-        {% for tournament in tournaments %}
-            {% include 'includes/tournament_card.html' with tournament=tournament %}
-        {% empty %}
-        <p class="text-secondary">{% if is_archive %}Завершённые турниры не найдены.{% else %}Турниры не найдены.{% endif %}</p>
-        {% endfor %}
     </div>
-    {% if tournaments_page and tournaments_page.paginator.num_pages > 1 %}
-    <div class="pagination pagination--center">
-        <ul class="pagination__list">
-            {% for page_num in tournaments_page.paginator.page_range %}
-                {% if page_num == tournaments_page.number %}
-                <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
-                {% else %}
-                <li class="pagination__item">
-                    <a href="?page={{ page_num }}{% if current_region %}&region={{ current_region }}{% endif %}{% if current_area %}&area={{ current_area }}{% endif %}{% if current_variant %}&variant={{ current_variant }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_status and not is_archive %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
-                </li>
-                {% endif %}
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}

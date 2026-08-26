@@ -254,7 +254,15 @@ class PendingStartDateTestCase(TestCase):
     def test_card_hides_year_long_range(self) -> None:
         response = self.client.get(reverse("tournament_list"), secure=True)
 
-        self.assertContains(response, "Старт после набора группы")
+        self.assertContains(response, "Старт после набора")
+        self.assertContains(response, "tournaments-masthead")
+        self.assertContains(response, "Как проходит турнир")
+        self.assertContains(
+            response, "Набор по уровню. Место проведения появится после набора."
+        )
+        self.assertNotContains(response, "tournaments-intro__nav")
+        self.assertNotContains(response, "набора группы")
+        self.assertNotContains(response, "одну группу")
         self.assertNotContains(response, self.tournament.end_date.strftime("%d.%m.%Y"))
 
     def test_detail_page_hides_year_long_range(self) -> None:
@@ -263,7 +271,7 @@ class PendingStartDateTestCase(TestCase):
             secure=True,
         )
 
-        self.assertContains(response, "старт после набора группы")
+        self.assertContains(response, "старт после набора")
         self.assertNotContains(response, self.tournament.end_date.strftime("%d.%m.%Y"))
 
     def test_detail_page_shows_dates_after_bracket(self) -> None:
@@ -276,4 +284,4 @@ class PendingStartDateTestCase(TestCase):
         )
 
         self.assertContains(response, self.tournament.start_date.strftime("%d.%m.%Y"))
-        self.assertNotContains(response, "старт после набора группы")
+        self.assertNotContains(response, "старт после набора")

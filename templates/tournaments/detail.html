@@ -6,13 +6,13 @@
 {% block title %}{{ tournament.name }}{% endblock %}
 
 {% block meta_description %}
-{{ tournament.city }} • {% if tournament.start_date_is_pending %}старт после набора группы{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}. {{ tournament.description|striptags|truncatechars:150 }}
+{{ tournament.city }} • {% if tournament.start_date_is_pending %}старт после набора{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}. {{ tournament.description|striptags|truncatechars:150 }}
 {% endblock %}
 
 {% block meta_og %}
     <meta property="og:type" content="website">
     <meta property="og:title" content="{{ tournament.name }} — TennisFan">
-    <meta property="og:description" content="{{ tournament.city }} • {% if tournament.start_date_is_pending %}старт после набора группы{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}">
+    <meta property="og:description" content="{{ tournament.city }} • {% if tournament.start_date_is_pending %}старт после набора{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}">
     <meta property="og:url" content="{{ canonical_url }}">
     {% if tournament.image %}
     <meta property="og:image" content="{{ site_base_url }}{{ tournament.image.url }}">
@@ -270,7 +270,7 @@
                 {% endif %}
                 •
                 {% if tournament.start_date_is_pending %}
-                старт после набора группы{% if tournament.registration_deadline %}, запись до {{ tournament.registration_deadline|date:"d.m.Y" }}{% endif %}
+                старт после набора{% if tournament.registration_deadline %}, запись до {{ tournament.registration_deadline|date:"d.m.Y" }}{% endif %}
                 {% else %}
                 {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
                 {% endif %}
@@ -339,7 +339,7 @@
                             <span class="tournament-meta-label">Продолжительность</span>
                             <span class="tournament-meta-value">
                                 {% if tournament.start_date_is_pending %}
-                                    Старт после набора группы
+                                    Старт после набора
                                     {% if tournament.is_one_day %}· однодневный{% else %}· многодневный{% endif %}
                                     {% if tournament.match_days_per_round %} · {{ tournament.match_days_per_round }} дн. на раунд{% endif %}
                                 {% else %}
@@ -378,13 +378,17 @@
                             <span class="tournament-meta-label">Условия старта</span>
                             <span class="tournament-meta-value">
                                 {% if tournament.is_doubles %}
+                                    {% if tournament.min_teams %}
+                                    Старт после набора {{ tournament.min_teams }} команд
+                                    {% else %}
                                     Старт после набора
-                                    {% if tournament.min_teams %}{{ tournament.min_teams }}{% else %}группы{% endif %}
-                                    {% if tournament.min_teams %} команд{% endif %}
+                                    {% endif %}
                                 {% else %}
+                                    {% if tournament.min_participants %}
+                                    Старт после набора {{ tournament.min_participants }} участников
+                                    {% else %}
                                     Старт после набора
-                                    {% if tournament.min_participants %}{{ tournament.min_participants }}{% else %}группы{% endif %}
-                                    {% if tournament.min_participants %} участников{% endif %}
+                                    {% endif %}
                                 {% endif %}
                                 {% if tournament.is_doubles %}
                                     · сейчас {{ tournament.teams.count }} /
@@ -483,7 +487,7 @@
             {% endif %}
         </div>
     </div>
-    
+
     {% if tournament.description %}
     <div class="card mb-4">
         <div class="card-body">
@@ -506,9 +510,9 @@
         <div class="card-body">
             <h3 class="section-title mb-2">Как проходит турнир</h3>
             <ol class="tournament-howto text-secondary mb-0" style="padding-left: 1.25rem; max-width: 70ch;">
-                <li>Запишитесь в группу своего уровня.</li>
+                <li>Запишитесь на турнир своего уровня.</li>
                 <li>Турнир начнётся, когда наберётся состав{% if tournament.min_participants and not tournament.is_doubles %} (от {{ tournament.min_participants }} человек){% elif tournament.min_teams and tournament.is_doubles %} (от {{ tournament.min_teams }} пар){% endif %}{% if tournament.registration_deadline %}. Запись до {{ tournament.registration_deadline|date:"d.m.Y" }}{% endif %}.</li>
-                <li>Соперников видно в таблице. Когда и где играть матч, договаривайтесь с соперником.</li>
+                <li>Соперников видно в таблице. Когда и где играть матч, договаривайтесь с соперником самостоятельно - контакты будут указаны в деталях матча в Вашем личном кабинете.</li>
                 <li>Счёт вносите на сайте. Он идёт в рейтинг. На раунд обычно даётся {{ tournament.match_days_per_round }} дн.</li>
             </ol>
         </div>
@@ -741,7 +745,7 @@
         </div>
     </div>
     {% endif %}
-    
+
     {% if is_round_robin and matrix_rows and rr_standings %}
     <h2 class="section-title mb-3">Матрица результатов</h2>
     <div class="card mb-4 round-robin-table-wrapper">

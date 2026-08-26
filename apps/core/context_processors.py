@@ -93,6 +93,29 @@ def site_meta(request):
     }
 
 
+def metrika_goals(request):
+    """Передать в шаблон цели Метрики из сессии и сразу очистить очередь.
+
+    Args:
+        request: HTTP-запрос с сессией.
+
+    Returns:
+        dict: Ключ ``metrika_goals`` — список целей для ``reachGoal``.
+    """
+    import json
+
+    from apps.core.metrika import pop_metrika_goals
+
+    goals = []
+    for item in pop_metrika_goals(request):
+        entry = {"goal": item.get("goal", ""), "params_json": ""}
+        params = item.get("params") or {}
+        if params:
+            entry["params_json"] = json.dumps(params, ensure_ascii=False)
+        goals.append(entry)
+    return {"metrika_goals": goals}
+
+
 def _tennistop_host_set() -> frozenset[str]:
     """Возвращает множество хостов, для которых показывается бренд TennisTop.
 

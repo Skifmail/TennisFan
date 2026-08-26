@@ -617,6 +617,48 @@ select.form-control {
 }
 
 /* ==========================================================================
+   Вводный блок страницы турниров
+   ========================================================================== */
+.tournaments-intro {
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-lg);
+}
+
+.tournaments-intro__title {
+    margin: 0 0 var(--spacing-md);
+    font-size: 1.15rem;
+}
+
+.tournaments-intro__text {
+    margin: 0 0 var(--spacing-md);
+    max-width: 70ch;
+    color: var(--color-text-secondary);
+}
+
+.tournaments-intro__nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.tournaments-intro__link {
+    padding: 6px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.tournaments-intro__link:hover,
+.tournaments-intro__link--active {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* ==========================================================================
    Filter Bar
    ========================================================================== */
 .filter-bar {

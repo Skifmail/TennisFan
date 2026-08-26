@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.text import slugify
 
-from apps.core.models import UserTelegramLink
+from apps.core.models import GeoArea, UserTelegramLink
 from apps.courts.models import Court
 from apps.tournaments.models import (
     MatchFormat,
@@ -491,6 +491,8 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "is_one_day",
             "allow_postpayment",
             "city",
+            "region",
+            "geo_area",
             "court",
             "gender",
             "allowed_categories",
@@ -529,9 +531,13 @@ class ClubTournamentCreateForm(forms.ModelForm):
         self.fields["match_days_per_round"].initial = 7
         self.fields["entry_fee"].initial = 0
 
+        self._apply_geo_defaults_from_club()
+
         self.fields["description"].required = False
         self.fields["image"].required = False
         self.fields["slug"].required = False
+        self.fields["region"].required = False
+        self.fields["geo_area"].required = False
         self.fields["court"].required = False
         self.fields["registration_deadline"].required = False
         self.fields["end_date"].required = False
@@ -559,6 +565,10 @@ class ClubTournamentCreateForm(forms.ModelForm):
             else Court.objects.all().order_by("city", "name")
         )
         self.fields["court"].empty_label = "Без привязки к корту"
+        self.fields["geo_area"].empty_label = "Не выбрано"
+        self.fields["region"].widget.attrs["data-geo-region"] = "1"
+        self.fields["geo_area"].widget.attrs["data-geo-area"] = "1"
+        self._configure_geo_area_queryset()
         self.fields["match_format"].choices = [("", "Выберите формат матча")] + list(
             MatchFormat.choices
         )
@@ -568,6 +578,12 @@ class ClubTournamentCreateForm(forms.ModelForm):
         )
         self.fields["registration_deadline"].help_text = (
             "Если поле пустое, регистрация будет открыта до старта турнира."
+        )
+        self.fields["region"].help_text = (
+            "Москва или область — от выбора зависит список зон и городов."
+        )
+        self.fields["geo_area"].help_text = (
+            "Зона Москвы или город области для рекламных страниц и фильтров."
         )
         self.fields["is_open_interclub"].disabled = not is_pro
         if not is_pro:
@@ -586,6 +602,67 @@ class ClubTournamentCreateForm(forms.ModelForm):
             else:
                 existing = widget.attrs.get("class", "")
                 widget.attrs["class"] = (existing + " form-control").strip()
+
+    def geo_areas_payload(self) -> list[dict[str, str | int]]:
+        """Данные активных площадок для каскадного селекта на клиенте.
+
+        Returns:
+            list[dict[str, str | int]]: id, регион и название каждой площадки.
+        """
+        return [
+            {"id": area.pk, "region": area.region, "name": area.name}
+            for area in GeoArea.objects.filter(is_active=True).order_by(
+                "region", "sort_order", "name"
+            )
+        ]
+
+    def _selected_region(self) -> str:
+        """Текущий регион из POST, инстанса или initial.
+
+        Returns:
+            str: Значение ``region`` либо пустая строка.
+        """
+        if self.is_bound:
+            return str(self.data.get("region") or "").strip()
+        if self.instance and self.instance.pk and self.instance.region:
+            return str(self.instance.region)
+        initial_region = self.initial.get("region") or self.fields["region"].initial
+        return str(initial_region or "").strip()
+
+    def _configure_geo_area_queryset(self) -> None:
+        """Ограничить список площадок выбранным регионом."""
+        queryset = GeoArea.objects.filter(is_active=True)
+        region = self._selected_region()
+        if region:
+            queryset = queryset.filter(region=region)
+        self.fields["geo_area"].queryset = queryset.order_by("sort_order", "name")
+
+    def _apply_geo_defaults_from_club(self) -> None:
+        """Подставить регион и площадку по городу клуба, если ещё не заданы."""
+        if self.is_bound or not self.club:
+            return
+        if self.instance and self.instance.pk:
+            return
+
+        city = (self.club.city or "").strip()
+        if not city:
+            return
+
+        city_norm = city.casefold()
+        if city_norm in {"москва", "moscow"}:
+            if not self.fields["region"].initial and "region" not in self.initial:
+                self.fields["region"].initial = "moscow"
+            return
+
+        area = GeoArea.resolve_from_name(city, region="moscow_oblast")
+        if area is None:
+            area = GeoArea.resolve_from_name(city)
+        if area is None:
+            return
+        if not self.fields["region"].initial and "region" not in self.initial:
+            self.fields["region"].initial = area.region
+        if not self.fields["geo_area"].initial and "geo_area" not in self.initial:
+            self.fields["geo_area"].initial = area.pk
 
     def clean_allowed_categories(self):
         value = self.cleaned_data.get("allowed_categories") or []
@@ -727,6 +804,20 @@ class ClubTournamentCreateForm(forms.ModelForm):
 
         if cleaned_data.get("is_open_interclub") and not self.is_pro:
             cleaned_data["is_open_interclub"] = False
+
+        region = (cleaned_data.get("region") or "").strip()
+        geo_area = cleaned_data.get("geo_area")
+        if geo_area is not None:
+            if region and geo_area.region != region:
+                self.add_error(
+                    "geo_area",
+                    (
+                        f"«{geo_area.name}» относится к региону "
+                        f"«{geo_area.get_region_display()}», а не к выбранному."
+                    ),
+                )
+            elif not region:
+                cleaned_data["region"] = geo_area.region
 
         return cleaned_data
 

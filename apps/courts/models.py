@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
 
+from apps.core.geo import GeoRegion
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,24 @@ class Court(CompressImageFieldsMixin, models.Model):
     city = models.CharField("Город", max_length=100)
     address = models.CharField("Адрес", max_length=255)
     district = models.CharField("Район города", max_length=100, blank=True)
+    region = models.CharField(
+        "Регион",
+        max_length=32,
+        choices=GeoRegion.choices,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Москва или область. Определяет набор доступных зон и городов.",
+    )
+    geo_area = models.ForeignKey(
+        "core.GeoArea",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="courts",
+        verbose_name="Зона / город",
+        help_text="Зона Москвы или город области, из справочника. Поле «Район города» — свободный текст.",
+    )
     description = models.TextField("Описание", blank=True)
 
     surface = models.CharField(

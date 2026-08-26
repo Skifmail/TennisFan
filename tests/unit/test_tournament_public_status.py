@@ -29,6 +29,16 @@ class TournamentPublicStatusLabelTestCase(SimpleTestCase):
     def test_upcoming_open_is_recruiting(self) -> None:
         t = self._tournament()
         t.is_full_annotated = False
+        # Без корта — набор с отложенным выбором места.
+        self.assertEqual(
+            get_tournament_public_status_label(t),
+            "Идёт набор, место будет определено с учётом удобства участников",
+        )
+
+    def test_upcoming_with_court_is_short_recruiting(self) -> None:
+        t = self._tournament()
+        t.is_full_annotated = False
+        t.court_id = 1
         self.assertEqual(get_tournament_public_status_label(t), "Идёт набор")
 
     def test_upcoming_full_shows_no_seats(self) -> None:

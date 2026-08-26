@@ -9,6 +9,7 @@ from django.db import models
 from django.db.models import Case, IntegerField, When
 from django.utils import timezone
 
+from apps.core.geo import GeoRegion
 from apps.users.models import Player, SkillLevel
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
@@ -167,6 +168,24 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     slug = models.SlugField("URL", unique=True)
     description = models.TextField("Описание", blank=True)
     city = models.CharField("Город", max_length=100)
+    region = models.CharField(
+        "Регион",
+        max_length=32,
+        choices=GeoRegion.choices,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Москва или область. Определяет набор доступных зон и городов.",
+    )
+    geo_area = models.ForeignKey(
+        "core.GeoArea",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tournaments",
+        verbose_name="Зона / город",
+        help_text="Зона Москвы или город области — по ней турнир попадает в рекламные страницы.",
+    )
     court = models.ForeignKey(
         "courts.Court",
         on_delete=models.SET_NULL,
@@ -375,6 +394,34 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         """Check if tournament is mixed doubles (парный микст: мужчина + женщина в команде)."""
         return self.is_doubles() and self.gender == TournamentGender.MIXED
 
+    @property
+    def venue_is_pending(self) -> bool:
+        """Место проведения ещё не зафиксировано.
+
+        Пока группа собирается, организатор может не указывать корт: адрес
+        появится после набора с учётом удобства участников.
+
+        Returns:
+            bool: True, если турнир набирается и корт не выбран.
+        """
+        return (
+            self.status == TournamentStatus.UPCOMING
+            and not self.bracket_generated
+            and not self.court_id
+        )
+
+    @property
+    def start_date_is_pending(self) -> bool:
+        """Дата старта ещё не определена: группа не набрана, сетки нет.
+
+        До формирования сетки `start_date` и `end_date` хранят технические
+        значения (обычно старт плюс год), показывать их посетителю нельзя.
+
+        Returns:
+            bool: True, если вместо дат нужно показывать условие старта.
+        """
+        return self.status == TournamentStatus.UPCOMING and not self.bracket_generated
+
     def is_full(self) -> bool:
         """Check if tournament has reached max participants/teams."""
         if self.is_doubles():
@@ -425,6 +472,55 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             return None
         return started + timedelta(hours=self.get_postpayment_deadline_hours())
 
+    def resolve_geography(self) -> None:
+        """Определить регион и зону/город, если они не заданы вручную.
+
+        Порядок источников: название турнира (в московских названиях зона зашита
+        в текст), затем география корта. Уже заполненные поля не перезаписываются,
+        поле ``Court.district`` не используется — данные в нём несогласованы.
+        """
+        if self.geo_area_id and self.region:
+            return
+
+        from apps.core.models import GeoArea
+
+        area = self.geo_area
+        if area is None:
+            area = GeoArea.resolve_from_name(self.name, region=self.region or None)
+        if area is None and self.court_id:
+            court = self.court
+            area = court.geo_area or GeoArea.resolve_from_name(
+                court.city, region="moscow_oblast"
+            )
+        if area is None:
+            area = GeoArea.resolve_from_name(self.city, region="moscow_oblast")
+
+        if area is not None:
+            self.geo_area = area
+            if not self.region:
+                self.region = area.region
+
+    def clean(self) -> None:
+        """Проверить согласованность региона и выбранной зоны/города.
+
+        Raises:
+            ValidationError: Если площадка относится к другому региону.
+        """
+        super().clean()
+        if self.geo_area_id and self.region:
+            if self.geo_area.region != self.region:
+                from django.core.exceptions import ValidationError
+
+                raise ValidationError(
+                    {
+                        "geo_area": (
+                            f"«{self.geo_area.name}» относится к региону "
+                            f"«{self.geo_area.get_region_display()}», "
+                            "а у турнира указан другой регион."
+                        )
+                    }
+                )
+
     def save(self, *args, **kwargs) -> None:
         """Custom save to normalize duration and reset notification flag when дедлайн сдвинут."""
         from django.utils import timezone
@@ -456,6 +552,10 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         if self.registration_deadline and self.insufficient_participants_notified_at:
             if self.registration_deadline > timezone.now():
                 self.insufficient_participants_notified_at = None
+        # Частичное сохранение не должно тянуть за собой географию: вызывающий
+        # перечислил поля осознанно, а запрос к справочнику здесь был бы лишним.
+        if kwargs.get("update_fields") is None:
+            self.resolve_geography()
         super().save(*args, **kwargs)
 
         # Продление/сокращение окна постоплаты должно обновлять due_at инвойсов.

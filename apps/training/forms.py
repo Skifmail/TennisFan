@@ -15,66 +15,79 @@ from .widgets import MultiCheckboxWidget, TypePricesWidget
 
 
 class TrainingEnrollmentForm(forms.ModelForm):
-    """Форма записи на тренировку: ФИО, Telegram, email, время, корт, согласие."""
+    """Упрощённая заявка: имя, один контакт, корт, согласие."""
 
+    CONTACT_TELEGRAM = "telegram"
+    CONTACT_WHATSAPP = "whatsapp"
+    CONTACT_EMAIL = "email"
+    CONTACT_CHOICES = (
+        (CONTACT_TELEGRAM, "Telegram"),
+        (CONTACT_WHATSAPP, "WhatsApp / телефон"),
+        (CONTACT_EMAIL, "Email"),
+    )
+
+    contact_method = forms.ChoiceField(
+        choices=CONTACT_CHOICES,
+        label="Способ связи",
+        initial=CONTACT_TELEGRAM,
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    contact_value = forms.CharField(
+        label="Контакт",
+        max_length=200,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "@username, телефон или email",
+            }
+        ),
+    )
     agree_legal = forms.BooleanField(
         required=True,
         label="",
         widget=forms.CheckboxInput(attrs={"class": "form-checkbox"}),
     )
-    preferred_datetime = forms.DateTimeField(
-        required=False,
-        label="Желаемое время",
-        widget=forms.DateTimeInput(
-            attrs={"class": "form-control", "type": "datetime-local"},
-            format="%Y-%m-%dT%H:%M",
-        ),
-        input_formats=["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M"],
-    )
 
     class Meta:
         model = TrainingEnrollment
-        fields = (
-            "full_name",
-            "telegram",
-            "whatsapp",
-            "email",
-            "preferred_datetime",
-            "desired_court",
-            "message",
-        )
+        fields = ("full_name", "desired_court", "message")
         widgets = {
             "full_name": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Фамилия Имя Отчество"}
-            ),
-            "telegram": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "@username или +7..."}
-            ),
-            "whatsapp": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "+7XXXXXXXXXX"}
-            ),
-            "email": forms.EmailInput(
-                attrs={"class": "form-control", "placeholder": "email@example.com"}
+                attrs={"class": "form-control", "placeholder": "Имя и фамилия"}
             ),
             "desired_court": forms.Select(attrs={"class": "form-control"}),
             "message": forms.Textarea(
                 attrs={
                     "class": "form-control",
-                    "rows": 3,
-                    "placeholder": "Дополнительные пожелания (необязательно)",
+                    "rows": 2,
+                    "placeholder": "Пожелания (необязательно)",
                 }
             ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["full_name"].required = True
         self.fields["desired_court"].queryset = Court.objects.filter(
             is_active=True
-        ).order_by("name")
+        ).order_by("city", "name")
         self.fields["desired_court"].required = False
-        self.fields["desired_court"].empty_label = "—— Не выбрано ——"
+        self.fields["desired_court"].empty_label = "—— Город / корт (необязательно) ——"
+        self.fields["desired_court"].label_from_instance = (
+            lambda court: f"{court.city} — {court.name}"
+        )
         self.fields["message"].required = False
-        self.fields["whatsapp"].required = False
+        # Подставляем контакт из instance при редактировании (на будущее).
+        if self.instance and self.instance.pk and not self.data:
+            if self.instance.telegram:
+                self.fields["contact_method"].initial = self.CONTACT_TELEGRAM
+                self.fields["contact_value"].initial = self.instance.telegram
+            elif self.instance.whatsapp:
+                self.fields["contact_method"].initial = self.CONTACT_WHATSAPP
+                self.fields["contact_value"].initial = self.instance.whatsapp
+            elif self.instance.email:
+                self.fields["contact_method"].initial = self.CONTACT_EMAIL
+                self.fields["contact_value"].initial = self.instance.email
 
     def clean_agree_legal(self):
         if not self.cleaned_data.get("agree_legal"):
@@ -82,6 +95,38 @@ class TrainingEnrollmentForm(forms.ModelForm):
                 "Необходимо согласие на обработку персональных данных."
             )
         return True
+
+    def clean(self):
+        cleaned = super().clean()
+        method = cleaned.get("contact_method")
+        value = (cleaned.get("contact_value") or "").strip()
+        if not value:
+            self.add_error("contact_value", "Укажите контакт для связи.")
+            return cleaned
+        cleaned["telegram"] = ""
+        cleaned["whatsapp"] = ""
+        cleaned["email"] = ""
+        if method == self.CONTACT_TELEGRAM:
+            cleaned["telegram"] = value
+        elif method == self.CONTACT_WHATSAPP:
+            cleaned["whatsapp"] = value
+        elif method == self.CONTACT_EMAIL:
+            if "@" not in value:
+                self.add_error("contact_value", "Введите корректный email.")
+            else:
+                cleaned["email"] = value
+        else:
+            self.add_error("contact_method", "Выберите способ связи.")
+        return cleaned
+
+    def save(self, commit: bool = True):
+        enrollment = super().save(commit=False)
+        enrollment.telegram = self.cleaned_data.get("telegram", "")
+        enrollment.whatsapp = self.cleaned_data.get("whatsapp", "")
+        enrollment.email = self.cleaned_data.get("email", "") or ""
+        if commit:
+            enrollment.save()
+        return enrollment
 
 
 class CoachApplicationForm(forms.ModelForm):

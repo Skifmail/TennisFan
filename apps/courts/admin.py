@@ -74,6 +74,7 @@ class CourtAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "city",
+        "geo_area",
         "surface",
         "courts_count",
         "is_indoor",
@@ -82,6 +83,8 @@ class CourtAdmin(admin.ModelAdmin):
         "is_active",
     )
     list_filter = (
+        "region",
+        "geo_area",
         "city",
         "surface",
         "is_indoor",
@@ -106,6 +109,8 @@ class CourtAdmin(admin.ModelAdmin):
                     "city",
                     "address",
                     "district",
+                    "region",
+                    "geo_area",
                     "description",
                 ),
                 "description": "Для точной метки на карте: в «Город» — только название города (например: Сочи). В «Адрес» — улица и номер дома (например: Курортный проспект, 45). Не дублируйте город в поле «Адрес».",

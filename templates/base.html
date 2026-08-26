@@ -63,7 +63,19 @@
                     accurateTrackBounce: true,
                     trackLinks: true
                 });
+                {% for item in metrika_goals %}
+                ym(107284748, "reachGoal", "{{ item.goal }}"{% if item.params_json %}, {{ item.params_json|safe }}{% endif %});
+                {% endfor %}
             }, 1500);
+        });
+        document.addEventListener("click", function (event) {
+            var link = event.target && event.target.closest
+                ? event.target.closest("[data-metrika-goal]")
+                : null;
+            if (!link || typeof ym !== "function") {
+                return;
+            }
+            ym(107284748, "reachGoal", link.getAttribute("data-metrika-goal"));
         });
     </script>
     <noscript>
@@ -199,7 +211,7 @@
     <div class="messages-container">
         <div class="container">
             <div class="alert alert-warning">
-                Подтвердите email, чтобы получать важные уведомления платформы.
+                Подтвердите email: он нужен для уведомлений платформы и обязателен для участия в турнирах.
                 <form action="{% url 'verify_email_resend' %}" method="post" style="display:inline-block; margin-left: 8px;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-ghost" style="padding: 4px 10px;">Отправить письмо повторно</button>

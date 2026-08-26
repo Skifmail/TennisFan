@@ -2686,6 +2686,48 @@ select.form-control {
 }
 
 /* ==========================================================================
+   Вводный блок страницы турниров
+   ========================================================================== */
+.tournaments-intro {
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-lg);
+}
+
+.tournaments-intro__title {
+    margin: 0 0 var(--spacing-md);
+    font-size: 1.15rem;
+}
+
+.tournaments-intro__text {
+    margin: 0 0 var(--spacing-md);
+    max-width: 70ch;
+    color: var(--color-text-secondary);
+}
+
+.tournaments-intro__nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.tournaments-intro__link {
+    padding: 6px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.tournaments-intro__link:hover,
+.tournaments-intro__link--active {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* ==========================================================================
    Filter Bar
    ========================================================================== */
 .filter-bar {
@@ -3573,6 +3615,31 @@ form.club-filter-dropdown-open {
 
 .main .tournament-card.card-in-view:hover {
     transform: none;
+}
+
+/* Клик по всей карточке реализован ссылкой-оверлеем, а не onclick: так работают
+   средний клик, «открыть в новой вкладке» и обход поисковыми роботами.
+   Интерактивные элементы внутри карточки поднимаются выше оверлея. */
+.tournament-card__overlay-link {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+.tournament-card__meta-link,
+.tournament-card__aside-action,
+.tournament-card__title-link {
+    position: relative;
+    z-index: 2;
+}
+
+.tournament-card__title-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.tournament-card__title-link:hover {
+    color: var(--color-primary);
 }
 
 /* Общие токены чипов / меты (база для всех ширин) */
@@ -15278,6 +15345,10 @@ a.home-activity__actor:hover {
     gap: 0.75rem;
     align-items: center;
     min-width: 0;
+}
+
+.home-activity__cell--action-plain {
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .home-activity__cell--action .club-dashboard-activity__badge {

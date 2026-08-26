@@ -1,8 +1,31 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load humanize %}
 {% load skill_tags club_tags %}
 
 {% block title %}{{ tournament.name }}{% endblock %}
+
+{% block meta_description %}
+{{ tournament.city }} • {% if tournament.start_date_is_pending %}старт после набора группы{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}. {{ tournament.description|striptags|truncatechars:150 }}
+{% endblock %}
+
+{% block meta_og %}
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ tournament.name }} — TennisFan">
+    <meta property="og:description" content="{{ tournament.city }} • {% if tournament.start_date_is_pending %}старт после набора группы{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    {% if tournament.image %}
+    <meta property="og:image" content="{{ site_base_url }}{{ tournament.image.url }}">
+    {% else %}
+    <meta property="og:image" content="{{ site_base_url }}{% static 'images/avatar_placeholder.png' %}">
+    {% endif %}
+{% endblock %}
+
+{% block extra_head %}
+{% if sports_event_json %}
+<script type="application/ld+json">{{ sports_event_json|safe }}</script>
+{% endif %}
+{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top: var(--spacing-2xl);">
@@ -57,8 +80,17 @@
 
     <h1 class="page-title" style="text-align: left;">{{ tournament.name }}</h1>
     <p class="text-secondary mb-4 d-flex flex-wrap align-items-center gap-2">
-        {{ tournament.city }} • {{ tournament.start_date|date:"d.m.Y" }}
-        {% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
+        {% if tournament.geo_area %}
+        {{ tournament.geo_area.name }}{% if tournament.get_region_display %}, {{ tournament.get_region_display }}{% endif %}
+        {% else %}
+        {{ tournament.city }}
+        {% endif %}
+        •
+        {% if tournament.start_date_is_pending %}
+        старт после набора группы{% if tournament.registration_deadline %}, запись до {{ tournament.registration_deadline|date:"d.m.Y" }}{% endif %}
+        {% else %}
+        {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
+        {% endif %}
         {% if can_manage_tournament %}
         <span class="btn-manage-tournament-wrap">
             <a href="{% url 'tournament_manage' slug=tournament.slug %}" class="btn btn-manage-tournament">Управление турниром</a>
@@ -86,6 +118,17 @@
                     <span class="tournament-meta-label">Вариант</span>
                     <span class="tournament-meta-value">{{ tournament.get_variant_display }}</span>
                 </div>
+                {% if tournament.geo_area or tournament.region %}
+                <div class="tournament-meta-row">
+                    <span class="tournament-meta-label">{% if tournament.region == 'moscow_oblast' %}Город{% else %}Зона{% endif %}</span>
+                    <span class="tournament-meta-value">
+                        {% if tournament.geo_area %}{{ tournament.geo_area.name }}{% endif %}
+                        {% if tournament.get_region_display %}
+                            {% if tournament.geo_area %} · {% endif %}{{ tournament.get_region_display }}
+                        {% endif %}
+                    </span>
+                </div>
+                {% endif %}
                 <div class="tournament-meta-row">
                     <span class="tournament-meta-label">Пол</span>
                     <span class="tournament-meta-value">{{ tournament.get_gender_display }}</span>
@@ -195,10 +238,37 @@
         </div>
     </div>
 
+    <div class="card mb-4">
+        <div class="card-body">
+            <h3 class="section-title mb-2">Место проведения</h3>
+            {% if tournament.court %}
+            <p class="mb-1"><strong>{{ tournament.court.name }}</strong></p>
+            <p class="text-secondary mb-1">{{ tournament.court.address }}{% if tournament.court.surface %} • {{ tournament.court.surface }}{% endif %}</p>
+            <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="btn btn-outline btn-sm">Подробнее о корте</a>
+            {% else %}
+            <p class="text-secondary mb-0">Идёт набор — точный адрес появится после формирования группы с учётом удобства участников.</p>
+            {% endif %}
+        </div>
+    </div>
+
     {% if tournament.description %}
     <div class="card mb-4">
         <div class="card-body">
             {{ tournament.description }}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if tournament.start_date_is_pending or tournament.status == 'upcoming' %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h3 class="section-title mb-2">Как проходит турнир</h3>
+            <ol class="tournament-howto text-secondary mb-0" style="padding-left: 1.25rem; max-width: 70ch;">
+                <li>Записываетесь в группу своего уровня — вход после авторизации и заполненного профиля.</li>
+                <li>Когда группа набрана, организатор назначает дату и площадку с учётом участников.</li>
+                <li>Вы получаете соперников и сами согласовываете корт и время матчей.</li>
+                <li>Результат вносите на платформе — он идёт в рейтинг.</li>
+            </ol>
         </div>
     </div>
     {% endif %}
@@ -257,7 +327,7 @@
                     <p class="text-secondary mb-0">Зарегистрируйтесь для участия в турнире выходного дня.</p>
                 </div>
                 <div>
-                    <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary">Зарегистрироваться</a>
+                    <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary" data-metrika-goal="tournament_cta_click">Принять участие</a>
                 </div>
             </div>
         </div>
@@ -275,11 +345,13 @@
         <div class="card mb-4">
             <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div>
-                    <h3 class="mb-1" style="font-size: var(--font-size-lg);">Регистрация на турнир</h3>
-                    <p class="text-secondary mb-0">Войдите или зарегистрируйтесь, чтобы принять участие.</p>
+                    <h3 class="mb-1" style="font-size: var(--font-size-lg);">Принять участие</h3>
+                    <p class="text-secondary mb-0">Запись открыта. После нажатия попросим войти или зарегистрироваться — и вернём к этому турниру.</p>
                 </div>
                 <div>
-                    <a href="{% url 'auth' %}?next={{ request.path }}" class="btn btn-primary">Войти / Регистрация</a>
+                    <a href="{% url 'tournament_register' slug=tournament.slug %}" class="btn btn-primary" data-metrika-goal="tournament_cta_click">
+                        Принять участие
+                    </a>
                 </div>
             </div>
         </div>

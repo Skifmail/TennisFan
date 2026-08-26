@@ -20,40 +20,33 @@
                 {% endif %}
 
                 <div class="form-group">
-                    <label class="form-label" for="id_full_name">ФИО *</label>
+                    <label class="form-label" for="id_full_name">Имя *</label>
                     {{ form.full_name }}
                     {% for err in form.full_name.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="id_telegram">Telegram *</label>
-                    {{ form.telegram }}
-                    {% for err in form.telegram.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    <label class="form-label" for="id_contact_method">Способ связи *</label>
+                    {{ form.contact_method }}
+                    {% for err in form.contact_method.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="id_whatsapp">WhatsApp</label>
-                    {{ form.whatsapp }}
-                    {% for err in form.whatsapp.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    <label class="form-label" for="id_contact_value">Контакт *</label>
+                    {{ form.contact_value }}
+                    {% for err in form.contact_value.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="id_email">Email *</label>
-                    {{ form.email }}
-                    {% for err in form.email.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="id_preferred_datetime">Желаемое время</label>
-                    {{ form.preferred_datetime }}
-                    {% for err in form.preferred_datetime.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="id_desired_court">Желаемый корт</label>
+                    <label class="form-label" for="id_desired_court">Город / корт</label>
                     {{ form.desired_court }}
                     {% for err in form.desired_court.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="id_message">Сообщение</label>
-                    {{ form.message }}
-                    {% for err in form.message.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                </div>
+                <details class="form-group" style="margin-bottom: var(--spacing-lg);">
+                    <summary style="cursor: pointer; color: var(--color-text-secondary);">Уточнить детали</summary>
+                    <div style="margin-top: var(--spacing-md);">
+                        <label class="form-label" for="id_message">Сообщение</label>
+                        {{ form.message }}
+                        {% for err in form.message.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    </div>
+                </details>
 
                 <div class="form-group form-group-consent">
                     <label class="consent-label">

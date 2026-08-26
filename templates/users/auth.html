@@ -29,6 +29,7 @@
                 <form method="post" id="register-form" class="register-form-layout register-form-steps" novalidate data-loader-overlay>
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="register">
+                    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
                     {{ register_form.ntrp_quiz_payload }}
 
                     <!-- Общие ошибки формы (non-field errors) -->
@@ -179,6 +180,7 @@
                 <form method="post" class="auth-login-form" data-loader-overlay>
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="login">
+                    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
 
                     {% if login_form.errors %}
                     <div class="alert alert-error mb-3">

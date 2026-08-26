@@ -16,6 +16,7 @@ from .models import (
     City,
     ClubsOutboundEmail,
     FooterSocialLink,
+    GeoArea,
     LegalAcceptanceLog,
     NewTournamentOutboundEmail,
     OtherOutboundEmail,
@@ -593,3 +594,22 @@ class CityAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
     ordering = ("name",)
+
+
+@admin.register(GeoArea)
+class GeoAreaAdmin(admin.ModelAdmin):
+    """Зоны Москвы и города области: фильтры, лендинги и рекламные направления."""
+
+    list_display = (
+        "name",
+        "region",
+        "slug",
+        "sort_order",
+        "is_active",
+        "is_advertised",
+    )
+    list_editable = ("sort_order", "is_active", "is_advertised")
+    list_filter = ("region", "is_active", "is_advertised")
+    search_fields = ("name", "slug", "aliases")
+    prepopulated_fields: ClassVar[dict[str, tuple[str, ...]]] = {"slug": ("name",)}
+    ordering = ("region", "sort_order", "name")

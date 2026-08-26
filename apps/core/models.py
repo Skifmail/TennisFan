@@ -9,6 +9,8 @@ from django.contrib.admin.models import LogEntry
 from django.db import models
 from django.utils import timezone
 
+from apps.core.geo import GeoRegion, normalize_geo_text
+
 # ---------------------------------------------------------------------------
 # Новая система обратной связи через Telegram (пользователь ↔ админ в Telegram)
 # ---------------------------------------------------------------------------
@@ -470,6 +472,124 @@ class City(models.Model):
 
     def __str__(self) -> str:
         return str(self.name)
+
+
+# ---------------------------------------------------------------------------
+# Зоны Москвы и города области (редактируются в админке)
+# ---------------------------------------------------------------------------
+
+
+class GeoArea(models.Model):
+    """Площадка проведения внутри региона: зона Москвы или город области.
+
+    Справочник редактируется в админке: маркетинг добавляет новые направления
+    без выпуска релиза. Тип площадки отдельным полем не хранится — он
+    однозначно следует из региона.
+    """
+
+    region = models.CharField(
+        "Регион",
+        max_length=32,
+        choices=GeoRegion.choices,
+        db_index=True,
+    )
+    name = models.CharField(
+        "Название",
+        max_length=100,
+        help_text="Например: Юго-Восток, Раменское.",
+    )
+    slug = models.SlugField(
+        "Слаг",
+        max_length=100,
+        unique=True,
+        help_text="Часть адреса страницы: yugo-vostok, ramenskoe.",
+    )
+    aliases = models.TextField(
+        "Варианты написания",
+        blank=True,
+        default="",
+        help_text=(
+            "По одному в строке. Используются для распознавания зоны "
+            "в названиях турниров, например «ЮВАО» или «юго-восток»."
+        ),
+    )
+    sort_order = models.PositiveSmallIntegerField(
+        "Порядок",
+        default=0,
+        help_text="Определяет позицию в фильтрах и меню.",
+    )
+    is_active = models.BooleanField(
+        "Показывать на сайте",
+        default=True,
+    )
+    is_advertised = models.BooleanField(
+        "Рекламное направление",
+        default=False,
+        help_text="Для площадки создаётся отдельная страница под рекламный трафик.",
+    )
+
+    class Meta:
+        verbose_name = "зона / город"
+        verbose_name_plural = "Зоны Москвы и города области"
+        ordering = ["region", "sort_order", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["region", "name"],
+                name="uniq_geoarea_region_name",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        """Вернуть название площадки с регионом.
+
+        Returns:
+            str: Например «Юго-Восток (Москва)».
+        """
+        return f"{self.name} ({self.get_region_display()})"
+
+    def get_alias_list(self) -> list[str]:
+        """Вернуть варианты написания, приведённые к единому виду.
+
+        Returns:
+            list[str]: Название и все непустые псевдонимы.
+        """
+        raw = [self.name, *(self.aliases or "").splitlines()]
+        return [normalize_geo_text(value) for value in raw if value.strip()]
+
+    @classmethod
+    def resolve_from_name(
+        cls, text: str, region: str | None = None
+    ) -> "GeoArea | None":
+        """Найти площадку, упомянутую в произвольном тексте.
+
+        Нужна для разбора уже созданных турниров: зона указана только внутри
+        названия, например «Турнир TennisFan Юго-Восток».
+
+        Args:
+            text: Текст для разбора, обычно название турнира.
+            region: Ограничить поиск одним регионом, если он известен.
+
+        Returns:
+            GeoArea | None: Первая подходящая площадка либо None.
+        """
+        haystack = normalize_geo_text(text)
+        if not haystack:
+            return None
+
+        queryset = cls.objects.filter(is_active=True)
+        if region:
+            queryset = queryset.filter(region=region)
+
+        # Сначала длинные псевдонимы: «Юго-Восток» не должен проиграть «Восток».
+        candidates = [
+            (alias, area) for area in queryset for alias in area.get_alias_list()
+        ]
+        matched_area: GeoArea | None = None
+        for alias, candidate in sorted(candidates, key=lambda item: -len(item[0])):
+            if alias in haystack:
+                matched_area = candidate
+                break
+        return matched_area
 
 
 # ---------------------------------------------------------------------------

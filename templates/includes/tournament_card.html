@@ -1,7 +1,11 @@
 {% load humanize %}
 {% load skill_tags %}
 {% load static %}
-<div class="card tournament-card{% if tournament.status == 'cancelled' %} tournament-card--cancelled{% endif %}" data-url="{% url 'tournament_detail' slug=tournament.slug %}" onclick="window.location.href=this.dataset.url;">
+<div class="card tournament-card{% if tournament.status == 'cancelled' %} tournament-card--cancelled{% endif %}">
+    <a href="{% url 'tournament_detail' slug=tournament.slug %}"
+       class="tournament-card__overlay-link"
+       tabindex="-1"
+       aria-hidden="true"></a>
     <div class="card-body tournament-card-body">
         <div class="tournament-card__center">
             <div class="tournament-card__center-top">
@@ -18,8 +22,10 @@
                 {% endif %}
                 <div class="tournament-card__title-col">
                     <div class="tournament-card__line tournament-card__line--title">
-                        <h3 class="tournament-card__title">{{ tournament.name }}</h3>
-                        <span class="tournament-card__dates-muted">{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}</span>
+                        <h3 class="tournament-card__title">
+                            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="tournament-card__title-link">{{ tournament.name }}</a>
+                        </h3>
+                        <span class="tournament-card__dates-muted">{% if tournament.start_date_is_pending %}Старт после набора группы{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}{% if tournament.venue_is_pending %} · место уточняется{% endif %}</span>
                     </div>
                 </div>
             </div>
@@ -64,7 +70,7 @@
                 <span>{{ tournament.city }}</span>
                 {% if tournament.court %}
                 <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
-                <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="tournament-card__meta-link" onclick="event.stopPropagation();" title="{{ tournament.court.address }}">{{ tournament.court.name }}</a>
+                <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="tournament-card__meta-link" title="{{ tournament.court.address }}">{{ tournament.court.name }}</a>
                 {% endif %}
                 <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
                 <span>{{ tournament.get_gender_display }}</span>
@@ -133,7 +139,7 @@
             </div>
             <div class="tournament-card__aside-action tournament-action">
                 {% if tournament.card_action_is_join_form %}
-                <form method="post" action="{% url 'clubs:join_request_create' slug=tournament.card_join_club_slug %}" onclick="event.stopPropagation();">
+                <form method="post" action="{% url 'clubs:join_request_create' slug=tournament.card_join_club_slug %}">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ tournament.card_join_next_url }}">
                     <button type="submit" class="btn btn-primary btn--tournament-card">{{ tournament.card_action_label }}</button>
@@ -149,11 +155,12 @@
                 <a
                     href="{{ tournament.card_action_url }}"
                     class="btn {% if tournament.card_action_is_primary %}btn-primary{% else %}btn-outline{% endif %} btn--tournament-card"
-                    onclick="event.stopPropagation();"
+                    {% if tournament.card_action_label == "Принять участие" %}data-metrika-goal="tournament_cta_click"{% endif %}
                 >{{ tournament.card_action_label }}</a>
                 {% else %}
                 <button type="button" class="btn btn-outline btn--tournament-card" disabled>{{ tournament.card_action_label|default:"Недоступно" }}</button>
                 {% endif %}
+                <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="btn btn-ghost btn--tournament-card tournament-card__details-btn">Подробнее</a>
             </div>
         </aside>
     </div>

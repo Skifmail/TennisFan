@@ -36,7 +36,14 @@ from apps.clubs.plan_services import (
     check_tournament_registration_eligibility as check_club_tournament_registration_eligibility,
 )
 from apps.clubs.services import get_fee_status_for_member, user_can_manage_club
-from apps.core.decorators import require_filled_profile, require_verified_player
+from apps.core.decorators import require_filled_profile
+from apps.core.geo import region_to_slug
+from apps.core.metrika import (
+    TOURNAMENT_PAYMENT_STARTED,
+    TOURNAMENT_REGISTRATION_SUCCESS,
+    queue_metrika_goal,
+    tournament_goal_params,
+)
 from apps.core.text_search import filter_field_contains_ci
 from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
 from apps.subscriptions.models import FancoinTransaction
@@ -46,6 +53,13 @@ from .cancel import cancel_tournament
 from .fan import _is_fan
 from .fan import generate_bracket as fan_generate_bracket
 from .forms import TournamentPhotoUploadForm
+from .landing import (
+    VARIANT_BY_VALUE,
+    geo_area_choices,
+    region_options,
+    resolve_landing,
+    variant_options,
+)
 from .models import (
     Match,
     MatchResultProposal,
@@ -102,6 +116,7 @@ from .round_robin import (
 from .round_robin import (
     generate_bracket as round_robin_generate_bracket,
 )
+from .seo import build_tournament_sports_event_json
 from .tables_stats import build_tables_dashboard
 from .tvd import (
     TVD_STAGE_CONSOLATION_RR,
@@ -341,19 +356,39 @@ def _build_bracket_standings(tournament, is_fan, is_olympic):
     return standings
 
 
-def tournament_list(request, *, archive: bool = False):
+def tournament_list(
+    request,
+    *,
+    archive: bool = False,
+    region_slug: str | None = None,
+    area_slug: str | None = None,
+    variant_slug: str | None = None,
+):
     """Список турниров платформы и клубов.
 
     Завершённые турниры по умолчанию скрыты и доступны через фильтр
     «Завершённые» или отдельную страницу архива.
 
+    Регион, зона/город и формат приходят либо из адреса (посадочные страницы для
+    рекламы), либо из query-параметров (переключение фильтров на странице).
+    Значение из адреса приоритетнее, а канонический адрес всегда указывает на
+    ЧПУ-версию, чтобы query-версия не плодила дубли в индексе.
+
     Args:
         request (HttpRequest): HTTP-запрос со query-параметрами фильтров.
         archive (bool): Если True — показывать только завершённые турниры.
+        region_slug (str | None): Слаг региона из адреса страницы.
+        area_slug (str | None): Слаг зоны Москвы или города области из адреса.
+        variant_slug (str | None): ``singles`` или ``doubles`` из адреса.
 
     Returns:
         HttpResponse: Страница списка или архива турниров.
     """
+    landing = resolve_landing(
+        region_slug or (request.GET.get("region") or "").strip(),
+        area_slug or (request.GET.get("area") or "").strip(),
+        variant_slug or (request.GET.get("variant") or "").strip(),
+    )
     city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
     if archive:
@@ -383,6 +418,12 @@ def tournament_list(request, *, archive: bool = False):
         )
     )
 
+    if landing.region:
+        tournaments = tournaments.filter(region=landing.region)
+    if landing.area is not None:
+        tournaments = tournaments.filter(geo_area=landing.area)
+    if landing.variant:
+        tournaments = tournaments.filter(variant=landing.variant)
     if city:
         tournaments = filter_field_contains_ci(
             tournaments, "city", city, annotation="_tlist_city_l"
@@ -470,11 +511,19 @@ def tournament_list(request, *, archive: bool = False):
             continue
 
         if not request.user.is_authenticated:
-            tournament.card_action_label = "Войти"
-            tournament.card_action_url = (
-                f"{reverse('login')}?next={reverse('tournament_list')}"
+            # Аноним идёт сразу на регистрацию: @login_required отправит его на вход
+            # с next на этот турнир, поэтому после авторизации он вернётся к
+            # выбранному турниру, а не в общий каталог.
+            tournament.card_action_label = "Принять участие"
+            tournament.card_action_url = reverse(
+                (
+                    "tournament_register_doubles"
+                    if tournament.is_doubles()
+                    else "tournament_register"
+                ),
+                kwargs={"slug": tournament.slug},
             )
-            tournament.card_action_is_primary = False
+            tournament.card_action_is_primary = True
             tournament.card_action_disabled = False
             continue
 
@@ -554,6 +603,16 @@ def tournament_list(request, *, archive: bool = False):
         "current_city": city,
         "current_category": category,
         "current_status": status,
+        "landing": landing,
+        "landing_heading": landing.heading,
+        "landing_meta_description": landing.meta_description,
+        "canonical_url": request.build_absolute_uri(landing.url),
+        "region_options": region_options(),
+        "area_options": geo_area_choices(landing.region),
+        "variant_options": variant_options(),
+        "current_region": region_to_slug(landing.region),
+        "current_area": landing.area.slug if landing.area else "",
+        "current_variant": VARIANT_BY_VALUE.get(landing.variant, ""),
         # Не использовать ключ current_club — он зарезервирован под клуб из context processor (base.html).
         "list_club_filter": club_filter,
         "club_filter_choices": club_filter_choices_for_tournament_lists(),
@@ -561,6 +620,34 @@ def tournament_list(request, *, archive: bool = False):
         "is_archive": archive,
     }
     return render(request, "tournaments/list.html", context)
+
+
+def tournament_region_landing(
+    request,
+    region_slug: str,
+    area_slug: str | None = None,
+    variant_slug: str | None = None,
+):
+    """Посадочная страница турниров по региону, зоне/городу и формату.
+
+    Адрес страницы подставляется в объявление, поэтому фильтры приходят из пути,
+    а не из query-параметров.
+
+    Args:
+        request (HttpRequest): HTTP-запрос.
+        region_slug (str): Слаг региона: ``moscow`` или ``moskovskaya-oblast``.
+        area_slug (str | None): Слаг зоны Москвы либо города области.
+        variant_slug (str | None): ``singles`` или ``doubles``.
+
+    Returns:
+        HttpResponse: Страница списка турниров, суженная до направления.
+    """
+    return tournament_list(
+        request,
+        region_slug=region_slug,
+        area_slug=area_slug,
+        variant_slug=variant_slug,
+    )
 
 
 def tournament_archive(request):
@@ -631,7 +718,7 @@ def tournament_detail(request, slug):
     зарегистрироваться может только активный член клуба-организатора.
     """
     tournament = get_object_or_404(
-        Tournament.objects.select_related("court", "club").prefetch_related(
+        Tournament.objects.select_related("court", "club", "geo_area").prefetch_related(
             "matches__player1__user",
             "matches__player2__user",
             "matches__winner__user",
@@ -1140,6 +1227,18 @@ def tournament_detail(request, slug):
         **_get_participant_photo_context(request, tournament),
     }
     context.update(_get_club_panel_context_for_tournament(request, tournament))
+    from django.conf import settings as dj_settings
+
+    site_base = getattr(dj_settings, "TELEGRAM_BOT_SITE_BASE_URL", "") or ""
+    if not site_base:
+        site_base = request.build_absolute_uri("/").rstrip("/")
+    context["sports_event_json"] = build_tournament_sports_event_json(
+        tournament,
+        absolute_url=request.build_absolute_uri(
+            reverse("tournament_detail", kwargs={"slug": tournament.slug})
+        ),
+        site_base_url=site_base.rstrip("/"),
+    )
     if is_tvd:
         return render(request, "tournaments/tvd_detail.html", context)
     return render(request, "tournaments/detail.html", context)
@@ -3769,8 +3868,14 @@ def _tournament_does_not_consume_subscription_limit(tournament) -> bool:
     )
 
 
-def _build_tournament_payment_redirect(tournament, *, next_url: str = ""):
+def _build_tournament_payment_redirect(tournament, *, next_url: str = "", request=None):
     """Формирует redirect на оплату вступительного взноса турнира."""
+    if request is not None:
+        queue_metrika_goal(
+            request,
+            TOURNAMENT_PAYMENT_STARTED,
+            tournament_goal_params(tournament),
+        )
     params = {"type": "tournament", "id": tournament.id}
     if next_url:
         params["next"] = next_url
@@ -3993,7 +4098,6 @@ def _get_tournament_club_member(user, tournament) -> ClubMember | None:
 
 @login_required
 @require_filled_profile
-@require_verified_player
 def tournament_register(request, slug):
     """Register authenticated user to a tournament."""
 
@@ -4059,7 +4163,7 @@ def tournament_register(request, slug):
     if not ok:
         messages.error(request, err)
         if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
-            return _build_tournament_payment_redirect(tournament)
+            return _build_tournament_payment_redirect(tournament, request=request)
         if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
             return redirect("tournament_register_required", slug=tournament.slug)
         if "подписк" in (err or ""):
@@ -4070,7 +4174,7 @@ def tournament_register(request, slug):
 
     # Однодневный с взносом: все переходят на страницу оплаты
     if _tournament_requires_entry_payment(tournament) and tournament.is_one_day:
-        return _build_tournament_payment_redirect(tournament)
+        return _build_tournament_payment_redirect(tournament, request=request)
     else:
         # Без взноса: регистрация сразу; лимит подписки не тратим для однодневных
         if is_admin:
@@ -4117,6 +4221,11 @@ def tournament_register(request, slug):
             )
 
         tournament.participants.add(player)
+        queue_metrika_goal(
+            request,
+            TOURNAMENT_REGISTRATION_SUCCESS,
+            tournament_goal_params(tournament),
+        )
         try:
             from apps.core.telegram_notify import notify_tournament_registration
             from apps.telegram_bot import notifications as tg
@@ -4130,7 +4239,6 @@ def tournament_register(request, slug):
 
 @login_required
 @require_filled_profile
-@require_verified_player
 def tournament_register_required(request, slug):
     """Страница выбора: оплатить вступительный взнос или оформить подписку (для многодневного турнира)."""
     tournament = get_object_or_404(Tournament, slug=slug)
@@ -4159,7 +4267,6 @@ def tournament_register_required(request, slug):
 
 @login_required
 @require_filled_profile
-@require_verified_player
 def tournament_register_doubles(request, slug):
     """Регистрация на парный турнир: solo, с партнёром или присоединение к существующей паре."""
 
@@ -4220,6 +4327,7 @@ def tournament_register_doubles(request, slug):
                 next_url=request.build_absolute_uri(
                     reverse("tournament_register_doubles", kwargs={"slug": slug})
                 ),
+                request=request,
             )
         if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
             return redirect("tournament_register_required", slug=slug)
@@ -4236,6 +4344,7 @@ def tournament_register_doubles(request, slug):
                 next_url=request.build_absolute_uri(
                     reverse("tournament_register_doubles", kwargs={"slug": slug})
                 ),
+                request=request,
             )
 
     solo_teams = list(
@@ -4380,6 +4489,11 @@ def tournament_register_doubles(request, slug):
                 request,
                 "Вы зарегистрированы. Партнёр может присоединиться к вам со своей страницы турнира.",
             )
+            queue_metrika_goal(
+                request,
+                TOURNAMENT_REGISTRATION_SUCCESS,
+                tournament_goal_params(tournament),
+            )
             return redirect("tournament_detail", slug=slug)
 
         if action == "join" and solo_teams:
@@ -4418,6 +4532,7 @@ def _do_join_team(request, tournament, player, team):
                         "tournament_register_doubles", kwargs={"slug": tournament.slug}
                     )
                 ),
+                request=request,
             )
         if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
             return redirect("tournament_register_required", slug=tournament.slug)
@@ -4491,6 +4606,11 @@ def _do_join_team(request, tournament, player, team):
     messages.success(
         request, f"Вы присоединились к команде с {team.player1}. Регистрация завершена."
     )
+    queue_metrika_goal(
+        request,
+        TOURNAMENT_REGISTRATION_SUCCESS,
+        tournament_goal_params(tournament),
+    )
     return redirect("tournament_detail", slug=tournament.slug)
 
 
@@ -4551,6 +4671,7 @@ def _do_add_partner(request, tournament, player, partner_id):
                         "tournament_register_doubles", kwargs={"slug": tournament.slug}
                     )
                 ),
+                request=request,
             )
         if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
             return redirect("tournament_register_required", slug=tournament.slug)
@@ -4648,12 +4769,16 @@ def _do_add_partner(request, tournament, player, partner_id):
     except Exception:
         pass
     messages.success(request, f"Команда зарегистрирована: вы и {partner}.")
+    queue_metrika_goal(
+        request,
+        TOURNAMENT_REGISTRATION_SUCCESS,
+        tournament_goal_params(tournament),
+    )
     return redirect("tournament_detail", slug=tournament.slug)
 
 
 @login_required
 @require_filled_profile
-@require_verified_player
 def tournament_join_team(request, slug, team_id):
     """Присоединиться к команде (партнёр без пары)."""
     if request.method != "POST":

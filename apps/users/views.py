@@ -24,11 +24,13 @@ from django.views.decorators.http import require_POST
 from apps.core.consent_utils import record_platform_consent
 from apps.core.decorators import login_required_with_message
 from apps.core.models import LegalAcceptanceLog, UserConsent, UserTelegramLink
+from apps.core.redirects import append_next, get_safe_next_url
 from apps.legal.utils import get_legal_document_version
 
 from .context_processors import invalidate_unread_notifications_cache
 from .forms import EmailAuthenticationForm, PlayerProfileForm, UserRegistrationForm
 from .models import EmailVerificationToken, Notification, NtrpTestResult, Player
+from .verification import try_auto_verify
 
 logger = logging.getLogger(__name__)
 
@@ -392,6 +394,10 @@ def auth(request):
     if active_mode not in ("register", "login"):
         active_mode = "register"
 
+    # Адрес возврата: рекламный трафик приходит с конкретного турнира,
+    # и после входа или регистрации человек должен вернуться именно туда.
+    next_url = get_safe_next_url(request)
+
     register_form = None
     login_form = None
     # По умолчанию при загрузке показываем шаг 1 регистрации.
@@ -468,7 +474,7 @@ def auth(request):
                     get_legal_document_version("privacy"),
                 )
                 messages.success(request, "Регистрация успешна! Добро пожаловать.")
-                return redirect("home")
+                return redirect(next_url or "home")
             else:
                 # Если ошибка только в поле уровня силы (шаг 2),
                 # а все поля шага 1 валидны, то оставляем пользователя на шаге 2.
@@ -497,7 +503,7 @@ def auth(request):
                 messages.success(
                     request, f"Добро пожаловать, {user.get_full_name() or user.email}!"
                 )
-                return redirect("home")
+                return redirect(next_url or "home")
 
     # Инициализируем формы если они не были созданы выше
     if register_form is None:
@@ -513,18 +519,23 @@ def auth(request):
             "login_form": login_form,
             "active_mode": active_mode,
             "show_register_step2": show_register_step2,
+            "next_url": next_url,
         },
     )
 
 
 def register(request):
-    """Редирект на объединённую страницу авторизации."""
-    return redirect(reverse("auth") + "?mode=register")
+    """Редирект на объединённую страницу авторизации в режиме регистрации."""
+    return redirect(
+        append_next(reverse("auth") + "?mode=register", get_safe_next_url(request))
+    )
 
 
 def login_view(request):
-    """Редирект на объединённую страницу авторизации."""
-    return redirect(reverse("auth") + "?mode=login")
+    """Редирект на объединённую страницу авторизации в режиме входа."""
+    return redirect(
+        append_next(reverse("auth") + "?mode=login", get_safe_next_url(request))
+    )
 
 
 @login_required_with_message(
@@ -918,13 +929,21 @@ def profile_edit(request):
     except Player.DoesNotExist:
         player = Player.objects.create(user=request.user)
 
+    # Профиль часто открывается принудительно с другой страницы (например,
+    # с регистрации на турнир) — после сохранения возвращаем человека туда же.
+    next_url = get_safe_next_url(request)
+
     if request.method == "POST":
         form = PlayerProfileForm(
             request.POST, request.FILES, instance=player, user=request.user
         )
         if form.is_valid():
             form.save()
+            player.refresh_from_db()
+            try_auto_verify(player)
             messages.success(request, "Профиль обновлён.")
+            if next_url:
+                return redirect(next_url)
             return redirect("profile", pk=player.pk)
     else:
         form = PlayerProfileForm(instance=player, user=request.user)
@@ -934,6 +953,7 @@ def profile_edit(request):
         "users/profile_edit.html",
         {
             "form": form,
+            "next_url": next_url,
             **_get_telegram_bot_connection_context(request.user),
         },
     )
@@ -981,6 +1001,7 @@ def verify_email_confirm(request, token: str):
     user.save(update_fields=["email_verified"])
     messages.success(request, "Email успешно подтверждён.")
     player = getattr(user, "player", None)
+    try_auto_verify(player)
     if player is not None:
         return redirect("profile", pk=player.pk)
     return redirect("login")

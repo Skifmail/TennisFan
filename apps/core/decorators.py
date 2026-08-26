@@ -10,6 +10,9 @@ from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 
+from apps.core.redirects import append_next
+from apps.users.verification import get_missing_profile_fields
+
 
 def login_required_with_message(
     message: str = "Данная информация доступна только для зарегистрированных пользователей.",
@@ -32,8 +35,9 @@ def login_required_with_message(
             if not request.user.is_authenticated:
                 messages.info(request, message)
                 login_url = getattr(settings, "LOGIN_URL", "login")
-                next_url = request.get_full_path()
-                return redirect(f"{reverse(login_url)}?next={next_url}")
+                return redirect(
+                    append_next(reverse(login_url), request.get_full_path())
+                )
             return view_func(request, *args, **kwargs)
 
         return wrapper
@@ -60,16 +64,7 @@ def require_filled_profile(view_func):
 
             player = Player.objects.create(user=user)
 
-        required_fields = {
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "phone": user.phone,
-            "birth_date": player.birth_date,
-        }
-
-        missing = [k for k, v in required_fields.items() if not v]
-
-        if missing:
+        if get_missing_profile_fields(user, player):
             # Для POST запросов с JSON возвращаем JSON ответ вместо редиректа
             if (
                 request.method == "POST"
@@ -88,7 +83,9 @@ def require_filled_profile(view_func):
                 request,
                 "Для выполнения этого действия необходимо заполнить профиль (Имя, Фамилия, Телефон, Дата рождения).",
             )
-            return redirect("profile_edit")
+            return redirect(
+                append_next(reverse("profile_edit"), request.get_full_path())
+            )
 
         return view_func(request, *args, **kwargs)
 
@@ -135,6 +132,8 @@ def require_verified_player(view_func):
                 "Ваш аккаунт ещё не подтверждён администратором. "
                 "Регистрация на турниры и спарринги будет доступна после подтверждения.",
             )
+            # Без next: верификацию пользователь не может пройти сам, и возврат
+            # отправил бы его в то же заблокированное действие.
             return redirect("profile_edit")
 
         return view_func(request, *args, **kwargs)

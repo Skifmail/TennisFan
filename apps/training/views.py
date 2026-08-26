@@ -24,6 +24,11 @@ from .forms import (
     TrainingEnrollmentForm,
     TrainingForm,
 )
+from .geo import (
+    advertised_training_cities,
+    format_city_list,
+    group_training_courts,
+)
 from .models import (
     Coach,
     Training,
@@ -58,11 +63,15 @@ def training_list(request):
             trainings, "city", city, annotation="_trn_list_city_l"
         )
 
+    training_cities = advertised_training_cities()
     context = {
         "trainings": trainings,
         "current_level": skill_level,
         "current_type": training_type,
         "current_city": city,
+        "training_cities": training_cities,
+        "training_cities_label": format_city_list(training_cities),
+        "training_city_groups": group_training_courts(city_filter=city),
     }
     return render(request, "training/list.html", context)
 

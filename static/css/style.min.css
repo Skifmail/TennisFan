@@ -16707,6 +16707,76 @@ a.home-activity__actor:hover {
     margin-bottom: auto;
 }
 
+.training-geo {
+    margin: 0 0 var(--spacing-xl);
+    padding: clamp(1rem, 2vw, 1.35rem) 0 0;
+    border-top: 1px solid rgb(166 130 74 / 0.28);
+}
+
+.training-geo__lede {
+    margin: 0.55rem auto 0;
+    max-width: 46ch;
+    color: var(--color-text);
+    font-size: var(--font-size-md);
+    line-height: 1.45;
+}
+
+.training-geo__title {
+    margin: 0 0 1rem;
+    color: var(--color-primary);
+    font-family: var(--font-heading);
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.training-geo__cities {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+    gap: 1rem 1.25rem;
+}
+
+.training-geo__city {
+    min-width: 0;
+    padding: 0 0 0 0.85rem;
+    border-left: 2px solid rgb(166 130 74 / 0.45);
+}
+
+.training-geo__city-name {
+    margin: 0 0 0.35rem;
+    color: var(--color-primary);
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.training-geo__courts {
+    display: grid;
+    gap: 0.28rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.training-geo__courts a {
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.training-geo__courts a:hover,
+.training-geo__courts a:focus-visible {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.training-geo__empty {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+}
+
 .training-detail-sidebar-card {
     position: sticky;
     top: 100px;

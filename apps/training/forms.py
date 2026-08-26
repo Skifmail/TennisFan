@@ -8,6 +8,7 @@ from django import forms
 
 from apps.core.contact_utils import normalize_max_contact
 from apps.courts.models import Court
+from apps.training.geo import advertised_training_courts
 from apps.users.models import SkillLevel
 
 from .models import CoachApplication, Training, TrainingEnrollment
@@ -68,9 +69,7 @@ class TrainingEnrollmentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["full_name"].required = True
-        self.fields["desired_court"].queryset = Court.objects.filter(
-            is_active=True
-        ).order_by("city", "name")
+        self.fields["desired_court"].queryset = advertised_training_courts()
         self.fields["desired_court"].required = False
         self.fields["desired_court"].empty_label = "—— Город / корт (необязательно) ——"
         self.fields["desired_court"].label_from_instance = (

@@ -33,7 +33,7 @@
                 <td class="tournament-table__cell tournament-table__cell--title">
                     <div class="tournament-table__title">{{ tournament.name }}</div>
                     <div class="tournament-table__sub">
-                        {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
+                        {% if tournament.start_date_is_pending %}Старт после набора группы{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}
                     </div>
                     <div class="tournament-table__participants">
                         {% if tournament.variant == 'doubles' %}

@@ -10,7 +10,7 @@
 
 <div class="container">
     <form method="get" class="filter-bar">
-        <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
+        <input name="city" class="form-control" placeholder="Москва, Раменское, Жуковский, Воскресенск" value="{{ current_city }}" onchange="this.form.submit()">
         <select name="type" class="form-control" onchange="this.form.submit()">
             <option value="">Все типы</option>
             <option value="individual" {% if current_type == 'individual' %}selected{% endif %}>Индивидуальные</option>

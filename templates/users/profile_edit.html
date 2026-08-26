@@ -13,6 +13,7 @@
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
+                {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
                 {% if form.non_field_errors %}
                 <div class="alert alert-error" style="margin-bottom: var(--spacing-lg);">
                     {% for err in form.non_field_errors %}{{ err }}{% endfor %}

@@ -12,6 +12,11 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.decorators import login_required_with_message
+from apps.core.metrika import (
+    COACH_APPLICATION_SUCCESS,
+    TRAINING_ENROLL_SUCCESS,
+    queue_metrika_goal,
+)
 from apps.core.text_search import filter_field_contains_ci
 
 from .forms import (
@@ -96,6 +101,14 @@ def training_enroll(request, slug):
                 enrollment.player = player
             enrollment.save()
             messages.success(request, "Заявка на тренировку отправлена!")
+            queue_metrika_goal(
+                request,
+                TRAINING_ENROLL_SUCCESS,
+                {
+                    "training_slug": training.slug,
+                    "training_id": training.pk,
+                },
+            )
             return redirect("training_detail", slug=slug)
     else:
         initial = {}
@@ -103,13 +116,15 @@ def training_enroll(request, slug):
         if user.is_authenticated:
             if user.get_full_name():
                 initial["full_name"] = user.get_full_name().strip()
-            if user.email:
-                initial["email"] = user.email
-            if player is not None:
-                if getattr(player, "telegram", None):
-                    initial["telegram"] = player.telegram
-                if getattr(player, "whatsapp", None):
-                    initial["whatsapp"] = player.whatsapp
+            if player is not None and getattr(player, "telegram", None):
+                initial["contact_method"] = TrainingEnrollmentForm.CONTACT_TELEGRAM
+                initial["contact_value"] = player.telegram
+            elif player is not None and getattr(player, "whatsapp", None):
+                initial["contact_method"] = TrainingEnrollmentForm.CONTACT_WHATSAPP
+                initial["contact_value"] = player.whatsapp
+            elif user.email:
+                initial["contact_method"] = TrainingEnrollmentForm.CONTACT_EMAIL
+                initial["contact_value"] = user.email
         form = TrainingEnrollmentForm(initial=initial)
 
     return render(request, "training/enroll.html", {"training": training, "form": form})
@@ -153,6 +168,7 @@ def coach_application_create(request):
                 "Заявка отправлена. Мы рассмотрим её и свяжемся с вами. "
                 "После одобрения вы появитесь в разделе «Наши тренеры».",
             )
+            queue_metrika_goal(request, COACH_APPLICATION_SUCCESS)
             return redirect("coach_application_success")
     else:
         user = request.user

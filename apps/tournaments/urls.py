@@ -2,13 +2,43 @@
 Tournaments app URLs.
 """
 
-from django.urls import path
+from django.urls import path, re_path
+
+from apps.core.geo import REGION_SLUGS
 
 from . import views
+from .landing import VARIANT_SLUGS
+
+# Регион и формат — закрытые перечисления, поэтому попадают в регулярное
+# выражение: иначе `/tournaments/moscow/` перехватил бы маршрут детальной
+# страницы турнира, где slug тоже стоит первым сегментом.
+_REGION = "|".join(REGION_SLUGS)
+_VARIANT = "|".join(VARIANT_SLUGS)
 
 urlpatterns = [
     path("", views.tournament_list, name="tournament_list"),
     path("archive/", views.tournament_archive, name="tournament_archive"),
+    re_path(
+        rf"^(?P<region_slug>{_REGION})/$",
+        views.tournament_region_landing,
+        name="tournament_region_landing",
+    ),
+    re_path(
+        rf"^(?P<region_slug>{_REGION})/(?P<variant_slug>{_VARIANT})/$",
+        views.tournament_region_landing,
+        name="tournament_region_variant_landing",
+    ),
+    re_path(
+        rf"^(?P<region_slug>{_REGION})/(?P<area_slug>[-\w]+)/$",
+        views.tournament_region_landing,
+        name="tournament_area_landing",
+    ),
+    re_path(
+        rf"^(?P<region_slug>{_REGION})/(?P<area_slug>[-\w]+)/"
+        rf"(?P<variant_slug>{_VARIANT})/$",
+        views.tournament_region_landing,
+        name="tournament_area_variant_landing",
+    ),
     path("tables/", views.tournament_tables_list, name="tournament_tables_list"),
     path(
         "tables/<slug:slug>/",

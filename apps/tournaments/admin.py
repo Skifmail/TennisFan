@@ -421,6 +421,8 @@ class TournamentAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "city",
+        "region",
+        "geo_area",
         "allowed_skill_levels",
         "format",
         "variant",
@@ -436,6 +438,8 @@ class TournamentAdmin(admin.ModelAdmin):
         "max_teams",
     )
     list_filter = (
+        "region",
+        "geo_area",
         "city",
         "gender",
         "tournament_type",
@@ -1090,6 +1094,8 @@ class TournamentAdmin(admin.ModelAdmin):
                     "entry_fee",
                     "is_one_day",
                     "city",
+                    "region",
+                    "geo_area",
                     "court",
                     "gender",
                     "allowed_categories",
@@ -1229,13 +1235,15 @@ class TVDTournamentAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "city",
+        "region",
+        "geo_area",
         "variant",
         "status",
         "bracket_generated",
         "start_date",
         "max_participants",
     )
-    list_filter = ("city", "status", "bracket_generated")
+    list_filter = ("region", "geo_area", "city", "status", "bracket_generated")
     search_fields = ("name", "description")
     list_editable = ("status",)
     prepopulated_fields = {"slug": ("name",)}
@@ -1259,6 +1267,8 @@ class TVDTournamentAdmin(admin.ModelAdmin):
                     "is_free",
                     "entry_fee",
                     "city",
+                    "region",
+                    "geo_area",
                     "court",
                     "gender",
                     "allowed_categories",

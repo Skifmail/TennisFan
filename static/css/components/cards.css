@@ -574,6 +574,31 @@
     transform: none;
 }
 
+/* Клик по всей карточке реализован ссылкой-оверлеем, а не onclick: так работают
+   средний клик, «открыть в новой вкладке» и обход поисковыми роботами.
+   Интерактивные элементы внутри карточки поднимаются выше оверлея. */
+.tournament-card__overlay-link {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+.tournament-card__meta-link,
+.tournament-card__aside-action,
+.tournament-card__title-link {
+    position: relative;
+    z-index: 2;
+}
+
+.tournament-card__title-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.tournament-card__title-link:hover {
+    color: var(--color-primary);
+}
+
 /* Общие токены чипов / меты (база для всех ширин) */
 .tournament-card__chip {
     display: inline-flex;

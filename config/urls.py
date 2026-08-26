@@ -9,14 +9,14 @@ from django.contrib.sitemaps import views as sitemap_views
 from django.urls import include, path
 
 from apps.core.views import robots_txt
-from config.sitemaps import StaticViewSitemap
+from config.sitemaps import SITEMAPS
 
 urlpatterns = [
     path(f"{settings.ADMIN_URL}/", admin.site.urls),
     path(
         "sitemap.xml",
         sitemap_views.sitemap,
-        {"sitemaps": {"static": StaticViewSitemap}},
+        {"sitemaps": SITEMAPS},
         name="sitemap",
     ),
     path("robots.txt", robots_txt, name="robots_txt"),

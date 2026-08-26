@@ -1,18 +1,49 @@
 {% extends 'base.html' %}
 
-{% block title %}{% if is_archive %}Архив турниров{% else %}Турниры{% endif %}{% endblock %}
+{% block title %}{% if is_archive %}Архив турниров{% else %}{{ landing_heading|default:"Турниры" }}{% endif %}{% endblock %}
+
+{% block meta_description %}{% if is_archive %}Архив завершённых любительских турниров по теннису на TennisFan.{% else %}{{ landing_meta_description|default:"Любительские турниры по теннису в Москве и Московской области." }}{% endif %}{% endblock %}
+
+{% block meta_og %}
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{% if is_archive %}Архив турниров{% else %}{{ landing_heading|default:"Турниры" }}{% endif %} — TennisFan">
+    <meta property="og:description" content="{% if is_archive %}Архив завершённых любительских турниров по теннису.{% else %}{{ landing_meta_description|default:"" }}{% endif %}">
+    <meta property="og:url" content="{{ canonical_url }}">
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">{% if is_archive %}Архив турниров{% else %}Турниры{% endif %}</h1>
+    <h1 class="page-title">{% if is_archive %}Архив турниров{% else %}{{ landing_heading|default:"Турниры" }}{% endif %}</h1>
     <p class="page-subtitle">{% if is_archive %}Завершённые теннисные турниры{% else %}Расписание теннисных турниров{% endif %}</p>
 </div>
 
 <div class="container">
+    {% if not is_archive %}{% include 'tournaments/_intro.html' %}{% endif %}
+
     <!-- Filters -->
-    <form method="get" class="filter-bar" {% if is_archive %}action="{% url 'tournament_archive' %}"{% endif %}>
+    <form method="get" class="filter-bar" action="{% if is_archive %}{% url 'tournament_archive' %}{% else %}{% url 'tournament_list' %}{% endif %}">
+        <select name="region" class="form-control" onchange="this.form.submit()" aria-label="Регион">
+            <option value="">Москва и область</option>
+            {% for option in region_options %}
+            <option value="{{ option.slug }}" {% if current_region == option.slug %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+        </select>
+        {% if area_options %}
+        <select name="area" class="form-control" onchange="this.form.submit()" aria-label="Зона или город">
+            <option value="">Все зоны и города</option>
+            {% for area in area_options %}
+            <option value="{{ area.slug }}" {% if current_area == area.slug %}selected{% endif %}>{{ area.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <select name="variant" class="form-control" onchange="this.form.submit()" aria-label="Формат">
+            <option value="">Одиночные и парные</option>
+            {% for option in variant_options %}
+            <option value="{{ option.slug }}" {% if current_variant == option.slug %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+        </select>
         <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
-        <select name="category" class="form-control" onchange="this.form.submit()">
+        <select name="category" class="form-control" onchange="this.form.submit()" aria-label="Уровень игроков">
             <option value="">Все категории</option>
             {% for value, label in category_choices %}
             <option value="{{ value }}" {% if current_category == value %}selected{% endif %}>{{ label }}</option>
@@ -44,7 +75,7 @@
                 <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
                 {% else %}
                 <li class="pagination__item">
-                    <a href="?page={{ page_num }}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_status and not is_archive %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
+                    <a href="?page={{ page_num }}{% if current_region %}&region={{ current_region }}{% endif %}{% if current_area %}&area={{ current_area }}{% endif %}{% if current_variant %}&variant={{ current_variant }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_status and not is_archive %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
                 </li>
                 {% endif %}
             {% endfor %}

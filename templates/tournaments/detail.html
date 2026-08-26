@@ -479,7 +479,7 @@
             <p class="text-secondary mb-1">{{ tournament.court.address }}{% if tournament.court.surface %} • {{ tournament.court.surface }}{% endif %}</p>
             <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="btn btn-outline btn-sm">Подробнее о корте</a>
             {% else %}
-            <p class="text-secondary mb-0">Идёт набор — точный адрес появится после формирования группы с учётом удобства участников.</p>
+            <p class="text-secondary mb-0">Пока идёт набор, адрес ещё не выбран. Корт подберём ближе к старту, когда будет ясно, кто играет.</p>
             {% endif %}
         </div>
     </div>
@@ -507,9 +507,9 @@
             <h3 class="section-title mb-2">Как проходит турнир</h3>
             <ol class="tournament-howto text-secondary mb-0" style="padding-left: 1.25rem; max-width: 70ch;">
                 <li>Запишитесь в группу своего уровня.</li>
-                <li>Старт после набора{% if tournament.min_participants and not tournament.is_doubles %} (от {{ tournament.min_participants }} человек){% elif tournament.min_teams and tournament.is_doubles %} (от {{ tournament.min_teams }} пар){% endif %}{% if tournament.registration_deadline %}, запись до {{ tournament.registration_deadline|date:"d.m.Y" }}{% endif %}. Корт назначим под состав.</li>
-                <li>Соперников увидите в таблице. Корт и время матча договаривайтесь сами.</li>
-                <li>Счёт — на сайте, в рейтинг. На раунд обычно {{ tournament.match_days_per_round }} дн.</li>
+                <li>Турнир начнётся, когда наберётся состав{% if tournament.min_participants and not tournament.is_doubles %} (от {{ tournament.min_participants }} человек){% elif tournament.min_teams and tournament.is_doubles %} (от {{ tournament.min_teams }} пар){% endif %}{% if tournament.registration_deadline %}. Запись до {{ tournament.registration_deadline|date:"d.m.Y" }}{% endif %}. Корт назначим ближе к старту.</li>
+                <li>Соперников видно в таблице. Время и корт матча договаривайтесь с соперником.</li>
+                <li>Счёт вносите на сайте. Он идёт в рейтинг. На раунд обычно {{ tournament.match_days_per_round }} дн.</li>
             </ol>
         </div>
     </div>
@@ -615,7 +615,7 @@
             <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div>
                     <h3 class="mb-1" style="font-size: var(--font-size-lg);">Принять участие</h3>
-                    <p class="text-secondary mb-0">Запись открыта. После нажатия попросим войти или зарегистрироваться — и вернём к этому турниру.</p>
+                    <p class="text-secondary mb-0">Запись открыта. Нужно войти или зарегистрироваться, после этого вернём вас к этому турниру.</p>
                 </div>
                 <div>
                     {% if tournament.variant == 'doubles' %}

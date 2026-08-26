@@ -73,7 +73,7 @@
                 <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="tournament-card__meta-link" title="{{ tournament.court.address }}">{{ tournament.court.name }}</a>
                 {% elif tournament.venue_is_pending %}
                 <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
-                <span>корт уточним после набора</span>
+                <span>корт ещё не выбран</span>
                 {% endif %}
                 <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
                 <span>{{ tournament.get_gender_display }}</span>

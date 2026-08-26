@@ -6,13 +6,13 @@
 {% block title %}{{ tournament.name }}{% endblock %}
 
 {% block meta_description %}
-{{ tournament.city }} • {% if tournament.start_date_is_pending %}старт после набора группы{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}. {{ tournament.description|striptags|truncatechars:150 }}
+{{ tournament.city }} • {% if tournament.start_date_is_pending %}старт после набора{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}. {{ tournament.description|striptags|truncatechars:150 }}
 {% endblock %}
 
 {% block meta_og %}
     <meta property="og:type" content="website">
     <meta property="og:title" content="{{ tournament.name }} — TennisFan">
-    <meta property="og:description" content="{{ tournament.city }} • {% if tournament.start_date_is_pending %}старт после набора группы{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}">
+    <meta property="og:description" content="{{ tournament.city }} • {% if tournament.start_date_is_pending %}старт после набора{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}">
     <meta property="og:url" content="{{ canonical_url }}">
     {% if tournament.image %}
     <meta property="og:image" content="{{ site_base_url }}{{ tournament.image.url }}">
@@ -87,7 +87,7 @@
         {% endif %}
         •
         {% if tournament.start_date_is_pending %}
-        старт после набора группы{% if tournament.registration_deadline %}, запись до {{ tournament.registration_deadline|date:"d.m.Y" }}{% endif %}
+        старт после набора{% if tournament.registration_deadline %}, запись до {{ tournament.registration_deadline|date:"d.m.Y" }}{% endif %}
         {% else %}
         {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}
         {% endif %}
@@ -264,9 +264,9 @@
         <div class="card-body">
             <h3 class="section-title mb-2">Как проходит турнир</h3>
             <ol class="tournament-howto text-secondary mb-0" style="padding-left: 1.25rem; max-width: 70ch;">
-                <li>Запишитесь в группу своего уровня.</li>
+                <li>Запишитесь на турнир своего уровня.</li>
                 <li>Турнир начнётся, когда наберётся состав.</li>
-                <li>Соперников видно в таблице. Когда и где играть матч, договаривайтесь с соперником.</li>
+                <li>Соперников видно в таблице. Когда и где играть матч, договаривайтесь с соперником самостоятельно - контакты будут указаны в деталях матча в Вашем личном кабинете.</li>
                 <li>Счёт вносите на сайте. Он идёт в рейтинг.</li>
             </ol>
         </div>

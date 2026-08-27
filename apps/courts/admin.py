@@ -138,14 +138,13 @@ class CourtAdmin(admin.ModelAdmin):
                     "sells_water",
                     "multiple_payment_methods",
                     "racket_rental",
-                    "parking_on_site",
-                    "parking_nearby",
+                    "has_parking",
                     "racket_stringing",
                     "has_training",
                 )
             },
         ),
-        ("Контакты", {"fields": ("phone", "whatsapp", "website")}),
+        ("Контакты", {"fields": ("phone", "working_hours", "whatsapp", "website")}),
         (
             "Карта",
             {

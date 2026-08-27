@@ -70,12 +70,18 @@ class Court(CompressImageFieldsMixin, models.Model):
     )
 
     racket_rental = models.BooleanField("Аренда ракеток", default=False)
-    parking_on_site = models.BooleanField("Парковка на территории", default=False)
-    parking_nearby = models.BooleanField("Парковка рядом", default=False)
+    has_parking = models.BooleanField("Автомобильная парковка", default=False)
     racket_stringing = models.BooleanField("Перетяжка ракеток", default=False)
     has_training = models.BooleanField("Тренировки", default=False)
 
     phone = models.CharField("Телефон", max_length=50, blank=True)
+    working_hours = models.CharField(
+        "Время работы",
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Например: 7:00 до 23:00",
+    )
     whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
     website = models.URLField("Сайт", blank=True)
     sells_balls = models.BooleanField("Теннисные мячи в продаже", default=False)

@@ -132,7 +132,7 @@ class TrainingListGeographyTestCase(TestCase):
         self.assertIn("Корт Москва 1", html)
         self.assertIn("Корт Москва 4", html)
         self.assertIn("Корт Москва 5", html)
-        self.assertIn("training-geo__courts--extra", html)
+        self.assertIn("training-geo__extra", html)
 
     def test_short_city_court_list_hides_more_toggle(self) -> None:
         response = self.client.get(reverse("training_list"), secure=True)

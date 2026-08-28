@@ -60,13 +60,17 @@
                     {% endfor %}
                 </ul>
                 {% if group.courts|length > 4 %}
-                <ul class="training-geo__courts training-geo__courts--extra">
-                    {% for court in group.courts|slice:"4:" %}
-                    <li>
-                        <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>
-                    </li>
-                    {% endfor %}
-                </ul>
+                <div class="training-geo__extra">
+                    <div class="training-geo__extra-clip">
+                        <ul class="training-geo__courts">
+                            {% for court in group.courts|slice:"4:" %}
+                            <li>
+                                <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
                 {% endif %}
                 {% else %}
                 <p class="training-geo__empty">Площадку уточним при записи.</p>
@@ -75,10 +79,12 @@
             {% endfor %}
         </div>
         {% if training_courts_has_more %}
-        <label for="training-geo-more" class="training-geo__more-toggle">
-            <span class="training-geo__more-label">Ещё...</span>
-            <span class="training-geo__more-label training-geo__more-label--open">Свернуть</span>
-        </label>
+        <div class="training-geo__more">
+            <label for="training-geo-more" class="training-geo__more-toggle">
+                <span class="training-geo__more-label">Ещё...</span>
+                <span class="training-geo__more-label training-geo__more-label--open">Свернуть</span>
+            </label>
+        </div>
         {% endif %}
     </section>
 

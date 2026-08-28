@@ -50,12 +50,27 @@
                 <h3 class="training-geo__city-name">{{ group.city }}</h3>
                 {% if group.courts %}
                 <ul class="training-geo__courts">
-                    {% for court in group.courts %}
+                    {% for court in group.courts|slice:":4" %}
                     <li>
                         <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>
                     </li>
                     {% endfor %}
                 </ul>
+                {% if group.courts|length > 4 %}
+                <details class="training-geo__more">
+                    <summary class="training-geo__more-toggle">
+                        <span class="training-geo__more-label">Ещё...</span>
+                        <span class="training-geo__more-label training-geo__more-label--open">Свернуть</span>
+                    </summary>
+                    <ul class="training-geo__courts training-geo__courts--extra">
+                        {% for court in group.courts|slice:"4:" %}
+                        <li>
+                            <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </details>
+                {% endif %}
                 {% else %}
                 <p class="training-geo__empty">Площадку уточним при записи.</p>
                 {% endif %}

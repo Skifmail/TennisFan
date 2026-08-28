@@ -111,6 +111,35 @@ class TrainingListGeographyTestCase(TestCase):
         ):
             self.assertIn(f'value="{city}"', html)
 
+    def test_long_city_court_list_shows_more_toggle(self) -> None:
+        moscow_area = GeoArea.objects.get(slug="yugo-vostok")
+        for index in range(1, 6):
+            _make_court(
+                name=f"Корт Москва {index}",
+                slug=f"court-moscow-{index}",
+                city="Москва",
+                region=GeoRegion.MOSCOW,
+                geo_area=moscow_area,
+            )
+
+        response = self.client.get(reverse("training_list"), secure=True)
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ещё...")
+        self.assertContains(response, 'class="training-geo__more"')
+        self.assertIn("Корт Москва 1", html)
+        self.assertIn("Корт Москва 4", html)
+        self.assertIn("Корт Москва 5", html)
+        self.assertEqual(html.count("training-geo__courts--extra"), 1)
+
+    def test_short_city_court_list_hides_more_toggle(self) -> None:
+        response = self.client.get(reverse("training_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Ещё...")
+        self.assertNotContains(response, 'class="training-geo__more"')
+
 
 class TrainingEnrollCourtChoicesTestCase(TestCase):
     """В заявке только корты рекламируемой географии."""

@@ -79,6 +79,10 @@ SESSION_SAVE_EVERY_REQUEST = (
     os.environ.get("SESSION_SAVE_EVERY_REQUEST", "False") == "True"
 )
 
+# Лимиты загрузки файлов (админка: фото корта + до 4 фото в inline).
+DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024  # 12 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+
 # Защита от перебора паролей (админка и вход на сайт)
 AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = timedelta(minutes=5)  # время блокировки после превышения попыток
@@ -145,6 +149,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.core.middleware.AdminNoCacheMiddleware",
     "axes.middleware.AxesMiddleware",
     "apps.core.middleware.StartupMiddleware",
 ]

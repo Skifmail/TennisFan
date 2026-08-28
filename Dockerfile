@@ -5,12 +5,22 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Системные зависимости
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    gcc \
-    cron \
-    && rm -rf /var/lib/apt/lists/*
+# Системные зависимости.
+# На части VPS (в т.ч. Dokploy) deb.debian.org/CDN недоступен из build-контейнера,
+# поэтому ставим зеркало. Переопределение: --build-arg DEBIAN_MIRROR=...
+ARG DEBIAN_MIRROR=https://mirror.yandex.ru/debian
+ARG DEBIAN_SECURITY_MIRROR=https://mirror.yandex.ru/debian-security
+RUN set -eux; \
+    sed -i \
+      -e "s|https\\?://deb.debian.org/debian-security|${DEBIAN_SECURITY_MIRROR}|g" \
+      -e "s|https\\?://deb.debian.org/debian|${DEBIAN_MIRROR}|g" \
+      /etc/apt/sources.list.d/debian.sources; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        libpq-dev \
+        gcc \
+        cron; \
+    rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt

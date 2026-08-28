@@ -67,7 +67,7 @@ class CourtAdmin(admin.ModelAdmin):
     """Admin for Court model."""
 
     class Media:
-        js = ("js/city_autocomplete.js",)
+        js = ("js/city_autocomplete.js", "js/admin_court_form.js")
 
     inlines = [CourtPhotoInline]
 
@@ -160,7 +160,11 @@ class CourtAdmin(admin.ModelAdmin):
                     "rental_price_min",
                     "rental_price_max",
                     "image",
-                )
+                ),
+                "description": (
+                    "Фото можно добавить позже через «Изменить». "
+                    "Если форма открыта долго — перед сохранением выберите файлы заново."
+                ),
             },
         ),
         ("Статус", {"fields": ("is_active",)}),

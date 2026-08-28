@@ -8,8 +8,11 @@ RuntimeWarning: Accessing the database during app initialization is discouraged.
 import logging
 import sys
 import time
+from collections.abc import Callable
 
+from django.conf import settings
 from django.db import connection
+from django.http import HttpRequest, HttpResponse
 
 logger = logging.getLogger(__name__)
 
@@ -102,4 +105,25 @@ class SlowRequestLoggingMiddleware:
                 elapsed_ms,
                 len(getattr(connection, "queries", [])),
             )
+        return response
+
+
+class AdminNoCacheMiddleware:
+    """Запрещает кэширование страниц админки (устаревший CSRF-токен → 403).
+
+    На мобильных браузерах закэшированная форма добавления корта часто
+    отправляет старый csrfmiddlewaretoken; no-store заставляет браузер
+    каждый раз загружать свежую страницу.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+        self._admin_prefix = f"/{settings.ADMIN_URL.strip('/')}/"
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        response = self.get_response(request)
+        if request.path.startswith(self._admin_prefix):
+            response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response["Pragma"] = "no-cache"
+            response["Expires"] = "0"
         return response

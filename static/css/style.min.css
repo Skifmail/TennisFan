@@ -16734,6 +16734,7 @@ a.home-activity__actor:hover {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
     gap: 1rem 1.25rem;
+    align-items: start;
 }
 
 .training-geo__city {
@@ -16760,7 +16761,12 @@ a.home-activity__actor:hover {
 }
 
 .training-geo__courts--extra {
+    display: none;
     margin-top: 0.28rem;
+}
+
+.training-geo:has(.training-geo__more-input:checked) .training-geo__courts--extra {
+    display: grid;
 }
 
 .training-geo__courts a {
@@ -16774,25 +16780,28 @@ a.home-activity__actor:hover {
     text-decoration: underline;
 }
 
-.training-geo__more {
-    margin-top: 0.45rem;
+.training-geo__more-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
 }
 
 .training-geo__more-toggle {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 0.3rem;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    margin-top: 1rem;
     cursor: pointer;
     color: var(--color-primary);
     font-size: var(--font-size-sm);
     font-weight: 600;
     line-height: 1.3;
-    list-style: none;
     user-select: none;
-}
-
-.training-geo__more-toggle::-webkit-details-marker {
-    display: none;
 }
 
 .training-geo__more-toggle::after {
@@ -16805,7 +16814,7 @@ a.home-activity__actor:hover {
     transition: transform 0.18s ease;
 }
 
-.training-geo__more[open] .training-geo__more-toggle::after {
+.training-geo:has(.training-geo__more-input:checked) .training-geo__more-toggle::after {
     transform: translateY(0.1rem) rotate(225deg);
 }
 
@@ -16813,11 +16822,11 @@ a.home-activity__actor:hover {
     display: none;
 }
 
-.training-geo__more[open] .training-geo__more-label:not(.training-geo__more-label--open) {
+.training-geo:has(.training-geo__more-input:checked) .training-geo__more-label:not(.training-geo__more-label--open) {
     display: none;
 }
 
-.training-geo__more[open] .training-geo__more-label--open {
+.training-geo:has(.training-geo__more-input:checked) .training-geo__more-label--open {
     display: inline;
 }
 

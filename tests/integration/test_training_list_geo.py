@@ -127,18 +127,19 @@ class TrainingListGeographyTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Ещё...")
-        self.assertContains(response, 'class="training-geo__more"')
+        self.assertContains(response, 'class="training-geo__more-toggle"')
+        self.assertEqual(html.count('class="training-geo__more-toggle"'), 1)
         self.assertIn("Корт Москва 1", html)
         self.assertIn("Корт Москва 4", html)
         self.assertIn("Корт Москва 5", html)
-        self.assertEqual(html.count("training-geo__courts--extra"), 1)
+        self.assertIn("training-geo__courts--extra", html)
 
     def test_short_city_court_list_hides_more_toggle(self) -> None:
         response = self.client.get(reverse("training_list"), secure=True)
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Ещё...")
-        self.assertNotContains(response, 'class="training-geo__more"')
+        self.assertNotContains(response, 'class="training-geo__more-toggle"')
 
 
 class TrainingEnrollCourtChoicesTestCase(TestCase):

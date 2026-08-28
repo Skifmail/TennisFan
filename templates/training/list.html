@@ -43,6 +43,9 @@
     </div>
 
     <section class="training-geo" aria-label="Города и корты">
+        {% if training_courts_has_more %}
+        <input type="checkbox" id="training-geo-more" class="training-geo__more-input">
+        {% endif %}
         <h2 class="training-geo__title">Корты</h2>
         <div class="training-geo__cities">
             {% for group in training_city_groups %}
@@ -57,19 +60,13 @@
                     {% endfor %}
                 </ul>
                 {% if group.courts|length > 4 %}
-                <details class="training-geo__more">
-                    <summary class="training-geo__more-toggle">
-                        <span class="training-geo__more-label">Ещё...</span>
-                        <span class="training-geo__more-label training-geo__more-label--open">Свернуть</span>
-                    </summary>
-                    <ul class="training-geo__courts training-geo__courts--extra">
-                        {% for court in group.courts|slice:"4:" %}
-                        <li>
-                            <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </details>
+                <ul class="training-geo__courts training-geo__courts--extra">
+                    {% for court in group.courts|slice:"4:" %}
+                    <li>
+                        <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>
+                    </li>
+                    {% endfor %}
+                </ul>
                 {% endif %}
                 {% else %}
                 <p class="training-geo__empty">Площадку уточним при записи.</p>
@@ -77,6 +74,12 @@
             </div>
             {% endfor %}
         </div>
+        {% if training_courts_has_more %}
+        <label for="training-geo-more" class="training-geo__more-toggle">
+            <span class="training-geo__more-label">Ещё...</span>
+            <span class="training-geo__more-label training-geo__more-label--open">Свернуть</span>
+        </label>
+        {% endif %}
     </section>
 
     <div class="training-list-grid">

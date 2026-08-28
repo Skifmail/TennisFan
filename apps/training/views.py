@@ -64,6 +64,7 @@ def training_list(request):
         )
 
     training_cities = advertised_training_cities()
+    training_city_groups = group_training_courts(city_filter=city)
     context = {
         "trainings": trainings,
         "current_level": skill_level,
@@ -71,7 +72,10 @@ def training_list(request):
         "current_city": city,
         "training_cities": training_cities,
         "training_cities_label": format_city_list(training_cities),
-        "training_city_groups": group_training_courts(city_filter=city),
+        "training_city_groups": training_city_groups,
+        "training_courts_has_more": any(
+            len(group.courts) > 4 for group in training_city_groups
+        ),
     }
     return render(request, "training/list.html", context)
 

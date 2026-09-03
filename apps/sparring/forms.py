@@ -28,7 +28,7 @@ class SparringRequestForm(forms.ModelForm):
         )
         widgets = {
             "city": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Город"}
+                attrs={"class": "form-control", "placeholder": "Населённый пункт"}
             ),
             "preferred_gender": forms.Select(attrs={"class": "form-control"}),
             "desired_category": forms.Select(attrs={"class": "form-control"}),
@@ -102,7 +102,9 @@ class DoublesMatchRequestForm(forms.Form):
     city = forms.CharField(
         max_length=100,
         required=False,
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Город"}),
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Населённый пункт"}
+        ),
     )
     preferred_gender = forms.ChoiceField(
         label="Категория по полу",

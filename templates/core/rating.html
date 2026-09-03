@@ -13,7 +13,7 @@
     <!-- Filters -->
     <form method="get" class="filter-bar">
         <select name="city" class="form-control">
-            <option value="">Любой город России</option>
+            <option value="">Любой населённый пункт России</option>
             {% for city in city_options %}
             <option value="{{ city }}" {% if current_city == city %}selected{% endif %}>{{ city }}</option>
             {% endfor %}

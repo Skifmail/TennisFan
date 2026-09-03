@@ -216,7 +216,7 @@ def notify_new_registration(user, player) -> bool:
         f"Имя: {name}\n"
         f"Email: {email}\n"
         f"Телефон: {phone}\n"
-        f"Город: {city}\n"
+        f"Населённый пункт: {city}\n"
         f"Сила: {ntrp_s}"
     )
     return send_admin_message(text)
@@ -244,7 +244,7 @@ def notify_club_registered(club, creator) -> bool:
         "🏢 <b>Регистрация нового клуба</b>\n\n"
         f"Клуб: {club_name}\n"
         f"Slug: {club_slug}\n"
-        f"Город: {club_city}\n"
+        f"Населённый пункт: {club_city}\n"
         f"Email клуба: {club_email}\n"
         f"Ответственный: {admin_name}\n\n"
         f"Создатель: {creator_name}\n"
@@ -318,7 +318,7 @@ def notify_tournament_registration(user, tournament) -> bool:
     text = (
         "📝 <b>Регистрация на турнир</b>\n\n"
         f"Турнир: {tournament_name}\n"
-        f"Город: {tournament_city}\n"
+        f"Населённый пункт: {tournament_city}\n"
         f"Формат: {format_label}\n\n"
         f"Игрок: {user_name}\n"
         f"Email: {user_email}\n"
@@ -339,7 +339,7 @@ def notify_coach_application(app) -> bool:
         "",
         "<b>О тренере:</b>",
         f"  • Имя: {_escape(app.name)}",
-        f"  • Город: {_escape(app.city)}",
+        f"  • Населённый пункт: {_escape(app.city)}",
         f"  • Опыт: {app.experience_years} лет",
         f"  • Специализация: {_escape(app.specialization) or '—'}",
         "",
@@ -366,7 +366,7 @@ def notify_court_application(app) -> bool:
         "",
         "<b>Корт:</b>",
         f"  • Название: {_escape(app.name)}",
-        f"  • Город: {_escape(app.city)}",
+        f"  • Населённый пункт: {_escape(app.city)}",
         f"  • Адрес: {_escape(app.address)}",
         f"  • Покрытие (крытые): {_escape(format_surface_labels(getattr(app, 'indoor_surfaces', None)) or '—')}",
         f"  • Покрытие (открытые): {_escape(format_surface_labels(getattr(app, 'outdoor_surfaces', None)) or '—')}",

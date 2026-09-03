@@ -243,7 +243,7 @@
                 <a href="{% url 'cities' %}" class="hero-metric hero-metric--link">
                     <span class="hero-metric__value">{{ hero_stats.cities_count|default:"0" }}</span>
                     <span class="hero-metric__label">
-                        {{ hero_stats.cities_count|default:"0"|ru_pluralize:"город,города,городов" }}
+                        {{ hero_stats.cities_count|default:"0"|ru_pluralize:"населённый пункт,населённых пункта,населённых пунктов" }}
                     </span>
                 </a>
                 <div class="hero-metric-divider"></div>
@@ -402,8 +402,8 @@
         <form method="get" class="card mb-4" id="home-tournaments-filter" action="{% url 'home' %}">
             <div class="card-body filter-grid">
                 <div class="form-group home-filter-group home-filter-group--city">
-                    <label class="form-label">Город</label>
-                    <input type="text" name="city" class="form-control" placeholder="Начните вводить город…" value="{{ current_filters.city }}" autocomplete="off" aria-autocomplete="list" aria-label="Город для фильтра турниров">
+                    <label class="form-label">Населённый пункт</label>
+                    <input type="text" name="city" class="form-control" placeholder="Начните вводить населённый пункт…" value="{{ current_filters.city }}" autocomplete="off" aria-autocomplete="list" aria-label="Населённый пункт для фильтра турниров">
                 </div>
                 <div class="form-group home-filter-group home-filter-group--level">
                     <label class="form-label">Уровень</label>
@@ -507,7 +507,7 @@
                     <img src="{% static 'images/find_tournament.png' %}" alt="" class="home-action-card__image">
                 </div>
                 <h3 class="home-action-card__title">Записаться на турнир</h3>
-                <p class="home-action-card__text">Подбери турнир по городу, уровню и формату за пару кликов.</p>
+                <p class="home-action-card__text">Подбери турнир по населённому пункту, уровню и формату за пару кликов.</p>
                 <a href="{% url 'tournament_list' %}" class="btn btn-outline home-action-card__btn">Подобрать турнир</a>
             </article>
 
@@ -534,7 +534,7 @@
                     <img src="{% static 'images/training.png' %}" alt="" class="home-action-card__image">
                 </div>
                 <h3 class="home-action-card__title">Тренировки</h3>
-                <p class="home-action-card__text">Подбери индивидуальные и групповые занятия с тренерами в своем городе.</p>
+                <p class="home-action-card__text">Подбери индивидуальные и групповые занятия с тренерами в своём населённом пункте.</p>
                 <a href="{% url 'training_list' %}" class="btn btn-outline home-action-card__btn">Смотреть тренировки</a>
             </article>
 

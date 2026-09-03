@@ -1719,6 +1719,11 @@ a.home-activity__actor:hover {
     display: none;
 }
 
+#home-tournaments-filter .home-filter-group--city {
+    flex: 1 1 19rem;
+    min-width: min(100%, 19rem);
+}
+
 /* Для нативных select на мобильных: убираем transform-анимацию карточки фильтра,
    иначе popup списка может позиционироваться со смещением. */
 .main #home-tournaments-filter.card,
@@ -1758,7 +1763,6 @@ a.home-activity__actor:hover {
     }
 
     #home-tournaments-filter .card-body.filter-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.55rem 0.65rem;
         padding: 0.75rem;
     }
@@ -1769,7 +1773,7 @@ a.home-activity__actor:hover {
 
     #home-tournaments-filter .home-filter-group--city,
     #home-tournaments-filter .home-filter-group--submit {
-        grid-column: 1 / -1;
+        flex-basis: 100%;
     }
 
     #home-tournaments-filter .home-filter-group--submit .form-label {

@@ -306,7 +306,7 @@ class UserAdmin(BaseUserAdmin):
                 "<div><strong>Окончание:</strong> {}</div>"
                 "<div><strong>Отменена:</strong> {}</div>"
                 "<div><strong>Баланс FT:</strong> {}</div>"
-                "<div><strong>Город покупки:</strong> {}</div>"
+                "<div><strong>Населённый пункт покупки:</strong> {}</div>"
                 "</div>",
                 subscription.tier.get_name_display(),
                 current_status,

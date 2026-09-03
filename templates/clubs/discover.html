@@ -7,7 +7,7 @@
     <div class="container">
         <div class="club-discover-header__eyebrow">Клубы платформы</div>
         <h1 class="page-title">Вступить в клуб</h1>
-        <p class="page-subtitle">Найдите клуб по названию или городу, изучите условия и сразу отправьте заявку на вступление.</p>
+        <p class="page-subtitle">Найдите клуб по названию или населённому пункту, изучите условия и сразу отправьте заявку на вступление.</p>
     </div>
 </section>
 
@@ -20,7 +20,7 @@
                     <input id="club-discover-q" type="text" name="q" class="form-control" placeholder="Например, Спартак" value="{{ search }}">
                 </div>
                 <div class="form-group club-discover-filters__group club-discover-filters__group--city">
-                    <label class="form-label" for="club-discover-city">Город</label>
+                    <label class="form-label" for="club-discover-city">Населённый пункт</label>
                     <input id="club-discover-city" type="text" name="city" class="form-control" placeholder="Москва" value="{{ city }}">
                 </div>
                 <div class="form-group form-group-submit club-discover-filters__group club-discover-filters__group--search">
@@ -103,7 +103,7 @@
         <div class="card club-discover-empty">
             <div class="card-body">
                 <h2 class="club-discover-empty__title">Клубы не найдены</h2>
-                <p class="club-discover-empty__text">Попробуйте изменить название или город в фильтрах. Если фильтров нет, значит сейчас нет клубов, доступных для вступления.</p>
+                <p class="club-discover-empty__text">Попробуйте изменить название или населённый пункт в фильтрах. Если фильтров нет, значит сейчас нет клубов, доступных для вступления.</p>
             </div>
         </div>
         {% endif %}

@@ -1819,7 +1819,7 @@ def _handle_menu_callback_action(
                 "",
                 "📊 <b>ОСНОВНАЯ ИНФОРМАЦИЯ</b>",
                 "━━━━━━━━━━━━━━━━━━",
-                f"📍 Город: <b>{player.city or '—'}</b>",
+                f"📍 Населённый пункт: <b>{player.city or '—'}</b>",
                 f"🎯 Уровень: <b>{player.get_skill_level_display()}</b>",
                 f"📈 Сила: <b>{player.ntrp_level}</b>",
             ]

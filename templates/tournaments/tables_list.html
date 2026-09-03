@@ -12,7 +12,7 @@
     </div>
 
     <form method="get" class="filter-bar" aria-label="Фильтры списка турнирных таблиц">
-        <input type="search" name="city" class="form-control" placeholder="Город" value="{{ current_city }}" autocomplete="off" aria-label="Город" onchange="this.form.submit()">
+        <input type="search" name="city" class="form-control" placeholder="Населённый пункт" value="{{ current_city }}" autocomplete="off" aria-label="Населённый пункт" onchange="this.form.submit()">
         <select name="status" class="form-control" aria-label="Статус турнира" onchange="this.form.submit()">
             <option value="">Все статусы</option>
             <option value="upcoming" {% if current_status == 'upcoming' %}selected{% endif %}>Предстоящие</option>

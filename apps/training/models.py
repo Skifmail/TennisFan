@@ -61,7 +61,7 @@ class Coach(models.Model):
         help_text="Ссылка на профиль в мессенджере MAX или номер телефона, привязанный к MAX.",
     )
 
-    city = models.CharField("Город", max_length=100)
+    city = models.CharField("Населённый пункт", max_length=100)
     is_active = models.BooleanField("Активен", default=True)
 
     created_at = models.DateTimeField("Создан", auto_now_add=True)
@@ -180,7 +180,7 @@ class CoachApplication(CompressImageFieldsMixin, models.Model):
     whatsapp = models.CharField("WhatsApp", max_length=20, blank=True)
     max_contact = models.CharField("MAX", max_length=500, blank=True)
 
-    city = models.CharField("Город", max_length=100)
+    city = models.CharField("Населённый пункт", max_length=100)
 
     created_at = models.DateTimeField("Создана", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлена", auto_now=True)
@@ -284,7 +284,7 @@ class Training(CompressImageFieldsMixin, models.Model):
         verbose_name="Корты",
         help_text="Один тренер может проводить тренировки на разных площадках.",
     )
-    city = models.CharField("Город", max_length=100)
+    city = models.CharField("Населённый пункт", max_length=100)
 
     duration_minutes = models.PositiveSmallIntegerField(
         "Длительность (мин)", default=60

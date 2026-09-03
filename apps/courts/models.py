@@ -30,7 +30,7 @@ class Court(CompressImageFieldsMixin, models.Model):
     )
     city = models.CharField("Населённый пункт", max_length=100)
     address = models.CharField("Адрес", max_length=255)
-    district = models.CharField("Район города", max_length=100, blank=True)
+    district = models.CharField("Район", max_length=100, blank=True)
     region = models.CharField(
         "Регион",
         max_length=32,
@@ -47,7 +47,7 @@ class Court(CompressImageFieldsMixin, models.Model):
         blank=True,
         related_name="courts",
         verbose_name="Зона / город",
-        help_text="Зона Москвы или город области, из справочника. Поле «Район города» — свободный текст.",
+        help_text="Зона Москвы или город области, из справочника. Поле «Район» — свободный текст.",
     )
     description = models.TextField("Описание", blank=True)
 

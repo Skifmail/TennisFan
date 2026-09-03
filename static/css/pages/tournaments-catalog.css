@@ -133,9 +133,13 @@
     line-height: 1.5;
 }
 
+/*
+ * Семь колонок в одну строку обрезают «Москва и область», «Любой город России»
+ * и соседние подписи. Поля переносятся, а не сжимаются ниже текста.
+ */
 .tournaments-catalog .filter-bar.tournaments-filters {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10.25rem, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 0.85rem 0.9rem;
     margin-bottom: clamp(1.25rem, 2.4vw, 2rem);
     padding: 0;
@@ -143,15 +147,10 @@
     border-radius: 0;
 }
 
-@media (width >= 1180px) {
-    .tournaments-catalog .filter-bar.tournaments-filters {
-        grid-template-columns: repeat(7, minmax(0, 1fr));
-    }
-}
-
 .tournaments-filters__field {
     display: flex;
-    min-width: 0;
+    flex: 1 1 19rem;
+    min-width: min(100%, 19rem);
     flex-direction: column;
     gap: 0.35rem;
 }
@@ -173,6 +172,10 @@
 
 .tournaments-catalog .tournaments-filters .form-control {
     min-height: 44px;
+}
+
+.tournaments-catalog .tournaments-filters select.form-control {
+    padding-right: 2.25rem;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -277,12 +280,7 @@
     }
 
     .tournaments-catalog .filter-bar.tournaments-filters {
-        grid-template-columns: 1fr 1fr;
         gap: 0.75rem 0.65rem;
-    }
-
-    .tournaments-filters__field:last-child {
-        grid-column: 1 / -1;
     }
 }
 

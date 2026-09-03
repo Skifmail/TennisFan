@@ -13,8 +13,8 @@
 
 <div class="container">
     <form method="get" class="filter-bar">
-        <select name="city" class="form-control" onchange="this.form.submit()" aria-label="Город">
-            <option value="">Все города</option>
+        <select name="city" class="form-control" onchange="this.form.submit()" aria-label="Населённый пункт">
+            <option value="">Все населённые пункты</option>
             {% for city in training_cities %}
             <option value="{{ city }}" {% if current_city == city %}selected{% endif %}>{{ city }}</option>
             {% endfor %}
@@ -42,7 +42,7 @@
         {% if not user_is_coach %}<a href="{% url 'coach_application_create' %}" class="btn btn-primary btn--filter-size">Стать тренером</a>{% endif %}
     </div>
 
-    <section class="training-geo" aria-label="Города и корты">
+    <section class="training-geo" aria-label="Населённые пункты и корты">
         {% if training_courts_has_more %}
         <input type="checkbox" id="training-geo-more" class="training-geo__more-input">
         {% endif %}

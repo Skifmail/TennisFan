@@ -635,12 +635,14 @@ select.form-control {
 }
 
 .filter-grid {
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--spacing-md);
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .filter-grid .form-group {
+    flex: 1 1 15.5rem;
+    min-width: min(100%, 15.5rem);
     margin-bottom: 0;
 }
 
@@ -653,6 +655,8 @@ select.form-control {
 
 .filter-grid .form-group-submit {
     display: flex;
+    flex: 1 1 8rem;
+    min-width: min(100%, 8rem);
     flex-direction: column;
     align-items: stretch;
 }
@@ -674,8 +678,9 @@ select.form-control {
 }
 
 @media (width <= 600px) {
-    .filter-grid {
-        grid-template-columns: 1fr;
+    .filter-grid .form-group {
+        flex-basis: 100%;
+        min-width: 0;
     }
 }
 

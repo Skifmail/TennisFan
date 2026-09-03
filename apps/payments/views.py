@@ -555,7 +555,7 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
                 *([("Клуб", tournament.club.name)] if tournament.club_id else []),
                 ("Турнир", tournament.name),
                 ("Дата", tournament.start_date),
-                ("Город", tournament.city),
+                ("Населённый пункт", tournament.city),
                 *(
                     [("Получатель", f"{tournament.club.name} · YooKassa клуба")]
                     if tournament.club_id

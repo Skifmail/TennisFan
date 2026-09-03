@@ -41,7 +41,7 @@
     <div class="sparring-toolbar sparring-toolbar__panel">
         <form method="get" class="filter-bar sparring-filters sparring-toolbar__filters">
             <input type="hidden" name="type" value="{{ sparring_type }}">
-            <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
+            <input name="city" class="form-control" placeholder="Любой населённый пункт России" value="{{ current_city }}" onchange="this.form.submit()" aria-label="Населённый пункт">
             {% if sparring_type == 'singles' %}
             <select name="category" class="form-control" onchange="this.form.submit()">
                 <option value="">Все уровни силы</option>
@@ -187,7 +187,7 @@
                             {% if req.desired_level %}
                             <span class="sparring-desired-category">Партнёры: {{ req.get_desired_level_display }}</span>
                             {% endif %}
-                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city|default:"Город не указан" }}</span>
+                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city|default:"Населённый пункт не указан" }}</span>
                         </div>
                         {% if req.description %}
                         <p class="sparring-card__desc text-secondary">{{ req.description|truncatewords:20 }}</p>
@@ -250,7 +250,7 @@
                             {% if req.desired_level %}
                             <span class="sparring-desired-category">Партнёры: {{ req.get_desired_level_display }}</span>
                             {% endif %}
-                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city|default:"Город не указан" }}</span>
+                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city|default:"Населённый пункт не указан" }}</span>
                         </div>
                         {% if req.description %}
                         <p class="sparring-card__desc text-secondary">{{ req.description|truncatewords:20 }}</p>

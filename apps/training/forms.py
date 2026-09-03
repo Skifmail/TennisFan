@@ -71,7 +71,9 @@ class TrainingEnrollmentForm(forms.ModelForm):
         self.fields["full_name"].required = True
         self.fields["desired_court"].queryset = advertised_training_courts()
         self.fields["desired_court"].required = False
-        self.fields["desired_court"].empty_label = "—— Город / корт (необязательно) ——"
+        self.fields["desired_court"].empty_label = (
+            "—— Населённый пункт / корт (необязательно) ——"
+        )
         self.fields["desired_court"].label_from_instance = (
             lambda court: f"{court.city} — {court.name}"
         )
@@ -208,7 +210,7 @@ class CoachApplicationForm(forms.ModelForm):
                 }
             ),
             "city": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Город"}
+                attrs={"class": "form-control", "placeholder": "Населённый пункт"}
             ),
         }
 

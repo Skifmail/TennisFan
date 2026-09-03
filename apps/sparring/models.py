@@ -38,7 +38,7 @@ class SparringRequest(models.Model):
         related_name="sparring_requests",
         verbose_name="Игрок",
     )
-    city = models.CharField("Город", max_length=100)
+    city = models.CharField("Населённый пункт", max_length=100)
     desired_category = models.CharField(
         "Желаемый уровень силы",
         max_length=20,
@@ -290,7 +290,7 @@ class DoublesMatchRequest(models.Model):
         related_name="doubles_match_requests_created",
         verbose_name="Автор заявки",
     )
-    city = models.CharField("Город", max_length=100, blank=True)
+    city = models.CharField("Населённый пункт", max_length=100, blank=True)
     preferred_gender = models.CharField(
         "Предпочтительный пол",
         max_length=20,

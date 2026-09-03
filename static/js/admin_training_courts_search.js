@@ -9,7 +9,7 @@
         var search = document.createElement('input');
         search.type = 'text';
         search.className = 'vTextField';
-        search.placeholder = 'Поиск корта по названию или городу';
+        search.placeholder = 'Поиск корта по названию или населённому пункту';
         search.style.marginBottom = '4px';
 
         var container = select.parentNode;

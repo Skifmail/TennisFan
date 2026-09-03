@@ -231,7 +231,7 @@ def create_club_with_trial(data: dict[str, Any], user: AbstractUser) -> Club:
     address = (data.get("address") or "").strip()
     email = (data.get("email") or "").strip()
     if not city or not address or not email:
-        raise ValueError("Город, адрес и email обязательны")
+        raise ValueError("Населённый пункт, адрес и email обязательны")
 
     admin_name = (data.get("admin_name") or "").strip()
     if not admin_name:

@@ -191,7 +191,7 @@
                     <div class="sparring-card__col sparring-card__col--main">
                         {% include 'includes/sparring_doubles_roster.html' with req=req %}
                         <div class="sparring-card__chips">
-                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city|default:"Город не указан" }}</span>
+                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city|default:"Населённый пункт не указан" }}</span>
                         </div>
                         {% if req.description %}
                         <p class="sparring-card__desc text-secondary">{{ req.description|truncatewords:15 }}</p>

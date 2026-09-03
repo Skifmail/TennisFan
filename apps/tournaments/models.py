@@ -167,7 +167,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     name = models.CharField("Название", max_length=200)
     slug = models.SlugField("URL", unique=True)
     description = models.TextField("Описание", blank=True)
-    city = models.CharField("Город", max_length=100)
+    city = models.CharField("Населённый пункт", max_length=100)
     region = models.CharField(
         "Регион",
         max_length=32,

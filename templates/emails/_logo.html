@@ -1,0 +1,14 @@
+{% comment %}
+Квадратный логотип TennisFan для HTML-писем.
+Пропорции 1:1 обязательны: атрибуты width/height совпадают,
+height:auto сохраняет соотношение в клиентах с поддержкой CSS.
+{% endcomment %}
+{% if logo_url %}
+<img
+    src="{{ logo_url }}"
+    alt="{{ logo_alt|default:'TennisFan' }}"
+    width="{{ logo_size|default:80 }}"
+    height="{{ logo_size|default:80 }}"
+    style="display:block;margin:0 auto 12px;width:{{ logo_size|default:80 }}px;height:auto;max-width:100%;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;"
+>
+{% endif %}

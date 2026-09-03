@@ -85,6 +85,11 @@ class NewTournamentNotifyTestCase(TestCase):
         html = mail.outbox[0].alternatives[0][0]
         self.assertIn("TENNISFAN", html)
         self.assertIn(self.tournament.name, html)
+        # Квадратный logo.png не должен сплющиваться атрибутами width≠height.
+        self.assertIn('width="80"', html)
+        self.assertIn('height="80"', html)
+        self.assertNotIn('width="120"', html)
+        self.assertNotIn('height="56"', html)
         row = OutboundEmail.objects.get()
         self.assertEqual(row.category, OutboundEmail.Category.NEW_TOURNAMENT)
         self.assertEqual(row.user_id, self.user.pk)

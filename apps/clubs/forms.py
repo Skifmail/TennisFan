@@ -74,10 +74,13 @@ class ClubRegistrationStep1Form(forms.Form):
         ),
     )
     city = forms.CharField(
-        label="Город",
+        label="Населённый пункт",
         max_length=100,
         widget=forms.TextInput(
-            attrs={"class": "form-control", "placeholder": "Москва"}
+            attrs={
+                "class": "form-control",
+                "placeholder": "Город, село, деревня, пгт…",
+            }
         ),
     )
     address = forms.CharField(

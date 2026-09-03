@@ -15,12 +15,13 @@ from apps.users.models import Player
 
 from .forms import CourtApplicationForm
 from .models import Court, CourtRating
+from .surfaces import CourtSurface, filter_courts_by_surfaces, format_surface_labels
 
 
 def court_list(request):
     """List of courts with average rating."""
     city = (request.GET.get("city") or "").strip()
-    surface = request.GET.get("surface", "")
+    selected_surfaces = request.GET.getlist("surface")
 
     courts = Court.objects.filter(is_active=True).annotate(
         average_rating=Avg("ratings__score"),
@@ -31,15 +32,7 @@ def court_list(request):
         courts = filter_field_contains_ci(
             courts, "city", city, annotation="_court_list_city_l"
         )
-    if surface:
-        courts = courts.filter(surface=surface)
-
-    surface_choices = list(
-        Court.objects.filter(is_active=True)
-        .values_list("surface", flat=True)
-        .distinct()
-        .order_by("surface")
-    )
+    courts = filter_courts_by_surfaces(courts, selected_surfaces)
 
     courts = list(courts)
     for c in courts:
@@ -52,8 +45,10 @@ def court_list(request):
     context = {
         "courts": courts,
         "current_city": city,
-        "current_surface": surface,
-        "surface_choices": surface_choices,
+        "current_surfaces": selected_surfaces,
+        "surface_choices": CourtSurface.choices,
+        "current_surfaces_label": format_surface_labels(selected_surfaces)
+        or "Все покрытия",
     }
     return render(request, "courts/list.html", context)
 

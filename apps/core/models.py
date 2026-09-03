@@ -10,6 +10,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.core.geo import GeoRegion, normalize_geo_text
+from apps.core.localities import SettlementType, format_locality_label
 
 # ---------------------------------------------------------------------------
 # Новая система обратной связи через Telegram (пользователь ↔ админ в Telegram)
@@ -447,31 +448,69 @@ class FeedbackReply(models.Model):
 
 class City(models.Model):
     """
-    Справочник городов для автодополнения в полях ввода.
-    Заполняется миграцией и при необходимости синхронизируется из других моделей.
+    Справочник населённых пунктов для автодополнения в полях ввода.
+
+    Исторически хранил только города. В РФ в том же поле указывают пгт, сёла,
+    деревни, станицы, хутора и аулы — тип и регион нужны, чтобы отличать
+    одноимённые пункты и показывать их в подсказках.
     """
 
-    name = models.CharField("Название", max_length=100, unique=True, db_index=True)
+    name = models.CharField("Название", max_length=100, db_index=True)
+    settlement_type = models.CharField(
+        "Тип",
+        max_length=20,
+        choices=SettlementType.choices,
+        default=SettlementType.CITY,
+        db_index=True,
+    )
+    region = models.CharField(
+        "Регион",
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Субъект РФ, например: Архангельская область.",
+    )
     lat = models.FloatField(
         "Широта",
         null=True,
         blank=True,
-        help_text="Широта города для отображения на карте.",
+        help_text="Широта населённого пункта для отображения на карте.",
     )
     lng = models.FloatField(
         "Долгота",
         null=True,
         blank=True,
-        help_text="Долгота города для отображения на карте.",
+        help_text="Долгота населённого пункта для отображения на карте.",
     )
 
     class Meta:
-        verbose_name = "город"
-        verbose_name_plural = "города"
+        verbose_name = "населённый пункт"
+        verbose_name_plural = "населённые пункты"
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "region", "settlement_type"],
+                name="core_city_name_region_type_uniq",
+            )
+        ]
 
     def __str__(self) -> str:
-        return str(self.name)
+        return self.display_label()
+
+    def display_label(self) -> str:
+        """Подпись для автодополнения: город как есть, остальные типы с префиксом."""
+        return format_locality_label(self.name, self.settlement_type, self.region)
+
+    def suggestion_payload(self) -> dict[str, str]:
+        """JSON-элемент для ``GET /api/cities/?q=``."""
+        label = self.display_label()
+        return {
+            "name": str(self.name),
+            "value": label,
+            "label": label,
+            "settlement_type": str(self.settlement_type),
+            "region": str(self.region),
+        }
 
 
 # ---------------------------------------------------------------------------

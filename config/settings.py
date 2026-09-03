@@ -79,8 +79,9 @@ SESSION_SAVE_EVERY_REQUEST = (
     os.environ.get("SESSION_SAVE_EVERY_REQUEST", "False") == "True"
 )
 
-# Лимиты загрузки файлов (админка: фото корта + до 4 фото в inline).
-DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024  # 12 MB
+# Лимиты загрузки файлов (админка: основное фото + до 4 фото галереи).
+# На файл — до 10 МБ (validate_image_max_2mb); суммарно multipart — до 40 МБ.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 40 * 1024 * 1024  # 40 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
 
 # Защита от перебора паролей (админка и вход на сайт)

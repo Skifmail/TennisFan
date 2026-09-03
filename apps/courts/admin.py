@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.utils.html import format_html
 
+from .forms import CourtAdminForm, CourtApplicationAdminForm
 from .geocoder import _normalize_address_for_geocode, geocode_address
 from .models import (
     Court,
@@ -16,6 +17,7 @@ from .models import (
     CourtPhoto,
     CourtRating,
 )
+from .surfaces import CourtSurface
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +64,37 @@ class CourtPhotoInline(admin.TabularInline):
     max_num = 4
 
 
+class CourtSurfaceListFilter(admin.SimpleListFilter):
+    """Фильтр списка кортов по каноническому покрытию."""
+
+    title = "Покрытие"
+    parameter_name = "surface_code"
+
+    def lookups(self, request, model_admin):
+        return CourtSurface.choices
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+        from .surfaces import filter_courts_by_surfaces
+
+        return filter_courts_by_surfaces(queryset, [value])
+
+
 @admin.register(Court)
 class CourtAdmin(admin.ModelAdmin):
     """Admin for Court model."""
 
+    form = CourtAdminForm
+
     class Media:
-        js = ("js/city_autocomplete.js", "js/admin_court_form.js")
+        js = (
+            "js/city_autocomplete.js",
+            "js/admin_court_form.js",
+            "js/admin_court_surfaces.js",
+        )
+        css = {"all": ("css/admin_court_surfaces.css",)}
 
     inlines = [CourtPhotoInline]
 
@@ -86,7 +113,7 @@ class CourtAdmin(admin.ModelAdmin):
         "region",
         "geo_area",
         "city",
-        "surface",
+        CourtSurfaceListFilter,
         "is_indoor",
         "is_outdoor",
         "has_lighting",
@@ -96,7 +123,8 @@ class CourtAdmin(admin.ModelAdmin):
     )
     search_fields = ("name", "address")
     list_editable = ("is_active",)
-    prepopulated_fields = {"slug": ("name",)}
+    # Не используем prepopulated_fields: для кириллицы JS оставляет slug пустым,
+    # форма падает с «Обязательное поле», а загруженные фото при этом пропадают.
     actions = ["geocode_selected_courts"]
 
     fieldsets = (
@@ -113,16 +141,19 @@ class CourtAdmin(admin.ModelAdmin):
                     "geo_area",
                     "description",
                 ),
-                "description": "Для точной метки на карте: в «Город» — только название города (например: Сочи). В «Адрес» — улица и номер дома (например: Курортный проспект, 45). Не дублируйте город в поле «Адрес».",
+                "description": (
+                    "URL (slug) можно оставить пустым — подставится из названия. "
+                    "Для карты: в «Населённый пункт» только город (например: Сочи), "
+                    "в «Адрес» — улица и дом без повторения города."
+                ),
             },
         ),
         (
             "Характеристики",
             {
                 "fields": (
-                    "surface",
-                    "indoor_surface",
-                    "outdoor_surface",
+                    "indoor_surfaces",
+                    "outdoor_surfaces",
                     "courts_count",
                     "has_lighting",
                     "is_indoor",
@@ -162,23 +193,31 @@ class CourtAdmin(admin.ModelAdmin):
                     "image",
                 ),
                 "description": (
-                    "Фото можно добавить позже через «Изменить». "
-                    "Если форма открыта долго — перед сохранением выберите файлы заново."
+                    "Сначала заполните все поля и нажмите «Сохранить», фото добавьте "
+                    "через «Изменить» — так надёжнее. Если всё же грузите фото сразу: "
+                    "выбирайте файлы в самом конце, прямо перед «Сохранить»."
                 ),
             },
         ),
         ("Статус", {"fields": ("is_active",)}),
     )
 
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        """Показать понятное сообщение, если сохранение упало на валидации (фото сбросятся)."""
+        response = super().changeform_view(request, object_id, form_url, extra_context)
+        if request.method == "POST" and hasattr(response, "context_data"):
+            adminform = (response.context_data or {}).get("adminform")
+            form = getattr(adminform, "form", None)
+            if form is not None and form.errors:
+                messages.error(
+                    request,
+                    "Корт не сохранён из‑за ошибок в форме (смотрите красные подписи у полей). "
+                    "Файлы фото браузер не возвращает после ошибки — выберите их заново "
+                    "или сначала сохраните корт без фото.",
+                )
+        return response
+
     def save_model(self, request, obj, form, change):
-        # Синхронизируем агрегированное поле покрытия для витрины/фильтров.
-        parts: list[str] = []
-        if obj.is_indoor and obj.indoor_surface:
-            parts.append(f"Крытые: {obj.indoor_surface}")
-        if obj.is_outdoor and obj.outdoor_surface:
-            parts.append(f"Открытые: {obj.outdoor_surface}")
-        if parts:
-            obj.surface = "; ".join(parts)
         super().save_model(request, obj, form, change)
         # Автогеокодирование: если адрес есть, а координат нет — запросить по API
         if obj.address and (obj.latitude is None or obj.longitude is None):
@@ -264,11 +303,16 @@ class CourtApplicationAdmin(admin.ModelAdmin):
         "court_link",
         "created_at",
     )
-    list_filter = ("status", "city", "surface")
+    list_filter = ("status", "city")
     search_fields = ("name", "city", "address", "applicant_name", "applicant_email")
     list_display_links = ("name",)
     actions = [approve_court_applications, reject_court_applications]
     readonly_fields = ("status", "court", "created_at", "updated_at")
+    form = CourtApplicationAdminForm
+
+    class Media:
+        js = ("js/admin_court_surfaces.js",)
+        css = {"all": ("css/admin_court_surfaces.css",)}
 
     fieldsets = (
         (
@@ -280,9 +324,8 @@ class CourtApplicationAdmin(admin.ModelAdmin):
             "Характеристики",
             {
                 "fields": (
-                    "surface",
-                    "indoor_surface",
-                    "outdoor_surface",
+                    "indoor_surfaces",
+                    "outdoor_surfaces",
                     "courts_count",
                     "has_lighting",
                     "is_indoor",

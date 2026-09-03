@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Корты{% endblock %}
 
@@ -12,12 +13,43 @@
     <div class="d-flex flex-wrap align-items-center gap-2" style="margin-bottom: var(--spacing-xl);">
         <form method="get" class="filter-bar" style="flex: 1; min-width: 200px;">
             <input name="city" class="form-control" placeholder="Любой город России" value="{{ current_city }}" onchange="this.form.submit()">
-            <select name="surface" class="form-control" onchange="this.form.submit()">
-                <option value="">Все покрытия</option>
-                {% for choice in surface_choices %}
-                <option value="{{ choice }}" {% if current_surface == choice %}selected{% endif %}>{{ choice }}</option>
-                {% endfor %}
-            </select>
+            <div
+                class="club-filter-select club-filter-select--custom court-surface-filter"
+                data-court-surface-filter
+                data-auto-submit="1"
+            >
+                <button
+                    type="button"
+                    class="club-filter-select__toggle form-control"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="court-surface-filter-dropdown"
+                    aria-label="Покрытие"
+                >
+                    <span class="club-filter-select__current">{{ current_surfaces_label }}</span>
+                    <span class="club-filter-select__chevron" aria-hidden="true"></span>
+                </button>
+                <div
+                    id="court-surface-filter-dropdown"
+                    class="club-filter-select__dropdown"
+                    role="listbox"
+                    aria-label="Покрытие"
+                    hidden
+                >
+                    {% for value, label in surface_choices %}
+                    <label class="club-filter-select__option court-surface-filter__option{% if value in current_surfaces %} is-selected{% endif %}">
+                        <input
+                            type="checkbox"
+                            name="surface"
+                            value="{{ value }}"
+                            class="form-checkbox"
+                            {% if value in current_surfaces %}checked{% endif %}
+                        >
+                        <span>{{ label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
         </form>
         <a href="{% url 'court_application_create' %}" class="btn btn-primary btn--filter-size">Подать заявку на добавление корта</a>
     </div>
@@ -82,4 +114,8 @@
         {% endfor %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script defer src="{% static 'js/court_surface_filter.js' %}?v=20260903-1"></script>
 {% endblock %}

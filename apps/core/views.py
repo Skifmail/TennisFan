@@ -7,7 +7,6 @@ import json
 import logging
 import re
 from calendar import monthrange
-from collections.abc import Iterable
 from datetime import datetime, timedelta
 from decimal import Decimal
 from functools import lru_cache
@@ -77,6 +76,14 @@ from .activity import (
     set_home_activity_seen_cookie,
 )
 from .forms import FeedbackForm, PlatformActivityAnnounceForm
+from .localities import (
+    ST_CITY,
+    YANDEX_SUGGEST_MIN_QUERY,
+    fetch_yandex_localities,
+    parse_kladr_row,
+    strip_settlement_prefix,
+    upsert_locality,
+)
 from .models import City, PlatformActivityEvent, SupportMessage, SupportThread
 from .support_notifications import (
     send_admin_support_notification,
@@ -127,19 +134,16 @@ def _load_city_coordinates_from_csv() -> dict[str, tuple[float, float]]:
         with csv_path.open("r", encoding="utf-8") as csv_file:
             reader = csv.DictReader(csv_file)
             for row in reader:
-                city_name = (row.get("city") or "").strip()
-                geo_lat_raw = (row.get("geo_lat") or "").strip()
-                geo_lon_raw = (row.get("geo_lon") or "").strip()
-                if not city_name or not geo_lat_raw or not geo_lon_raw:
+                parsed = parse_kladr_row(row)
+                if parsed is None:
                     continue
-                try:
-                    lat = float(geo_lat_raw)
-                    lng = float(geo_lon_raw)
-                except ValueError:
+                lat = parsed.get("lat")
+                lng = parsed.get("lng")
+                if lat is None or lng is None:
                     continue
-                normalized_city_name = _normalize_city_name(city_name)
+                normalized_city_name = _normalize_city_name(str(parsed["name"]))
                 if normalized_city_name and normalized_city_name not in coordinates:
-                    coordinates[normalized_city_name] = (lat, lng)
+                    coordinates[normalized_city_name] = (float(lat), float(lng))
     except OSError:
         logger.exception("Не удалось прочитать city.csv для координат городов.")
         return {}
@@ -148,11 +152,8 @@ def _load_city_coordinates_from_csv() -> dict[str, tuple[float, float]]:
 
 
 def _normalize_city_name(raw_name: str) -> str:
-    """Нормализовать название города для устойчивого сравнения."""
-    normalized = (raw_name or "").strip().lower().replace("ё", "е")
-    normalized = re.sub(r"^(г\.?|город)\s+", "", normalized)
-    normalized = re.sub(r"\s+", " ", normalized)
-    return normalized
+    """Нормализовать название населённого пункта для устойчивого сравнения."""
+    return strip_settlement_prefix(raw_name)
 
 
 def _resolve_city_coordinates(
@@ -255,7 +256,10 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
                     )
                     if lat is not None and lng is not None:
                         coords = (float(lat), float(lng))
-                        city_obj, _ = City.objects.get_or_create(name=city_name)
+                        city_obj, _ = upsert_locality(
+                            name=city_name,
+                            settlement_type=ST_CITY,
+                        )
                         if city_obj.lat is None or city_obj.lng is None:
                             city_obj.lat = coords[0]
                             city_obj.lng = coords[1]
@@ -1504,11 +1508,11 @@ def platform_activity_export(request: HttpRequest) -> HttpResponse:
 @require_safe
 def api_cities(request: Any) -> JsonResponse:
     """
-    API городов.
+    API населённых пунктов.
 
     Режимы:
-      1. ``GET /api/cities/?q=<query>`` — автодополнение названий (обратная совместимость).
-      2. ``GET /api/cities/`` — данные городов и игроков для интерактивной карты.
+      1. ``GET /api/cities/?q=<query>`` — автодополнение (города, пгт, сёла, деревни).
+      2. ``GET /api/cities/`` — данные пунктов и игроков для интерактивной карты.
     """
     q = (request.GET.get("q") or "").strip()
     if not q:
@@ -1518,20 +1522,33 @@ def api_cities(request: Any) -> JsonResponse:
 
     q_cf = q.casefold()
     seen_keys: set[str] = set()
-    names: list[str] = []
+    suggestions: list[dict[str, str]] = []
 
-    def add_from_values(values: Iterable[str | None]) -> None:
-        for raw in values:
-            if raw is None:
-                continue
-            n = str(raw).strip()
-            if not n or q_cf not in n.casefold():
-                continue
-            key = n.casefold()
-            if key in seen_keys:
-                continue
-            seen_keys.add(key)
-            names.append(n)
+    def add_payload(payload: dict[str, str]) -> None:
+        label = (payload.get("label") or payload.get("value") or "").strip()
+        if not label:
+            return
+        key = label.casefold()
+        if key in seen_keys:
+            return
+        seen_keys.add(key)
+        suggestions.append(payload)
+
+    def add_raw_name(raw: str | None) -> None:
+        if raw is None:
+            return
+        name = str(raw).strip()
+        if not name or q_cf not in name.casefold():
+            return
+        add_payload(
+            {
+                "name": name,
+                "value": name,
+                "label": name,
+                "settlement_type": "",
+                "region": "",
+            }
+        )
 
     visible = Q(club__isnull=True) | Q(is_open_interclub=True)
     tournament_cities = (
@@ -1544,24 +1561,43 @@ def api_cities(request: Any) -> JsonResponse:
         .values_list("city", flat=True)
         .distinct()[:40]
     )
-    add_from_values(tournament_cities)
+    for tournament_city in tournament_cities:
+        add_raw_name(tournament_city)
 
     ref_cities = filter_field_contains_ci(
         City.objects.all(),
         "name",
         q,
         annotation="_api_ref_city_l",
-    ).values_list("name", flat=True)[:40]
-    add_from_values(ref_cities)
+    )[:40]
+    for city in ref_cities:
+        add_payload(city.suggestion_payload())
 
-    names.sort(
-        key=lambda n: (
-            0 if n.casefold().startswith(q_cf) else 1,
-            len(n),
-            n.casefold(),
+    api_key = _get_geocoder_api_key()
+    if api_key and len(q) >= YANDEX_SUGGEST_MIN_QUERY and len(suggestions) < 10:
+        yandex_hits = fetch_yandex_localities(
+            q,
+            api_key=api_key,
+            referer=_get_geocoder_referer(),
+        )
+        for hit in yandex_hits:
+            obj, _created = upsert_locality(
+                name=str(hit["name"]),
+                settlement_type=str(hit["settlement_type"]),
+                region=str(hit.get("region") or ""),
+                lat=hit.get("lat"),
+                lng=hit.get("lng"),
+            )
+            add_payload(obj.suggestion_payload())
+
+    suggestions.sort(
+        key=lambda item: (
+            0 if item["label"].casefold().startswith(q_cf) else 1,
+            len(item["label"]),
+            item["label"].casefold(),
         )
     )
-    return JsonResponse(names[:10], safe=False)
+    return JsonResponse(suggestions[:10], safe=False)
 
 
 @require_safe

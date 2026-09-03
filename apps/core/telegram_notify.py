@@ -13,6 +13,7 @@ from django.core.mail import send_mail
 from django.utils.html import strip_tags
 
 from apps.core.contact_utils import get_max_display_contact
+from apps.courts.surfaces import format_surface_labels
 from apps.telegram_bot.telegram_http import (
     is_telegram_api_enabled,
     telegram_requests_proxies,
@@ -367,8 +368,8 @@ def notify_court_application(app) -> bool:
         f"  • Название: {_escape(app.name)}",
         f"  • Город: {_escape(app.city)}",
         f"  • Адрес: {_escape(app.address)}",
-        f"  • Покрытие (крытые): {_escape(getattr(app, 'indoor_surface', '') or '—')}",
-        f"  • Покрытие (открытые): {_escape(getattr(app, 'outdoor_surface', '') or '—')}",
+        f"  • Покрытие (крытые): {_escape(format_surface_labels(getattr(app, 'indoor_surfaces', None)) or '—')}",
+        f"  • Покрытие (открытые): {_escape(format_surface_labels(getattr(app, 'outdoor_surfaces', None)) or '—')}",
         f"  • Кортов: {app.courts_count}",
         (
             f"  • Освещение: {'да' if app.has_lighting else 'нет'}, "

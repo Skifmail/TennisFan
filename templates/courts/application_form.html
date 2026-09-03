@@ -72,7 +72,6 @@
                         {% for err in form.courts_count.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                 </div>
-                {{ form.surface }}
                 <div class="d-flex gap-3" style="flex-wrap: wrap; margin-top: var(--spacing-md);">
                     <label class="consent-label" style="align-items: center;">
                         {{ form.has_lighting }}
@@ -91,15 +90,15 @@
                 {% for err in form.is_indoor.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 {% for err in form.is_outdoor.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 <div class="d-flex gap-2" style="flex-wrap: wrap; margin-top: var(--spacing-md);">
-                    <div class="form-group" style="flex: 1; min-width: 220px;">
-                        <label class="form-label" for="id_indoor_surface">{{ form.indoor_surface.label }}</label>
-                        {{ form.indoor_surface }}
-                        {% for err in form.indoor_surface.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    <div class="form-group surface-checkboxes-group" id="indoor-surfaces-group" style="flex: 1; min-width: 220px;">
+                        <span class="form-label">{{ form.indoor_surfaces.label }}</span>
+                        {{ form.indoor_surfaces }}
+                        {% for err in form.indoor_surfaces.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
-                    <div class="form-group" style="flex: 1; min-width: 220px;">
-                        <label class="form-label" for="id_outdoor_surface">{{ form.outdoor_surface.label }}</label>
-                        {{ form.outdoor_surface }}
-                        {% for err in form.outdoor_surface.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                    <div class="form-group surface-checkboxes-group" id="outdoor-surfaces-group" style="flex: 1; min-width: 220px;">
+                        <span class="form-label">{{ form.outdoor_surfaces.label }}</span>
+                        {{ form.outdoor_surfaces }}
+                        {% for err in form.outdoor_surfaces.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                     </div>
                 </div>
 
@@ -174,21 +173,25 @@
 document.addEventListener("DOMContentLoaded", function () {
     const indoorCheckbox = document.getElementById("id_is_indoor");
     const outdoorCheckbox = document.getElementById("id_is_outdoor");
-    const indoorInput = document.getElementById("id_indoor_surface");
-    const outdoorInput = document.getElementById("id_outdoor_surface");
-    if (!indoorCheckbox || !outdoorCheckbox || !indoorInput || !outdoorInput) {
-        return;
-    }
-
-    const indoorGroup = indoorInput.closest(".form-group");
-    const outdoorGroup = outdoorInput.closest(".form-group");
-    if (!indoorGroup || !outdoorGroup) {
+    const indoorGroup = document.getElementById("indoor-surfaces-group");
+    const outdoorGroup = document.getElementById("outdoor-surfaces-group");
+    if (!indoorCheckbox || !outdoorCheckbox || !indoorGroup || !outdoorGroup) {
         return;
     }
 
     function syncSurfaceFields() {
         indoorGroup.style.display = indoorCheckbox.checked ? "" : "none";
         outdoorGroup.style.display = outdoorCheckbox.checked ? "" : "none";
+        if (!indoorCheckbox.checked) {
+            indoorGroup.querySelectorAll("input[type='checkbox']").forEach(function (box) {
+                box.checked = false;
+            });
+        }
+        if (!outdoorCheckbox.checked) {
+            outdoorGroup.querySelectorAll("input[type='checkbox']").forEach(function (box) {
+                box.checked = false;
+            });
+        }
     }
 
     indoorCheckbox.addEventListener("change", syncSurfaceFields);

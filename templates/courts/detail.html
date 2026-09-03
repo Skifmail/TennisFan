@@ -62,7 +62,7 @@
             <h1 class="court-detail__title">{{ court.name }}</h1>
 
             <dl class="court-detail__dl court-detail__dl--striped">
-                <dt>Город</dt>
+                <dt>Населённый пункт</dt>
                 <dd>{{ court.city }}</dd>
 
                 <dt>Адрес</dt>
@@ -92,7 +92,7 @@
                 {% if court.sells_balls %}<li><span class="court-detail__check">✓</span> Теннисные мячи в продаже</li>{% endif %}
                 {% if court.sells_water %}<li><span class="court-detail__check">✓</span> Вода в продаже</li>{% endif %}
                 {% if court.multiple_payment_methods %}<li><span class="court-detail__check">✓</span> Возможность оплаты корта разными способами</li>{% endif %}
-                {% if court.racket_rental %}<li><span class="court-detail__check">✓</span> Аренда ракеток</li>{% endif %}
+                {% if court.racket_rental %}<li><span class="court-detail__check">✓</span> Прокат инвентаря</li>{% endif %}
                 {% if court.has_parking %}<li><span class="court-detail__check">✓</span> Автомобильная парковка</li>{% endif %}
                 {% if court.racket_stringing %}<li><span class="court-detail__check">✓</span> Перетяжка ракеток</li>{% endif %}
                 {% if court.has_training %}<li><span class="court-detail__check">✓</span> Тренировки</li>{% endif %}

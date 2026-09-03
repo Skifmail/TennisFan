@@ -190,7 +190,7 @@ class Club(CompressImageFieldsMixin, models.Model):
 
     name = models.CharField("Официальное название", max_length=255)
     slug = models.SlugField("URL-идентификатор", max_length=100, unique=True)
-    city = models.CharField("Город", max_length=100)
+    city = models.CharField("Населённый пункт", max_length=100)
     address = models.TextField("Адрес")
     logo = models.ImageField(
         "Логотип",

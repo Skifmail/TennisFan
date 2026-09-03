@@ -589,10 +589,11 @@ class FooterSocialLinkAdmin(admin.ModelAdmin):
 
 @admin.register(City)
 class CityAdmin(admin.ModelAdmin):
-    """Справочник городов для автодополнения на сайте."""
+    """Справочник населённых пунктов для автодополнения на сайте."""
 
-    list_display = ("name",)
-    search_fields = ("name",)
+    list_display = ("name", "settlement_type", "region")
+    list_filter = ("settlement_type",)
+    search_fields = ("name", "region")
     ordering = ("name",)
 
 

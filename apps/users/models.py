@@ -135,7 +135,7 @@ class Player(CompressImageFieldsMixin, models.Model):
         storage=None,  # Use default storage from settings
         validators=[validate_image_max_2mb],
     )
-    city = models.CharField("Город", max_length=100, blank=True, default="")
+    city = models.CharField("Населённый пункт", max_length=100, blank=True, default="")
     ntrp_level = models.DecimalField(
         "Уровень силы", max_digits=3, decimal_places=1, default=1.5
     )

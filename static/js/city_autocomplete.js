@@ -1,6 +1,7 @@
 /**
- * Универсальное автодополнение для полей ввода города на сайте.
+ * Универсальное автодополнение для полей населённого пункта.
  * Подключается на всех страницах, находит поля по name="city", id/class содержащим "city".
+ * API возвращает объекты {label, value, settlement_type, region} (или строки для совместимости).
  */
 
 (function () {
@@ -117,29 +118,35 @@
         dropdown.setAttribute("aria-hidden", "false");
         dropdown.style.display = "block";
 
-        items.forEach(function (name, index) {
-            var item = document.createElement("div");
-            item.className = "city-autocomplete__item";
-            item.setAttribute("role", "option");
-            item.setAttribute("data-index", index);
-            item.textContent = name;
-            item.style.background = "#ffffff";
-            item.style.color = "#0f172a";
-            item.style.padding = "8px 12px";
+        items.forEach(function (item, index) {
+            var label = typeof item === "string"
+                ? item
+                : (item.label || item.value || item.name || "");
+            var value = typeof item === "string"
+                ? item
+                : (item.value || item.label || item.name || "");
+            var row = document.createElement("div");
+            row.className = "city-autocomplete__item";
+            row.setAttribute("role", "option");
+            row.setAttribute("data-index", index);
+            row.textContent = label;
+            row.style.background = "#ffffff";
+            row.style.color = "#0f172a";
+            row.style.padding = "8px 12px";
 
             // Используем mousedown, чтобы успеть выбрать до blur/focus смены (особенно в админке)
             function handleSelect(event) {
                 event.preventDefault();
                 event.stopPropagation();
-                onSelect(name);
+                onSelect(value);
             }
 
-            item.addEventListener("mousedown", handleSelect);
-            item.addEventListener("click", handleSelect);
-            item.addEventListener("mouseenter", function () {
+            row.addEventListener("mousedown", handleSelect);
+            row.addEventListener("click", handleSelect);
+            row.addEventListener("mouseenter", function () {
                 setHighlight(dropdown, index);
             });
-            dropdown.appendChild(item);
+            dropdown.appendChild(row);
         });
 
         setHighlight(dropdown, 0);

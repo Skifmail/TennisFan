@@ -12,6 +12,9 @@ from django.utils.text import slugify
 from apps.core.geo import GeoRegion
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
+from .surfaces import CourtSurface as CourtSurface
+from .surfaces import compose_surface_display, normalize_surface_codes
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,8 +22,13 @@ class Court(CompressImageFieldsMixin, models.Model):
     """Tennis court / club model."""
 
     name = models.CharField("Название", max_length=200)
-    slug = models.SlugField("URL", unique=True)
-    city = models.CharField("Город", max_length=100)
+    slug = models.SlugField(
+        "URL",
+        unique=True,
+        allow_unicode=True,
+        help_text="Латиница или кириллица. Если пусто в админке — заполнится из названия.",
+    )
+    city = models.CharField("Населённый пункт", max_length=100)
     address = models.CharField("Адрес", max_length=255)
     district = models.CharField("Район города", max_length=100, blank=True)
     region = models.CharField(
@@ -45,20 +53,22 @@ class Court(CompressImageFieldsMixin, models.Model):
 
     surface = models.CharField(
         "Покрытие",
-        max_length=100,
-        help_text="Например: хард, грунт, трава. Заполняется заявителем при подаче заявки.",
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Собирается автоматически из выбранных покрытий.",
     )
-    indoor_surface = models.CharField(
+    indoor_surfaces = models.JSONField(
         "Покрытие крытых кортов",
-        max_length=100,
+        default=list,
         blank=True,
-        help_text="Например: хард, грунт, трава.",
+        help_text="Хард, грунт, терафлекс или другое. Можно выбрать несколько.",
     )
-    outdoor_surface = models.CharField(
+    outdoor_surfaces = models.JSONField(
         "Покрытие открытых кортов",
-        max_length=100,
+        default=list,
         blank=True,
-        help_text="Например: хард, грунт, трава.",
+        help_text="Хард, грунт, терафлекс или другое. Можно выбрать несколько.",
     )
     courts_count = models.PositiveSmallIntegerField("Количество кортов", default=1)
     has_lighting = models.BooleanField("Освещение", default=True)
@@ -69,7 +79,7 @@ class Court(CompressImageFieldsMixin, models.Model):
         help_text="У одного корта могут быть и крытые, и открытые поля.",
     )
 
-    racket_rental = models.BooleanField("Аренда ракеток", default=False)
+    racket_rental = models.BooleanField("Прокат инвентаря", default=False)
     has_parking = models.BooleanField("Автомобильная парковка", default=False)
     racket_stringing = models.BooleanField("Перетяжка ракеток", default=False)
     has_training = models.BooleanField("Тренировки", default=False)
@@ -130,6 +140,27 @@ class Court(CompressImageFieldsMixin, models.Model):
     def __str__(self) -> str:
         return f"{self.name} ({self.city})"
 
+    def save(self, *args, **kwargs) -> None:
+        """Нормализовать выбранные покрытия и обновить строку для витрины."""
+        self.sync_surface_display()
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = list(
+                set(update_fields) | {"indoor_surfaces", "outdoor_surfaces", "surface"}
+            )
+        super().save(*args, **kwargs)
+
+    def sync_surface_display(self) -> None:
+        """Записать канонические коды и человекочитаемую строку покрытия."""
+        self.indoor_surfaces = normalize_surface_codes(self.indoor_surfaces)
+        self.outdoor_surfaces = normalize_surface_codes(self.outdoor_surfaces)
+        self.surface = compose_surface_display(
+            is_indoor=self.is_indoor,
+            indoor_surfaces=self.indoor_surfaces,
+            is_outdoor=self.is_outdoor,
+            outdoor_surfaces=self.outdoor_surfaces,
+        )
+
     @property
     def whatsapp_url(self) -> str | None:
         if not self.whatsapp:
@@ -146,7 +177,7 @@ class Court(CompressImageFieldsMixin, models.Model):
         return f"https://wa.me/{phone}"
 
 
-class CourtPhoto(models.Model):
+class CourtPhoto(CompressImageFieldsMixin, models.Model):
     """Дополнительное фото корта для галереи (до 5 штук на корт)."""
 
     court = models.ForeignKey(
@@ -212,26 +243,28 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
     applicant_phone = models.CharField("Телефон заявителя", max_length=20, blank=True)
 
     name = models.CharField("Название", max_length=200)
-    city = models.CharField("Город", max_length=100)
+    city = models.CharField("Населённый пункт", max_length=100)
     address = models.CharField("Адрес", max_length=255)
     description = models.TextField("Описание", blank=True)
 
     surface = models.CharField(
         "Покрытие",
-        max_length=100,
-        help_text="Например: хард, грунт, трава. Укажите вручную.",
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Собирается автоматически из выбранных покрытий.",
     )
-    indoor_surface = models.CharField(
+    indoor_surfaces = models.JSONField(
         "Покрытие крытых кортов",
-        max_length=100,
+        default=list,
         blank=True,
-        help_text="Например: хард, грунт, трава.",
+        help_text="Хард, грунт, терафлекс или другое. Можно выбрать несколько.",
     )
-    outdoor_surface = models.CharField(
+    outdoor_surfaces = models.JSONField(
         "Покрытие открытых кортов",
-        max_length=100,
+        default=list,
         blank=True,
-        help_text="Например: хард, грунт, трава.",
+        help_text="Хард, грунт, терафлекс или другое. Можно выбрать несколько.",
     )
     courts_count = models.PositiveSmallIntegerField("Количество кортов", default=1)
     has_lighting = models.BooleanField("Освещение", default=True)
@@ -268,6 +301,27 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
     def __str__(self) -> str:
         return f"{self.name} ({self.city}) — {self.get_status_display()}"
 
+    def save(self, *args, **kwargs) -> None:
+        """Нормализовать покрытия заявки перед сохранением."""
+        self.sync_surface_display()
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = list(
+                set(update_fields) | {"indoor_surfaces", "outdoor_surfaces", "surface"}
+            )
+        super().save(*args, **kwargs)
+
+    def sync_surface_display(self) -> None:
+        """Записать канонические коды и человекочитаемую строку покрытия."""
+        self.indoor_surfaces = normalize_surface_codes(self.indoor_surfaces)
+        self.outdoor_surfaces = normalize_surface_codes(self.outdoor_surfaces)
+        self.surface = compose_surface_display(
+            is_indoor=self.is_indoor,
+            indoor_surfaces=self.indoor_surfaces,
+            is_outdoor=self.is_outdoor,
+            outdoor_surfaces=self.outdoor_surfaces,
+        )
+
     def approve_and_create_court(self) -> Court:
         """Создать Court из заявки, привязать к заявке, пометить одобренной."""
         if self.status != CourtApplicationStatus.PENDING:
@@ -280,16 +334,14 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
         while Court.objects.filter(slug=slug).exists():
             n += 1
             slug = f"{base_slug}-{n}"
-        combined_surface = self._compose_surface_display()
         court = Court.objects.create(
             name=self.name,
             slug=slug,
             city=self.city,
             address=self.address,
             description=self.description,
-            surface=combined_surface,
-            indoor_surface=self.indoor_surface,
-            outdoor_surface=self.outdoor_surface,
+            indoor_surfaces=self.indoor_surfaces,
+            outdoor_surfaces=self.outdoor_surfaces,
             courts_count=self.courts_count,
             has_lighting=self.has_lighting,
             is_indoor=self.is_indoor,
@@ -318,18 +370,6 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
                 self.pk,
             )
         return cast(Court, court)
-
-    def _compose_surface_display(self) -> str:
-        parts: list[str] = []
-        if self.is_indoor and self.indoor_surface:
-            parts.append(f"Крытые: {self.indoor_surface}")
-        if self.is_outdoor and self.outdoor_surface:
-            parts.append(f"Открытые: {self.outdoor_surface}")
-        if parts:
-            return "; ".join(parts)
-        if self.surface:
-            return str(self.surface)
-        return "не указано"
 
 
 class CourtRating(models.Model):

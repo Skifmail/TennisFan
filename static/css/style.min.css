@@ -2795,6 +2795,49 @@ form.club-filter-dropdown-open {
     min-width: 150px;
 }
 
+.court-surface-filter__option {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    cursor: pointer;
+}
+
+.court-surface-filter__option .form-checkbox {
+    margin-top: 0;
+}
+
+.surface-checkboxes,
+.surface-checkboxes-group .surface-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 1rem;
+    margin: 0.35rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.surface-checkboxes div,
+.surface-checkboxes li {
+    margin: 0;
+}
+
+.surface-checkboxes label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+}
+
+.surface-checkboxes input[type="checkbox"] {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+
 .club-filter-select__toggle.form-control {
     display: flex;
     align-items: center;

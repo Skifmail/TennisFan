@@ -336,7 +336,7 @@
         }
         if (cityField) {
             cityField.addEventListener('blur', function () {
-                if (!this.value.trim()) showError(cityError, 'Укажите город.');
+                if (!this.value.trim()) showError(cityError, 'Укажите населённый пункт.');
                 else hideError(cityError);
             });
         }
@@ -361,7 +361,7 @@
             else hideError(passwordError);
             if (passwordConfirmField && (!passwordConfirmField.value || passwordConfirmField.value !== passwordField.value)) { showError(passwordConfirmError, 'Пароли не совпадают.'); has = true; }
             else hideError(passwordConfirmError);
-            if (!cityField || !cityField.value.trim()) { showError(cityError, 'Укажите город.'); has = true; }
+            if (!cityField || !cityField.value.trim()) { showError(cityError, 'Укажите населённый пункт.'); has = true; }
             else hideError(cityError);
             if (!phoneField || !phoneField.value.trim()) { showError(phoneError, 'Укажите телефон.'); has = true; }
             else if (!validatePhone(phoneField.value.trim())) { showError(phoneError, 'Введите корректный номер телефона.'); has = true; }

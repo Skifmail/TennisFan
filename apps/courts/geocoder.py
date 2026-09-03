@@ -51,6 +51,7 @@ def _request_yandex(
     spn: tuple[float, float] | None = None,
     rspn: int = 0,
     results: int = 10,
+    kind: str | None = None,
 ) -> list | None:
     """Один запрос к Yandex Geocoder. Возвращает featureMember или None."""
     params: dict[str, str | int] = {
@@ -60,6 +61,8 @@ def _request_yandex(
         "format": "json",
         "results": results,
     }
+    if kind:
+        params["kind"] = kind
     if ll is not None and spn is not None:
         params["ll"] = f"{ll[0]},{ll[1]}"
         params["spn"] = f"{spn[0]},{spn[1]}"

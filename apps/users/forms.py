@@ -62,11 +62,14 @@ class UserRegistrationForm(forms.ModelForm):
         widget=forms.EmailInput(attrs={"class": "form-control"}),
     )
     city = forms.CharField(
-        label="Город *",
+        label="Населённый пункт *",
         required=True,
         max_length=100,
         widget=forms.TextInput(
-            attrs={"class": "form-control", "placeholder": "Например: Москва"}
+            attrs={
+                "class": "form-control",
+                "placeholder": "Город, село, деревня, пгт…",
+            }
         ),
     )
     ntrp_level = forms.DecimalField(
@@ -131,7 +134,7 @@ class UserRegistrationForm(forms.ModelForm):
     def clean_city(self):
         city = (self.cleaned_data.get("city") or "").strip()
         if not city:
-            raise forms.ValidationError("Укажите город.")
+            raise forms.ValidationError("Укажите населённый пункт.")
         return city
 
     def clean_phone(self):
@@ -244,7 +247,10 @@ class PlayerProfileForm(forms.ModelForm):
             "gender": forms.Select(attrs={"class": "form-control"}),
             "forehand": forms.Select(attrs={"class": "form-control"}),
             "city": forms.TextInput(
-                attrs={"class": "form-control", "placeholder": "Город"}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Город, село, деревня, пгт…",
+                }
             ),
             "bio": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
             "telegram": forms.TextInput(attrs={"class": "form-control"}),
@@ -260,7 +266,7 @@ class PlayerProfileForm(forms.ModelForm):
             "birth_date": "Дата рождения",
             "gender": "Пол",
             "forehand": "Ведущая рука",
-            "city": "Город",
+            "city": "Населённый пункт",
             "bio": "О себе",
             "telegram": "Telegram",
             "whatsapp": "WhatsApp",

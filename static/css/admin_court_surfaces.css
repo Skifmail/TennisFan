@@ -1,0 +1,16 @@
+/* Чекбоксы покрытий корта в админке Django. */
+
+.field-indoor_surfaces ul,
+.field-outdoor_surfaces ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.1rem;
+}
+
+.field-indoor_surfaces li,
+.field-outdoor_surfaces li {
+    margin: 0;
+}

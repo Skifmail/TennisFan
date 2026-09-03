@@ -1,12 +1,16 @@
-"""Команда для загрузки городов и координат в справочник City из CSV-файла.
+"""Команда для загрузки населённых пунктов и координат в справочник City из CSV.
 
-Ожидается CSV с колонками:
-    - ``city`` (название города)
-    - ``geo_lat`` (широта, опционально)
-    - ``geo_lon`` (долгота, опционально)
+Ожидается CSV в формате КЛАДР/ФИАС с колонками:
+    - ``city`` / ``city_type`` (город)
+    - ``settlement`` / ``settlement_type`` (село, деревня, пгт и т.д.)
+    - ``region`` / ``region_type`` (субъект РФ)
+    - ``geo_lat`` / ``geo_lon`` (координаты, опционально)
+
+Если заполнен ``settlement``, в справочник попадает он, а не родительский город.
 
 Пример запуска:
-    python manage.py load_cities_from_csv --path /path/to/city.csv
+    python manage.py load_cities_from_csv --path static/documents/city.csv
+    python manage.py load_cities_from_csv --path static/documents/settlements.csv
 """
 
 from __future__ import annotations
@@ -17,39 +21,26 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.core.models import City
+from apps.core.localities import parse_kladr_row, upsert_locality
 
 
 class Command(BaseCommand):
-    """Загружает города и координаты в модель City из CSV-файла.
-
-    Args:
-        path: Путь к CSV-файлу (через опцию ``--path``).
-
-    Raises:
-        CommandError: Если файл не найден или не содержит колонки ``city``.
-    """
+    """Загружает города и прочие населённые пункты в модель City из CSV."""
 
     help = (
-        "Загрузка городов и координат в City из CSV "
-        "с колонками 'city', 'geo_lat', 'geo_lon'."
+        "Загрузка населённых пунктов и координат в City из KLADR-CSV "
+        "(колонки city/settlement, типы и geo_lat/geo_lon)."
     )
 
     def add_arguments(self, parser: Any) -> None:
-        """Добавляет аргументы командной строки.
-
-        Args:
-            parser: Парсер аргументов Django.
-        """
+        """Добавляет аргументы командной строки."""
 
         parser.add_argument(
             "--path",
             dest="path",
             type=str,
             required=True,
-            help=(
-                "Путь к CSV-файлу со списком городов " "(должна быть колонка 'city')."
-            ),
+            help="Путь к CSV-файлу (KLADR: city и/или settlement).",
         )
         parser.add_argument(
             "--force-update",
@@ -59,12 +50,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
-        """Основная логика загрузки городов из CSV.
-
-        Args:
-            *args: Позиционные аргументы (не используются).
-            **options: Опции командной строки, включая ``path``.
-        """
+        """Основная логика загрузки населённых пунктов из CSV."""
 
         raw_path = options.get("path") or ""
         path = Path(raw_path).expanduser().resolve()
@@ -76,68 +62,52 @@ class Command(BaseCommand):
         updated = 0
         skipped = 0
         without_coords = 0
-        seen: set[str] = set()
+        seen: set[tuple[str, str, str]] = set()
         force_update = bool(options.get("force_update"))
 
-        with path.open("r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            fieldnames = reader.fieldnames
-            if not fieldnames or "city" not in fieldnames:
-                raise CommandError("В CSV-файле нет колонки 'city'.")
+        with path.open("r", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            fieldnames = reader.fieldnames or []
+            if "city" not in fieldnames and "settlement" not in fieldnames:
+                raise CommandError("В CSV-файле нет колонок 'city' или 'settlement'.")
 
             for row in reader:
-                name = (row.get("city") or "").strip()
-                if not name:
+                parsed = parse_kladr_row(row)
+                if parsed is None:
                     skipped += 1
                     continue
-                if name in seen:
+                key = (
+                    parsed["name"].casefold(),
+                    parsed["region"].casefold(),
+                    parsed["settlement_type"],
+                )
+                if key in seen:
                     skipped += 1
                     continue
-                seen.add(name)
+                seen.add(key)
 
-                geo_lat_raw = (row.get("geo_lat") or "").strip()
-                geo_lon_raw = (row.get("geo_lon") or "").strip()
-                lat: float | None = None
-                lng: float | None = None
-                if geo_lat_raw and geo_lon_raw:
-                    try:
-                        lat = float(geo_lat_raw)
-                        lng = float(geo_lon_raw)
-                    except ValueError:
-                        lat = None
-                        lng = None
-
+                lat = parsed.get("lat")
+                lng = parsed.get("lng")
                 if lat is None or lng is None:
                     without_coords += 1
 
-                defaults: dict[str, Any] = {}
-                if lat is not None and lng is not None:
-                    defaults = {"lat": lat, "lng": lng}
-
-                obj, created_flag = City.objects.get_or_create(
-                    name=name, defaults=defaults
+                _obj, created_flag = upsert_locality(
+                    name=parsed["name"],
+                    settlement_type=parsed["settlement_type"],
+                    region=parsed["region"],
+                    lat=lat,
+                    lng=lng,
+                    force_update=force_update,
                 )
                 if created_flag:
                     created += 1
                 else:
-                    # Обновляем координаты только если они отсутствуют
-                    # или если явно задан флаг принудительного обновления.
-                    if (
-                        lat is not None
-                        and lng is not None
-                        and (force_update or obj.lat is None or obj.lng is None)
-                    ):
-                        obj.lat = lat
-                        obj.lng = lng
-                        obj.save(update_fields=["lat", "lng"])
-                        updated += 1
-                    else:
-                        skipped += 1
+                    updated += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Города загружены из {path}. "
-                f"Создано: {created}, обновлено координат: {updated}, "
+                f"Населённые пункты загружены из {path}. "
+                f"Создано: {created}, обновлено: {updated}, "
                 f"без координат в CSV: {without_coords}, пропущено: {skipped}."
             )
         )

@@ -13,7 +13,11 @@ from datetime import date
 from typing import Any
 
 from apps.tournaments.models import Match, Tournament
-from apps.tournaments.round_robin import get_match_matrix
+from apps.tournaments.round_robin import (
+    compute_standings,
+    get_match_matrix,
+    order_matrix_by_standings,
+)
 from apps.users.models import Player
 
 
@@ -434,6 +438,8 @@ def build_tables_dashboard(
     if is_round_robin:
         entities, matrix = get_match_matrix(tournament)
         if entities and matrix:
+            standings = compute_standings(tournament)
+            entities, matrix = order_matrix_by_standings(entities, matrix, standings)
             labels = [str(e) for e in entities]
             cells: list[list[dict[str, Any]]] = []
             for i, row in enumerate(matrix):

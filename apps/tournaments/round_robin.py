@@ -512,6 +512,59 @@ def get_match_matrix(tournament: Tournament) -> tuple[list, list]:
     return participants, matrix
 
 
+def order_matrix_by_standings(
+    participants: list[Player | TournamentTeam],
+    matrix: list[list[dict[str, Any]]],
+    standings: list[dict[str, Any]],
+) -> tuple[list[Player | TournamentTeam], list[list[dict[str, Any]]]]:
+    """
+    Переставить строки и столбцы матрицы в порядке мест из таблицы результатов.
+
+    Нужно, чтобы первое место шло первой строкой/столбцом, а не по алфавиту.
+    ``standings`` должен быть уже отсортирован по месту (как из compute_standings*).
+    """
+    if not participants or not standings or not matrix:
+        return participants, matrix
+
+    n = len(participants)
+    if len(matrix) != n or any(len(row) != n for row in matrix):
+        logger.warning(
+            "order_matrix_by_standings: размер матрицы %s×%s не совпадает с %d участниками",
+            len(matrix),
+            len(matrix[0]) if matrix else 0,
+            n,
+        )
+        return participants, matrix
+
+    id_to_idx = {p.id: i for i, p in enumerate(participants)}
+    ordered_indices: list[int] = []
+    seen: set[int] = set()
+    for row in standings:
+        entity = row.get("team") or row.get("player")
+        if entity is None or entity.id in seen:
+            continue
+        idx = id_to_idx.get(entity.id)
+        if idx is None:
+            continue
+        ordered_indices.append(idx)
+        seen.add(entity.id)
+
+    for i, participant in enumerate(participants):
+        if participant.id not in seen:
+            ordered_indices.append(i)
+            seen.add(participant.id)
+
+    if ordered_indices == list(range(n)):
+        return participants, matrix
+
+    new_participants = [participants[i] for i in ordered_indices]
+    new_matrix: list[list[dict[str, Any]]] = [
+        [matrix[row_idx][col_idx] for col_idx in ordered_indices]
+        for row_idx in ordered_indices
+    ]
+    return new_participants, new_matrix
+
+
 def compute_standings_for_entities(
     tournament: Tournament,
     entities: list[Player | TournamentTeam],

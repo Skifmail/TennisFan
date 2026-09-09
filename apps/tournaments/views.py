@@ -112,6 +112,7 @@ from .round_robin import (
     compute_standings_for_entities,
     get_match_matrix,
     get_match_matrix_for_entities,
+    order_matrix_by_standings,
 )
 from .round_robin import (
     generate_bracket as round_robin_generate_bracket,
@@ -782,6 +783,9 @@ def tournament_detail(request, slug):
                 )
         matrix_participants, matrix_data = get_match_matrix(tournament)
         rr_standings = compute_standings(tournament)
+        matrix_participants, matrix_data = order_matrix_by_standings(
+            matrix_participants, matrix_data, rr_standings
+        )
         if tournament.status == "completed":
             fan_results_map = {
                 r.player_id: r.fan_points
@@ -905,6 +909,9 @@ def tournament_detail(request, slug):
                     tournament, main_rr_entities, main_rr_matches
                 )
             )
+            tvd_main_rr_matrix_participants, main_rr_matrix = order_matrix_by_standings(
+                tvd_main_rr_matrix_participants, main_rr_matrix, tvd_main_rr_standings
+            )
             standings_by_entity = {
                 (row["team"] or row["player"]).id: row for row in tvd_main_rr_standings
             }
@@ -931,6 +938,9 @@ def tournament_detail(request, slug):
                 get_match_matrix_for_entities(
                     tournament, cons_rr_entities, cons_rr_matches
                 )
+            )
+            tvd_cons_rr_matrix_participants, cons_rr_matrix = order_matrix_by_standings(
+                tvd_cons_rr_matrix_participants, cons_rr_matrix, tvd_cons_rr_standings
             )
             standings_by_entity = {
                 (row["team"] or row["player"]).id: row for row in tvd_cons_rr_standings
@@ -965,6 +975,9 @@ def tournament_detail(request, slug):
                     tournament, rr_1_3_entities, rr_1_3_matches
                 )
             )
+            tvd_rr_1_3_matrix_participants, rr_1_3_matrix = order_matrix_by_standings(
+                tvd_rr_1_3_matrix_participants, rr_1_3_matrix, tvd_rr_1_3_standings
+            )
             st_by_entity = {
                 (r["team"] or r["player"]).id: r for r in tvd_rr_1_3_standings
             }
@@ -991,6 +1004,9 @@ def tournament_detail(request, slug):
                 get_match_matrix_for_entities(
                     tournament, rr_4_6_entities, rr_4_6_matches
                 )
+            )
+            tvd_rr_4_6_matrix_participants, rr_4_6_matrix = order_matrix_by_standings(
+                tvd_rr_4_6_matrix_participants, rr_4_6_matrix, tvd_rr_4_6_standings
             )
             st_by_entity = {
                 (r["team"] or r["player"]).id: r for r in tvd_rr_4_6_standings
@@ -1625,6 +1641,9 @@ def tournament_manage(request, slug):
         tvd_main_rr_matrix_participants, main_rr_matrix = get_match_matrix_for_entities(
             tournament, main_rr_entities, main_rr_matches
         )
+        tvd_main_rr_matrix_participants, main_rr_matrix = order_matrix_by_standings(
+            tvd_main_rr_matrix_participants, main_rr_matrix, tvd_main_rr_standings
+        )
         standings_by_entity = {
             (row["team"] or row["player"]).id: row for row in tvd_main_rr_standings
         }
@@ -1649,6 +1668,9 @@ def tournament_manage(request, slug):
         )
         tvd_cons_rr_matrix_participants, cons_rr_matrix = get_match_matrix_for_entities(
             tournament, cons_rr_entities, cons_rr_matches
+        )
+        tvd_cons_rr_matrix_participants, cons_rr_matrix = order_matrix_by_standings(
+            tvd_cons_rr_matrix_participants, cons_rr_matrix, tvd_cons_rr_standings
         )
         standings_by_entity = {
             (row["team"] or row["player"]).id: row for row in tvd_cons_rr_standings

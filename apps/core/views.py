@@ -72,6 +72,7 @@ from .activity import (
     annotate_home_activity_new_events,
     format_new_home_activity_label,
     get_public_home_activity_events,
+    latest_home_activity_event_id,
     log_activity,
     mark_platform_dashboard_seen,
     parse_home_activity_seen_id,
@@ -2193,7 +2194,7 @@ def home(request):
         home_activity_events,
         seen_id=home_activity_seen_id,
     )
-    home_activity_latest_id = home_activity_events[0].id if home_activity_events else 0
+    home_activity_latest_id = latest_home_activity_event_id(home_activity_events)
     club_choices = list(club_filter_choices_for_tournament_lists())
 
     context = {

@@ -60,7 +60,7 @@
         if (!values.length) {
             return null;
         }
-        return Math.min.apply(null, values);
+        return Math.max.apply(null, values);
     }
 
     function persistSeen(id) {
@@ -108,7 +108,7 @@
             return;
         }
         var seen = readStoredSeen();
-        if (seen !== null && latestId <= seen) {
+        if (seen === null || latestId <= seen) {
             return;
         }
         var host = document.querySelector(".hero-content--premium");

@@ -273,6 +273,12 @@ class ClubAdmin(admin.ModelAdmin):
 
     form = ClubAdminForm
     change_list_template = "admin/clubs/club_changelist.html"
+
+    class Media:
+        """Подключить автодополнение населённых пунктов на форме клуба."""
+
+        js = ("js/city_autocomplete.js",)
+
     list_display = (
         "name",
         "slug",

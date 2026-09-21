@@ -88,14 +88,14 @@ class TrainingListGeographyTestCase(TestCase):
         self.assertContains(response, "Тренировки для взрослых")
         self.assertContains(
             response,
-            "Москва, Раменское, Жуковский, Воскресенск, Павловский Посад и Казань",
+            "Москва, Раменское, Жуковский, Воскресенск и Павловский Посад",
         )
         self.assertContains(response, "Где вам удобно?")
         self.assertContains(response, "Юг")
         self.assertContains(response, "Раменское")
-        self.assertContains(response, "Другие города")
-        self.assertContains(response, "Казань")
-        self.assertNotContains(response, 'name="city"')
+        self.assertNotContains(response, "Другие города")
+        self.assertNotContains(response, "Казань")
+        self.assertNotContains(response, "data-extra-city-filter")
         self.assertNotContains(response, "Корт ЮВАО")
         self.assertNotContains(response, "Корт Раменское")
         self.assertNotContains(response, "Корт Казань")
@@ -165,12 +165,13 @@ class TrainingListExtraCitiesTestCase(TestCase):
         response = self.client.get(reverse("training_list"), secure=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Другие города")
+        self.assertContains(response, "data-extra-city-filter")
         self.assertContains(response, "Ростов-на-Дону")
-        self.assertContains(response, "Казань")
+        self.assertNotContains(response, "Другие города")
+        self.assertNotContains(response, "Казань")
         self.assertContains(
             response,
-            "Москва, Раменское, Жуковский, Воскресенск, Павловский Посад, Казань и Ростов-на-Дону",
+            "Москва, Раменское, Жуковский, Воскресенск, Павловский Посад и Ростов-на-Дону",
         )
         self.assertNotContains(response, "Корт Ростов")
         self.assertNotContains(response, "Корт Казань")

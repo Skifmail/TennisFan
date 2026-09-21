@@ -1,7 +1,7 @@
 """География публичной страницы тренировок.
 
-Заголовок и фильтр называют Москву, города области и другие города, где уже
-есть активная тренировка или корт. Чужой корт не попадает в дамп до выбора города.
+Заголовок называет Москву, города области и города активных тренировок.
+Корт без тренировки в фильтр не попадает.
 """
 
 from django.test import TestCase
@@ -19,6 +19,7 @@ from apps.training.geo import (
     format_city_list,
     group_training_courts,
     public_training_cities,
+    public_training_cities_label,
     training_area_for_court,
     training_city_for_court,
     training_city_slug,
@@ -331,15 +332,17 @@ class CourtsForTrainingAreaTestCase(TestCase):
             ["Корт Ростов"],
         )
 
-    def test_court_only_city_slug_returns_courts(self) -> None:
+    def test_court_only_city_slug_is_empty_without_training(self) -> None:
         _make_court(name="Корт Адлер", slug="adler-geo-court", city="Адлер")
 
-        names = [
-            court.name
-            for court in courts_for_training_area(training_city_slug("Адлер"))
-        ]
+        self.assertEqual(courts_for_training_area(training_city_slug("Адлер")), ())
 
-        self.assertEqual(names, ["Корт Адлер"])
+    def test_court_only_city_is_not_in_picker(self) -> None:
+        _make_court(name="Корт Сочи", slug="sochi-place-court", city="Сочи")
+
+        self.assertEqual(extra_training_cities(), [])
+        self.assertEqual(extra_place_cities(), [])
+        self.assertNotIn("Сочи", public_training_cities())
 
 
 class ExtraTrainingCitiesTestCase(TestCase):
@@ -378,9 +381,34 @@ class ExtraTrainingCitiesTestCase(TestCase):
         self.assertEqual(public_training_cities()[-1], "Ростов-на-Дону")
         self.assertEqual(training_city_slug("Ростов-на-Дону"), "ростов-на-дону")
 
-    def test_court_only_city_is_in_place_picker_not_training_cities(self) -> None:
+    def test_court_only_city_is_not_in_picker(self) -> None:
         _make_court(name="Корт Сочи", slug="sochi-place-court", city="Сочи")
 
         self.assertEqual(extra_training_cities(), [])
-        self.assertEqual(extra_place_cities(), ["Сочи"])
-        self.assertEqual(public_training_cities()[-1], "Сочи")
+        self.assertEqual(extra_place_cities(), [])
+        self.assertNotIn("Сочи", public_training_cities())
+
+    def test_heading_collapses_many_extra_cities(self) -> None:
+        Training.objects.create(
+            title="Ростов",
+            slug="rostov-heading-extra",
+            description="Описание",
+            city="Ростов-на-Дону",
+            is_active=True,
+            type_prices={"individual": 3000},
+        )
+        Training.objects.create(
+            title="Сочи",
+            slug="sochi-heading-extra",
+            description="Описание",
+            city="Сочи",
+            is_active=True,
+            type_prices={"individual": 3000},
+        )
+
+        label = public_training_cities_label()
+
+        self.assertIn("Москва", label)
+        self.assertIn("другие города", label)
+        self.assertNotIn("Ростов-на-Дону", label)
+        self.assertNotIn("Сочи", label)

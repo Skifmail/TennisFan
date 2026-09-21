@@ -17020,6 +17020,10 @@ a.home-activity__actor:hover {
     margin: 0 0 1rem;
 }
 
+.training-browse__filters--with-city {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .training-browse__field {
     display: flex;
     min-width: 0;
@@ -17159,6 +17163,7 @@ a.home-activity__actor:hover {
     align-items: center;
     justify-content: center;
     min-height: 1.9rem;
+    max-width: 100%;
     padding: 0.28rem 0.72rem;
     border: 1px solid rgb(196 158 92 / 0.48);
     border-radius: 999px;
@@ -17169,6 +17174,7 @@ a.home-activity__actor:hover {
     letter-spacing: 0.01em;
     line-height: 1.2;
     text-decoration: none;
+    white-space: nowrap;
     transition:
         background 0.2s ease,
         border-color 0.2s ease,
@@ -17260,6 +17266,14 @@ a.home-activity__actor:hover {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .training-browse__filters--with-city {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .training-browse__field--city {
+        grid-column: 1 / -1;
+    }
+
     .training-detail-grid {
         grid-template-columns: 1fr;
     }
@@ -17298,6 +17312,14 @@ a.home-activity__actor:hover {
         grid-template-columns: 1fr 1fr;
         gap: 0.5rem 0.55rem;
         margin-bottom: 0.8rem;
+    }
+
+    .training-browse__filters--with-city {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .training-browse__field--city {
+        grid-column: 1 / -1;
     }
 
     .training-browse__filters .form-control {

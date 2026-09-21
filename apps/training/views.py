@@ -27,15 +27,12 @@ from .forms import (
     TrainingForm,
 )
 from .geo import (
-    OTHER_CITIES_LABEL,
-    OTHER_CITIES_REGION,
     TrainingPlace,
     advertised_training_areas,
     courts_for_training_area,
-    extra_place_cities,
+    extra_training_cities,
     filter_trainings_by_city,
-    format_city_list,
-    public_training_cities,
+    public_training_cities_label,
     training_city_slug,
 )
 from .models import (
@@ -83,7 +80,7 @@ def training_list(request):
         trainings = trainings.filter(type_prices__has_key=training_type)
 
     areas = advertised_training_areas()
-    extra_cities = extra_place_cities(areas)
+    extra_cities = extra_training_cities(areas)
     selected_area = next((area for area in areas if area.slug == area_slug), None)
     selected_extra_city = ""
     if selected_area is None and area_slug:
@@ -114,21 +111,14 @@ def training_list(request):
                 ),
             }
         )
-    extra_options: list[dict[str, str | bool]] = []
+    extra_city_options: list[dict[str, str | bool]] = []
     for city in extra_cities:
         city_slug = training_city_slug(city)
-        is_active = bool(selected_extra_city) and city_slug == area_slug
-        extra_options.append(
+        extra_city_options.append(
             {
                 "name": city,
                 "slug": city_slug,
-                "region": OTHER_CITIES_REGION,
-                "is_active": is_active,
-                "url": _training_list_query(
-                    area="" if is_active else city_slug,
-                    type=training_type,
-                    level=skill_level,
-                ),
+                "is_active": bool(selected_extra_city) and city_slug == area_slug,
             }
         )
     area_groups = [
@@ -148,10 +138,6 @@ def training_list(request):
                 if option["region"] == GeoRegion.MOSCOW_OBLAST
             ],
         },
-        {
-            "label": OTHER_CITIES_LABEL,
-            "areas": extra_options,
-        },
     ]
     area_groups = [group for group in area_groups if group["areas"]]
 
@@ -166,8 +152,9 @@ def training_list(request):
             if selected_place
             else ()
         ),
-        "training_cities_label": format_city_list(public_training_cities(areas)),
+        "training_cities_label": public_training_cities_label(areas),
         "training_area_groups": area_groups,
+        "extra_city_options": extra_city_options,
     }
     return render(request, "training/list.html", context)
 

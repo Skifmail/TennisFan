@@ -14,10 +14,8 @@
 
 <div class="container">
     <div class="training-browse">
-        <form method="get" class="training-browse__filters">
-            {% if current_area %}
+        <form method="get" class="training-browse__filters{% if extra_city_options %} training-browse__filters--with-city{% endif %}">
             <input type="hidden" name="area" value="{{ current_area }}">
-            {% endif %}
             <label class="training-browse__field">
                 <span class="training-browse__label">Тип</span>
                 <select name="type" class="form-control" onchange="this.form.submit()">
@@ -40,12 +38,28 @@
                     <option value="professional" {% if current_level == 'professional' %}selected{% endif %}>Профессионал (5.5–7.0)</option>
                 </select>
             </label>
+            {% if extra_city_options %}
+            <label class="training-browse__field training-browse__field--city">
+                <span class="training-browse__label">Город</span>
+                <select
+                    class="form-control"
+                    aria-label="Другой город"
+                    data-extra-city-filter
+                    onchange="this.form.elements.area.value=this.value; this.form.submit()"
+                >
+                    <option value="">Другой город</option>
+                    {% for city in extra_city_options %}
+                    <option value="{{ city.slug }}" {% if city.is_active %}selected{% endif %}>{{ city.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            {% endif %}
         </form>
 
         <section class="training-geo" aria-label="Районы и города">
             <div class="training-geo__head">
                 <h2 class="training-geo__title">Где вам удобно?</h2>
-                <p class="training-geo__hint">Район Москвы, город области или другой город с тренировками.</p>
+                <p class="training-geo__hint">Район Москвы или город области.</p>
             </div>
             <div class="training-browse__actions">
                 <a href="{% url 'coach_list' %}" class="training-browse__action">Наши тренеры</a>

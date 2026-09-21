@@ -317,6 +317,24 @@ def get_public_home_activity_events(
     )
 
 
+def latest_home_activity_event_id(events: list[PlatformActivityEvent]) -> int:
+    """Вернуть максимальный id в выборке ленты.
+
+    Лента сортируется по ``created_at``, а «просмотрено» хранится как id.
+    Если у более старого по времени события id больше, запоминать
+    ``events[0].id`` нельзя: бейдж новых событий никогда не погаснет.
+
+    Args:
+        events: События публичной ленты.
+
+    Returns:
+        int: Максимальный id или ``0``, если лента пуста.
+    """
+    if not events:
+        return 0
+    return max(int(event.pk) for event in events)
+
+
 def parse_home_activity_seen_id(raw: str | None) -> int | None:
     """Разобрать cookie с id последнего просмотренного события ленты.
 

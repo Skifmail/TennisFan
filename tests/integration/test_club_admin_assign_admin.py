@@ -48,6 +48,17 @@ class ClubAdminAssignAdministratorTestCase(TestCase):
         )
         self.client.force_login(self.admin_user)
 
+    def test_add_page_includes_city_autocomplete(self) -> None:
+        """На форме добавления клуба должен быть скрипт подсказок населённых пунктов."""
+        response = self.client.get(
+            reverse("admin:clubs_club_add"),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="city"')
+        self.assertContains(response, "city_autocomplete.js")
+
     def test_change_page_contains_new_admin_field(self) -> None:
         response = self.client.get(
             reverse("admin:clubs_club_change", args=[self.club.pk]),

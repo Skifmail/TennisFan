@@ -420,6 +420,61 @@ class PlatformActivityFeedTestCase(TestCase):
         self.assertContains(response, "localStorage")
         self.assertContains(response, "getBoundingClientRect")
         self.assertContains(response, "scrollIntoView")
+        self.assertContains(response, "Math.max.apply(null, values)")
+
+    def test_seen_marker_uses_max_id_when_timestamps_are_out_of_order(self) -> None:
+        """Просмотр ленты запоминает максимальный id, а не первое событие по времени."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        older_user = User.objects.create_user(
+            email="home-feed-ts-old@test.local",
+            password="testpass123",
+            first_name="Раньше",
+            last_name="Поid",
+        )
+        Player.objects.create(user=older_user)
+        newer_user = User.objects.create_user(
+            email="home-feed-ts-new@test.local",
+            password="testpass123",
+            first_name="Позже",
+            last_name="Повремени",
+        )
+        Player.objects.create(user=newer_user)
+
+        higher_id_event = (
+            PlatformActivityEvent.objects.filter(actor=newer_user)
+            .order_by("-id")
+            .first()
+        )
+        lower_id_event = (
+            PlatformActivityEvent.objects.filter(actor=older_user)
+            .order_by("-id")
+            .first()
+        )
+        self.assertIsNotNone(higher_id_event)
+        self.assertIsNotNone(lower_id_event)
+        assert higher_id_event is not None
+        assert lower_id_event is not None
+        self.assertGreater(higher_id_event.id, lower_id_event.id)
+
+        now = timezone.now()
+        higher_id_event.created_at = now - timedelta(minutes=10)
+        lower_id_event.created_at = now
+        higher_id_event.save(update_fields=["created_at"])
+        lower_id_event.save(update_fields=["created_at"])
+
+        home = self.client.get(reverse("home"))
+        self.assertEqual(home.context["home_activity_latest_id"], higher_id_event.id)
+        self.assertEqual(
+            home.cookies[HOME_ACTIVITY_SEEN_COOKIE].value, str(higher_id_event.id)
+        )
+
+        self.client.cookies[HOME_ACTIVITY_SEEN_COOKIE] = str(higher_id_event.id)
+        seen = self.client.get(reverse("home"))
+        self.assertEqual(seen.context["home_activity_new_count"], 0)
+        self.assertNotContains(seen, 'class="home-activity-nudge"')
 
     def test_returning_visitor_sees_new_home_activity(self) -> None:
         """После новых событий возвращающийся посетитель видит бейдж и плашку."""

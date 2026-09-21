@@ -26,8 +26,38 @@
     </header>
 
     <div class="container">
-        <form method="get" class="filter-bar tournaments-filters" action="{% if is_archive %}{% url 'tournament_archive' %}{% else %}{% url 'tournament_list' %}{% endif %}">
-            <div class="tournaments-filters__field">
+        <form method="get" class="filter-bar tournaments-filters{% if filter_chips %} tournaments-filters--has-active{% endif %}" action="{% if is_archive %}{% url 'tournament_archive' %}{% else %}{% url 'tournament_list' %}{% endif %}">
+            <input
+                type="checkbox"
+                id="tournaments-filters-drawer"
+                class="tournaments-filters__drawer-check"
+                aria-controls="tournaments-filters-panel"
+            >
+            <div class="tournaments-filters__toolbar">
+                <label for="tournaments-filters-drawer" class="tournaments-filters__toggle">
+                    <span class="tournaments-filters__toggle-copy">
+                        <span class="tournaments-filters__toggle-title">Фильтры</span>
+                        {% if filter_chips %}
+                        <span class="tournaments-filters__count">{{ filter_chips|length }}</span>
+                        {% endif %}
+                    </span>
+                </label>
+                {% if filter_chips %}
+                <div class="tournaments-filters__meta">
+                    <ul class="tournaments-filters__chips" aria-label="Выбранные фильтры">
+                        {% for chip in filter_chips %}
+                        <li class="tournaments-filters__chip">{{ chip }}</li>
+                        {% endfor %}
+                    </ul>
+                    <a
+                        class="tournaments-filters__reset"
+                        href="{% if is_archive %}{% url 'tournament_archive' %}{% else %}{% url 'tournament_list' %}{% endif %}"
+                    >Сбросить</a>
+                </div>
+                {% endif %}
+            </div>
+            <div class="tournaments-filters__panel" id="tournaments-filters-panel">
+            <div class="tournaments-filters__field{% if current_region %} is-active{% endif %}">
                 <label class="tournaments-filters__label" for="tournament-filter-region">Регион</label>
                 <select name="region" id="tournament-filter-region" class="form-control" onchange="this.form.submit()" aria-label="Регион">
                     <option value="">Москва и область</option>
@@ -37,17 +67,17 @@
                 </select>
             </div>
             {% if area_options %}
-            <div class="tournaments-filters__field">
-                <label class="tournaments-filters__label" for="tournament-filter-area">Зона или город</label>
-                <select name="area" id="tournament-filter-area" class="form-control" onchange="this.form.submit()" aria-label="Зона или город">
-                    <option value="">Все зоны и города</option>
+            <div class="tournaments-filters__field{% if current_area %} is-active{% endif %}">
+                <label class="tournaments-filters__label" for="tournament-filter-area">Район или город</label>
+                <select name="area" id="tournament-filter-area" class="form-control" onchange="this.form.submit()" aria-label="Район или город">
+                    <option value="">Все районы и города</option>
                     {% for area in area_options %}
                     <option value="{{ area.slug }}" {% if current_area == area.slug %}selected{% endif %}>{{ area.name }}</option>
                     {% endfor %}
                 </select>
             </div>
             {% endif %}
-            <div class="tournaments-filters__field">
+            <div class="tournaments-filters__field{% if current_variant %} is-active{% endif %}">
                 <label class="tournaments-filters__label" for="tournament-filter-variant">Формат</label>
                 <select name="variant" id="tournament-filter-variant" class="form-control" onchange="this.form.submit()" aria-label="Формат">
                     <option value="">Одиночные и парные</option>
@@ -56,11 +86,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="tournaments-filters__field">
-                <label class="tournaments-filters__label" for="tournament-filter-city">Населённый пункт</label>
-                <input name="city" id="tournament-filter-city" class="form-control" placeholder="Любой населённый пункт России" value="{{ current_city }}" onchange="this.form.submit()">
-            </div>
-            <div class="tournaments-filters__field">
+            <div class="tournaments-filters__field{% if current_category %} is-active{% endif %}">
                 <label class="tournaments-filters__label" for="tournament-filter-category">Уровень</label>
                 <select name="category" id="tournament-filter-category" class="form-control" onchange="this.form.submit()" aria-label="Уровень игроков">
                     <option value="">Все категории</option>
@@ -70,7 +96,7 @@
                 </select>
             </div>
             {% if not is_archive %}
-            <div class="tournaments-filters__field">
+            <div class="tournaments-filters__field{% if current_status %} is-active{% endif %}">
                 <label class="tournaments-filters__label" for="tournament-filter-status">Статус</label>
                 <select name="status" id="tournament-filter-status" class="form-control" onchange="this.form.submit()">
                     <option value="">Все статусы</option>
@@ -80,9 +106,14 @@
                 </select>
             </div>
             {% endif %}
-            <div class="tournaments-filters__field">
+            <div class="tournaments-filters__field{% if current_city %} is-active{% endif %}">
+                <label class="tournaments-filters__label" for="tournament-filter-city">Населённый пункт</label>
+                <input name="city" id="tournament-filter-city" class="form-control" placeholder="Любой населённый пункт России" value="{{ current_city }}" onchange="this.form.submit()">
+            </div>
+            <div class="tournaments-filters__field tournaments-filters__field--wide{% if list_club_filter %} is-active{% endif %}">
                 <span class="tournaments-filters__label" id="tournament-filter-club-label">Клуб</span>
                 {% include 'includes/club_filter_select.html' with selected_club=list_club_filter|default:'' auto_submit=1 id_suffix='list' aria_label='Фильтр по клубу' %}
+            </div>
             </div>
         </form>
 

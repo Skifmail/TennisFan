@@ -38,7 +38,7 @@ class Court(CompressImageFieldsMixin, models.Model):
         blank=True,
         default="",
         db_index=True,
-        help_text="Москва или область. Определяет набор доступных зон и городов.",
+        help_text="Москва или область. Определяет набор доступных районов и городов.",
     )
     geo_area = models.ForeignKey(
         "core.GeoArea",
@@ -46,8 +46,8 @@ class Court(CompressImageFieldsMixin, models.Model):
         null=True,
         blank=True,
         related_name="courts",
-        verbose_name="Зона / город",
-        help_text="Зона Москвы или город области, из справочника. Поле «Район» — свободный текст.",
+        verbose_name="Район / город",
+        help_text="Район Москвы или город области, из справочника. Поле «Район» — более точное место свободным текстом.",
     )
     description = models.TextField("Описание", blank=True)
 

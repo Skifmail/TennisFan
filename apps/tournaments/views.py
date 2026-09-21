@@ -55,6 +55,7 @@ from .fan import generate_bracket as fan_generate_bracket
 from .forms import TournamentPhotoUploadForm
 from .landing import (
     VARIANT_BY_VALUE,
+    build_tournament_filter_chips,
     geo_area_choices,
     region_options,
     resolve_landing,
@@ -367,10 +368,10 @@ def tournament_list(
 ):
     """Список турниров платформы и клубов.
 
-    Завершённые турниры по умолчанию скрыты и доступны через фильтр
-    «Завершённые» или отдельную страницу архива.
+    Завершённые идут после набора и «в игре», но перед отменёнными;
+    позже завершённые выше. Архив по-прежнему показывает только завершённые.
 
-    Регион, зона/город и формат приходят либо из адреса (посадочные страницы для
+    Регион, район/город и формат приходят либо из адреса (посадочные страницы для
     рекламы), либо из query-параметров (переключение фильтров на странице).
     Значение из адреса приоритетнее, а канонический адрес всегда указывает на
     ЧПУ-версию, чтобы query-версия не плодила дубли в индексе.
@@ -379,7 +380,7 @@ def tournament_list(
         request (HttpRequest): HTTP-запрос со query-параметрами фильтров.
         archive (bool): Если True — показывать только завершённые турниры.
         region_slug (str | None): Слаг региона из адреса страницы.
-        area_slug (str | None): Слаг зоны Москвы или города области из адреса.
+        area_slug (str | None): Слаг района Москвы или города области из адреса.
         variant_slug (str | None): ``singles`` или ``doubles`` из адреса.
 
     Returns:
@@ -392,10 +393,11 @@ def tournament_list(
     )
     city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
+    status: str
     if archive:
-        status = TournamentStatus.COMPLETED
+        status = str(TournamentStatus.COMPLETED)
     else:
-        status = request.GET.get("status", "")
+        status = request.GET.get("status") or ""
     club_filter = (request.GET.get("club") or "").strip()
 
     # Турниры платформы и клубов (клубные — с отдельным CTA «Вступить в клуб»).
@@ -435,9 +437,6 @@ def tournament_list(
         ).distinct()
     if status:
         tournaments = tournaments.filter(status=status)
-    else:
-        # В общем списке завершённые не показываем — только по явному фильтру/архиву.
-        tournaments = tournaments.exclude(status=TournamentStatus.COMPLETED)
     if club_filter == CLUB_FILTER_PLATFORM:
         tournaments = tournaments.filter(club__isnull=True)
     elif club_filter == CLUB_FILTER_CLUB_ONLY:
@@ -470,6 +469,26 @@ def tournament_list(
                 status=ClubMemberStatus.ACTIVE,
             ).values_list("club_id", flat=True)
         )
+
+    region_opts = region_options()
+    variant_opts = variant_options()
+    club_choices = list(club_filter_choices_for_tournament_lists())
+    current_region = region_to_slug(landing.region)
+    current_variant = VARIANT_BY_VALUE.get(landing.variant, "")
+    filter_chips = build_tournament_filter_chips(
+        current_region=current_region,
+        region_opts=region_opts,
+        current_area_name=landing.area.name if landing.area else "",
+        current_variant=current_variant,
+        variant_opts=variant_opts,
+        current_city=city,
+        current_category=category,
+        category_choices=SkillLevel.choices,
+        current_status=status,
+        is_archive=archive,
+        club_filter=club_filter,
+        club_choices=club_choices,
+    )
 
     from apps.tournaments.platform_home import get_tournament_public_status_label
 
@@ -608,16 +627,17 @@ def tournament_list(
         "landing_heading": landing.heading,
         "landing_meta_description": landing.meta_description,
         "canonical_url": request.build_absolute_uri(landing.url),
-        "region_options": region_options(),
+        "region_options": region_opts,
         "area_options": geo_area_choices(landing.region),
-        "variant_options": variant_options(),
-        "current_region": region_to_slug(landing.region),
+        "variant_options": variant_opts,
+        "current_region": current_region,
         "current_area": landing.area.slug if landing.area else "",
-        "current_variant": VARIANT_BY_VALUE.get(landing.variant, ""),
+        "current_variant": current_variant,
         # Не использовать ключ current_club — он зарезервирован под клуб из context processor (base.html).
         "list_club_filter": club_filter,
-        "club_filter_choices": club_filter_choices_for_tournament_lists(),
+        "club_filter_choices": club_choices,
         "category_choices": SkillLevel.choices,
+        "filter_chips": filter_chips,
         "is_archive": archive,
     }
     return render(request, "tournaments/list.html", context)
@@ -629,7 +649,7 @@ def tournament_region_landing(
     area_slug: str | None = None,
     variant_slug: str | None = None,
 ):
-    """Посадочная страница турниров по региону, зоне/городу и формату.
+    """Посадочная страница турниров по региону, району/городу и формату.
 
     Адрес страницы подставляется в объявление, поэтому фильтры приходят из пути,
     а не из query-параметров.
@@ -637,7 +657,7 @@ def tournament_region_landing(
     Args:
         request (HttpRequest): HTTP-запрос.
         region_slug (str): Слаг региона: ``moscow`` или ``moskovskaya-oblast``.
-        area_slug (str | None): Слаг зоны Москвы либо города области.
+        area_slug (str | None): Слаг района Москвы либо города области.
         variant_slug (str | None): ``singles`` или ``doubles``.
 
     Returns:

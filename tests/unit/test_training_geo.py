@@ -69,11 +69,11 @@ class AdvertisedTrainingCitiesTestCase(TestCase):
 class TrainingCityForCourtTestCase(TestCase):
     """Привязка корта к городу рекламируемой географии."""
 
-    def test_moscow_zone_counts_as_moscow(self) -> None:
-        area = GeoArea.objects.get(slug="yugo-vostok")
+    def test_moscow_district_counts_as_moscow(self) -> None:
+        area = GeoArea.objects.get(slug="yug")
         court = _make_court(
-            name="Юго-Восток",
-            slug="se-court",
+            name="Юг",
+            slug="south-court",
             city="Москва",
             region=GeoRegion.MOSCOW,
             geo_area=area,

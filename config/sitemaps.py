@@ -65,7 +65,7 @@ class TournamentSitemap(Sitemap):
 
 
 class TournamentFilterSitemap(Sitemap):
-    """Фильтры каталога: регион, регион+формат, регион+зона/город."""
+    """Фильтры каталога: регион, регион+формат, регион+район/город."""
 
     changefreq = "daily"
     priority = 0.6

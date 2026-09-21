@@ -35,7 +35,7 @@ class TrainingListGeographyTestCase(TestCase):
     """Заголовок, лид и список кортов называют одни и те же города."""
 
     def setUp(self) -> None:
-        moscow_area = GeoArea.objects.get(slug="yugo-vostok")
+        moscow_area = GeoArea.objects.get(slug="yug")
         ramenskoe = GeoArea.objects.get(slug="ramenskoe")
         zhukovskiy = GeoArea.objects.get(slug="zhukovskiy")
         voskresensk = GeoArea.objects.get(slug="voskresensk")
@@ -112,7 +112,7 @@ class TrainingListGeographyTestCase(TestCase):
             self.assertIn(f'value="{city}"', html)
 
     def test_long_city_court_list_shows_more_toggle(self) -> None:
-        moscow_area = GeoArea.objects.get(slug="yugo-vostok")
+        moscow_area = GeoArea.objects.get(slug="yug")
         for index in range(1, 6):
             _make_court(
                 name=f"Корт Москва {index}",

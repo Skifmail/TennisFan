@@ -114,6 +114,112 @@ class OrderTournamentsActiveFirstTestCase(TestCase):
             ["sort-active-keep", "sort-upcoming-keep", "sort-cancelled"],
         )
 
+    def test_completed_before_cancelled_newer_finished_higher(self) -> None:
+        now = timezone.now()
+        today = date.today()
+        cancelled = Tournament.objects.create(
+            name="Отменённый",
+            slug="sort-cancelled-after-done",
+            city="Москва",
+            start_date=today + timedelta(days=20),
+            end_date=today + timedelta(days=21),
+            format="round_robin",
+            status=TournamentStatus.CANCELLED,
+        )
+        older_completed = Tournament.objects.create(
+            name="Завершён давно",
+            slug="sort-completed-old",
+            city="Москва",
+            start_date=today - timedelta(days=30),
+            end_date=today - timedelta(days=20),
+            format="round_robin",
+            status=TournamentStatus.COMPLETED,
+        )
+        newer_completed = Tournament.objects.create(
+            name="Завершён недавно",
+            slug="sort-completed-new",
+            city="Москва",
+            start_date=today - timedelta(days=10),
+            end_date=today - timedelta(days=2),
+            format="round_robin",
+            status=TournamentStatus.COMPLETED,
+        )
+        upcoming = Tournament.objects.create(
+            name="Набор",
+            slug="sort-upcoming-before-done",
+            city="Москва",
+            start_date=today,
+            format="round_robin",
+            status=TournamentStatus.UPCOMING,
+        )
+        Tournament.objects.filter(pk=cancelled.pk).update(created_at=now)
+        Tournament.objects.filter(pk=newer_completed.pk).update(
+            created_at=now - timedelta(days=40)
+        )
+        Tournament.objects.filter(pk=older_completed.pk).update(
+            created_at=now - timedelta(days=1)
+        )
+        Tournament.objects.filter(pk=upcoming.pk).update(
+            created_at=now - timedelta(days=3)
+        )
+
+        ordered = list(
+            order_tournaments_active_first(
+                Tournament.objects.filter(
+                    slug__in=(
+                        cancelled.slug,
+                        older_completed.slug,
+                        newer_completed.slug,
+                        upcoming.slug,
+                    )
+                )
+            ).values_list("slug", flat=True)
+        )
+        self.assertEqual(
+            ordered,
+            [
+                "sort-upcoming-before-done",
+                "sort-completed-new",
+                "sort-completed-old",
+                "sort-cancelled-after-done",
+            ],
+        )
+
+    def test_completed_without_end_date_uses_start_date(self) -> None:
+        today = date.today()
+        now = timezone.now()
+        without_end = Tournament.objects.create(
+            name="Без даты окончания",
+            slug="sort-completed-no-end",
+            city="Москва",
+            start_date=today - timedelta(days=3),
+            format="round_robin",
+            status=TournamentStatus.COMPLETED,
+        )
+        with_end = Tournament.objects.create(
+            name="С датой окончания",
+            slug="sort-completed-with-end",
+            city="Москва",
+            start_date=today - timedelta(days=30),
+            end_date=today - timedelta(days=1),
+            format="round_robin",
+            status=TournamentStatus.COMPLETED,
+        )
+        Tournament.objects.filter(pk=without_end.pk).update(created_at=now)
+        Tournament.objects.filter(pk=with_end.pk).update(
+            created_at=now - timedelta(days=10)
+        )
+
+        ordered = list(
+            order_tournaments_active_first(
+                Tournament.objects.filter(slug__in=(without_end.slug, with_end.slug))
+            ).values_list("slug", flat=True)
+        )
+        self.assertEqual(
+            ordered,
+            ["sort-completed-with-end", "sort-completed-no-end"],
+        )
+
 
 class OrderWithCancelledLastTestCase(TestCase):
     """Отменённые турниры в конце при сортировке по дате старта."""

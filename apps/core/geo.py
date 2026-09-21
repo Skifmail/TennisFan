@@ -1,6 +1,6 @@
 """География платформы: регионы проведения турниров и тренировок.
 
-Регион — верхний уровень навигации: Москва делится на зоны, область — на
+Регион — верхний уровень навигации: Москва делится на районы, область — на
 города. Перечисление, а не таблица в базе: значений два и они не меняются,
 а редактируемый уровень вынесен в модель ``apps.core.models.GeoArea``.
 """
@@ -26,8 +26,16 @@ REGION_BY_VALUE: dict[str, str] = {value: slug for slug, value in REGION_SLUGS.i
 
 #: Название единицы внутри региона — для заголовков и подписей фильтров.
 AREA_LABELS: dict[str, str] = {
-    "moscow": "зона",
+    "moscow": "район",
     "moscow_oblast": "город",
+}
+
+#: Старые диагональные слаги Москвы → актуальные стороны света.
+LEGACY_AREA_SLUGS: dict[str, str] = {
+    "yugo-vostok": "yug",
+    "yugo-zapad": "zapad",
+    "severo-vostok": "vostok",
+    "severo-zapad": "sever",
 }
 
 
@@ -84,6 +92,19 @@ def area_label(region: str) -> str:
         region: Значение поля ``region``.
 
     Returns:
-        str: «зона» для Москвы, «город» для области, «площадка» по умолчанию.
+        str: «район» для Москвы, «город» для области, «площадка» по умолчанию.
     """
     return AREA_LABELS.get(region or "", "площадка")
+
+
+def canonical_area_slug(slug: str) -> str:
+    """Вернуть актуальный слаг района с учётом старых рекламных адресов.
+
+    Args:
+        slug: Слаг из URL или query-параметра.
+
+    Returns:
+        str: Текущий слаг либо исходная строка, если замены нет.
+    """
+    normalized = (slug or "").strip().lower()
+    return LEGACY_AREA_SLUGS.get(normalized, normalized)

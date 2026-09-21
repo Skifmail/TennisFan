@@ -14295,8 +14295,8 @@ a.match-details-value__lead:hover {
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) auto;
     gap: clamp(1rem, 2.4vw, 2rem);
-    align-items: end;
-    padding-bottom: clamp(1.05rem, 1.8vw, 1.55rem);
+    align-items: start;
+    padding-bottom: clamp(1.75rem, 3vw, 2.5rem);
     border-bottom: 1px solid var(--courts-gold-line);
 }
 
@@ -14325,8 +14325,9 @@ a.match-details-value__lead:hover {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.75rem;
+    gap: 0.65rem;
     min-width: 0;
+    padding-top: 0.35rem;
 }
 
 .courts-masthead__count {
@@ -14371,13 +14372,20 @@ a.match-details-value__lead:hover {
 }
 
 .courts-catalog .courts-filters .form-control,
-.courts-catalog .courts-filters .club-filter-select--custom {
+.courts-catalog .courts-filters .club-filter-select--custom,
+.courts-catalog .courts-filters .court-list-search-btn {
     min-width: 0;
     width: 100%;
 }
 
-.courts-catalog .courts-filters .form-control {
-    min-height: 44px;
+.courts-catalog .courts-filters .form-control,
+.courts-catalog .courts-filters .court-list-search-btn {
+    box-sizing: border-box;
+    height: 3.25rem;
+    min-height: 3.25rem;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.25;
 }
 
 .courts-filters__field.is-active .form-control,
@@ -14389,15 +14397,27 @@ a.match-details-value__lead:hover {
 .courts-filters__actions {
     display: flex;
     flex: 0 0 auto;
-    align-items: flex-end;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
     min-width: 7.5rem;
 }
 
+.courts-filters__label--ghost {
+    visibility: hidden;
+    user-select: none;
+}
+
 .courts-filters__actions .court-list-search-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
-    height: 44px;
-    min-height: 44px;
-    align-self: flex-end;
+    align-self: stretch;
+}
+
+.courts-filters__row {
+    display: contents;
 }
 
 .courts-grid {
@@ -14642,37 +14662,104 @@ a.match-details-value__lead:hover {
 }
 
 @media (width <= 768px) {
+    .courts-masthead {
+        padding-top: 0.85rem;
+        margin-bottom: 0.85rem;
+    }
+
     .courts-masthead__inner {
         grid-template-columns: 1fr;
-        align-items: start;
+        gap: 0.7rem;
+        padding-bottom: 0.9rem;
     }
 
     .courts-catalog h1.courts-masthead__title {
         max-width: none;
-        font-size: clamp(1.55rem, 7.2vw, 2.05rem);
+        margin-bottom: 0.3rem;
+        font-size: clamp(1.45rem, 7vw, 1.85rem);
     }
 
     .courts-masthead__lede {
         max-width: none;
-        font-size: 1rem;
+        font-size: 0.9375rem;
+        line-height: 1.35;
     }
 
     .courts-masthead__aside {
-        align-items: stretch;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem 0.75rem;
+        padding-top: 0;
     }
 
     .courts-masthead__count {
         text-align: left;
+        font-size: 0.75rem;
     }
 
     .courts-masthead__cta {
-        width: 100%;
+        width: auto;
+        height: 36px;
+        min-height: 36px;
+        padding: 0 0.85rem;
+        font-size: 0.8125rem;
+    }
+
+    .courts-catalog .filter-bar.courts-filters {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 0.95rem;
+    }
+
+    .courts-filters__row {
+        display: grid;
+        gap: 0.5rem;
+        min-width: 0;
+        align-items: end;
+    }
+
+    .courts-filters__row--search {
+        grid-template-columns: minmax(0, 1fr) 5.5rem;
+    }
+
+    .courts-filters__row--meta {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
 
     .courts-filters__field,
     .courts-filters__actions {
-        flex-basis: 100%;
+        flex: none;
+        flex-basis: auto;
         min-width: 0;
+        gap: 0.22rem;
+    }
+
+    .courts-filters__label {
+        font-size: 0.6875rem;
+    }
+
+    .courts-filters__label--ghost {
+        display: none;
+    }
+
+    .courts-catalog .courts-filters .form-control,
+    .courts-catalog .courts-filters .court-list-search-btn {
+        height: 42px;
+        min-height: 42px;
+        min-width: 0;
+        flex: none;
+        font-size: 0.9375rem;
+    }
+
+    .courts-filters__actions {
+        min-width: 0;
+    }
+
+    .courts-filters__actions .court-list-search-btn {
+        padding-inline: 0.65rem;
     }
 
     .courts-grid {

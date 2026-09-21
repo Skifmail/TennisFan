@@ -188,19 +188,14 @@ def extra_training_cities(areas: list[GeoArea] | None = None) -> list[str]:
     )
     for raw in cities:
         _remember_extra_city(display_by_key, raw, needles)
-    court_cities = (
-        Court.objects.filter(is_active=True, trainings__is_active=True)
-        .exclude(city="")
-        .values_list("city", flat=True)
-        .distinct()
-    )
-    for raw in court_cities:
-        _remember_extra_city(display_by_key, raw, needles)
     return sorted(display_by_key.values(), key=lambda name: name.casefold())
 
 
 def extra_place_cities(areas: list[GeoArea] | None = None) -> list[str]:
-    """Города вне справочника, где есть тренировка или активный корт.
+    """Города активных тренировок вне справочника.
+
+    Совпадает с ``extra_training_cities``: в фильтр не попадают корты
+    без тренировки, иначе страница снова превращается в дамп площадок.
 
     Args:
         areas: Кэш справочника. Если не передан, читается из базы.
@@ -208,19 +203,7 @@ def extra_place_cities(areas: list[GeoArea] | None = None) -> list[str]:
     Returns:
         list[str]: Уникальные названия по алфавиту.
     """
-    catalog = areas if areas is not None else advertised_training_areas()
-    needles = _catalog_city_needles(catalog)
-    display_by_key: dict[str, str] = {}
-    for city in extra_training_cities(catalog):
-        _remember_extra_city(display_by_key, city, needles)
-    court_cities = (
-        Court.objects.filter(is_active=True)
-        .exclude(city="")
-        .values_list("city", flat=True)
-    )
-    for raw in court_cities:
-        _remember_extra_city(display_by_key, raw, needles)
-    return sorted(display_by_key.values(), key=lambda name: name.casefold())
+    return extra_training_cities(areas)
 
 
 def _remember_extra_city(
@@ -237,16 +220,38 @@ def _remember_extra_city(
 
 
 def public_training_cities(areas: list[GeoArea] | None = None) -> list[str]:
-    """Города для заголовка: справочник, затем другие города с тренировками и кортами.
+    """Города для заголовка: справочник, затем города активных тренировок.
 
     Args:
         areas: Кэш справочника. Если не передан, читается из базы.
 
     Returns:
-        list[str]: Москва, область и дополнительные города.
+        list[str]: Москва, область и дополнительные города тренировок.
     """
     catalog = areas if areas is not None else advertised_training_areas()
-    return advertised_training_cities() + extra_place_cities(catalog)
+    return advertised_training_cities() + extra_training_cities(catalog)
+
+
+def public_training_cities_label(areas: list[GeoArea] | None = None) -> str:
+    """Подзаголовок страницы: справочник и, если нужно, другие города.
+
+    Один дополнительный город называется прямо. Несколько не перечисляем,
+    чтобы шапка не превращалась в список площадок.
+
+    Args:
+        areas: Кэш справочника. Если не передан, читается из базы.
+
+    Returns:
+        str: Перечень для подзаголовка.
+    """
+    catalog = areas if areas is not None else advertised_training_areas()
+    advertised = advertised_training_cities()
+    extras = extra_training_cities(catalog)
+    if not extras:
+        return format_city_list(advertised)
+    if len(extras) == 1:
+        return format_city_list([*advertised, extras[0]])
+    return f"{', '.join(advertised)} и другие города"
 
 
 def training_city_slug(city: str) -> str:
@@ -398,7 +403,7 @@ def courts_for_training_area(
         extra_city = next(
             (
                 city
-                for city in extra_place_cities(catalog)
+                for city in extra_training_cities(catalog)
                 if training_city_slug(city) == needle
             ),
             None,

@@ -1,8 +1,8 @@
 """География публичной страницы тренировок.
 
 Базовый набор — Москва и города области из справочника ``GeoArea``.
-Если есть активные тренировки в других городах, они появляются отдельной
-группой и попадают в заголовок страницы.
+Список открывается в Москве с чипами районов. Другой город в поле
+«Город» скрывает зоны Москвы и оставляет тренировки этого города.
 """
 
 from __future__ import annotations
@@ -21,6 +21,25 @@ OTHER_CITIES_LABEL = "Другие города"
 OTHER_CITIES_REGION = "other"
 
 
+def is_moscow_city(name: str) -> bool:
+    """Проверить, что название города — Москва."""
+    return bool(name) and normalize_geo_text(name) == normalize_geo_text(MOSCOW_CITY)
+
+
+def oblast_area_for_city(
+    city: str, areas: list[GeoArea] | None = None
+) -> GeoArea | None:
+    """Найти район области по названию города, если он есть в каталоге."""
+    needle = normalize_geo_text(city)
+    if not needle:
+        return None
+    catalog = areas if areas is not None else advertised_training_areas()
+    for area in catalog:
+        if area.region == GeoRegion.MOSCOW_OBLAST and needle in area.get_alias_list():
+            return area
+    return None
+
+
 @dataclass(frozen=True)
 class TrainingCityGroup:
     """Город рекламируемой географии и активные корты в нём."""
@@ -35,6 +54,15 @@ class TrainingPlace:
 
     slug: str
     name: str
+
+
+@dataclass(frozen=True)
+class TrainingListGeo:
+    """Город публичного списка и район Москвы, если он выбран."""
+
+    city: str
+    moscow_district: GeoArea | None
+    show_moscow_zones: bool
 
 
 def advertised_training_cities() -> list[str]:
@@ -429,3 +457,98 @@ def courts_for_training_area(
     matched = with_fk + fallback
     matched.sort(key=lambda court: court.name.casefold())
     return tuple(matched)
+
+
+def resolve_training_list_geo(
+    city: str = "",
+    area_slug: str = "",
+    areas: list[GeoArea] | None = None,
+) -> TrainingListGeo:
+    """Разобрать фильтр списка: Москва по умолчанию, район только внутри неё.
+
+    Старый ``?area=ramenskoe`` без ``city`` превращается в город Раменское.
+    Неизвестный ``area`` без города не уводит со Москвы.
+
+    Args:
+        city: Текст из поля «Город».
+        area_slug: Слаг района или устаревший слаг площадки.
+        areas: Кэш справочника. Если не передан, читается из базы.
+
+    Returns:
+        TrainingListGeo: Город, район Москвы и флаг чипов зон.
+    """
+    catalog = areas if areas is not None else advertised_training_areas()
+    moscow = _moscow_areas(catalog)
+    oblast = _oblast_areas_from(catalog)
+    needle = canonical_area_slug((area_slug or "").strip().lower())
+    typed = (city or "").strip()
+
+    if typed:
+        if is_moscow_city(typed):
+            district = next((area for area in moscow if area.slug == needle), None)
+            return TrainingListGeo(
+                city=MOSCOW_CITY,
+                moscow_district=district,
+                show_moscow_zones=True,
+            )
+        return TrainingListGeo(
+            city=typed,
+            moscow_district=None,
+            show_moscow_zones=False,
+        )
+
+    if needle:
+        district = next((area for area in moscow if area.slug == needle), None)
+        if district is not None:
+            return TrainingListGeo(
+                city=MOSCOW_CITY,
+                moscow_district=district,
+                show_moscow_zones=True,
+            )
+        oblast_match = next((area for area in oblast if area.slug == needle), None)
+        if oblast_match is not None:
+            return TrainingListGeo(
+                city=oblast_match.name,
+                moscow_district=None,
+                show_moscow_zones=False,
+            )
+        extra = next(
+            (
+                name
+                for name in extra_training_cities(catalog)
+                if training_city_slug(name) == needle
+            ),
+            "",
+        )
+        if extra:
+            return TrainingListGeo(
+                city=extra,
+                moscow_district=None,
+                show_moscow_zones=False,
+            )
+
+    return TrainingListGeo(
+        city=MOSCOW_CITY,
+        moscow_district=None,
+        show_moscow_zones=True,
+    )
+
+
+def courts_for_training_city(
+    city: str,
+    areas: list[GeoArea] | None = None,
+) -> tuple[Court, ...]:
+    """Корты выбранного города: справочник области или свободный город.
+
+    Args:
+        city: Название города из фильтра.
+        areas: Кэш справочника. Если не передан, читается из базы.
+
+    Returns:
+        tuple[Court, ...]: Корты города по названию.
+    """
+    catalog = areas if areas is not None else advertised_training_areas()
+    oblast = oblast_area_for_city(city, catalog)
+    if oblast is not None:
+        return courts_for_training_area(oblast.slug, catalog)
+    return courts_for_extra_city(city)

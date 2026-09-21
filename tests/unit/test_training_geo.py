@@ -14,12 +14,16 @@ from apps.training.geo import (
     advertised_training_cities,
     courts_for_extra_city,
     courts_for_training_area,
+    courts_for_training_city,
     extra_place_cities,
     extra_training_cities,
     format_city_list,
     group_training_courts,
+    is_moscow_city,
+    oblast_area_for_city,
     public_training_cities,
     public_training_cities_label,
+    resolve_training_list_geo,
     training_area_for_court,
     training_city_for_court,
     training_city_slug,
@@ -412,3 +416,74 @@ class ExtraTrainingCitiesTestCase(TestCase):
         self.assertIn("другие города", label)
         self.assertNotIn("Ростов-на-Дону", label)
         self.assertNotIn("Сочи", label)
+
+
+class ResolveTrainingListGeoTestCase(TestCase):
+    """Поле города: Москва по умолчанию, район только внутри неё."""
+
+    def test_moscow_city_detection(self) -> None:
+        self.assertTrue(is_moscow_city("Москва"))
+        self.assertTrue(is_moscow_city(" москва "))
+        self.assertFalse(is_moscow_city("Ростов-на-Дону"))
+        self.assertFalse(is_moscow_city(""))
+
+    def test_oblast_area_for_catalog_city(self) -> None:
+        area = oblast_area_for_city("Раменское")
+
+        self.assertIsNotNone(area)
+        assert area is not None
+        self.assertEqual(area.slug, "ramenskoe")
+        self.assertIsNone(oblast_area_for_city("Москва"))
+        self.assertIsNone(oblast_area_for_city("Ростов-на-Дону"))
+
+    def test_default_is_moscow_with_zones(self) -> None:
+        geo = resolve_training_list_geo()
+
+        self.assertEqual(geo.city, "Москва")
+        self.assertIsNone(geo.moscow_district)
+        self.assertTrue(geo.show_moscow_zones)
+
+    def test_moscow_keeps_district(self) -> None:
+        geo = resolve_training_list_geo(city="Москва", area_slug="yug")
+
+        self.assertEqual(geo.city, "Москва")
+        self.assertIsNotNone(geo.moscow_district)
+        assert geo.moscow_district is not None
+        self.assertEqual(geo.moscow_district.slug, "yug")
+        self.assertTrue(geo.show_moscow_zones)
+
+    def test_other_city_hides_zones_and_drops_district(self) -> None:
+        geo = resolve_training_list_geo(city="Ростов-на-Дону", area_slug="yug")
+
+        self.assertEqual(geo.city, "Ростов-на-Дону")
+        self.assertIsNone(geo.moscow_district)
+        self.assertFalse(geo.show_moscow_zones)
+
+    def test_legacy_oblast_slug_becomes_city(self) -> None:
+        geo = resolve_training_list_geo(area_slug="ramenskoe")
+
+        self.assertEqual(geo.city, "Раменское")
+        self.assertFalse(geo.show_moscow_zones)
+
+    def test_legacy_district_slug_stays_moscow(self) -> None:
+        geo = resolve_training_list_geo(area_slug="yugo-vostok")
+
+        self.assertEqual(geo.city, "Москва")
+        self.assertIsNotNone(geo.moscow_district)
+        assert geo.moscow_district is not None
+        self.assertEqual(geo.moscow_district.slug, "yug")
+        self.assertTrue(geo.show_moscow_zones)
+
+    def test_courts_for_oblast_city(self) -> None:
+        ramenskoe = GeoArea.objects.get(slug="ramenskoe")
+        _make_court(
+            name="Корт Раменское",
+            slug="geo-ramenskoe-city",
+            city="Раменское",
+            region=GeoRegion.MOSCOW_OBLAST,
+            geo_area=ramenskoe,
+        )
+
+        names = [court.name for court in courts_for_training_city("Раменское")]
+
+        self.assertEqual(names, ["Корт Раменское"])

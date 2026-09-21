@@ -14,7 +14,7 @@
 
 <div class="container">
     <div class="training-browse">
-        <form method="get" class="training-browse__filters{% if extra_city_options %} training-browse__filters--with-city{% endif %}">
+        <form method="get" class="training-browse__filters">
             <input type="hidden" name="area" value="{{ current_area }}">
             <label class="training-browse__field">
                 <span class="training-browse__label">Тип</span>
@@ -38,51 +38,47 @@
                     <option value="professional" {% if current_level == 'professional' %}selected{% endif %}>Профессионал (5.5–7.0)</option>
                 </select>
             </label>
-            {% if extra_city_options %}
             <label class="training-browse__field training-browse__field--city">
                 <span class="training-browse__label">Город</span>
-                <select
+                <input
+                    type="text"
+                    name="city"
                     class="form-control"
-                    aria-label="Другой город"
-                    data-extra-city-filter
-                    onchange="this.form.elements.area.value=this.value; this.form.submit()"
+                    value="{{ current_city }}"
+                    placeholder="Москва"
+                    aria-label="Город"
+                    autocomplete="off"
+                    data-training-city
                 >
-                    <option value="">Другой город</option>
-                    {% for city in extra_city_options %}
-                    <option value="{{ city.slug }}" {% if city.is_active %}selected{% endif %}>{{ city.name }}</option>
-                    {% endfor %}
-                </select>
             </label>
-            {% endif %}
         </form>
 
-        <section class="training-geo" aria-label="Районы и города">
+        <section class="training-geo{% if not show_moscow_zones %} training-geo--city{% endif %}" aria-label="География тренировок">
+            {% if show_moscow_zones %}
             <div class="training-geo__head">
                 <h2 class="training-geo__title">Где вам удобно?</h2>
-                <p class="training-geo__hint">Район Москвы или город области.</p>
+                <p class="training-geo__hint">Район Москвы.</p>
             </div>
+            {% endif %}
             <div class="training-browse__actions">
                 <a href="{% url 'coach_list' %}" class="training-browse__action">Наши тренеры</a>
                 {% if not user_is_coach %}<a href="{% url 'coach_application_create' %}" class="training-browse__action training-browse__action--primary">Стать тренером</a>{% endif %}
             </div>
+            {% if show_moscow_zones and moscow_zones %}
             <div class="training-geo__groups">
-                {% for group in training_area_groups %}
-                <div class="training-geo__group">
-                    <h3 class="training-geo__group-title">{{ group.label }}</h3>
-                    <ul class="training-geo__areas">
-                        {% for area in group.areas %}
-                        <li>
-                            <a
-                                href="{% url 'training_list' %}{{ area.url }}"
-                                class="training-geo__area{% if area.is_active %} is-active{% endif %}"
-                                {% if area.is_active %}aria-current="true"{% endif %}
-                            >{{ area.name }}</a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endfor %}
+                <ul class="training-geo__areas">
+                    {% for area in moscow_zones %}
+                    <li>
+                        <a
+                            href="{% url 'training_list' %}{{ area.url }}"
+                            class="training-geo__area{% if area.is_active %} is-active{% endif %}"
+                            {% if area.is_active %}aria-current="true"{% endif %}
+                        >{{ area.name }}</a>
+                    </li>
+                    {% endfor %}
+                </ul>
             </div>
+            {% endif %}
             {% if selected_area %}
             <div class="training-geo__courts-panel">
                 <h3 class="training-geo__courts-title">{{ selected_area.name }}</h3>
@@ -155,5 +151,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script defer src="{% static 'js/training_geo_search.js' %}?v=20260921-1"></script>
+<script defer src="{% static 'js/training_geo_search.js' %}?v=20260921-2"></script>
 {% endblock %}

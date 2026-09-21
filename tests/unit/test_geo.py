@@ -22,6 +22,7 @@ from apps.core.geo import (
 from apps.core.models import GeoArea
 from apps.tournaments.landing import (
     TournamentLanding,
+    build_home_filter_chips,
     build_tournament_filter_chips,
     geo_area_choices,
     resolve_landing,
@@ -425,6 +426,59 @@ class TournamentFilterChipsTestCase(TestCase):
             current_status="",
             is_archive=False,
             club_filter="club-a",
+            club_choices=(("club-a", "Клуб А"),),
+        )
+
+        self.assertEqual(chips, ["Клуб А"])
+
+
+class HomeFilterChipsTestCase(TestCase):
+    """Подписи активных фильтров блока турниров на главной."""
+
+    def test_empty_when_no_filters_selected(self) -> None:
+        self.assertEqual(
+            build_home_filter_chips(
+                city="",
+                category="",
+                gender="",
+                duration="",
+                club_filter="",
+                category_choices=(("amateur", "Любитель"),),
+                gender_choices=(("male", "Мужчины"),),
+                duration_choices=(("single", "Однодневный"),),
+                club_choices=(("club-a", "Клуб А"),),
+            ),
+            [],
+        )
+
+    def test_collects_labels_in_form_order(self) -> None:
+        chips = build_home_filter_chips(
+            city="Химки",
+            category="amateur",
+            gender="male",
+            duration="multi",
+            club_filter="__platform__",
+            category_choices=(("amateur", "Любитель"),),
+            gender_choices=(("male", "Мужчины"),),
+            duration_choices=(("multi", "Многодневный"),),
+            club_choices=(("club-a", "Клуб А"),),
+        )
+
+        self.assertEqual(
+            chips,
+            ["Химки", "Любитель", "Мужчины", "Многодневный", "TennisFan"],
+        )
+
+    def test_named_club_uses_club_title(self) -> None:
+        chips = build_home_filter_chips(
+            city="",
+            category="",
+            gender="",
+            duration="",
+            club_filter="club-a",
+            category_choices=(),
+            gender_choices=(),
+            duration_choices=(),
             club_choices=(("club-a", "Клуб А"),),
         )
 

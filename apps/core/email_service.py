@@ -1016,3 +1016,33 @@ def send_new_tournament_email(user: User, tournament: Tournament) -> bool:
         recipient=email,
         category="new_tournament",
     )
+
+
+def send_tournament_completed_email(
+    user: User,
+    tournament: Tournament,
+    context: dict[str, Any],
+) -> bool:
+    """Отправить branded-письмо с итогами завершённого турнира.
+
+    Args:
+        user: Получатель письма.
+        tournament: Завершённый турнир.
+        context: Контекст шаблона (тема, место, очки, кубок, подиум).
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    subject = str(context.get("subject") or "").strip()
+    if not subject:
+        subject = f"TennisFan: турнир «{tournament.name}» завершён"
+    return _send_html_email(
+        subject=subject,
+        template_name="emails/tournament_completed.html",
+        context=context,
+        recipient=email,
+        category="tournament",
+    )

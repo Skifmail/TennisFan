@@ -496,8 +496,9 @@ def finalize_olympic(tournament: Tournament) -> tuple[bool, str]:
     # FAN очки не влияют на рейтинг (total_points) - только для отображения результатов турнира
     # Рейтинг обновляется только через FAN-алгоритм после каждого матча
 
-    tournament.status = "completed"
-    tournament.save(update_fields=["status"])
+    from .completion_notify import complete_tournament_and_notify
+
+    complete_tournament_and_notify(tournament)
     logger.info("Olympic tournament %s completed, ratings updated.", tournament.name)
     return True, "Турнир завершён, рейтинг обновлён."
 

@@ -232,6 +232,53 @@ def build_tournament_filter_chips(
     return chips
 
 
+def build_home_filter_chips(
+    *,
+    city: str,
+    category: str,
+    gender: str,
+    duration: str,
+    club_filter: str,
+    category_choices: Iterable[tuple[str, str]],
+    gender_choices: Iterable[tuple[str, str]],
+    duration_choices: Iterable[tuple[str, str]],
+    club_choices: Iterable[tuple[str, str]],
+) -> list[str]:
+    """Собрать подписи активных фильтров блока турниров на главной.
+
+    Args:
+        city: Строка населённого пункта.
+        category: Код уровня игроков.
+        gender: Код пола турнира.
+        duration: Код продолжительности.
+        club_filter: Слаг клуба или пресет ``__platform__`` / ``__club_only__``.
+        category_choices: Пары ``(value, label)`` уровней.
+        gender_choices: Пары ``(value, label)`` пола.
+        duration_choices: Пары ``(value, label)`` продолжительности.
+        club_choices: Пары ``(slug, name)`` клубов.
+
+    Returns:
+        list[str]: Подписи в порядке полей формы на главной.
+    """
+    chips: list[str] = []
+    if city:
+        chips.append(city)
+    if category:
+        chips.append(dict(category_choices).get(category, category))
+    if gender:
+        chips.append(dict(gender_choices).get(gender, gender))
+    if duration:
+        chips.append(dict(duration_choices).get(duration, duration))
+    if club_filter:
+        chips.append(
+            CLUB_FILTER_CHIP_LABELS.get(
+                club_filter,
+                dict(club_choices).get(club_filter, club_filter),
+            )
+        )
+    return chips
+
+
 def geo_area_choices(region: str = "") -> list[GeoArea]:
     """Вернуть активные районы и города для выпадающего списка фильтра.
 

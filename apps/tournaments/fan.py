@@ -692,8 +692,9 @@ def finalize_tournament(tournament: Tournament) -> tuple[bool, str]:
             player, points, match=None
         )  # В финале match уже завершен, но это турнирный матч
 
-    tournament.status = "completed"
-    tournament.save(update_fields=["status"])
+    from .completion_notify import complete_tournament_and_notify
+
+    complete_tournament_and_notify(tournament)
     logger.info("FAN tournament %s completed, ratings updated.", tournament.name)
     return True, "Турнир завершён, рейтинг обновлён."
 

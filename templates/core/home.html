@@ -395,33 +395,59 @@
             <h2 class="section-title">Турниры</h2>
             <div class="section-header__actions home-tournaments-header__actions">
                 <a href="{% url 'tournament_list' %}" class="btn btn-outline">Все турниры</a>
-                <a href="?" class="btn btn-outline" data-home-tournaments-reset="1">Сбросить фильтры</a>
+                <a href="?" class="btn btn-outline home-tournaments-header__reset" data-home-tournaments-reset="1">Сбросить фильтры</a>
             </div>
         </div>
 
-        <form method="get" class="card mb-4" id="home-tournaments-filter" action="{% url 'home' %}">
-            <div class="card-body filter-grid">
-                <div class="form-group home-filter-group home-filter-group--city">
+        <form method="get" class="card mb-4 tournaments-filters{% if home_filter_chips %} tournaments-filters--has-active{% endif %}" id="home-tournaments-filter" action="{% url 'home' %}">
+            <input
+                type="checkbox"
+                id="home-filters-drawer"
+                class="tournaments-filters__drawer-check"
+                aria-controls="home-filters-panel"
+            >
+            <div class="tournaments-filters__toolbar">
+                <label for="home-filters-drawer" class="tournaments-filters__toggle">
+                    <span class="tournaments-filters__toggle-copy">
+                        <span class="tournaments-filters__toggle-title">Фильтры</span>
+                        {% if home_filter_chips %}
+                        <span class="tournaments-filters__count">{{ home_filter_chips|length }}</span>
+                        {% endif %}
+                    </span>
+                </label>
+                {% if home_filter_chips %}
+                <div class="tournaments-filters__meta">
+                    <ul class="tournaments-filters__chips" aria-label="Выбранные фильтры">
+                        {% for chip in home_filter_chips %}
+                        <li class="tournaments-filters__chip">{{ chip }}</li>
+                        {% endfor %}
+                    </ul>
+                    <a class="tournaments-filters__reset" href="?" data-home-tournaments-reset="1">Сбросить</a>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-body filter-grid tournaments-filters__panel" id="home-filters-panel">
+                <div class="form-group home-filter-group home-filter-group--city tournaments-filters__field{% if current_filters.city %} is-active{% endif %}">
                     <label class="form-label">Населённый пункт</label>
                     <input type="text" name="city" class="form-control" placeholder="Начните вводить населённый пункт…" value="{{ current_filters.city }}" autocomplete="off" aria-autocomplete="list" aria-label="Населённый пункт для фильтра турниров">
                 </div>
-                <div class="form-group home-filter-group home-filter-group--level">
+                <div class="form-group home-filter-group home-filter-group--level tournaments-filters__field{% if current_filters.category %} is-active{% endif %}">
                     <label class="form-label">Уровень</label>
                     {% include 'includes/custom_filter_select.html' with field_name='category' selected_value=current_filters.category|default:'' choices=category_choices empty_label='Все' id_suffix='home-category' aria_label='Фильтр турниров по уровню' %}
                 </div>
-                <div class="form-group home-filter-group home-filter-group--gender">
+                <div class="form-group home-filter-group home-filter-group--gender tournaments-filters__field{% if current_filters.gender %} is-active{% endif %}">
                     <label class="form-label">Пол</label>
                     {% include 'includes/custom_filter_select.html' with field_name='gender' selected_value=current_filters.gender|default:'' choices=gender_choices empty_label='Все' id_suffix='home-gender' aria_label='Фильтр турниров по полу' %}
                 </div>
-                <div class="form-group home-filter-group home-filter-group--duration">
+                <div class="form-group home-filter-group home-filter-group--duration tournaments-filters__field{% if current_filters.duration %} is-active{% endif %}">
                     <label class="form-label">Продолжительность</label>
                     {% include 'includes/custom_filter_select.html' with field_name='duration' selected_value=current_filters.duration|default:'' choices=duration_choices empty_label='Все' id_suffix='home-duration' aria_label='Фильтр турниров по продолжительности' %}
                 </div>
-                <div class="form-group home-filter-group home-filter-group--club">
+                <div class="form-group home-filter-group home-filter-group--club tournaments-filters__field tournaments-filters__field--wide{% if current_filters.club %} is-active{% endif %}">
                     <label class="form-label">Клуб</label>
                     {% include 'includes/club_filter_select.html' with selected_club=current_filters.club|default:'' auto_submit=0 id_suffix='home' aria_label='Фильтр турниров по клубу' %}
                 </div>
-                <div class="form-group form-group-submit home-filter-group home-filter-group--submit">
+                <div class="form-group form-group-submit home-filter-group home-filter-group--submit tournaments-filters__field tournaments-filters__field--wide">
                     <label class="form-label">Применить</label>
                     <button type="submit" class="btn btn-primary">Применить</button>
                 </div>

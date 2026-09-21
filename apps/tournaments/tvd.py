@@ -1942,8 +1942,9 @@ def check_and_finalize(tournament: Tournament) -> tuple[bool, str]:
                     None,
                 )
         _assign_tvd_places_5_onwards(tournament)
-        tournament.status = TournamentStatus.COMPLETED
-        tournament.save(update_fields=["status"])
+        from .completion_notify import complete_tournament_and_notify
+
+        complete_tournament_and_notify(tournament)
         logger.info("TVD tournament %s completed (3-group RR).", tournament.name)
         return True, "Турнир завершён, очки начислены."
 
@@ -1986,8 +1987,9 @@ def check_and_finalize(tournament: Tournament) -> tuple[bool, str]:
                 None,
             )
 
-        tournament.status = TournamentStatus.COMPLETED
-        tournament.save(update_fields=["status"])
+        from .completion_notify import complete_tournament_and_notify
+
+        complete_tournament_and_notify(tournament)
         logger.info("TVD tournament %s completed (main RR).", tournament.name)
         return True, "Турнир завершён, очки начислены."
 
@@ -2149,8 +2151,9 @@ def check_and_finalize(tournament: Tournament) -> tuple[bool, str]:
 
     _assign_tvd_places_5_onwards(tournament)
 
-    tournament.status = TournamentStatus.COMPLETED
-    tournament.save(update_fields=["status"])
+    from .completion_notify import complete_tournament_and_notify
+
+    complete_tournament_and_notify(tournament)
     logger.info("TVD tournament %s completed.", tournament.name)
     return True, "Турнир завершён, очки начислены."
 

@@ -307,7 +307,8 @@ def _reopen_tournament_after_auto_rt_revert(tournament: Tournament) -> None:
         season_points.save(update_fields=["current_season_points", "updated_at"])
     tournament.fan_results.filter(place__isnull=False).delete()
     tournament.status = TournamentStatus.ACTIVE
-    tournament.save(update_fields=["status"])
+    tournament.completion_notified_at = None
+    tournament.save(update_fields=["status", "completion_notified_at"])
     logger.info(
         "Reopened tournament %s after deadline auto RT revert",
         tournament.pk,
@@ -920,10 +921,7 @@ def replace_no_show_walkover(
     p2_after = p2_now - (old_delta2 if is_walkover else 0.0) + new_delta2
 
     lines = [
-        (
-            f"match={match.pk} tournament={tournament_name} "
-            f"«{p1_name}» vs «{p2_name}»"
-        ),
+        (f"match={match.pk} tournament={tournament_name} «{p1_name}» vs «{p2_name}»"),
         (
             f"сейчас: status={match.status} winner={winner_name} "
             f"Δ1={old_delta1:+.1f} Δ2={old_delta2:+.1f}"
@@ -933,7 +931,7 @@ def replace_no_show_walkover(
             f"после: winner={new_winner_name} неявка={loser.get_display_name()} "
             f"Δ1={new_delta1:+.1f} Δ2={new_delta2:+.1f}"
         ),
-        (f"ожидаемый рейтинг: {p1_name}={p1_after:.1f} " f"{p2_name}={p2_after:.1f}"),
+        (f"ожидаемый рейтинг: {p1_name}={p1_after:.1f} {p2_name}={p2_after:.1f}"),
     ]
     if match.tournament_id and match.tournament.status == "completed":
         lines.append("внимание: турнир уже завершён; таблица мест не пересчитывается.")
@@ -950,8 +948,7 @@ def replace_no_show_walkover(
             _reset_walkover_to_scheduled(match)
             match = _reload_match(match.pk)
             lines.append(
-                f"откат FAN: {p1_name} {old_delta1:+.1f}, "
-                f"{p2_name} {old_delta2:+.1f}"
+                f"откат FAN: {p1_name} {old_delta1:+.1f}, {p2_name} {old_delta2:+.1f}"
             )
         apply_no_show_walkover(match, loser=loser, notify=notify)
         lines.append(

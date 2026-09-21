@@ -8,6 +8,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import path, reverse
@@ -33,6 +34,7 @@ from .models import (
     TournamentPlayerResult,
     TournamentPostpaymentInvoice,
     TournamentRegistrationCoverage,
+    TournamentStatus,
     TournamentTeam,
     TVDGroup,
     TVDGroupMember,
@@ -81,6 +83,47 @@ _PAYMENT_STATUS_TONE_STYLES: dict[PaymentStatusTone, str] = {
     "danger": "color:#cf222e; font-weight:600;",
     "neutral": "color:#57606a;",
 }
+
+
+def _preserve_completion_notified_at(obj: Tournament) -> None:
+    """Не дать устаревшей форме админки затереть timestamp рассылки.
+
+    Args:
+        obj: Турнир, который сейчас сохраняется.
+    """
+    if not obj.pk:
+        return
+    obj.completion_notified_at = (
+        Tournament.objects.filter(pk=obj.pk)
+        .values_list("completion_notified_at", flat=True)
+        .first()
+    )
+
+
+def _schedule_completion_notify_if_status_completed(
+    obj: Tournament,
+    form: forms.ModelForm,
+    change: bool,
+) -> None:
+    """После коммита разослать итоги, если админ перевёл турнир в COMPLETED.
+
+    Args:
+        obj: Сохранённый турнир.
+        form: Форма админки.
+        change: True, если это редактирование существующего объекта.
+    """
+    if not change:
+        return
+    if "status" not in getattr(form, "changed_data", []):
+        return
+    if obj.status != TournamentStatus.COMPLETED:
+        return
+    from .completion_notify import dispatch_completion_notify
+
+    tournament_pk = obj.pk
+    transaction.on_commit(
+        lambda pk=tournament_pk: dispatch_completion_notify(pk),
+    )
 
 
 @admin.action(description="Подтвердить результат матча")
@@ -455,6 +498,7 @@ class TournamentAdmin(admin.ModelAdmin):
     date_hierarchy = "start_date"
     readonly_fields = (
         "insufficient_participants_notified_at",
+        "completion_notified_at",
         "postpayment_window_started_at",
         "postpayment_window_schedule_display",
         "participant_payment_status_display",
@@ -1109,6 +1153,7 @@ class TournamentAdmin(admin.ModelAdmin):
                     "min_teams",
                     "max_teams",
                     "insufficient_participants_notified_at",
+                    "completion_notified_at",
                     "bracket_generated",
                     "match_days_per_round",
                     "participants",
@@ -1156,11 +1201,14 @@ class TournamentAdmin(admin.ModelAdmin):
     )
 
     def save_model(self, request, obj, form, change):
+        if change:
+            _preserve_completion_notified_at(obj)
         super().save_model(request, obj, form, change)
         selected = form.cleaned_data.get("allowed_categories") or []
         obj.allowed_categories.all().delete()
         for category in selected:
             TournamentAllowedCategory.objects.create(tournament=obj, category=category)
+        _schedule_completion_notify_if_status_completed(obj, form, change)
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
         """Добавить пустой выбор для формата на странице добавления."""
@@ -1249,7 +1297,10 @@ class TVDTournamentAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
     filter_horizontal = ("participants",)
     date_hierarchy = "start_date"
-    readonly_fields = ("insufficient_participants_notified_at",)
+    readonly_fields = (
+        "insufficient_participants_notified_at",
+        "completion_notified_at",
+    )
     actions = [
         generate_tvd_groups_action,
         generate_tvd_playoffs_action,
@@ -1280,6 +1331,7 @@ class TVDTournamentAdmin(admin.ModelAdmin):
                     "min_participants",
                     "max_participants",
                     "insufficient_participants_notified_at",
+                    "completion_notified_at",
                     "bracket_generated",
                     "match_days_per_round",
                     "participants",
@@ -1325,11 +1377,14 @@ class TVDTournamentAdmin(admin.ModelAdmin):
         obj.duration = TournamentDuration.SINGLE_DAY
         if form.cleaned_data.get("is_free"):
             obj.entry_fee = 0
+        if change:
+            _preserve_completion_notified_at(obj)
         super().save_model(request, obj, form, change)
         selected = form.cleaned_data.get("allowed_categories") or []
         obj.allowed_categories.all().delete()
         for category in selected:
             TournamentAllowedCategory.objects.create(tournament=obj, category=category)
+        _schedule_completion_notify_if_status_completed(obj, form, change)
 
 
 WINNER_SIDE_PLAYER1 = "player1"

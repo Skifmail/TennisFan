@@ -43,6 +43,7 @@ from apps.content.models import News, RulesSection
 from apps.courts.models import Court
 from apps.payments.models import PaymentRecord
 from apps.subscriptions.models import UserSubscription
+from apps.tournaments.landing import build_home_filter_chips
 from apps.tournaments.models import (
     Match,
     SeasonArchive,
@@ -2145,6 +2146,7 @@ def home(request):
         seen_id=home_activity_seen_id,
     )
     home_activity_latest_id = home_activity_events[0].id if home_activity_events else 0
+    club_choices = list(club_filter_choices_for_tournament_lists())
 
     context = {
         "filtered_tournaments": tournaments_page.object_list,
@@ -2168,7 +2170,18 @@ def home(request):
         "category_choices": SkillLevel.choices,
         "gender_choices": TournamentGender.choices,
         "duration_choices": TournamentDuration.choices,
-        "club_filter_choices": club_filter_choices_for_tournament_lists(),
+        "club_filter_choices": club_choices,
+        "home_filter_chips": build_home_filter_chips(
+            city=city,
+            category=category,
+            gender=gender,
+            duration=duration,
+            club_filter=club_filter,
+            category_choices=SkillLevel.choices,
+            gender_choices=TournamentGender.choices,
+            duration_choices=TournamentDuration.choices,
+            club_choices=club_choices,
+        ),
         "home_activity_events": home_activity_events,
         "home_activity_new_count": home_activity_new_count,
         "home_activity_new_label": format_new_home_activity_label(

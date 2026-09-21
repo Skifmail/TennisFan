@@ -408,6 +408,36 @@ class HomeClubTournamentsIntegrationTestCase(TestCase):
         self.assertContains(response, "Внутриклубный кубок")
         self.assertContains(response, "Межклубный открытый")
 
+    def test_home_keeps_tournament_filters_in_collapsible_panel(self) -> None:
+        response = self.client.get(reverse("home"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="home-filters-drawer"')
+        self.assertContains(response, "tournaments-filters__toggle")
+        self.assertContains(response, "Фильтры")
+        self.assertContains(response, 'id="home-filters-panel"')
+        self.assertContains(response, 'name="city"')
+        self.assertContains(response, 'id="filter-select-home-category-toggle"')
+        self.assertContains(response, 'id="filter-select-home-gender-toggle"')
+        self.assertContains(response, 'id="filter-select-home-duration-toggle"')
+        self.assertContains(response, 'id="club-filter-home-toggle"')
+        self.assertContains(response, "Применить")
+        self.assertNotContains(response, "tournaments-filters__chip")
+
+    def test_home_shows_active_tournament_filter_chips(self) -> None:
+        response = self.client.get(
+            reverse("home"),
+            {"city": "Химки", "club": "__platform__"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "tournaments-filters__chip")
+        self.assertContains(response, "Химки")
+        self.assertContains(response, "TennisFan")
+        self.assertContains(response, 'class="tournaments-filters__count"')
+        self.assertContains(response, "Сбросить")
+
     def test_home_club_filter_platform_only_excludes_club_rows(self) -> None:
         response = self.client.get(
             reverse("home"),

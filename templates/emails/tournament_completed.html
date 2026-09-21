@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+    <style>
+        body { margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-size:16px; line-height:1.55; color:#333; background:#f4f4f4; }
+        .wrapper { width:100%; background:#f4f4f4; padding:40px 0; }
+        .container { max-width:600px; margin:0 auto; background:#fff; border-radius:12px; overflow:hidden; }
+        .header { background:#0f2318; background:linear-gradient(165deg,#1a3a2a 0%,#0a1810 100%); padding:36px 30px 32px; text-align:center; }
+        .header img.logo { display:block; width:72px; height:auto; margin:0 auto 10px; border:0; }
+        .brand { margin:0; color:#a6824a; font-size:13px; font-weight:700; letter-spacing:2px; text-transform:uppercase; }
+        .trophy { display:block; width:148px; height:auto; margin:22px auto 8px; border:0; }
+        .headline { margin:8px 0 0; color:#f3e6c8; font-size:28px; font-weight:700; letter-spacing:0.2px; line-height:1.2; }
+        .headline.no-trophy { margin-top:18px; font-size:26px; }
+        .subhead { margin:8px 0 0; color:rgba(255,255,255,0.78); font-size:16px; }
+        .tour-name { margin:14px 0 0; color:#a6824a; font-size:15px; font-weight:600; }
+        .content { padding:32px 30px 8px; }
+        .greeting { font-size:20px; font-weight:600; color:#1a3a2a; margin:0 0 12px; }
+        .intro { margin:0 0 24px; color:#555; }
+        .stats { width:100%; border-collapse:separate; border-spacing:8px 0; margin:0 0 8px; }
+        .stats.stats-solo { margin-bottom:24px; }
+        .stat { background:#f7faf8; border:1px solid #d9e5dd; border-radius:8px; text-align:center; padding:16px 8px; width:33.33%; }
+        .stat-value { display:block; color:#1a3a2a; font-size:26px; font-weight:700; line-height:1.1; }
+        .stat-value .plus { color:#a6824a; font-size:18px; }
+        .stat-label { display:block; margin-top:6px; color:#6b7a72; font-size:12px; text-transform:uppercase; letter-spacing:0.6px; }
+        .note { margin:4px 0 8px; color:#7a6a4a; font-size:13px; text-align:center; }
+        .note.last { margin-bottom:24px; }
+        .podium-title { margin:8px 0 10px; color:#1a3a2a; font-size:14px; font-weight:700; }
+        .podium { width:100%; border-collapse:collapse; margin:0 0 24px; }
+        .podium td { vertical-align:bottom; text-align:center; padding:0 4px; width:33.33%; }
+        .podium-card { background:#f7faf8; border:1px solid #d9e5dd; border-radius:8px 8px 0 0; padding:12px 6px 10px; }
+        .podium-card.is-you { background:#1a3a2a; border-color:#a6824a; }
+        .podium-place { display:block; color:#a6824a; font-size:18px; font-weight:700; }
+        .podium-card.is-you .podium-place { color:#f3e6c8; }
+        .podium-name { display:block; margin-top:4px; color:#1a3a2a; font-size:13px; font-weight:600; line-height:1.3; }
+        .podium-card.is-you .podium-name { color:#fff; }
+        .podium-bar { height:10px; background:#c5a36a; border-radius:0 0 6px 6px; }
+        .podium-bar.s { height:22px; background:#c0c7ce; }
+        .podium-bar.g { height:34px; background:#a6824a; }
+        .podium-bar.b { height:14px; background:#b08a62; }
+        .cta { text-align:center; padding:24px 18px; background:#f9f9f9; border-radius:8px; margin:0 0 20px; }
+        .cta p { margin:0 0 16px; color:#555; }
+        .btn { display:inline-block; padding:14px 28px; background:#a6824a; background:linear-gradient(135deg,#a6824a 0%,#8b6a3d 100%); color:#fff !important; text-decoration:none; font-weight:600; font-size:16px; border-radius:8px; }
+        .fallback { color:#777; font-size:13px; margin:0 0 24px; }
+        .fallback a { color:#a6824a; word-break:break-all; }
+        .footer { background:#1a3a2a; padding:26px 30px; text-align:center; }
+        .footer p { margin:0 0 8px; color:rgba(255,255,255,0.7); font-size:14px; }
+        .footer a { color:#a6824a; text-decoration:none; }
+        .fine { margin-top:14px !important; font-size:12px !important; color:rgba(255,255,255,0.45) !important; }
+        @media only screen and (max-width:620px) {
+            .container { margin:0 10px; border-radius:8px; }
+            .header,.content,.footer { padding-left:18px; padding-right:18px; }
+            .headline { font-size:24px; }
+            .trophy { width:120px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <div class="header">
+                {% include "emails/_logo.html" with logo_url=logo_url logo_alt="TennisFan" logo_size=72 %}
+                <p class="brand">TennisFan</p>
+                {% if trophy_url %}
+                <img class="trophy" src="{{ trophy_url }}" alt="Кубок за {{ trophy_place }} место" width="148" height="222">
+                {% endif %}
+                <h1 class="headline{% if not trophy_url %} no-trophy{% endif %}">{{ headline }}</h1>
+                <p class="subhead">{{ subhead }}</p>
+                <p class="tour-name">{{ tournament_name }}</p>
+            </div>
+            <div class="content">
+                <p class="greeting">{{ greeting }}</p>
+                <p class="intro">{{ intro }}</p>
+                <table class="stats{% if not trophy_note and not zero_points_note %} stats-solo{% endif %}" role="presentation" width="100%">
+                    <tr>
+                        <td class="stat">
+                            <span class="stat-value">{{ place_stat }}</span>
+                            <span class="stat-label">Место</span>
+                        </td>
+                        <td class="stat">
+                            <span class="stat-value">{% if points_awarded %}<span class="plus">+</span>{{ fan_points }}{% else %}0{% endif %}</span>
+                            <span class="stat-label">Очки за турнир</span>
+                        </td>
+                        <td class="stat">
+                            <span class="stat-value">{{ season_points }}</span>
+                            <span class="stat-label">В сезоне</span>
+                        </td>
+                    </tr>
+                </table>
+                {% if trophy_note %}<p class="note{% if not zero_points_note %} last{% endif %}">{{ trophy_note }}</p>{% endif %}
+                {% if zero_points_note %}<p class="note last">{{ zero_points_note }}</p>{% endif %}
+
+                {% if podium %}
+                <p class="podium-title">Подиум турнира</p>
+                <table class="podium" role="presentation" width="100%">
+                    <tr>
+                        {% for item in podium %}
+                        <td>
+                            <div class="podium-card{% if item.is_you %} is-you{% endif %}">
+                                <span class="podium-place">{{ item.place }}</span>
+                                <span class="podium-name">{{ item.name_line1 }}{% if item.name_line2 %}<br>{{ item.name_line2 }}{% endif %}</span>
+                            </div>
+                            <div class="podium-bar {{ item.bar_class }}"></div>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                </table>
+                {% endif %}
+
+                <div class="cta">
+                    <p>{{ cta_text }}</p>
+                    <a class="btn" href="{{ tournament_url }}">Открыть результаты</a>
+                </div>
+                <p class="fallback">
+                    Если кнопка не работает, откройте страницу турнира:<br>
+                    <a href="{{ tournament_url }}">{{ tournament_url }}</a>
+                </p>
+            </div>
+            <div class="footer">
+                <p>Вопросы: <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+                <p><a href="{{ base_url }}">tennisfan.ru</a></p>
+                <p class="fine">Вы получили это письмо как участник турнира TennisFan.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

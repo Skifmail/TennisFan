@@ -323,6 +323,12 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         blank=True,
         help_text="Заполняется автоматически при первом срабатывании; сбрасывается при продлении дедлайна.",
     )
+    completion_notified_at = models.DateTimeField(
+        "Когда отправлены письма об итогах",
+        null=True,
+        blank=True,
+        help_text="Заполняется автоматически при первой рассылке после завершения турнира.",
+    )
     bracket_generated = models.BooleanField(
         "Сетка сформирована",
         default=False,

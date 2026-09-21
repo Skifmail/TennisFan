@@ -837,8 +837,9 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
 
     # Уже финализирован (очки начислены)?
     if tournament.fan_results.filter(place__isnull=False).exists():
-        tournament.status = "completed"
-        tournament.save(update_fields=["status"])
+        from .completion_notify import complete_tournament_and_notify
+
+        complete_tournament_and_notify(tournament)
         return True
 
     standings = compute_standings(tournament)
@@ -937,8 +938,9 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
 
                 _update_season_points(player, award)
 
-    tournament.status = "completed"
-    tournament.save(update_fields=["status"])
+    from .completion_notify import complete_tournament_and_notify
+
+    complete_tournament_and_notify(tournament)
     logger.info(
         "Round-robin tournament %s completed (all %d matches done), ratings updated by place.",
         tournament.name,

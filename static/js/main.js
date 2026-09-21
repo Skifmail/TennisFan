@@ -246,6 +246,142 @@ document.addEventListener('DOMContentLoaded', function() {
             target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+        function collapseHomeFiltersDrawer() {
+            var drawer = tournamentsForm.querySelector('.tournaments-filters__drawer-check');
+            if (drawer) {
+                drawer.checked = false;
+            }
+        }
+
+        function homeFilterChipLabels() {
+            var chips = [];
+            var cityInput = tournamentsForm.querySelector('[name="city"]');
+            if (cityInput && cityInput.value.trim()) {
+                chips.push(cityInput.value.trim());
+            }
+            ['category', 'gender', 'duration', 'club'].forEach(function(name) {
+                var input = tournamentsForm.querySelector('[name="' + name + '"]');
+                if (!input || !String(input.value || '').trim()) {
+                    return;
+                }
+                var wrap = input.closest('[data-filter-select], [data-club-filter]');
+                var current = wrap && wrap.querySelector('.club-filter-select__current');
+                var label = current ? current.textContent.replace(/\s+/g, ' ').trim() : input.value;
+                if (label) {
+                    chips.push(label);
+                }
+            });
+            return chips;
+        }
+
+        function syncHomeFilterChips() {
+            var chips = homeFilterChipLabels();
+            var toolbar = tournamentsForm.querySelector('.tournaments-filters__toolbar');
+            var toggleCopy = toolbar && toolbar.querySelector('.tournaments-filters__toggle-copy');
+            var countEl = toggleCopy && toggleCopy.querySelector('.tournaments-filters__count');
+            var meta = toolbar && toolbar.querySelector('.tournaments-filters__meta');
+
+            tournamentsForm.classList.toggle('tournaments-filters--has-active', chips.length > 0);
+
+            if (toggleCopy) {
+                if (chips.length) {
+                    if (!countEl) {
+                        countEl = document.createElement('span');
+                        countEl.className = 'tournaments-filters__count';
+                        toggleCopy.appendChild(countEl);
+                    }
+                    countEl.textContent = String(chips.length);
+                } else if (countEl) {
+                    countEl.remove();
+                }
+            }
+
+            if (!chips.length) {
+                if (meta) {
+                    meta.remove();
+                }
+                return;
+            }
+
+            if (!meta && toolbar) {
+                meta = document.createElement('div');
+                meta.className = 'tournaments-filters__meta';
+                meta.innerHTML =
+                    '<ul class="tournaments-filters__chips" aria-label="Выбранные фильтры"></ul>' +
+                    '<a class="tournaments-filters__reset" href="?" data-home-tournaments-reset="1">Сбросить</a>';
+                toolbar.appendChild(meta);
+            }
+
+            var list = meta && meta.querySelector('.tournaments-filters__chips');
+            if (!list) {
+                return;
+            }
+            list.innerHTML = '';
+            chips.forEach(function(chip) {
+                var item = document.createElement('li');
+                item.className = 'tournaments-filters__chip';
+                item.textContent = chip;
+                list.appendChild(item);
+            });
+        }
+
+        function setHomeFilterFieldActive(field, isActive) {
+            if (!field) {
+                return;
+            }
+            field.classList.toggle('is-active', Boolean(isActive));
+        }
+
+        function syncHomeFilterActiveFields() {
+            var cityInput = tournamentsForm.querySelector('[name="city"]');
+            setHomeFilterFieldActive(
+                cityInput && cityInput.closest('.tournaments-filters__field'),
+                cityInput && cityInput.value.trim()
+            );
+            ['category', 'gender', 'duration', 'club'].forEach(function(name) {
+                var input = tournamentsForm.querySelector('[name="' + name + '"]');
+                setHomeFilterFieldActive(
+                    input && input.closest('.tournaments-filters__field'),
+                    input && String(input.value || '').trim()
+                );
+            });
+        }
+
+        function resetHomeFilterSelect(wrap, emptyLabel) {
+            if (!wrap) {
+                return;
+            }
+            var hidden = wrap.querySelector('input[type="hidden"]');
+            var current = wrap.querySelector('.club-filter-select__current');
+            if (hidden) {
+                hidden.value = '';
+            }
+            if (current) {
+                current.textContent = emptyLabel;
+            }
+            wrap.querySelectorAll('.club-filter-select__option').forEach(function(option) {
+                var isEmpty = option.getAttribute('data-value') === '';
+                option.classList.toggle('is-selected', isEmpty);
+                option.setAttribute('aria-selected', isEmpty ? 'true' : 'false');
+            });
+        }
+
+        function clearHomeTournamentFilters() {
+            var cityInput = tournamentsForm.querySelector('[name="city"]');
+            if (cityInput) {
+                cityInput.value = '';
+            }
+            tournamentsForm.querySelectorAll('[data-filter-select]').forEach(function(wrap) {
+                resetHomeFilterSelect(wrap, 'Все');
+            });
+            resetHomeFilterSelect(
+                tournamentsForm.querySelector('[data-club-filter]'),
+                'Все турниры'
+            );
+            syncHomeFilterActiveFields();
+            syncHomeFilterChips();
+        }
+
         function loadTournaments(url, pushState) {
             tournamentsBlock.classList.add('is-loading');
             fetch(url, {
@@ -262,6 +398,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         updateUrlWithoutPartial(url);
                     }
                     attachPaginationHandlers();
+                    collapseHomeFiltersDrawer();
+                    syncHomeFilterActiveFields();
+                    syncHomeFilterChips();
                     scrollToTournaments();
                 })
                 .catch(function() {
@@ -278,15 +417,17 @@ document.addEventListener('DOMContentLoaded', function() {
             loadTournaments(url, true);
         });
 
-        var resetLink = document.querySelector('[data-home-tournaments-reset="1"]');
-        if (resetLink) {
-            resetLink.addEventListener('click', function(e) {
-                e.preventDefault();
-                tournamentsForm.reset();
-                var url = baseUrl + '?partial=tournaments';
-                loadTournaments(url, true);
-            });
-        }
+        var resetRoot = tournamentsSection || tournamentsForm;
+        resetRoot.addEventListener('click', function(e) {
+            var resetLink = e.target.closest('[data-home-tournaments-reset="1"]');
+            if (!resetLink) {
+                return;
+            }
+            e.preventDefault();
+            clearHomeTournamentFilters();
+            var url = baseUrl + '?partial=tournaments';
+            loadTournaments(url, true);
+        });
 
         attachPaginationHandlers();
 

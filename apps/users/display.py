@@ -23,6 +23,24 @@ def format_user_display_name(user: User | None) -> str:
     return name or str(user.email or "")
 
 
+def format_user_admin_label(user: User | None) -> str:
+    """Метка пользователя для админки: «Имя Фамилия — email».
+
+    Args:
+        user: Пользователь платформы.
+
+    Returns:
+        str: Имя и email или только email, если ФИО не заполнены.
+    """
+    if user is None:
+        return ""
+    name = format_user_display_name(user)
+    email = str(user.email or "").strip()
+    if name and email and name != email:
+        return f"{name} — {email}"
+    return name or email
+
+
 def format_player_display_name(player: Player | None) -> str:
     """Форматирует имя игрока для UI.
 

@@ -33,6 +33,7 @@ from django.views.decorators.http import require_http_methods, require_safe
 from apps.clubs.models import (
     Club,
     ClubApplicationStatus,
+    ClubJoinRequest,
     ClubJoinRequestStatus,
     ClubMemberStatus,
     ClubStatus,
@@ -497,6 +498,7 @@ def _format_expiring_player_subscriptions_attention(
             {
                 "name": format_user_display_name(subscription.user),
                 "meta": timezone.localtime(subscription.end_date).strftime("%d.%m.%Y"),
+                "meta_prefix": "до",
                 "url": reverse(
                     "admin:subscriptions_usersubscription_change",
                     args=[subscription.pk],
@@ -514,6 +516,46 @@ def _format_expiring_player_subscriptions_attention(
     noun = _ru_pluralize(count, ("подписка", "подписки", "подписок"))
     verb = _ru_verb_by_count(count, "заканчивается", "заканчиваются")
     return f"{count} {noun} {verb} в ближайшие 7 дней.", entries
+
+
+def _pending_join_requests_admin_url() -> str:
+    """URL списка заявок на вступление в админке, отфильтрованный по pending."""
+    return (
+        f"{reverse('admin:clubs_clubjoinrequest_changelist')}"
+        f"?status__exact={ClubJoinRequestStatus.PENDING}"
+    )
+
+
+def _format_pending_join_requests_attention(
+    requests: list[ClubJoinRequest],
+    total_count: int,
+) -> tuple[str, list[dict[str, str]]]:
+    """Формирует описание и список заявок на вступление для панели платформы.
+
+    Args:
+        requests: Pending-заявки для отображения в блоке внимания.
+        total_count: Полное число pending-заявок.
+
+    Returns:
+        tuple[str, list[dict[str, str]]]: Текст описания и записи для UI.
+    """
+    entries: list[dict[str, str]] = []
+    for req in requests:
+        player_name = format_user_display_name(req.user)
+        entries.append(
+            {
+                "name": f"{player_name} → {req.club.name}",
+                "meta": timezone.localtime(req.created_at).strftime("%d.%m.%Y"),
+                "meta_prefix": "подана",
+                "url": reverse(
+                    "admin:clubs_clubjoinrequest_change",
+                    args=[req.pk],
+                ),
+            }
+        )
+    noun = _ru_pluralize(total_count, ("заявка", "заявки", "заявок"))
+    verb = _ru_verb_by_count(total_count, "ожидает", "ожидают")
+    return f"{total_count} {noun} {verb} решения.", entries
 
 
 @login_required
@@ -832,11 +874,12 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         or Decimal("0")
     )
 
-    pending_join_requests = (
-        Club.objects.filter(join_requests__status=ClubJoinRequestStatus.PENDING)
-        .distinct()
-        .count()
+    pending_join_request_qs = (
+        ClubJoinRequest.objects.filter(status=ClubJoinRequestStatus.PENDING)
+        .select_related("club", "user")
+        .order_by("-created_at")
     )
+    pending_join_requests = pending_join_request_qs.count()
     pending_interclub_applications = (
         Club.objects.filter(
             tournament_applications__status=ClubApplicationStatus.PENDING
@@ -1001,13 +1044,18 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
             }
         )
     if pending_join_requests:
+        pending_description, pending_entries = _format_pending_join_requests_attention(
+            list(pending_join_request_qs[:10]),
+            pending_join_requests,
+        )
         attention_items.append(
             {
                 "tone": "info",
                 "title": "Заявки на вступление в клубы",
-                "description": f"{pending_join_requests} заявок ожидают решения.",
-                "action_label": "Клубы",
-                "action_url": reverse("admin:clubs_club_changelist"),
+                "description": pending_description,
+                "entries": pending_entries,
+                "action_label": "Заявки",
+                "action_url": _pending_join_requests_admin_url(),
             }
         )
     if expiring_user_subscriptions_count:

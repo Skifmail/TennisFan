@@ -1,7 +1,7 @@
 """География публичной страницы тренировок.
 
-Заголовок, текст и список кортов должны называть одни и те же города:
-Москва и активные города области из справочника.
+Заголовок и фильтр называют Москву, города области и другие города, где уже
+есть активная тренировка или корт. Чужой корт не попадает в дамп до выбора города.
 """
 
 from django.test import TestCase
@@ -12,12 +12,18 @@ from apps.courts.models import Court
 from apps.training.geo import (
     advertised_training_areas,
     advertised_training_cities,
+    courts_for_extra_city,
     courts_for_training_area,
+    extra_place_cities,
+    extra_training_cities,
     format_city_list,
     group_training_courts,
+    public_training_cities,
     training_area_for_court,
     training_city_for_court,
+    training_city_slug,
 )
+from apps.training.models import Training
 
 
 def _make_court(
@@ -301,3 +307,80 @@ class CourtsForTrainingAreaTestCase(TestCase):
     def test_unknown_or_empty_slug_is_empty(self) -> None:
         self.assertEqual(courts_for_training_area(""), ())
         self.assertEqual(courts_for_training_area("unknown"), ())
+
+    def test_extra_city_slug_returns_matching_courts(self) -> None:
+        Training.objects.create(
+            title="Ростов",
+            slug="rostov-geo-training",
+            description="Описание",
+            city="Ростов-на-Дону",
+            is_active=True,
+            type_prices={"individual": 3000},
+        )
+        _make_court(name="Корт Ростов", slug="court-rostov-geo", city="Ростов-на-Дону")
+        _make_court(name="Корт Казань", slug="court-kazan-geo", city="Казань")
+
+        names = [
+            court.name
+            for court in courts_for_training_area(training_city_slug("Ростов-на-Дону"))
+        ]
+
+        self.assertEqual(names, ["Корт Ростов"])
+        self.assertEqual(
+            [court.name for court in courts_for_extra_city("Ростов-на-Дону")],
+            ["Корт Ростов"],
+        )
+
+    def test_court_only_city_slug_returns_courts(self) -> None:
+        _make_court(name="Корт Адлер", slug="adler-geo-court", city="Адлер")
+
+        names = [
+            court.name
+            for court in courts_for_training_area(training_city_slug("Адлер"))
+        ]
+
+        self.assertEqual(names, ["Корт Адлер"])
+
+
+class ExtraTrainingCitiesTestCase(TestCase):
+    """Города активных тренировок вне справочника Москвы и области."""
+
+    def test_collects_active_cities_outside_catalog(self) -> None:
+        Training.objects.create(
+            title="Ростов",
+            slug="rostov-extra-city",
+            description="Описание",
+            city="Ростов-на-Дону",
+            is_active=True,
+            type_prices={"individual": 3000},
+        )
+        Training.objects.create(
+            title="Раменское",
+            slug="ramenskoe-extra-city",
+            description="Описание",
+            city="Раменское",
+            is_active=True,
+            type_prices={"individual": 3000},
+        )
+        Training.objects.create(
+            title="Сочи скрытая",
+            slug="sochi-inactive-extra",
+            description="Описание",
+            city="Сочи",
+            is_active=False,
+            type_prices={"individual": 3000},
+        )
+
+        extras = extra_training_cities()
+
+        self.assertEqual(extras, ["Ростов-на-Дону"])
+        self.assertEqual(public_training_cities()[0], "Москва")
+        self.assertEqual(public_training_cities()[-1], "Ростов-на-Дону")
+        self.assertEqual(training_city_slug("Ростов-на-Дону"), "ростов-на-дону")
+
+    def test_court_only_city_is_in_place_picker_not_training_cities(self) -> None:
+        _make_court(name="Корт Сочи", slug="sochi-place-court", city="Сочи")
+
+        self.assertEqual(extra_training_cities(), [])
+        self.assertEqual(extra_place_cities(), ["Сочи"])
+        self.assertEqual(public_training_cities()[-1], "Сочи")

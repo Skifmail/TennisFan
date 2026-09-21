@@ -1,7 +1,8 @@
-"""Рекламируемая география тренировок: Москва и города области.
+"""География публичной страницы тренировок.
 
-Заголовок страницы называет города. Выбор площадок идёт по районам Москвы
-и городам области из справочника ``GeoArea``.
+Базовый набор — Москва и города области из справочника ``GeoArea``.
+Если есть активные тренировки в других городах, они появляются отдельной
+группой и попадают в заголовок страницы.
 """
 
 from __future__ import annotations
@@ -9,12 +10,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.db.models import QuerySet
+from django.utils.text import slugify
 
 from apps.core.geo import GeoRegion, canonical_area_slug, normalize_geo_text
 from apps.core.models import GeoArea
 from apps.courts.models import Court
 
 MOSCOW_CITY = "Москва"
+OTHER_CITIES_LABEL = "Другие города"
+OTHER_CITIES_REGION = "other"
 
 
 @dataclass(frozen=True)
@@ -23,6 +27,14 @@ class TrainingCityGroup:
 
     city: str
     courts: tuple[Court, ...]
+
+
+@dataclass(frozen=True)
+class TrainingPlace:
+    """Выбранный район справочника или город активной тренировки."""
+
+    slug: str
+    name: str
 
 
 def advertised_training_cities() -> list[str]:
@@ -136,13 +148,160 @@ def group_training_courts(city_filter: str = "") -> list[TrainingCityGroup]:
 
 
 def advertised_training_courts() -> QuerySet[Court]:
-    """Активные корты в рекламируемых городах для формы записи.
+    """Активные корты для формы записи: справочник и города тренировок.
 
     Returns:
         QuerySet[Court]: Корты по городу и названию.
     """
     pks = [court.pk for group in group_training_courts() for court in group.courts]
+    for city in extra_training_cities():
+        pks.extend(court.pk for court in courts_for_extra_city(city))
     return Court.objects.filter(pk__in=pks).order_by("city", "name")
+
+
+def _catalog_city_needles(areas: list[GeoArea]) -> set[str]:
+    """Нормализованные названия и псевдонимы справочника географии."""
+    needles = {normalize_geo_text(MOSCOW_CITY)}
+    for area in areas:
+        needles.update(area.get_alias_list())
+    return needles
+
+
+def extra_training_cities(areas: list[GeoArea] | None = None) -> list[str]:
+    """Города активных тренировок, которых нет в справочнике Москвы и области.
+
+    Args:
+        areas: Кэш справочника. Если не передан, читается из базы.
+
+    Returns:
+        list[str]: Уникальные названия по алфавиту, как их указали в тренировках.
+    """
+    from apps.training.models import Training
+
+    catalog = areas if areas is not None else advertised_training_areas()
+    needles = _catalog_city_needles(catalog)
+    display_by_key: dict[str, str] = {}
+    cities = (
+        Training.objects.filter(is_active=True)
+        .exclude(city="")
+        .values_list("city", flat=True)
+    )
+    for raw in cities:
+        _remember_extra_city(display_by_key, raw, needles)
+    court_cities = (
+        Court.objects.filter(is_active=True, trainings__is_active=True)
+        .exclude(city="")
+        .values_list("city", flat=True)
+        .distinct()
+    )
+    for raw in court_cities:
+        _remember_extra_city(display_by_key, raw, needles)
+    return sorted(display_by_key.values(), key=lambda name: name.casefold())
+
+
+def extra_place_cities(areas: list[GeoArea] | None = None) -> list[str]:
+    """Города вне справочника, где есть тренировка или активный корт.
+
+    Args:
+        areas: Кэш справочника. Если не передан, читается из базы.
+
+    Returns:
+        list[str]: Уникальные названия по алфавиту.
+    """
+    catalog = areas if areas is not None else advertised_training_areas()
+    needles = _catalog_city_needles(catalog)
+    display_by_key: dict[str, str] = {}
+    for city in extra_training_cities(catalog):
+        _remember_extra_city(display_by_key, city, needles)
+    court_cities = (
+        Court.objects.filter(is_active=True)
+        .exclude(city="")
+        .values_list("city", flat=True)
+    )
+    for raw in court_cities:
+        _remember_extra_city(display_by_key, raw, needles)
+    return sorted(display_by_key.values(), key=lambda name: name.casefold())
+
+
+def _remember_extra_city(
+    display_by_key: dict[str, str],
+    raw: str,
+    needles: set[str],
+) -> None:
+    """Запомнить город, если его нет в справочнике Москвы и области."""
+    name = (raw or "").strip()
+    key = normalize_geo_text(name)
+    if not key or key in needles:
+        return
+    display_by_key.setdefault(key, name)
+
+
+def public_training_cities(areas: list[GeoArea] | None = None) -> list[str]:
+    """Города для заголовка: справочник, затем другие города с тренировками и кортами.
+
+    Args:
+        areas: Кэш справочника. Если не передан, читается из базы.
+
+    Returns:
+        list[str]: Москва, область и дополнительные города.
+    """
+    catalog = areas if areas is not None else advertised_training_areas()
+    return advertised_training_cities() + extra_place_cities(catalog)
+
+
+def training_city_slug(city: str) -> str:
+    """Слаг города тренировки для query-параметра ``area``.
+
+    Args:
+        city: Название населённого пункта.
+
+    Returns:
+        str: Unicode-слаг либо ``city``, если название не даёт слага.
+    """
+    return slugify(city, allow_unicode=True) or "city"
+
+
+def courts_for_extra_city(city: str) -> tuple[Court, ...]:
+    """Активные корты выбранного города вне справочника.
+
+    Args:
+        city: Название города тренировки.
+
+    Returns:
+        tuple[Court, ...]: Корты с тем же нормализованным городом.
+    """
+    needle = normalize_geo_text(city)
+    if not needle:
+        return ()
+    matched = [
+        court
+        for court in Court.objects.filter(is_active=True).order_by("name")
+        if normalize_geo_text(court.city) == needle
+    ]
+    return tuple(matched)
+
+
+def filter_trainings_by_city(queryset: QuerySet, city: str) -> QuerySet:
+    """Оставить тренировки выбранного города.
+
+    Args:
+        queryset: Уже отфильтрованный список тренировок.
+        city: Название города.
+
+    Returns:
+        QuerySet: Тренировки с тем же нормализованным городом.
+    """
+    needle = normalize_geo_text(city)
+    if not needle:
+        return queryset.none()
+    matched_pks = [
+        training.pk
+        for training in queryset
+        if normalize_geo_text(training.city) == needle
+    ]
+    if not matched_pks:
+        return queryset.none()
+    return queryset.filter(pk__in=matched_pks)
 
 
 def advertised_training_areas() -> list[GeoArea]:
@@ -219,10 +378,12 @@ def courts_for_training_area(
     area_slug: str,
     areas: list[GeoArea] | None = None,
 ) -> tuple[Court, ...]:
-    """Вернуть активные корты выбранного района или города.
+    """Вернуть активные корты выбранного района, города области или другого города.
 
     Args:
-        area_slug: Слаг ``GeoArea``. Пустой или неизвестный слаг даёт пустой список.
+        area_slug: Слаг ``GeoArea`` или слаг города активной тренировки.
+            Пустой или неизвестный слаг даёт пустой список. Слаг справочника
+            важнее, если совпадёт со слагом дополнительного города.
         areas: Кэш справочника. Если не передан, читается из базы.
 
     Returns:
@@ -234,7 +395,17 @@ def courts_for_training_area(
     catalog = areas if areas is not None else advertised_training_areas()
     selected = next((area for area in catalog if area.slug == needle), None)
     if selected is None:
-        return ()
+        extra_city = next(
+            (
+                city
+                for city in extra_place_cities(catalog)
+                if training_city_slug(city) == needle
+            ),
+            None,
+        )
+        if extra_city is None:
+            return ()
+        return courts_for_extra_city(extra_city)
 
     with_fk = list(
         Court.objects.filter(is_active=True, geo_area=selected).order_by("name")

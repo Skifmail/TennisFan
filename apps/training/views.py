@@ -27,10 +27,16 @@ from .forms import (
     TrainingForm,
 )
 from .geo import (
+    OTHER_CITIES_LABEL,
+    OTHER_CITIES_REGION,
+    TrainingPlace,
     advertised_training_areas,
-    advertised_training_cities,
     courts_for_training_area,
+    extra_place_cities,
+    filter_trainings_by_city,
     format_city_list,
+    public_training_cities,
+    training_city_slug,
 )
 from .models import (
     Coach,
@@ -76,9 +82,21 @@ def training_list(request):
         # type_prices — словарь {type: price}, фильтруем по наличию ключа
         trainings = trainings.filter(type_prices__has_key=training_type)
 
-    training_cities = advertised_training_cities()
     areas = advertised_training_areas()
+    extra_cities = extra_place_cities(areas)
     selected_area = next((area for area in areas if area.slug == area_slug), None)
+    selected_extra_city = ""
+    if selected_area is None and area_slug:
+        selected_extra_city = next(
+            (city for city in extra_cities if training_city_slug(city) == area_slug),
+            "",
+        )
+    if selected_extra_city:
+        trainings = filter_trainings_by_city(trainings, selected_extra_city)
+
+    selected_place = selected_area
+    if selected_place is None and selected_extra_city:
+        selected_place = TrainingPlace(slug=area_slug, name=selected_extra_city)
 
     area_options: list[dict[str, str | bool]] = []
     for area in areas:
@@ -91,6 +109,23 @@ def training_list(request):
                 "is_active": is_active,
                 "url": _training_list_query(
                     area="" if is_active else area.slug,
+                    type=training_type,
+                    level=skill_level,
+                ),
+            }
+        )
+    extra_options: list[dict[str, str | bool]] = []
+    for city in extra_cities:
+        city_slug = training_city_slug(city)
+        is_active = bool(selected_extra_city) and city_slug == area_slug
+        extra_options.append(
+            {
+                "name": city,
+                "slug": city_slug,
+                "region": OTHER_CITIES_REGION,
+                "is_active": is_active,
+                "url": _training_list_query(
+                    area="" if is_active else city_slug,
                     type=training_type,
                     level=skill_level,
                 ),
@@ -113,6 +148,10 @@ def training_list(request):
                 if option["region"] == GeoRegion.MOSCOW_OBLAST
             ],
         },
+        {
+            "label": OTHER_CITIES_LABEL,
+            "areas": extra_options,
+        },
     ]
     area_groups = [group for group in area_groups if group["areas"]]
 
@@ -120,12 +159,14 @@ def training_list(request):
         "trainings": trainings,
         "current_level": skill_level,
         "current_type": training_type,
-        "current_area": selected_area.slug if selected_area else "",
-        "selected_area": selected_area,
+        "current_area": selected_place.slug if selected_place else "",
+        "selected_area": selected_place,
         "selected_courts": (
-            courts_for_training_area(selected_area.slug, areas) if selected_area else ()
+            courts_for_training_area(selected_place.slug, areas)
+            if selected_place
+            else ()
         ),
-        "training_cities_label": format_city_list(training_cities),
+        "training_cities_label": format_city_list(public_training_cities(areas)),
         "training_area_groups": area_groups,
     }
     return render(request, "training/list.html", context)

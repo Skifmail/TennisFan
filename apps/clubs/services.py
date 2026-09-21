@@ -4,18 +4,22 @@
 
 from __future__ import annotations
 
+import logging
 from calendar import monthrange
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from django.db import transaction
 from django.db.models import Count, Q
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.text_search import filter_field_contains_ci
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
+
+from apps.users.models import Notification
 
 from .models import (
     Club,
@@ -38,9 +42,11 @@ from .models import (
     PlatformPlan,
     PlatformSettings,
 )
+from .notifications import send_new_member_notification
 
 # Дней до конца периода, при которых показываем «истекает через N дней»
 FEE_EXPIRING_DAYS = 7
+logger = logging.getLogger(__name__)
 
 
 def get_platform_plan(slug: str) -> PlatformPlan | None:
@@ -374,6 +380,140 @@ def assign_club_administrator(
             updated_at=now,
         )
         return member, kind
+
+
+def approve_club_join_request(
+    join_request: ClubJoinRequest,
+    *,
+    reviewed_by: AbstractUser,
+    dashboard_url: str = "",
+) -> ClubMember:
+    """Одобряет заявку: добавляет игрока в клуб и уведомляет его.
+
+    Args:
+        join_request: Заявка на вступление.
+        reviewed_by: Кто принял решение.
+        dashboard_url: Ссылка на панель клуба для письма администраторам.
+
+    Returns:
+        ClubMember: Активный участник клуба.
+
+    Raises:
+        ValueError: Если заявка уже обработана.
+    """
+    now = timezone.now()
+    with transaction.atomic():
+        locked = (
+            ClubJoinRequest.objects.select_for_update()
+            .select_related("user", "club")
+            .get(pk=join_request.pk)
+        )
+        if locked.status != ClubJoinRequestStatus.PENDING:
+            raise ValueError("Заявка уже обработана.")
+
+        club = locked.club
+        member, created = ClubMember.objects.get_or_create(
+            club=club,
+            user=locked.user,
+            defaults={
+                "role": ClubMemberRole.PLAYER,
+                "status": ClubMemberStatus.ACTIVE,
+                "invited_by": reviewed_by,
+                "joined_at": now,
+            },
+        )
+        already_active = not created and member.status == ClubMemberStatus.ACTIVE
+        if not created:
+            update_fields: list[str] = []
+            if member.status != ClubMemberStatus.ACTIVE:
+                member.status = ClubMemberStatus.ACTIVE
+                update_fields.append("status")
+            if member.joined_at is None:
+                member.joined_at = now
+                update_fields.append("joined_at")
+            if member.invited_by_id is None:
+                member.invited_by = reviewed_by
+                update_fields.append("invited_by")
+            if member.role not in (ClubMemberRole.ADMIN, ClubMemberRole.MANAGER):
+                if member.role != ClubMemberRole.PLAYER:
+                    member.role = ClubMemberRole.PLAYER
+                    update_fields.append("role")
+            if update_fields:
+                member.save(update_fields=update_fields)
+
+        ClubRating.objects.get_or_create(
+            club=club,
+            member=member,
+            defaults={"points": 0},
+        )
+
+        locked.status = ClubJoinRequestStatus.APPROVED
+        locked.reviewed_by = reviewed_by
+        locked.reviewed_at = now
+        locked.save(
+            update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"]
+        )
+
+    if not already_active:
+        Notification.objects.create(
+            user=locked.user,
+            message=f"Ваша заявка на вступление в клуб «{club.name}» одобрена.",
+            url=reverse("clubs:club_public_detail", kwargs={"slug": club.slug}),
+        )
+        try:
+            send_new_member_notification(club, member, dashboard_url=dashboard_url)
+        except Exception:
+            logger.exception("Ошибка отправки уведомления о новом участнике")
+
+    join_request.status = locked.status
+    join_request.reviewed_by = locked.reviewed_by
+    join_request.reviewed_at = locked.reviewed_at
+    return cast(ClubMember, member)
+
+
+def reject_club_join_request(
+    join_request: ClubJoinRequest,
+    *,
+    reviewed_by: AbstractUser,
+) -> ClubJoinRequest:
+    """Отклоняет заявку и уведомляет игрока.
+
+    Args:
+        join_request: Заявка на вступление.
+        reviewed_by: Кто принял решение.
+
+    Returns:
+        ClubJoinRequest: Обновлённая заявка.
+
+    Raises:
+        ValueError: Если заявка уже обработана.
+    """
+    now = timezone.now()
+    with transaction.atomic():
+        locked = (
+            ClubJoinRequest.objects.select_for_update()
+            .select_related("user", "club")
+            .get(pk=join_request.pk)
+        )
+        if locked.status != ClubJoinRequestStatus.PENDING:
+            raise ValueError("Заявка уже обработана.")
+
+        locked.status = ClubJoinRequestStatus.REJECTED
+        locked.reviewed_by = reviewed_by
+        locked.reviewed_at = now
+        locked.save(
+            update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"]
+        )
+
+    Notification.objects.create(
+        user=locked.user,
+        message=f"Ваша заявка на вступление в клуб «{locked.club.name}» отклонена.",
+        url=reverse("clubs:club_public_detail", kwargs={"slug": locked.club.slug}),
+    )
+    join_request.status = locked.status
+    join_request.reviewed_by = locked.reviewed_by
+    join_request.reviewed_at = locked.reviewed_at
+    return cast(ClubJoinRequest, locked)
 
 
 def club_has_published_offer(club: Club) -> bool:

@@ -17340,10 +17340,6 @@ a.home-activity__actor:hover {
         display: none;
     }
 
-    .training-geo__groups {
-        gap: 0.6rem;
-    }
-
     .training-geo__area {
         min-height: 1.8rem;
         padding: 0.24rem 0.62rem;
@@ -22040,6 +22036,18 @@ a.home-activity__actor:hover {
     color: rgba(241, 245, 249, 0.92);
     font-size: 1rem;
     line-height: 1.55;
+}
+
+.club-dashboard-hero__summary-link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.22em;
+    text-decoration-color: rgba(201, 168, 76, 0.7);
+}
+
+.club-dashboard-hero__summary-link:hover {
+    color: #e8c56a;
+    text-decoration-color: currentColor;
 }
 
 .club-dashboard-hero__actions {

@@ -88,11 +88,13 @@ class TrainingListGeographyTestCase(TestCase):
         self.assertContains(response, "Тренировки для взрослых")
         self.assertContains(
             response,
-            "Москва, Раменское, Жуковский, Воскресенск и Павловский Посад",
+            "Москва, Раменское, Жуковский, Воскресенск, Павловский Посад и Казань",
         )
         self.assertContains(response, "Где вам удобно?")
         self.assertContains(response, "Юг")
         self.assertContains(response, "Раменское")
+        self.assertContains(response, "Другие города")
+        self.assertContains(response, "Казань")
         self.assertNotContains(response, 'name="city"')
         self.assertNotContains(response, "Корт ЮВАО")
         self.assertNotContains(response, "Корт Раменское")
@@ -136,6 +138,57 @@ class TrainingListGeographyTestCase(TestCase):
         self.assertNotContains(response, "Корт Раменское")
 
 
+class TrainingListExtraCitiesTestCase(TestCase):
+    """Города активных тренировок вне Москвы появляются в фильтре."""
+
+    def setUp(self) -> None:
+        _make_court(name="Корт Ростов", slug="court-rostov-list", city="Ростов-на-Дону")
+        _make_court(name="Корт Казань", slug="court-kazan-list", city="Казань")
+        Training.objects.create(
+            title="Тренировка в Ростове",
+            slug="rostov-list-training",
+            description="Описание",
+            city="Ростов-на-Дону",
+            is_active=True,
+            type_prices={"individual": 3000},
+        )
+        Training.objects.create(
+            title="Тренировка в Москве",
+            slug="moscow-list-training",
+            description="Описание",
+            city="Москва",
+            is_active=True,
+            type_prices={"individual": 3000},
+        )
+
+    def test_heading_and_picker_include_training_city(self) -> None:
+        response = self.client.get(reverse("training_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Другие города")
+        self.assertContains(response, "Ростов-на-Дону")
+        self.assertContains(response, "Казань")
+        self.assertContains(
+            response,
+            "Москва, Раменское, Жуковский, Воскресенск, Павловский Посад, Казань и Ростов-на-Дону",
+        )
+        self.assertNotContains(response, "Корт Ростов")
+        self.assertNotContains(response, "Корт Казань")
+
+    def test_selected_extra_city_shows_courts_and_local_trainings(self) -> None:
+        response = self.client.get(
+            reverse("training_list"),
+            {"area": "ростов-на-дону"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Корт Ростов")
+        self.assertNotContains(response, "Корт Казань")
+        self.assertContains(response, "Тренировка в Ростове")
+        self.assertNotContains(response, "Тренировка в Москве")
+
+
 class TrainingEnrollCourtChoicesTestCase(TestCase):
     """В заявке только корты рекламируемой географии."""
 
@@ -155,4 +208,22 @@ class TrainingEnrollCourtChoicesTestCase(TestCase):
         names = [court.name for court in form.fields["desired_court"].queryset]
 
         self.assertIn("Корт Раменское", names)
+        self.assertNotIn("Корт Казань", names)
+
+    def test_includes_courts_from_training_cities_outside_moscow(self) -> None:
+        _make_court(name="Корт Ростов", slug="enroll-rostov", city="Ростов-на-Дону")
+        _make_court(name="Корт Казань", slug="enroll-kazan-extra", city="Казань")
+        Training.objects.create(
+            title="Тренировка в Ростове",
+            slug="geo-enroll-rostov",
+            description="Описание",
+            city="Ростов-на-Дону",
+            is_active=True,
+            type_prices={"individual": 3000},
+        )
+
+        form = TrainingEnrollmentForm()
+        names = [court.name for court in form.fields["desired_court"].queryset]
+
+        self.assertIn("Корт Ростов", names)
         self.assertNotIn("Корт Казань", names)

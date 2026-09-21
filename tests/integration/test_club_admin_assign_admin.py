@@ -41,7 +41,11 @@ class ClubAdminAssignAdministratorTestCase(TestCase):
             name="Клуб без администратора",
             slug="club-needs-admin",
         )
-        self.candidate = make_user(email="club-owner@test.local")
+        self.candidate = make_user(
+            email="club-owner@test.local",
+            first_name="Иван",
+            last_name="Петров",
+        )
         self.client.force_login(self.admin_user)
 
     def test_change_page_contains_new_admin_field(self) -> None:
@@ -53,6 +57,43 @@ class ClubAdminAssignAdministratorTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Добавить администратора")
         self.assertContains(response, "new_admin")
+        self.assertContains(response, "Текущие администраторы")
+        self.assertContains(response, "Не назначены")
+
+    def test_change_page_shows_current_admins(self) -> None:
+        ClubMember.objects.create(
+            club=self.club,
+            user=self.candidate,
+            role=ClubMemberRole.ADMIN,
+            status=ClubMemberStatus.ACTIVE,
+        )
+
+        response = self.client.get(
+            reverse("admin:clubs_club_change", args=[self.club.pk]),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Иван Петров")
+        self.assertContains(response, "club-owner@test.local")
+        self.assertNotContains(response, "Не назначены")
+
+    def test_named_user_autocomplete_includes_name_and_email(self) -> None:
+        response = self.client.get(
+            reverse("admin:clubs_named_user_autocomplete"),
+            {
+                "app_label": "clubs",
+                "model_name": "clubmember",
+                "field_name": "user",
+                "term": "Петров",
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        texts = [item["text"] for item in payload["results"]]
+        self.assertIn("Иван Петров — club-owner@test.local", texts)
 
     def test_save_model_creates_club_admin(self) -> None:
         factory = RequestFactory()

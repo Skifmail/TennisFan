@@ -240,6 +240,58 @@ class TrainingListExtraCitiesTestCase(TestCase):
         self.assertNotContains(response, "Где вам удобно?")
 
 
+class TrainingListMultiCityTestCase(TestCase):
+    """Прод: одна тренировка сразу на Москву и города области."""
+
+    def setUp(self) -> None:
+        Training.objects.create(
+            title="Тренировки по теннису в Москве, Раменском, Жуковском, Воскресенске",
+            slug="trenirovki-v-ramenskom-i-zhukovskom",
+            description="Описание",
+            city="Москва, Раменское, Жуковский, Воскресенск",
+            is_active=True,
+            type_prices={"individual": 3000},
+        )
+
+    def test_default_moscow_shows_multi_city_training(self) -> None:
+        response = self.client.get(reverse("training_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="Москва"')
+        self.assertContains(
+            response,
+            "Тренировки по теннису в Москве, Раменском, Жуковском, Воскресенске",
+        )
+
+    def test_ramenskoe_shows_same_training_without_moscow_zones(self) -> None:
+        response = self.client.get(
+            reverse("training_list"),
+            {"city": "Раменское"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Где вам удобно?")
+        self.assertContains(
+            response,
+            "Тренировки по теннису в Москве, Раменском, Жуковском, Воскресенске",
+        )
+        self.assertNotContains(response, "Тренировки пока не добавлены.")
+
+    def test_unrelated_city_hides_training(self) -> None:
+        response = self.client.get(
+            reverse("training_list"),
+            {"city": "Ростов-на-Дону"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(
+            response,
+            "Тренировки по теннису в Москве, Раменском, Жуковском, Воскресенске",
+        )
+
+
 class TrainingEnrollCourtChoicesTestCase(TestCase):
     """В заявке только корты рекламируемой географии."""
 

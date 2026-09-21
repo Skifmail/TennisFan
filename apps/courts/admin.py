@@ -56,6 +56,31 @@ def _geocode_court(court: Court) -> bool:
     return True
 
 
+def _should_geocode_on_save(
+    court: Court,
+    *,
+    changed_data: list[str],
+    change: bool,
+) -> bool:
+    """Нужно ли запросить координаты при сохранении корта в админке.
+
+    Геокодируем, если координат нет, или если сменили город/адрес и координаты
+    при этом не правили вручную. Иначе устаревшая точка (часто центр Москвы)
+    остаётся на карте после правки адреса.
+    """
+    if not (court.address or "").strip():
+        return False
+    coords_missing = court.latitude is None or court.longitude is None
+    if coords_missing:
+        return True
+    if not change:
+        return False
+    changed = set(changed_data)
+    address_changed = bool({"city", "address"} & changed)
+    coords_manual = bool({"latitude", "longitude"} & changed)
+    return address_changed and not coords_manual
+
+
 class CourtPhotoInline(admin.TabularInline):
     """Дополнительные фото корта (до 4 штук, вместе с основным фото — до 5)."""
 
@@ -218,22 +243,28 @@ class CourtAdmin(admin.ModelAdmin):
         return response
 
     def save_model(self, request, obj, form, change):
+        changed_data = list(getattr(form, "changed_data", []) or [])
+        should_geocode = _should_geocode_on_save(
+            obj, changed_data=changed_data, change=change
+        )
+        geocoded = False
+        if should_geocode:
+            geocoded = _geocode_court(obj)
         super().save_model(request, obj, form, change)
-        # Автогеокодирование: если адрес есть, а координат нет — запросить по API
-        if obj.address and (obj.latitude is None or obj.longitude is None):
-            if _geocode_court(obj):
-                obj.save(update_fields=["latitude", "longitude"])
-                self.message_user(
-                    request,
-                    "Координаты получены по адресу и сохранены.",
-                    messages.SUCCESS,
-                )
-            else:
-                self.message_user(
-                    request,
-                    "Не удалось получить координаты по адресу. Проверьте адрес или укажите координаты вручную.",
-                    messages.WARNING,
-                )
+        if not should_geocode:
+            return
+        if geocoded:
+            self.message_user(
+                request,
+                "Координаты получены по адресу и сохранены.",
+                messages.SUCCESS,
+            )
+        else:
+            self.message_user(
+                request,
+                "Не удалось получить координаты по адресу. Проверьте адрес или укажите координаты вручную.",
+                messages.WARNING,
+            )
 
     @admin.action(description="Получить координаты по адресу")
     def geocode_selected_courts(self, request, queryset):

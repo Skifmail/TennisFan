@@ -4,6 +4,10 @@
 только туда), разбор адресов лендингов и построение канонических ссылок.
 """
 
+from datetime import date
+from importlib import import_module
+
+from django.apps import apps
 from django.http import Http404
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -22,7 +26,7 @@ from apps.tournaments.landing import (
     geo_area_choices,
     resolve_landing,
 )
-from apps.tournaments.models import TournamentVariant
+from apps.tournaments.models import Tournament, TournamentVariant
 
 
 class NormalizeGeoTextTestCase(TestCase):
@@ -86,6 +90,58 @@ class GeoAreaSeedTestCase(TestCase):
         self.assertEqual(
             sorted(cities.values_list("slug", flat=True)),
             ["pavlovskiy-posad", "ramenskoe", "voskresensk", "zhukovskiy"],
+        )
+
+
+class RenameMoscowDistrictsMergeTestCase(TestCase):
+    """Миграция 0033 сливает админский район со старой зоной."""
+
+    def test_merges_when_target_slug_already_exists(self) -> None:
+        migration = import_module("apps.core.migrations.0033_moscow_cardinal_districts")
+
+        canonical = GeoArea.objects.get(slug="sever")
+        leftover = GeoArea.objects.create(
+            region=GeoRegion.MOSCOW,
+            name="Северо-Запад",
+            slug="severo-zapad",
+            aliases="СЗАО",
+            sort_order=99,
+            is_active=True,
+            is_advertised=True,
+        )
+        tournament = Tournament.objects.create(
+            name="Старый северо-запад",
+            slug="old-northwest",
+            city="Москва",
+            start_date=date.today(),
+            format="round_robin",
+            geo_area=leftover,
+        )
+
+        migration.rename_moscow_districts(apps, None)
+
+        tournament.refresh_from_db()
+        merged = GeoArea.objects.get(slug="sever")
+        self.assertFalse(GeoArea.objects.filter(slug="severo-zapad").exists())
+        self.assertEqual(GeoArea.objects.filter(slug="sever").count(), 1)
+        self.assertEqual(tournament.geo_area_id, canonical.pk)
+        self.assertEqual(merged.pk, canonical.pk)
+        self.assertIn("СЗАО", merged.aliases)
+        self.assertIn("Северо-Запад", merged.aliases)
+
+    def test_rename_is_idempotent(self) -> None:
+        migration = import_module("apps.core.migrations.0033_moscow_cardinal_districts")
+
+        migration.rename_moscow_districts(apps, None)
+        migration.rename_moscow_districts(apps, None)
+
+        self.assertEqual(
+            sorted(
+                GeoArea.objects.filter(region=GeoRegion.MOSCOW).values_list(
+                    "slug", flat=True
+                )
+            ),
+            ["sever", "vostok", "yug", "zapad"],
         )
 
 

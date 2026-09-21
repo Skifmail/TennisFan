@@ -21,6 +21,7 @@ from .surfaces import CourtSurface, filter_courts_by_surfaces, format_surface_la
 def court_list(request):
     """List of courts with average rating."""
     city = (request.GET.get("city") or "").strip()
+    query = (request.GET.get("q") or "").strip()
     selected_surfaces = request.GET.getlist("surface")
 
     courts = Court.objects.filter(is_active=True).annotate(
@@ -28,6 +29,10 @@ def court_list(request):
         rating_count=Count("ratings"),
     )
 
+    if query:
+        courts = filter_field_contains_ci(
+            courts, "name", query, annotation="_court_list_name_l"
+        )
     if city:
         courts = filter_field_contains_ci(
             courts, "city", city, annotation="_court_list_city_l"
@@ -45,6 +50,7 @@ def court_list(request):
     context = {
         "courts": courts,
         "current_city": city,
+        "current_query": query,
         "current_surfaces": selected_surfaces,
         "surface_choices": CourtSurface.choices,
         "current_surfaces_label": format_surface_labels(selected_surfaces)

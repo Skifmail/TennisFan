@@ -3198,6 +3198,18 @@ form.club-filter-dropdown-open {
     flex: 1;
 }
 
+.court-card__city {
+    margin: 0 0 0.2rem;
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.court-card .card-title {
+    margin-bottom: 0.25rem;
+}
+
 .court-card__footer {
     margin-top: auto;
 }

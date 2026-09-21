@@ -12,6 +12,15 @@
 <div class="container">
     <div class="d-flex flex-wrap align-items-center gap-2" style="margin-bottom: var(--spacing-xl);">
         <form method="get" class="filter-bar" style="flex: 1; min-width: 200px;">
+            <input
+                type="search"
+                name="q"
+                class="form-control"
+                placeholder="Название корта"
+                value="{{ current_query }}"
+                aria-label="Название корта"
+                autocomplete="off"
+            >
             <input name="city" class="form-control" placeholder="Любой населённый пункт России" value="{{ current_city }}" onchange="this.form.submit()" aria-label="Населённый пункт">
             <div
                 class="club-filter-select club-filter-select--custom court-surface-filter"
@@ -64,7 +73,12 @@
             {% endif %}
             <div class="card-body court-card__body">
                 <h3 class="card-title">{{ court.name }}</h3>
-                <p class="card-text">{{ court.display_address|default:court.address }}</p>
+                {% if court.city %}
+                <p class="court-card__city">{{ court.city }}</p>
+                {% endif %}
+                {% if court.display_address %}
+                <p class="card-text">{{ court.display_address }}</p>
+                {% endif %}
                 <div class="d-flex gap-1 mt-2 flex-wrap">
                     <span class="player-category">{{ court.surface }}</span>
                     {% if court.is_indoor %}

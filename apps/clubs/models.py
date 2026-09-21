@@ -3,11 +3,12 @@
 """
 
 import decimal
-from typing import cast
+from typing import Any, cast
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
@@ -288,7 +289,10 @@ class ClubSubscription(models.Model):
         max_digits=10,
         decimal_places=2,
     )
-    started_at = models.DateTimeField("Начало подписки")
+    started_at = models.DateTimeField(
+        "Начало подписки",
+        default=timezone.now,
+    )
     ends_at = models.DateTimeField("Конец подписки")
     auto_renew = models.BooleanField("Автопродление", default=False)
     payment_provider = models.CharField(
@@ -311,6 +315,15 @@ class ClubSubscription(models.Model):
         verbose_name = "Подписка клуба"
         verbose_name_plural = "Подписки клубов"
         ordering = ["-ends_at", "id"]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Подставляет текущее время, если начало подписки не задано (админка)."""
+        if self.started_at is None:
+            self.started_at = timezone.now()
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = [*update_fields, "started_at"]
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return (

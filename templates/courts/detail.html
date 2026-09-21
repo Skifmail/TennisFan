@@ -65,10 +65,12 @@
                 <dt>Населённый пункт</dt>
                 <dd>{{ court.city }}</dd>
 
+                {% if court.display_address %}
                 <dt>Адрес</dt>
                 <dd>
-                    <a href="https://yandex.ru/maps/?text={{ court.address|urlencode }}+{{ court.city|urlencode }}" target="_blank" rel="noopener">{{ court.city }}, {{ court.address }}</a>
+                    <a href="https://yandex.ru/maps/?text={{ court.city|urlencode }}+{{ court.display_address|urlencode }}" target="_blank" rel="noopener">{{ court.display_address }}</a>
                 </dd>
+                {% endif %}
 
                 {% if court.district %}
                 <dt>Район</dt>

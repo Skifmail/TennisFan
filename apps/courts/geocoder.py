@@ -8,6 +8,8 @@ from typing import Any, cast
 
 import requests
 
+from apps.core.geo import normalize_geo_text
+
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 10
@@ -206,6 +208,62 @@ def _normalize_address_for_geocode(city: str, address: str) -> str:
     ):
         return address
     return f"{city}, {address}"
+
+
+_LOCALITY_PREFIXES = (
+    "город",
+    "посёлок",
+    "поселок",
+    "деревня",
+    "пгт.",
+    "пгт",
+    "дер.",
+    "пос.",
+    "село",
+    "г.",
+    "г",
+    "с.",
+)
+
+
+def _locality_key(text: str) -> str:
+    """Нормализовать часть адреса для сравнения с населённым пунктом."""
+    key = normalize_geo_text(text)
+    for prefix in _LOCALITY_PREFIXES:
+        prefix_key = normalize_geo_text(prefix)
+        if key.startswith(f"{prefix_key} "):
+            return key[len(prefix_key) :].strip()
+    return key
+
+
+def format_court_display_address(city: str, address: str) -> str:
+    """Вернуть адрес корта без повторённого населённого пункта.
+
+    Город уже выводится отдельной строкой, поэтому из адреса убираем
+    совпадающие части и подряд идущие дубли.
+
+    Args:
+        city: Населённый пункт корта.
+        address: Сырая строка адреса, часто из геокодера.
+
+    Returns:
+        str: Адрес для карточки. Пустая строка, если кроме города ничего нет.
+    """
+    city_key = _locality_key(city)
+    parts: list[str] = []
+    previous_key = ""
+    for raw in (address or "").split(","):
+        part = " ".join(raw.split())
+        if not part:
+            continue
+        key = _locality_key(part)
+        if city_key and key == city_key:
+            continue
+        if key and key == previous_key:
+            continue
+        parts.append(part)
+        previous_key = key
+    return ", ".join(parts)
 
 
 def geocode_address(

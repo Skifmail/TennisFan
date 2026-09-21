@@ -480,7 +480,7 @@
             <h3 class="section-title mb-2">Место проведения</h3>
             {% if tournament.court %}
             <p class="mb-1"><strong>{{ tournament.court.name }}</strong></p>
-            <p class="text-secondary mb-1">{{ tournament.court.address }}{% if tournament.court.surface %} • {{ tournament.court.surface }}{% endif %}</p>
+            <p class="text-secondary mb-1">{{ tournament.court.display_address|default:tournament.court.address }}{% if tournament.court.surface %} • {{ tournament.court.surface }}{% endif %}</p>
             <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="btn btn-outline btn-sm">Подробнее о корте</a>
             {% else %}
             <p class="text-secondary mb-0">Точный адрес сообщим, когда завершится набор участников.</p>

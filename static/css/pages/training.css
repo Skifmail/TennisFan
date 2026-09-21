@@ -66,56 +66,164 @@
     margin-bottom: auto;
 }
 
-.training-geo {
-    margin: 0 0 var(--spacing-xl);
-    padding: clamp(1rem, 2vw, 1.35rem) 0 0;
-    border-top: 1px solid rgb(166 130 74 / 0.28);
+.training-header .page-subtitle {
+    max-width: 38rem;
+    text-wrap: pretty;
 }
 
-.training-geo__lede {
-    margin: 0.55rem auto 0;
-    max-width: 46ch;
+.training-header__lede {
+    margin: 0.5rem auto 0;
+    max-width: 42ch;
     color: var(--color-text);
     font-size: var(--font-size-md);
     line-height: 1.45;
 }
 
+.training-browse {
+    margin: 0 0 var(--spacing-xl);
+    padding: 1.05rem 1.15rem 1.2rem;
+    border: 1px solid rgb(166 130 74 / 0.3);
+    border-radius: var(--radius-lg);
+    background:
+        linear-gradient(180deg, rgb(196 158 92 / 0.08) 0%, rgb(8 28 22 / 0.22) 42%);
+}
+
+.training-browse__filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem 0.85rem;
+    margin: 0 0 1rem;
+}
+
+.training-browse__field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.32rem;
+}
+
+.training-browse__label {
+    color: var(--color-primary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.training-browse__filters .form-control {
+    min-width: 0;
+    width: 100%;
+    min-height: 44px;
+}
+
+.training-browse__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.training-browse__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2rem;
+    padding: 0.28rem 0.75rem;
+    border: 1px solid rgb(196 158 92 / 0.45);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.training-browse__action:hover,
+.training-browse__action:focus-visible {
+    border-color: var(--color-primary);
+    color: #f0d48a;
+    text-decoration: none;
+}
+
+.training-browse__action:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.training-browse__action--primary {
+    border-color: rgb(196 158 92 / 0.8);
+    background: rgb(196 158 92 / 0.18);
+    color: #e8c878;
+}
+
+.training-geo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem 1rem;
+    align-items: start;
+    margin: 0;
+    padding: 0.95rem 0 0;
+    border-top: 1px solid rgb(166 130 74 / 0.22);
+}
+
+.training-geo__head {
+    grid-column: 1;
+    margin: 0;
+}
+
+.training-browse__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+}
+
+.training-geo__groups,
+.training-geo__courts-panel {
+    grid-column: 1 / -1;
+}
+
 .training-geo__title {
-    margin: 0 0 0.4rem;
+    margin: 0;
     color: var(--color-primary);
     font-family: var(--font-heading);
-    font-size: var(--font-size-lg);
+    font-size: 1.05rem;
     font-weight: 700;
     line-height: 1.25;
 }
 
 .training-geo__hint {
-    margin: 0 0 1.15rem;
-    max-width: 48ch;
+    margin: 0.2rem 0 0;
     color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-    line-height: 1.45;
+    font-size: 0.82rem;
+    line-height: 1.35;
 }
 
 .training-geo__groups {
     display: grid;
-    gap: 1.15rem;
+    gap: 0.75rem;
 }
 
 .training-geo__group-title {
-    margin: 0 0 0.55rem;
-    color: var(--color-primary);
-    font-family: var(--font-heading);
-    font-size: 0.95rem;
+    margin: 0 0 0.4rem;
+    color: rgb(232 200 120 / 0.78);
+    font-size: 0.68rem;
     font-weight: 700;
-    letter-spacing: 0.02em;
-    line-height: 1.3;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
 }
 
 .training-geo__areas {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.38rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -125,22 +233,21 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 2.15rem;
-    padding: 0.4rem 0.95rem;
-    border: 1.5px solid rgb(196 158 92 / 0.55);
+    min-height: 1.9rem;
+    padding: 0.28rem 0.72rem;
+    border: 1px solid rgb(196 158 92 / 0.48);
     border-radius: 999px;
-    background: rgb(166 130 74 / 0.1);
+    background: rgb(166 130 74 / 0.08);
     color: var(--color-text);
-    font-size: 0.92rem;
+    font-size: 0.82rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     line-height: 1.2;
     text-decoration: none;
     transition:
         background 0.2s ease,
         border-color 0.2s ease,
-        color 0.2s ease,
-        box-shadow 0.2s ease;
+        color 0.2s ease;
 }
 
 .training-geo__area:hover,
@@ -168,11 +275,11 @@
 }
 
 .training-geo__courts-panel {
-    margin-top: 1.25rem;
-    padding: 1rem 1.05rem 1.05rem;
-    border: 1px solid rgb(166 130 74 / 0.28);
-    border-radius: var(--radius-lg);
-    background: rgb(8 28 22 / 0.35);
+    margin-top: 0.85rem;
+    padding: 0.75rem 0.85rem 0.85rem;
+    border: 1px solid rgb(166 130 74 / 0.22);
+    border-radius: var(--radius-md);
+    background: rgb(8 28 22 / 0.28);
 }
 
 .training-geo__courts-title {
@@ -239,6 +346,92 @@
 }
 
 @media (width <= 760px) {
+    .training-header {
+        padding: 0.7rem 0 0.65rem;
+    }
+
+    .training-header .page-title {
+        margin-bottom: 0.35rem;
+        font-size: 1.28rem;
+        letter-spacing: 0.02em;
+    }
+
+    .training-header .page-subtitle {
+        display: none;
+    }
+
+    .training-header__lede {
+        display: none;
+    }
+
+    .training-browse {
+        margin-bottom: 1rem;
+        padding: 0.8rem 0.8rem 0.9rem;
+    }
+
+    .training-browse__filters {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem 0.55rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .training-browse__filters .form-control {
+        min-height: 42px;
+        padding: 0.45rem 1.85rem 0.45rem 0.7rem;
+        font-size: 0.86rem;
+    }
+
+    .training-geo {
+        grid-template-columns: 1fr;
+        gap: 0.55rem;
+        padding-top: 0.75rem;
+    }
+
+    .training-geo__head {
+        order: 0;
+    }
+
+    .training-geo__groups {
+        order: 1;
+        gap: 0.6rem;
+    }
+
+    .training-browse__actions {
+        grid-column: 1;
+        grid-row: auto;
+        justify-self: start;
+        order: 2;
+    }
+
+    .training-geo__courts-panel {
+        order: 3;
+    }
+
+    .training-geo__title {
+        font-size: 0.98rem;
+    }
+
+    .training-geo__hint {
+        display: none;
+    }
+
+    .training-geo__area {
+        min-height: 1.8rem;
+        padding: 0.24rem 0.62rem;
+        font-size: 0.78rem;
+    }
+
+    .training-browse__action {
+        min-height: 1.8rem;
+        padding: 0.22rem 0.65rem;
+        font-size: 0.75rem;
+    }
+
+    .training-geo__courts {
+        grid-template-columns: 1fr;
+        max-height: min(16rem, 42vh);
+    }
+
     .training-list-grid {
         grid-template-columns: minmax(0, 1fr);
         gap: var(--spacing-md);

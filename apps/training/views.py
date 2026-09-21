@@ -13,7 +13,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.decorators import login_required_with_message
-from apps.core.geo import GeoRegion, canonical_area_slug
+from apps.core.geo import GeoRegion
 from apps.core.metrika import (
     COACH_APPLICATION_SUCCESS,
     TRAINING_ENROLL_SUCCESS,
@@ -27,13 +27,14 @@ from .forms import (
     TrainingForm,
 )
 from .geo import (
+    MOSCOW_CITY,
     TrainingPlace,
     advertised_training_areas,
     courts_for_training_area,
-    extra_training_cities,
+    courts_for_training_city,
     filter_trainings_by_city,
     public_training_cities_label,
-    training_city_slug,
+    resolve_training_list_geo,
 )
 from .models import (
     Coach,
@@ -69,7 +70,14 @@ def training_list(request):
     """Список тренировок. Доступен всем пользователям."""
     skill_level = request.GET.get("level", "")
     training_type = request.GET.get("type", "")
-    area_slug = canonical_area_slug((request.GET.get("area") or "").strip().lower())
+    areas = advertised_training_areas()
+    geo = resolve_training_list_geo(
+        city=(request.GET.get("city") or "").strip(),
+        area_slug=(request.GET.get("area") or "").strip(),
+        areas=areas,
+    )
+    district = geo.moscow_district
+    district_slug = district.slug if district is not None else ""
 
     trainings = Training.objects.filter(is_active=True).select_related("coach")
 
@@ -78,83 +86,49 @@ def training_list(request):
     if training_type:
         # type_prices — словарь {type: price}, фильтруем по наличию ключа
         trainings = trainings.filter(type_prices__has_key=training_type)
+    trainings = filter_trainings_by_city(trainings, geo.city)
 
-    areas = advertised_training_areas()
-    extra_cities = extra_training_cities(areas)
-    selected_area = next((area for area in areas if area.slug == area_slug), None)
-    selected_extra_city = ""
-    if selected_area is None and area_slug:
-        selected_extra_city = next(
-            (city for city in extra_cities if training_city_slug(city) == area_slug),
-            "",
-        )
-    if selected_extra_city:
-        trainings = filter_trainings_by_city(trainings, selected_extra_city)
+    selected_place = None
+    selected_courts = ()
+    if geo.show_moscow_zones:
+        if district is not None:
+            selected_place = district
+            selected_courts = courts_for_training_area(district.slug, areas)
+    else:
+        selected_place = TrainingPlace(slug=geo.city, name=geo.city)
+        selected_courts = courts_for_training_city(geo.city, areas)
 
-    selected_place = selected_area
-    if selected_place is None and selected_extra_city:
-        selected_place = TrainingPlace(slug=area_slug, name=selected_extra_city)
-
-    area_options: list[dict[str, str | bool]] = []
-    for area in areas:
-        is_active = selected_area is not None and selected_area.slug == area.slug
-        area_options.append(
-            {
-                "name": area.name,
-                "slug": area.slug,
-                "region": area.region,
-                "is_active": is_active,
-                "url": _training_list_query(
-                    area="" if is_active else area.slug,
-                    type=training_type,
-                    level=skill_level,
-                ),
-            }
-        )
-    extra_city_options: list[dict[str, str | bool]] = []
-    for city in extra_cities:
-        city_slug = training_city_slug(city)
-        extra_city_options.append(
-            {
-                "name": city,
-                "slug": city_slug,
-                "is_active": bool(selected_extra_city) and city_slug == area_slug,
-            }
-        )
-    area_groups = [
-        {
-            "label": str(GeoRegion.MOSCOW.label),
-            "areas": [
-                option
-                for option in area_options
-                if option["region"] == GeoRegion.MOSCOW
-            ],
-        },
-        {
-            "label": str(GeoRegion.MOSCOW_OBLAST.label),
-            "areas": [
-                option
-                for option in area_options
-                if option["region"] == GeoRegion.MOSCOW_OBLAST
-            ],
-        },
-    ]
-    area_groups = [group for group in area_groups if group["areas"]]
+    moscow_zones: list[dict[str, str | bool]] = []
+    if geo.show_moscow_zones:
+        for area in areas:
+            if area.region != GeoRegion.MOSCOW:
+                continue
+            is_active = district is not None and district.slug == area.slug
+            moscow_zones.append(
+                {
+                    "name": area.name,
+                    "slug": area.slug,
+                    "is_active": is_active,
+                    "url": _training_list_query(
+                        city=MOSCOW_CITY,
+                        area="" if is_active else area.slug,
+                        type=training_type,
+                        level=skill_level,
+                    ),
+                }
+            )
 
     context = {
         "trainings": trainings,
         "current_level": skill_level,
         "current_type": training_type,
-        "current_area": selected_place.slug if selected_place else "",
+        "current_city": geo.city,
+        "current_area": district_slug,
+        "show_moscow_zones": geo.show_moscow_zones,
         "selected_area": selected_place,
-        "selected_courts": (
-            courts_for_training_area(selected_place.slug, areas)
-            if selected_place
-            else ()
-        ),
+        "selected_courts": selected_courts,
         "training_cities_label": public_training_cities_label(areas),
-        "training_area_groups": area_groups,
-        "extra_city_options": extra_city_options,
+        "moscow_zones": moscow_zones,
     }
     return render(request, "training/list.html", context)
 

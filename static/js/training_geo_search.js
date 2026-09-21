@@ -1,4 +1,36 @@
 (function () {
+    function isMoscow(value) {
+        return (value || "").trim().toLowerCase() === "москва";
+    }
+
+    function initCityFilter() {
+        var form = document.querySelector(".training-browse__filters");
+        if (!form) {
+            return;
+        }
+        var city = form.querySelector("[data-training-city]");
+        var area = form.querySelector('input[name="area"]');
+        if (!city) {
+            return;
+        }
+
+        function apply() {
+            if (area && !isMoscow(city.value)) {
+                area.value = "";
+            }
+            form.submit();
+        }
+
+        city.addEventListener("change", apply);
+        city.addEventListener("keydown", function (event) {
+            if (event.key !== "Enter") {
+                return;
+            }
+            event.preventDefault();
+            window.setTimeout(apply, 0);
+        });
+    }
+
     function initCourtSearch() {
         var input = document.querySelector("[data-court-search]");
         var list = document.querySelector("[data-court-search-list]");
@@ -29,9 +61,14 @@
         });
     }
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initCourtSearch);
-    } else {
+    function init() {
+        initCityFilter();
         initCourtSearch();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+    } else {
+        init();
     }
 })();

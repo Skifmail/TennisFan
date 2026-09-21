@@ -90,11 +90,12 @@ class TrainingListGeographyTestCase(TestCase):
             response,
             "Москва, Раменское, Жуковский, Воскресенск и Павловский Посад",
         )
+        self.assertContains(response, 'name="city"')
+        self.assertContains(response, 'value="Москва"')
         self.assertContains(response, "Где вам удобно?")
+        self.assertContains(response, "Район Москвы.")
         self.assertContains(response, "Юг")
-        self.assertContains(response, "Раменское")
-        self.assertNotContains(response, "Другие города")
-        self.assertNotContains(response, "Казань")
+        self.assertNotContains(response, "Московская область")
         self.assertNotContains(response, "data-extra-city-filter")
         self.assertNotContains(response, "Корт ЮВАО")
         self.assertNotContains(response, "Корт Раменское")
@@ -134,12 +135,41 @@ class TrainingListGeographyTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="Москва"')
+        self.assertContains(response, "Где вам удобно?")
         self.assertNotContains(response, "Корт ЮВАО")
         self.assertNotContains(response, "Корт Раменское")
 
+    def test_oblast_slug_switches_city_and_hides_moscow_zones(self) -> None:
+        response = self.client.get(
+            reverse("training_list"),
+            {"area": "ramenskoe"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="Раменское"')
+        self.assertNotContains(response, "Где вам удобно?")
+        self.assertContains(response, "Корт Раменское")
+        self.assertNotContains(response, "Корт ЮВАО")
+
+    def test_typed_city_hides_moscow_zones_and_shows_city_courts(self) -> None:
+        response = self.client.get(
+            reverse("training_list"),
+            {"city": "Раменское"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="Раменское"')
+        self.assertNotContains(response, "Где вам удобно?")
+        self.assertContains(response, "Корт Раменское")
+        self.assertNotContains(response, "Корт ЮВАО")
+        self.assertNotContains(response, "Корт Казань")
+
 
 class TrainingListExtraCitiesTestCase(TestCase):
-    """Города активных тренировок вне Москвы появляются в фильтре."""
+    """Другой город скрывает зоны Москвы и оставляет свои тренировки."""
 
     def setUp(self) -> None:
         _make_court(name="Корт Ростов", slug="court-rostov-list", city="Ростов-на-Дону")
@@ -161,12 +191,16 @@ class TrainingListExtraCitiesTestCase(TestCase):
             type_prices={"individual": 3000},
         )
 
-    def test_heading_and_picker_include_training_city(self) -> None:
+    def test_default_moscow_hides_other_city_trainings(self) -> None:
         response = self.client.get(reverse("training_list"), secure=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "data-extra-city-filter")
-        self.assertContains(response, "Ростов-на-Дону")
+        self.assertContains(response, 'name="city"')
+        self.assertContains(response, 'value="Москва"')
+        self.assertContains(response, "Где вам удобно?")
+        self.assertContains(response, "Тренировка в Москве")
+        self.assertNotContains(response, "Тренировка в Ростове")
+        self.assertNotContains(response, "data-extra-city-filter")
         self.assertNotContains(response, "Другие города")
         self.assertNotContains(response, "Казань")
         self.assertContains(
@@ -176,7 +210,22 @@ class TrainingListExtraCitiesTestCase(TestCase):
         self.assertNotContains(response, "Корт Ростов")
         self.assertNotContains(response, "Корт Казань")
 
-    def test_selected_extra_city_shows_courts_and_local_trainings(self) -> None:
+    def test_typed_city_shows_local_trainings_without_moscow_zones(self) -> None:
+        response = self.client.get(
+            reverse("training_list"),
+            {"city": "Ростов-на-Дону"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="Ростов-на-Дону"')
+        self.assertNotContains(response, "Где вам удобно?")
+        self.assertContains(response, "Корт Ростов")
+        self.assertNotContains(response, "Корт Казань")
+        self.assertContains(response, "Тренировка в Ростове")
+        self.assertNotContains(response, "Тренировка в Москве")
+
+    def test_legacy_extra_area_slug_still_filters(self) -> None:
         response = self.client.get(
             reverse("training_list"),
             {"area": "ростов-на-дону"},
@@ -188,6 +237,7 @@ class TrainingListExtraCitiesTestCase(TestCase):
         self.assertNotContains(response, "Корт Казань")
         self.assertContains(response, "Тренировка в Ростове")
         self.assertNotContains(response, "Тренировка в Москве")
+        self.assertNotContains(response, "Где вам удобно?")
 
 
 class TrainingEnrollCourtChoicesTestCase(TestCase):

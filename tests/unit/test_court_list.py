@@ -4,6 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.courts.models import Court
+from apps.courts.views import format_courts_count
 
 
 def _make_court(*, name: str, slug: str, city: str) -> Court:
@@ -16,6 +17,19 @@ def _make_court(*, name: str, slug: str, city: str) -> Court:
         surface="хард",
         is_active=True,
     )
+
+
+class FormatCourtsCountTestCase(TestCase):
+    """Склонение «корт» в шапке каталога."""
+
+    def test_russian_plural_forms(self) -> None:
+        self.assertEqual(format_courts_count(0), "0 кортов")
+        self.assertEqual(format_courts_count(1), "1 корт")
+        self.assertEqual(format_courts_count(2), "2 корта")
+        self.assertEqual(format_courts_count(5), "5 кортов")
+        self.assertEqual(format_courts_count(11), "11 кортов")
+        self.assertEqual(format_courts_count(21), "21 корт")
+        self.assertEqual(format_courts_count(22), "22 корта")
 
 
 class CourtListCatalogTestCase(TestCase):
@@ -43,6 +57,11 @@ class CourtListCatalogTestCase(TestCase):
         self.assertContains(response, 'name="q"')
         self.assertContains(response, "Найти")
         self.assertContains(response, 'type="submit"')
+        self.assertContains(response, "courts-masthead")
+        self.assertContains(response, "2 корта")
+        self.assertContains(response, "Подать заявку")
+        self.assertNotContains(response, "Подать заявку на добавление корта")
+        self.assertNotContains(response, "Сбросить фильтры")
 
     def test_search_by_court_name(self) -> None:
         response = self.client.get(
@@ -66,3 +85,5 @@ class CourtListCatalogTestCase(TestCase):
         self.assertNotContains(response, "TennisCapital на Мечуринской")
         self.assertNotContains(response, "Территория тенниса")
         self.assertContains(response, "Корты не найдены.")
+        self.assertContains(response, "courts-empty__reset")
+        self.assertContains(response, "Сбросить фильтры")

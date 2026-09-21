@@ -19,6 +19,28 @@ from .models import Court, CourtRating
 from .surfaces import CourtSurface, filter_courts_by_surfaces, format_surface_labels
 
 
+def format_courts_count(count: int) -> str:
+    """Склонить «корт» для шапки каталога.
+
+    Args:
+        count: Число найденных кортов.
+
+    Returns:
+        str: Строка вида «21 корт», «3 корта» или «12 кортов».
+    """
+    n = abs(count) % 100
+    n1 = n % 10
+    if 11 <= n <= 19:
+        word = "кортов"
+    elif n1 == 1:
+        word = "корт"
+    elif 2 <= n1 <= 4:
+        word = "корта"
+    else:
+        word = "кортов"
+    return f"{count} {word}"
+
+
 def court_list(request):
     """List of courts with average rating."""
     city = (request.GET.get("city") or "").strip()
@@ -50,6 +72,9 @@ def court_list(request):
 
     context = {
         "courts": courts,
+        "courts_count": len(courts),
+        "courts_count_label": format_courts_count(len(courts)),
+        "has_court_filters": bool(query or city or selected_surfaces),
         "current_city": city,
         "current_query": query,
         "current_surfaces": selected_surfaces,

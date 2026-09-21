@@ -195,6 +195,23 @@ def _catalog_city_needles(areas: list[GeoArea]) -> set[str]:
     return needles
 
 
+def training_city_tokens(city: str) -> set[str]:
+    """Нормализованные города из поля тренировки, в том числе через запятую.
+
+    Args:
+        city: Значение ``Training.city``. Может содержать несколько городов.
+
+    Returns:
+        set[str]: Нормализованные названия без пустых частей.
+    """
+    tokens: set[str] = set()
+    for part in (city or "").replace(";", ",").split(","):
+        key = normalize_geo_text(part)
+        if key:
+            tokens.add(key)
+    return tokens
+
+
 def extra_training_cities(areas: list[GeoArea] | None = None) -> list[str]:
     """Города активных тренировок, которых нет в справочнике Москвы и области.
 
@@ -215,7 +232,9 @@ def extra_training_cities(areas: list[GeoArea] | None = None) -> list[str]:
         .values_list("city", flat=True)
     )
     for raw in cities:
-        _remember_extra_city(display_by_key, raw, needles)
+        parts = [part.strip() for part in (raw or "").replace(";", ",").split(",")]
+        for part in parts:
+            _remember_extra_city(display_by_key, part, needles)
     return sorted(display_by_key.values(), key=lambda name: name.casefold())
 
 
@@ -317,12 +336,15 @@ def courts_for_extra_city(city: str) -> tuple[Court, ...]:
 def filter_trainings_by_city(queryset: QuerySet, city: str) -> QuerySet:
     """Оставить тренировки выбранного города.
 
+    Поле города может содержать несколько населённых пунктов через запятую,
+    как «Москва, Раменское, Жуковский, Воскресенск».
+
     Args:
         queryset: Уже отфильтрованный список тренировок.
         city: Название города.
 
     Returns:
-        QuerySet: Тренировки с тем же нормализованным городом.
+        QuerySet: Тренировки, в чьём поле города есть выбранный город.
     """
     needle = normalize_geo_text(city)
     if not needle:
@@ -330,7 +352,7 @@ def filter_trainings_by_city(queryset: QuerySet, city: str) -> QuerySet:
     matched_pks = [
         training.pk
         for training in queryset
-        if normalize_geo_text(training.city) == needle
+        if needle in training_city_tokens(training.city)
     ]
     if not matched_pks:
         return queryset.none()

@@ -17,6 +17,7 @@ from apps.training.geo import (
     courts_for_training_city,
     extra_place_cities,
     extra_training_cities,
+    filter_trainings_by_city,
     format_city_list,
     group_training_courts,
     is_moscow_city,
@@ -487,3 +488,29 @@ class ResolveTrainingListGeoTestCase(TestCase):
         names = [court.name for court in courts_for_training_city("Раменское")]
 
         self.assertEqual(names, ["Корт Раменское"])
+
+
+class MultiCityTrainingFilterTestCase(TestCase):
+    """Тренировка сразу в нескольких городах видна в каждом из них."""
+
+    def setUp(self) -> None:
+        Training.objects.create(
+            title="Тренировки по теннису в Москве, Раменском, Жуковском, Воскресенске",
+            slug="multi-city-geo-training",
+            description="Описание",
+            city="Москва, Раменское, Жуковский, Воскресенск",
+            is_active=True,
+            type_prices={"individual": 3000},
+        )
+
+    def test_matches_each_listed_city(self) -> None:
+        qs = Training.objects.filter(is_active=True)
+
+        self.assertEqual(filter_trainings_by_city(qs, "Москва").count(), 1)
+        self.assertEqual(filter_trainings_by_city(qs, "Раменское").count(), 1)
+        self.assertEqual(filter_trainings_by_city(qs, "Жуковский").count(), 1)
+        self.assertEqual(filter_trainings_by_city(qs, "Воскресенск").count(), 1)
+        self.assertEqual(filter_trainings_by_city(qs, "Ростов-на-Дону").count(), 0)
+
+    def test_combined_catalog_cities_are_not_extra(self) -> None:
+        self.assertEqual(extra_training_cities(), [])

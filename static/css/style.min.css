@@ -14257,6 +14257,431 @@ a.match-details-value__lead:hover {
 
 /* END tournaments-catalog.css */
 
+/* BEGIN courts.css */
+
+/*
+ * Каталог кортов: шапка, фильтры и карточки площадок.
+ * Сохраняет тёмно-зелёную палитру TennisFan, ритм как у каталога турниров.
+ */
+
+.courts-catalog {
+    --courts-ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --courts-gold-line: rgb(166 130 74 / 0.28);
+    --courts-gold-soft: rgb(166 130 74 / 0.12);
+    padding-bottom: clamp(2rem, 4vw, 3.5rem);
+}
+
+.courts-masthead {
+    position: relative;
+    padding: clamp(1.1rem, 2.6vw, 2.1rem) 0 0;
+    margin-bottom: clamp(1.1rem, 2vw, 1.6rem);
+}
+
+.courts-masthead::before {
+    content: "";
+    position: absolute;
+    inset: -1.25rem auto auto -8%;
+    width: min(42rem, 70vw);
+    height: 16rem;
+    pointer-events: none;
+    background: radial-gradient(
+        ellipse 70% 80% at 20% 0%,
+        rgb(166 130 74 / 0.1),
+        transparent 68%
+    );
+}
+
+.courts-masthead__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) auto;
+    gap: clamp(1rem, 2.4vw, 2rem);
+    align-items: end;
+    padding-bottom: clamp(1.05rem, 1.8vw, 1.55rem);
+    border-bottom: 1px solid var(--courts-gold-line);
+}
+
+.courts-catalog h1.courts-masthead__title {
+    margin: 0 0 0.5rem;
+    max-width: 16ch;
+    color: var(--color-primary);
+    font-family: var(--font-heading);
+    font-size: clamp(1.85rem, 3.6vw, 3.05rem);
+    font-weight: 700;
+    line-height: 1.12;
+    letter-spacing: -0.038em;
+    text-transform: none;
+    text-wrap: balance;
+}
+
+.courts-masthead__lede {
+    margin: 0;
+    max-width: 42ch;
+    color: var(--color-text);
+    font-size: var(--font-size-lg);
+    line-height: 1.45;
+}
+
+.courts-masthead__aside {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.courts-masthead__count {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+.courts-masthead__cta {
+    min-height: 44px;
+    padding-inline: 1.15rem;
+    white-space: nowrap;
+}
+
+.courts-catalog .filter-bar.courts-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem 0.9rem;
+    margin: 0 0 clamp(1.25rem, 2.4vw, 2rem);
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+}
+
+.courts-filters__field {
+    display: flex;
+    flex: 1 1 16rem;
+    min-width: min(100%, 16rem);
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.courts-filters__label {
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+}
+
+.courts-catalog .courts-filters .form-control,
+.courts-catalog .courts-filters .club-filter-select--custom {
+    min-width: 0;
+    width: 100%;
+}
+
+.courts-catalog .courts-filters .form-control {
+    min-height: 44px;
+}
+
+.courts-filters__field.is-active .form-control,
+.courts-filters__field.is-active .club-filter-select__toggle {
+    border-color: rgb(166 130 74 / 0.85);
+    background: rgb(166 130 74 / 0.1);
+}
+
+.courts-filters__actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: flex-end;
+    min-width: 7.5rem;
+}
+
+.courts-filters__actions .court-list-search-btn {
+    width: 100%;
+    height: 44px;
+    min-height: 44px;
+    align-self: flex-end;
+}
+
+.courts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(1rem, 2vw, 1.35rem);
+}
+
+.courts-catalog .court-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    background: var(--color-bg-card);
+    border: 1px solid var(--courts-gold-line);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 28px rgb(0 0 0 / 0.18);
+    transition:
+        transform 220ms var(--courts-ease),
+        border-color 220ms var(--courts-ease),
+        box-shadow 220ms var(--courts-ease);
+}
+
+.courts-catalog .court-card:hover {
+    border-color: rgb(166 130 74 / 0.85);
+    box-shadow: 0 16px 36px rgb(0 0 0 / 0.28);
+    transform: translateY(-3px);
+}
+
+.courts-catalog .court-card:active {
+    transform: translateY(-1px);
+}
+
+.courts-catalog .court-card:focus-visible {
+    border-color: rgb(166 130 74 / 0.85);
+    outline: none;
+    box-shadow:
+        0 0 0 2px var(--color-bg),
+        0 0 0 4px var(--color-primary),
+        0 16px 36px rgb(0 0 0 / 0.28);
+}
+
+.court-card__media {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background:
+        linear-gradient(155deg, rgb(8 22 16) 0%, rgb(14 32 24) 55%, rgb(10 26 18) 100%);
+}
+
+.court-card__media img,
+.court-card__media .court-card__placeholder {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 420ms var(--courts-ease);
+}
+
+.courts-catalog .court-card:hover .court-card__media img {
+    transform: scale(1.04);
+}
+
+.court-card__placeholder {
+    background:
+        radial-gradient(circle at 30% 20%, rgb(166 130 74 / 0.18), transparent 46%),
+        linear-gradient(155deg, rgb(8 22 16), rgb(14 32 24));
+}
+
+.courts-catalog .court-card__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 0.95rem 1rem 1.05rem;
+}
+
+.courts-catalog .court-card .card-title {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.3;
+    text-wrap: balance;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.courts-catalog .court-card__city {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+}
+
+.courts-catalog .court-card .card-text {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.court-card__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.court-card__chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0.28rem 0.65rem;
+    color: var(--color-primary);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    background: var(--courts-gold-soft);
+    border: 1px solid rgb(166 130 74 / 0.22);
+    border-radius: 999px;
+}
+
+.courts-catalog .court-card__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem 0.75rem;
+    margin-top: auto;
+    padding-top: 0.55rem;
+}
+
+.court-card__price {
+    color: var(--color-primary);
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.court-card__rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.court-card__rating-empty {
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+}
+
+.courts-empty {
+    display: grid;
+    gap: 0.65rem;
+    max-width: 36rem;
+    margin: 0.5rem 0 2rem;
+    padding: 1.35rem 1.25rem;
+    background: var(--color-bg-card);
+    border: 1px solid var(--courts-gold-line);
+    border-radius: var(--radius-lg);
+}
+
+.courts-empty__title {
+    margin: 0;
+    color: var(--color-primary);
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-transform: none;
+}
+
+.courts-empty__text {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 0.975rem;
+    line-height: 1.5;
+}
+
+.courts-empty__reset {
+    width: fit-content;
+    min-height: 44px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .courts-masthead__copy,
+    .courts-masthead__aside {
+        animation: courts-masthead-in 0.5s var(--courts-ease) both;
+    }
+
+    .courts-masthead__aside {
+        animation-delay: 0.08s;
+    }
+}
+
+@keyframes courts-masthead-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .courts-catalog .court-card,
+    .courts-catalog .court-card:hover,
+    .courts-catalog .court-card:active,
+    .court-card__media img {
+        transform: none;
+        transition: none;
+    }
+
+    .courts-masthead__copy,
+    .courts-masthead__aside {
+        animation: none;
+    }
+}
+
+@media (width <= 1024px) {
+    .courts-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (width <= 768px) {
+    .courts-masthead__inner {
+        grid-template-columns: 1fr;
+        align-items: start;
+    }
+
+    .courts-catalog h1.courts-masthead__title {
+        max-width: none;
+        font-size: clamp(1.55rem, 7.2vw, 2.05rem);
+    }
+
+    .courts-masthead__lede {
+        max-width: none;
+        font-size: 1rem;
+    }
+
+    .courts-masthead__aside {
+        align-items: stretch;
+    }
+
+    .courts-masthead__count {
+        text-align: left;
+    }
+
+    .courts-masthead__cta {
+        width: 100%;
+    }
+
+    .courts-filters__field,
+    .courts-filters__actions {
+        flex-basis: 100%;
+        min-width: 0;
+    }
+
+    .courts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* END courts.css */
+
 /* BEGIN home.css */
 
 /*

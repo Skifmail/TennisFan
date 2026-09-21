@@ -4,130 +4,160 @@
 {% block title %}Корты{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">Теннисные корты</h1>
-    <p class="page-subtitle">Площадки для игры по всей России</p>
-</div>
+<div class="courts-catalog">
+    <header class="courts-masthead">
+        <div class="container courts-masthead__inner">
+            <div class="courts-masthead__copy">
+                <h1 class="courts-masthead__title">Теннисные корты</h1>
+                <p class="courts-masthead__lede">Площадки для игры по всей России</p>
+            </div>
+            <div class="courts-masthead__aside">
+                <p class="courts-masthead__count" role="status" aria-atomic="true">{{ courts_count_label }}</p>
+                <a href="{% url 'court_application_create' %}" class="btn btn-primary courts-masthead__cta">Подать заявку</a>
+            </div>
+        </div>
+    </header>
 
-<div class="container">
-    <div class="d-flex flex-wrap align-items-center gap-2" style="margin-bottom: var(--spacing-xl);">
-        <form method="get" class="filter-bar" style="flex: 1; min-width: 200px;">
-            <input
-                type="search"
-                name="q"
-                class="form-control"
-                placeholder="Название корта"
-                value="{{ current_query }}"
-                aria-label="Название корта"
-                autocomplete="off"
-                data-court-name-search
-            >
-            <input name="city" class="form-control" placeholder="Любой населённый пункт России" value="{{ current_city }}" onchange="this.form.submit()" aria-label="Населённый пункт">
-            <div
-                class="club-filter-select club-filter-select--custom court-surface-filter"
-                data-court-surface-filter
-                data-auto-submit="1"
-            >
-                <button
-                    type="button"
-                    class="club-filter-select__toggle form-control"
-                    aria-haspopup="listbox"
-                    aria-expanded="false"
-                    aria-controls="court-surface-filter-dropdown"
-                    aria-label="Покрытие"
+    <div class="container">
+        <form method="get" class="filter-bar courts-filters">
+            <div class="courts-filters__field{% if current_query %} is-active{% endif %}">
+                <label class="courts-filters__label" for="court-filter-q">Название</label>
+                <input
+                    id="court-filter-q"
+                    type="search"
+                    name="q"
+                    class="form-control"
+                    placeholder="Название корта"
+                    value="{{ current_query }}"
+                    aria-label="Название корта"
+                    autocomplete="off"
+                    data-court-name-search
                 >
-                    <span class="club-filter-select__current">{{ current_surfaces_label }}</span>
-                    <span class="club-filter-select__chevron" aria-hidden="true"></span>
-                </button>
+            </div>
+            <div class="courts-filters__field{% if current_city %} is-active{% endif %}">
+                <label class="courts-filters__label" for="court-filter-city">Город</label>
+                <input
+                    id="court-filter-city"
+                    name="city"
+                    class="form-control"
+                    placeholder="Любой населённый пункт России"
+                    value="{{ current_city }}"
+                    onchange="this.form.submit()"
+                    aria-label="Населённый пункт"
+                >
+            </div>
+            <div class="courts-filters__field{% if current_surfaces %} is-active{% endif %}">
+                <span class="courts-filters__label" id="court-filter-surface-label">Покрытие</span>
                 <div
-                    id="court-surface-filter-dropdown"
-                    class="club-filter-select__dropdown"
-                    role="listbox"
-                    aria-label="Покрытие"
-                    hidden
+                    class="club-filter-select club-filter-select--custom court-surface-filter"
+                    data-court-surface-filter
+                    data-auto-submit="1"
                 >
-                    {% for value, label in surface_choices %}
-                    <label class="club-filter-select__option court-surface-filter__option{% if value in current_surfaces %} is-selected{% endif %}">
-                        <input
-                            type="checkbox"
-                            name="surface"
-                            value="{{ value }}"
-                            class="form-checkbox"
-                            {% if value in current_surfaces %}checked{% endif %}
-                        >
-                        <span>{{ label }}</span>
-                    </label>
-                    {% endfor %}
+                    <button
+                        type="button"
+                        class="club-filter-select__toggle form-control"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-controls="court-surface-filter-dropdown"
+                        aria-labelledby="court-filter-surface-label"
+                    >
+                        <span class="club-filter-select__current">{{ current_surfaces_label }}</span>
+                        <span class="club-filter-select__chevron" aria-hidden="true"></span>
+                    </button>
+                    <div
+                        id="court-surface-filter-dropdown"
+                        class="club-filter-select__dropdown"
+                        role="listbox"
+                        aria-labelledby="court-filter-surface-label"
+                        hidden
+                    >
+                        {% for value, label in surface_choices %}
+                        <label class="club-filter-select__option court-surface-filter__option{% if value in current_surfaces %} is-selected{% endif %}">
+                            <input
+                                type="checkbox"
+                                name="surface"
+                                value="{{ value }}"
+                                class="form-checkbox"
+                                {% if value in current_surfaces %}checked{% endif %}
+                            >
+                            <span>{{ label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
-            <button type="submit" class="btn btn-outline court-list-search-btn">Найти</button>
+            <div class="courts-filters__actions">
+                <button type="submit" class="btn btn-outline court-list-search-btn">Найти</button>
+            </div>
         </form>
-        <a href="{% url 'court_application_create' %}" class="btn btn-primary btn--filter-size">Подать заявку на добавление корта</a>
-    </div>
 
-    <div class="grid grid-3">
-        {% for court in courts %}
-        <a href="{% url 'court_detail' slug=court.slug %}" class="card court-card">
-            {% if court.image %}
-            <img src="{{ court.image.url }}" alt="" class="card-image">
-            {% else %}
-            <div class="card-image" style="background: var(--color-bg-elevated);"></div>
-            {% endif %}
-            <div class="card-body court-card__body">
-                <h3 class="card-title">{{ court.name }}</h3>
-                {% if court.city %}
-                <p class="court-card__city">{{ court.city }}</p>
-                {% endif %}
-                {% if court.display_address %}
-                <p class="card-text">{{ court.display_address }}</p>
-                {% endif %}
-                <div class="d-flex gap-1 mt-2 flex-wrap">
-                    <span class="player-category">{{ court.surface }}</span>
-                    {% if court.is_indoor %}
-                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">Крытый</span>
-                    {% endif %}
-                    {% if court.is_outdoor %}
-                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">Открытый</span>
+        {% if courts %}
+        <div class="courts-grid">
+            {% for court in courts %}
+            <a href="{% url 'court_detail' slug=court.slug %}" class="card court-card">
+                <div class="court-card__media">
+                    {% if court.image %}
+                    <img
+                        src="{{ court.image.url }}"
+                        alt=""
+                        {% if forloop.counter <= 3 %}fetchpriority="high"{% else %}loading="lazy" decoding="async"{% endif %}
+                    >
+                    {% else %}
+                    <div class="court-card__placeholder" aria-hidden="true"></div>
                     {% endif %}
                 </div>
-                <div class="court-card__footer mt-2 d-flex justify-content-between align-items-center flex-wrap gap-1">
-                    {% if court.rental_price_min or court.rental_price_max or court.price_per_hour %}
-                    <span class="text-primary" style="font-weight: 600;">
-                        {% if court.rental_price_min and court.rental_price_max %}от {{ court.rental_price_min }} до {{ court.rental_price_max }} ₽/час
-                        {% elif court.rental_price_min %}от {{ court.rental_price_min }} ₽/час
-                        {% elif court.rental_price_max %}до {{ court.rental_price_max }} ₽/час
-                        {% else %}{{ court.price_per_hour }} ₽/час{% endif %}
-                    </span>
-                    {% else %}
-                    <span></span>
+                <div class="card-body court-card__body">
+                    <h3 class="card-title">{{ court.name }}</h3>
+                    {% if court.city %}
+                    <p class="court-card__city">{{ court.city }}</p>
                     {% endif %}
-                    {% if court.average_rating %}
-                    <div class="court-rating" style="display: flex; align-items: center; gap: 4px;">
-                        <span class="rating-stars" style="display: flex; gap: 2px;">
-                            {% with rating_int=court.average_rating|floatformat:0 %}
-                            {% for i in "12345"|make_list %}
-                                {% if forloop.counter <= rating_int|add:0 %}
-                                    <span class="star star-filled" style="font-size: 1em;">⭐</span>
-                                {% else %}
-                                    <span class="star star-empty" style="font-size: 1em; opacity: 0.3;">☆</span>
-                                {% endif %}
-                            {% endfor %}
-                            {% endwith %}
-                        </span>
-                        <span class="rating-value" style="font-weight: 600; color: var(--color-primary); font-size: 0.9em;">{{ court.average_rating|floatformat:1 }}</span>
-                        {% if court.rating_count > 0 %}
-                        <span class="rating-count" style="color: var(--color-text-muted); font-size: 0.85em;">({{ court.rating_count }})</span>
+                    {% if court.display_address %}
+                    <p class="card-text">{{ court.display_address }}</p>
+                    {% endif %}
+                    <div class="court-card__chips">
+                        {% if court.surface %}
+                        <span class="court-card__chip">{{ court.surface }}</span>
+                        {% endif %}
+                        {% if court.is_indoor %}
+                        <span class="court-card__chip">Крытый</span>
+                        {% endif %}
+                        {% if court.is_outdoor %}
+                        <span class="court-card__chip">Открытый</span>
                         {% endif %}
                     </div>
-                    {% else %}
-                    <span class="text-muted" style="font-size: 0.85em;">Нет оценок</span>
-                    {% endif %}
+                    <div class="court-card__footer">
+                        {% if court.rental_price_min or court.rental_price_max or court.price_per_hour %}
+                        <span class="court-card__price">
+                            {% if court.rental_price_min and court.rental_price_max %}от {{ court.rental_price_min }} до {{ court.rental_price_max }} ₽/час
+                            {% elif court.rental_price_min %}от {{ court.rental_price_min }} ₽/час
+                            {% elif court.rental_price_max %}до {{ court.rental_price_max }} ₽/час
+                            {% else %}{{ court.price_per_hour }} ₽/час{% endif %}
+                        </span>
+                        {% else %}
+                        <span></span>
+                        {% endif %}
+                        {% if court.average_rating %}
+                        <div class="court-card__rating">
+                            {% widthratio court.average_rating 5 100 as rating_percent %}
+                            {% include "courts/_star_rating.html" with rating_percent=rating_percent rating_count=court.rating_count average_rating=court.average_rating size="sm" show_count=True %}
+                        </div>
+                        {% else %}
+                        <span class="court-card__rating-empty">Нет оценок</span>
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
-        </a>
-        {% empty %}
-        <p class="text-secondary">Корты не найдены.</p>
-        {% endfor %}
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="courts-empty">
+            <h2 class="courts-empty__title">Корты не найдены.</h2>
+            <p class="courts-empty__text">Попробуйте другое название, город или покрытие.</p>
+            {% if has_court_filters %}
+            <a class="btn btn-outline courts-empty__reset" href="{% url 'court_list' %}">Сбросить фильтры</a>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

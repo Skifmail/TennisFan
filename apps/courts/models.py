@@ -140,6 +140,13 @@ class Court(CompressImageFieldsMixin, models.Model):
     def __str__(self) -> str:
         return f"{self.name} ({self.city})"
 
+    @property
+    def display_address(self) -> str:
+        """Адрес без повторённого населённого пункта."""
+        from .geocoder import format_court_display_address
+
+        return format_court_display_address(self.city, self.address)
+
     def save(self, *args, **kwargs) -> None:
         """Нормализовать выбранные покрытия и обновить строку для витрины."""
         self.sync_surface_display()

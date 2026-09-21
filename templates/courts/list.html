@@ -64,7 +64,7 @@
             {% endif %}
             <div class="card-body court-card__body">
                 <h3 class="card-title">{{ court.name }}</h3>
-                <p class="card-text">{{ court.address }}</p>
+                <p class="card-text">{{ court.display_address|default:court.address }}</p>
                 <div class="d-flex gap-1 mt-2 flex-wrap">
                     <span class="player-category">{{ court.surface }}</span>
                     {% if court.is_indoor %}

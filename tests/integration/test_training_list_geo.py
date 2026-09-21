@@ -81,7 +81,7 @@ class TrainingListGeographyTestCase(TestCase):
             city="Казань",
         )
 
-    def test_heading_lede_and_courts_list_same_cities(self) -> None:
+    def test_heading_and_area_picker_without_court_dump(self) -> None:
         response = self.client.get(reverse("training_list"), secure=True)
 
         self.assertEqual(response.status_code, 200)
@@ -90,56 +90,50 @@ class TrainingListGeographyTestCase(TestCase):
             response,
             "Москва, Раменское, Жуковский, Воскресенск и Павловский Посад",
         )
-        self.assertContains(response, "Корт ЮВАО")
-        self.assertContains(response, "Корт Раменское")
-        self.assertContains(response, "Корт Жуковский")
-        self.assertContains(response, "Корт Воскресенск")
-        self.assertContains(response, "Корт Павловский Посад")
+        self.assertContains(response, "Где вам удобно?")
+        self.assertContains(response, "Юг")
+        self.assertContains(response, "Раменское")
+        self.assertNotContains(response, 'name="city"')
+        self.assertNotContains(response, "Корт ЮВАО")
+        self.assertNotContains(response, "Корт Раменское")
         self.assertNotContains(response, "Корт Казань")
-
-    def test_city_filter_options_match_advertised_cities(self) -> None:
-        response = self.client.get(reverse("training_list"), secure=True)
-        html = response.content.decode()
-
-        self.assertIn('name="city"', html)
-        for city in (
-            "Москва",
-            "Раменское",
-            "Жуковский",
-            "Воскресенск",
-            "Павловский Посад",
-        ):
-            self.assertIn(f'value="{city}"', html)
-
-    def test_long_city_court_list_shows_more_toggle(self) -> None:
-        moscow_area = GeoArea.objects.get(slug="yug")
-        for index in range(1, 6):
-            _make_court(
-                name=f"Корт Москва {index}",
-                slug=f"court-moscow-{index}",
-                city="Москва",
-                region=GeoRegion.MOSCOW,
-                geo_area=moscow_area,
-            )
-
-        response = self.client.get(reverse("training_list"), secure=True)
-        html = response.content.decode()
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ещё...")
-        self.assertContains(response, 'class="training-geo__more-toggle"')
-        self.assertEqual(html.count('class="training-geo__more-toggle"'), 1)
-        self.assertIn("Корт Москва 1", html)
-        self.assertIn("Корт Москва 4", html)
-        self.assertIn("Корт Москва 5", html)
-        self.assertIn("training-geo__extra", html)
-
-    def test_short_city_court_list_hides_more_toggle(self) -> None:
-        response = self.client.get(reverse("training_list"), secure=True)
-
-        self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Ещё...")
         self.assertNotContains(response, 'class="training-geo__more-toggle"')
+
+    def test_selected_area_shows_only_its_courts(self) -> None:
+        response = self.client.get(
+            reverse("training_list"),
+            {"area": "yug"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Корт ЮВАО")
+        self.assertNotContains(response, "Корт Раменское")
+        self.assertNotContains(response, "Корт Казань")
+        self.assertContains(response, "data-court-search")
+
+    def test_legacy_area_slug_shows_current_district_courts(self) -> None:
+        response = self.client.get(
+            reverse("training_list"),
+            {"area": "yugo-vostok"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Корт ЮВАО")
+        self.assertNotContains(response, "Корт Раменское")
+
+    def test_unknown_area_hides_courts(self) -> None:
+        response = self.client.get(
+            reverse("training_list"),
+            {"area": "unknown"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Корт ЮВАО")
+        self.assertNotContains(response, "Корт Раменское")
 
 
 class TrainingEnrollCourtChoicesTestCase(TestCase):

@@ -1,9 +1,12 @@
 """
 Геокодирование адреса в координаты для кортов через Yandex Geocoder API.
-При указании города поиск ограничивается областью города (ll, spn, rspn=1), чтобы точка не уезжала за сотни км.
+Сначала ищем в области города (ll, spn, rspn=1). Если там только сам город,
+повторяем с мягким смещением к центру города (rspn=0) и берём дом/улицу,
+только если точка не уехала слишком далеко от hint_city.
 """
 
 import logging
+import math
 from typing import Any, cast
 
 import requests
@@ -19,8 +22,9 @@ REQUEST_HEADERS = {
 
 YANDEX_GEOCODER_URL = "https://geocode-maps.yandex.ru/v1/"
 
-# Размер области вокруг города (градусы: ~0.15 ≈ 15 км), чтобы ограничить поиск адреса
+# Жёсткая рамка ~15 км; мягкий повтор допускает ближнее Подмосковье, но не другой регион.
 CITY_SPAN_LON, CITY_SPAN_LAT = 0.15, 0.15
+FALLBACK_MAX_DEG = 0.45
 
 KIND_RANK = {
     "house": 1,
@@ -41,6 +45,9 @@ PRECISION_RANK = {
     "street": 5,
     "other": 6,
 }
+
+# Дом/улица — точное попадание; метро/район/город часто дают центр Москвы.
+PRECISE_GEO_KINDS = frozenset({"house", "street"})
 
 
 def _request_yandex(
@@ -137,6 +144,40 @@ def _pos_to_lat_lon(geo: dict) -> tuple[float | None, float | None]:
         return None, None
 
 
+def _geo_kind(geo: dict | None) -> str:
+    """Вернуть kind GeoObject (house, locality, province, ...)."""
+    if not geo:
+        return "other"
+    meta_prop = geo.get("metaDataProperty") or {}
+    if not isinstance(meta_prop, dict):
+        return "other"
+    meta = meta_prop.get("GeocoderMetaData") or {}
+    if not isinstance(meta, dict):
+        return "other"
+    return str(meta.get("kind") or "other")
+
+
+def _is_precise_geo(geo: dict | None) -> bool:
+    """True, если точка привязана к дому или улице, а не к центру города."""
+    return _geo_kind(geo) in PRECISE_GEO_KINDS
+
+
+def _deg_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Грубая дистанция в градусах, чтобы отсечь другой регион."""
+    return math.hypot(lat1 - lat2, lon1 - lon2)
+
+
+def _is_near_hint(geo: dict | None, hint_ll: tuple[float, float] | None) -> bool:
+    """True, если точка рядом с центром hint_city или подсказки нет."""
+    if hint_ll is None or not geo:
+        return True
+    lat, lon = _pos_to_lat_lon(geo)
+    if lat is None or lon is None:
+        return False
+    hint_lon, hint_lat = hint_ll
+    return _deg_distance(lat, lon, hint_lat, hint_lon) <= FALLBACK_MAX_DEG
+
+
 def _geocode_yandex(
     address: str,
     *,
@@ -147,8 +188,9 @@ def _geocode_yandex(
 ) -> tuple[float | None, float | None]:
     """
     Координаты через Yandex Geocoder API.
-    Если задан hint_city — сначала получаем центр города, затем ищем адрес только в этой области (rspn=1),
-    чтобы не получить точку в другом регионе с тем же названием улицы.
+    Если задан hint_city — сначала ищем в области города (~15 км), чтобы не уехать
+    в другой регион с той же улицей. Если в рамке находится только сам город
+    (типичный центр Москвы), повторяем с rspn=0 и берём дом/улицу рядом с городом.
     """
     if not api_key or not (address or "").strip():
         return None, None
@@ -170,6 +212,7 @@ def _geocode_yandex(
                 ll = (lon, lat)
                 spn = (CITY_SPAN_LON, CITY_SPAN_LAT)
 
+    used_bbox = ll is not None and spn is not None
     members = _request_yandex(
         geocode_query,
         api_key=api_key,
@@ -177,16 +220,32 @@ def _geocode_yandex(
         referer=referer,
         ll=ll,
         spn=spn,
-        rspn=1 if (ll and spn) else 0,
+        rspn=1 if used_bbox else 0,
     )
-    if not members and ll and spn:
-        # В области города ничего не нашли — пробуем без ограничения (на случай ошибки границ)
-        members = _request_yandex(
-            geocode_query, api_key=api_key, lang=lang, referer=referer
+    best = _pick_best_member(members) if members else None
+    if used_bbox and not _is_precise_geo(best):
+        # Рамка ~15 км часто возвращает locality «Москва» вместо дома в области.
+        fallback_members = _request_yandex(
+            geocode_query,
+            api_key=api_key,
+            lang=lang,
+            referer=referer,
+            ll=ll,
+            spn=spn,
+            rspn=0,
         )
-    if not members:
-        return None, None
-    best = _pick_best_member(members)
+        fallback_best = (
+            _pick_best_member(fallback_members) if fallback_members else None
+        )
+        if fallback_best and _is_near_hint(fallback_best, ll):
+            fallback_rank = KIND_RANK.get(_geo_kind(fallback_best), 99)
+            best_rank = KIND_RANK.get(_geo_kind(best), 99)
+            if (
+                _is_precise_geo(fallback_best)
+                or best is None
+                or fallback_rank < best_rank
+            ):
+                best = fallback_best
     if not best:
         return None, None
     return _pos_to_lat_lon(best)
@@ -276,7 +335,8 @@ def geocode_address(
 ) -> tuple[float | None, float | None]:
     """
     Преобразовать адрес в координаты (широта, долгота) через Yandex Geocoder API.
-    hint_city: если задан, поиск ограничивается областью этого города (~15 км), чтобы не получить точку в другом регионе.
+    hint_city сужает первый запрос областью города; если там находится только
+    сам город, а не дом/улица, повторяем поиск без рамки.
 
     :param address: Строка адреса (город, улица, дом).
     :param api_key: API-ключ Яндекса (обязателен для работы).

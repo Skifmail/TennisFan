@@ -2800,6 +2800,12 @@ form.club-filter-dropdown-open {
     min-width: 150px;
 }
 
+.court-list-search-btn {
+    flex: 0 0 auto;
+    min-height: 44px;
+    align-self: center;
+}
+
 .court-surface-filter__option {
     display: flex;
     align-items: center;

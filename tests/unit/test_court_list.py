@@ -41,6 +41,8 @@ class CourtListCatalogTestCase(TestCase):
         self.assertContains(response, "Видное")
         self.assertContains(response, "Москва")
         self.assertContains(response, 'name="q"')
+        self.assertContains(response, "Найти")
+        self.assertContains(response, 'type="submit"')
 
     def test_search_by_court_name(self) -> None:
         response = self.client.get(

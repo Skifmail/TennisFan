@@ -20,6 +20,7 @@
                 value="{{ current_query }}"
                 aria-label="Название корта"
                 autocomplete="off"
+                data-court-name-search
             >
             <input name="city" class="form-control" placeholder="Любой населённый пункт России" value="{{ current_city }}" onchange="this.form.submit()" aria-label="Населённый пункт">
             <div
@@ -59,6 +60,7 @@
                     {% endfor %}
                 </div>
             </div>
+            <button type="submit" class="btn btn-outline court-list-search-btn">Найти</button>
         </form>
         <a href="{% url 'court_application_create' %}" class="btn btn-primary btn--filter-size">Подать заявку на добавление корта</a>
     </div>
@@ -131,5 +133,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script defer src="{% static 'js/court_surface_filter.js' %}?v=20260903-1"></script>
+<script defer src="{% static 'js/court_surface_filter.js' %}?v=20260921-3"></script>
 {% endblock %}

@@ -114,4 +114,32 @@
     }
 
     document.querySelectorAll("[data-court-surface-filter]").forEach(initWrap);
+
+    function initNameSearch() {
+        var form = document.querySelector(".filter-bar");
+        if (!form) {
+            return;
+        }
+        var input = form.querySelector("[data-court-name-search]");
+        if (!input) {
+            return;
+        }
+        var timer = null;
+        var lastSubmitted = input.value;
+
+        input.addEventListener("input", function () {
+            if (timer) {
+                clearTimeout(timer);
+            }
+            timer = setTimeout(function () {
+                if (input.value === lastSubmitted) {
+                    return;
+                }
+                lastSubmitted = input.value;
+                form.submit();
+            }, 400);
+        });
+    }
+
+    initNameSearch();
 })();

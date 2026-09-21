@@ -175,7 +175,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         blank=True,
         default="",
         db_index=True,
-        help_text="Москва или область. Определяет набор доступных зон и городов.",
+        help_text="Москва или область. Определяет набор доступных районов и городов.",
     )
     geo_area = models.ForeignKey(
         "core.GeoArea",
@@ -183,8 +183,8 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         null=True,
         blank=True,
         related_name="tournaments",
-        verbose_name="Зона / город",
-        help_text="Зона Москвы или город области — по ней турнир попадает в рекламные страницы.",
+        verbose_name="Район / город",
+        help_text="Район Москвы или город области — по нему турнир попадает в рекламные страницы.",
     )
     court = models.ForeignKey(
         "courts.Court",
@@ -473,9 +473,9 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         return started + timedelta(hours=self.get_postpayment_deadline_hours())
 
     def resolve_geography(self) -> None:
-        """Определить регион и зону/город, если они не заданы вручную.
+        """Определить регион и район/город, если они не заданы вручную.
 
-        Порядок источников: название турнира (в московских названиях зона зашита
+        Порядок источников: название турнира (в московских названиях район зашит
         в текст), затем география корта. Уже заполненные поля не перезаписываются,
         поле ``Court.district`` не используется — данные в нём несогласованы.
         """
@@ -501,7 +501,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
                 self.region = area.region
 
     def clean(self) -> None:
-        """Проверить согласованность региона и выбранной зоны/города.
+        """Проверить согласованность региона и выбранного района/города.
 
         Raises:
             ValidationError: Если площадка относится к другому региону.

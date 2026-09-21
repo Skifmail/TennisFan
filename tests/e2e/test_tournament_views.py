@@ -143,7 +143,8 @@ class TournamentListCardStateTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Вы записаны")
         self.assertContains(response, "Регистрация закрыта")
-        self.assertNotContains(response, completed.name)
+        self.assertContains(response, completed.name)
+        self.assertContains(response, "Турнир завершён")
         self.assertContains(
             response,
             reverse("tournament_register", kwargs={"slug": open_tournament.slug}),
@@ -219,6 +220,36 @@ class TournamentListCardStateTestCase(TestCase):
         self.assertEqual(r_club.status_code, 200)
         self.assertContains(r_club, club_tm.name)
         self.assertNotContains(r_club, platform_tm.name)
+
+    def test_tournament_list_keeps_all_filter_fields_in_compact_panel(self) -> None:
+        response = self.client.get(reverse("tournament_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "tournaments-filters__toggle")
+        self.assertContains(response, "Фильтры")
+        self.assertContains(response, 'id="tournament-filter-region"')
+        self.assertContains(response, 'id="tournament-filter-area"')
+        self.assertContains(response, 'id="tournament-filter-variant"')
+        self.assertContains(response, 'id="tournament-filter-city"')
+        self.assertContains(response, 'id="tournament-filter-category"')
+        self.assertContains(response, 'id="tournament-filter-status"')
+        self.assertContains(response, 'id="club-filter-list-toggle"')
+        self.assertNotContains(response, "tournaments-filters__chip")
+        self.assertNotContains(response, "Сбросить")
+
+    def test_tournament_list_shows_active_filter_chips(self) -> None:
+        response = self.client.get(
+            reverse("tournament_list"),
+            {"status": "upcoming", "city": "Химки"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "tournaments-filters__chip")
+        self.assertContains(response, "Предстоящие")
+        self.assertContains(response, "Химки")
+        self.assertContains(response, "Сбросить")
+        self.assertContains(response, 'class="tournaments-filters__count"')
 
 
 class MyMatchesOrderingTestCase(TestCase):
@@ -300,6 +331,15 @@ class TournamentPublicListOrderingTestCase(TestCase):
             format="round_robin",
             status=TournamentStatus.CANCELLED,
         )
+        self.completed = Tournament.objects.create(
+            name="Завершённый Раменское тест",
+            slug="ordering-completed-rr",
+            city="Москва",
+            start_date=date.today() - timedelta(days=14),
+            end_date=date.today() - timedelta(days=7),
+            format="round_robin",
+            status=TournamentStatus.COMPLETED,
+        )
 
     def test_tournament_list_shows_active_before_upcoming(self) -> None:
         response = self.client.get(reverse("tournament_list"), secure=True)
@@ -320,6 +360,32 @@ class TournamentPublicListOrderingTestCase(TestCase):
         )
         self.assertLess(
             content.index(self.upcoming.name),
+            content.index(self.cancelled.name),
+        )
+
+    def test_tournament_list_shows_completed_before_cancelled(self) -> None:
+        older_completed = Tournament.objects.create(
+            name="Старый завершённый Подольск тест",
+            slug="ordering-completed-old-rr",
+            city="Москва",
+            start_date=date.today() - timedelta(days=40),
+            end_date=date.today() - timedelta(days=30),
+            format="round_robin",
+            status=TournamentStatus.COMPLETED,
+        )
+        response = self.client.get(reverse("tournament_list"), secure=True)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertLess(
+            content.index(self.upcoming.name),
+            content.index(self.completed.name),
+        )
+        self.assertLess(
+            content.index(self.completed.name),
+            content.index(older_completed.name),
+        )
+        self.assertLess(
+            content.index(older_completed.name),
             content.index(self.cancelled.name),
         )
 

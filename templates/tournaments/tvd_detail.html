@@ -120,7 +120,7 @@
                 </div>
                 {% if tournament.geo_area or tournament.region %}
                 <div class="tournament-meta-row">
-                    <span class="tournament-meta-label">{% if tournament.region == 'moscow_oblast' %}Город{% else %}Зона{% endif %}</span>
+                    <span class="tournament-meta-label">{% if tournament.region == 'moscow_oblast' %}Город{% else %}Район{% endif %}</span>
                     <span class="tournament-meta-value">
                         {% if tournament.geo_area %}{{ tournament.geo_area.name }}{% endif %}
                         {% if tournament.get_region_display %}

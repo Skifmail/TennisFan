@@ -10,7 +10,8 @@ from collections.abc import Iterable
 from typing import TypeAlias
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
-from django.db.models import Case, IntegerField, Q, QuerySet, When
+from django.db.models import Case, DateField, IntegerField, Q, QuerySet, Value, When
+from django.db.models.functions import Coalesce
 from django.urls import reverse
 
 from apps.clubs.models import (
@@ -68,9 +69,10 @@ def order_tournaments_active_first(
 ) -> QuerySet[Tournament]:
     """Сортировка публичных списков: «в игре» первыми, отменённые — в конце.
 
-    Сначала active / group_stage / playoffs, затем набор и завершённые,
-    отменённые всегда последние. Внутри группы — от новых к старым
-    (``-created_at``).
+    Сначала active / group_stage / playoffs, затем набор, затем завершённые
+    (позже завершённые выше), отменённые всегда последние. Внутри набора
+    и «в игре» — от новых к старым (``-created_at``). Дата завершения —
+    ``end_date``, при её отсутствии ``start_date``.
 
     Args:
         queryset (QuerySet[Tournament]): Исходный queryset турниров.
@@ -81,11 +83,26 @@ def order_tournaments_active_first(
     return queryset.annotate(
         _list_status_priority=Case(
             When(status__in=_IN_GAME_STATUSES, then=0),
-            When(status=TournamentStatus.CANCELLED, then=2),
+            When(status=TournamentStatus.UPCOMING, then=1),
+            When(status=TournamentStatus.COMPLETED, then=2),
+            When(status=TournamentStatus.CANCELLED, then=3),
             default=1,
             output_field=IntegerField(),
-        )
-    ).order_by("_list_status_priority", "-created_at", "-pk")
+        ),
+        _completed_sort=Case(
+            When(
+                status=TournamentStatus.COMPLETED,
+                then=Coalesce("end_date", "start_date"),
+            ),
+            default=Value(None),
+            output_field=DateField(),
+        ),
+    ).order_by(
+        "_list_status_priority",
+        "-_completed_sort",
+        "-created_at",
+        "-pk",
+    )
 
 
 def club_filter_choices_for_tournament_lists():

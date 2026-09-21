@@ -1,19 +1,27 @@
-"""Посадочные страницы турниров: регион, зона/город и формат в адресе.
+"""Посадочные страницы турниров: регион, район/город и формат в адресе.
 
 Реклама ведёт на конкретное направление, поэтому фильтры вынесены в путь, а не
 в query-параметры: адрес остаётся читаемым, страница индексируется и её можно
 подставить в объявление без потери контекста.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import cast
 
 from django.http import Http404
 from django.urls import reverse
 
-from apps.core.geo import GeoRegion, region_from_slug, region_to_slug
+from apps.core.geo import (
+    GeoRegion,
+    canonical_area_slug,
+    region_from_slug,
+    region_to_slug,
+)
 from apps.core.models import GeoArea
 
 from .models import TournamentVariant
+from .platform_home import CLUB_FILTER_CLUB_ONLY, CLUB_FILTER_PLATFORM
 
 #: Слаг формата в адресе → значение поля ``variant``.
 VARIANT_SLUGS: dict[str, str] = {
@@ -38,6 +46,19 @@ REGION_IN: dict[str, str] = {
     "moscow_oblast": "в Московской области",
 }
 
+#: Подписи фильтра статуса на каталоге (не архив).
+STATUS_FILTER_LABELS: dict[str, str] = {
+    "upcoming": "Предстоящие",
+    "active": "Активные",
+    "completed": "Завершённые",
+}
+
+#: Пресеты query-параметра ``club`` на каталоге.
+CLUB_FILTER_CHIP_LABELS: dict[str, str] = {
+    CLUB_FILTER_PLATFORM: "TennisFan",
+    CLUB_FILTER_CLUB_ONLY: "Только клубные",
+}
+
 
 @dataclass(frozen=True)
 class TournamentLanding:
@@ -45,7 +66,7 @@ class TournamentLanding:
 
     Attributes:
         region: Значение поля ``region`` или пустая строка для общего каталога.
-        area: Зона Москвы или город области, если страница сужена до неё.
+        area: Район Москвы или город области, если страница сужена до неё.
         variant: Значение поля ``variant`` или пустая строка для всех форматов.
     """
 
@@ -67,7 +88,7 @@ class TournamentLanding:
         """Собрать канонический адрес страницы.
 
         Returns:
-            str: Путь вида ``/tournaments/moscow/yugo-vostok/singles/``.
+            str: Путь вида ``/tournaments/moscow/yug/singles/``.
         """
         base = str(reverse("tournament_list"))
         if not self.region:
@@ -84,7 +105,7 @@ class TournamentLanding:
         """Собрать заголовок H1 страницы.
 
         Returns:
-            str: Например «Парные турниры по теннису в Москве, Юго-Восток».
+            str: Например «Парные турниры по теннису в Москве, Юг».
         """
         prefix = VARIANT_WORDS.get(self.variant, "Любительские")
         place = REGION_IN.get(self.region, "")
@@ -135,8 +156,84 @@ def variant_options() -> list[dict[str, str]]:
     ]
 
 
+def _option_label(slug: str, options: list[dict[str, str]]) -> str:
+    """Найти подпись опции по слагу.
+
+    Args:
+        slug: Выбранное значение фильтра.
+        options: Список словарей со ``slug`` и ``label``.
+
+    Returns:
+        str: Подпись опции либо сам слаг, если совпадения нет.
+    """
+    for option in options:
+        if option["slug"] == slug:
+            return option["label"]
+    return slug
+
+
+def build_tournament_filter_chips(
+    *,
+    current_region: str,
+    region_opts: list[dict[str, str]],
+    current_area_name: str,
+    current_variant: str,
+    variant_opts: list[dict[str, str]],
+    current_city: str,
+    current_category: str,
+    category_choices: Iterable[tuple[str, str]],
+    current_status: str,
+    is_archive: bool,
+    club_filter: str,
+    club_choices: Iterable[tuple[str, str]],
+) -> list[str]:
+    """Собрать короткие подписи активных фильтров для мобильной панели.
+
+    Пустые значения (все регионы, все форматы и т.д.) в чипы не попадают,
+    чтобы свёрнутая панель оставалась короткой.
+
+    Args:
+        current_region: Слаг выбранного региона.
+        region_opts: Опции фильтра региона.
+        current_area_name: Название выбранного района или города.
+        current_variant: Слаг выбранного формата.
+        variant_opts: Опции фильтра формата.
+        current_city: Строка населённого пункта.
+        current_category: Код уровня игроков.
+        category_choices: Пары ``(value, label)`` уровней.
+        current_status: Код статуса турнира.
+        is_archive: Архив всегда завершённые, чип статуса там не нужен.
+        club_filter: Слаг клуба или пресет ``__platform__`` / ``__club_only__``.
+        club_choices: Пары ``(slug, name)`` клубов.
+
+    Returns:
+        list[str]: Подписи в порядке полей формы.
+    """
+    chips: list[str] = []
+    if current_region:
+        chips.append(_option_label(current_region, region_opts))
+    if current_area_name:
+        chips.append(current_area_name)
+    if current_variant:
+        chips.append(_option_label(current_variant, variant_opts))
+    if current_city:
+        chips.append(current_city)
+    if current_category:
+        chips.append(dict(category_choices).get(current_category, current_category))
+    if current_status and not is_archive:
+        chips.append(STATUS_FILTER_LABELS.get(current_status, current_status))
+    if club_filter:
+        chips.append(
+            CLUB_FILTER_CHIP_LABELS.get(
+                club_filter,
+                dict(club_choices).get(club_filter, club_filter),
+            )
+        )
+    return chips
+
+
 def geo_area_choices(region: str = "") -> list[GeoArea]:
-    """Вернуть активные зоны и города для выпадающего списка фильтра.
+    """Вернуть активные районы и города для выпадающего списка фильтра.
 
     Args:
         region: Ограничить одним регионом; пустая строка — все регионы.
@@ -175,6 +272,36 @@ def _resolve_variant(variant_slug: str | None) -> str:
     return value
 
 
+def _active_area_by_slug(area_slug: str, region: str | None = None) -> GeoArea | None:
+    """Найти активную площадку по текущему или устаревшему слагу.
+
+    Ищем оба варианта, чтобы рекламные адреса не отдавали 404, если код
+    и миграция справочника выкатываются не одновременно.
+
+    Args:
+        area_slug: Слаг из адреса или query-параметра, уже в нижнем регистре.
+        region: Ограничить поиск одним регионом.
+
+    Returns:
+        GeoArea | None: Площадка с каноническим слагом, если она есть,
+        иначе запись со старым слагом.
+    """
+    if not area_slug:
+        return None
+    slugs = {area_slug, canonical_area_slug(area_slug)}
+    queryset = GeoArea.objects.filter(slug__in=slugs, is_active=True)
+    if region:
+        queryset = queryset.filter(region=region)
+    areas = list(queryset)
+    if not areas:
+        return None
+    wanted = canonical_area_slug(area_slug)
+    for area in areas:
+        if area.slug == wanted:
+            return cast(GeoArea, area)
+    return cast(GeoArea, areas[0])
+
+
 def resolve_landing(
     region_slug: str | None = None,
     area_slug: str | None = None,
@@ -184,7 +311,7 @@ def resolve_landing(
 
     Args:
         region_slug: Слаг региона из адреса или query-параметра.
-        area_slug: Слаг зоны Москвы либо города области.
+        area_slug: Слаг района Москвы либо города области.
         variant_slug: ``singles`` или ``doubles``.
 
     Returns:
@@ -204,9 +331,9 @@ def resolve_landing(
             return TournamentLanding(variant=variant)
         # Площадку можно выбрать в фильтре, не указав регион: слаги уникальны,
         # поэтому регион выводим из самой площадки.
-        area = GeoArea.objects.filter(slug=area_slug, is_active=True).first()
+        area = _active_area_by_slug(area_slug)
         if area is None:
-            raise Http404("Неизвестная зона или город")
+            raise Http404("Неизвестный район или город")
         return TournamentLanding(region=area.region, area=area, variant=variant)
 
     region = region_from_slug(region_slug)
@@ -215,21 +342,17 @@ def resolve_landing(
 
     area = None
     if area_slug:
-        area = GeoArea.objects.filter(
-            slug=area_slug,
-            region=region,
-            is_active=True,
-        ).first()
+        area = _active_area_by_slug(area_slug, region=region)
         if area is None:
-            raise Http404("Неизвестная зона или город")
+            raise Http404("Неизвестный район или город")
 
     return TournamentLanding(region=region, area=area, variant=variant)
 
 
 def iter_sitemap_landings() -> list[TournamentLanding]:
-    """Страницы каталога для sitemap: регионы, зоны/города и форматы.
+    """Страницы каталога для sitemap: регионы, районы/города и форматы.
 
-    Не плодим матрицу «каждая зона × каждый формат» как отдельные рекламные
+    Не плодим матрицу «каждый район × каждый формат» как отдельные рекламные
     направления: в индекс идут общий каталог (через static sitemap), регионы,
     регион+формат и регион+площадка. Новая площадка из справочника попадает
     сюда без правок кода.

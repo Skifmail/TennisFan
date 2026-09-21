@@ -33,6 +33,23 @@ class SparringToolbarCssTests(SimpleTestCase):
         self.assertNotIn("repeat(7, minmax(0, 1fr))", css)
         self.assertNotIn("minmax(10.25rem, 1fr)", css)
 
+    def test_tournaments_catalog_mobile_filters_collapse_into_drawer(self) -> None:
+        """На узком экране поля спрятаны, пока не открыта панель «Фильтры»."""
+        css_path = (
+            Path(settings.BASE_DIR)
+            / "static"
+            / "css"
+            / "pages"
+            / "tournaments-catalog.css"
+        )
+        css = css_path.read_text(encoding="utf-8")
+        self.assertIn(
+            ".tournaments-filters__drawer-check:checked ~ .tournaments-filters__panel",
+            css,
+        )
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", css)
+        self.assertIn("scroll-snap-type: x mandatory", css)
+
     def test_filter_grid_wraps_at_readable_min_width(self) -> None:
         """Сетка фильтров на главной не сжимается до 180px."""
         css_path = (

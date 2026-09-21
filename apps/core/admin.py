@@ -599,7 +599,7 @@ class CityAdmin(admin.ModelAdmin):
 
 @admin.register(GeoArea)
 class GeoAreaAdmin(admin.ModelAdmin):
-    """Зоны Москвы и города области: фильтры, лендинги и рекламные направления."""
+    """Районы Москвы и города области: фильтры, лендинги и рекламные направления."""
 
     list_display = (
         "name",

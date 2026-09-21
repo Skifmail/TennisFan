@@ -5,12 +5,13 @@ Courts views.
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.comments.models import Comment
 from apps.core.text_search import filter_field_contains_ci
 from apps.subscriptions.utils import user_can_read_comments, user_can_write_comments
+from apps.tournaments.models import Match
 from apps.users.models import Player
 
 from .forms import CourtApplicationForm
@@ -57,6 +58,36 @@ def court_list(request):
         or "Все покрытия",
     }
     return render(request, "courts/list.html", context)
+
+
+def matches_for_court(court: Court, *, limit: int = 10):
+    """Вернуть сыгранные матчи площадки.
+
+    На проде корт чаще стоит у турнира, а не у самого матча, поэтому
+    берём оба варианта: ``Match.court`` и ``Tournament.court``.
+
+    Args:
+        court: Площадка, для которой собираем ленту.
+        limit: Сколько последних матчей показать.
+
+    Returns:
+        QuerySet[Match]: Завершённые и технические матчи, новые сверху.
+    """
+    return (
+        Match.objects.filter(
+            Q(court=court) | Q(tournament__court=court),
+            status__in=(
+                Match.MatchStatus.COMPLETED,
+                Match.MatchStatus.WALKOVER,
+            ),
+        )
+        .select_related(
+            "tournament",
+            "player1__user",
+            "player2__user",
+        )
+        .order_by("-completed_datetime", "-scheduled_datetime", "-pk")[:limit]
+    )
 
 
 def court_detail(request, slug):
@@ -148,9 +179,7 @@ def court_detail(request, slug):
                 messages.success(request, "Комментарий и оценка сохранены.")
                 return redirect("court_detail", slug=court.slug)
 
-    recent_matches = court.matches.select_related(
-        "player1__user", "player2__user"
-    ).order_by("-scheduled_datetime")[:10]
+    recent_matches = matches_for_court(court)
 
     context = {
         "court": court,

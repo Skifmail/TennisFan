@@ -258,8 +258,8 @@
             {% for match in recent_matches %}
             <a href="{% url 'match_detail' pk=match.pk %}" class="match-card">
                 <div class="match-header">
-                    <span class="match-tournament">{{ match.tournament.name }}</span>
-                    <span class="match-date">{{ match.scheduled_datetime|date:"d.m.Y" }}</span>
+                    <span class="match-tournament">{% if match.tournament %}{{ match.tournament.name }}{% else %}Спарринг{% endif %}</span>
+                    <span class="match-date">{{ match.completed_datetime|default:match.scheduled_datetime|date:"d.m.Y" }}</span>
                 </div>
                 <div class="match-players">
                     <div class="match-player">

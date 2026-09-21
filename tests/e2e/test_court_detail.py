@@ -6,6 +6,8 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from apps.courts.models import Court
+from apps.tournaments.models import Match
+from tests.support.factories import make_player, make_tournament
 
 
 class CourtDetailParkingTestCase(TestCase):
@@ -139,3 +141,58 @@ class CourtDetailWorkingHoursTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "<dt>Время работы</dt>", html=False)
+
+
+class CourtDetailRecentMatchesTestCase(TestCase):
+    """Лента матчей берёт и корт турнира, не только Match.court."""
+
+    def test_shows_completed_matches_from_tournament_court(self) -> None:
+        court = Court.objects.create(
+            name="Теннисный центр Воскресенск",
+            slug="tennisniy-centr-voskresensk",
+            city="Воскресенск",
+            address="ул. Тестовая, 1",
+            surface="хард",
+            is_active=True,
+        )
+        other = Court.objects.create(
+            name="Другой корт",
+            slug="other-court-matches",
+            city="Москва",
+            address="ул. Другая, 1",
+            surface="хард",
+            is_active=True,
+        )
+        player1 = make_player(email_suffix="c1", first_name="Иван")
+        player2 = make_player(email_suffix="c2", first_name="Пётр")
+        tournament = make_tournament(
+            name="Турнир Воскресенск",
+            slug="voskresensk-court-feed",
+            court=court,
+        )
+        Match.objects.create(
+            tournament=tournament,
+            player1=player1,
+            player2=player2,
+            status=Match.MatchStatus.COMPLETED,
+            player1_set1=6,
+            player2_set1=4,
+            player1_set2=6,
+            player2_set2=3,
+        )
+
+        on_court = self.client.get(
+            reverse("court_detail", kwargs={"slug": court.slug}),
+            secure=True,
+        )
+        elsewhere = self.client.get(
+            reverse("court_detail", kwargs={"slug": other.slug}),
+            secure=True,
+        )
+
+        self.assertEqual(on_court.status_code, 200)
+        self.assertContains(on_court, "Турнир Воскресенск")
+        self.assertContains(on_court, "6:4 6:3")
+        self.assertNotContains(on_court, "Матчи на этом корте пока не проводились.")
+        self.assertContains(elsewhere, "Матчи на этом корте пока не проводились.")
+        self.assertNotContains(elsewhere, "Турнир Воскресенск")

@@ -450,6 +450,18 @@
     line-height: 1.55;
 }
 
+.club-dashboard-hero__summary-link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.22em;
+    text-decoration-color: rgba(201, 168, 76, 0.7);
+}
+
+.club-dashboard-hero__summary-link:hover {
+    color: #e8c56a;
+    text-decoration-color: currentColor;
+}
+
 .club-dashboard-hero__actions {
     display: flex;
     flex-wrap: wrap;

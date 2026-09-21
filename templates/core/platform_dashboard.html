@@ -18,7 +18,11 @@
                     <div class="club-dashboard-hero__copy">
                         <h1 class="page-title club-dashboard-page-header__title">Платформа TennisFan</h1>
                         <p class="club-dashboard-page-header__subtitle">Управление клубами, игроками, турнирами и денежным потоком платформы</p>
+                        {% if attention_items.0.action_url %}
+                        <p class="club-dashboard-hero__summary"><a href="{{ attention_items.0.action_url }}" class="club-dashboard-hero__summary-link">{{ status_summary }}</a></p>
+                        {% else %}
                         <p class="club-dashboard-hero__summary">{{ status_summary }}</p>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -278,7 +282,7 @@
                                     {% else %}
                                     <span class="club-dashboard-persona-item__name">{{ entry.name }}</span>
                                     {% endif %}
-                                    <span class="club-dashboard-persona-item__meta">до {{ entry.meta }}</span>
+                                    <span class="club-dashboard-persona-item__meta">{% if entry.meta_prefix %}{{ entry.meta_prefix }} {% endif %}{{ entry.meta }}</span>
                                 </li>
                                 {% endfor %}
                             </ul>

@@ -11,25 +11,33 @@ from typing import Any, cast
 
 from django import forms
 from django.contrib import admin, messages
+from django.contrib.admin.views.autocomplete import AutocompleteJsonView
 from django.contrib.admin.widgets import AutocompleteSelect
 from django.db.models import Count, Q, QuerySet, Sum
 from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
-from django.urls import path
+from django.urls import path, reverse
 from django.utils import timezone
+from django.utils.html import format_html_join
+from django.utils.safestring import mark_safe
 
 from apps.tournaments.admin import TournamentAdmin
 from apps.tournaments.platform_home import order_with_cancelled_last
+from apps.users.display import format_user_admin_label
 from apps.users.models import User
 
 from .models import (
     Club,
     ClubFeePayment,
     ClubInviteLink,
+    ClubJoinRequest,
+    ClubJoinRequestStatus,
     ClubLegalDocument,
     ClubMember,
     ClubMemberPlan,
+    ClubMemberRole,
     ClubMembershipFee,
+    ClubMemberStatus,
     ClubNotificationConfig,
     ClubNotificationSettings,
     ClubPlanSlotUsage,
@@ -46,7 +54,12 @@ from .models import (
     PlatformPlan,
     PlatformSettings,
 )
-from .services import assign_club_administrator, log_platform_action
+from .services import (
+    approve_club_join_request,
+    assign_club_administrator,
+    log_platform_action,
+    reject_club_join_request,
+)
 
 # ---------------------------------------------------------------------------
 # Search helpers (регистронезависимый поиск по кириллице + телефоны)
@@ -207,10 +220,35 @@ class CurrentPlanFilter(admin.SimpleListFilter):
 # ---------------------------------------------------------------------------
 
 
+class NamedUserAutocompleteSelect(AutocompleteSelect):
+    """Autocomplete пользователей с отдельным URL, где в подписи есть имя."""
+
+    url_name = "%s:clubs_named_user_autocomplete"
+
+
+class NamedUserAutocompleteJsonView(AutocompleteJsonView):
+    """JSON для выбора пользователя: «Имя Фамилия — email»."""
+
+    def serialize_result(self, obj: User, to_field_name: str) -> dict[str, str]:
+        """Вернуть id и подпись пользователя для Select2."""
+        return {
+            "id": str(getattr(obj, to_field_name)),
+            "text": format_user_admin_label(obj),
+        }
+
+
+class NamedUserChoiceField(forms.ModelChoiceField):
+    """Поле выбора пользователя с именем и email в подписи."""
+
+    def label_from_instance(self, obj: User) -> str:
+        """Подпись выбранного пользователя."""
+        return format_user_admin_label(obj)
+
+
 class ClubAdminForm(forms.ModelForm):
     """Форма клуба с полем назначения администратора."""
 
-    new_admin = forms.ModelChoiceField(
+    new_admin = NamedUserChoiceField(
         label="Добавить администратора",
         queryset=User.objects.filter(is_active=True).order_by("email"),
         required=False,
@@ -218,7 +256,7 @@ class ClubAdminForm(forms.ModelForm):
             "Выберите пользователя платформы. Он станет администратором этого клуба. "
             "Если пользователь уже участник — его роль будет повышена."
         ),
-        widget=AutocompleteSelect(
+        widget=NamedUserAutocompleteSelect(
             ClubMember._meta.get_field("user"),
             admin.site,
         ),
@@ -252,6 +290,7 @@ class ClubAdmin(admin.ModelAdmin):
         "created_at",
         "members_count_display",
         "tournaments_count_display",
+        "current_admins_display",
     )
     inlines = [
         ClubSubscriptionInline,
@@ -271,17 +310,19 @@ class ClubAdmin(admin.ModelAdmin):
         fieldsets = list(super().get_fieldsets(request, obj))
         heading, options = fieldsets[0]
         fields = tuple(
-            field for field in options.get("fields", ()) if field != "new_admin"
+            field
+            for field in options.get("fields", ())
+            if field not in {"new_admin", "current_admins_display"}
         )
         fieldsets[0] = (heading, {**options, "fields": fields})
         return [
             (
                 "Администратор клуба",
                 {
-                    "fields": ("new_admin",),
+                    "fields": ("current_admins_display", "new_admin"),
                     "description": (
-                        "Выберите пользователя платформы — он получит роль "
-                        "администратора клуба. Если он уже участник, роль будет повышена."
+                        "Текущие администраторы клуба. Чтобы добавить ещё одного, "
+                        "выберите пользователя ниже и сохраните клуб."
                     ),
                 },
             ),
@@ -336,6 +377,13 @@ class ClubAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         custom_urls = [
+            path(
+                "named-user-autocomplete/",
+                self.admin_site.admin_view(
+                    NamedUserAutocompleteJsonView.as_view(admin_site=self.admin_site)
+                ),
+                name="clubs_named_user_autocomplete",
+            ),
             path(
                 "financial-summary/",
                 self.admin_site.admin_view(self.financial_summary_view),
@@ -415,6 +463,33 @@ class ClubAdmin(admin.ModelAdmin):
     @admin.display(description="Турниров", ordering="_tournaments_count")
     def tournaments_count_display(self, obj: Club) -> int:
         return getattr(obj, "_tournaments_count", 0)
+
+    @admin.display(description="Текущие администраторы")
+    def current_admins_display(self, obj: Club) -> str:
+        """Показать активных администраторов клуба с именем и email."""
+        if not obj.pk:
+            return "—"
+        admins = (
+            obj.members.filter(
+                role=ClubMemberRole.ADMIN,
+                status=ClubMemberStatus.ACTIVE,
+            )
+            .select_related("user")
+            .order_by("user__last_name", "user__first_name", "user__email")
+        )
+        items = [
+            (
+                reverse("admin:users_user_change", args=[member.user.pk]),
+                format_user_admin_label(member.user),
+            )
+            for member in admins
+        ]
+        if not items:
+            return "Не назначены"
+        return cast(
+            str,
+            format_html_join(mark_safe("<br>"), '<a href="{}">{}</a>', items),
+        )
 
     @admin.display(description="Тариф")
     def current_plan_display(self, obj: Club) -> str:
@@ -649,6 +724,128 @@ class ClubInviteLinkAdmin(admin.ModelAdmin):
     @admin.display(description="Токен")
     def token_short(self, obj: ClubInviteLink) -> str:
         return f"{obj.token[:12]}..." if obj.token else "—"
+
+
+@admin.register(ClubJoinRequest)
+class ClubJoinRequestAdmin(admin.ModelAdmin):
+    """Админка заявок игроков на вступление в клуб."""
+
+    list_display = (
+        "user_display",
+        "club",
+        "status",
+        "message",
+        "created_at",
+        "reviewed_by_display",
+        "reviewed_at",
+    )
+    list_filter = ("status", "club")
+    search_fields = (
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+        "club__name",
+        "message",
+    )
+    raw_id_fields = ("user", "club", "reviewed_by")
+    readonly_fields = (
+        "club",
+        "user",
+        "status",
+        "message",
+        "reviewed_by",
+        "reviewed_at",
+        "created_at",
+        "updated_at",
+    )
+    date_hierarchy = "created_at"
+    actions = ["approve_selected", "reject_selected"]
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Заявки создаются игроками на публичной странице клуба."""
+        return False
+
+    def has_delete_permission(
+        self, request: HttpRequest, obj: ClubJoinRequest | None = None
+    ) -> bool:
+        """Удаление скрывает заявку без уведомления игрока."""
+        return False
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[ClubJoinRequest]:
+        """Подгрузить игрока, клуб и рецензента для списка заявок."""
+        return (
+            super().get_queryset(request).select_related("user", "club", "reviewed_by")
+        )
+
+    def _review_selected(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[ClubJoinRequest],
+        *,
+        approve: bool,
+    ) -> None:
+        """Одобрить или отклонить выбранные pending-заявки."""
+        done = 0
+        skipped = 0
+        for join_request in queryset:
+            if join_request.status != ClubJoinRequestStatus.PENDING:
+                skipped += 1
+                continue
+            try:
+                if approve:
+                    dashboard_url = request.build_absolute_uri(
+                        reverse(
+                            "clubs:dashboard",
+                            kwargs={"slug": join_request.club.slug},
+                        )
+                    )
+                    approve_club_join_request(
+                        join_request,
+                        reviewed_by=request.user,
+                        dashboard_url=dashboard_url,
+                    )
+                else:
+                    reject_club_join_request(join_request, reviewed_by=request.user)
+            except ValueError:
+                skipped += 1
+                continue
+            done += 1
+        verb = "Одобрено" if approve else "Отклонено"
+        if done:
+            self.message_user(request, f"{verb} заявок: {done}.")
+        if skipped:
+            self.message_user(
+                request,
+                f"Пропущено уже обработанных: {skipped}.",
+                level=messages.WARNING,
+            )
+
+    @admin.display(description="Игрок", ordering="user__last_name")
+    def user_display(self, obj: ClubJoinRequest) -> str:
+        """Имя и email игрока."""
+        return format_user_admin_label(obj.user)
+
+    @admin.display(description="Кто обработал", ordering="reviewed_by__last_name")
+    def reviewed_by_display(self, obj: ClubJoinRequest) -> str:
+        """Имя обработавшего заявку или прочерк."""
+        if obj.reviewed_by is None:
+            return "—"
+        return format_user_admin_label(obj.reviewed_by)
+
+    @admin.action(description="Одобрить выбранные заявки")
+    def approve_selected(
+        self, request: HttpRequest, queryset: QuerySet[ClubJoinRequest]
+    ) -> None:
+        """Одобрить pending-заявки и добавить игроков в клубы."""
+        self._review_selected(request, queryset, approve=True)
+
+    @admin.action(description="Отклонить выбранные заявки")
+    def reject_selected(
+        self, request: HttpRequest, queryset: QuerySet[ClubJoinRequest]
+    ) -> None:
+        """Отклонить pending-заявки без добавления в клуб."""
+        self._review_selected(request, queryset, approve=False)
 
 
 @admin.register(ClubMembershipFee)

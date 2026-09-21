@@ -20,3 +20,23 @@ class DisplayNameFormatTestCase(TestCase):
         self.assertEqual(user.get_display_name(), "Кристина Козубова")
         self.assertEqual(player.get_display_name(), "Кристина Козубова")
         self.assertEqual(str(player), "Кристина Козубова")
+
+    def test_user_admin_label_includes_name_and_email(self) -> None:
+        from apps.users.display import format_user_admin_label
+
+        user = User.objects.create_user(
+            email="admin-label@test.local",
+            password="x",
+            first_name="Иван",
+            last_name="Петров",
+        )
+        nameless = User.objects.create_user(
+            email="no-name@test.local",
+            password="x",
+        )
+
+        self.assertEqual(
+            format_user_admin_label(user),
+            "Иван Петров — admin-label@test.local",
+        )
+        self.assertEqual(format_user_admin_label(nameless), "no-name@test.local")

@@ -45,7 +45,7 @@
         <section class="training-geo" aria-label="Районы и города">
             <div class="training-geo__head">
                 <h2 class="training-geo__title">Где вам удобно?</h2>
-                <p class="training-geo__hint">Район Москвы или город области.</p>
+                <p class="training-geo__hint">Район Москвы, город области или другой город с тренировками.</p>
             </div>
             <div class="training-browse__actions">
                 <a href="{% url 'coach_list' %}" class="training-browse__action">Наши тренеры</a>
@@ -115,6 +115,9 @@
                     {% for sl in training.skill_levels_display %}
                     <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ sl }}</span>
                     {% endfor %}
+                    {% if training.city %}
+                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ training.city }}</span>
+                    {% endif %}
                 </div>
                 <h3 class="card-title">{{ training.title }}</h3>
                 <p class="card-text">{{ training.short_description|default:training.description|truncatewords:15 }}</p>

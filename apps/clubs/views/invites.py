@@ -12,8 +12,6 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from apps.users.models import Notification
-
 from ..forms import ClubInviteImportForm, ClubInviteLinkForm, InviteByEmailForm
 from ..models import (
     Club,
@@ -26,7 +24,11 @@ from ..models import (
     ClubRating,
 )
 from ..notifications import send_club_invite_email, send_new_member_notification
-from ..services import club_can_add_member
+from ..services import (
+    approve_club_join_request,
+    club_can_add_member,
+    reject_club_join_request,
+)
 from .helpers import _get_club_and_check_manage, _resolve_club_manage, logger
 
 INVITE_ACTION_CREATE_LINK = "create_link"
@@ -378,45 +380,18 @@ def join_request_approve(request: HttpRequest, slug: str, pk: int) -> HttpRespon
         status=ClubJoinRequestStatus.PENDING,
     )
 
-    member, created = ClubMember.objects.get_or_create(
-        club=club,
-        user=join_request.user,
-        defaults={
-            "role": ClubMemberRole.PLAYER,
-            "status": ClubMemberStatus.ACTIVE,
-            "invited_by": request.user,
-            "joined_at": timezone.now(),
-        },
+    dashboard_url = request.build_absolute_uri(
+        reverse("clubs:dashboard", kwargs={"slug": club.slug})
     )
-    if not created:
-        member.role = ClubMemberRole.PLAYER
-        member.status = ClubMemberStatus.ACTIVE
-        member.invited_by = request.user
-        member.joined_at = timezone.now()
-        member.save(update_fields=["role", "status", "invited_by", "joined_at"])
-
-    ClubRating.objects.get_or_create(club=club, member=member, defaults={"points": 0})
-
-    join_request.status = ClubJoinRequestStatus.APPROVED
-    join_request.reviewed_by = request.user
-    join_request.reviewed_at = timezone.now()
-    join_request.save(
-        update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"]
-    )
-
-    Notification.objects.create(
-        user=join_request.user,
-        message=f"Ваша заявка на вступление в клуб «{club.name}» одобрена.",
-        url=reverse("clubs:club_public_detail", kwargs={"slug": club.slug}),
-    )
-
     try:
-        dashboard_url = request.build_absolute_uri(
-            reverse("clubs:dashboard", kwargs={"slug": club.slug})
+        approve_club_join_request(
+            join_request,
+            reviewed_by=request.user,
+            dashboard_url=dashboard_url,
         )
-        send_new_member_notification(club, member, dashboard_url=dashboard_url)
-    except Exception:
-        logger.exception("Ошибка отправки уведомления о новом участнике")
+    except ValueError:
+        messages.error(request, "Заявка уже обработана.")
+        return redirect("clubs:invites_list", slug=slug)
 
     messages.success(request, "Заявка одобрена. Игрок добавлен в клуб.")
     return redirect("clubs:invites_list", slug=slug)
@@ -437,18 +412,11 @@ def join_request_reject(request: HttpRequest, slug: str, pk: int) -> HttpRespons
         club=club,
         status=ClubJoinRequestStatus.PENDING,
     )
-    join_request.status = ClubJoinRequestStatus.REJECTED
-    join_request.reviewed_by = request.user
-    join_request.reviewed_at = timezone.now()
-    join_request.save(
-        update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"]
-    )
-
-    Notification.objects.create(
-        user=join_request.user,
-        message=f"Ваша заявка на вступление в клуб «{club.name}» отклонена.",
-        url=reverse("clubs:club_public_detail", kwargs={"slug": club.slug}),
-    )
+    try:
+        reject_club_join_request(join_request, reviewed_by=request.user)
+    except ValueError:
+        messages.error(request, "Заявка уже обработана.")
+        return redirect("clubs:invites_list", slug=slug)
 
     messages.success(request, "Заявка отклонена.")
     return redirect("clubs:invites_list", slug=slug)

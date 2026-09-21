@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Тренировки для взрослых{% endblock %}
 
@@ -13,12 +14,9 @@
 
 <div class="container">
     <form method="get" class="filter-bar">
-        <select name="city" class="form-control" onchange="this.form.submit()" aria-label="Населённый пункт">
-            <option value="">Все населённые пункты</option>
-            {% for city in training_cities %}
-            <option value="{{ city }}" {% if current_city == city %}selected{% endif %}>{{ city }}</option>
-            {% endfor %}
-        </select>
+        {% if current_area %}
+        <input type="hidden" name="area" value="{{ current_area }}">
+        {% endif %}
         <select name="type" class="form-control" onchange="this.form.submit()">
             <option value="">Все типы</option>
             <option value="individual" {% if current_type == 'individual' %}selected{% endif %}>Индивидуальные</option>
@@ -42,48 +40,52 @@
         {% if not user_is_coach %}<a href="{% url 'coach_application_create' %}" class="btn btn-primary btn--filter-size">Стать тренером</a>{% endif %}
     </div>
 
-    <section class="training-geo" aria-label="Населённые пункты и корты">
-        {% if training_courts_has_more %}
-        <input type="checkbox" id="training-geo-more" class="training-geo__more-input">
-        {% endif %}
-        <h2 class="training-geo__title">Корты</h2>
-        <div class="training-geo__cities">
-            {% for group in training_city_groups %}
-            <div class="training-geo__city">
-                <h3 class="training-geo__city-name">{{ group.city }}</h3>
-                {% if group.courts %}
-                <ul class="training-geo__courts">
-                    {% for court in group.courts|slice:":4" %}
+    <section class="training-geo" aria-label="Районы и города">
+        <h2 class="training-geo__title">Где вам удобно?</h2>
+        <p class="training-geo__hint">Выберите район Москвы или город области — покажем площадки рядом.</p>
+        <div class="training-geo__groups">
+            {% for group in training_area_groups %}
+            <div class="training-geo__group">
+                <h3 class="training-geo__group-title">{{ group.label }}</h3>
+                <ul class="training-geo__areas">
+                    {% for area in group.areas %}
                     <li>
-                        <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>
+                        <a
+                            href="{% url 'training_list' %}{{ area.url }}"
+                            class="training-geo__area{% if area.is_active %} is-active{% endif %}"
+                            {% if area.is_active %}aria-current="true"{% endif %}
+                        >{{ area.name }}</a>
                     </li>
                     {% endfor %}
                 </ul>
-                {% if group.courts|length > 4 %}
-                <div class="training-geo__extra">
-                    <div class="training-geo__extra-clip">
-                        <ul class="training-geo__courts">
-                            {% for court in group.courts|slice:"4:" %}
-                            <li>
-                                <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </div>
-                {% endif %}
-                {% else %}
-                <p class="training-geo__empty">Площадку уточним при записи.</p>
-                {% endif %}
             </div>
             {% endfor %}
         </div>
-        {% if training_courts_has_more %}
-        <div class="training-geo__more">
-            <label for="training-geo-more" class="training-geo__more-toggle">
-                <span class="training-geo__more-label">Ещё...</span>
-                <span class="training-geo__more-label training-geo__more-label--open">Свернуть</span>
+        {% if selected_area %}
+        <div class="training-geo__courts-panel">
+            <h3 class="training-geo__courts-title">{{ selected_area.name }}</h3>
+            {% if selected_courts %}
+            <label class="training-geo__search">
+                <input
+                    type="search"
+                    class="form-control"
+                    placeholder="Найти корт по названию"
+                    aria-label="Найти корт по названию"
+                    data-court-search
+                    autocomplete="off"
+                >
             </label>
+            <ul class="training-geo__courts" data-court-search-list>
+                {% for court in selected_courts %}
+                <li data-court-search-item data-court-name="{{ court.name|lower }}">
+                    <a href="{% url 'court_detail' slug=court.slug %}">{{ court.name }}</a>
+                </li>
+                {% endfor %}
+            </ul>
+            <p class="training-geo__empty" data-court-search-empty hidden>Ничего не найдено.</p>
+            {% else %}
+            <p class="training-geo__empty">Площадку уточним при записи.</p>
+            {% endif %}
         </div>
         {% endif %}
     </section>
@@ -124,4 +126,8 @@
         {% endfor %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script defer src="{% static 'js/training_geo_search.js' %}?v=20260921-1"></script>
 {% endblock %}

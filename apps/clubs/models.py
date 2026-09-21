@@ -1205,6 +1205,7 @@ class PlatformAuditAction(models.TextChoices):
     CLUB_AUTO_SUSPENDED = "club_auto_suspended", "Клуб автоматически приостановлен"
     CLUB_AUTO_DELETED = "club_auto_deleted", "Клуб автоматически удалён"
     SETTINGS_CHANGED = "settings_changed", "Настройки платформы изменены"
+    CLUB_ADMIN_ASSIGNED = "club_admin_assigned", "Назначен администратор клуба"
 
 
 class PlatformAuditLog(models.Model):

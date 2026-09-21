@@ -3,6 +3,7 @@ Training views.
 """
 
 import logging
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -12,6 +13,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.decorators import login_required_with_message
+from apps.core.geo import GeoRegion, canonical_area_slug
 from apps.core.metrika import (
     COACH_APPLICATION_SUCCESS,
     TRAINING_ENROLL_SUCCESS,
@@ -25,9 +27,10 @@ from .forms import (
     TrainingForm,
 )
 from .geo import (
+    advertised_training_areas,
     advertised_training_cities,
+    courts_for_training_area,
     format_city_list,
-    group_training_courts,
 )
 from .models import (
     Coach,
@@ -36,6 +39,20 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _training_list_query(**params: str) -> str:
+    """Собрать query string фильтров списка тренировок.
+
+    Args:
+        **params: Параметры фильтра. Пустые значения отбрасываются.
+
+    Returns:
+        str: Строка вида ``?area=yug`` либо пустая строка.
+    """
+    cleaned = {key: value for key, value in params.items() if value}
+    encoded = urlencode(cleaned)
+    return f"?{encoded}" if encoded else ""
 
 
 def _visible_coaches():
@@ -49,7 +66,7 @@ def training_list(request):
     """Список тренировок. Доступен всем пользователям."""
     skill_level = request.GET.get("level", "")
     training_type = request.GET.get("type", "")
-    city = (request.GET.get("city") or "").strip()
+    area_slug = canonical_area_slug((request.GET.get("area") or "").strip().lower())
 
     trainings = Training.objects.filter(is_active=True).select_related("coach")
 
@@ -58,24 +75,58 @@ def training_list(request):
     if training_type:
         # type_prices — словарь {type: price}, фильтруем по наличию ключа
         trainings = trainings.filter(type_prices__has_key=training_type)
-    if city:
-        trainings = filter_field_contains_ci(
-            trainings, "city", city, annotation="_trn_list_city_l"
-        )
 
     training_cities = advertised_training_cities()
-    training_city_groups = group_training_courts(city_filter=city)
+    areas = advertised_training_areas()
+    selected_area = next((area for area in areas if area.slug == area_slug), None)
+
+    area_options: list[dict[str, str | bool]] = []
+    for area in areas:
+        is_active = selected_area is not None and selected_area.slug == area.slug
+        area_options.append(
+            {
+                "name": area.name,
+                "slug": area.slug,
+                "region": area.region,
+                "is_active": is_active,
+                "url": _training_list_query(
+                    area="" if is_active else area.slug,
+                    type=training_type,
+                    level=skill_level,
+                ),
+            }
+        )
+    area_groups = [
+        {
+            "label": str(GeoRegion.MOSCOW.label),
+            "areas": [
+                option
+                for option in area_options
+                if option["region"] == GeoRegion.MOSCOW
+            ],
+        },
+        {
+            "label": str(GeoRegion.MOSCOW_OBLAST.label),
+            "areas": [
+                option
+                for option in area_options
+                if option["region"] == GeoRegion.MOSCOW_OBLAST
+            ],
+        },
+    ]
+    area_groups = [group for group in area_groups if group["areas"]]
+
     context = {
         "trainings": trainings,
         "current_level": skill_level,
         "current_type": training_type,
-        "current_city": city,
-        "training_cities": training_cities,
-        "training_cities_label": format_city_list(training_cities),
-        "training_city_groups": training_city_groups,
-        "training_courts_has_more": any(
-            len(group.courts) > 4 for group in training_city_groups
+        "current_area": selected_area.slug if selected_area else "",
+        "selected_area": selected_area,
+        "selected_courts": (
+            courts_for_training_area(selected_area.slug, areas) if selected_area else ()
         ),
+        "training_cities_label": format_city_list(training_cities),
+        "training_area_groups": area_groups,
     }
     return render(request, "training/list.html", context)
 

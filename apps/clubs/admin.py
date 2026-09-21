@@ -9,7 +9,9 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import Any, cast
 
+from django import forms
 from django.contrib import admin, messages
+from django.contrib.admin.widgets import AutocompleteSelect
 from django.db.models import Count, Q, QuerySet, Sum
 from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
@@ -18,6 +20,7 @@ from django.utils import timezone
 
 from apps.tournaments.admin import TournamentAdmin
 from apps.tournaments.platform_home import order_with_cancelled_last
+from apps.users.models import User
 
 from .models import (
     Club,
@@ -43,7 +46,7 @@ from .models import (
     PlatformPlan,
     PlatformSettings,
 )
-from .services import log_platform_action
+from .services import assign_club_administrator, log_platform_action
 
 # ---------------------------------------------------------------------------
 # Search helpers (регистронезависимый поиск по кириллице + телефоны)
@@ -204,10 +207,33 @@ class CurrentPlanFilter(admin.SimpleListFilter):
 # ---------------------------------------------------------------------------
 
 
+class ClubAdminForm(forms.ModelForm):
+    """Форма клуба с полем назначения администратора."""
+
+    new_admin = forms.ModelChoiceField(
+        label="Добавить администратора",
+        queryset=User.objects.filter(is_active=True).order_by("email"),
+        required=False,
+        help_text=(
+            "Выберите пользователя платформы. Он станет администратором этого клуба. "
+            "Если пользователь уже участник — его роль будет повышена."
+        ),
+        widget=AutocompleteSelect(
+            ClubMember._meta.get_field("user"),
+            admin.site,
+        ),
+    )
+
+    class Meta:
+        model = Club
+        fields = "__all__"
+
+
 @admin.register(Club)
 class ClubAdmin(admin.ModelAdmin):
     """Расширенная админка клуба для platform_admin."""
 
+    form = ClubAdminForm
     change_list_template = "admin/clubs/club_changelist.html"
     list_display = (
         "name",
@@ -235,6 +261,78 @@ class ClubAdmin(admin.ModelAdmin):
         ClubLegalDocumentInline,
     ]
     actions = ["block_clubs", "unblock_clubs", "reset_trial"]
+
+    def get_fieldsets(
+        self,
+        request: HttpRequest,
+        obj: Club | None = None,
+    ) -> list[tuple[str | None, dict[str, Any]]]:
+        """Вынести назначение администратора в отдельный блок в начале формы."""
+        fieldsets = list(super().get_fieldsets(request, obj))
+        heading, options = fieldsets[0]
+        fields = tuple(
+            field for field in options.get("fields", ()) if field != "new_admin"
+        )
+        fieldsets[0] = (heading, {**options, "fields": fields})
+        return [
+            (
+                "Администратор клуба",
+                {
+                    "fields": ("new_admin",),
+                    "description": (
+                        "Выберите пользователя платформы — он получит роль "
+                        "администратора клуба. Если он уже участник, роль будет повышена."
+                    ),
+                },
+            ),
+            *fieldsets,
+        ]
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: Club,
+        form: forms.ModelForm,
+        change: bool,
+    ) -> None:
+        """Сохранить клуб и при необходимости назначить администратора."""
+        super().save_model(request, obj, form, change)
+        new_admin = form.cleaned_data.get("new_admin")
+        if not new_admin:
+            return
+        _member, kind = assign_club_administrator(
+            obj,
+            new_admin,
+            reviewed_by=request.user,
+        )
+        if kind == "already_admin":
+            self.message_user(
+                request,
+                f"Пользователь {new_admin.email} уже является администратором клуба.",
+                messages.INFO,
+            )
+            return
+        log_platform_action(
+            actor=request.user,
+            action="club_admin_assigned",
+            club=obj,
+            details=f"Администратор: {new_admin.email} (id={new_admin.pk})",
+        )
+        if kind == "created":
+            self.message_user(
+                request,
+                f"Пользователь {new_admin.email} назначен администратором клуба.",
+                messages.SUCCESS,
+            )
+            return
+        self.message_user(
+            request,
+            (
+                f"Пользователь {new_admin.email} уже был участником "
+                "и повышен до администратора."
+            ),
+            messages.SUCCESS,
+        )
 
     def get_urls(self):
         custom_urls = [
@@ -430,7 +528,8 @@ class ClubMemberAdmin(admin.ModelAdmin):
         "user__phone",
         "club__name",
     )
-    raw_id_fields = ("user", "invited_by")
+    autocomplete_fields = ("user",)
+    raw_id_fields = ("invited_by",)
     readonly_fields = ("created_at",)
 
     @admin.display(description="Email", ordering="user__email")

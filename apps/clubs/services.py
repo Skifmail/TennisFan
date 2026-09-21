@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from calendar import monthrange
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from django.db import transaction
 from django.db.models import Count, Q
@@ -300,6 +300,80 @@ def create_club_with_trial(data: dict[str, Any], user: AbstractUser) -> Club:
         pass
 
     return club
+
+
+def assign_club_administrator(
+    club: Club,
+    user: AbstractUser,
+    *,
+    reviewed_by: AbstractUser | None = None,
+) -> tuple[ClubMember, Literal["created", "promoted", "already_admin"]]:
+    """
+    Назначает пользователя администратором клуба.
+
+    Если участника ещё нет — создаёт активную запись с ролью ADMIN и рейтинг.
+    Если запись есть — повышает роль до ADMIN и активирует участие.
+    Открытые заявки на вступление этого пользователя закрываются как одобренные,
+    чтобы их последующее одобрение не сбросило роль до игрока.
+
+    Args:
+        club: Клуб, которому назначается администратор.
+        user: Пользователь платформы.
+        reviewed_by: Кто назначил администратора (для закрытия заявок).
+
+    Returns:
+        Кортеж ``(участник, вид изменения)``: ``created``, ``promoted``
+        или ``already_admin``.
+    """
+    now = timezone.now()
+    with transaction.atomic():
+        member, created = ClubMember.objects.select_for_update().get_or_create(
+            club=club,
+            user=user,
+            defaults={
+                "role": ClubMemberRole.ADMIN,
+                "status": ClubMemberStatus.ACTIVE,
+                "joined_at": now,
+            },
+        )
+        kind: Literal["created", "promoted", "already_admin"]
+        if created:
+            kind = "created"
+        else:
+            already_admin = (
+                member.role == ClubMemberRole.ADMIN
+                and member.status == ClubMemberStatus.ACTIVE
+            )
+            update_fields: list[str] = []
+            if member.role != ClubMemberRole.ADMIN:
+                member.role = ClubMemberRole.ADMIN
+                update_fields.append("role")
+            if member.status != ClubMemberStatus.ACTIVE:
+                member.status = ClubMemberStatus.ACTIVE
+                update_fields.append("status")
+            if member.joined_at is None:
+                member.joined_at = now
+                update_fields.append("joined_at")
+            if update_fields:
+                member.save(update_fields=update_fields)
+            kind = "already_admin" if already_admin else "promoted"
+
+        ClubRating.objects.get_or_create(
+            club=club,
+            member=member,
+            defaults={"points": 0},
+        )
+        ClubJoinRequest.objects.filter(
+            club=club,
+            user=user,
+            status=ClubJoinRequestStatus.PENDING,
+        ).update(
+            status=ClubJoinRequestStatus.APPROVED,
+            reviewed_by=reviewed_by,
+            reviewed_at=now,
+            updated_at=now,
+        )
+        return member, kind
 
 
 def club_has_published_offer(club: Club) -> bool:

@@ -177,6 +177,7 @@ def check_and_generate_past_deadline_brackets() -> int:
             bracket_generated=False,
             registration_deadline__lte=now,
             registration_deadline__isnull=False,
+            start_after_fill=False,
         ).exclude(status=TournamentStatus.CANCELLED)
     )
     total = 0

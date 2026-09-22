@@ -317,6 +317,24 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         blank=True,
         help_text="Для парных: обязателен. Количество команд (пар) для регистрации.",
     )
+    start_after_fill = models.BooleanField(
+        "Старт после набора",
+        default=False,
+        help_text=(
+            "Дата старта и дедлайн регистрации не задаются. "
+            "При наборе минимума — письмо админу; при наборе максимума — "
+            "автоматический запуск турнира и формирование сетки."
+        ),
+    )
+    min_fill_reached_notified_at = models.DateTimeField(
+        "Когда отправлено уведомление о наборе минимума",
+        null=True,
+        blank=True,
+        help_text=(
+            "Для режима «Старт после набора»: заполняется при первом "
+            "достижении минимального состава."
+        ),
+    )
     insufficient_participants_notified_at = models.DateTimeField(
         "Когда отправлено уведомление о недостатке участников",
         null=True,
@@ -340,10 +358,24 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         help_text="Сколько дней у игроков на проведение матча раунда/тура.",
     )
 
-    start_date = models.DateField("Дата начала")
+    start_date = models.DateField(
+        "Дата начала",
+        null=True,
+        blank=True,
+        help_text=(
+            "Необязательна при режиме «Старт после набора» — "
+            "дата проставится при автозапуске."
+        ),
+    )
     end_date = models.DateField("Дата окончания", null=True, blank=True)
     registration_deadline = models.DateTimeField(
-        "Дедлайн регистрации", null=True, blank=True
+        "Дедлайн регистрации",
+        null=True,
+        blank=True,
+        help_text=(
+            "Не используется при режиме «Старт после набора» "
+            "(запуск по набору участников)."
+        ),
     )
 
     # Одноэтапная сетка / Олимпийская: очки за раунд (начисляются при вылете / в конце турнира)
@@ -420,13 +452,20 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     def start_date_is_pending(self) -> bool:
         """Дата старта ещё не определена: набор не закрыт, сетки нет.
 
-        До формирования сетки `start_date` и `end_date` хранят технические
-        значения (обычно старт плюс год), показывать их посетителю нельзя.
+        В режиме «Старт после набора» даты не заданы явно. До формирования
+        сетки также могут храниться технические значения (старт плюс год) —
+        показывать их посетителю нельзя.
 
         Returns:
             bool: True, если вместо дат нужно показывать условие старта.
         """
-        return self.status == TournamentStatus.UPCOMING and not self.bracket_generated
+        if self.status != TournamentStatus.UPCOMING or self.bracket_generated:
+            return False
+        if self.start_after_fill or self.start_date is None:
+            return True
+        # Пока сетка не сформирована, UI показывает условие старта
+        # (историческое поведение карточек турниров).
+        return True
 
     def is_full(self) -> bool:
         """Check if tournament has reached max participants/teams."""

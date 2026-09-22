@@ -211,6 +211,50 @@
         updateParticipantsVsTeamsVisibility();
     }
 
+    function updateStartAfterFillVisibility() {
+        const checkbox = document.querySelector(
+            "#id_start_after_fill, input[name='start_after_fill']"
+        );
+        if (!checkbox) {
+            return;
+        }
+        const enabled = Boolean(checkbox.checked);
+        const bracketInput = document.querySelector(
+            "#id_bracket_generated, input[name='bracket_generated']"
+        );
+        const bracketDone = Boolean(bracketInput && bracketInput.checked);
+        ["start_date", "end_date", "registration_deadline"].forEach(function (name) {
+            const input = document.querySelector("#id_" + name + ", [name='" + name + "']");
+            if (!input) {
+                return;
+            }
+            // После формирования сетки даты только для просмотра.
+            // До старта в режиме набора — блокируем ввод, но не чистим
+            // уже сохранённые значения на каждом открытии формы (иначе POST
+            // без disabled-полей затрёт start_date после автозапуска).
+            if (enabled && !bracketDone) {
+                input.readOnly = true;
+                input.classList.add("vDateField--fill-mode");
+                input.setAttribute("aria-disabled", "true");
+                // Не используем disabled: такие поля не уходят в POST.
+                if (name === "registration_deadline") {
+                    input.value = "";
+                }
+            } else if (enabled && bracketDone) {
+                input.readOnly = true;
+                input.setAttribute("aria-disabled", "true");
+            } else {
+                input.readOnly = false;
+                input.removeAttribute("aria-disabled");
+                input.classList.remove("vDateField--fill-mode");
+            }
+            const row = getFieldRow(name);
+            if (row) {
+                row.style.opacity = enabled ? "0.55" : "";
+            }
+        });
+    }
+
     function init() {
         const formatSelect = getFormatSelect();
         if (!formatSelect) {
@@ -224,11 +268,19 @@
             variantSelect.addEventListener("change", updateVariantVisibility);
             variantSelect.addEventListener("input", updateVariantVisibility);
         }
+        const startAfterCheckbox = document.querySelector(
+            "#id_start_after_fill, input[name='start_after_fill']"
+        );
+        if (startAfterCheckbox) {
+            startAfterCheckbox.addEventListener("change", updateStartAfterFillVisibility);
+            startAfterCheckbox.addEventListener("input", updateStartAfterFillVisibility);
+        }
         // Вызываем updateVisibility с небольшой задержкой, чтобы убедиться, что значения по умолчанию установлены
         setTimeout(function() {
             updateVisibility();
             updateGenderOptions();
             updateParticipantsVsTeamsVisibility();
+            updateStartAfterFillVisibility();
         }, 50);
     }
 

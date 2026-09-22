@@ -552,6 +552,77 @@ def notify_purchase_request(pr) -> bool:
     return send_admin_message(msg)
 
 
+def notify_tournament_min_fill_reached(tournament) -> bool:
+    """Уведомление админу: набран минимум в режиме «Старт после набора».
+
+    Можно вручную запустить турнир или ждать максимума (автостарт).
+    """
+    from django.conf import settings
+
+    name = _escape(getattr(tournament, "name", "") or "—")
+    slug = _escape(getattr(tournament, "slug", "") or "—")
+    if getattr(tournament, "is_doubles", lambda: False)():
+        current = getattr(tournament, "full_teams_count", lambda: 0)()
+        if callable(current):
+            current = current()
+        min_required = getattr(tournament, "min_teams", None) or 0
+        max_required = getattr(tournament, "max_teams", None)
+        label = "команд"
+    else:
+        current = getattr(tournament, "participants", None)
+        current = current.count() if current is not None else 0
+        min_required = getattr(tournament, "min_participants", None) or 0
+        max_required = getattr(tournament, "max_participants", None)
+        label = "участников"
+    max_str = str(max_required) if max_required is not None else "—"
+
+    base = (getattr(settings, "SITE_URL", None) or "").rstrip("/")
+    admin_path = (getattr(settings, "ADMIN_URL", None) or "admin").strip("/")
+    pk = getattr(tournament, "pk", "")
+    manage_path = ""
+    club_edit_url = ""
+    try:
+        from django.urls import reverse
+
+        manage_path = reverse(
+            "tournament_manage", kwargs={"slug": getattr(tournament, "slug", "")}
+        )
+    except Exception:
+        manage_path = ""
+    manage_url = f"{base}{manage_path}" if base and manage_path else manage_path
+    club = getattr(tournament, "club", None)
+    if club is not None and pk:
+        try:
+            from django.urls import reverse
+
+            club_path = reverse(
+                "clubs:tournament_edit",
+                kwargs={"slug": club.slug, "tournament_id": pk},
+            )
+            club_edit_url = f"{base}{club_path}" if base else club_path
+        except Exception:
+            club_edit_url = ""
+    if club is not None:
+        admin_rel = f"/{admin_path}/clubs/clubtournament/{pk}/change/"
+    else:
+        admin_rel = f"/{admin_path}/tournaments/tournament/{pk}/change/"
+    admin_url = f"{base}{admin_rel}" if base else admin_rel
+
+    msg = (
+        "✅ <b>Турнир: набран минимальный состав</b>\n\n"
+        f"Турнир: {name}\n"
+        f"Slug: {slug}\n"
+        f"Сейчас: {current} {label} "
+        f"(минимум: {min_required}, максимум: {max_str})\n\n"
+        "Можно <b>запустить турнир вручную</b> или подождать, "
+        "пока наберётся максимум — тогда система стартует сама "
+        "и сформирует сетку.\n"
+        f"Управление: {club_edit_url or manage_url or admin_url}\n"
+        f"Админка: {admin_url}"
+    )
+    return send_admin_message(msg)
+
+
 def notify_tournament_insufficient_participants(tournament) -> bool:
     """Уведомление админу: недостаточно участников/команд к дедлайну, турнир отменят через 3 ч без продления."""
     from django.conf import settings

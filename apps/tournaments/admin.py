@@ -359,6 +359,16 @@ class TournamentAdminForm(forms.ModelForm):
             "Можно оставить пустым или ввести вручную. При совпадении с существующим "
             "турниром автоматически добавится суффикс -2, -3 и т.д."
         )
+        start_after = False
+        data = args[0] if args else kwargs.get("data")
+        if data is not None:
+            start_after = data.get("start_after_fill") in (True, "on", "True", "1")
+        elif self.instance and getattr(self.instance, "start_after_fill", False):
+            start_after = True
+        if start_after:
+            self.fields["start_date"].required = False
+            self.fields["end_date"].required = False
+            self.fields["registration_deadline"].required = False
 
     def clean_allowed_categories(self):
         value = self.cleaned_data.get("allowed_categories") or []
@@ -397,6 +407,38 @@ class TournamentAdminForm(forms.ModelForm):
                 raise ValidationError(
                     "Постоплата доступна только при вступительном взносе больше 0 ₽."
                 )
+        start_after_fill = bool(cleaned_data.get("start_after_fill"))
+        bracket_generated = bool(
+            cleaned_data.get("bracket_generated")
+            or (self.instance and self.instance.bracket_generated)
+        )
+        if start_after_fill:
+            cleaned_data["registration_deadline"] = None
+            if not bracket_generated:
+                # До автозапуска даты не используются.
+                cleaned_data["start_date"] = None
+                cleaned_data["end_date"] = None
+            else:
+                # После старта не затираем даты, даже если поле не пришло в POST.
+                if not cleaned_data.get("start_date") and self.instance.start_date:
+                    cleaned_data["start_date"] = self.instance.start_date
+                if not cleaned_data.get("end_date") and self.instance.end_date:
+                    cleaned_data["end_date"] = self.instance.end_date
+            if variant == "doubles":
+                if not cleaned_data.get("max_teams"):
+                    raise ValidationError(
+                        "При «Старте после набора» укажите максимальное "
+                        "количество команд — по нему турнир запустится автоматически."
+                    )
+            else:
+                if not cleaned_data.get("max_participants"):
+                    raise ValidationError(
+                        "При «Старте после набора» укажите максимальное "
+                        "количество участников — по нему турнир запустится автоматически."
+                    )
+        else:
+            if not cleaned_data.get("start_date"):
+                self.add_error("start_date", "Укажите дату начала турнира.")
         # Автогенерация уникального slug: при одинаковых названиях добавляется суффикс -2, -3 и т.д.
         name = cleaned_data.get("name") or ""
         slug = cleaned_data.get("slug") or ""
@@ -498,6 +540,7 @@ class TournamentAdmin(admin.ModelAdmin):
     date_hierarchy = "start_date"
     readonly_fields = (
         "insufficient_participants_notified_at",
+        "min_fill_reached_notified_at",
         "completion_notified_at",
         "postpayment_window_started_at",
         "postpayment_window_schedule_display",
@@ -1145,6 +1188,7 @@ class TournamentAdmin(admin.ModelAdmin):
                     "allowed_categories",
                     "tournament_type",
                     "status",
+                    "start_after_fill",
                     "start_date",
                     "end_date",
                     "registration_deadline",
@@ -1152,13 +1196,19 @@ class TournamentAdmin(admin.ModelAdmin):
                     "max_participants",
                     "min_teams",
                     "max_teams",
+                    "min_fill_reached_notified_at",
                     "insufficient_participants_notified_at",
                     "completion_notified_at",
                     "bracket_generated",
                     "match_days_per_round",
                     "participants",
                 ),
-                "description": "Блок отображается после выбора формата турнира (Одноэтапная сетка, Олимпийская система или Круговой).",
+                "description": (
+                    "Блок отображается после выбора формата турнира "
+                    "(Одноэтапная сетка, Олимпийская система или Круговой). "
+                    "«Старт после набора» — без дат: уведомление при минимуме, "
+                    "автозапуск при максимуме."
+                ),
                 "classes": ("format-common-section",),
             },
         ),

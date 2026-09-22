@@ -416,7 +416,7 @@
                     <div class="club-dashboard-table__row">
                         <div class="club-dashboard-table__cell club-dashboard-table__cell--title">
                             <a href="{% url 'tournament_detail' slug=item.object.slug %}">{{ item.object.name }}</a>
-                            <span class="club-dashboard-table__hint">{{ item.host_label }}{% if item.object.city %} · {{ item.object.city }}{% endif %}</span>
+                            {% if item.object.city %}<span class="club-dashboard-table__hint">{{ item.object.city }}</span>{% endif %}
                         </div>
                         <div class="club-dashboard-table__cell">{{ item.object.start_date|date:"d.m.Y" }}</div>
                         <div class="club-dashboard-table__cell">
@@ -430,7 +430,7 @@
                         </div>
                         <div class="club-dashboard-table__cell club-dashboard-table__cell--actions">
                             <a href="{% url 'tournament_detail' slug=item.object.slug %}">Открыть</a>
-                            <a href="{% url 'admin:tournaments_tournament_change' item.object.id %}">Админка</a>
+                            <a href="{{ item.admin_url }}">Админка</a>
                         </div>
                     </div>
                     {% endfor %}

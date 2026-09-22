@@ -501,6 +501,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "gender",
             "allowed_categories",
             "tournament_type",
+            "start_after_fill",
             "start_date",
             "end_date",
             "registration_deadline",
@@ -551,6 +552,23 @@ class ClubTournamentCreateForm(forms.ModelForm):
         self.fields["min_teams"].required = False
         self.fields["max_teams"].required = False
         self.fields["entry_fee"].required = False
+        self.fields["start_after_fill"].required = False
+
+        start_after = False
+        if self.is_bound:
+            start_after = self.data.get("start_after_fill") in (True, "on", "True", "1")
+        elif self.instance and getattr(self.instance, "start_after_fill", False):
+            start_after = True
+        self.fields["start_date"].required = not start_after
+        if start_after:
+            self.fields["start_date"].required = False
+            self.fields["end_date"].required = False
+            self.fields["registration_deadline"].required = False
+
+        self.fields["start_after_fill"].help_text = (
+            "Без дат старта и дедлайна: при минимуме — письмо админам клуба, "
+            "при максимуме — автозапуск и сетка."
+        )
 
         self.fields["description"].widget = forms.Textarea(
             attrs={
@@ -712,6 +730,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "max_participants",
             "min_teams",
             "max_teams",
+            "start_after_fill",
             "match_days_per_round",
             "match_format",
             "fan_points_r1",
@@ -764,6 +783,29 @@ class ClubTournamentCreateForm(forms.ModelForm):
             raise ValidationError(
                 "Категория «Микст» доступна только для парных турниров."
             )
+
+        start_after_fill = bool(cleaned_data.get("start_after_fill"))
+        bracket_generated = bool(
+            getattr(self.instance, "bracket_generated", False)
+            if self.instance and self.instance.pk
+            else False
+        )
+        if start_after_fill:
+            cleaned_data["registration_deadline"] = None
+            if not bracket_generated:
+                cleaned_data["start_date"] = None
+                cleaned_data["end_date"] = None
+            else:
+                if not cleaned_data.get("start_date") and self.instance.start_date:
+                    cleaned_data["start_date"] = self.instance.start_date
+                if not cleaned_data.get("end_date") and self.instance.end_date:
+                    cleaned_data["end_date"] = self.instance.end_date
+            start_date = cleaned_data.get("start_date")
+            end_date = cleaned_data.get("end_date")
+            registration_deadline = None
+        else:
+            if not start_date:
+                self.add_error("start_date", "Укажите дату начала турнира.")
 
         if start_date and end_date and end_date < start_date:
             self.add_error(
@@ -826,6 +868,12 @@ class ClubTournamentCreateForm(forms.ModelForm):
             cleaned_data["max_teams"] = None
             min_participants = cleaned_data.get("min_participants")
             max_participants = cleaned_data.get("max_participants")
+            if start_after_fill and not max_participants:
+                self.add_error(
+                    "max_participants",
+                    "При «Старте после набора» укажите максимальное "
+                    "количество участников — по нему турнир запустится автоматически.",
+                )
             if (
                 min_participants
                 and max_participants
@@ -834,6 +882,13 @@ class ClubTournamentCreateForm(forms.ModelForm):
                 self.add_error(
                     "min_participants",
                     "Минимум участников не может быть больше максимума.",
+                )
+        if start_after_fill and variant == TournamentVariant.DOUBLES:
+            if not cleaned_data.get("max_teams"):
+                self.add_error(
+                    "max_teams",
+                    "При «Старте после набора» укажите максимальное "
+                    "количество команд — по нему турнир запустится автоматически.",
                 )
 
         if cleaned_data.get("is_open_interclub") and not self.is_pro:

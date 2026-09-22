@@ -717,6 +717,86 @@ def _club_tournament_manage_url(tournament) -> str:
     return f"{base}{path}"
 
 
+def send_tournament_min_fill_to_club(tournament) -> None:
+    """Уведомить админов/менеджеров клуба о наборе минимума (старт после набора).
+
+    Args:
+        tournament: Клубный турнир в режиме ``start_after_fill``.
+    """
+    club = getattr(tournament, "club", None)
+    if club is None:
+        return
+
+    config = _get_club_config(club)
+    if getattr(tournament, "is_doubles", lambda: False)():
+        current = getattr(tournament, "full_teams_count", lambda: 0)()
+        if callable(current):
+            current = current()
+        min_required = getattr(tournament, "min_teams", None) or 0
+        max_required = getattr(tournament, "max_teams", None)
+        label = "команд"
+    else:
+        participants = getattr(tournament, "participants", None)
+        current = participants.count() if participants is not None else 0
+        min_required = getattr(tournament, "min_participants", None) or 0
+        max_required = getattr(tournament, "max_participants", None)
+        label = "участников"
+
+    max_str = str(max_required) if max_required is not None else "—"
+    manage_url = _club_tournament_manage_url(tournament)
+    tournament_name = getattr(tournament, "name", "") or "—"
+
+    for member in _get_club_managers_and_admins(club):
+        admin_name = member.user.get_full_name() or member.user.email
+        ms = _get_member_settings(member.user, club)
+
+        if _should_send_email(config, ms) and member.user.email:
+            try:
+                _send_club_email(
+                    subject=(
+                        f"Набран минимум: «{tournament_name}» — можно стартовать "
+                        f"или ждать максимума"
+                    ),
+                    template_name="emails/clubs/tournament_min_fill.html",
+                    context={
+                        "club_name": club.name,
+                        "admin_name": admin_name,
+                        "tournament_name": tournament_name,
+                        "current_count": current,
+                        "min_required": min_required,
+                        "max_required": max_str,
+                        "label": label,
+                        "manage_url": manage_url,
+                    },
+                    recipient_email=member.user.email,
+                )
+            except Exception:
+                logger.exception(
+                    "send_tournament_min_fill email failed | member=%s",
+                    member.pk,
+                )
+
+        if _should_send_telegram(config, ms):
+            safe_name = escape(str(tournament_name))
+            text = (
+                f"✅ <b>Набран минимальный состав</b>\n\n"
+                f"Турнир: {safe_name}\n"
+                f"Сейчас: {current} {label} "
+                f"(мин.: {min_required}, макс.: {escape(max_str)})\n\n"
+                f"Можно <b>запустить вручную</b> или подождать максимума — "
+                f"тогда система стартует сама."
+            )
+            if manage_url:
+                text += f"\n\nУправление: {manage_url}"
+            try:
+                _send_club_telegram(member.user, text)
+            except Exception:
+                logger.exception(
+                    "send_tournament_min_fill tg failed | member=%s",
+                    member.pk,
+                )
+
+
 def send_tournament_insufficient_to_club(tournament) -> None:
     """Уведомить админов/менеджеров клуба о недоборе и окне 3 часов.
 

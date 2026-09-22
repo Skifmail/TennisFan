@@ -559,63 +559,80 @@ def _format_pending_join_requests_attention(
     return f"{total_count} {noun} {verb} решения.", entries
 
 
+def _tournament_admin_change_url(tournament) -> str:
+    """URL карточки турнира в админке (клубный proxy или глобальный).
+
+    Клубные турниры зарегистрированы как ``clubs.ClubTournament`` и
+    исключены из ``tournaments.Tournament`` queryset — ссылка на
+    ``tournaments_tournament_change`` для них отдаёт «не существует».
+
+    Args:
+        tournament: Экземпляр Tournament (с клубом или без).
+
+    Returns:
+        str: Путь change-view в Django admin.
+    """
+    if getattr(tournament, "club_id", None):
+        return str(
+            reverse(
+                "admin:clubs_clubtournament_change",
+                args=[tournament.pk],
+            )
+        )
+    return str(
+        reverse(
+            "admin:tournaments_tournament_change",
+            args=[tournament.pk],
+        )
+    )
+
+
 def _format_low_fill_tournaments_attention(
     items: list[dict[str, Any]],
 ) -> tuple[str, list[dict[str, str]], str, str]:
-    """Формирует блок внимания по турнирам с недобором участников.
+    """Формирует блок внимания по платформенным турнирам с недобором.
 
     Args:
         items: Словари с ключами ``object``, ``participants_count``,
-            ``min_required``, ``host_label``.
+            ``min_required`` (только турниры без клуба).
 
     Returns:
         tuple: Описание, записи для UI, подпись кнопки, URL действия.
     """
-    entries: list[dict[str, str]] = []
-    for item in items:
-        tournament = item["object"]
-        min_required = item["min_required"]
-        participants_count = item["participants_count"]
-        host_label = item.get("host_label") or "TennisFan"
-        city_suffix = f" · {tournament.city}" if tournament.city else ""
-        entries.append(
-            {
-                "name": tournament.name,
-                "meta": (
-                    f"{participants_count}/{min_required} · {host_label}{city_suffix}"
-                ),
-                "meta_prefix": "набрано",
-                "url": reverse(
-                    "admin:tournaments_tournament_change",
-                    args=[tournament.pk],
-                ),
-            }
-        )
-
     count = len(items)
     if count == 1:
         tournament = items[0]["object"]
         participants_count = items[0]["participants_count"]
         min_required = items[0]["min_required"]
+        city_suffix = f" · {tournament.city}" if tournament.city else ""
         description = (
             f"«{tournament.name}»: набрано {participants_count} "
-            f"из минимальных {min_required}."
+            f"из минимальных {min_required}{city_suffix}."
         )
-        action_label = "Открыть турнир"
-        action_url = reverse(
-            "admin:tournaments_tournament_change",
-            args=[tournament.pk],
+        action_url = _tournament_admin_change_url(tournament)
+        # Один турнир — без дублирующего списка entries.
+        return description, [], "Открыть турнир", action_url
+
+    entries: list[dict[str, str]] = []
+    for item in items:
+        tournament = item["object"]
+        min_required = item["min_required"]
+        participants_count = item["participants_count"]
+        city_suffix = f" · {tournament.city}" if tournament.city else ""
+        entries.append(
+            {
+                "name": tournament.name,
+                "meta": f"{participants_count}/{min_required}{city_suffix}",
+                "meta_prefix": "набрано",
+                "url": _tournament_admin_change_url(tournament),
+            }
         )
-        return description, entries, action_label, action_url
 
     noun = _ru_pluralize(count, ("турнир", "турнира", "турниров"))
     verb = _ru_verb_by_count(count, "не набрал", "не набрали")
     description = f"{count} {noun} {verb} минимальный состав."
     action_label = "К турнирам"
-    action_url = reverse(
-        "admin:tournaments_tournament_change",
-        args=[items[0]["object"].pk],
-    )
+    action_url = _tournament_admin_change_url(items[0]["object"])
     return description, entries, action_label, action_url
 
 
@@ -709,16 +726,22 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         round((active_players_count / players_total) * 100) if players_total else 0
     )
 
-    tournaments_this_month = Tournament.objects.filter(
+    # KPI и операционный горизонт — только турниры платформы.
+    # Клубные турниры живут в панели клуба и не смешиваются сюда.
+    platform_tournaments = Tournament.objects.filter(club__isnull=True)
+    tournaments_this_month = platform_tournaments.filter(
         start_date__year=today.year,
         start_date__month=today.month,
     ).count()
-    tournaments_previous_month = Tournament.objects.filter(
+    tournaments_previous_month = platform_tournaments.filter(
         start_date__gte=previous_month_start,
         start_date__lte=previous_month_end,
     ).count()
     upcoming_tournaments_qs = order_with_cancelled_last(
-        Tournament.objects.filter(start_date__gte=today).select_related("club"),
+        platform_tournaments.filter(
+            Q(start_date__gte=today)
+            | Q(start_date__isnull=True, start_after_fill=True, bracket_generated=False)
+        ).exclude(status=TournamentStatus.CANCELLED),
         "start_date",
         "registration_deadline",
     )
@@ -961,7 +984,6 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
             participants_count = tournament.participants.count()
             min_required = tournament.min_participants
             target_participants = tournament.max_participants
-        host_label = tournament.club.name if tournament.club_id else "TennisFan"
         needs_attention = bool(
             min_required is not None
             and participants_count < min_required
@@ -974,7 +996,6 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
                     "object": tournament,
                     "participants_count": participants_count,
                     "min_required": min_required,
-                    "host_label": host_label,
                 }
             )
 
@@ -999,9 +1020,7 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
                 "participants_count": participants_count,
                 "target_participants": target_participants,
                 "needs_attention": needs_attention,
-                "host_label": (
-                    tournament.club.name if tournament.club_id else "TennisFan"
-                ),
+                "admin_url": _tournament_admin_change_url(tournament),
             }
         )
 

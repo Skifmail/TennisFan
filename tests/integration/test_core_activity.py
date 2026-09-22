@@ -248,13 +248,35 @@ class PlatformActivityFeedTestCase(TestCase):
         self.assertContains(response, "Подписка игрока Александр Шевченко закончится")
         self.assertNotContains(response, "пользовательских подписок закончатся")
 
-    def test_platform_dashboard_low_fill_links_to_tournament(self) -> None:
-        """Недобор показывает имя турнира и ссылку на его карточку в админке."""
-        tournament = Tournament.objects.create(
+    def test_platform_dashboard_excludes_club_tournament_low_fill(self) -> None:
+        """Клубный недобор не попадает в attention/старты панели платформы."""
+        club = Club.objects.create(
+            name="TENNISFAN",
+            slug="tennisfan-lowfill",
+            city="Раменское",
+            address="ул. 1",
+            email="club@test.local",
+            admin_name="Админ",
+        )
+        club_tournament = Tournament.objects.create(
             name="Раменский недобор",
             slug="ramenskiy-nedobor",
             city="Раменское",
+            club=club,
             start_date=date.today() + timedelta(days=5),
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            status=TournamentStatus.UPCOMING,
+            entry_fee=500,
+            min_participants=8,
+            max_participants=32,
+            bracket_generated=False,
+        )
+        platform_tournament = Tournament.objects.create(
+            name="Платформенный недобор",
+            slug="platform-nedobor",
+            city="Москва",
+            club=None,
+            start_date=date.today() + timedelta(days=3),
             format=TournamentFormat.SINGLE_ELIMINATION,
             status=TournamentStatus.UPCOMING,
             entry_fee=500,
@@ -265,15 +287,19 @@ class PlatformActivityFeedTestCase(TestCase):
         self.client.force_login(self.staff)
         response = self.client.get(reverse("platform_dashboard"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Раменский недобор")
+        self.assertNotContains(response, "Раменский недобор")
+        self.assertContains(response, "Платформенный недобор")
         self.assertContains(response, "набрано 0 из минимальных 8")
         change_url = reverse(
-            "admin:tournaments_tournament_change", args=[tournament.pk]
+            "admin:tournaments_tournament_change",
+            args=[platform_tournament.pk],
+        )
+        club_change_url = reverse(
+            "admin:clubs_clubtournament_change",
+            args=[club_tournament.pk],
         )
         self.assertContains(response, change_url)
-        self.assertContains(response, "Открыть турнир")
-        # Hero summary / кнопка не ведут на общий список всех турниров.
-        changelist = reverse("admin:tournaments_tournament_changelist")
+        self.assertNotContains(response, club_change_url)
         attention = response.context["attention_items"]
         low_fill = next(
             item
@@ -281,7 +307,13 @@ class PlatformActivityFeedTestCase(TestCase):
             if item["title"] == "Турниры с недобором участников"
         )
         self.assertEqual(low_fill["action_url"], change_url)
-        self.assertNotEqual(low_fill["action_url"], changelist)
+        self.assertEqual(low_fill["entries"], [])
+        upcoming = response.context["upcoming_tournaments"]
+        self.assertTrue(upcoming)
+        self.assertEqual(upcoming[0]["object"].pk, platform_tournament.pk)
+        self.assertEqual(upcoming[0]["admin_url"], change_url)
+        upcoming_pks = {item["object"].pk for item in upcoming}
+        self.assertNotIn(club_tournament.pk, upcoming_pks)
 
     def test_platform_activity_unseen_indicator(self) -> None:
         """Индикатор новых событий показывается до просмотра панели и скрывается после."""

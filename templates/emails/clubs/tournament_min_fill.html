@@ -1,0 +1,17 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Набран минимальный состав</h2>
+<p>Здравствуйте, {{ admin_name }}!</p>
+<p>
+  В турнире <b>«{{ tournament_name }}»</b> набралось
+  {{ current_count }} {{ label }} из минимальных {{ min_required }}
+  (максимум: {{ max_required }}).
+</p>
+<p>
+  Можно <b>запустить турнир вручную</b> или подождать, пока наберётся максимум —
+  тогда система стартует сама и сформирует сетку.
+</p>
+{% if manage_url %}
+<p><a href="{{ manage_url }}" class="btn">Открыть турнир</a></p>
+{% endif %}
+{% endblock %}

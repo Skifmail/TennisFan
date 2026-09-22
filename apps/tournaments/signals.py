@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 
@@ -11,7 +11,7 @@ from .fan import (
     ensure_consolation_created,
     finalize_tournament,
 )
-from .models import Match, MatchResultProposal
+from .models import Match, MatchResultProposal, Tournament, TournamentTeam
 from .olympic_consolation import (
     _is_olympic,
     advance_winner_olympic,
@@ -1016,3 +1016,38 @@ def apply_proposal_on_admin_accept(sender, instance, created, **kwargs):
     if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
         return  # уже применено (например, из confirm_proposal)
     apply_proposal(instance)
+
+
+@receiver(m2m_changed, sender=Tournament.participants.through)
+def on_tournament_participants_changed(sender, instance, action, **kwargs: Any) -> None:
+    """После добавления участников — прогресс режима «Старт после набора»."""
+    if action != "post_add":
+        return
+    try:
+        from apps.tournaments.start_after_fill import maybe_progress_start_after_fill
+
+        maybe_progress_start_after_fill(instance)
+    except Exception:
+        logger.exception(
+            "start_after_fill progress failed for tournament pk=%s",
+            getattr(instance, "pk", None),
+        )
+
+
+@receiver(post_save, sender=TournamentTeam)
+def on_tournament_team_saved(sender, instance, **kwargs: Any) -> None:
+    """После комплектации пары — прогресс «Старт после набора»."""
+    if getattr(instance, "player2_id", None) is None:
+        return
+    tournament = getattr(instance, "tournament", None)
+    if tournament is None:
+        return
+    try:
+        from apps.tournaments.start_after_fill import maybe_progress_start_after_fill
+
+        maybe_progress_start_after_fill(tournament)
+    except Exception:
+        logger.exception(
+            "start_after_fill progress failed for doubles tournament pk=%s",
+            getattr(tournament, "pk", None),
+        )

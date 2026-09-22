@@ -644,7 +644,7 @@ class TournamentPhoto(CompressImageFieldsMixin, models.Model):
     order = models.PositiveSmallIntegerField(
         "Порядок",
         default=0,
-        help_text="Меньшее число — раньше в галерее.",
+        help_text="Не влияет на отображение: в галерее сначала новые фото.",
     )
     uploaded_by = models.ForeignKey(
         "users.Player",
@@ -659,7 +659,7 @@ class TournamentPhoto(CompressImageFieldsMixin, models.Model):
     class Meta:
         verbose_name = "Фото турнира"
         verbose_name_plural = "Фото турниров"
-        ordering = ["order", "id"]
+        ordering = ["-created_at", "-id"]
 
     def __str__(self) -> str:
         return f"Фото турнира {self.tournament.name}"

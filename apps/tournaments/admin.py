@@ -331,7 +331,7 @@ class TournamentPhotoInline(admin.TabularInline):
 
     model = TournamentPhoto
     extra = 1
-    fields = ("image", "caption", "order")
+    fields = ("image", "caption")
 
 
 class TournamentAdminForm(forms.ModelForm):

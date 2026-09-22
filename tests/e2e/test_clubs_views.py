@@ -1551,8 +1551,7 @@ class ClubTournamentManagementViewsTestCase(TestCase):
             ).exists()
         )
         recipients = {tuple(message.to) for message in mail.outbox}
-        self.assertIn((self.user.email,), recipients)
-        self.assertIn(("platform-admin@test.local",), recipients)
+        self.assertEqual(recipients, {(self.user.email,)})
 
     def test_admin_can_approve_join_request(self) -> None:
         applicant = User.objects.create_user(

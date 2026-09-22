@@ -711,9 +711,6 @@ def join_request_create(request: HttpRequest, slug: str) -> HttpResponse:
         invites_url=request.build_absolute_uri(
             reverse("clubs:invites_list", kwargs={"slug": club.slug})
         ),
-        platform_admin_url=request.build_absolute_uri(
-            reverse("admin:clubs_clubjoinrequest_changelist") + "?status__exact=pending"
-        ),
         comment=join_request.message,
     )
 

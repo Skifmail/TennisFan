@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
@@ -149,7 +149,11 @@ def training_enroll(request, slug):
     Для авторизованных пользователей привязывает заявку к профилю игрока.
     Для неавторизованных создаёт анонимную заявку без привязки к игроку.
     """
-    training = get_object_or_404(Training, slug=slug, is_active=True)
+    training = get_object_or_404(
+        Training.objects.select_related("coach__user"),
+        slug=slug,
+        is_active=True,
+    )
 
     player = None
     if request.user.is_authenticated:
@@ -166,6 +170,15 @@ def training_enroll(request, slug):
             if player is not None:
                 enrollment.player = player
             enrollment.save()
+            try:
+                from apps.core.email_service import send_training_enrollment_email
+
+                send_training_enrollment_email(enrollment)
+            except Exception:
+                logger.exception(
+                    "send_training_enrollment_email failed | enrollment=%s",
+                    enrollment.pk,
+                )
             messages.success(request, "Заявка на тренировку отправлена!")
             queue_metrika_goal(
                 request,
@@ -295,7 +308,12 @@ def my_trainings(request):
     if coach:
         coach_trainings = (
             Training.objects.filter(coach=coach)
-            .prefetch_related("enrollments")
+            .prefetch_related(
+                Prefetch(
+                    "enrollments",
+                    queryset=TrainingEnrollment.objects.select_related("player__user"),
+                )
+            )
             .order_by("-created_at")
         )
     if player:

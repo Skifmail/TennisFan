@@ -484,16 +484,14 @@ def send_join_request_notification(
     applicant: Any,
     *,
     invites_url: str = "",
-    platform_admin_url: str = "",
     comment: str = "",
 ) -> None:
-    """Уведомляет администраторов клуба и платформы о заявке на вступление.
+    """Уведомляет администраторов клуба о заявке на вступление.
 
     Args:
         club: Клуб, в который подана заявка.
         applicant: Пользователь, подавший заявку.
         invites_url: Ссылка на страницу заявок клуба.
-        platform_admin_url: Ссылка на список заявок в админке платформы.
         comment: Комментарий игрока к заявке.
     """
     applicant_name = applicant.get_full_name() or applicant.email
@@ -540,19 +538,6 @@ def send_join_request_notification(
                 logger.exception(
                     "send_join_request tg failed | admin=%s", admin_member.pk
                 )
-
-    try:
-        from apps.core.telegram_notify import notify_club_join_request
-
-        notify_club_join_request(
-            club_name=club.name,
-            applicant_name=str(applicant_name or ""),
-            applicant_email=applicant_email,
-            comment=comment,
-            admin_url=platform_admin_url,
-        )
-    except Exception:
-        logger.exception("send_join_request platform notify failed | club=%s", club.pk)
 
 
 def send_debtors_summary(

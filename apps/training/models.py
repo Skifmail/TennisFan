@@ -466,8 +466,25 @@ class TrainingEnrollment(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        player_display = str(self.player) if self.player else "Анонимный игрок"
-        return f"{player_display} на {self.training}"
+        return f"{self.get_display_name()} на {self.training}"
+
+    def get_display_name(self) -> str:
+        """Имя для карточки заявки.
+
+        Returns:
+            str: ФИО заявки, иначе имя или email игрока, иначе «Анонимный игрок».
+        """
+        full_name = (self.full_name or "").strip()
+        if full_name:
+            return full_name
+        player = self.player
+        if player is not None:
+            user = getattr(player, "user", None)
+            if user is not None:
+                name = (user.get_display_name() or "").strip()
+                if name:
+                    return name
+        return "Анонимный игрок"
 
     @property
     def telegram_url(self) -> str | None:

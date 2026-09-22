@@ -3,8 +3,9 @@
 from django.test import TestCase
 from django.urls import reverse
 
-from apps.training.models import Coach, Training
+from apps.training.models import Coach, Training, TrainingEnrollment
 from apps.users.models import User
+from tests.support.factories import make_player, make_user
 
 
 class CoachVisibilityTests(TestCase):
@@ -93,3 +94,90 @@ class CoachVisibilityTests(TestCase):
         self.assertEqual(list_response.status_code, 200)
         self.assertNotContains(list_response, "Скрытый тренер")
         self.assertEqual(detail_response.status_code, 404)
+
+
+class MyTrainingsAnonymousEnrollmentTests(TestCase):
+    """Страница «Мои тренировки» не должна падать на заявках без игрока."""
+
+    def setUp(self) -> None:
+        self.coach_user = make_user(
+            email="coach-my@test.local",
+            first_name="Иван",
+            last_name="Тренер",
+        )
+        self.coach = Coach.objects.create(
+            user=self.coach_user,
+            name="Иван Тренер",
+            slug="ivan-trener-my",
+            city="Москва",
+            is_active=True,
+        )
+        self.training = Training.objects.create(
+            title="Утренняя группа",
+            slug="my-trainings-anon",
+            description="Описание",
+            city="Москва",
+            coach=self.coach,
+            is_active=True,
+            type_prices={"group": 2000},
+        )
+        self.client.force_login(self.coach_user)
+
+    def test_coach_page_renders_anonymous_enrollment_full_name(self) -> None:
+        """Заявка без игрока отображает ФИО и не даёт 500."""
+        TrainingEnrollment.objects.create(
+            training=self.training,
+            player=None,
+            full_name="Анна Гость",
+            telegram="@anna_guest",
+        )
+
+        response = self.client.get(reverse("my_trainings"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Анна Гость")
+
+    def test_coach_page_renders_player_name_when_full_name_empty(self) -> None:
+        """Старая заявка с игроком без ФИО показывает имя пользователя."""
+        player = make_player(
+            email_suffix="enrolled",
+            first_name="Пётр",
+            last_name="Игрок",
+        )
+        TrainingEnrollment.objects.create(
+            training=self.training,
+            player=player,
+            full_name="",
+        )
+
+        response = self.client.get(reverse("my_trainings"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Пётр Игрок")
+
+    def test_coach_page_renders_player_email_when_name_empty(self) -> None:
+        """Если у игрока нет имени, на странице показывается email."""
+        player = make_player(email_suffix="no-name")
+        TrainingEnrollment.objects.create(
+            training=self.training,
+            player=player,
+            full_name="",
+        )
+
+        response = self.client.get(reverse("my_trainings"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, player.user.email)
+
+    def test_coach_page_renders_placeholder_when_anonymous_has_no_name(self) -> None:
+        """Заявка без игрока и без ФИО не даёт 500 и показывает заглушку."""
+        TrainingEnrollment.objects.create(
+            training=self.training,
+            player=None,
+            full_name="",
+        )
+
+        response = self.client.get(reverse("my_trainings"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Анонимный игрок")

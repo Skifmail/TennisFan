@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Новая заявка на тренировку</title>
+<style>
+body { margin:0; padding:0; background:#f4f6f8; font-family:Arial,Helvetica,sans-serif; color:#222; }
+.wrapper { max-width:600px; margin:0 auto; background:#fff; border-radius:8px; overflow:hidden; }
+.header { background:#1a1a2e; padding:24px 32px; text-align:center; }
+.header h1 { margin:0; color:#fff; font-size:20px; }
+.header .accent { color:#e94560; }
+.content { padding:32px; line-height:1.6; }
+.content h2 { font-size:18px; margin:0 0 16px; color:#1a1a2e; }
+.content p { margin:0 0 12px; }
+.row { margin:0 0 8px; }
+.row span { color:#666; }
+.btn { display:inline-block; padding:12px 24px; background:#e94560; color:#fff; text-decoration:none; border-radius:6px; font-weight:700; }
+.footer { padding:16px 32px; background:#f4f6f8; text-align:center; font-size:12px; color:#888; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="header">
+    <h1>Tennis<span class="accent">Fan</span></h1>
+  </div>
+  <div class="content">
+    <h2>Новая заявка на тренировку</h2>
+    <p>Здравствуйте{% if coach_name %}, {{ coach_name }}{% endif %}!</p>
+    <p>На тренировку «<a href="{{ training_url }}">{{ training.title }}</a>» поступила заявка.</p>
+    {% if created_at %}
+    <p class="row"><span>Когда:</span> {{ created_at|date:"d.m.Y H:i" }}</p>
+    {% endif %}
+    {% if training.city %}
+    <p class="row"><span>Населённый пункт:</span> {{ training.city }}</p>
+    {% endif %}
+    <p class="row"><span>Имя:</span> {{ full_name }}</p>
+    {% if telegram %}
+    <p class="row"><span>Telegram:</span> {{ telegram }}</p>
+    {% endif %}
+    {% if whatsapp %}
+    <p class="row"><span>WhatsApp / телефон:</span> {{ whatsapp }}</p>
+    {% endif %}
+    {% if email %}
+    <p class="row"><span>Email:</span> <a href="mailto:{{ email }}">{{ email }}</a></p>
+    {% endif %}
+    {% if desired_court %}
+    <p class="row"><span>Желаемый корт:</span> {{ desired_court }}</p>
+    {% endif %}
+    {% if message %}
+    <p class="row"><span>Пожелания:</span></p>
+    <p>{{ message|linebreaksbr }}</p>
+    {% endif %}
+    {% if my_trainings_url %}
+    <p><a href="{{ my_trainings_url }}" class="btn">Открыть заявки</a></p>
+    {% endif %}
+  </div>
+  <div class="footer">
+    Это письмо отправлено автоматически платформой TennisFan.<br>
+    Если вы получили его по ошибке, просто проигнорируйте.
+  </div>
+</div>
+</body>
+</html>

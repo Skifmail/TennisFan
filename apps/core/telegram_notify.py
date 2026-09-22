@@ -393,42 +393,6 @@ def notify_court_application(app) -> bool:
     return send_admin_message("\n".join(lines))
 
 
-def notify_club_join_request(
-    *,
-    club_name: str,
-    applicant_name: str,
-    applicant_email: str,
-    comment: str = "",
-    admin_url: str = "",
-) -> bool:
-    """Уведомление платформенного админа о заявке на вступление в клуб.
-
-    Args:
-        club_name: Название клуба.
-        applicant_name: Имя игрока.
-        applicant_email: Email игрока.
-        comment: Комментарий к заявке.
-        admin_url: Ссылка на список заявок в админке.
-
-    Returns:
-        bool: True, если уведомление ушло хотя бы в один канал.
-    """
-    lines = [
-        "🎾 <b>Заявка на вступление в клуб</b>",
-        "",
-        f"Клуб: {_escape(club_name)}",
-        f"Игрок: {_escape(applicant_name) or '—'}",
-        f"Email: {_escape(applicant_email) or '—'}",
-    ]
-    if comment:
-        trimmed = comment[:300]
-        suffix = "…" if len(comment) > 300 else ""
-        lines.extend(["", f"Комментарий: {_escape(trimmed)}{suffix}"])
-    if admin_url:
-        lines.extend(["", f"Ссылка: {admin_url}"])
-    return send_admin_message("\n".join(lines))
-
-
 def notify_feedback(
     user, subject: str, message: str, feedback_id: int | None = None
 ) -> bool:

@@ -1128,17 +1128,18 @@
         padding-top: var(--spacing-xs);
     }
 
-    /* Кубки по центру карточки: единственную подсказку тоже центрируем,
-       иначе left:0 уезжает за правый край экрана */
-    .profile-trophy:only-child::after {
+    /* Кубки по центру шапки профиля: единственную подсказку тоже центрируем,
+       иначе left:0 уезжает за правый край экрана.
+       Не трогаем кубки в карточках рейтинга — там свой мобильный режим. */
+    .profile-info__trophies .profile-trophy:only-child::after {
         left: 50%;
         right: auto;
         max-width: min(220px, calc(100vw - 2rem));
         transform: translateX(-50%) translateY(4px);
     }
 
-    .profile-trophy:only-child:hover::after,
-    .profile-trophy:only-child:focus-visible::after {
+    .profile-info__trophies .profile-trophy:only-child:hover::after,
+    .profile-info__trophies .profile-trophy:only-child:focus-visible::after {
         transform: translateX(-50%) translateY(0);
     }
 

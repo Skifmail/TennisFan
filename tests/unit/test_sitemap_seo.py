@@ -61,6 +61,28 @@ class SitemapSeoTestCase(TestCase):
             self.assertIn(f"/tournaments/moscow/{self.area.slug}/", urls)
             self.assertNotIn(f"/tournaments/moscow/{self.area.slug}/singles/", urls)
 
+    def test_home_declares_brand_as_search_site_name(self) -> None:
+        """Главная отдаёт имя TennisFan, чтобы выдача не показывала только домен."""
+        response = self.client.get(reverse("home"), secure=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<meta property="og:site_name" content="TennisFan">',
+        )
+        self.assertContains(response, '"@type": "WebSite"')
+        self.assertContains(response, '"name": "TennisFan"')
+        self.assertContains(response, '"alternateName": ["ТеннисФан"]')
+
+    def test_inner_page_keeps_site_name_without_homepage_schema(self) -> None:
+        """Название сайта есть на всех страницах, схема WebSite — только на главной."""
+        response = self.client.get(reverse("tournament_list"), secure=True)
+        self.assertContains(
+            response,
+            '<meta property="og:site_name" content="TennisFan">',
+            html=True,
+        )
+        self.assertNotContains(response, '"@type": "WebSite"')
+
     def test_catalog_meta_description(self) -> None:
         response = self.client.get(reverse("tournament_list"), secure=True)
         self.assertContains(response, 'name="description"', html=False)

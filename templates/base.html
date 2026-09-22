@@ -8,7 +8,19 @@
     <title>{% block title %}{{ site_brand_copyright }}{% endblock %} - Всероссийская теннисная платформа для игроков всех уровней</title>
     <meta name="description"
         content="{% block meta_description %}{{ site_brand_copyright }} - платформа любительских теннисных турниров по всей России. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
+    <meta property="og:site_name" content="{{ site_brand_copyright }}">
     {% block meta_og %}{% endblock %}
+    {% if request.resolver_match and request.resolver_match.url_name == "home" and not request.resolver_match.namespace and not is_tennistop %}
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "{{ site_brand_copyright|escapejs }}",
+        "alternateName": ["{{ site_brand_footer_ru|escapejs }}"],
+        "url": "{{ site_base_url }}/"
+    }
+    </script>
+    {% endif %}
     {% for token in google_site_verifications %}
     <meta name="google-site-verification" content="{{ token }}">
     {% endfor %}

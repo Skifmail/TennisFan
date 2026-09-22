@@ -3442,6 +3442,56 @@ form.club-filter-dropdown-open {
     }
 }
 
+/* Подсказка кубка в карточке рейтинга.
+   Кубок стоит у левого края, а текст турнира длинный: центрирование
+   и привязка к краю иконки уводят пузырь за экран. На мобилке
+   растягиваем его на ширину карточки. */
+@media (width <= 768px) {
+    .player-card {
+        position: relative;
+    }
+
+    .player-card__trophies .profile-trophy {
+        position: static;
+    }
+
+    .player-card__trophies .profile-trophy:hover,
+    .player-card__trophies .profile-trophy:focus-visible {
+        transform: none;
+    }
+
+    .player-card__trophies .profile-trophy:hover .profile-trophy__img,
+    .player-card__trophies .profile-trophy:focus-visible .profile-trophy__img {
+        transform: translateY(-2px) scale(1.06);
+    }
+
+    .player-card__trophies .profile-trophy::after,
+    .player-card__trophies .profile-trophy:first-child:not(:only-child)::after,
+    .player-card__trophies .profile-trophy:last-child:not(:only-child)::after,
+    .player-card__trophies .profile-trophy:only-child::after {
+        left: 0.5rem;
+        right: 0.5rem;
+        top: 0.35rem;
+        bottom: auto;
+        width: auto;
+        max-width: none;
+        transform: translateY(4px);
+        text-align: left;
+        overflow-wrap: anywhere;
+    }
+
+    .player-card__trophies .profile-trophy:hover::after,
+    .player-card__trophies .profile-trophy:focus-visible::after,
+    .player-card__trophies .profile-trophy:first-child:not(:only-child):hover::after,
+    .player-card__trophies .profile-trophy:first-child:not(:only-child):focus-visible::after,
+    .player-card__trophies .profile-trophy:last-child:not(:only-child):hover::after,
+    .player-card__trophies .profile-trophy:last-child:not(:only-child):focus-visible::after,
+    .player-card__trophies .profile-trophy:only-child:hover::after,
+    .player-card__trophies .profile-trophy:only-child:focus-visible::after {
+        transform: translateY(0);
+    }
+}
+
 @media (width <= 992px) {
     .player-card {
         flex-wrap: wrap;
@@ -9086,17 +9136,18 @@ body.has-fullscreen-loader {
         padding-top: var(--spacing-xs);
     }
 
-    /* Кубки по центру карточки: единственную подсказку тоже центрируем,
-       иначе left:0 уезжает за правый край экрана */
-    .profile-trophy:only-child::after {
+    /* Кубки по центру шапки профиля: единственную подсказку тоже центрируем,
+       иначе left:0 уезжает за правый край экрана.
+       Не трогаем кубки в карточках рейтинга — там свой мобильный режим. */
+    .profile-info__trophies .profile-trophy:only-child::after {
         left: 50%;
         right: auto;
         max-width: min(220px, calc(100vw - 2rem));
         transform: translateX(-50%) translateY(4px);
     }
 
-    .profile-trophy:only-child:hover::after,
-    .profile-trophy:only-child:focus-visible::after {
+    .profile-info__trophies .profile-trophy:only-child:hover::after,
+    .profile-info__trophies .profile-trophy:only-child:focus-visible::after {
         transform: translateX(-50%) translateY(0);
     }
 

@@ -559,6 +559,66 @@ def _format_pending_join_requests_attention(
     return f"{total_count} {noun} {verb} решения.", entries
 
 
+def _format_low_fill_tournaments_attention(
+    items: list[dict[str, Any]],
+) -> tuple[str, list[dict[str, str]], str, str]:
+    """Формирует блок внимания по турнирам с недобором участников.
+
+    Args:
+        items: Словари с ключами ``object``, ``participants_count``,
+            ``min_required``, ``host_label``.
+
+    Returns:
+        tuple: Описание, записи для UI, подпись кнопки, URL действия.
+    """
+    entries: list[dict[str, str]] = []
+    for item in items:
+        tournament = item["object"]
+        min_required = item["min_required"]
+        participants_count = item["participants_count"]
+        host_label = item.get("host_label") or "TennisFan"
+        city_suffix = f" · {tournament.city}" if tournament.city else ""
+        entries.append(
+            {
+                "name": tournament.name,
+                "meta": (
+                    f"{participants_count}/{min_required} · {host_label}{city_suffix}"
+                ),
+                "meta_prefix": "набрано",
+                "url": reverse(
+                    "admin:tournaments_tournament_change",
+                    args=[tournament.pk],
+                ),
+            }
+        )
+
+    count = len(items)
+    if count == 1:
+        tournament = items[0]["object"]
+        participants_count = items[0]["participants_count"]
+        min_required = items[0]["min_required"]
+        description = (
+            f"«{tournament.name}»: набрано {participants_count} "
+            f"из минимальных {min_required}."
+        )
+        action_label = "Открыть турнир"
+        action_url = reverse(
+            "admin:tournaments_tournament_change",
+            args=[tournament.pk],
+        )
+        return description, entries, action_label, action_url
+
+    noun = _ru_pluralize(count, ("турнир", "турнира", "турниров"))
+    verb = _ru_verb_by_count(count, "не набрал", "не набрали")
+    description = f"{count} {noun} {verb} минимальный состав."
+    action_label = "К турнирам"
+    action_url = reverse(
+        "admin:tournaments_tournament_change",
+        args=[items[0]["object"].pk],
+    )
+    return description, entries, action_label, action_url
+
+
 @login_required
 def platform_dashboard(request: HttpRequest) -> HttpResponse:
     """Глобальный дашборд платформы для staff/superuser."""
@@ -889,25 +949,50 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
         .count()
     )
 
-    low_fill_tournaments_count = 0
+    low_fill_tournaments: list[dict[str, Any]] = []
     upcoming_tournaments: list[dict[str, Any]] = []
-    for tournament in upcoming_tournaments_qs[:5]:
-        participants_count = (
-            tournament.full_teams_count()
-            if tournament.is_doubles()
-            else tournament.participants.count()
-        )
-        target_participants = (
-            tournament.max_teams
-            if tournament.is_doubles()
-            else tournament.max_participants
-        )
+    # Смотрим горизонт 14 дней для недобора; в таблице — первые 5 стартов.
+    for tournament in upcoming_tournaments_qs.filter(start_date__lte=next_14_days)[:30]:
+        if tournament.is_doubles():
+            participants_count = tournament.full_teams_count()
+            min_required = tournament.min_teams
+            target_participants = tournament.max_teams
+        else:
+            participants_count = tournament.participants.count()
+            min_required = tournament.min_participants
+            target_participants = tournament.max_participants
+        host_label = tournament.club.name if tournament.club_id else "TennisFan"
         needs_attention = bool(
-            tournament.min_participants
-            and participants_count < tournament.min_participants
+            min_required is not None
+            and participants_count < min_required
+            and not tournament.bracket_generated
+            and tournament.status != TournamentStatus.CANCELLED
         )
         if needs_attention:
-            low_fill_tournaments_count += 1
+            low_fill_tournaments.append(
+                {
+                    "object": tournament,
+                    "participants_count": participants_count,
+                    "min_required": min_required,
+                    "host_label": host_label,
+                }
+            )
+
+    for tournament in upcoming_tournaments_qs[:5]:
+        if tournament.is_doubles():
+            participants_count = tournament.full_teams_count()
+            min_required = tournament.min_teams
+            target_participants = tournament.max_teams
+        else:
+            participants_count = tournament.participants.count()
+            min_required = tournament.min_participants
+            target_participants = tournament.max_participants
+        needs_attention = bool(
+            min_required is not None
+            and participants_count < min_required
+            and not tournament.bracket_generated
+            and tournament.status != TournamentStatus.CANCELLED
+        )
         upcoming_tournaments.append(
             {
                 "object": tournament,
@@ -1022,14 +1107,18 @@ def platform_dashboard(request: HttpRequest) -> HttpResponse:
                 "action_url": reverse("admin:clubs_club_changelist"),
             }
         )
-    if low_fill_tournaments_count:
+    if low_fill_tournaments:
+        low_fill_description, low_fill_entries, low_fill_label, low_fill_url = (
+            _format_low_fill_tournaments_attention(low_fill_tournaments)
+        )
         attention_items.append(
             {
                 "tone": "warning",
                 "title": "Турниры с недобором участников",
-                "description": f"{low_fill_tournaments_count} ближайших турниров не набрали минимальный состав.",
-                "action_label": "Турниры",
-                "action_url": reverse("admin:tournaments_tournament_changelist"),
+                "description": low_fill_description,
+                "entries": low_fill_entries,
+                "action_label": low_fill_label,
+                "action_url": low_fill_url,
             }
         )
     if pending_interclub_applications:

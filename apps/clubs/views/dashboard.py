@@ -290,13 +290,18 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
         joined_at__gte=last_7_days,
     ).count()
 
-    low_fill_tournaments_count = 0
+    low_fill_tournaments: list[dict[str, Any]] = []
     upcoming_tournaments: list[dict[str, Any]] = []
-    for tournament in upcoming_tournaments_qs[:5]:
+    for tournament in upcoming_tournaments_qs[:10]:
         participants_count = (
             int(getattr(tournament, "full_teams_count_annotated", 0))
             if tournament.is_doubles()
             else int(getattr(tournament, "participants_count", 0))
+        )
+        min_required = (
+            tournament.min_teams
+            if tournament.is_doubles()
+            else tournament.min_participants
         )
         target_participants = (
             tournament.max_teams
@@ -307,20 +312,31 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
             participants_count / target_participants if target_participants else 0
         )
         needs_attention = bool(
-            tournament.min_participants
-            and participants_count < tournament.min_participants
+            min_required is not None
+            and participants_count < min_required
+            and not tournament.bracket_generated
+            and tournament.status != TournamentStatus.CANCELLED
         )
         if needs_attention:
-            low_fill_tournaments_count += 1
-        upcoming_tournaments.append(
-            {
-                "object": tournament,
-                "participants_count": participants_count,
-                "target_participants": target_participants,
-                "fill_ratio": round(fill_ratio * 100) if target_participants else None,
-                "needs_attention": needs_attention,
-            }
-        )
+            low_fill_tournaments.append(
+                {
+                    "object": tournament,
+                    "participants_count": participants_count,
+                    "min_required": min_required,
+                }
+            )
+        if len(upcoming_tournaments) < 5:
+            upcoming_tournaments.append(
+                {
+                    "object": tournament,
+                    "participants_count": participants_count,
+                    "target_participants": target_participants,
+                    "fill_ratio": (
+                        round(fill_ratio * 100) if target_participants else None
+                    ),
+                    "needs_attention": needs_attention,
+                }
+            )
 
     inactive_members = [
         member
@@ -430,7 +446,7 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
         for point in weekly_activity_raw
     ]
 
-    attention_items: list[dict[str, str]] = []
+    attention_items: list[dict[str, Any]] = []
     if tournaments_limit and tournaments_this_month >= tournaments_limit:
         attention_items.append(
             {
@@ -482,19 +498,44 @@ def dashboard(request: HttpRequest, slug: str) -> HttpResponse:
                 "action_url": reverse("clubs:invites_list", kwargs={"slug": club.slug}),
             }
         )
-    if low_fill_tournaments_count:
+    if low_fill_tournaments:
+        first = low_fill_tournaments[0]
+        first_t = first["object"]
+        if len(low_fill_tournaments) == 1:
+            description = (
+                f"«{first_t.name}»: набрано {first['participants_count']} "
+                f"из минимальных {first['min_required']}."
+            )
+            action_label = "Открыть турнир"
+            action_url = reverse("tournament_manage", kwargs={"slug": first_t.slug})
+        else:
+            description = (
+                f"{len(low_fill_tournaments)} турниров не набрали минимальный состав."
+            )
+            action_label = "К турнирам"
+            action_url = reverse(
+                "clubs:club_tournaments_list",
+                kwargs={"slug": club.slug},
+            )
+        entries = [
+            {
+                "name": item["object"].name,
+                "meta": (f"{item['participants_count']}/{item['min_required']}"),
+                "meta_prefix": "набрано",
+                "url": reverse(
+                    "tournament_manage", kwargs={"slug": item["object"].slug}
+                ),
+            }
+            for item in low_fill_tournaments
+        ]
         attention_items.append(
             {
                 "tone": "warning",
                 "title": "Турниры с недобором",
-                "description": (
-                    f"{low_fill_tournaments_count} ближайших турниров пока не набрали минимальный состав."
-                ),
-                "action_label": "Турниры",
-                "action_url": reverse(
-                    "clubs:club_tournaments_list",
-                    kwargs={"slug": club.slug},
-                ),
+                "description": description,
+                "entries": entries,
+                "action_label": action_label,
+                "action_url": action_url,
             }
         )
     active_postpayment_tournaments = (

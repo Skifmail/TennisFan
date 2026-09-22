@@ -1,6 +1,7 @@
 """Интеграционные тесты: лента активности платформы."""
 
 import uuid
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.cache import cache
@@ -14,6 +15,7 @@ from apps.clubs.models import (
 from apps.core.activity import HOME_ACTIVITY_SEEN_COOKIE, log_activity
 from apps.core.models import PlatformActivityEvent
 from apps.payments.models import PaymentRecord
+from apps.tournaments.models import Tournament, TournamentFormat, TournamentStatus
 from apps.users.models import Player, User
 from tests.support.factories import make_subscription
 
@@ -245,6 +247,41 @@ class PlatformActivityFeedTestCase(TestCase):
         self.assertContains(response, "Александр Шевченко")
         self.assertContains(response, "Подписка игрока Александр Шевченко закончится")
         self.assertNotContains(response, "пользовательских подписок закончатся")
+
+    def test_platform_dashboard_low_fill_links_to_tournament(self) -> None:
+        """Недобор показывает имя турнира и ссылку на его карточку в админке."""
+        tournament = Tournament.objects.create(
+            name="Раменский недобор",
+            slug="ramenskiy-nedobor",
+            city="Раменское",
+            start_date=date.today() + timedelta(days=5),
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            status=TournamentStatus.UPCOMING,
+            entry_fee=500,
+            min_participants=8,
+            max_participants=32,
+            bracket_generated=False,
+        )
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse("platform_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Раменский недобор")
+        self.assertContains(response, "набрано 0 из минимальных 8")
+        change_url = reverse(
+            "admin:tournaments_tournament_change", args=[tournament.pk]
+        )
+        self.assertContains(response, change_url)
+        self.assertContains(response, "Открыть турнир")
+        # Hero summary / кнопка не ведут на общий список всех турниров.
+        changelist = reverse("admin:tournaments_tournament_changelist")
+        attention = response.context["attention_items"]
+        low_fill = next(
+            item
+            for item in attention
+            if item["title"] == "Турниры с недобором участников"
+        )
+        self.assertEqual(low_fill["action_url"], change_url)
+        self.assertNotEqual(low_fill["action_url"], changelist)
 
     def test_platform_activity_unseen_indicator(self) -> None:
         """Индикатор новых событий показывается до просмотра панели и скрывается после."""

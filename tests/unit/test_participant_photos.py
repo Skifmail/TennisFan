@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import io
-from datetime import date
+from datetime import date, timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.tournaments.models import (
     Match,
@@ -112,6 +113,41 @@ class ParticipantPhotoServicesTestCase(TestCase):
         self.assertTrue(can_participant_delete_photo(own, self.participant))
         self.assertFalse(can_participant_delete_photo(admin_photo, self.participant))
 
+    def test_photos_are_ordered_newest_first(self) -> None:
+        """Последнее загруженное фото должно быть первым в галерее."""
+        now = timezone.now()
+        oldest = TournamentPhoto.objects.create(
+            tournament=self.tournament,
+            image=_make_test_image("oldest.jpg"),
+            caption="oldest",
+            uploaded_by=self.participant,
+            order=99,
+        )
+        middle = TournamentPhoto.objects.create(
+            tournament=self.tournament,
+            image=_make_test_image("middle.jpg"),
+            caption="middle",
+            uploaded_by=self.participant,
+            order=1,
+        )
+        newest = TournamentPhoto.objects.create(
+            tournament=self.tournament,
+            image=_make_test_image("newest.jpg"),
+            caption="newest",
+            uploaded_by=self.participant,
+            order=0,
+        )
+        TournamentPhoto.objects.filter(pk=oldest.pk).update(
+            created_at=now - timedelta(hours=2)
+        )
+        TournamentPhoto.objects.filter(pk=middle.pk).update(
+            created_at=now - timedelta(hours=1)
+        )
+        TournamentPhoto.objects.filter(pk=newest.pk).update(created_at=now)
+
+        ordered_ids = list(self.tournament.photos.values_list("pk", flat=True))
+        self.assertEqual(ordered_ids, [newest.pk, middle.pk, oldest.pk])
+
 
 class ParticipantPhotoViewsTestCase(TestCase):
     def setUp(self) -> None:
@@ -167,6 +203,59 @@ class ParticipantPhotoViewsTestCase(TestCase):
         photo = TournamentPhoto.objects.get()
         self.assertEqual(photo.uploaded_by_id, self.participant.id)
         self.assertEqual(photo.caption, "Матч дня")
+
+    def test_detail_and_gallery_pages_show_newest_photo_first(self) -> None:
+        """На странице турнира и в автогалерее новое фото идёт первым."""
+        now = timezone.now()
+        oldest = TournamentPhoto.objects.create(
+            tournament=self.tournament,
+            image=_make_test_image("oldest.jpg"),
+            caption="oldest-photo",
+            uploaded_by=self.participant,
+            order=99,
+        )
+        newest = TournamentPhoto.objects.create(
+            tournament=self.tournament,
+            image=_make_test_image("newest.jpg"),
+            caption="newest-photo",
+            uploaded_by=self.participant,
+            order=0,
+        )
+        TournamentPhoto.objects.filter(pk=oldest.pk).update(
+            created_at=now - timedelta(hours=1)
+        )
+        TournamentPhoto.objects.filter(pk=newest.pk).update(created_at=now)
+
+        detail = self.client.get(self.detail_url, secure=True)
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, "newest-photo")
+        self.assertContains(detail, "oldest-photo")
+        detail_html = detail.content.decode()
+        self.assertLess(
+            detail_html.index("newest-photo"),
+            detail_html.index("oldest-photo"),
+        )
+
+        gallery_url = reverse(
+            "tournament_gallery_detail",
+            kwargs={"slug": self.tournament.slug},
+        )
+        gallery = self.client.get(gallery_url, secure=True)
+        self.assertEqual(gallery.status_code, 200)
+        self.assertContains(gallery, "newest-photo")
+        self.assertContains(gallery, "oldest-photo")
+        gallery_html = gallery.content.decode()
+        self.assertLess(
+            gallery_html.index("newest-photo"),
+            gallery_html.index("oldest-photo"),
+        )
+
+        gallery_list = self.client.get(reverse("gallery_list"), secure=True)
+        cover_photo = self.tournament.photos.first()
+        self.assertIsNotNone(cover_photo)
+        assert cover_photo is not None
+        self.assertEqual(cover_photo.pk, newest.pk)
+        self.assertContains(gallery_list, newest.image.url)
 
     def test_upload_limit_enforced(self) -> None:
         self.client.force_login(self.participant_user)

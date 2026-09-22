@@ -17457,10 +17457,11 @@ a.home-activity__actor:hover {
  * training.css
  *
  * Описание: Макет страницы тренировки с двухколоночной структурой и sticky-сайдбаром.
- * Компоненты: .training-detail-grid, .training-detail-sidebar-card
- * Используется на: страница тренировки
+ * Компоненты: .training-detail-grid, .training-detail-sidebar-card,
+ *             .my-trainings, .my-trainings-offer, .my-trainings-enrollment
+ * Используется на: страница тренировки, «Мои тренировки»
  *
- * Последнее обновление: 2026-03
+ * Последнее обновление: 2026-09
  */
 
 /* Training detail layout */
@@ -17909,6 +17910,301 @@ a.home-activity__actor:hover {
 
     .training-list-grid .training-card .card-image {
         aspect-ratio: 16 / 10;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Мои тренировки: ровная сетка действий без filter-size кнопок
+   Карточки 12px, кнопки 8px, статус-чип 4px. Высота кнопок 40px / 44px.
+   -------------------------------------------------------------------------- */
+.my-trainings {
+    padding-bottom: var(--spacing-2xl);
+}
+
+.my-trainings__section + .my-trainings__section {
+    margin-top: var(--spacing-2xl);
+}
+
+.my-trainings__section-head {
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.my-trainings__section-title {
+    margin: 0 0 var(--spacing-lg);
+}
+
+.my-trainings__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    box-sizing: border-box;
+    height: 40px;
+    min-height: 40px;
+    margin: 0;
+    padding: 0 0.9rem;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: var(--radius-md);
+    line-height: 1;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.my-trainings__btn.btn-primary {
+    border-color: #a6824a;
+}
+
+.my-trainings__btn.btn-outline {
+    border-color: var(--color-primary);
+}
+
+.my-trainings__btn.btn-ghost {
+    border-color: transparent;
+}
+
+.my-trainings__btn .messenger-btn__icon {
+    width: 16px;
+    height: 16px;
+    max-width: 16px;
+    max-height: 16px;
+}
+
+.my-trainings__hint {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+.my-trainings-offer {
+    margin-bottom: var(--spacing-lg);
+}
+
+.my-trainings-offer:last-child {
+    margin-bottom: 0;
+}
+
+.my-trainings-offer__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.my-trainings-offer__head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem 1rem;
+    align-items: start;
+}
+
+.my-trainings-offer__title-block {
+    min-width: 0;
+}
+
+.my-trainings-offer__title {
+    margin: 0;
+    color: var(--color-text);
+    font-family: var(--font-heading);
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+    text-transform: uppercase;
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+}
+
+.my-trainings-offer__meta {
+    margin: 0.4rem 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+}
+
+.my-trainings-offer__court-price {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.my-trainings-offer__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.my-trainings-offer__enrollments {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.my-trainings-offer__enrollments-title {
+    margin: 0;
+    color: var(--color-text);
+    font-family: var(--font-heading);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.my-trainings-enrollment {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem 1rem;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgb(166 130 74 / 0.22);
+    border-radius: var(--radius-md);
+    background: rgb(8 28 22 / 0.45);
+}
+
+.my-trainings-enrollment__info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.7rem;
+    min-width: 0;
+}
+
+.my-trainings-enrollment__name {
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.my-trainings-enrollment__status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.4rem;
+    padding: 0 0.5rem;
+    border: 1px solid rgb(166 130 74 / 0.28);
+    border-radius: var(--radius-sm);
+    background: rgb(166 130 74 / 0.12);
+    color: var(--color-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.my-trainings-enrollment__status--confirmed,
+.my-trainings-enrollment__status--completed {
+    border-color: rgb(136 155 115 / 0.4);
+    background: rgb(136 155 115 / 0.16);
+    color: #c5d4b4;
+}
+
+.my-trainings-enrollment__status--cancelled {
+    border-color: rgb(160 0 0 / 0.35);
+    background: rgb(160 0 0 / 0.14);
+    color: #e2b4b4;
+}
+
+.my-trainings-enrollment__contacts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.my-trainings-requests {
+    align-items: stretch;
+}
+
+.my-trainings-request {
+    height: 100%;
+}
+
+.my-trainings-request__body {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-width: 0;
+}
+
+.my-trainings-request__title {
+    margin: 0;
+    color: var(--color-text);
+    font-family: var(--font-heading);
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+}
+
+.my-trainings-request__meta {
+    margin: 0.4rem 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+}
+
+.my-trainings-request__status-row {
+    margin: 0.75rem 0 0;
+}
+
+.my-trainings-request__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding-top: var(--spacing-md);
+}
+
+.my-trainings-request__actions form {
+    display: inline-flex;
+    margin: 0;
+}
+
+@media (width <= 768px) {
+    .my-trainings__section-head {
+        align-items: stretch;
+    }
+
+    .my-trainings__section-head .my-trainings__btn {
+        width: 100%;
+        height: 44px;
+        min-height: 44px;
+    }
+
+    .my-trainings-offer__actions .my-trainings__btn,
+    .my-trainings-enrollment__contacts .my-trainings__btn,
+    .my-trainings-request__actions .my-trainings__btn {
+        flex: 1 1 8.5rem;
+        min-width: 0;
+        height: 44px;
+        min-height: 44px;
+    }
+
+    .my-trainings-offer__head,
+    .my-trainings-enrollment {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .my-trainings-offer__actions,
+    .my-trainings-enrollment__contacts,
+    .my-trainings-request__actions {
+        justify-content: stretch;
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .my-trainings .card:hover {
+        transform: none;
     }
 }
 

@@ -9,92 +9,104 @@
     <p class="page-subtitle">Управление тренировками и заявками</p>
 </div>
 
-<div class="container">
+<div class="container my-trainings">
 
     {% if coach %}
-    <section class="mb-5">
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
-            <h2 class="section-title mb-0">Как тренер</h2>
-            <a href="{% url 'training_add' %}" class="btn btn-primary btn--filter-size">Добавить тренировку</a>
+    <section class="my-trainings__section" aria-labelledby="my-trainings-coach-title">
+        <div class="section-header my-trainings__section-head">
+            <h2 id="my-trainings-coach-title" class="section-title">Как тренер</h2>
+            <a href="{% url 'training_add' %}" class="btn btn-primary my-trainings__btn">Добавить тренировку</a>
         </div>
 
         {% for t in coach_trainings %}
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                    <h3 class="mb-0" style="font-size: var(--font-size-xl);">{{ t.title }}</h3>
-                    <a href="{% url 'training_edit' pk=t.pk %}" class="btn btn-ghost btn--filter-size">Изменить</a>
-                    <a href="{% url 'training_detail' slug=t.slug %}" class="btn btn-outline btn--filter-size">На сайт</a>
-                </div>
-                <p class="text-secondary mb-0">
-                    {% for tt in t.training_types_display %}{{ tt }}{% if not forloop.last %}, {% endif %}{% endfor %}
-                    · {{ t.city }}
-                    {% if t.price_display %} · {{ t.price_display }}{% endif %}
-                    {% if t.court_price_display %} <span style="font-size: var(--font-size-sm);">{{ t.court_price_display }}</span>{% endif %}
-                </p>
+        <article class="card my-trainings-offer">
+            <div class="card-body my-trainings-offer__body">
+                <header class="my-trainings-offer__head">
+                    <div class="my-trainings-offer__title-block">
+                        <h3 class="my-trainings-offer__title">{{ t.title }}</h3>
+                        <p class="my-trainings-offer__meta">
+                            {% for tt in t.training_types_display %}{{ tt }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                            · {{ t.city }}
+                            {% if t.price_display %} · {{ t.price_display }}{% endif %}
+                            {% if t.court_price_display %}
+                            <span class="my-trainings-offer__court-price">{{ t.court_price_display }}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="my-trainings-offer__actions">
+                        <a href="{% url 'training_edit' pk=t.pk %}" class="btn btn-outline my-trainings__btn">Изменить</a>
+                        <a href="{% url 'training_detail' slug=t.slug %}" class="btn btn-outline my-trainings__btn">На сайт</a>
+                    </div>
+                </header>
 
-                <h4 class="mt-4 mb-2" style="font-size: var(--font-size-base);">Заявки ({{ t.enrollments.all|length }})</h4>
-                {% for e in t.enrollments.all %}
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2 p-3" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
-                    <div style="flex: 1; min-width: 180px;">
-                        <strong>{{ e.get_display_name }}</strong>
-                        <span class="text-secondary" style="font-size: var(--font-size-sm); margin-left: var(--spacing-sm);">{{ e.get_status_display }}</span>
+                <div class="my-trainings-offer__enrollments">
+                    <h4 class="my-trainings-offer__enrollments-title">Заявки ({{ t.enrollments.all|length }})</h4>
+                    {% for e in t.enrollments.all %}
+                    <div class="my-trainings-enrollment">
+                        <div class="my-trainings-enrollment__info">
+                            <strong class="my-trainings-enrollment__name">{{ e.get_display_name }}</strong>
+                            <span class="my-trainings-enrollment__status my-trainings-enrollment__status--{{ e.status }}">{{ e.get_status_display }}</span>
+                        </div>
+                        <div class="my-trainings-enrollment__contacts">
+                            {% if e.telegram_url %}
+                            <a href="{% url 'enrollment_contact' pk=e.pk method='telegram' %}" class="btn btn-outline my-trainings__btn messenger-btn" target="_blank" rel="noopener">
+                                <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="16" height="16">
+                                Telegram
+                            </a>
+                            {% endif %}
+                            {% if e.whatsapp_url %}
+                            <a href="{% url 'enrollment_contact' pk=e.pk method='whatsapp' %}" class="btn btn-outline my-trainings__btn messenger-btn" target="_blank" rel="noopener">
+                                <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="16" height="16">
+                                WhatsApp
+                            </a>
+                            {% endif %}
+                            {% if e.email %}
+                            <a href="{% url 'enrollment_contact' pk=e.pk method='email' %}" class="btn btn-outline my-trainings__btn">
+                                Email
+                            </a>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div class="d-flex gap-1 flex-wrap">
-                        {% if e.telegram_url %}
-                        <a href="{% url 'enrollment_contact' pk=e.pk method='telegram' %}" class="btn btn-outline btn--filter-size" target="_blank" rel="noopener">
-                            <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="18" height="18"> Telegram
-                        </a>
-                        {% endif %}
-                        {% if e.whatsapp_url %}
-                        <a href="{% url 'enrollment_contact' pk=e.pk method='whatsapp' %}" class="btn btn-outline btn--filter-size" target="_blank" rel="noopener">
-                            <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="18" height="18"> WhatsApp
-                        </a>
-                        {% endif %}
-                        {% if e.email %}
-                        <a href="{% url 'enrollment_contact' pk=e.pk method='email' %}" class="btn btn-outline btn--filter-size">
-                            Email
-                        </a>
-                        {% endif %}
-                    </div>
+                    {% empty %}
+                    <p class="my-trainings__hint">Заявок пока нет.</p>
+                    {% endfor %}
                 </div>
-                {% empty %}
-                <p class="text-secondary mb-0">Заявок пока нет.</p>
-                {% endfor %}
             </div>
-        </div>
+        </article>
         {% empty %}
-        <p class="text-secondary">У вас пока нет тренировок. <a href="{% url 'training_add' %}">Добавить</a>.</p>
+        <p class="my-trainings__hint">У вас пока нет тренировок. <a href="{% url 'training_add' %}">Добавить</a>.</p>
         {% endfor %}
     </section>
     {% endif %}
 
-    <section>
-        <h2 class="section-title mb-4">Мои заявки на тренировки</h2>
+    <section class="my-trainings__section" aria-labelledby="my-trainings-requests-title">
+        <h2 id="my-trainings-requests-title" class="section-title my-trainings__section-title">Мои заявки на тренировки</h2>
         {% if my_enrollments %}
-        <div class="grid grid-3">
+        <div class="grid grid-3 my-trainings-requests">
             {% for e in my_enrollments %}
-            <div class="card">
-                <div class="card-body">
-                    <h3 class="card-title">{{ e.training.title }}</h3>
-                    <p class="text-secondary mb-2" style="font-size: var(--font-size-sm);">
+            <article class="card my-trainings-request">
+                <div class="card-body my-trainings-request__body">
+                    <h3 class="my-trainings-request__title">{{ e.training.title }}</h3>
+                    <p class="my-trainings-request__meta">
                         {% for tt in e.training.training_types_display %}{{ tt }}{% if not forloop.last %}, {% endif %}{% endfor %}
                         · {{ e.training.city }}
                     </p>
-                    <p class="mb-3"><span class="player-category">{{ e.get_status_display }}</span></p>
-                    <div class="d-flex gap-2">
-                        <a href="{% url 'training_detail' slug=e.training.slug %}" class="btn btn-outline btn--filter-size">Подробнее</a>
-                        <form action="{% url 'enrollment_delete' pk=e.pk %}" method="post" class="d-inline">
+                    <p class="my-trainings-request__status-row">
+                        <span class="my-trainings-enrollment__status my-trainings-enrollment__status--{{ e.status }}">{{ e.get_status_display }}</span>
+                    </p>
+                    <div class="my-trainings-request__actions">
+                        <a href="{% url 'training_detail' slug=e.training.slug %}" class="btn btn-outline my-trainings__btn">Подробнее</a>
+                        <form action="{% url 'enrollment_delete' pk=e.pk %}" method="post">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-ghost btn--filter-size" onclick="return confirm('Удалить заявку?');">Удалить</button>
+                            <button type="submit" class="btn btn-ghost my-trainings__btn" onclick="return confirm('Удалить заявку?');">Удалить</button>
                         </form>
                     </div>
                 </div>
-            </div>
+            </article>
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-secondary">У вас нет заявок на тренировки. <a href="{% url 'training_list' %}">Выбрать тренировку</a>.</p>
+        <p class="my-trainings__hint">У вас нет заявок на тренировки. <a href="{% url 'training_list' %}">Выбрать тренировку</a>.</p>
         {% endif %}
     </section>
 

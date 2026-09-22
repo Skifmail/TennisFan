@@ -136,6 +136,9 @@ class MyTrainingsAnonymousEnrollmentTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Анна Гость")
+        self.assertContains(response, "my-trainings__btn")
+        self.assertNotContains(response, "btn--filter-size")
+        self.assertContains(response, "Telegram")
 
     def test_coach_page_renders_player_name_when_full_name_empty(self) -> None:
         """Старая заявка с игроком без ФИО показывает имя пользователя."""
@@ -181,3 +184,20 @@ class MyTrainingsAnonymousEnrollmentTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Анонимный игрок")
+
+    def test_my_trainings_css_keeps_compact_equal_height_buttons(self) -> None:
+        """Кнопки страницы имеют фиксированную высоту и не используют filter-size."""
+        from pathlib import Path
+
+        css_path = (
+            Path(__file__).resolve().parents[2]
+            / "static"
+            / "css"
+            / "pages"
+            / "training.css"
+        )
+        css = css_path.read_text(encoding="utf-8")
+        self.assertIn(".my-trainings__btn {", css)
+        self.assertIn("height: 40px", css)
+        self.assertIn("white-space: nowrap", css)
+        self.assertIn("grid-template-columns: minmax(0, 1fr) auto", css)

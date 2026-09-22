@@ -6,6 +6,7 @@ from typing import Any
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse
@@ -1580,6 +1581,11 @@ def tournament_edit(
         if structure_locked:
             form.lock_structure_fields()
         if form.is_valid():
+            want_reopen = (
+                request.POST.get("reopen") == "1"
+                and tournament.status == TournamentStatus.CANCELLED
+                and not tournament.bracket_generated
+            )
             tournament = form.save(commit=False)
             tournament.club = club
             tournament.is_open_interclub = bool(
@@ -1595,12 +1601,50 @@ def tournament_edit(
                     datetime.combine(tournament.start_date, time(23, 59)),
                     timezone.get_current_timezone(),
                 )
-            tournament.save()
-            if not structure_locked:
-                tournament.allowed_categories.all().delete()
-                for category in form.cleaned_data["allowed_categories"]:
-                    tournament.allowed_categories.create(category=category)
-            messages.success(request, f"Турнир «{tournament.name}» обновлён.")
+            if want_reopen:
+                from apps.tournaments.cancel import (
+                    TournamentLifecycleError,
+                    reopen_tournament,
+                )
+
+                try:
+                    with transaction.atomic():
+                        reopen_tournament(
+                            tournament,
+                            start_date=tournament.start_date,
+                            registration_deadline=tournament.registration_deadline,
+                        )
+                        if not structure_locked:
+                            tournament.allowed_categories.all().delete()
+                            for category in form.cleaned_data["allowed_categories"]:
+                                tournament.allowed_categories.create(category=category)
+                except TournamentLifecycleError as exc:
+                    messages.error(request, str(exc))
+                    return render(
+                        request,
+                        "clubs/tournament_create.html",
+                        {
+                            "club": club,
+                            "is_club_panel": True,
+                            "form": form,
+                            "can_create": True,
+                            "is_pro": is_pro,
+                            "page_mode": "edit",
+                            "tournament": tournament,
+                            "structure_locked": structure_locked,
+                        },
+                    )
+                messages.success(
+                    request,
+                    f"Турнир «{tournament.name}» обновлён, набор возобновлён.",
+                )
+            else:
+                tournament.save()
+                if not structure_locked:
+                    tournament.allowed_categories.all().delete()
+                    for category in form.cleaned_data["allowed_categories"]:
+                        tournament.allowed_categories.create(category=category)
+                messages.success(request, f"Турнир «{tournament.name}» обновлён.")
             return redirect("tournament_manage", slug=tournament.slug)
     else:
         form = ClubTournamentCreateForm(

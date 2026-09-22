@@ -1,8 +1,9 @@
 """Юнит-тесты: формы клуба."""
 
-from datetime import date
+from datetime import date, datetime, timedelta
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from apps.clubs.forms import ClubPlayerPlanForm, ClubTournamentCreateForm
 from apps.clubs.models import (
@@ -11,8 +12,10 @@ from apps.clubs.models import (
 from apps.core.geo import GeoRegion
 from apps.core.models import GeoArea
 from apps.tournaments.models import (
+    Tournament,
     TournamentFormat,
     TournamentGender,
+    TournamentStatus,
     TournamentType,
 )
 
@@ -122,6 +125,52 @@ class ClubTournamentCreateFormTestCase(TestCase):
         ids = set(form.fields["geo_area"].queryset.values_list("pk", flat=True))
         self.assertIn(moscow.pk, ids)
         self.assertNotIn(oblast.pk, ids)
+
+    @override_settings(LANGUAGE_CODE="ru")
+    def test_date_widgets_render_iso_values(self) -> None:
+        """При ru-локали type=date/datetime-local показывают ISO-значения."""
+        deadline = timezone.make_aware(datetime(2026, 10, 5, 18, 30))
+        tournament = Tournament.objects.create(
+            name="Даты ISO",
+            slug="dates-iso",
+            city="Москва",
+            club=self.club,
+            start_date=date(2026, 10, 10),
+            end_date=date(2026, 10, 12),
+            registration_deadline=deadline,
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            status=TournamentStatus.UPCOMING,
+            entry_fee=500,
+        )
+        form = ClubTournamentCreateForm(
+            instance=tournament, club=self.club, is_pro=False
+        )
+        start_html = str(form["start_date"])
+        end_html = str(form["end_date"])
+        deadline_html = str(form["registration_deadline"])
+        self.assertIn('value="2026-10-10"', start_html)
+        self.assertIn('value="2026-10-12"', end_html)
+        self.assertIn('value="2026-10-05T18:30"', deadline_html)
+
+    @override_settings(LANGUAGE_CODE="ru")
+    def test_datetime_local_post_saves_registration_deadline(self) -> None:
+        """POST с datetime-local сохраняет дедлайн при LANGUAGE_CODE=ru."""
+        start = (date.today() + timedelta(days=14)).isoformat()
+        deadline_local = (
+            timezone.localtime(timezone.now()) + timedelta(days=10)
+        ).strftime("%Y-%m-%dT%H:%M")
+        form = ClubTournamentCreateForm(
+            data=self._base_tournament_data(
+                format=TournamentFormat.SINGLE_ELIMINATION,
+                start_date=start,
+                registration_deadline=deadline_local,
+                postpayment_deadline_hours="12",
+            ),
+            club=self.club,
+            is_pro=False,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIsNotNone(form.cleaned_data["registration_deadline"])
 
 
 class ClubPlayerPlanFormTestCase(TestCase):

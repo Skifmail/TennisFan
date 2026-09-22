@@ -1,6 +1,6 @@
 """Интеграционные тесты: отмена турнира и восстановление статуса."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.test import TestCase
@@ -13,7 +13,10 @@ from apps.subscriptions.models import (
     UserSubscription,
 )
 from apps.tournaments.cancel import (
+    TournamentLifecycleError,
     cancel_tournament,
+    extend_registration,
+    reopen_tournament,
     restore_tournament_after_cancellation,
 )
 from apps.tournaments.models import (
@@ -199,3 +202,58 @@ class TournamentCancelRestoreTestCase(TestCase):
             ).count(),
             1,
         )
+
+    def test_extend_registration_clears_insufficient_flag(self) -> None:
+        """Продление дедлайна сбрасывает отметку уведомления о недоборе."""
+        self.tournament.insufficient_participants_notified_at = timezone.now()
+        self.tournament.registration_deadline = timezone.now() - timedelta(hours=1)
+        self.tournament.save(
+            update_fields=[
+                "insufficient_participants_notified_at",
+                "registration_deadline",
+                "updated_at",
+            ]
+        )
+        new_start = date.today() + timedelta(days=20)
+        new_deadline = timezone.make_aware(
+            datetime.combine(new_start, datetime.min.time().replace(hour=18))
+        )
+        extend_registration(
+            self.tournament,
+            registration_deadline=new_deadline,
+            start_date=new_start,
+        )
+        self.tournament.refresh_from_db()
+        self.assertIsNone(self.tournament.insufficient_participants_notified_at)
+        self.assertEqual(self.tournament.start_date, new_start)
+
+    def test_reopen_tournament_sets_upcoming_and_restores_ft(self) -> None:
+        """Возобновление отменённого турнира возвращает upcoming и списывает FT."""
+        cancel_tournament(self.tournament)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.fancoin_balance, TOURNAMENT_REGISTRATION_COST)
+
+        new_start = date.today() + timedelta(days=15)
+        new_deadline = timezone.make_aware(
+            datetime.combine(new_start, datetime.min.time().replace(hour=12))
+        )
+        reopen_tournament(
+            self.tournament,
+            start_date=new_start,
+            registration_deadline=new_deadline,
+            notify=False,
+        )
+        self.tournament.refresh_from_db()
+        self.sub.refresh_from_db()
+        self.assertEqual(self.tournament.status, TournamentStatus.UPCOMING)
+        self.assertEqual(self.sub.fancoin_balance, 0)
+
+    def test_reopen_rejects_non_cancelled(self) -> None:
+        """Нельзя возобновить турнир, который не отменён."""
+        with self.assertRaises(TournamentLifecycleError):
+            reopen_tournament(
+                self.tournament,
+                start_date=date.today() + timedelta(days=5),
+                registration_deadline=timezone.now() + timedelta(days=3),
+                notify=False,
+            )

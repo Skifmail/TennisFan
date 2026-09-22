@@ -493,6 +493,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "entry_fee",
             "is_one_day",
             "allow_postpayment",
+            "postpayment_deadline_hours",
             "city",
             "region",
             "geo_area",
@@ -557,10 +558,33 @@ class ClubTournamentCreateForm(forms.ModelForm):
                 "placeholder": "Описание турнира, покрытие, правила, регистрация, расписание и важные детали",
             }
         )
-        self.fields["start_date"].widget = forms.DateInput(attrs={"type": "date"})
-        self.fields["end_date"].widget = forms.DateInput(attrs={"type": "date"})
+        # type=date / datetime-local требуют ISO-формат; при ru-локали без
+        # format значения не отображаются и POST не проходит валидацию.
+        self.fields["start_date"].widget = forms.DateInput(
+            attrs={"type": "date"},
+            format="%Y-%m-%d",
+        )
+        self.fields["start_date"].input_formats = ["%Y-%m-%d", "%d.%m.%Y"]
+        self.fields["end_date"].widget = forms.DateInput(
+            attrs={"type": "date"},
+            format="%Y-%m-%d",
+        )
+        self.fields["end_date"].input_formats = ["%Y-%m-%d", "%d.%m.%Y"]
         self.fields["registration_deadline"].widget = forms.DateTimeInput(
-            attrs={"type": "datetime-local"}
+            attrs={"type": "datetime-local"},
+            format="%Y-%m-%dT%H:%M",
+        )
+        self.fields["registration_deadline"].input_formats = [
+            "%Y-%m-%dT%H:%M",
+            "%Y-%m-%dT%H:%M:%S",
+        ]
+        self.fields["postpayment_deadline_hours"].required = False
+        self.fields["postpayment_deadline_hours"].help_text = (
+            "Сколько часов на оплату после открытия окна постоплаты (по умолчанию 12)."
+        )
+        self.fields["start_date"].help_text = (
+            "Чтобы продлить регистрацию, сдвиньте и дату начала: "
+            "дедлайн не может быть позже старта турнира."
         )
         self.fields["court"].queryset = (
             Court.objects.filter(city=club.city).order_by("name")
@@ -774,6 +798,13 @@ class ClubTournamentCreateForm(forms.ModelForm):
                     "allow_postpayment",
                     "Постоплата доступна только при вступительном взносе больше 0 ₽.",
                 )
+
+        hours = cleaned_data.get("postpayment_deadline_hours")
+        if hours is not None and int(hours) < 1:
+            self.add_error(
+                "postpayment_deadline_hours",
+                "Длительность окна постоплаты должна быть не меньше 1 часа.",
+            )
 
         if variant == TournamentVariant.DOUBLES:
             cleaned_data["min_participants"] = None

@@ -1,0 +1,13 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Новая заявка на вступление</h2>
+<p>Здравствуйте, {{ admin_name }}!</p>
+<p>В клуб <b>{{ club_name }}</b> поступила заявка на вступление:</p>
+<p><b>{{ applicant_name }}</b> ({{ applicant_email }})</p>
+{% if comment %}
+<p>Комментарий игрока: {{ comment }}</p>
+{% endif %}
+{% if invites_url %}
+<p><a href="{{ invites_url }}" class="btn">Открыть заявки</a></p>
+{% endif %}
+{% endblock %}

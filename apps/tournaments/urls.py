@@ -84,6 +84,16 @@ urlpatterns = [
         name="tournament_manage_cancel",
     ),
     path(
+        "<slug:slug>/manage/extend-registration/",
+        views.tournament_manage_extend_registration,
+        name="tournament_manage_extend_registration",
+    ),
+    path(
+        "<slug:slug>/manage/reopen/",
+        views.tournament_manage_reopen,
+        name="tournament_manage_reopen",
+    ),
+    path(
         "<slug:slug>/manage/compose-pair/",
         views.tournament_manage_compose_pair,
         name="tournament_manage_compose_pair",

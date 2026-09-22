@@ -198,11 +198,20 @@ def check_and_generate_past_deadline_brackets() -> int:
             if count < min_required:
                 notified_at = t.insufficient_participants_notified_at
                 if notified_at is None:
+                    from apps.clubs.notifications import (
+                        send_tournament_insufficient_to_club,
+                    )
                     from apps.core.telegram_notify import (
                         notify_tournament_insufficient_participants,
                     )
 
                     notify_tournament_insufficient_participants(t)
+                    try:
+                        send_tournament_insufficient_to_club(t)
+                    except Exception:
+                        logger.exception(
+                            "Club insufficient notify failed for %s", t.slug
+                        )
                     t.insufficient_participants_notified_at = now
                     t.save(update_fields=["insufficient_participants_notified_at"])
                     logger.info(
@@ -212,9 +221,54 @@ def check_and_generate_past_deadline_brackets() -> int:
                         min_required,
                     )
                 elif (notified_at + timedelta(hours=3)) <= now:
+                    from django.db import transaction
+
+                    from apps.clubs.notifications import (
+                        send_tournament_auto_cancelled_to_club,
+                    )
+
                     from .cancel import cancel_tournament
 
-                    cancel_tournament(t)
+                    with transaction.atomic():
+                        locked = (
+                            Tournament.objects.select_for_update()
+                            .filter(pk=t.pk)
+                            .exclude(status=TournamentStatus.CANCELLED)
+                            .first()
+                        )
+                        if locked is None:
+                            continue
+                        locked.refresh_from_db()
+                        if (
+                            locked.registration_deadline
+                            and locked.registration_deadline > now
+                        ):
+                            continue
+                        if locked.bracket_generated:
+                            continue
+                        min_req = (
+                            locked.min_teams
+                            if locked.is_doubles()
+                            else locked.min_participants
+                        )
+                        cur = (
+                            locked.full_teams_count()
+                            if locked.is_doubles()
+                            else locked.participants.count()
+                        )
+                        if min_req is None or cur >= min_req:
+                            continue
+                        stamp = locked.insufficient_participants_notified_at
+                        if stamp is None or (stamp + timedelta(hours=3)) > now:
+                            continue
+                        cancel_tournament(locked)
+                        t = locked
+                    try:
+                        send_tournament_auto_cancelled_to_club(t)
+                    except Exception:
+                        logger.exception(
+                            "Club auto-cancel notify failed for %s", t.slug
+                        )
                     logger.info(
                         "Cancelled tournament %s: still insufficient after 3h (%s/%s)",
                         t.slug,

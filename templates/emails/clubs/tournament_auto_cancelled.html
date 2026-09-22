@@ -1,0 +1,17 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Турнир отменён из‑за недобора</h2>
+<p>Здравствуйте, {{ admin_name }}!</p>
+<p>
+  Турнир <b>«{{ tournament_name }}»</b> автоматически отменён:
+  к дедлайну не набралось минимальное число участников
+  ({{ current_count }} из {{ min_required }} {{ label }}).
+</p>
+<p>
+  Вы можете возобновить набор: укажите новую дату начала и дедлайн регистрации
+  в панели управления клуба.
+</p>
+{% if manage_url %}
+<p><a href="{{ manage_url }}" class="btn">Возобновить набор</a></p>
+{% endif %}
+{% endblock %}

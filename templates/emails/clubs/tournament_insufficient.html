@@ -1,0 +1,17 @@
+{% extends "emails/clubs/base_email.html" %}
+{% block content %}
+<h2>Недостаточно участников</h2>
+<p>Здравствуйте, {{ admin_name }}!</p>
+<p>
+  К дедлайну регистрации на турнир <b>«{{ tournament_name }}»</b> набралось
+  {{ current_count }} {{ label }} из минимальных {{ min_required }}.
+</p>
+<p>Дедлайн регистрации: {{ deadline_str }}.</p>
+<p>
+  Если в течение <b>3 часов</b> не продлить дедлайн, турнир будет автоматически отменён,
+  а участникам вернутся лимиты регистраций / FT.
+</p>
+{% if manage_url %}
+<p><a href="{{ manage_url }}" class="btn">Продлить регистрацию</a></p>
+{% endif %}
+{% endblock %}

@@ -393,6 +393,42 @@ def notify_court_application(app) -> bool:
     return send_admin_message("\n".join(lines))
 
 
+def notify_club_join_request(
+    *,
+    club_name: str,
+    applicant_name: str,
+    applicant_email: str,
+    comment: str = "",
+    admin_url: str = "",
+) -> bool:
+    """Уведомление платформенного админа о заявке на вступление в клуб.
+
+    Args:
+        club_name: Название клуба.
+        applicant_name: Имя игрока.
+        applicant_email: Email игрока.
+        comment: Комментарий к заявке.
+        admin_url: Ссылка на список заявок в админке.
+
+    Returns:
+        bool: True, если уведомление ушло хотя бы в один канал.
+    """
+    lines = [
+        "🎾 <b>Заявка на вступление в клуб</b>",
+        "",
+        f"Клуб: {_escape(club_name)}",
+        f"Игрок: {_escape(applicant_name) or '—'}",
+        f"Email: {_escape(applicant_email) or '—'}",
+    ]
+    if comment:
+        trimmed = comment[:300]
+        suffix = "…" if len(comment) > 300 else ""
+        lines.extend(["", f"Комментарий: {_escape(trimmed)}{suffix}"])
+    if admin_url:
+        lines.extend(["", f"Ссылка: {admin_url}"])
+    return send_admin_message("\n".join(lines))
+
+
 def notify_feedback(
     user, subject: str, message: str, feedback_id: int | None = None
 ) -> bool:
@@ -519,6 +555,7 @@ def notify_purchase_request(pr) -> bool:
 def notify_tournament_insufficient_participants(tournament) -> bool:
     """Уведомление админу: недостаточно участников/команд к дедлайну, турнир отменят через 3 ч без продления."""
     from django.conf import settings
+    from django.urls import reverse
 
     name = _escape(getattr(tournament, "name", "") or "—")
     slug = _escape(getattr(tournament, "slug", "") or "—")
@@ -535,17 +572,34 @@ def notify_tournament_insufficient_participants(tournament) -> bool:
         label = "участников"
     deadline = getattr(tournament, "registration_deadline", None)
     deadline_str = deadline.strftime("%d.%m.%Y %H:%M") if deadline else "—"
-    admin_url = ""
-    if hasattr(settings, "ADMIN_URL") and settings.ADMIN_URL:
-        admin_url = f"\nПродлить дедлайн: {settings.ADMIN_URL}/tournaments/tournament/{getattr(tournament, 'pk', '')}/change/"
+
+    base = (getattr(settings, "SITE_URL", None) or "").rstrip("/")
+    action_url = ""
+    club = getattr(tournament, "club", None)
+    if club is not None and getattr(tournament, "pk", None):
+        try:
+            path = reverse(
+                "clubs:tournament_edit",
+                kwargs={"slug": club.slug, "tournament_id": tournament.pk},
+            )
+            action_url = f"{base}{path}" if base else path
+        except Exception:
+            action_url = ""
+    if not action_url:
+        admin_path = (getattr(settings, "ADMIN_URL", None) or "admin").strip("/")
+        pk = getattr(tournament, "pk", "")
+        rel = f"/{admin_path}/tournaments/tournament/{pk}/change/"
+        action_url = f"{base}{rel}" if base else rel
+
     msg = (
         "⚠️ <b>Турнир: недостаточно участников</b>\n\n"
         f"Турнир: {name}\n"
         f"Slug: {slug}\n"
         f"Зарегистрировано: {current} {label} (минимум: {min_required})\n"
         f"Дедлайн регистрации: {deadline_str}\n\n"
-        "Если в течение <b>3 часов</b> не продлить дедлайн регистрации, турнир будет автоматически отменён, участникам вернутся лимиты регистраций."
-        f"{admin_url}"
+        "Если в течение <b>3 часов</b> не продлить дедлайн регистрации, "
+        "турнир будет автоматически отменён, участникам вернутся лимиты регистраций."
+        f"\nПродлить дедлайн: {action_url}"
     )
     return send_admin_message(msg)
 

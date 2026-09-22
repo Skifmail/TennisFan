@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     from apps.courts.models import CourtApplication
     from apps.tournaments.models import Match, Tournament
-    from apps.training.models import CoachApplication
+    from apps.training.models import CoachApplication, TrainingEnrollment
     from apps.users.models import User
 
 logger = logging.getLogger(__name__)
@@ -777,6 +777,86 @@ def send_coach_application_decision_email(
         context={
             "application": application,
             "approved": approved,
+        },
+        recipient=recipient,
+        category="other",
+    )
+
+
+def send_training_enrollment_email(enrollment: TrainingEnrollment) -> bool:
+    """Отправить тренеру письмо о новой заявке на тренировку.
+
+    Args:
+        enrollment (TrainingEnrollment): Созданная заявка игрока.
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    from apps.training.models import TrainingEnrollment as Enrollment
+
+    if enrollment.pk:
+        enrollment = Enrollment.objects.select_related(
+            "training__coach__user",
+            "desired_court",
+        ).get(pk=enrollment.pk)
+
+    training = enrollment.training
+    if not training.coach_id:
+        logger.warning(
+            "send_training_enrollment_email: no coach | enrollment=%s training=%s",
+            enrollment.pk,
+            training.pk,
+        )
+        return False
+    coach = training.coach
+    if coach is None or not coach.user_id:
+        logger.warning(
+            "send_training_enrollment_email: coach has no user | enrollment=%s coach=%s",
+            enrollment.pk,
+            getattr(coach, "pk", None),
+        )
+        return False
+    user = coach.user
+    recipient = _resolve_user_email(user)
+    if not recipient:
+        logger.warning(
+            "send_training_enrollment_email: coach has no valid email | enrollment=%s user=%s",
+            enrollment.pk,
+            user.pk,
+        )
+        return False
+
+    base_url = _get_site_base_url()
+    created_at = enrollment.created_at
+    if created_at is not None:
+        created_at = timezone.localtime(created_at)
+
+    desired_court = ""
+    court = enrollment.desired_court
+    if court is not None:
+        city = (court.city or "").strip()
+        name = (court.name or "").strip()
+        desired_court = " — ".join(part for part in (city, name) if part)
+
+    coach_name = (coach.name or "").strip() or user.get_display_name() or recipient
+    return _send_html_email(
+        subject=f"TennisFan: заявка на тренировку «{training.title}»",
+        template_name="emails/training_enrollment.html",
+        context={
+            "coach_name": coach_name,
+            "training": training,
+            "enrollment": enrollment,
+            "full_name": (enrollment.full_name or "").strip() or "—",
+            "telegram": (enrollment.telegram or "").strip(),
+            "whatsapp": (enrollment.whatsapp or "").strip(),
+            "email": (enrollment.email or "").strip(),
+            "desired_court": desired_court,
+            "message": (enrollment.message or "").strip(),
+            "created_at": created_at,
+            "my_trainings_url": f"{base_url}{reverse('my_trainings')}",
+            "training_url": (
+                f"{base_url}{reverse('training_detail', kwargs={'slug': training.slug})}"
+            ),
         },
         recipient=recipient,
         category="other",

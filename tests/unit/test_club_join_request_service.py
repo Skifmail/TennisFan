@@ -109,7 +109,7 @@ class ClubJoinRequestServiceTestCase(TestCase):
     TELEGRAM_ADMIN_CHAT_IDS=[],
 )
 class ClubJoinRequestEmailNotificationTestCase(TestCase):
-    """Новая заявка должна уходить письмом админу клуба и платформы."""
+    """Новая заявка должна уходить письмом админу клуба."""
 
     def setUp(self) -> None:
         self.club = make_club(name="Клуб писем", slug="join-email-club")
@@ -130,18 +130,16 @@ class ClubJoinRequestEmailNotificationTestCase(TestCase):
             last_name="Заявкин",
         )
 
-    def test_sends_email_to_club_admin_and_platform_admin(self) -> None:
+    def test_sends_email_to_club_admin(self) -> None:
         send_join_request_notification(
             self.club,
             self.applicant,
             invites_url="https://tennisfan.ru/club/join-email-club/invites/",
-            platform_admin_url="https://tennisfan.ru/admin/clubs/clubjoinrequest/?status__exact=pending",
             comment="Хочу играть в турнирах",
         )
 
         recipients = {tuple(message.to) for message in mail.outbox}
-        self.assertIn(("club-admin@test.local",), recipients)
-        self.assertIn(("platform-admin@test.local",), recipients)
+        self.assertEqual(recipients, {("club-admin@test.local",)})
         club_mail = next(m for m in mail.outbox if m.to == ["club-admin@test.local"])
         self.assertIn("Новая заявка в клуб", club_mail.subject)
         self.assertIn("Павел Заявкин", club_mail.alternatives[0][0])

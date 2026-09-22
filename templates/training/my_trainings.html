@@ -33,11 +33,11 @@
                     {% if t.court_price_display %} <span style="font-size: var(--font-size-sm);">{{ t.court_price_display }}</span>{% endif %}
                 </p>
 
-                <h4 class="mt-4 mb-2" style="font-size: var(--font-size-base);">Заявки ({{ t.enrollments.count }})</h4>
+                <h4 class="mt-4 mb-2" style="font-size: var(--font-size-base);">Заявки ({{ t.enrollments.all|length }})</h4>
                 {% for e in t.enrollments.all %}
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2 p-3" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
                     <div style="flex: 1; min-width: 180px;">
-                        <strong>{{ e.full_name|default:e.player.user.get_full_name|default:e.player.user.email }}</strong>
+                        <strong>{{ e.get_display_name }}</strong>
                         <span class="text-secondary" style="font-size: var(--font-size-sm); margin-left: var(--spacing-sm);">{{ e.get_status_display }}</span>
                     </div>
                     <div class="d-flex gap-1 flex-wrap">

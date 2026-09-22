@@ -6,6 +6,7 @@ from decimal import Decimal
 from unittest.mock import patch
 from urllib.parse import urlencode
 
+from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -1517,10 +1518,20 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         )
         self.assertNotContains(response, "В ссылке отсутствует токен приглашения.")
 
+    @override_settings(
+        EMAIL_BACKEND="apps.core.mail.LoggingEmailBackend",
+        EMAIL_BACKEND_INNER="django.core.mail.backends.locmem.EmailBackend",
+        ADMIN_NOTIFICATIONS_EMAIL="platform-admin@test.local",
+        TELEGRAM_BOT_TOKEN="",
+        TELEGRAM_ADMIN_CHAT_ID="",
+        TELEGRAM_ADMIN_CHAT_IDS=[],
+    )
     def test_player_can_submit_join_request_from_public_page(self) -> None:
         applicant = User.objects.create_user(
             email="applicant@test.local",
             password="testpass123",
+            first_name="Анна",
+            last_name="Иванова",
         )
         self.client.force_login(applicant)
 
@@ -1539,6 +1550,9 @@ class ClubTournamentManagementViewsTestCase(TestCase):
                 message__contains="Новая заявка на вступление в клуб",
             ).exists()
         )
+        recipients = {tuple(message.to) for message in mail.outbox}
+        self.assertIn((self.user.email,), recipients)
+        self.assertIn(("platform-admin@test.local",), recipients)
 
     def test_admin_can_approve_join_request(self) -> None:
         applicant = User.objects.create_user(
@@ -2007,3 +2021,86 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         self.assertEqual(len(payload["results"]), 1)
         self.assertIn("Иванов", payload["results"][0]["display"])
         self.assertNotIn("Иванченко", payload["results"][0]["display"])
+
+    def test_cancelled_manage_shows_reopen_action(self) -> None:
+        """На manage отменённого турнира есть возобновление, а не пустые действия."""
+        tournament = Tournament.objects.create(
+            name="Отменённый турнир",
+            slug="cancelled-reopen-ui",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            status=TournamentStatus.CANCELLED,
+            entry_fee=1000,
+            min_participants=8,
+            bracket_generated=False,
+        )
+        response = self.client.get(
+            reverse("tournament_manage", kwargs={"slug": tournament.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Возобновить набор")
+        self.assertNotContains(response, "Нет доступных действий для текущего статуса.")
+        self.assertContains(response, "Редактировать турнир")
+
+    def test_club_admin_can_reopen_cancelled_tournament(self) -> None:
+        """Админ клуба (не staff) может POST reopen."""
+        tournament = Tournament.objects.create(
+            name="Возобновляемый",
+            slug="club-reopen-post",
+            city="Москва",
+            club=self.club,
+            start_date=date.today() - timedelta(days=1),
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            status=TournamentStatus.CANCELLED,
+            entry_fee=1000,
+            min_participants=4,
+            bracket_generated=False,
+        )
+        self.assertFalse(self.user.is_staff)
+        new_start = (date.today() + timedelta(days=20)).isoformat()
+        new_deadline = (
+            timezone.localtime(timezone.now()) + timedelta(days=10)
+        ).strftime("%Y-%m-%dT%H:%M")
+        response = self.client.post(
+            reverse("tournament_manage_reopen", kwargs={"slug": tournament.slug}),
+            {
+                "start_date": new_start,
+                "registration_deadline": new_deadline,
+            },
+            secure=True,
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        tournament.refresh_from_db()
+        self.assertEqual(tournament.status, TournamentStatus.UPCOMING)
+
+    def test_edit_form_shows_existing_dates_in_iso(self) -> None:
+        """Страница редактирования отдаёт ISO-значения дат."""
+        from datetime import datetime
+
+        deadline = timezone.make_aware(datetime(2026, 11, 1, 20, 0))
+        tournament = Tournament.objects.create(
+            name="Редактирование дат",
+            slug="edit-dates-iso",
+            city="Москва",
+            club=self.club,
+            start_date=date(2026, 11, 5),
+            registration_deadline=deadline,
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            status=TournamentStatus.UPCOMING,
+            entry_fee=1000,
+        )
+        tournament.allowed_categories.create(category="amateur")
+        response = self.client.get(
+            reverse(
+                "clubs:tournament_edit",
+                kwargs={"slug": self.club.slug, "tournament_id": tournament.id},
+            ),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="2026-11-05"')
+        self.assertContains(response, 'value="2026-11-01T20:00"')

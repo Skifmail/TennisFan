@@ -49,7 +49,12 @@ from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
 from apps.subscriptions.models import FancoinTransaction
 from apps.users.models import Notification, Player, SkillLevel
 
-from .cancel import cancel_tournament
+from .cancel import (
+    TournamentLifecycleError,
+    cancel_tournament,
+    extend_registration,
+    reopen_tournament,
+)
 from .fan import _is_fan
 from .fan import generate_bracket as fan_generate_bracket
 from .forms import TournamentPhotoUploadForm
@@ -1511,6 +1516,27 @@ def _tournament_manage_primary_action(tournament: Tournament) -> tuple[bool, str
     return False, ""
 
 
+def _insufficient_grace_deadline(tournament: Tournament):
+    """Момент автоотмены после уведомления о недоборе (notified_at + 3ч).
+
+    Args:
+        tournament: Турнир.
+
+    Returns:
+        datetime | None: Дедлайн окна продления или None.
+    """
+    from datetime import timedelta
+
+    notified = tournament.insufficient_participants_notified_at
+    if (
+        notified is None
+        or tournament.bracket_generated
+        or tournament.status != TournamentStatus.UPCOMING
+    ):
+        return None
+    return notified + timedelta(hours=3)
+
+
 @login_required
 def tournament_manage(request, slug):
     """Интерактивная страница управления турниром (staff или admin/manager клуба)."""
@@ -1795,10 +1821,28 @@ def tournament_manage(request, slug):
         "can_generate_primary_structure": can_generate_primary_structure,
         "generate_primary_structure_label": generate_primary_structure_label,
         "matches_section_title": "Плей-офф" if is_tvd else "Матчи турнира",
-        "can_edit_tournament": bool(tournament.club_id)
-        and tournament.status != TournamentStatus.CANCELLED,
+        "can_edit_tournament": bool(tournament.club_id),
         "can_cancel_tournament": tournament.status
         not in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED),
+        "can_extend_registration": (
+            tournament.status == TournamentStatus.UPCOMING
+            and not tournament.bracket_generated
+        ),
+        "can_reopen_tournament": (
+            tournament.status == TournamentStatus.CANCELLED
+            and not tournament.bracket_generated
+        ),
+        "lifecycle_current_count": (
+            tournament.full_teams_count()
+            if tournament.is_doubles()
+            else tournament.participants.count()
+        ),
+        "lifecycle_min_required": (
+            tournament.min_teams
+            if tournament.is_doubles()
+            else tournament.min_participants
+        ),
+        "insufficient_grace_deadline": _insufficient_grace_deadline(tournament),
         "players_available_to_add": players_available_to_add,
         "withdrawn_player_ids": withdrawn_player_ids,
         "withdrawn_team_ids": withdrawn_team_ids,
@@ -1905,6 +1949,113 @@ def tournament_manage_cancel(request, slug):
         ),
     )
     messages.success(request, "Турнир отменён.")
+    return redirect("tournament_manage", slug=slug)
+
+
+@login_required
+def tournament_manage_extend_registration(request, slug):
+    """POST: продлить дедлайн регистрации из панели управления."""
+    from datetime import date, datetime
+
+    from django.utils import timezone
+    from django.utils.dateparse import parse_date, parse_datetime
+
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+
+    raw_deadline = (request.POST.get("registration_deadline") or "").strip()
+    raw_start = (request.POST.get("start_date") or "").strip()
+    deadline = parse_datetime(raw_deadline.replace("T", " ")) if raw_deadline else None
+    if deadline is None and raw_deadline:
+        # datetime-local: 2026-09-22T18:00
+        try:
+            deadline = datetime.strptime(raw_deadline, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            try:
+                deadline = datetime.strptime(raw_deadline, "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                deadline = None
+    if deadline is not None and timezone.is_naive(deadline):
+        deadline = timezone.make_aware(deadline, timezone.get_current_timezone())
+
+    start_date = parse_date(raw_start) if raw_start else None
+    if start_date is None and raw_start:
+        try:
+            start_date = date.fromisoformat(raw_start)
+        except ValueError:
+            start_date = None
+
+    if deadline is None:
+        messages.error(request, "Укажите новый дедлайн регистрации.")
+        return redirect("tournament_manage", slug=slug)
+
+    try:
+        extend_registration(
+            tournament,
+            registration_deadline=deadline,
+            start_date=start_date,
+        )
+        messages.success(request, "Дедлайн регистрации продлён.")
+    except TournamentLifecycleError as exc:
+        messages.error(request, str(exc))
+    return redirect("tournament_manage", slug=slug)
+
+
+@login_required
+def tournament_manage_reopen(request, slug):
+    """POST: возобновить набор после отмены турнира."""
+    from datetime import date, datetime
+
+    from django.utils import timezone
+    from django.utils.dateparse import parse_date
+
+    if request.method != "POST":
+        return redirect("tournament_manage", slug=slug)
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+
+    raw_deadline = (request.POST.get("registration_deadline") or "").strip()
+    raw_start = (request.POST.get("start_date") or "").strip()
+
+    deadline = None
+    if raw_deadline:
+        try:
+            deadline = datetime.strptime(raw_deadline, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            try:
+                deadline = datetime.strptime(raw_deadline, "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                deadline = None
+    if deadline is not None and timezone.is_naive(deadline):
+        deadline = timezone.make_aware(deadline, timezone.get_current_timezone())
+
+    start_date = parse_date(raw_start) if raw_start else None
+    if start_date is None and raw_start:
+        try:
+            start_date = date.fromisoformat(raw_start)
+        except ValueError:
+            start_date = None
+
+    if deadline is None or start_date is None:
+        messages.error(
+            request,
+            "Укажите новую дату начала и дедлайн регистрации.",
+        )
+        return redirect("tournament_manage", slug=slug)
+
+    try:
+        reopen_tournament(
+            tournament,
+            start_date=start_date,
+            registration_deadline=deadline,
+        )
+        messages.success(request, "Набор на турнир возобновлён.")
+    except TournamentLifecycleError as exc:
+        messages.error(request, str(exc))
     return redirect("tournament_manage", slug=slug)
 
 

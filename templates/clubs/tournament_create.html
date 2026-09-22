@@ -40,7 +40,40 @@
         {% endif %}
     </div>
 
-    {% if form.non_field_errors %}
+
+    {% if page_mode == 'edit' and tournament %}
+    <div class="club-tournament-create__status-banners" style="margin-bottom: var(--spacing-lg);">
+        <div class="alert alert-info">
+            Статус турнира: <strong>{{ tournament.get_status_display }}</strong>
+            {% if tournament.registration_deadline %}
+            • Регистрация до {{ tournament.registration_deadline|date:"d.m.Y H:i" }}
+            {% endif %}
+        </div>
+        {% if tournament.status == 'cancelled' %}
+        <div class="alert alert-error">
+            Турнир отменён. Чтобы возобновить набор, укажите новую дату начала и дедлайн регистрации,
+            затем нажмите «Сохранить и возобновить набор». Участники сохранятся.
+        </div>
+        {% elif tournament.insufficient_participants_notified_at and not tournament.bracket_generated %}
+        <div class="alert alert-warning">
+            Зафиксирован недобор участников. Без продления дедлайна турнир будет автоматически отменён
+            через 3 часа после уведомления
+            ({{ tournament.insufficient_participants_notified_at|date:"d.m.Y H:i" }}).
+            Сдвиньте дату начала вместе с дедлайном, если старт уже прошёл.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if form.errors %}
+    <div class="club-tournament-create__errors">
+        <div class="alert alert-error">
+            Форма содержит ошибки. Проверьте поля ниже
+            {% if form.non_field_errors %}и сообщения:{% else %}.{% endif %}
+            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+        </div>
+    </div>
+    {% elif form.non_field_errors %}
     <div class="club-tournament-create__errors">
         {% for error in form.non_field_errors %}
         <div class="alert alert-error">{{ error }}</div>
@@ -182,6 +215,7 @@
                     <div class="club-tournament-create__field">
                         <label for="{{ form.start_date.id_for_label }}" class="form-label">{{ form.start_date.label }}</label>
                         {{ form.start_date }}
+                        {% if form.start_date.help_text %}<p class="club-tournament-create__help">{{ form.start_date.help_text }}</p>{% endif %}
                         {% for error in form.start_date.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
                     </div>
                     <div class="club-tournament-create__field">
@@ -224,10 +258,16 @@
                             {{ form.allow_postpayment }}
                             <span>
                                 <span class="club-tournament-create__toggle-title">{{ form.allow_postpayment.label }}</span>
-                                <span class="club-tournament-create__toggle-help">Разрешить регистрацию без немедленной оплаты взноса. Срок постоплаты задаётся отдельно (по умолчанию 12 часов).</span>
+                                <span class="club-tournament-create__toggle-help">Разрешить регистрацию без немедленной оплаты взноса.</span>
                             </span>
                         </label>
                         {% for error in form.allow_postpayment.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.postpayment_deadline_hours.id_for_label }}" class="form-label">{{ form.postpayment_deadline_hours.label }}</label>
+                        {{ form.postpayment_deadline_hours }}
+                        {% if form.postpayment_deadline_hours.help_text %}<p class="club-tournament-create__help">{{ form.postpayment_deadline_hours.help_text }}</p>{% endif %}
+                        {% for error in form.postpayment_deadline_hours.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
                     </div>
                     <div class="club-tournament-create__field">
                         <label for="{{ form.min_participants.id_for_label }}" class="form-label">{{ form.min_participants.label }}</label>
@@ -272,6 +312,9 @@
 
             <div class="club-tournament-create__actions">
                 <button type="submit" class="btn btn-primary btn-lg" {% if not can_create and page_mode != 'edit' %}disabled{% endif %}>{% if page_mode == 'edit' %}Сохранить изменения{% else %}Создать турнир{% endif %}</button>
+                {% if page_mode == 'edit' and tournament and tournament.status == 'cancelled' and not tournament.bracket_generated %}
+                <button type="submit" name="reopen" value="1" class="btn btn-outline-primary btn-lg">Сохранить и возобновить набор</button>
+                {% endif %}
                 <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-ghost btn-lg">Отмена</a>
             </div>
         </div>

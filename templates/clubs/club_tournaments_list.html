@@ -231,13 +231,28 @@
                             Регистрация до {{ t.registration_deadline|date:"d.m.Y H:i" }}
                         </p>
                         {% endif %}
+                        {% if t.status == 'cancelled' and not t.bracket_generated %}
+                        <p class="club-tournament-card__note" style="color: var(--color-error);">
+                            Отменён — можно возобновить набор в управлении.
+                        </p>
+                        {% elif t.insufficient_participants_notified_at and t.status == 'upcoming' and not t.bracket_generated %}
+                        <p class="club-tournament-card__note" style="color: var(--color-warning, #c9a227);">
+                            Недобор: продлите дедлайн в течение 3 часов, иначе турнир отменится.
+                        </p>
+                        {% endif %}
                     </div>
 
                     <div class="club-tournament-card__actions">
                         {% if can_manage_club %}
                         <a href="{% url 'clubs:tournament_plan_access' slug=club.slug tournament_id=t.id %}" class="btn btn-ghost btn-sm">Доступ тарифов</a>
                         <a href="{% url 'clubs:tournament_edit' slug=club.slug tournament_id=t.id %}" class="btn btn-ghost btn-sm">Редактировать</a>
+                        {% if t.status == 'cancelled' and not t.bracket_generated %}
+                        <a href="{% url 'tournament_manage' slug=t.slug %}" class="btn btn-primary btn-sm">Возобновить</a>
+                        {% elif t.insufficient_participants_notified_at and t.status == 'upcoming' and not t.bracket_generated %}
+                        <a href="{% url 'tournament_manage' slug=t.slug %}" class="btn btn-primary btn-sm">Продлить</a>
+                        {% else %}
                         <a href="{% url 'tournament_manage' slug=t.slug %}" class="btn btn-primary btn-sm">Управление</a>
+                        {% endif %}
                         {% endif %}
                     </div>
                 </article>

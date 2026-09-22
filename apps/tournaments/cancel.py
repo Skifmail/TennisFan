@@ -331,3 +331,231 @@ def restore_tournament_after_cancellation(tournament: Tournament) -> int:
         settled,
     )
     return settled
+
+
+class TournamentLifecycleError(ValueError):
+    """Ошибка продления регистрации или возобновления набора."""
+
+
+def _aware_deadline(value):
+    """Привести дедлайн к aware datetime в текущей TZ.
+
+    Args:
+        value: datetime (naive или aware).
+
+    Returns:
+        datetime: Aware datetime.
+    """
+    from django.utils import timezone
+
+    if timezone.is_naive(value):
+        return timezone.make_aware(value, timezone.get_current_timezone())
+    return value
+
+
+def _validate_registration_window(
+    *,
+    registration_deadline,
+    start_date,
+) -> tuple:
+    """Проверить окно регистрации и вернуть нормализованные значения.
+
+    Args:
+        registration_deadline: Новый дедлайн регистрации.
+        start_date: Дата начала турнира.
+
+    Returns:
+        tuple: ``(deadline, start_date)``.
+
+    Raises:
+        TournamentLifecycleError: Если даты некорректны.
+    """
+    from django.utils import timezone
+
+    deadline = _aware_deadline(registration_deadline)
+    now = timezone.now()
+    if deadline <= now:
+        raise TournamentLifecycleError("Дедлайн регистрации должен быть в будущем.")
+    if start_date is None:
+        raise TournamentLifecycleError("Укажите дату начала турнира.")
+    deadline_date = timezone.localtime(deadline).date()
+    if deadline_date > start_date:
+        raise TournamentLifecycleError(
+            "Дедлайн регистрации не может быть позже даты начала турнира."
+        )
+    return deadline, start_date
+
+
+def _sync_end_date(tournament: Tournament, start_date) -> None:
+    """Подтянуть end_date, если старт уехал вперёд.
+
+    Args:
+        tournament (Tournament): Турнир.
+        start_date: Новая дата начала.
+    """
+    if tournament.end_date is not None and tournament.end_date < start_date:
+        tournament.end_date = start_date
+    if tournament.is_one_day:
+        tournament.end_date = start_date
+
+
+def extend_registration(
+    tournament: Tournament,
+    *,
+    registration_deadline,
+    start_date=None,
+) -> Tournament:
+    """Продлить дедлайн регистрации (и при необходимости сдвинуть старт).
+
+    Сбрасывает ``insufficient_participants_notified_at`` через ``Tournament.save()``,
+    если новый дедлайн в будущем.
+
+    Args:
+        tournament (Tournament): Турнир без сформированной сетки.
+        registration_deadline: Новый дедлайн регистрации.
+        start_date: Новая дата начала (опционально).
+
+    Returns:
+        Tournament: Обновлённый турнир.
+
+    Raises:
+        TournamentLifecycleError: При неверном статусе или датах.
+    """
+    if tournament.bracket_generated:
+        raise TournamentLifecycleError(
+            "Нельзя продлить регистрацию: сетка уже сформирована."
+        )
+    if tournament.status == TournamentStatus.CANCELLED:
+        raise TournamentLifecycleError("Отменённый турнир нужно сначала возобновить.")
+    if tournament.status == TournamentStatus.COMPLETED:
+        raise TournamentLifecycleError("Завершённый турнир нельзя изменить.")
+
+    new_start = start_date if start_date is not None else tournament.start_date
+    deadline, new_start = _validate_registration_window(
+        registration_deadline=registration_deadline,
+        start_date=new_start,
+    )
+    tournament.registration_deadline = deadline
+    tournament.start_date = new_start
+    _sync_end_date(tournament, new_start)
+    tournament.save()
+    logger.info(
+        "Extended registration for %s until %s (start=%s)",
+        tournament.slug,
+        deadline,
+        new_start,
+    )
+    return tournament
+
+
+def reopen_tournament(
+    tournament: Tournament,
+    *,
+    start_date,
+    registration_deadline,
+    notify: bool = True,
+) -> Tournament:
+    """Возобновить набор после отмены (без сетки).
+
+    Ставит статус ``upcoming``, обновляет даты; ``Tournament.save()`` вызывает
+    ``restore_tournament_after_cancellation`` для повторного списания FT.
+
+    Args:
+        tournament (Tournament): Отменённый турнир без сетки.
+        start_date: Новая дата начала.
+        registration_deadline: Новый дедлайн регистрации.
+        notify (bool): Уведомить участников о повторном открытии набора.
+
+    Returns:
+        Tournament: Возобновлённый турнир.
+
+    Raises:
+        TournamentLifecycleError: При неверном статусе или датах.
+    """
+    if tournament.status != TournamentStatus.CANCELLED:
+        raise TournamentLifecycleError("Возобновить можно только отменённый турнир.")
+    if tournament.bracket_generated:
+        raise TournamentLifecycleError(
+            "Нельзя возобновить турнир со сформированной сеткой."
+        )
+
+    deadline, new_start = _validate_registration_window(
+        registration_deadline=registration_deadline,
+        start_date=start_date,
+    )
+    tournament.status = TournamentStatus.UPCOMING
+    tournament.start_date = new_start
+    tournament.registration_deadline = deadline
+    tournament.insufficient_participants_notified_at = None
+    _sync_end_date(tournament, new_start)
+    tournament.save()
+
+    if notify:
+        _notify_tournament_reopened(tournament)
+
+    logger.info(
+        "Reopened tournament %s (start=%s, deadline=%s)",
+        tournament.slug,
+        new_start,
+        deadline,
+    )
+    return tournament
+
+
+def _notify_tournament_reopened(tournament: Tournament) -> None:
+    """Уведомить участников, что набор снова открыт.
+
+    Args:
+        tournament (Tournament): Возобновлённый турнир.
+    """
+    from django.urls import reverse
+
+    url = None
+    try:
+        url = reverse("tournament_detail", args=[tournament.slug])
+    except Exception:
+        pass
+
+    message = (
+        f"Набор на турнир «{tournament.name}» снова открыт. "
+        "Вы можете остаться в списке участников или снять заявку на странице турнира."
+    )
+    users: list = []
+    if tournament.is_doubles():
+        seen: set[int] = set()
+        for team in tournament.teams.select_related("player1__user", "player2__user"):
+            for player in (team.player1, team.player2):
+                if player is None:
+                    continue
+                u = getattr(player, "user", None)
+                if u and u.pk not in seen:
+                    seen.add(u.pk)
+                    users.append(u)
+    else:
+        for player in tournament.participants.select_related("user").only("user_id"):
+            u = getattr(player, "user", None)
+            if u:
+                users.append(u)
+
+    for user in users:
+        try:
+            Notification.objects.create(
+                user=user,
+                title="Набор на турнир возобновлён",
+                message=message,
+                url=url or "",
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed in-app reopen notify for user %s: %s",
+                getattr(user, "pk", None),
+                exc,
+            )
+        try:
+            send_to_user_by_user(user, message)
+        except Exception as exc:
+            logger.warning(
+                "Failed telegram reopen notify for user %s: %s",
+                getattr(user, "pk", None),
+                exc,
+            )

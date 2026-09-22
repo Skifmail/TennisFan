@@ -12,7 +12,7 @@ from typing import Any, cast
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-from django.utils.html import strip_tags
+from django.utils.html import escape, strip_tags
 
 from apps.telegram_bot.notifications import send_to_user_by_user
 
@@ -479,6 +479,82 @@ def send_new_member_notification(
                 )
 
 
+def send_join_request_notification(
+    club: Club,
+    applicant: Any,
+    *,
+    invites_url: str = "",
+    platform_admin_url: str = "",
+    comment: str = "",
+) -> None:
+    """Уведомляет администраторов клуба и платформы о заявке на вступление.
+
+    Args:
+        club: Клуб, в который подана заявка.
+        applicant: Пользователь, подавший заявку.
+        invites_url: Ссылка на страницу заявок клуба.
+        platform_admin_url: Ссылка на список заявок в админке платформы.
+        comment: Комментарий игрока к заявке.
+    """
+    applicant_name = applicant.get_full_name() or applicant.email
+    applicant_email = str(getattr(applicant, "email", "") or "")
+    config = _get_club_config(club)
+    admins = _get_club_admins(club)
+
+    for admin_member in admins:
+        admin_user = admin_member.user
+        admin_name = admin_user.get_full_name() or admin_user.email
+        ms = _get_member_settings(admin_user, club)
+
+        if _should_send_email(config, ms) and admin_user.email:
+            try:
+                _send_club_email(
+                    subject=f"Новая заявка в клуб «{club.name}»",
+                    template_name="emails/clubs/join_request.html",
+                    context={
+                        "club_name": club.name,
+                        "admin_name": admin_name,
+                        "applicant_name": applicant_name,
+                        "applicant_email": applicant_email,
+                        "comment": comment,
+                        "invites_url": invites_url,
+                    },
+                    recipient_email=admin_user.email,
+                )
+            except Exception:
+                logger.exception(
+                    "send_join_request email failed | admin=%s", admin_member.pk
+                )
+
+        if _should_send_telegram(config, ms):
+            text = (
+                f"📩 <b>Новая заявка в клуб</b>\n\n"
+                f"Клуб: {club.name}\n"
+                f"Игрок: {applicant_name}"
+            )
+            if invites_url:
+                text += f"\n{invites_url}"
+            try:
+                _send_club_telegram(admin_user, text)
+            except Exception:
+                logger.exception(
+                    "send_join_request tg failed | admin=%s", admin_member.pk
+                )
+
+    try:
+        from apps.core.telegram_notify import notify_club_join_request
+
+        notify_club_join_request(
+            club_name=club.name,
+            applicant_name=str(applicant_name or ""),
+            applicant_email=applicant_email,
+            comment=comment,
+            admin_url=platform_admin_url,
+        )
+    except Exception:
+        logger.exception("send_join_request platform notify failed | club=%s", club.pk)
+
+
 def send_debtors_summary(
     club: Club,
     period_label: str,
@@ -599,3 +675,192 @@ def send_tournament_reminder(
             logger.exception(
                 "send_tournament_reminder tg failed | member=%s", member.pk
             )
+
+
+def _get_club_managers_and_admins(club: Club) -> list[ClubMember]:
+    """Активные администраторы и менеджеры клуба."""
+    return list(
+        club.members.filter(
+            role__in=(ClubMemberRole.ADMIN, ClubMemberRole.MANAGER),
+            status=ClubMemberStatus.ACTIVE,
+        ).select_related("user")
+    )
+
+
+def _club_tournament_manage_url(tournament) -> str:
+    """Абсолютный URL редактирования клубного турнира.
+
+    Args:
+        tournament: Модель Tournament с привязанным клубом.
+
+    Returns:
+        str: Абсолютный URL или пустая строка.
+    """
+    from django.conf import settings
+    from django.urls import reverse
+
+    club = getattr(tournament, "club", None)
+    if club is None or not getattr(tournament, "pk", None):
+        return ""
+    try:
+        path = str(
+            reverse(
+                "clubs:tournament_edit",
+                kwargs={"slug": club.slug, "tournament_id": tournament.pk},
+            )
+        )
+    except Exception:
+        return ""
+    base = (getattr(settings, "SITE_URL", None) or "").rstrip("/")
+    if not base:
+        return path
+    return f"{base}{path}"
+
+
+def send_tournament_insufficient_to_club(tournament) -> None:
+    """Уведомить админов/менеджеров клуба о недоборе и окне 3 часов.
+
+    Args:
+        tournament: Турнир клуба с истёкшим дедлайном и недобором.
+    """
+    club = getattr(tournament, "club", None)
+    if club is None:
+        return
+
+    config = _get_club_config(club)
+    if getattr(tournament, "is_doubles", lambda: False)():
+        current = getattr(tournament, "full_teams_count", lambda: 0)()
+        if callable(current):
+            current = current()
+        min_required = getattr(tournament, "min_teams", None) or 0
+        label = "команд"
+    else:
+        participants = getattr(tournament, "participants", None)
+        current = participants.count() if participants is not None else 0
+        min_required = getattr(tournament, "min_participants", None) or 0
+        label = "участников"
+
+    deadline = getattr(tournament, "registration_deadline", None)
+    deadline_str = deadline.strftime("%d.%m.%Y %H:%M") if deadline else "—"
+    manage_url = _club_tournament_manage_url(tournament)
+    tournament_name = getattr(tournament, "name", "") or "—"
+
+    for member in _get_club_managers_and_admins(club):
+        admin_name = member.user.get_full_name() or member.user.email
+        ms = _get_member_settings(member.user, club)
+
+        if _should_send_email(config, ms) and member.user.email:
+            try:
+                _send_club_email(
+                    subject=(
+                        f"Недобор участников: «{tournament_name}» — продлите "
+                        f"дедлайн за 3 часа"
+                    ),
+                    template_name="emails/clubs/tournament_insufficient.html",
+                    context={
+                        "club_name": club.name,
+                        "admin_name": admin_name,
+                        "tournament_name": tournament_name,
+                        "current_count": current,
+                        "min_required": min_required,
+                        "label": label,
+                        "deadline_str": deadline_str,
+                        "manage_url": manage_url,
+                    },
+                    recipient_email=member.user.email,
+                )
+            except Exception:
+                logger.exception(
+                    "send_tournament_insufficient email failed | member=%s",
+                    member.pk,
+                )
+
+        if _should_send_telegram(config, ms):
+            safe_name = escape(str(tournament_name))
+            text = (
+                f"⚠️ <b>Недобор участников</b>\n\n"
+                f"Турнир: {safe_name}\n"
+                f"Зарегистрировано: {current} {label} (мин.: {min_required})\n"
+                f"Дедлайн: {escape(str(deadline_str))}\n\n"
+                f"Если за <b>3 часа</b> не продлить дедлайн, турнир отменится."
+            )
+            if manage_url:
+                text += f"\n\nПродлить: {manage_url}"
+            try:
+                _send_club_telegram(member.user, text)
+            except Exception:
+                logger.exception(
+                    "send_tournament_insufficient tg failed | member=%s",
+                    member.pk,
+                )
+
+
+def send_tournament_auto_cancelled_to_club(tournament) -> None:
+    """Уведомить клуб, что турнир автоотменён из‑за недобора.
+
+    Args:
+        tournament: Отменённый клубный турнир.
+    """
+    club = getattr(tournament, "club", None)
+    if club is None:
+        return
+
+    config = _get_club_config(club)
+    if getattr(tournament, "is_doubles", lambda: False)():
+        current = getattr(tournament, "full_teams_count", lambda: 0)()
+        if callable(current):
+            current = current()
+        min_required = getattr(tournament, "min_teams", None) or 0
+        label = "команд"
+    else:
+        participants = getattr(tournament, "participants", None)
+        current = participants.count() if participants is not None else 0
+        min_required = getattr(tournament, "min_participants", None) or 0
+        label = "участников"
+
+    manage_url = _club_tournament_manage_url(tournament)
+    tournament_name = getattr(tournament, "name", "") or "—"
+
+    for member in _get_club_managers_and_admins(club):
+        admin_name = member.user.get_full_name() or member.user.email
+        ms = _get_member_settings(member.user, club)
+
+        if _should_send_email(config, ms) and member.user.email:
+            try:
+                _send_club_email(
+                    subject=f"Турнир «{tournament_name}» отменён из‑за недобора",
+                    template_name="emails/clubs/tournament_auto_cancelled.html",
+                    context={
+                        "club_name": club.name,
+                        "admin_name": admin_name,
+                        "tournament_name": tournament_name,
+                        "current_count": current,
+                        "min_required": min_required,
+                        "label": label,
+                        "manage_url": manage_url,
+                    },
+                    recipient_email=member.user.email,
+                )
+            except Exception:
+                logger.exception(
+                    "send_tournament_auto_cancelled email failed | member=%s",
+                    member.pk,
+                )
+
+        if _should_send_telegram(config, ms):
+            safe_name = escape(str(tournament_name))
+            text = (
+                f"❌ <b>Турнир отменён</b>\n\n"
+                f"«{safe_name}»: недобор участников "
+                f"({current} из {min_required} {label}).\n"
+                f"Можно возобновить набор в панели клуба."
+            )
+            if manage_url:
+                text += f"\n\nВозобновить: {manage_url}"
+            try:
+                _send_club_telegram(member.user, text)
+            except Exception:
+                logger.exception(
+                    "send_tournament_auto_cancelled tg failed | member=%s",
+                    member.pk,
+                )

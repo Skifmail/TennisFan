@@ -44,6 +44,7 @@
                     {% csrf_token %}
                     <button type="submit" class="btn btn-primary">{{ generate_primary_structure_label }}</button>
                 </form>
+                <span class="text-secondary small">Можно запустить с текущим составом, не дожидаясь минимума.</span>
                 {% endif %}
                 {% if can_generate_groups %}
                 <form action="{% url 'tournament_manage_generate_groups' slug=tournament.slug %}" method="post" class="d-inline">
@@ -69,12 +70,76 @@
                     <button type="submit" class="btn btn-outline btn-danger-text">Отменить турнир</button>
                 </form>
                 {% endif %}
-                {% if not can_generate_primary_structure and not can_generate_groups and not can_generate_playoffs and not can_finalize and not can_edit_tournament and not can_cancel_tournament %}
+                {% if not can_generate_primary_structure and not can_generate_groups and not can_generate_playoffs and not can_finalize and not can_edit_tournament and not can_cancel_tournament and not can_extend_registration and not can_reopen_tournament %}
                 <p class="text-secondary mb-0">Нет доступных действий для текущего статуса.</p>
                 {% endif %}
             </div>
         </div>
     </div>
+
+
+    <!-- Жизненный цикл: продление / возобновление -->
+    {% if can_extend_registration or can_reopen_tournament or insufficient_grace_deadline %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="section-title mb-3">Набор участников</h2>
+            <p class="text-secondary mb-3">
+                Статус: <strong>{{ tournament.get_status_display }}</strong>
+                {% if lifecycle_min_required %}
+                • Набрано: {{ lifecycle_current_count }} / {{ lifecycle_min_required }}
+                {% else %}
+                • Участников: {{ lifecycle_current_count }}
+                {% endif %}
+                {% if tournament.registration_deadline %}
+                • Регистрация до {{ tournament.registration_deadline|date:"d.m.Y H:i" }}
+                {% endif %}
+            </p>
+            {% if insufficient_grace_deadline %}
+            <div class="alert alert-warning mb-3">
+                Недобор участников. Без продления дедлайна турнир будет отменён
+                {{ insufficient_grace_deadline|date:"d.m.Y H:i" }}.
+            </div>
+            {% endif %}
+            {% if can_reopen_tournament %}
+            <div class="alert alert-error mb-3">
+                Турнир отменён. Укажите новую дату начала и дедлайн, чтобы возобновить набор.
+                Участники сохранятся; FT будут списаны снова при наличии баланса.
+            </div>
+            <form action="{% url 'tournament_manage_reopen' slug=tournament.slug %}" method="post" class="manage-lifecycle-form">
+                {% csrf_token %}
+                <div class="d-flex flex-wrap align-items-end gap-3">
+                    <div>
+                        <label class="form-label" for="reopen-start">Дата начала</label>
+                        <input type="date" name="start_date" id="reopen-start" class="form-control" required>
+                    </div>
+                    <div>
+                        <label class="form-label" for="reopen-deadline">Дедлайн регистрации</label>
+                        <input type="datetime-local" name="registration_deadline" id="reopen-deadline" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Возобновить набор</button>
+                </div>
+                <p class="text-secondary small mt-2 mb-0">Дедлайн не может быть позже даты начала и должен быть в будущем.</p>
+            </form>
+            {% elif can_extend_registration %}
+            <form action="{% url 'tournament_manage_extend_registration' slug=tournament.slug %}" method="post" class="manage-lifecycle-form">
+                {% csrf_token %}
+                <div class="d-flex flex-wrap align-items-end gap-3">
+                    <div>
+                        <label class="form-label" for="extend-deadline">Новый дедлайн регистрации</label>
+                        <input type="datetime-local" name="registration_deadline" id="extend-deadline" class="form-control" required>
+                    </div>
+                    <div>
+                        <label class="form-label" for="extend-start">Дата начала (если нужно сдвинуть)</label>
+                        <input type="date" name="start_date" id="extend-start" class="form-control" value="{{ tournament.start_date|date:'Y-m-d' }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Продлить регистрацию</button>
+                </div>
+                <p class="text-secondary small mt-2 mb-0">Если старт уже прошёл или близок, сдвиньте и дату начала — иначе дедлайн не сохранится.</p>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Секция 2: Парный ТВД — команды и составление пар (до формирования групп) -->
     {% if not tvd_groups and is_doubles_tvd %}

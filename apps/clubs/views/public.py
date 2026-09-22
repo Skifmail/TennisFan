@@ -33,7 +33,7 @@ from ..models import (
     ClubRating,
 )
 from ..navigation import build_club_navigation_entry
-from ..notifications import send_new_member_notification
+from ..notifications import send_join_request_notification, send_new_member_notification
 from ..plan_services import assign_member_plan
 from ..services import (
     club_can_add_member,
@@ -704,6 +704,18 @@ def join_request_create(request: HttpRequest, slug: str) -> HttpResponse:
             message=f"Новая заявка на вступление в клуб «{club.name}» от {request.user}.",
             url=reverse("clubs:invites_list", kwargs={"slug": club.slug}),
         )
+
+    send_join_request_notification(
+        club,
+        request.user,
+        invites_url=request.build_absolute_uri(
+            reverse("clubs:invites_list", kwargs={"slug": club.slug})
+        ),
+        platform_admin_url=request.build_absolute_uri(
+            reverse("admin:clubs_clubjoinrequest_changelist") + "?status__exact=pending"
+        ),
+        comment=join_request.message,
+    )
 
     messages.success(
         request,

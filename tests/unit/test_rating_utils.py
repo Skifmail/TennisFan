@@ -8,6 +8,7 @@ from apps.users.models import SkillLevel
 from apps.users.rating_utils import (
     get_starting_points,
     map_ntrp_to_skill_level,
+    ntrp_category_band,
     rating_to_ntrp_level,
     rating_to_skill_level,
 )
@@ -65,11 +66,29 @@ class RatingToNtrpAndSkillTestCase(SimpleTestCase):
     """Обратное преобразование очков в NTRP и категорию."""
 
     def test_rating_to_ntrp_linear(self) -> None:
-        self.assertEqual(rating_to_ntrp_level(4200), Decimal("4.2"))
+        self.assertEqual(rating_to_ntrp_level(4200), Decimal("4.20"))
 
     def test_rating_clamped_at_bounds(self) -> None:
-        self.assertEqual(rating_to_ntrp_level(500), Decimal("1.5"))
-        self.assertEqual(rating_to_ntrp_level(99999), Decimal("7.0"))
+        self.assertEqual(rating_to_ntrp_level(500), Decimal("1.50"))
+        self.assertEqual(rating_to_ntrp_level(99999), Decimal("7.00"))
+
+    def test_hundredths_are_truncated_not_rounded(self) -> None:
+        self.assertEqual(rating_to_ntrp_level(2858), Decimal("2.85"))
+        self.assertEqual(rating_to_ntrp_level(Decimal("2925.6")), Decimal("2.92"))
+        self.assertEqual(rating_to_ntrp_level(Decimal("2857.7")), Decimal("2.85"))
+        self.assertEqual(rating_to_ntrp_level(Decimal("2783.6")), Decimal("2.78"))
+
+    def test_strength_delta_uses_truncated_hundredths(self) -> None:
+        before = rating_to_ntrp_level(Decimal("2857.7"))
+        after = rating_to_ntrp_level(Decimal("2925.6"))
+        self.assertEqual(after - before, Decimal("0.07"))
+
+    def test_category_band_keeps_tenths(self) -> None:
+        self.assertEqual(ntrp_category_band(Decimal("2.44")), Decimal("2.4"))
+        self.assertEqual(
+            rating_to_skill_level(Decimal("2440")),
+            SkillLevel.NOVICE,
+        )
 
     def test_rating_to_skill_level_matches_ntrp_mapping(self) -> None:
         self.assertEqual(rating_to_skill_level(2500), SkillLevel.AMATEUR)

@@ -120,7 +120,7 @@
                                             </span>
                                             <span class="club-members-inline-stat">
                                                 <span class="club-members-inline-stat__label">Сила</span>
-                                                <span class="club-members-inline-stat__value">{{ m.user.player.ntrp_level }}</span>
+                                                <span class="club-members-inline-stat__value">{{ m.user.player.ntrp_level|floatformat:2 }}</span>
                                             </span>
                                         </div>
                                         {% endif %}
@@ -206,7 +206,7 @@
                                 </span>
                                 <span class="club-members-inline-stat">
                                     <span class="club-members-inline-stat__label">Сила</span>
-                                    <span class="club-members-inline-stat__value">{{ m.user.player.ntrp_level }}</span>
+                                    <span class="club-members-inline-stat__value">{{ m.user.player.ntrp_level|floatformat:2 }}</span>
                                 </span>
                             </div>
                             {% endif %}

@@ -1938,12 +1938,12 @@ def _build_recent_matches(limit: int = 40, days: int = 30):
         r2_after = float(p2.total_points)
         r1_before = r1_after - delta1
         r2_before = r2_after - delta2
-        n1_after = float(p1.ntrp_level or 0)
-        n2_after = float(p2.ntrp_level or 0)
+        n1_after = float(rating_to_ntrp_level(r1_after))
+        n2_after = float(rating_to_ntrp_level(r2_after))
         n1_before = float(rating_to_ntrp_level(r1_before))
         n2_before = float(rating_to_ntrp_level(r2_before))
-        n1_delta = round(n1_after - n1_before, 1)
-        n2_delta = round(n2_after - n2_before, 1)
+        n1_delta = round(n1_after - n1_before, 2)
+        n2_delta = round(n2_after - n2_before, 2)
         avatar1 = p1.avatar.url if (hasattr(p1, "avatar") and p1.avatar) else None
         avatar2 = p2.avatar.url if (hasattr(p2, "avatar") and p2.avatar) else None
         result.append(
@@ -2026,11 +2026,11 @@ def _build_upcoming_matches(limit: int = 40, days: int = 30):
                 "p2_avatar": avatar2,
                 "score": "—",
                 "score_column": "—",
-                "p1_ntrp": float(p1.ntrp_level or 0),
+                "p1_ntrp": float(rating_to_ntrp_level(p1.total_points or 0)),
                 "p1_ntrp_delta": 0.0,
                 "p1_rating": float(p1.total_points),
                 "p1_rating_delta": 0.0,
-                "p2_ntrp": float(p2.ntrp_level or 0),
+                "p2_ntrp": float(rating_to_ntrp_level(p2.total_points or 0)),
                 "p2_ntrp_delta": 0.0,
                 "p2_rating": float(p2.total_points),
                 "p2_rating_delta": 0.0,

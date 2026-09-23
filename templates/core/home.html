@@ -288,7 +288,7 @@
                         <span class="live-results__name">{{ m.player1 }}</span>
                     </span>
                     <span class="live-results__vals live-results__vals--col">
-                        <span class="live-results__val live-results__val--{% if m.p1_ntrp_delta > 0 %}up{% elif m.p1_ntrp_delta < 0 %}down{% else %}none{% endif %}">{% if m.p1_ntrp_delta > 0 %}↑{% elif m.p1_ntrp_delta < 0 %}↓{% endif %} {{ m.p1_ntrp|floatformat:1 }}{% if m.p1_ntrp_delta %}({% if m.p1_ntrp_delta > 0 %}+{% endif %}{{ m.p1_ntrp_delta }}){% endif %}</span>
+                        <span class="live-results__val live-results__val--{% if m.p1_ntrp_delta > 0 %}up{% elif m.p1_ntrp_delta < 0 %}down{% else %}none{% endif %}">{% if m.p1_ntrp_delta > 0 %}↑{% elif m.p1_ntrp_delta < 0 %}↓{% endif %} {{ m.p1_ntrp|floatformat:2 }}{% if m.p1_ntrp_delta %}({% if m.p1_ntrp_delta > 0 %}+{% endif %}{{ m.p1_ntrp_delta|floatformat:2 }}){% endif %}</span>
                         <span class="live-results__val live-results__val--{% if m.p1_rating_delta > 0 %}up{% elif m.p1_rating_delta < 0 %}down{% else %}none{% endif %}">{% if m.p1_rating_delta > 0 %}↑{% elif m.p1_rating_delta < 0 %}↓{% endif %} {{ m.p1_rating|floatformat:1 }}{% if m.p1_rating_delta %}({% if m.p1_rating_delta > 0 %}+{% endif %}{{ m.p1_rating_delta }}){% endif %}</span>
                     </span>
                     <span class="live-results__center">
@@ -299,7 +299,7 @@
                         {% endif %}
                     </span>
                     <span class="live-results__vals live-results__vals--col live-results__vals--right">
-                        <span class="live-results__val live-results__val--{% if m.p2_ntrp_delta > 0 %}up{% elif m.p2_ntrp_delta < 0 %}down{% else %}none{% endif %}">{% if m.p2_ntrp_delta > 0 %}↑{% elif m.p2_ntrp_delta < 0 %}↓{% endif %} {{ m.p2_ntrp|floatformat:1 }}{% if m.p2_ntrp_delta %}({% if m.p2_ntrp_delta > 0 %}+{% endif %}{{ m.p2_ntrp_delta }}){% endif %}</span>
+                        <span class="live-results__val live-results__val--{% if m.p2_ntrp_delta > 0 %}up{% elif m.p2_ntrp_delta < 0 %}down{% else %}none{% endif %}">{% if m.p2_ntrp_delta > 0 %}↑{% elif m.p2_ntrp_delta < 0 %}↓{% endif %} {{ m.p2_ntrp|floatformat:2 }}{% if m.p2_ntrp_delta %}({% if m.p2_ntrp_delta > 0 %}+{% endif %}{{ m.p2_ntrp_delta|floatformat:2 }}){% endif %}</span>
                         <span class="live-results__val live-results__val--{% if m.p2_rating_delta > 0 %}up{% elif m.p2_rating_delta < 0 %}down{% else %}none{% endif %}">{% if m.p2_rating_delta > 0 %}↑{% elif m.p2_rating_delta < 0 %}↓{% endif %} {{ m.p2_rating|floatformat:1 }}{% if m.p2_rating_delta %}({% if m.p2_rating_delta > 0 %}+{% endif %}{{ m.p2_rating_delta }}){% endif %}</span>
                     </span>
                     <span class="live-results__player live-results__player--right{% if m.winner_side == 'player2' %} live-results__player--winner{% endif %}">
@@ -692,11 +692,18 @@ document.addEventListener('DOMContentLoaded', function() {
         return '<img src="' + src + '" alt="" class="live-results__avatar">';
     }
     function valLine(ntrp, rating, ntrpDelta, ratingDelta) {
-        var nd = ntrpDelta != null ? (ntrpDelta > 0 ? '+' : '') + ntrpDelta : '';
         var rd = ratingDelta != null ? (ratingDelta > 0 ? '+' : '') + Math.round(ratingDelta) : '';
         var an = (ntrpDelta || 0) > 0 ? '↑' : ((ntrpDelta || 0) < 0 ? '↓' : '');
         var ar = (ratingDelta || 0) > 0 ? '↑' : ((ratingDelta || 0) < 0 ? '↓' : '');
-        return '<span class="live-results__val live-results__val--' + cls(ntrpDelta) + '">' + an + ' ' + (ntrp != null ? ntrp.toFixed(1) : '—') + (nd ? '(' + nd + ')' : '') + '</span>' +
+        var ntrpText = ntrp != null ? Number(ntrp).toFixed(2) : '—';
+        var ntrpDeltaText = '';
+        if (ntrpDelta) {
+            var roundedNtrpDelta = Math.round(Number(ntrpDelta) * 100) / 100;
+            if (roundedNtrpDelta) {
+                ntrpDeltaText = '(' + (roundedNtrpDelta > 0 ? '+' : '') + roundedNtrpDelta.toFixed(2) + ')';
+            }
+        }
+        return '<span class="live-results__val live-results__val--' + cls(ntrpDelta) + '">' + an + ' ' + ntrpText + ntrpDeltaText + '</span>' +
             '<span class="live-results__val live-results__val--' + cls(ratingDelta) + '">' + ar + ' ' + (rating != null ? rating.toFixed(1) : '—') + (rd ? '(' + rd + ')' : '') + '</span>';
     }
     function avatarWrapHtml(url, isWinner) {

@@ -152,9 +152,9 @@
                 <li class="manage-list-item">
                     <div class="manage-list-item-content">
                         {% if t.player2_id %}
-                        {{ t.player1 }} <span class="text-secondary">(УС: {{ t.player1.ntrp_level|floatformat:1 }}, Р: {{ t.player1.total_points|floatformat:0 }})</span> / {{ t.player2 }} <span class="text-secondary">(УС: {{ t.player2.ntrp_level|floatformat:1 }}, Р: {{ t.player2.total_points|floatformat:0 }})</span>
+                        {{ t.player1 }} <span class="text-secondary">(УС: {{ t.player1.ntrp_level|floatformat:2 }}, Р: {{ t.player1.total_points|floatformat:0 }})</span> / {{ t.player2 }} <span class="text-secondary">(УС: {{ t.player2.ntrp_level|floatformat:2 }}, Р: {{ t.player2.total_points|floatformat:0 }})</span>
                         {% else %}
-                        {{ t.player1 }} <span class="text-secondary">(УС: {{ t.player1.ntrp_level|floatformat:1 }}, Р: {{ t.player1.total_points|floatformat:0 }})</span> <span class="text-secondary">— ожидает партнёра</span>
+                        {{ t.player1 }} <span class="text-secondary">(УС: {{ t.player1.ntrp_level|floatformat:2 }}, Р: {{ t.player1.total_points|floatformat:0 }})</span> <span class="text-secondary">— ожидает партнёра</span>
                         {% endif %}
                     </div>
                     {% if not tournament.bracket_generated %}
@@ -193,14 +193,14 @@
                     <select name="player1_id" required class="form-select form-select-sm manage-player-select" style="width: auto; min-width: 18rem;">
                         <option value="">—</option>
                         {% for p in players_for_pairs %}
-                        <option value="{{ p.pk }}">{{ p }} (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</option>
+                        <option value="{{ p.pk }}">{{ p }} (УС: {{ p.ntrp_level|floatformat:2 }}, Р: {{ p.total_points|floatformat:0 }})</option>
                         {% endfor %}
                     </select>
                     <label class="mb-0">Игрок 2</label>
                     <select name="player2_id" required class="form-select form-select-sm manage-player-select" style="width: auto; min-width: 18rem;">
                         <option value="">—</option>
                         {% for p in players_for_pairs %}
-                        <option value="{{ p.pk }}">{{ p }} (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</option>
+                        <option value="{{ p.pk }}">{{ p }} (УС: {{ p.ntrp_level|floatformat:2 }}, Р: {{ p.total_points|floatformat:0 }})</option>
                         {% endfor %}
                     </select>
                     <button type="submit" class="btn btn-sm btn-primary">Составить пару</button>
@@ -239,7 +239,7 @@
                 <li class="manage-list-item">
                     <div class="manage-list-item-content">
                         <a href="{% player_profile_url p %}">{{ p }}</a>
-                        <span class="text-secondary"> (УС: {{ p.ntrp_level|floatformat:1 }}, Р: {{ p.total_points|floatformat:0 }})</span>
+                        <span class="text-secondary"> (УС: {{ p.ntrp_level|floatformat:2 }}, Р: {{ p.total_points|floatformat:0 }})</span>
                         {% if p.pk in withdrawn_player_ids %}<span class="badge text-bg-secondary ms-1">Снят</span>{% endif %}
                     </div>
                     {% if not tournament.bracket_generated %}

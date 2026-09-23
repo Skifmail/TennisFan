@@ -77,18 +77,18 @@ class UserRegistrationForm(forms.ModelForm):
         required=True,
         min_value=Decimal("1.5"),
         max_value=Decimal("7.0"),
-        decimal_places=1,
+        decimal_places=2,
         widget=forms.NumberInput(
             attrs={
                 "id": "id_ntrp_level",
                 "class": "form-control",
                 "min": "1.5",
                 "max": "7",
-                "step": "0.1",
-                "placeholder": "например 3.7",
+                "step": "0.01",
+                "placeholder": "например 3.75",
             }
         ),
-        help_text="Число от 1.5 до 7.0.",
+        help_text="Число от 1.50 до 7.00, два знака после запятой.",
     )
     password = forms.CharField(
         label="Пароль *",
@@ -170,18 +170,16 @@ class UserRegistrationForm(forms.ModelForm):
         val = self.cleaned_data.get("ntrp_level")
         if val is None or val == "":
             raise forms.ValidationError(
-                "Укажите уровень силы от 1.5 до 7.0 (например 3.7) или пройдите калькулятор ниже."
+                "Укажите уровень силы от 1.50 до 7.00 (например 3.75) или пройдите калькулятор ниже."
             )
         try:
             v = Decimal(str(val))
             if v < Decimal("1.5") or v > Decimal("7.0"):
-                raise forms.ValidationError(
-                    "Уровень должен быть от 1.5 до 7.0 (один знак после запятой)."
-                )
+                raise forms.ValidationError("Уровень должен быть от 1.50 до 7.00.")
             return v
         except (TypeError, ValueError, InvalidOperation) as err:
             raise forms.ValidationError(
-                "Укажите уровень силы от 1.5 до 7.0 (например 3.7)."
+                "Укажите уровень силы от 1.50 до 7.00 (например 3.75)."
             ) from err
 
     def clean_password_confirm(self):

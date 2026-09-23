@@ -112,7 +112,7 @@
                         </div>
                         <div class="sparring-card__chips">
                             <span class="player-category sparring-card__chip">{{ req.player.get_skill_level_display }}</span>
-                            <span class="player-category sparring-card__chip sparring-card__chip--muted" title="Уровень силы (NTRP)">Сила {{ req.player.ntrp_level }}</span>
+                            <span class="player-category sparring-card__chip sparring-card__chip--muted" title="Уровень силы (NTRP)">Сила {{ req.player.ntrp_level|floatformat:2 }}</span>
                             <span class="player-category sparring-card__chip sparring-card__chip--muted" title="Рейтинг FAN">Рейтинг {{ req.player.total_points|floatformat:0 }}</span>
                             {% if req.desired_category %}
                             <span class="sparring-desired-category">Партнёр: {{ req.get_desired_category_display }}</span>

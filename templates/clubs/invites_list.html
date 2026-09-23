@@ -400,7 +400,7 @@
                                             {% if req.user.player.ntrp_level %}
                                             <span class="club-members-inline-stat">
                                                 <span class="club-members-inline-stat__label">NTRP</span>
-                                                <span class="club-members-inline-stat__value">{{ req.user.player.ntrp_level }}</span>
+                                                <span class="club-members-inline-stat__value">{{ req.user.player.ntrp_level|floatformat:2 }}</span>
                                             </span>
                                             {% endif %}
                                             {% if req.user.player.total_points %}
@@ -502,7 +502,7 @@
                                 {% if req.user.player.ntrp_level %}
                                 <span class="club-members-inline-stat">
                                     <span class="club-members-inline-stat__label">NTRP</span>
-                                    <span class="club-members-inline-stat__value">{{ req.user.player.ntrp_level }}</span>
+                                    <span class="club-members-inline-stat__value">{{ req.user.player.ntrp_level|floatformat:2 }}</span>
                                 </span>
                                 {% endif %}
                             </div>

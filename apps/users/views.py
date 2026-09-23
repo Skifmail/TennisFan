@@ -119,10 +119,10 @@ def _can_view_profile_stats(request_user: Any, player: Player) -> bool:
 
 
 def _map_ntrp_to_skill_level(level: Decimal) -> str:
-    """Map strength level (1.0-7.0) to SkillLevel category (delegates to rating_utils)."""
-    from .rating_utils import map_ntrp_to_skill_level
+    """Категория силы по десятым, чтобы 2.44 оставался в диапазоне «до 2.4»."""
+    from .rating_utils import map_ntrp_to_skill_level, ntrp_category_band
 
-    return map_ntrp_to_skill_level(level)
+    return map_ntrp_to_skill_level(ntrp_category_band(level))
 
 
 def _get_profile_progress_data(
@@ -1116,4 +1116,4 @@ def save_ntrp(request):
         update_fields=["ntrp_level", "skill_level", "total_points", "hidden_rating"]
     )
     logger.info("save_ntrp: ok level=%s", level)
-    return JsonResponse({"ok": True, "ntrp_level": f"{level:.1f}"})
+    return JsonResponse({"ok": True, "ntrp_level": f"{level:.2f}"})

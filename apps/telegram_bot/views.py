@@ -764,7 +764,7 @@ def _format_sparring_player_card(player: Player) -> str:
 
     name = str(player)
     age = player.age or "—"
-    ntrp = float(player.ntrp_level) if player.ntrp_level else "—"
+    ntrp = f"{player.ntrp_level:.2f}" if player.ntrp_level else "—"
     fan_rating = int(player.total_points) if player.total_points else "—"
     played = player.matches_played or 0
     won = player.matches_won or 0
@@ -1821,7 +1821,7 @@ def _handle_menu_callback_action(
                 "━━━━━━━━━━━━━━━━━━",
                 f"📍 Населённый пункт: <b>{player.city or '—'}</b>",
                 f"🎯 Уровень: <b>{player.get_skill_level_display()}</b>",
-                f"📈 Сила: <b>{player.ntrp_level}</b>",
+                f"📈 Сила: <b>{player.ntrp_level:.2f}</b>",
             ]
 
             # Добавляем дополнительную информацию, если есть

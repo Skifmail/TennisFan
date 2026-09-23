@@ -439,7 +439,7 @@ def notify_participants_match_result_confirmed(
                         rating_before = float(p.total_points) - float(delta)
                         ntrp_before = rating_to_ntrp_level(rating_before)
                         ntrp_after = rating_to_ntrp_level(float(p.total_points))
-                        base += f" Сила: {ntrp_before:.1f} → {ntrp_after:.1f}."
+                        base += f" Сила: {ntrp_before:.2f} → {ntrp_after:.2f}."
                 msg = base
             if len(msg) > 255:
                 msg = msg[:252] + "..."

@@ -1,13 +1,13 @@
 {% load humanize %}
 {% with rating_changes=player.get_rating_changes %}
-<span class="rating-badge" title="После последнего матча: Сила {% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta }}, Рейтинг {% if rating_changes.fan.direction == 'up' %}+{% endif %}{{ rating_changes.fan.delta }}">
+<span class="rating-badge" title="После последнего матча: Сила {% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta|floatformat:2 }}, Рейтинг {% if rating_changes.fan.direction == 'up' %}+{% endif %}{{ rating_changes.fan.delta }}">
     {% if rating_changes.ntrp.direction == 'up' %}
         <span class="rating-badge__arrow rating-badge__arrow--up">↑</span>
     {% elif rating_changes.ntrp.direction == 'down' %}
         <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
     {% endif %}
     <span class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}">
-        {% if rating_changes.ntrp.direction != 'none' and rating_changes.ntrp.delta %}{% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta }}{% else %}—{% endif %}
+        {% if rating_changes.ntrp.direction != 'none' and rating_changes.ntrp.delta %}{% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta|floatformat:2 }}{% else %}—{% endif %}
     </span>
     <span class="rating-badge__separator">/</span>
     {% if rating_changes.fan.direction == 'up' %}

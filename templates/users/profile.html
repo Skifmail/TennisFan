@@ -108,7 +108,7 @@
                                     {% elif rating_changes.ntrp.direction == 'down' %}
                                         <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
                                     {% endif %}
-                                    <strong class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}" title="После последнего матча{% if rating_changes.ntrp.direction != 'none' %}: {% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta }}{% endif %}">{{ player.ntrp_level }}</strong>
+                                    <strong class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}" title="После последнего матча{% if rating_changes.ntrp.direction != 'none' %}: {% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta|floatformat:2 }}{% endif %}">{{ player.ntrp_level|floatformat:2 }}</strong>
                                 </span>
                             </td>
                             <td>
@@ -1314,7 +1314,7 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
                 var ntrpSign = ntrpDelta >= 0 ? '+' : '';
                 var fanSign = fanDelta >= 0 ? '+' : '';
                 var lines = [
-                    'Сила ' + (d.ntrp_after || 0).toFixed(1) + ' (' + ntrpSign + ntrpDelta.toFixed(1) + ') / FAN ' +
+                    'Сила ' + (d.ntrp_after || 0).toFixed(2) + ' (' + ntrpSign + ntrpDelta.toFixed(2) + ') / FAN ' +
                     (d.points || 0).toFixed(1) + ' (' + fanSign + fanDelta.toFixed(1) + ')'
                 ];
                 if (d.match_opponent) lines.push('Матч: vs ' + d.match_opponent + ' — ' + (d.match_score || ''));

@@ -59,7 +59,7 @@
                             <div class="sparring-invite__profile-name">{{ p }}</div>
                             <div class="sparring-invite__profile-meta">{{ p.user.email }}</div>
                             <div class="sparring-invite__profile-stats">
-                                Сила: {{ p.get_skill_level_display }} · NTRP: {{ p.ntrp_level }} ·
+                                Сила: {{ p.get_skill_level_display }} · NTRP: {{ p.ntrp_level|floatformat:2 }} ·
                                 Рейтинг FAN: {{ p.total_points|default:0|floatformat:0 }}
                             </div>
                         </div>

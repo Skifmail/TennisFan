@@ -707,9 +707,9 @@ def notify_result_confirmed_to_participants(match) -> None:
                 ntrp_before = rating_to_ntrp_level(rating_before)
                 ntrp_after = rating_to_ntrp_level(float(p.total_points))
                 result_line = (
-                    f"Вы выиграли. Вам начислено {d_str} очков рейтинга. Сила: {ntrp_before:.1f} → {ntrp_after:.1f}."
+                    f"Вы выиграли. Вам начислено {d_str} очков рейтинга. Сила: {ntrp_before:.2f} → {ntrp_after:.2f}."
                     if is_winner
-                    else f"Вы проиграли. У вас вычтено {abs(int(delta))} очков рейтинга. Сила: {ntrp_before:.1f} → {ntrp_after:.1f}."
+                    else f"Вы проиграли. У вас вычтено {abs(int(delta))} очков рейтинга. Сила: {ntrp_before:.2f} → {ntrp_after:.2f}."
                 )
             else:
                 result_line = "Вы выиграли." if is_winner else "Вы проиграли."

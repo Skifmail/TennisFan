@@ -137,7 +137,7 @@ class Player(CompressImageFieldsMixin, models.Model):
     )
     city = models.CharField("Населённый пункт", max_length=100, blank=True, default="")
     ntrp_level = models.DecimalField(
-        "Уровень силы", max_digits=3, decimal_places=1, default=1.5
+        "Уровень силы", max_digits=4, decimal_places=2, default=1.5
     )
     skill_level = models.CharField(
         "Уровень силы",
@@ -372,9 +372,9 @@ class Player(CompressImageFieldsMixin, models.Model):
             ntrp_before = rating_to_ntrp_level(rating_before)
             ntrp_after = rating_to_ntrp_level(rating_after)
 
-            # Вычисляем дельту уровня силы
-            ntrp_delta = float(ntrp_after) - float(ntrp_before)
-            result["ntrp"]["delta"] = round(ntrp_delta, 1)
+            # Дельта — разница уже обрезанных до сотых значений (2.92 − 2.85 = 0.07).
+            ntrp_delta = ntrp_after - ntrp_before
+            result["ntrp"]["delta"] = float(ntrp_delta)
 
             if ntrp_delta > 0:
                 result["ntrp"]["direction"] = "up"
@@ -413,8 +413,8 @@ class NtrpTestResult(models.Model):
     )
     level = models.DecimalField(
         "Рассчитанный уровень силы (NTRP)",
-        max_digits=3,
-        decimal_places=1,
+        max_digits=4,
+        decimal_places=2,
         null=True,
         blank=True,
     )

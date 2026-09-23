@@ -137,7 +137,7 @@
                             </span>
                         </div>
                         <div class="sparring-response-row__rating">
-                            <span class="sparring-response-rating__ntrp" title="Сила">Сила {{ response.respondent.ntrp_level|floatformat:1 }}</span>
+                            <span class="sparring-response-rating__ntrp" title="Сила">Сила {{ response.respondent.ntrp_level|floatformat:2 }}</span>
                             <span class="sparring-response-rating__fan" title="Рейтинг FAN">{{ response.respondent.total_points|floatformat:0 }}</span>
                         </div>
                         {% if response.status == 'pending' %}

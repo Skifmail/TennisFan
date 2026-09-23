@@ -11,9 +11,15 @@ Linear mapping: strength * 1000 = FAN points
 This provides a stable, predictable mapping without jumps or interpolation issues.
 """
 
-from decimal import Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
 from .models import SkillLevel
+
+# Сила хранится и показывается до сотых. Лишние знаки отбрасываются:
+# 2.858 → 2.85, а не 2.86 и не 2.9.
+NTRP_STEP = Decimal("0.01")
+NTRP_MIN = Decimal("1.5")
+NTRP_MAX = Decimal("7.0")
 
 
 def get_starting_points(ntrp_level: Decimal) -> int:
@@ -68,26 +74,36 @@ def map_ntrp_to_skill_level(level: Decimal) -> str:
     return _choice_value(SkillLevel.PROFESSIONAL)
 
 
-def rating_to_ntrp_level(rating: int | float) -> Decimal:
-    """Convert rating points back to strength level (inverse of get_starting_points).
+def rating_to_ntrp_level(rating: int | float | Decimal) -> Decimal:
+    """Перевести очки FAN в уровень силы.
 
-    Uses linear mapping: strength = FAN points / 1000
+    Линейно: сила = очки / 1000. Результат обрезается до сотых
+    без округления вверх и зажимается в диапазон [1.5, 7.0].
 
     Args:
-        rating: Current rating points.
+        rating: Текущие очки рейтинга.
 
     Returns:
-        Strength level as Decimal in range [1.5, 7.0] (clamped).
+        Уровень силы с двумя знаками после запятой.
     """
-    rating_val = Decimal(str(rating))
+    ntrp = Decimal(str(rating)) / Decimal("1000")
+    ntrp = max(NTRP_MIN, min(NTRP_MAX, ntrp))
+    return ntrp.quantize(NTRP_STEP, rounding=ROUND_DOWN)
 
-    # Linear mapping: strength = FAN points / 1000
-    ntrp = rating_val / Decimal("1000")
 
-    # Clamp to valid range [1.5, 7.0]
-    ntrp = max(Decimal("1.5"), min(Decimal("7.0"), ntrp))
+def ntrp_category_band(level: Decimal | int | float) -> Decimal:
+    """Свести силу к десятым для категории (Новичок, Любитель и т.д.).
 
-    return Decimal(str(round(float(ntrp), 1)))
+    Категории по-прежнему режутся по десятым: 2.44 остаётся в диапазоне «до 2.4».
+    Отображаемая сила при этом хранится до сотых.
+
+    Args:
+        level: Уровень силы.
+
+    Returns:
+        Значение, округлённое до одного знака половиной вверх.
+    """
+    return Decimal(str(level)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
 
 
 def rating_to_skill_level(rating: int | float) -> str:
@@ -102,5 +118,4 @@ def rating_to_skill_level(rating: int | float) -> str:
     Returns:
         SkillLevel category string.
     """
-    ntrp = rating_to_ntrp_level(rating)
-    return map_ntrp_to_skill_level(ntrp)
+    return map_ntrp_to_skill_level(ntrp_category_band(rating_to_ntrp_level(rating)))

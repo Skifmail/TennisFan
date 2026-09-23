@@ -175,7 +175,7 @@
         const clampedScore = Math.min(Math.max(score, minScore), maxScore);
         let ntrp = minLevel + ((clampedScore - minScore) / (maxScore - minScore)) * (maxLevel - minLevel);
         ntrp = Math.min(ntrp, maxLevel);
-        return Math.round(ntrp * 10) / 10;
+        return Math.floor(ntrp * 100 + 1e-6) / 100;
     };
 
     /**
@@ -183,7 +183,8 @@
      */
     const getNtrpResult = (score) => {
         const level = getNtrpLevelFromScore(score);
-        const group = ntrpLevelGroups.find(item => level >= item.min && level <= item.max);
+        const band = Math.round(level * 10) / 10;
+        const group = ntrpLevelGroups.find(item => band >= item.min && band <= item.max);
         if (!group) {
             return null;
         }
@@ -334,13 +335,13 @@
         const result = getNtrpResult(totalScore);
         const payload = buildAnswersPayload(totalScore, level, result);
         if (typeof console !== 'undefined' && console.log) {
-            console.log('[NTRP] Рассчитать: баллы=%s, уровень=%.1f, result=%o', totalScore, level, result);
+            console.log('[NTRP] Рассчитать: баллы=%s, уровень=%.2f, result=%o', totalScore, level, result);
         }
         if (!result) {
             console.warn('[NTRP] Группа не найдена для уровня', level, '- проверьте ntrpLevelGroups');
             return;
         }
-        levelValueEl.textContent = `${result.label} (${result.level.toFixed(1)})`;
+        levelValueEl.textContent = `${result.label} (${result.level.toFixed(2)})`;
         descriptionEl.textContent = result.text;
         scoreTotalEl.textContent = `Ваш результат: ${totalScore} из 430 баллов`;
         quizEl.classList.add('hidden');
@@ -351,7 +352,7 @@
             }
             const input = document.getElementById(formTarget);
             if (input) {
-                input.value = result.level.toFixed(1);
+                input.value = result.level.toFixed(2);
                 input.dispatchEvent(new Event('input', { bubbles: true }));
 
                 const form = input.form;

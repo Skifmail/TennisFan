@@ -2437,7 +2437,7 @@ def tournament_manage_search_participants(request, slug):
         first = (p.user.first_name or "").lower()
         phone = (p.user.phone or "").lower()
         if q_lower in last or q_lower in first or q_lower in phone:
-            uc_str = f"{p.ntrp_level:.1f}" if p.ntrp_level is not None else "—"
+            uc_str = f"{p.ntrp_level:.2f}" if p.ntrp_level is not None else "—"
             rating_str = f"{p.total_points:.0f}" if p.total_points is not None else "—"
             results.append(
                 {

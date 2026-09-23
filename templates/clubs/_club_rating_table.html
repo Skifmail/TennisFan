@@ -85,13 +85,13 @@
             <div class="club-rating-table__meter-card">
                 <div class="club-rating-table__meter-head">
                     <span>Уровень</span>
-                    <span class="club-rating-table__meter-value">{{ r.member.user.player.ntrp_level|default:"—" }}</span>
+                    <span class="club-rating-table__meter-value">{{ r.member.user.player.ntrp_level|floatformat:2|default:"—" }}</span>
                 </div>
                 <progress class="club-rating-table__meter club-rating-table__meter--level" max="100" value="{{ r.level_percent }}"></progress>
                 <div class="club-rating-table__meter-foot">
                     <span class="club-rating-table__trend club-rating-table__trend--{{ rating_changes.ntrp.direction }}">
                         {% if rating_changes.ntrp.direction == 'up' %}↑ {% elif rating_changes.ntrp.direction == 'down' %}↓ {% else %}→ {% endif %}
-                        {% if rating_changes.ntrp.delta > 0 %}+{% endif %}{{ rating_changes.ntrp.delta|floatformat:1 }}
+                        {% if rating_changes.ntrp.delta > 0 %}+{% endif %}{{ rating_changes.ntrp.delta|floatformat:2 }}
                     </span>
                     <span class="club-rating-table__meter-note">шкала NTRP</span>
                 </div>

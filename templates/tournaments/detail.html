@@ -682,7 +682,7 @@
                 <form method="post" action="{% url 'tournament_join_team' slug=tournament.slug team_id=team.id %}" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline btn-sm">
-                        {{ team.player1 }} <span class="text-secondary">(УС: {{ team.player1.ntrp_level|floatformat:1 }}, Р: {{ team.player1.total_points|floatformat:0 }})</span> — присоединиться
+                        {{ team.player1 }} <span class="text-secondary">(УС: {{ team.player1.ntrp_level|floatformat:2 }}, Р: {{ team.player1.total_points|floatformat:0 }})</span> — присоединиться
                     </button>
                 </form>
                 {% endfor %}
@@ -709,13 +709,13 @@
                     <div class="tournament-team-card__players">
                         <div class="tournament-team-card__player">
                             <a href="{% player_profile_url participant.player1 %}">{{ participant.player1 }}</a>
-                            <span class="text-secondary small">(УС: {{ participant.player1.ntrp_level|floatformat:1 }}, Р: {{ participant.player1.total_points|floatformat:0 }})</span>
+                            <span class="text-secondary small">(УС: {{ participant.player1.ntrp_level|floatformat:2 }}, Р: {{ participant.player1.total_points|floatformat:0 }})</span>
                             {% if participant.id in withdrawn_team_ids %}<span class="withdrawn-badge" title="Снят с турнира">Снята</span>{% endif %}
                         </div>
                         {% if participant.player2 %}
                         <div class="tournament-team-card__player">
                             <a href="{% player_profile_url participant.player2 %}">{{ participant.player2 }}</a>
-                            <span class="text-secondary small">(УС: {{ participant.player2.ntrp_level|floatformat:1 }}, Р: {{ participant.player2.total_points|floatformat:0 }})</span>
+                            <span class="text-secondary small">(УС: {{ participant.player2.ntrp_level|floatformat:2 }}, Р: {{ participant.player2.total_points|floatformat:0 }})</span>
                         </div>
                         {% else %}
                         <div class="tournament-team-card__player tournament-team-card__player--waiting">
@@ -736,7 +736,7 @@
                         </div>
                         {% with rating_changes=participant.get_rating_changes %}
                         <div class="tournament-participant-metrics">
-                            <span class="tournament-participant-metric rating-badge__value--{{ rating_changes.ntrp.direction }}">УС: {{ participant.ntrp_level|floatformat:1 }}</span>
+                            <span class="tournament-participant-metric rating-badge__value--{{ rating_changes.ntrp.direction }}">УС: {{ participant.ntrp_level|floatformat:2 }}</span>
                             <span class="tournament-participant-metric rating-badge__value--{{ rating_changes.fan.direction }}">Р: {{ participant.total_points|floatformat:1 }}</span>
                         </div>
                         {% endwith %}

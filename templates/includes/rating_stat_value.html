@@ -8,8 +8,8 @@
         {% elif rating_changes.ntrp.direction == 'down' %}
             <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
         {% endif %}
-        <span class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}" title="После последнего матча{% if rating_changes.ntrp.direction != 'none' %}: {% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta }}{% endif %}">
-            {{ value }}
+        <span class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}" title="После последнего матча{% if rating_changes.ntrp.direction != 'none' %}: {% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta|floatformat:2 }}{% endif %}">
+            {{ value|floatformat:2 }}
         </span>
     </div>
 </div>

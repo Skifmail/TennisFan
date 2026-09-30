@@ -11,7 +11,14 @@ from django.http import HttpRequest
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 
-from .models import Notification, NtrpTestResult, Player, SkillLevel, User
+from .models import (
+    Notification,
+    NtrpTestResult,
+    Player,
+    PlayerSportProfile,
+    SkillLevel,
+    User,
+)
 from .skill_levels import skill_with_ntrp
 
 
@@ -532,12 +539,19 @@ class NtrpTestResultInline(admin.TabularInline):
         return cast(str, mark_safe(table_html))
 
 
+class PlayerSportProfileInline(admin.TabularInline):
+    """Профили силы по виду спорта."""
+
+    model = PlayerSportProfile
+    extra = 0
+
+
 @admin.register(Player)
 class PlayerAdmin(admin.ModelAdmin):
     """Admin configuration for Player model."""
 
     form = PlayerAdminForm
-    inlines = (NtrpTestResultInline,)
+    inlines = (NtrpTestResultInline, PlayerSportProfileInline)
     ordering = ("-created_at",)
 
     list_display = (

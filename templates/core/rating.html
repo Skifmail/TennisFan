@@ -12,6 +12,11 @@
 <div class="container">
     <!-- Filters -->
     <form method="get" class="filter-bar">
+        <select name="sport" class="form-control" onchange="this.form.submit()" aria-label="Вид спорта">
+            {% for value, label in sport_choices %}
+            <option value="{{ value }}" {% if current_sport == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
         <select name="city" class="form-control">
             <option value="">Любой населённый пункт России</option>
             {% for city in city_options %}
@@ -106,7 +111,7 @@
                 <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
                 {% else %}
                 <li class="pagination__item">
-                    <a href="?page={{ page_num }}{% if current_city %}&city={{ current_city|urlencode }}{% endif %}{% if current_skill_level %}&skill_level={{ current_skill_level }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">{{ page_num }}</a>
+                    <a href="?page={{ page_num }}{% if current_sport %}&sport={{ current_sport }}{% endif %}{% if current_city %}&city={{ current_city|urlencode }}{% endif %}{% if current_skill_level %}&skill_level={{ current_skill_level }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}">{{ page_num }}</a>
                 </li>
                 {% endif %}
             {% endfor %}

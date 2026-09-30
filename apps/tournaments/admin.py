@@ -528,6 +528,7 @@ class TournamentAdmin(admin.ModelAdmin):
         "city",
         "gender",
         "tournament_type",
+        "sport",
         "format",
         "variant",
         "status",
@@ -1144,7 +1145,7 @@ class TournamentAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
-        ("Формат турнира", {"fields": ("format", "variant")}),
+        ("Формат турнира", {"fields": ("sport", "format", "variant")}),
         (
             "Постоплата: статус оплаты участников",
             {
@@ -1364,6 +1365,7 @@ class TVDTournamentAdmin(admin.ModelAdmin):
             "ТВД (формат и участники)",
             {
                 "fields": (
+                    "sport",
                     "variant",
                     "is_free",
                     "entry_fee",

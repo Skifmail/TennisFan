@@ -10,6 +10,7 @@ from django.db.models import Case, IntegerField, When
 from django.utils import timezone
 
 from apps.core.geo import GeoRegion
+from apps.core.sports import Sport
 from apps.users.models import Player, SkillLevel
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
@@ -278,6 +279,14 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         default=TournamentFormat.SINGLE_ELIMINATION,
         help_text="Одноэтапная сетка: турнир на выбывание с подвалом, посев по рейтингу, очки при вылете. \nКруговой: все играют со всеми, итоговая таблица по очкам.",
     )
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=Sport.choices,
+        default=Sport.TENNIS,
+        db_index=True,
+        help_text="Падел проводится парными командами и считает отдельный рейтинг.",
+    )
     variant = models.CharField(
         "Вариант",
         max_length=20,
@@ -415,6 +424,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             models.Index(fields=["status", "-start_date"]),
             models.Index(fields=["club", "status", "-start_date"]),
             models.Index(fields=["registration_deadline"]),
+            models.Index(fields=["sport", "status", "-start_date"]),
         ]
 
     def __str__(self) -> str:
@@ -569,6 +579,12 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     def save(self, *args, **kwargs) -> None:
         """Custom save to normalize duration and reset notification flag when дедлайн сдвинут."""
         from django.utils import timezone
+
+        if self.sport == Sport.PADEL and self.variant != TournamentVariant.DOUBLES:
+            self.variant = TournamentVariant.DOUBLES
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None and "variant" not in update_fields:
+                kwargs["update_fields"] = [*list(update_fields), "variant"]
 
         old_deadline_hours: int | None = None
         old_status: str | None = None
@@ -1209,6 +1225,14 @@ class Match(models.Model):
         default=MatchType.TOURNAMENT,
         help_text="Турнирный матч или спарринг (личная встреча)",
     )
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=Sport.choices,
+        default=Sport.TENNIS,
+        db_index=True,
+        help_text="Для турнирного матча совпадает с турниром. От него зависит, какой рейтинг обновлять.",
+    )
     sparring_response = models.ForeignKey(
         "sparring.SparringResponse",
         on_delete=models.SET_NULL,
@@ -1444,6 +1468,22 @@ class Match(models.Model):
         verbose_name = "Матч"
         verbose_name_plural = "Матчи"
         ordering = ["-scheduled_datetime"]
+
+    def save(self, *args, **kwargs) -> None:
+        """Синхронизировать вид спорта турнирного матча с турниром."""
+        update_fields = kwargs.get("update_fields")
+        if self.tournament_id and update_fields is None:
+            tournament_sport = (
+                self.tournament.sport
+                if getattr(self, "tournament", None) is not None
+                and self.tournament.pk == self.tournament_id
+                else Tournament.objects.filter(pk=self.tournament_id)
+                .values_list("sport", flat=True)
+                .first()
+            )
+            if tournament_sport:
+                self.sport = tournament_sport
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         if self.team1 and self.team2:
@@ -1800,6 +1840,13 @@ class SeasonRating(models.Model):
     player = models.ForeignKey(
         Player, on_delete=models.CASCADE, related_name="season_ratings"
     )
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=Sport.choices,
+        default=Sport.TENNIS,
+        db_index=True,
+    )
     season = models.CharField("Сезон", max_length=20)  # e.g., "2026"
     category = models.CharField("Категория", max_length=20, choices=SkillLevel.choices)
     points = models.IntegerField("Очки", default=0)
@@ -1808,7 +1855,7 @@ class SeasonRating(models.Model):
     class Meta:
         verbose_name = "Рейтинг сезона"
         verbose_name_plural = "Рейтинги сезонов"
-        unique_together = ("player", "season", "category")
+        unique_together = ("player", "season", "category", "sport")
         ordering = ["-points"]
 
     def __str__(self) -> str:
@@ -1900,6 +1947,51 @@ class SeasonPoints(models.Model):
         return f"{self.player}: {self.current_season_points} очков ({self.season_name} {self.season_year})"
 
 
+class SportSeasonPoints(models.Model):
+    """Сезонные очки вида спорта, отличного от тенниса.
+
+    Теннис по-прежнему живёт в ``SeasonPoints`` (один к одному с игроком).
+    Падел копится отдельно, чтобы таблица сезона не смешивалась.
+    """
+
+    player = models.ForeignKey(
+        Player,
+        on_delete=models.CASCADE,
+        related_name="sport_season_points",
+        verbose_name="Игрок",
+    )
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=Sport.choices,
+        default=Sport.PADEL,
+        db_index=True,
+    )
+    current_season_points = models.PositiveIntegerField(
+        "Очки текущего сезона",
+        default=0,
+    )
+    season_name = models.CharField("Название сезона", max_length=20, default="")
+    season_year = models.IntegerField("Год сезона", default=0)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Сезонные очки вида спорта"
+        verbose_name_plural = "Сезонные очки видов спорта"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["player", "sport"],
+                name="tournaments_sport_season_points_uniq",
+            )
+        ]
+        ordering = ["-current_season_points"]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.player}: {self.current_season_points} ({self.get_sport_display()})"
+        )
+
+
 class SeasonArchive(models.Model):
     """Архив результатов сезонов для Зала Славы.
 
@@ -1911,6 +2003,13 @@ class SeasonArchive(models.Model):
         on_delete=models.CASCADE,
         related_name="season_archives",
         verbose_name="Игрок",
+    )
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=Sport.choices,
+        default=Sport.TENNIS,
+        db_index=True,
     )
     season_name = models.CharField(
         "Название сезона",
@@ -1940,7 +2039,7 @@ class SeasonArchive(models.Model):
     class Meta:
         verbose_name = "Архив сезона"
         verbose_name_plural = "Архивы сезонов"
-        unique_together = ("player", "season_name", "season_year")
+        unique_together = ("player", "season_name", "season_year", "sport")
         ordering = ["-season_year", "-season_name", "-final_points"]
         indexes = [
             models.Index(fields=["season_name", "season_year", "-final_points"]),

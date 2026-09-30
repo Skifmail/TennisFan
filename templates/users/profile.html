@@ -549,6 +549,7 @@
                 {% if request.user == player.user %}
                 <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3 profile-info__btn-edit profile-info__btn-fullwidth">Редактировать</a>
                 <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2 profile-info__btn-ntrp profile-info__btn-fullwidth" title="Тест носит информационный характер и не влияет на ваш рейтинг">Проверить уровень силы (информационно)</a>
+                <a href="{% url 'padel_strength' %}" class="btn btn-outline mt-2 profile-info__btn-fullwidth">Уровень силы в паделе</a>
                 {% endif %}
             </div>
 

@@ -6,6 +6,7 @@ from typing import cast
 
 from django.db import models
 
+from apps.core.sports import Sport
 from apps.users.models import Player, SkillLevel
 
 
@@ -81,6 +82,13 @@ class SparringRequest(models.Model):
         help_text="Если отмечено, результат матча не влияет на рейтинг и силу",
     )
 
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=Sport.choices,
+        default=Sport.TENNIS,
+        db_index=True,
+    )
     match_type = models.CharField(
         "Тип матча",
         max_length=20,
@@ -283,6 +291,13 @@ class DoublesMatchRequest(models.Model):
         db_index=True,
         verbose_name="Тип заявки",
         help_text="Парный матч 2×2 или командный спарринг.",
+    )
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=Sport.choices,
+        default=Sport.TENNIS,
+        db_index=True,
     )
     created_by = models.ForeignKey(
         Player,

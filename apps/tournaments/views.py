@@ -404,6 +404,9 @@ def tournament_list(
     else:
         status = request.GET.get("status") or ""
     club_filter = (request.GET.get("club") or "").strip()
+    from apps.core.sports import Sport, parse_sport_filter
+
+    sport_filter = parse_sport_filter(request.GET.get("sport"))
 
     # Турниры платформы и клубов (клубные — с отдельным CTA «Вступить в клуб»).
     tournaments = (
@@ -442,6 +445,8 @@ def tournament_list(
         ).distinct()
     if status:
         tournaments = tournaments.filter(status=status)
+    if sport_filter != "all":
+        tournaments = tournaments.filter(sport=sport_filter)
     if club_filter == CLUB_FILTER_PLATFORM:
         tournaments = tournaments.filter(club__isnull=True)
     elif club_filter == CLUB_FILTER_CLUB_ONLY:
@@ -642,6 +647,8 @@ def tournament_list(
         "list_club_filter": club_filter,
         "club_filter_choices": club_choices,
         "category_choices": SkillLevel.choices,
+        "current_sport": sport_filter,
+        "sport_choices": Sport.choices,
         "filter_chips": filter_chips,
         "is_archive": archive,
     }
@@ -1107,7 +1114,9 @@ def tournament_detail(request, slug):
         solo_teams = []
         can_join_team = False
         if is_fan or is_olympic or is_tvd:
-            participants_qs = participants_qs.order_by("-total_points")
+            from apps.users.sport_rating import order_by_sport_rating
+
+            participants_qs = order_by_sport_rating(participants_qs, tournament.sport)
         else:
             participants_qs = participants_qs.order_by(
                 "user__last_name", "user__first_name"
@@ -4125,11 +4134,19 @@ def _check_tournament_registration_eligibility(request, tournament, player):
             False,
             "В турнире не указаны допустимые категории участников. Обратитесь к организатору.",
         )
-    if player.skill_level not in allowed_categories:
+    from apps.users.sport_rating import skill_level_for
+
+    player_skill = skill_level_for(player, tournament.sport)
+    if player_skill is None:
+        return (
+            False,
+            "Сначала укажите уровень силы в паделе в профиле.",
+        )
+    if player_skill not in allowed_categories:
         from apps.users.models import SkillLevel
 
         allowed_labels = [SkillLevel(c).label for c in allowed_categories]
-        player_label = SkillLevel(player.skill_level).label
+        player_label = SkillLevel(player_skill).label
         return (
             False,
             f"Регистрация на этот турнир разрешена только для категорий: {', '.join(allowed_labels)}. "

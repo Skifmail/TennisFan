@@ -255,6 +255,7 @@ class TrainingForm(forms.ModelForm):
         model = Training
         fields = (
             "title",
+            "sport",
             "short_description",
             "description",
             "type_prices",
@@ -390,6 +391,7 @@ class AdminTrainingForm(forms.ModelForm):
         model = Training
         fields = (
             "title",
+            "sport",
             "slug",
             "short_description",
             "description",

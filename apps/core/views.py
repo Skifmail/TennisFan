@@ -2181,6 +2181,9 @@ def home(request):
     gender = request.GET.get("gender", "")
     duration = request.GET.get("duration", "")
     club_filter = (request.GET.get("club") or "").strip()
+    from apps.core.sports import Sport, parse_sport_filter
+
+    home_sport = parse_sport_filter(request.GET.get("sport"))
 
     if city:
         tournaments = filter_field_contains_ci(
@@ -2194,6 +2197,8 @@ def home(request):
         tournaments = tournaments.filter(gender=gender)
     if duration:
         tournaments = tournaments.filter(duration=duration)
+    if home_sport != "all":
+        tournaments = tournaments.filter(sport=home_sport)
     if club_filter == CLUB_FILTER_PLATFORM:
         tournaments = tournaments.filter(club__isnull=True)
     elif club_filter == CLUB_FILTER_CLUB_ONLY:
@@ -2230,21 +2235,57 @@ def home(request):
     from apps.tournaments.season_utils import annotate_season_pts
 
     rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
-    top_players = list(
-        annotate_season_pts(
-            Player.objects.filter(
-                is_bye=False,
-                is_hidden_on_home=False,
+    if home_sport == Sport.PADEL:
+        from apps.tournaments.models import SportSeasonPoints
+        from apps.users.models import PlayerSportProfile
+        from apps.users.sport_rating import apply_profile_to_player
+
+        profiles = list(
+            PlayerSportProfile.objects.filter(
+                sport=Sport.PADEL,
+                player__is_bye=False,
+                player__is_hidden_on_home=False,
             )
-            .filter(rating_visibility_filter)
+            .filter(Q(player__is_verified=True) | ~Q(player__avatar=""))
             .select_related(
-                "user",
-                "user__subscription",
-                "user__subscription__tier",
-                "season_points",
+                "player__user",
+                "player__user__subscription",
+                "player__user__subscription__tier",
             )
-        ).order_by("-season_pts", "-total_points")[:10]
-    )
+            .order_by("-total_points")[:10]
+        )
+        season_rows = {
+            row.player_id: row.current_season_points
+            for row in SportSeasonPoints.objects.filter(
+                sport=Sport.PADEL,
+                player_id__in=[profile.player_id for profile in profiles],
+            )
+        }
+        top_players = []
+        for profile in profiles:
+            player = profile.player
+            apply_profile_to_player(player, profile)
+            player.season_pts = season_rows.get(player.pk, 0)
+            top_players.append(player)
+        top_players.sort(
+            key=lambda player: (-int(player.season_pts), -float(player.total_points))
+        )
+    else:
+        top_players = list(
+            annotate_season_pts(
+                Player.objects.filter(
+                    is_bye=False,
+                    is_hidden_on_home=False,
+                )
+                .filter(rating_visibility_filter)
+                .select_related(
+                    "user",
+                    "user__subscription",
+                    "user__subscription__tier",
+                    "season_points",
+                )
+            ).order_by("-season_pts", "-total_points")[:10]
+        )
 
     from apps.tournaments.utils import get_players_trophies_map
 
@@ -2309,6 +2350,8 @@ def home(request):
         "filtered_tournaments": tournaments_page.object_list,
         "tournaments_page": tournaments_page,
         "top_players": top_players,
+        "home_sport": home_sport,
+        "sport_choices": Sport.choices,
         "recent_matches": recent_matches,
         "recent_matches_json": json.dumps(recent_matches, default=str),
         "upcoming_matches_json": json.dumps(upcoming_matches, default=str),
@@ -2383,9 +2426,11 @@ def api_upcoming_matches(request: HttpRequest) -> JsonResponse:
 
 def rating(request):
     """Player rating page - сортировка по сезонным очкам."""
+    from apps.core.sports import Sport, parse_sport_filter
     from apps.tournaments.season_utils import get_current_season
 
     city = request.GET.get("city", "")
+    rating_sport = parse_sport_filter(request.GET.get("sport"))
     skill_level = request.GET.get("skill_level", "") or request.GET.get("category", "")
     search = request.GET.get("q", "")
 
@@ -2405,16 +2450,27 @@ def rating(request):
         players = filter_field_contains_ci(
             players, "city", city, annotation="_rating_pl_city_l"
         )
-    if skill_level:
+    if skill_level and rating_sport == Sport.PADEL:
+        players = players.filter(
+            sport_profiles__sport=Sport.PADEL,
+            sport_profiles__skill_level=skill_level,
+        )
+    elif skill_level:
         players = players.filter(skill_level=skill_level)
+    elif rating_sport == Sport.PADEL:
+        players = players.filter(sport_profiles__sport=Sport.PADEL)
     if search:
         players = players.filter(
             Q(user__first_name__icontains=search) | Q(user__last_name__icontains=search)
         )
 
     from apps.tournaments.season_utils import annotate_season_pts
+    from apps.users.sport_rating import order_by_sport_rating
 
-    players = annotate_season_pts(players).order_by("-season_pts", "-total_points")
+    if rating_sport == Sport.PADEL:
+        players = order_by_sport_rating(players, Sport.PADEL)
+    else:
+        players = annotate_season_pts(players).order_by("-season_pts", "-total_points")
 
     paginator = Paginator(players, 50)
     page_number = request.GET.get("page")
@@ -2423,8 +2479,23 @@ def rating(request):
     from apps.tournaments.utils import get_players_trophies_map
 
     trophies_map = get_players_trophies_map(p.pk for p in players_page.object_list)
+    padel_profiles = {}
+    if rating_sport == Sport.PADEL:
+        from apps.users.models import PlayerSportProfile
+        from apps.users.sport_rating import apply_profile_to_player
+
+        padel_profiles = {
+            profile.player_id: profile
+            for profile in PlayerSportProfile.objects.filter(
+                sport=Sport.PADEL,
+                player_id__in=[p.pk for p in players_page.object_list],
+            )
+        }
     for p in players_page.object_list:
         p.trophies = trophies_map.get(p.pk, [])
+        profile = padel_profiles.get(p.pk)
+        if profile is not None:
+            apply_profile_to_player(p, profile)
 
     city_options = (
         Player.objects.exclude(city__exact="")
@@ -2468,6 +2539,8 @@ def rating(request):
         "city_options": list(city_options),
         "skill_level_choices": SkillLevel.choices,
         "current_season_display": f"{current_season.name} {current_season.year}",
+        "current_sport": rating_sport,
+        "sport_choices": Sport.choices,
     }
     return render(request, "core/rating.html", context)
 

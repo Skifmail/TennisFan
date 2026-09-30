@@ -60,6 +60,7 @@ def create_doubles_request(
     desired_age_max: int | None = None,
     preferred_location: str = "",
     kind: str = "classic",
+    sport: str = "tennis",
 ) -> DoublesMatchRequest:
     """Создать заявку на парный матч 2×2. Автор — капитан своей команды, опционально с партнёром."""
     with transaction.atomic():
@@ -77,6 +78,7 @@ def create_doubles_request(
             desired_age_max=desired_age_max,
             preferred_location=preferred_location,
             kind=kind,
+            sport=sport or "tennis",
         )
         author_team = DoublesTeam.objects.create(
             match_request=req,
@@ -365,7 +367,7 @@ def confirm_match(match_request_id: int, confirmed_by: "Player") -> Match:
             opponent_team=opponent_team,
             is_friendly=req.is_friendly,
             request_created_at=req.created_at,
-            team_request=None,
+            team_request=req,
         )
         req.status = DoublesMatchRequestStatus.CONFIRMED
         req.confirmed_at = timezone.now()
@@ -458,6 +460,7 @@ def _create_doubles_match_from_teams(
         status=Match.MatchStatus.SCHEDULED,
         deadline=timezone.now() + timedelta(days=7),
         rating_status=rating_status,
+        sport=team_request.sport if team_request is not None else "tennis",
     )
     return cast(Match, match)
 
@@ -518,6 +521,7 @@ def _create_team_sparring_singles(
             status=Match.MatchStatus.SCHEDULED,
             deadline=timezone.now() + timedelta(days=7),
             rating_status=rating_status,
+            sport=team_request.sport,
         )
         matches.append(cast(Match, match))
     return matches

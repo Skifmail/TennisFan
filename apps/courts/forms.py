@@ -8,8 +8,15 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 
+from apps.core.sports import VenueSport
+
 from .models import Court, CourtApplication, CourtRating
-from .surfaces import CourtSurface, normalize_surface_codes
+from .surfaces import (
+    CourtSurface,
+    PadelSurface,
+    normalize_padel_surface_codes,
+    normalize_surface_codes,
+)
 
 
 def _unique_court_slug(name: str, *, exclude_pk: int | None = None) -> str:
@@ -286,6 +293,12 @@ class CourtAdminForm(forms.ModelForm):
 
     indoor_surfaces = _surface_multiple_choice("Покрытие крытых кортов")
     outdoor_surfaces = _surface_multiple_choice("Покрытие открытых кортов")
+    padel_surfaces = forms.MultipleChoiceField(
+        label="Покрытие падел-корта",
+        choices=PadelSurface.choices,
+        widget=SurfaceCheckboxSelectMultiple(),
+        required=False,
+    )
 
     class Meta:
         model = Court
@@ -301,6 +314,15 @@ class CourtAdminForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             self.initial["indoor_surfaces"] = self.instance.indoor_surfaces or []
             self.initial["outdoor_surfaces"] = self.instance.outdoor_surfaces or []
+            self.initial["padel_surfaces"] = self.instance.padel_surfaces or []
+
+    def clean_venue_sport(self) -> str:
+        """Пустой вид спорта площадки считать теннисом."""
+        return str(self.cleaned_data.get("venue_sport") or VenueSport.TENNIS)
+
+    def clean_padel_surfaces(self) -> list[str]:
+        """Оставить только канонические покрытия падела."""
+        return normalize_padel_surface_codes(self.cleaned_data.get("padel_surfaces"))
 
     def clean_indoor_surfaces(self) -> list[str]:
         """Оставить только канонические коды крытых покрытий."""

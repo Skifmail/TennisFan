@@ -8407,6 +8407,7 @@ body.has-fullscreen-loader {
 .profile-sport-switch__track {
     position: relative;
     display: block;
+    box-sizing: border-box;
     flex: 0 0 auto;
     width: 3.25rem;
     height: 1.7rem;
@@ -8456,11 +8457,11 @@ body.has-fullscreen-loader {
 
 .profile-sport-switch__knob {
     position: absolute;
-    top: 0.18rem;
-    left: 0.18rem;
+    top: 50%;
+    left: 0.16rem;
     z-index: 1;
-    width: 1.34rem;
-    height: 1.34rem;
+    width: 1.22rem;
+    height: 1.22rem;
     border-radius: 50%;
     background: linear-gradient(180deg, #d4b57a 0%, var(--color-primary) 58%, #6f4710 100%);
     box-shadow:
@@ -8469,41 +8470,42 @@ body.has-fullscreen-loader {
         0 0 8px rgb(166 130 74 / 35%);
     transition: left var(--transition-base), transform var(--transition-fast);
     animation: profile-sport-switch-nudge 2.4s ease-in-out infinite;
+    transform: translateY(-50%);
 }
 
 .profile-sport-switch__track.is-padel .profile-sport-switch__knob {
-    left: calc(100% - 1.52rem);
+    left: calc(100% - 1.38rem);
     animation-name: profile-sport-switch-nudge-left;
 }
 
 .profile-sport-switch__track:hover .profile-sport-switch__knob,
 .profile-sport-switch__track:focus-visible .profile-sport-switch__knob {
     animation: none;
-    transform: translateX(0.28rem);
+    transform: translateY(-50%) translateX(0.28rem);
 }
 
 .profile-sport-switch__track.is-padel:hover .profile-sport-switch__knob,
 .profile-sport-switch__track.is-padel:focus-visible .profile-sport-switch__knob {
-    transform: translateX(-0.28rem);
+    transform: translateY(-50%) translateX(-0.28rem);
 }
 
 @keyframes profile-sport-switch-nudge {
     0%,
     62%,
     100% {
-        transform: translateX(0);
+        transform: translateY(-50%) translateX(0);
     }
 
     72% {
-        transform: translateX(0.32rem);
+        transform: translateY(-50%) translateX(0.32rem);
     }
 
     82% {
-        transform: translateX(0);
+        transform: translateY(-50%) translateX(0);
     }
 
     90% {
-        transform: translateX(0.16rem);
+        transform: translateY(-50%) translateX(0.16rem);
     }
 }
 
@@ -8511,19 +8513,19 @@ body.has-fullscreen-loader {
     0%,
     62%,
     100% {
-        transform: translateX(0);
+        transform: translateY(-50%) translateX(0);
     }
 
     72% {
-        transform: translateX(-0.32rem);
+        transform: translateY(-50%) translateX(-0.32rem);
     }
 
     82% {
-        transform: translateX(0);
+        transform: translateY(-50%) translateX(0);
     }
 
     90% {
-        transform: translateX(-0.16rem);
+        transform: translateY(-50%) translateX(-0.16rem);
     }
 }
 

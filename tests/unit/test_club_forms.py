@@ -118,6 +118,50 @@ class ClubTournamentCreateFormTestCase(TestCase):
         self.assertEqual(form.cleaned_data["region"], GeoRegion.MOSCOW)
         self.assertEqual(form.cleaned_data["geo_area"], area)
 
+    def test_spb_city_clears_moscow_geo_fields(self) -> None:
+        area = GeoArea.objects.filter(region=GeoRegion.MOSCOW).first()
+        self.assertIsNotNone(area)
+        form = ClubTournamentCreateForm(
+            data=self._base_tournament_data(
+                city="Санкт-Петербург",
+                region=GeoRegion.MOSCOW,
+                geo_area=str(area.pk),
+            ),
+            club=self.club,
+            is_pro=False,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["region"], "")
+        self.assertIsNone(form.cleaned_data["geo_area"])
+
+    def test_spb_club_hides_moscow_geo_on_create(self) -> None:
+        club = Club.objects.create(
+            name="Питерский клуб",
+            slug="spb-club-geo",
+            city="Санкт-Петербург",
+            address="Невский, 1",
+            email="spb-club@test.local",
+            admin_name="Администратор клуба",
+        )
+        form = ClubTournamentCreateForm(club=club, is_pro=False)
+        self.assertFalse(form.shows_moscow_geo())
+        self.assertFalse(form.fields["region"].initial)
+
+    def test_oblast_club_defaults_geo_area(self) -> None:
+        club = Club.objects.create(
+            name="Раменский клуб",
+            slug="ramenskoe-club-geo",
+            city="Раменское",
+            address="ул. 1",
+            email="ramenskoe-club@test.local",
+            admin_name="Администратор клуба",
+        )
+        area = GeoArea.objects.get(slug="ramenskoe")
+        form = ClubTournamentCreateForm(club=club, is_pro=False)
+        self.assertTrue(form.shows_moscow_geo())
+        self.assertEqual(form.fields["region"].initial, GeoRegion.MOSCOW_OBLAST)
+        self.assertEqual(form.fields["geo_area"].initial, area.pk)
+
     def test_geo_area_queryset_filters_by_region(self) -> None:
         moscow = GeoArea.objects.filter(region=GeoRegion.MOSCOW).first()
         oblast = GeoArea.objects.filter(region=GeoRegion.MOSCOW_OBLAST).first()

@@ -16,8 +16,12 @@ from apps.core.geo import (
     GeoRegion,
     area_label,
     canonical_area_slug,
+    city_uses_moscow_geo,
+    is_moscow_city_name,
     normalize_geo_text,
+    oblast_geo_area_for_city,
     region_to_slug,
+    should_show_moscow_geo_fields,
 )
 from apps.core.models import GeoArea
 from apps.tournaments.landing import (
@@ -330,18 +334,164 @@ class GeoAreaChoicesTestCase(TestCase):
         self.assertNotIn("voskresensk", slugs)
 
 
+class MoscowCityGeoHelpersTestCase(TestCase):
+    """Поля региона и района нужны только Москве и городам области."""
+
+    def test_moscow_name_variants(self) -> None:
+        self.assertTrue(is_moscow_city_name("Москва"))
+        self.assertTrue(is_moscow_city_name(" moscow "))
+        self.assertTrue(is_moscow_city_name("Москва, Россия"))
+        self.assertTrue(is_moscow_city_name("г. Москва"))
+        self.assertTrue(city_uses_moscow_geo("Москва"))
+        self.assertTrue(should_show_moscow_geo_fields(""))
+        self.assertTrue(should_show_moscow_geo_fields("Москва"))
+
+    def test_oblast_city_matches_catalog(self) -> None:
+        area = oblast_geo_area_for_city("г. Раменское")
+        self.assertIsNotNone(area)
+        assert area is not None
+        self.assertEqual(area.slug, "ramenskoe")
+        self.assertTrue(city_uses_moscow_geo("Раменское"))
+
+    def test_other_russian_city_skips_moscow_taxonomy(self) -> None:
+        self.assertFalse(is_moscow_city_name("Санкт-Петербург"))
+        self.assertFalse(city_uses_moscow_geo("Санкт-Петербург"))
+        self.assertFalse(should_show_moscow_geo_fields("Казань"))
+        self.assertIsNone(oblast_geo_area_for_city("Санкт-Петербург"))
+
+
+class NonMoscowTournamentGeoTestCase(TestCase):
+    """Турнир в другом городе не получает район Москвы из названия."""
+
+    def test_spb_does_not_inherit_district_from_name(self) -> None:
+        tournament = Tournament.objects.create(
+            name="Турнир TennisFan Юг",
+            slug="spb-south-name",
+            city="Санкт-Петербург",
+            start_date=date.today(),
+            format="round_robin",
+        )
+
+        self.assertEqual(tournament.region, "")
+        self.assertIsNone(tournament.geo_area_id)
+
+    def test_spb_clears_leftover_moscow_fields_on_save(self) -> None:
+        south = GeoArea.objects.get(slug="yug")
+        tournament = Tournament.objects.create(
+            name="Питер",
+            slug="spb-leftover-geo",
+            city="Санкт-Петербург",
+            start_date=date.today(),
+            format="round_robin",
+            region=GeoRegion.MOSCOW,
+            geo_area=south,
+        )
+
+        self.assertEqual(tournament.region, "")
+        self.assertIsNone(tournament.geo_area_id)
+
+    def test_ramenskoe_infers_oblast_area(self) -> None:
+        tournament = Tournament.objects.create(
+            name="Кубок Раменского",
+            slug="ramenskoe-cup-geo",
+            city="Раменское",
+            start_date=date.today(),
+            format="round_robin",
+        )
+        area = GeoArea.objects.get(slug="ramenskoe")
+
+        self.assertEqual(tournament.region, GeoRegion.MOSCOW_OBLAST)
+        self.assertEqual(tournament.geo_area_id, area.pk)
+
+    def test_admin_form_spb_clears_moscow_geo(self) -> None:
+        from apps.tournaments.admin import TournamentAdminForm
+
+        south = GeoArea.objects.get(slug="yug")
+        form = TournamentAdminForm(
+            data={
+                "name": "Питер админ",
+                "slug": "spb-admin-geo",
+                "city": "Санкт-Петербург",
+                "format": "round_robin",
+                "sport": "tennis",
+                "variant": "singles",
+                "status": "upcoming",
+                "entry_fee": "500",
+                "is_one_day": False,
+                "gender": "male",
+                "tournament_type": "regular",
+                "duration": "multi",
+                "start_date": date.today().isoformat(),
+                "allowed_categories": ["amateur"],
+                "fan_points_r1": "10",
+                "fan_points_r2": "25",
+                "fan_points_sf": "45",
+                "fan_points_final": "70",
+                "fan_points_winner": "100",
+                "match_days_per_round": "7",
+                "postpayment_deadline_hours": "12",
+                "region": GeoRegion.MOSCOW,
+                "geo_area": str(south.pk),
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["region"], "")
+        self.assertIsNone(form.cleaned_data["geo_area"])
+
+
 class CatalogFilterCopyTestCase(TestCase):
     """Публичный каталог называет площадку районом, не зоной."""
 
-    def test_filter_label_uses_district(self) -> None:
+    def test_all_russia_hides_districts_until_region_chosen(self) -> None:
         response = Client().get(reverse("tournament_list"), secure=True)
+
+        self.assertContains(response, ">Вся Россия</option>")
+        self.assertContains(response, 'id="tournament-filter-region"')
+        self.assertNotContains(response, ">Москва и область</option>")
+        self.assertNotContains(response, 'id="tournament-filter-area"')
+        self.assertNotContains(response, "Зона или город")
+
+    def test_moscow_region_shows_cardinal_districts(self) -> None:
+        response = Client().get(
+            reverse("tournament_list"),
+            {"region": "moscow"},
+            secure=True,
+        )
 
         self.assertContains(response, "Район или город")
         self.assertContains(response, "Все районы и города")
         self.assertContains(response, "Север")
         self.assertContains(response, "Юг")
-        self.assertNotContains(response, "Зона или город")
         self.assertNotContains(response, "Юго-Восток")
+
+    def test_spb_city_hides_moscow_filters_and_ignores_region(self) -> None:
+        moscow_tm = Tournament.objects.create(
+            name="Московский открытый",
+            slug="msk-listed-geo",
+            city="Москва",
+            region=GeoRegion.MOSCOW,
+            start_date=date.today(),
+            format="round_robin",
+        )
+        spb_tm = Tournament.objects.create(
+            name="Питерский открытый",
+            slug="spb-listed-geo",
+            city="Санкт-Петербург",
+            start_date=date.today(),
+            format="round_robin",
+        )
+
+        response = Client().get(
+            reverse("tournament_list"),
+            {"city": "Санкт-Петербург", "region": "moscow"},
+            secure=True,
+        )
+
+        self.assertContains(response, spb_tm.name)
+        self.assertNotContains(response, moscow_tm.name)
+        self.assertNotContains(response, 'id="tournament-filter-region"')
+        self.assertContains(response, 'id="tournament-filter-city"')
 
 
 class TournamentFilterChipsTestCase(TestCase):

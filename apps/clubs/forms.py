@@ -9,6 +9,14 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.text import slugify
 
+from apps.core.geo import (
+    GeoRegion,
+    city_uses_moscow_geo,
+    geo_areas_client_payload,
+    is_moscow_city_name,
+    oblast_geo_area_for_city,
+    should_show_moscow_geo_fields,
+)
 from apps.core.models import GeoArea, UserTelegramLink
 from apps.core.sports import Sport, VenueSport, sport_code
 from apps.courts.models import Court
@@ -680,6 +688,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "Список кортов сужается по виду спорта: теннисный корт нельзя выбрать для падела."
         )
         self.fields["geo_area"].empty_label = "Не выбрано"
+        self.fields["city"].widget.attrs["data-geo-city"] = "1"
         self.fields["region"].widget.attrs["data-geo-region"] = "1"
         self.fields["geo_area"].widget.attrs["data-geo-area"] = "1"
         self._configure_geo_area_queryset()
@@ -694,10 +703,12 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "Если поле пустое, регистрация будет открыта до старта турнира."
         )
         self.fields["region"].help_text = (
-            "Москва или область — от выбора зависит список районов и городов."
+            "Только для Москвы и области: от выбора зависит список районов "
+            "и городов. Для Санкт-Петербурга и других городов России поле скрыто."
         )
         self.fields["geo_area"].help_text = (
-            "Район Москвы или город области для рекламных страниц и фильтров."
+            "Район Москвы или город области — для рекламных страниц. "
+            "Для остальных населённых пунктов достаточно поля «Населённый пункт»."
         )
         self.fields["is_open_interclub"].disabled = not is_pro
         if not is_pro:
@@ -717,18 +728,33 @@ class ClubTournamentCreateForm(forms.ModelForm):
                 existing = widget.attrs.get("class", "")
                 widget.attrs["class"] = (existing + " form-control").strip()
 
-    def geo_areas_payload(self) -> list[dict[str, str | int]]:
-        """Данные активных площадок для каскадного селекта на клиенте.
+    def geo_areas_payload(self) -> list[dict[str, str | int | list[str]]]:
+        """Данные активных площадок для каскада и скрытия московских полей.
 
         Returns:
-            list[dict[str, str | int]]: id, регион и название каждой площадки.
+            list[dict[str, str | int | list[str]]]: id, регион, название, псевдонимы.
         """
-        return [
-            {"id": area.pk, "region": area.region, "name": area.name}
-            for area in GeoArea.objects.filter(is_active=True).order_by(
-                "region", "sort_order", "name"
+        return geo_areas_client_payload()
+
+    def shows_moscow_geo(self) -> bool:
+        """Нужно ли сразу показать регион и район на форме.
+
+        Returns:
+            bool: False, если населённый пункт вне Москвы и области.
+        """
+        city = ""
+        if self.is_bound:
+            city = str(self.data.get("city") or "")
+        elif self.instance and self.instance.pk:
+            city = self.instance.city or ""
+        else:
+            city = str(
+                self.initial.get("city")
+                or self.fields["city"].initial
+                or (self.club.city if self.club else "")
+                or ""
             )
-        ]
+        return should_show_moscow_geo_fields(city)
 
     def _selected_region(self) -> str:
         """Текущий регион из POST, инстанса или initial.
@@ -762,15 +788,12 @@ class ClubTournamentCreateForm(forms.ModelForm):
         if not city:
             return
 
-        city_norm = city.casefold()
-        if city_norm in {"москва", "moscow"}:
+        if is_moscow_city_name(city):
             if not self.fields["region"].initial and "region" not in self.initial:
-                self.fields["region"].initial = "moscow"
+                self.fields["region"].initial = GeoRegion.MOSCOW
             return
 
-        area = GeoArea.resolve_from_name(city, region="moscow_oblast")
-        if area is None:
-            area = GeoArea.resolve_from_name(city)
+        area = oblast_geo_area_for_city(city)
         if area is None:
             return
         if not self.fields["region"].initial and "region" not in self.initial:
@@ -982,9 +1005,13 @@ class ClubTournamentCreateForm(forms.ModelForm):
         if cleaned_data.get("is_open_interclub") and not self.is_pro:
             cleaned_data["is_open_interclub"] = False
 
+        city = (cleaned_data.get("city") or "").strip()
         region = (cleaned_data.get("region") or "").strip()
         geo_area = cleaned_data.get("geo_area")
-        if geo_area is not None:
+        if city and not city_uses_moscow_geo(city):
+            cleaned_data["region"] = ""
+            cleaned_data["geo_area"] = None
+        elif geo_area is not None:
             if region and geo_area.region != region:
                 self.add_error(
                     "geo_area",

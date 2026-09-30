@@ -18760,6 +18760,13 @@ a.home-activity__actor:hover {
     color: var(--color-text-muted);
 }
 
+.shop-product-card__placeholder-img,
+.shop-detail__placeholder-img {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+}
+
 .shop-product-card__body {
     flex: 1;
 }

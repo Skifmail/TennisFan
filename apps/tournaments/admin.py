@@ -16,6 +16,7 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 
+from apps.core.geo import city_uses_moscow_geo, geo_areas_client_payload
 from apps.core.sports import Sport
 from apps.users.models import Player, SkillLevel
 from apps.users.skill_levels import skill_with_ntrp
@@ -347,6 +348,9 @@ class TournamentAdminForm(forms.ModelForm):
         help_text="Отметьте от 1 до 5 категорий. Регистрироваться смогут только игроки с выбранными уровнями.",
     )
 
+    class Media:
+        js = ("js/tournament_moscow_geo.js",)
+
     class Meta:
         model = Tournament
         fields = "__all__"
@@ -361,6 +365,20 @@ class TournamentAdminForm(forms.ModelForm):
             "Можно оставить пустым или ввести вручную. При совпадении с существующим "
             "турниром автоматически добавится суффикс -2, -3 и т.д."
         )
+        if "city" in self.fields:
+            self.fields["city"].widget.attrs["data-geo-city"] = "1"
+        if "region" in self.fields:
+            self.fields["region"].widget.attrs["data-geo-region"] = "1"
+            self.fields["region"].help_text = (
+                "Только Москва и область. Для других городов России поле скрывается — "
+                "достаточно населённого пункта."
+            )
+        if "geo_area" in self.fields:
+            self.fields["geo_area"].widget.attrs["data-geo-area"] = "1"
+            self.fields["geo_area"].help_text = (
+                "Район Москвы или город области для рекламных страниц. "
+                "Для Санкт-Петербурга и остальных городов не используется."
+            )
         start_after = False
         data = args[0] if args else kwargs.get("data")
         if data is not None:
@@ -452,6 +470,10 @@ class TournamentAdminForm(forms.ModelForm):
             slug=slug or None,
             instance=self.instance,
         )
+        city = (cleaned_data.get("city") or "").strip()
+        if city and not city_uses_moscow_geo(city):
+            cleaned_data["region"] = ""
+            cleaned_data["geo_area"] = None
         return cleaned_data
 
 
@@ -497,8 +519,38 @@ class TournamentRegistrationCoverageAdmin(admin.ModelAdmin):
     readonly_fields = ("tournament", "user", "coverage_type", "created_at")
 
 
+class TournamentGeoAdminMixin:
+    """JSON справочника площадок для скрытия московских полей в админке."""
+
+    change_form_template = "admin/tournaments/tournament/change_form.html"
+
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Добавить справочник площадок в контекст формы турнира.
+
+        Args:
+            request: HTTP-запрос админки.
+            object_id: PK редактируемого турнира либо None на создании.
+            form_url: URL формы.
+            extra_context: Дополнительный контекст шаблона.
+
+        Returns:
+            HttpResponse: Страница добавления или изменения.
+        """
+        extra_context = extra_context or {}
+        extra_context["geo_areas_payload"] = geo_areas_client_payload()
+        return super().changeform_view(  # type: ignore[misc]
+            request, object_id, form_url, extra_context
+        )
+
+
 @admin.register(Tournament)
-class TournamentAdmin(admin.ModelAdmin):
+class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
     form = TournamentAdminForm
     inlines = [TournamentTeamInline, TournamentPhotoInline]
 
@@ -1330,7 +1382,7 @@ class TVDTournamentAdminForm(TournamentAdminForm):
 
 
 @admin.register(TVDTournament)
-class TVDTournamentAdmin(admin.ModelAdmin):
+class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
     """Админка для однодневных турниров (proxy над Tournament, format=weekend_day)."""
 
     form = TVDTournamentAdminForm

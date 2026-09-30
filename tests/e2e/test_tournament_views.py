@@ -228,7 +228,8 @@ class TournamentListCardStateTestCase(TestCase):
         self.assertContains(response, "tournaments-filters__toggle")
         self.assertContains(response, "Фильтры")
         self.assertContains(response, 'id="tournament-filter-region"')
-        self.assertContains(response, 'id="tournament-filter-area"')
+        self.assertNotContains(response, 'id="tournament-filter-area"')
+        self.assertContains(response, ">Вся Россия</option>")
         self.assertContains(response, 'id="tournament-filter-variant"')
         self.assertContains(response, 'id="tournament-filter-city"')
         self.assertContains(response, 'id="tournament-filter-category"')
@@ -250,6 +251,30 @@ class TournamentListCardStateTestCase(TestCase):
         self.assertContains(response, "Химки")
         self.assertContains(response, "Сбросить")
         self.assertContains(response, 'class="tournaments-filters__count"')
+
+    def test_tournament_list_shows_area_filter_after_region(self) -> None:
+        response = self.client.get(
+            reverse("tournament_list"),
+            {"region": "moscow"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="tournament-filter-region"')
+        self.assertContains(response, 'id="tournament-filter-area"')
+        self.assertContains(response, "Север")
+
+    def test_tournament_list_hides_moscow_geo_for_other_city(self) -> None:
+        response = self.client.get(
+            reverse("tournament_list"),
+            {"city": "Санкт-Петербург"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="tournament-filter-region"')
+        self.assertNotContains(response, 'id="tournament-filter-area"')
+        self.assertContains(response, 'id="tournament-filter-city"')
 
 
 class MyMatchesOrderingTestCase(TestCase):

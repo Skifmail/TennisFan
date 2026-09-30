@@ -2,7 +2,7 @@
  * Каскад «регион → зона/город» в форме создания турнира клуба.
  *
  * Подключается из templates/clubs/tournament_create.html (block extra_js).
- * Читает JSON из #club-geo-areas: [{id, region, name}, ...].
+ * Читает JSON из #geo-areas-payload: [{id, region, name, aliases}, ...].
  */
 (function () {
     "use strict";
@@ -49,7 +49,8 @@
     }
 
     function init() {
-        var scriptEl = document.getElementById("club-geo-areas");
+        var scriptEl = document.getElementById("geo-areas-payload")
+            || document.getElementById("club-geo-areas");
         var regionSelect = document.querySelector("[data-geo-region]");
         var areaSelect = document.querySelector("[data-geo-area]");
         if (!regionSelect || !areaSelect) {

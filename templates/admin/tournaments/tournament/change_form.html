@@ -1,0 +1,5 @@
+{% extends "admin/change_form.html" %}
+{% block extrahead %}
+{{ block.super }}
+{{ geo_areas_payload|json_script:"geo-areas-payload" }}
+{% endblock %}

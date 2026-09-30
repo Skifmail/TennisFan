@@ -9,7 +9,7 @@ from django.db import models
 from django.db.models import Case, IntegerField, When
 from django.utils import timezone
 
-from apps.core.geo import GeoRegion
+from apps.core.geo import GeoRegion, city_uses_moscow_geo
 from apps.core.sports import Sport
 from apps.users.models import Player, SkillLevel
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
@@ -533,7 +533,13 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         Порядок источников: название турнира (в московских названиях район зашит
         в текст), затем география корта. Уже заполненные поля не перезаписываются,
         поле ``Court.district`` не используется — данные в нём несогласованы.
+        Для городов вне Москвы и области справочник не применяется: там живёт
+        только поле ``city``.
         """
+        if (self.city or "").strip() and not city_uses_moscow_geo(self.city):
+            self.region = ""
+            self.geo_area = None
+            return
         if self.geo_area_id and self.region:
             return
 
@@ -562,6 +568,10 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             ValidationError: Если площадка относится к другому региону.
         """
         super().clean()
+        if (self.city or "").strip() and not city_uses_moscow_geo(self.city):
+            self.region = ""
+            self.geo_area = None
+            return
         if self.geo_area_id and self.region:
             if self.geo_area.region != self.region:
                 from django.core.exceptions import ValidationError

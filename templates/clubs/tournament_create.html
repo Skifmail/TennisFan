@@ -190,13 +190,13 @@
                         {% if form.city.help_text %}<p class="club-tournament-create__help">{{ form.city.help_text }}</p>{% endif %}
                         {% for error in form.city.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
                     </div>
-                    <div class="club-tournament-create__field">
+                    <div class="club-tournament-create__field" data-moscow-geo-field{% if not form.shows_moscow_geo %} hidden{% endif %}>
                         <label for="{{ form.region.id_for_label }}" class="form-label">{{ form.region.label }}</label>
                         {{ form.region }}
                         {% if form.region.help_text %}<p class="club-tournament-create__help">{{ form.region.help_text }}</p>{% endif %}
                         {% for error in form.region.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
                     </div>
-                    <div class="club-tournament-create__field">
+                    <div class="club-tournament-create__field" data-moscow-geo-field{% if not form.shows_moscow_geo %} hidden{% endif %}>
                         <label for="{{ form.geo_area.id_for_label }}" class="form-label">{{ form.geo_area.label }}</label>
                         {{ form.geo_area }}
                         {% if form.geo_area.help_text %}<p class="club-tournament-create__help">{{ form.geo_area.help_text }}</p>{% endif %}
@@ -339,7 +339,8 @@
 {% endblock %}
 
 {% block extra_js %}
-{{ form.geo_areas_payload|json_script:"club-geo-areas" }}
+{{ form.geo_areas_payload|json_script:"geo-areas-payload" }}
+<script src="{% static 'js/tournament_moscow_geo.js' %}" defer></script>
 <script src="{% static 'js/club_tournament_geo.js' %}" defer></script>
 <script src="{% static 'js/club_tournament_sport.js' %}" defer></script>
 <script>

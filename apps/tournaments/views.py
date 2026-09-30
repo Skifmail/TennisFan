@@ -37,7 +37,7 @@ from apps.clubs.plan_services import (
 )
 from apps.clubs.services import get_fee_status_for_member, user_can_manage_club
 from apps.core.decorators import require_filled_profile
-from apps.core.geo import region_to_slug
+from apps.core.geo import region_to_slug, should_show_moscow_geo_fields
 from apps.core.metrika import (
     TOURNAMENT_PAYMENT_STARTED,
     TOURNAMENT_REGISTRATION_SUCCESS,
@@ -391,12 +391,16 @@ def tournament_list(
     Returns:
         HttpResponse: Страница списка или архива турниров.
     """
-    landing = resolve_landing(
-        region_slug or (request.GET.get("region") or "").strip(),
-        area_slug or (request.GET.get("area") or "").strip(),
-        variant_slug or (request.GET.get("variant") or "").strip(),
-    )
+    landing_region = region_slug or (request.GET.get("region") or "").strip()
+    landing_area = area_slug or (request.GET.get("area") or "").strip()
+    landing_variant = variant_slug or (request.GET.get("variant") or "").strip()
     city = (request.GET.get("city") or "").strip()
+    path_locks_geo = bool(region_slug or area_slug)
+    show_moscow_geo_filters = path_locks_geo or should_show_moscow_geo_fields(city)
+    if not show_moscow_geo_filters:
+        landing_region = ""
+        landing_area = ""
+    landing = resolve_landing(landing_region, landing_area, landing_variant)
     category = request.GET.get("category", "")
     status: str
     if archive:
@@ -650,7 +654,8 @@ def tournament_list(
         "landing_meta_description": landing.meta_description,
         "canonical_url": request.build_absolute_uri(landing.url),
         "region_options": region_opts,
-        "area_options": geo_area_choices(landing.region),
+        "area_options": (geo_area_choices(landing.region) if landing.region else []),
+        "show_moscow_geo_filters": show_moscow_geo_filters,
         "variant_options": variant_opts,
         "current_region": current_region,
         "current_area": landing.area.slug if landing.area else "",

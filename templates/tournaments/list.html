@@ -2,7 +2,7 @@
 
 {% block title %}{% if is_archive %}Архив турниров{% else %}{{ landing_heading|default:"Турниры" }}{% endif %}{% endblock %}
 
-{% block meta_description %}{% if is_archive %}Архив завершённых любительских турниров по теннису на TennisFan.{% else %}{{ landing_meta_description|default:"Любительские турниры по теннису в Москве и Московской области." }}{% endif %}{% endblock %}
+{% block meta_description %}{% if is_archive %}Архив завершённых любительских турниров по теннису на TennisFan.{% else %}{{ landing_meta_description|default:"Любительские турниры по теннису по всей России." }}{% endif %}{% endblock %}
 
 {% block meta_og %}
     <meta property="og:type" content="website">
@@ -57,10 +57,11 @@
                 {% endif %}
             </div>
             <div class="tournaments-filters__panel" id="tournaments-filters-panel">
+            {% if show_moscow_geo_filters %}
             <div class="tournaments-filters__field{% if current_region %} is-active{% endif %}">
                 <label class="tournaments-filters__label" for="tournament-filter-region">Регион</label>
                 <select name="region" id="tournament-filter-region" class="form-control" onchange="this.form.submit()" aria-label="Регион">
-                    <option value="">Москва и область</option>
+                    <option value="">Вся Россия</option>
                     {% for option in region_options %}
                     <option value="{{ option.slug }}" {% if current_region == option.slug %}selected{% endif %}>{{ option.label }}</option>
                     {% endfor %}
@@ -76,6 +77,7 @@
                     {% endfor %}
                 </select>
             </div>
+            {% endif %}
             {% endif %}
             <div class="tournaments-filters__field{% if current_sport and current_sport != 'tennis' %} is-active{% endif %}">
                 <label class="tournaments-filters__label" for="tournament-filter-sport">Вид спорта</label>

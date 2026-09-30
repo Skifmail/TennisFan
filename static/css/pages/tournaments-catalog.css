@@ -190,12 +190,19 @@
 
 .tournaments-catalog .tournaments-filters select.form-control {
     padding-right: 2.25rem;
+    color-scheme: dark;
+    background-color: var(--color-bg-elevated);
+}
+
+.tournaments-catalog .tournaments-filters select.form-control option {
+    background-color: var(--color-bg-elevated);
+    color: var(--color-text);
 }
 
 .tournaments-filters__field.is-active .form-control,
 .tournaments-filters__field.is-active .club-filter-select__toggle {
     border-color: rgb(166 130 74 / 0.85);
-    background: rgb(166 130 74 / 0.1);
+    background-color: var(--color-bg-elevated);
 }
 
 @media (prefers-reduced-motion: no-preference) {

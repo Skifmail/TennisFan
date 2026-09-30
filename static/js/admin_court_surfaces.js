@@ -34,14 +34,32 @@
         }
     }
 
+    function syncPadelRows() {
+        var sport = document.getElementById("id_venue_sport");
+        if (!sport) {
+            return;
+        }
+        var show = sport.value === "padel" || sport.value === "both";
+        ["id_has_glass_walls", "id_padel_surfaces"].forEach(function (fieldId) {
+            var row = rowForField(fieldId);
+            if (row) {
+                row.style.display = show ? "" : "none";
+            }
+        });
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         var indoor = document.getElementById("id_is_indoor");
         var outdoor = document.getElementById("id_is_outdoor");
-        if (!indoor || !outdoor) {
-            return;
+        if (indoor && outdoor) {
+            indoor.addEventListener("change", syncRows);
+            outdoor.addEventListener("change", syncRows);
+            syncRows();
         }
-        indoor.addEventListener("change", syncRows);
-        outdoor.addEventListener("change", syncRows);
-        syncRows();
+        var sport = document.getElementById("id_venue_sport");
+        if (sport) {
+            sport.addEventListener("change", syncPadelRows);
+            syncPadelRows();
+        }
     });
 })();

@@ -61,9 +61,12 @@
             </div>
 
             <div class="rules-tabs__content" id="padel-rules" role="tabpanel" style="display: none;">
-                <article class="rules-article">
-                    <h2 class="rules-article__title">Правила падела</h2>
-                    <div class="rules-article__content">
+                <article class="rules-doc card">
+                    <div class="card-body rules-doc__body">
+                        <h2 class="rules-doc__title">Правила падела</h2>
+                        <p class="rules-doc__meta rules-doc__meta--links">
+                            <a class="rules-doc__doc-link" href="https://padel.ru/blog/obuchenie/pravila-padela/" target="_blank" rel="noopener">Правила игры в падел. Падел.ру</a>
+                        </p>
                         {% if rules_content.padel_rules %}
                             {{ rules_content.padel_rules|safe }}
                         {% else %}

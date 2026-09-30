@@ -290,7 +290,7 @@ class Player(CompressImageFieldsMixin, models.Model):
             return 0.0
         return float(round(self.matches_won / self.matches_played * 100, 1))
 
-    def get_rating_changes(self) -> dict[str, dict]:
+    def get_rating_changes(self, sport: str | None = None) -> dict[str, dict]:
         """
         Получить информацию об изменениях рейтинга после последнего матча.
         Возвращает:
@@ -301,7 +301,10 @@ class Player(CompressImageFieldsMixin, models.Model):
         """
         from django.db.models import Q
 
+        from apps.core.sports import sport_code
         from apps.tournaments.models import Match
+
+        sport_value = sport_code(sport or getattr(self, "_profile_sport", None))
 
         # Находим последний завершенный матч игрока
         last_match = (
@@ -313,6 +316,7 @@ class Player(CompressImageFieldsMixin, models.Model):
                 | Q(team2__player1=self)
                 | Q(team2__player2=self)
             )
+            .filter(sport=sport_value)
             .filter(
                 status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
             )

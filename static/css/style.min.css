@@ -3445,7 +3445,7 @@ form.club-filter-dropdown-open {
 /* Подсказка кубка в карточке рейтинга.
    Кубок стоит у левого края, а текст турнира длинный: центрирование
    и привязка к краю иконки уводят пузырь за экран. На мобилке
-   растягиваем его на ширину карточки. */
+   держим его внутри карточки, на всю её ширину. */
 @media (width <= 768px) {
     .player-card {
         position: relative;
@@ -8362,6 +8362,17 @@ body.has-fullscreen-loader {
     align-items: center;
     gap: var(--spacing-sm);
     flex-wrap: wrap;
+}
+
+.profile-sport-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.65rem;
+}
+
+.profile-sport-switch .profile-charts__pill {
+    text-decoration: none;
 }
 
 .profile-info__subscription-badge {
@@ -14000,12 +14011,19 @@ a.match-details-value__lead:hover {
 
 .tournaments-catalog .tournaments-filters select.form-control {
     padding-right: 2.25rem;
+    color-scheme: dark;
+    background-color: var(--color-bg-elevated);
+}
+
+.tournaments-catalog .tournaments-filters select.form-control option {
+    background-color: var(--color-bg-elevated);
+    color: var(--color-text);
 }
 
 .tournaments-filters__field.is-active .form-control,
 .tournaments-filters__field.is-active .club-filter-select__toggle {
     border-color: rgb(166 130 74 / 0.85);
-    background: rgb(166 130 74 / 0.1);
+    background-color: var(--color-bg-elevated);
 }
 
 @media (prefers-reduced-motion: no-preference) {

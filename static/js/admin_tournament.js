@@ -12,6 +12,8 @@
     const OLYMPIC_FORMAT = "olympic_consolation";
     const ROUND_ROBIN_FORMAT = "round_robin";
     const VARIANT_DOUBLES = "doubles";
+    const PADEL_SPORT = "padel";
+    const PADEL_VARIANT_LOCK = "id_variant_padel_lock";
 
     function getFormatSelect() {
         return document.querySelector("#id_format, select[name='format']");
@@ -211,6 +213,44 @@
         updateParticipantsVsTeamsVisibility();
     }
 
+    function syncPadelVariant() {
+        const sport = document.querySelector("#id_sport, select[name='sport']");
+        const variant = getVariantSelect();
+        if (!sport || !variant) {
+            return;
+        }
+        const padel = sport.value === PADEL_SPORT;
+        const row = getFieldRow("variant");
+        if (padel) {
+            variant.value = VARIANT_DOUBLES;
+            variant.disabled = true;
+            variant.setAttribute("aria-disabled", "true");
+            let hidden = document.getElementById(PADEL_VARIANT_LOCK);
+            if (!hidden) {
+                hidden = document.createElement("input");
+                hidden.type = "hidden";
+                hidden.name = variant.name || "variant";
+                hidden.id = PADEL_VARIANT_LOCK;
+                variant.insertAdjacentElement("afterend", hidden);
+            }
+            hidden.value = VARIANT_DOUBLES;
+            if (row) {
+                row.style.opacity = "0.55";
+            }
+        } else {
+            variant.disabled = false;
+            variant.removeAttribute("aria-disabled");
+            const hidden = document.getElementById(PADEL_VARIANT_LOCK);
+            if (hidden) {
+                hidden.remove();
+            }
+            if (row) {
+                row.style.opacity = "";
+            }
+        }
+        updateVariantVisibility();
+    }
+
     function updateStartAfterFillVisibility() {
         const checkbox = document.querySelector(
             "#id_start_after_fill, input[name='start_after_fill']"
@@ -268,6 +308,11 @@
             variantSelect.addEventListener("change", updateVariantVisibility);
             variantSelect.addEventListener("input", updateVariantVisibility);
         }
+        const sportSelect = document.querySelector("#id_sport, select[name='sport']");
+        if (sportSelect) {
+            sportSelect.addEventListener("change", syncPadelVariant);
+            sportSelect.addEventListener("input", syncPadelVariant);
+        }
         const startAfterCheckbox = document.querySelector(
             "#id_start_after_fill, input[name='start_after_fill']"
         );
@@ -278,6 +323,7 @@
         // Вызываем updateVisibility с небольшой задержкой, чтобы убедиться, что значения по умолчанию установлены
         setTimeout(function() {
             updateVisibility();
+            syncPadelVariant();
             updateGenderOptions();
             updateParticipantsVsTeamsVisibility();
             updateStartAfterFillVisibility();

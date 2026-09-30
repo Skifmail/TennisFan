@@ -46,6 +46,18 @@ class RulesDefaultsTests(TestCase):
             self.assertIn("40", body, msg=slug)
             self.assertNotIn("обработан автоматически", body, msg=slug)
 
+    def test_padel_rules_match_editable_document_structure(self) -> None:
+        """Правила падела оформлены как теннис и содержат платформенные нормы."""
+        body = get_default_rules_body("padel_rules")
+        self.assertIn("rules-doc__heading", body)
+        self.assertIn("подач", body.lower())
+        self.assertIn("стен", body.lower())
+        self.assertIn("тай-брейк", body.lower())
+        self.assertIn("TennisFan", body)
+        self.assertIn("FAN", body)
+        self.assertIn("преимущество", body.lower())
+        self.assertNotIn("Падел.ру", body)
+
 
 class RulesSectionAdminFormTests(TestCase):
     """Форма админки подставляет дефолт при пустом body."""

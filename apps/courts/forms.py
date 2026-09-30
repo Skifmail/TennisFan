@@ -341,6 +341,10 @@ class CourtAdminForm(forms.ModelForm):
         cleaned_data = cast(dict[str, Any], super().clean())
         name = str(cleaned_data.get("name") or "").strip()
         slug = str(cleaned_data.get("slug") or "").strip()
+        venue = str(cleaned_data.get("venue_sport") or VenueSport.TENNIS)
+        if venue == VenueSport.TENNIS:
+            cleaned_data["has_glass_walls"] = False
+            cleaned_data["padel_surfaces"] = []
         if not slug and name:
             exclude_pk = (
                 self.instance.pk if self.instance and self.instance.pk else None

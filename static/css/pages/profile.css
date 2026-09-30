@@ -356,6 +356,17 @@
     flex-wrap: wrap;
 }
 
+.profile-sport-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.65rem;
+}
+
+.profile-sport-switch .profile-charts__pill {
+    text-decoration: none;
+}
+
 .profile-info__subscription-badge {
     display: inline-flex;
     align-items: center;

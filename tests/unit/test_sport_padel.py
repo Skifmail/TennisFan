@@ -180,6 +180,8 @@ class ProfileSportSwitcherTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "?sport=padel")
+        self.assertContains(response, "profile-sport-switch__track")
+        self.assertNotContains(response, "profile-sport-switch__track is-padel")
         self.assertContains(response, "3,20")
         self.assertNotContains(response, "4,00")
 
@@ -191,6 +193,7 @@ class ProfileSportSwitcherTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "4,00")
+        self.assertContains(response, "profile-sport-switch__track is-padel")
         self.assertNotContains(response, "3,20")
 
 

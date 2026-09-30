@@ -44,9 +44,7 @@
                         {% endif %}
                     {% else %}
                         <div class="video-placeholder">
-                            <video class="video-placeholder__video" autoplay muted loop playsinline preload="metadata">
-                                <source src="{% static 'video/logotip.MP4' %}" type="video/mp4">
-                            </video>
+                            <img src="{% static 'images/tournament-placeholder.png' %}" alt="" class="video-placeholder__img" decoding="async">
                             <p>Не удалось загрузить трансляцию</p>
                             <a href="{{ stream.url }}" target="_blank" rel="noopener" class="btn btn-primary">Открыть трансляцию</a>
                         </div>
@@ -100,9 +98,7 @@
                         {% endif %}
                     {% else %}
                         <div class="video-placeholder">
-                            <video class="video-placeholder__video" autoplay muted loop playsinline preload="metadata">
-                                <source src="{% static 'video/logotip.MP4' %}" type="video/mp4">
-                            </video>
+                            <img src="{% static 'images/tournament-placeholder.png' %}" alt="" class="video-placeholder__img" decoding="async">
                             <p>Не удалось загрузить видео</p>
                             <a href="{{ video.url }}" target="_blank" rel="noopener" class="btn btn-primary">Открыть видео</a>
                         </div>

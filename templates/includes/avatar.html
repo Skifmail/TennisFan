@@ -1,8 +1,9 @@
 {% load static %}
+{% load media_tags %}
 {% if avatar %}
-<img src="{{ avatar.url }}" alt="" class="{{ class|default:'player-avatar' }}{% if size %} avatar--{{ size }}{% endif %}">
+<img src="{{ avatar|media_variant:'avatar' }}" data-full="{{ avatar.url }}" alt="" class="{{ class|default:'player-avatar' }}{% if size %} avatar--{{ size }}{% endif %}">
 {% elif url %}
-<img src="{{ url }}" alt="" class="{{ class|default:'player-avatar' }}{% if size %} avatar--{{ size }}{% endif %}">
+<img src="{{ url|media_variant:'avatar' }}" data-full="{{ url }}" alt="" class="{{ class|default:'player-avatar' }}{% if size %} avatar--{{ size }}{% endif %}">
 {% else %}
 <img src="{% static 'images/avatar_placeholder.png' %}" alt="" class="{{ class|default:'player-avatar' }}{% if size %} avatar--{{ size }}{% endif %}">
 {% endif %}

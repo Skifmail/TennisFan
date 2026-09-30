@@ -151,4 +151,42 @@ class CompressImageFieldsMixin:
                     field.name,
                     e,
                 )
+        fresh_names = []
+        for field in self._meta.get_fields():
+            if not isinstance(field, models.ImageField):
+                continue
+            file_obj = getattr(self, field.name, None)
+            if not file_obj or getattr(file_obj, "_committed", True):
+                continue
+            if getattr(file_obj, "name", None):
+                fresh_names.append(field.name)
         super().save(*args, **kwargs)
+        self._write_display_variants(fresh_names)
+
+    def _write_display_variants(self, field_names: list[str]) -> None:
+        """Пишет уменьшенные копии для только что загруженных изображений.
+
+        Args:
+            field_names: Имена ImageField, файл которых ещё не был в хранилище.
+        """
+        if not field_names:
+            return
+        from apps.core.image_variants import ensure_display_variants
+
+        for field_name in field_names:
+            file_obj = getattr(self, field_name, None)
+            stored_name = getattr(file_obj, "name", None)
+            if not stored_name:
+                continue
+            try:
+                ensure_display_variants(
+                    stored_name,
+                    storage=getattr(file_obj, "storage", None),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Не удалось записать копии %s.%s: %s",
+                    self.__class__.__name__,
+                    field_name,
+                    exc,
+                )

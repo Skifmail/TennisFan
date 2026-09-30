@@ -1,5 +1,6 @@
 {% load humanize %}
 {% load skill_tags %}
+{% load media_tags %}
 {% load static %}
 <div class="card tournament-card{% if tournament.status == 'cancelled' %} tournament-card--cancelled{% endif %}">
     <a href="{% url 'tournament_detail' slug=tournament.slug %}"
@@ -11,13 +12,11 @@
             <div class="tournament-card__center-top">
                 {% if tournament.image %}
                 <div class="tournament-card-photos tournament-card__media">
-                    <img src="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img" loading="lazy" decoding="async">
+                    <img src="{{ tournament.image|media_variant:'card' }}" data-full="{{ tournament.image.url }}" alt="{{ tournament.name }}" class="tournament-img" loading="lazy" decoding="async">
                 </div>
                 {% else %}
                 <div class="tournament-card-photos tournament-card__media">
-                    <video class="tournament-img" autoplay muted loop playsinline preload="metadata">
-                        <source src="{% static 'video/logotip.MP4' %}" type="video/mp4">
-                    </video>
+                    <img src="{% static 'images/tournament-placeholder.png' %}" alt="" class="tournament-img" decoding="async">
                 </div>
                 {% endif %}
                 <div class="tournament-card__title-col">

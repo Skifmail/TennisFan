@@ -20335,14 +20335,40 @@ a.home-activity__actor:hover {
     border-radius: var(--radius-lg);
 }
 
-/* Фильтры не растягиваются на всю панель: компактная группа слева, действия справа. */
+/* Первая строка — вид спорта и формат, вторая — поля и действия. */
 .sparring-toolbar__panel:has(.sparring-toolbar__filters) {
-    flex-direction: row;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    padding: 0.55rem 0.7rem 0.65rem;
+    margin-bottom: var(--spacing-lg);
+}
+
+.sparring-toolbar__modes {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.7rem;
+    width: 100%;
+}
+
+.sparring-toolbar__modes .sparring-tabs {
+    margin: 0;
+    padding: 0.12rem;
+    background: rgb(0 0 0 / 0.16);
+}
+
+.sparring-toolbar__modes .sparring-tab {
+    padding: 0.28rem 0.7rem;
+    min-height: 2rem;
+}
+
+.sparring-toolbar__row {
+    display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.55rem 0.75rem;
-    padding: 0.6rem 0.75rem;
-    margin-bottom: var(--spacing-lg);
+    width: 100%;
 }
 
 .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar {
@@ -20760,8 +20786,14 @@ a.home-activity__actor:hover {
         align-items: stretch;
     }
 
+    .sparring-toolbar__row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar {
         width: 100%;
+        max-width: none;
         grid-template-columns: 1fr;
     }
 

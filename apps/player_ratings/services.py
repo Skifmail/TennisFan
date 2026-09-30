@@ -428,6 +428,10 @@ def get_player_skills(
             }
         )
 
+    result["has_displayable_metrics"] = any(
+        not metric["insufficient_data"] for metric in result["metrics"]
+    )
+
     if is_owner and include_lowest_three:
         with_votes: list[tuple[str, dict[str, Any]]] = []
         for name in visible_metric_names:

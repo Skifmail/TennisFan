@@ -157,6 +157,7 @@ class GetPlayerSkillsTestCase(TestCase):
         self.assertTrue(serve_metric["insufficient_data"])
         self.assertIsNone(serve_metric["display_value"])
         self.assertLess(serve_metric["votes_count"], MIN_VOTES_TO_DISPLAY)
+        self.assertFalse(data["has_displayable_metrics"])
 
     def test_owner_lowest_three_only_with_enough_votes(self) -> None:
         data = get_player_skills(

@@ -38,7 +38,7 @@
                     <span class="player-skills-block__star {% if forloop.counter <= m.stars_filled %}player-skills-block__star--filled{% endif %}">★</span>
                     {% endfor %}
                 </span>
-                <span class="player-skills-block__votes">Оценок: {{ m.votes_count }}</span>
+                <span class="player-skills-block__votes" title="Оценок: {{ m.votes_count }}">{{ m.votes_count }}</span>
             </div>
             {% endif %}
         </div>

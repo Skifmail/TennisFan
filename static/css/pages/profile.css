@@ -92,6 +92,7 @@
     max-width: none;
     width: 100%;
     margin: 0 0 var(--spacing-xl);
+    overflow: visible;
 }
 
 .profile-card__inner {
@@ -99,7 +100,7 @@
     grid-template-columns: minmax(280px, 420px) 1fr;
     gap: var(--spacing-xl);
     align-items: start;
-    overflow-x: hidden;
+    overflow: visible;
     position: relative;
 }
 
@@ -111,7 +112,7 @@
     min-width: 0;
     max-width: 100%;
     text-align: left;
-    overflow-x: hidden;
+    overflow: visible;
 }
 
 .profile-info__header {
@@ -234,6 +235,7 @@
 
 .profile-trophy:hover,
 .profile-trophy:focus-visible {
+    z-index: 5;
     transform: translateY(-2px) scale(1.06);
 }
 
@@ -255,7 +257,7 @@
     max-width: min(240px, calc(100vw - 2rem));
     box-sizing: border-box;
     padding: 6px 10px;
-    background: rgb(3 17 13 / 96%);
+    background: #03110d;
     color: #f4e8cf;
     border: 1px solid rgb(166 130 74 / 45%);
     border-radius: 8px;
@@ -1447,7 +1449,7 @@
     .profile-info {
         text-align: left;
         max-width: 100%;
-        overflow-x: hidden;
+        overflow: visible;
     }
 
     .profile-info__stats {

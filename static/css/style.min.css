@@ -6903,6 +6903,61 @@ body.has-fullscreen-loader {
     align-items: start;
 }
 
+.footer-anim {
+    display: none;
+}
+
+@media (width >= 1201px) {
+    .footer-grid {
+        min-height: 11.5rem;
+    }
+
+    .footer-anim {
+        position: absolute;
+        display: flex;
+        grid-column: 2 / 5;
+        grid-row: 1;
+        top: 1.7rem;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 0;
+        align-items: flex-end;
+        justify-content: center;
+        overflow: hidden;
+        pointer-events: none;
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.25s ease, visibility 0.25s ease;
+    }
+
+    .footer-grid:has(.footer-section.is-open) .footer-anim,
+    .footer-anim.is-hidden {
+        opacity: 0;
+        visibility: hidden;
+    }
+
+    .footer-brand,
+    .footer-section,
+    .footer-social {
+        position: relative;
+        z-index: 1;
+    }
+
+    .footer-anim__video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        object-position: center bottom;
+    }
+}
+
+@media (width >= 1201px) and (prefers-reduced-motion: reduce) {
+    .footer-anim {
+        display: none;
+    }
+}
+
 .footer-brand .logo {
     display: inline-block;
     margin-bottom: var(--spacing-md);

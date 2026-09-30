@@ -2409,3 +2409,20 @@ a.home-activity__actor:hover {
         line-height: 1.2;
     }
 }
+
+.home-rating-header__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem 1.15rem;
+    flex-wrap: wrap;
+}
+
+.home-rating-header__actions .profile-sport-switch {
+    margin-top: 0;
+}
+
+@media (width <= 768px) {
+    .home-rating-header__actions {
+        width: 100%;
+    }
+}

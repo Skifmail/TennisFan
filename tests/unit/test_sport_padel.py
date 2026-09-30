@@ -197,6 +197,25 @@ class ProfileSportSwitcherTestCase(TestCase):
         self.assertNotContains(response, "3,20")
 
 
+class HomeSportSwitcherTestCase(TestCase):
+    """На главной топ рейтинга использует тот же тумблер спорта, что профиль."""
+
+    def test_home_rating_uses_sport_switch(self) -> None:
+        response = self.client.get(reverse("home"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "profile-sport-switch__track")
+        self.assertContains(response, "Полный рейтинг")
+        self.assertNotContains(response, 'class="btn btn-outline">Теннис')
+
+    def test_home_padel_switch_is_active(self) -> None:
+        response = self.client.get(reverse("home"), {"sport": "padel"}, secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "profile-sport-switch__track is-padel")
+        self.assertContains(response, "Топ рейтинга — падел")
+
+
 class PadelOnboardingLockTestCase(TestCase):
     """Стартовый уровень падела задаётся один раз и открывает доступ к событиям."""
 

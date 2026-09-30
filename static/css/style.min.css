@@ -8396,11 +8396,14 @@ body.has-fullscreen-loader {
     margin-top: var(--spacing-lg);
     margin-bottom: var(--spacing-md);
     padding: var(--spacing-md);
-    background: #013220cf;
+    background:
+        linear-gradient(180deg, rgba(168, 58, 52, 0.42) 0%, rgba(92, 24, 22, 0.62) 100%);
     backdrop-filter: blur(10px) saturate(180%);
     border-radius: var(--radius-md);
-    border: 1px solid rgba(212, 175, 55, 0.55);
-    box-shadow: 0 8px 32px rgb(0 0 0 / 10%);
+    border: 1px solid rgba(232, 150, 140, 0.55);
+    box-shadow:
+        0 8px 32px rgb(0 0 0 / 12%),
+        inset 0 1px 0 rgba(255, 210, 200, 0.12);
 }
 
 .profile-padel-entry__text {

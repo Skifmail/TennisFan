@@ -465,9 +465,10 @@
     <div class="container">
         <div class="section-header">
             <h2 class="section-title">Топ рейтинга{% if home_sport == 'padel' %} — падел{% endif %}</h2>
-            <a href="?sport=tennis" class="btn btn-outline">Теннис</a>
-            <a href="?sport=padel" class="btn btn-outline">Падел</a>
-            <a href="{% url 'rating' %}" class="btn btn-outline">Полный рейтинг</a>
+            <div class="home-rating-header__actions">
+                {% include 'includes/sport_switch.html' with current_sport=home_sport aria_label='Вид спорта рейтинга' %}
+                <a href="{% url 'rating' %}" class="btn btn-outline">Полный рейтинг</a>
+            </div>
         </div>
 
         <div class="grid">

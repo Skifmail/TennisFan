@@ -367,6 +367,10 @@
     margin-top: 0.75rem;
 }
 
+[data-sport-swap] {
+    overflow-anchor: none;
+}
+
 [data-sport-swap].is-loading {
     opacity: 0.6;
     pointer-events: none;

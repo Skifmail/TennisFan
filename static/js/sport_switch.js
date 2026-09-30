@@ -113,10 +113,7 @@
             if (!incoming) {
                 return;
             }
-            el.replaceChildren();
-            Array.prototype.forEach.call(incoming.childNodes, function(node) {
-                el.appendChild(document.importNode(node, true));
-            });
+            el.innerHTML = incoming.innerHTML;
             swapped = true;
         });
         JSON_SCRIPT_IDS.forEach(function(scriptId) {
@@ -131,7 +128,32 @@
         });
     }
 
+    function revealSwappedCards() {
+        document.querySelectorAll('[data-sport-swap] .card, [data-sport-swap] .match-card').forEach(function(card) {
+            card.style.transition = 'none';
+            card.classList.add('card-in-view');
+            card.style.willChange = 'auto';
+            card.style.opacity = '1';
+            card.style.transform = 'none';
+        });
+    }
+
+    function pinSwitcher(anchorTop) {
+        if (anchorTop === null || typeof anchorTop === 'undefined') {
+            return;
+        }
+        var switcher = document.querySelector('.profile-sport-switch');
+        if (!switcher) {
+            return;
+        }
+        var delta = switcher.getBoundingClientRect().top - anchorTop;
+        if (Math.abs(delta) >= 1) {
+            window.scrollBy(0, delta);
+        }
+    }
+
     function afterSwap() {
+        revealSwappedCards();
         if (window.TennisonProfile) {
             if (typeof window.TennisonProfile.applySubscriptionBars === 'function') {
                 window.TennisonProfile.applySubscriptionBars();
@@ -159,6 +181,11 @@
 
         applySwitcherSport(nextSport);
         setSwapLoading(true);
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+        var switcher = document.querySelector('.profile-sport-switch');
+        var anchorTop = switcher ? switcher.getBoundingClientRect().top : null;
 
         fetch(fetchUrl, {
             headers: {
@@ -192,6 +219,10 @@
                     history.pushState({ sportSwitch: true }, '', publicUrl);
                 }
                 afterSwap();
+                pinSwitcher(anchorTop);
+                requestAnimationFrame(function() {
+                    pinSwitcher(anchorTop);
+                });
             })
             .catch(function(err) {
                 if (err && err.name === 'AbortError') {

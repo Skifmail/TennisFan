@@ -8366,13 +8366,86 @@ body.has-fullscreen-loader {
 
 .profile-sport-switch {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-top: 0.65rem;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.55rem;
+    width: max-content;
+    max-width: 100%;
+    margin-top: 0.75rem;
 }
 
-.profile-sport-switch .profile-charts__pill {
+.profile-sport-switch__choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    color: rgb(224 215 193 / 62%);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1;
     text-decoration: none;
+    white-space: nowrap;
+    transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.profile-sport-switch__choice:hover,
+.profile-sport-switch__choice:focus-visible {
+    color: #f6ecd1;
+}
+
+.profile-sport-switch__choice.is-active {
+    color: #f4e4b2;
+}
+
+.profile-sport-switch__icon {
+    width: 1.05rem;
+    height: 1.05rem;
+    flex-shrink: 0;
+}
+
+.profile-sport-switch__track {
+    position: relative;
+    display: block;
+    flex: 0 0 auto;
+    width: 3.25rem;
+    height: 1.7rem;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #3a4556 0%, #2a3342 100%);
+    box-shadow:
+        inset 0 1px 2px rgb(255 255 255 / 12%),
+        inset 0 -1px 3px rgb(0 0 0 / 35%),
+        0 1px 2px rgb(0 0 0 / 20%);
+    text-decoration: none;
+}
+
+.profile-sport-switch__track:focus-visible {
+    outline: 2px solid var(--color-primary, #a6824a);
+    outline-offset: 3px;
+}
+
+.profile-sport-switch__knob {
+    position: absolute;
+    top: 0.18rem;
+    left: 0.18rem;
+    width: 1.34rem;
+    height: 1.34rem;
+    border-radius: 50%;
+    background: linear-gradient(180deg, #f4f7fb 0%, #d5dbe6 100%);
+    box-shadow:
+        0 1px 1px rgb(255 255 255 / 70%) inset,
+        0 2px 6px rgb(0 0 0 / 35%);
+    transition: left 0.22s ease;
+}
+
+.profile-sport-switch__track.is-padel .profile-sport-switch__knob {
+    left: calc(100% - 1.52rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .profile-sport-switch__knob {
+        transition: none;
+    }
 }
 
 .profile-info__subscription-badge {
@@ -9183,6 +9256,17 @@ body.has-fullscreen-loader {
     .profile-info__header:has(.profile-info__trophies) .profile-info__title {
         justify-content: center;
         padding-top: 0;
+    }
+
+    .profile-info__title {
+        width: 100%;
+        align-items: center;
+    }
+
+    .profile-sport-switch {
+        justify-content: center;
+        margin-left: auto;
+        margin-right: auto;
     }
 
     .profile-info__avatar-link {

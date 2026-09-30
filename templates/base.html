@@ -129,10 +129,19 @@
                 </a>
 
                 <!-- Desktop Navigation Links (управляются в админке: Навигация → Пункты меню) -->
-                <div class="nav-menu-desktop">
-                    {% for item in nav_menu_items %}
-                    <a href="{{ item.url }}" class="btn btn-ghost"{% if item.is_external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.title }}</a>
-                    {% endfor %}
+                <div class="nav-menu-desktop" id="nav-menu-desktop">
+                    <div class="nav-menu-desktop__track" id="nav-menu-track">
+                        {% for item in nav_menu_items %}
+                        <a href="{{ item.url }}" class="btn btn-ghost nav-menu-desktop__link"{% if item.is_external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.title }}</a>
+                        {% endfor %}
+                    </div>
+                    <div class="nav-more" id="nav-more" hidden>
+                        <button type="button" class="btn btn-ghost nav-more__toggle" id="nav-more-toggle" aria-expanded="false" aria-haspopup="menu" aria-controls="nav-more-panel">
+                            Ещё
+                            <span class="nav-more__caret" aria-hidden="true">▼</span>
+                        </button>
+                        <div class="nav-more__panel" id="nav-more-panel" role="menu"></div>
+                    </div>
                 </div>
 
                 <!-- Mobile Navigation Menu (hidden by default, shown on menu click) -->

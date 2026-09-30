@@ -58,6 +58,95 @@ document.addEventListener('DOMContentLoaded', function() {
     setupUserDropdown('user-menu-toggle', 'user-dropdown');
     setupUserDropdown('club-user-menu-toggle', 'club-user-dropdown');
 
+    // Десктоп: пункты, которые не влезают в одну строку, уходят в «Ещё».
+    function setupDesktopNavOverflow() {
+        var menu = document.getElementById('nav-menu-desktop');
+        var track = document.getElementById('nav-menu-track');
+        var more = document.getElementById('nav-more');
+        var toggle = document.getElementById('nav-more-toggle');
+        var panel = document.getElementById('nav-more-panel');
+        if (!menu || !track || !more || !toggle || !panel) return;
+
+        var desktopQuery = window.matchMedia('(min-width: 1025px)');
+        var links = Array.prototype.slice.call(track.querySelectorAll('.nav-menu-desktop__link'));
+        links.forEach(function(link, index) {
+            link.dataset.navIndex = String(index);
+        });
+
+        function orderedLinks() {
+            return links.slice().sort(function(a, b) {
+                return Number(a.dataset.navIndex) - Number(b.dataset.navIndex);
+            });
+        }
+
+        function closeMore() {
+            more.classList.remove('is-open');
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+
+        function trackOverflows() {
+            var child = track.firstElementChild;
+            if (!child) return false;
+            var box = track.getBoundingClientRect();
+            var item = child.getBoundingClientRect();
+            return item.left < box.left - 0.5;
+        }
+
+        function layout() {
+            orderedLinks().forEach(function(link) {
+                track.appendChild(link);
+            });
+            more.hidden = true;
+            closeMore();
+            if (!desktopQuery.matches) return;
+            if (!trackOverflows()) return;
+
+            more.hidden = false;
+            var guard = 0;
+            while (trackOverflows() && track.lastElementChild && guard < 40) {
+                panel.insertBefore(track.lastElementChild, panel.firstChild);
+                guard += 1;
+            }
+        }
+
+        var frame = 0;
+        function schedule() {
+            if (frame) window.cancelAnimationFrame(frame);
+            frame = window.requestAnimationFrame(function() {
+                frame = 0;
+                layout();
+            });
+        }
+
+        toggle.addEventListener('click', function(event) {
+            event.stopPropagation();
+            event.preventDefault();
+            var willOpen = !more.classList.contains('is-open');
+            closeMore();
+            if (willOpen) {
+                more.classList.add('is-open');
+                toggle.setAttribute('aria-expanded', 'true');
+            }
+        });
+        document.addEventListener('click', function(event) {
+            if (!more.contains(event.target)) closeMore();
+        });
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') closeMore();
+        });
+        window.addEventListener('resize', schedule);
+        if (typeof desktopQuery.addEventListener === 'function') {
+            desktopQuery.addEventListener('change', schedule);
+        }
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(schedule);
+        }
+        var logo = document.querySelector('.header .coin-logo');
+        if (logo) logo.addEventListener('load', schedule);
+        schedule();
+    }
+    setupDesktopNavOverflow();
+
     // Auto-hide alerts after 5 seconds
     document.querySelectorAll('.alert').forEach(function(el) {
         var messagesContainer = el.closest('.messages-container');

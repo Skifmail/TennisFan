@@ -518,6 +518,115 @@ button {
     flex: 1;
     justify-content: flex-end;
     flex-wrap: wrap;
+    min-width: 0;
+}
+
+.nav-menu-desktop__track {
+    display: contents;
+}
+
+.nav-more {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.nav-more__toggle {
+    gap: 0.35rem;
+}
+
+.nav-more__caret {
+    font-size: 0.6rem;
+    line-height: 1;
+    opacity: 0.9;
+    transition: transform 0.25s ease;
+}
+
+.nav-more.is-open .nav-more__caret {
+    transform: rotate(180deg);
+}
+
+.nav-more__panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 220px;
+    padding: var(--spacing-xs);
+    background: var(--color-bg-elevated);
+    border: 1px solid rgb(166 130 74 / 35%);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+    z-index: 1002;
+}
+
+.nav-more.is-open .nav-more__panel {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.nav-more__panel .nav-menu-desktop__link {
+    display: flex;
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.9rem;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.nav-more__panel .nav-menu-desktop__link::after {
+    display: none;
+}
+
+.nav-more__panel .nav-menu-desktop__link:hover,
+.nav-more__panel .nav-menu-desktop__link:focus-visible {
+    transform: none;
+    box-shadow: none;
+    background: rgb(166 130 74 / 15%);
+    color: var(--color-primary);
+}
+
+@media (width >= 1025px) {
+    .header:not(.header--club) .nav-menu-desktop {
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        gap: 0.15rem;
+    }
+
+    .header:not(.header--club) .nav-menu-desktop__track {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex: 1 1 auto;
+        flex-wrap: nowrap;
+        min-width: 0;
+        overflow: hidden;
+        gap: 0.1rem;
+    }
+
+    .header:not(.header--club) .nav-menu-desktop .btn {
+        flex-shrink: 0;
+        padding: 0.4rem 0.55rem;
+        font-size: 0.8125rem;
+        letter-spacing: 0.06em;
+    }
+
+    .header:not(.header--club) .nav-auth {
+        flex-shrink: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-more__caret,
+    .nav-more__panel {
+        transition: none;
+    }
 }
 
 .nav-menu-desktop .btn {
@@ -8557,7 +8666,7 @@ body.has-fullscreen-loader {
     .profile-sport-switch__track:focus-visible .profile-sport-switch__knob,
     .profile-sport-switch__track.is-padel:hover .profile-sport-switch__knob,
     .profile-sport-switch__track.is-padel:focus-visible .profile-sport-switch__knob {
-        transform: none;
+        transform: translateY(-50%);
     }
 }
 

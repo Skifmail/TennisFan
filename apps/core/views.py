@@ -2391,13 +2391,17 @@ def home(request):
         "home_activity_seen_cookie": HOME_ACTIVITY_SEEN_COOKIE,
     }
 
-    if (
-        request.headers.get("x-requested-with") == "XMLHttpRequest"
-        and request.GET.get("partial") == "tournaments"
-    ):
-        response = render(request, "core/_home_tournaments.html", context)
+    xhr_partials = {
+        "tournaments": "core/_home_tournaments.html",
+        "sport": "core/_home_sport.html",
+    }
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        template_name = xhr_partials.get(
+            request.GET.get("partial") or "", "core/home.html"
+        )
     else:
-        response = render(request, "core/home.html", context)
+        template_name = "core/home.html"
+    response = render(request, template_name, context)
 
     if home_activity_seen_id is None and home_activity_latest_id:
         set_home_activity_seen_cookie(

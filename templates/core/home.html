@@ -400,6 +400,7 @@
         </div>
 
         <form method="get" class="card mb-4 tournaments-filters{% if home_filter_chips %} tournaments-filters--has-active{% endif %}" id="home-tournaments-filter" action="{% url 'home' %}">
+            <input type="hidden" name="sport" id="home-filter-sport" value="{{ home_sport }}">
             <input
                 type="checkbox"
                 id="home-filters-drawer"
@@ -454,72 +455,16 @@
             </div>
         </form>
 
-        <div id="home-tournaments-block">
+        <div id="home-tournaments-block" data-sport-swap="home-tournaments">
             {% include 'core/_home_tournaments.html' %}
         </div>
     </div>
 </section>
 
 <!-- Top Players -->
-<section class="section">
-    <div class="container">
-        <div class="section-header">
-            <h2 class="section-title">Топ рейтинга{% if home_sport == 'padel' %} — падел{% endif %}</h2>
-            <div class="home-rating-header__actions">
-                {% include 'includes/sport_switch.html' with current_sport=home_sport aria_label='Вид спорта рейтинга' %}
-                <a href="{% url 'rating' %}" class="btn btn-outline">Полный рейтинг</a>
-            </div>
-        </div>
-
-        <div class="grid">
-            {% for player in top_players %}
-            <a href="{% url 'profile' pk=player.pk %}" class="player-card">
-                <span class="player-rank">{{ forloop.counter }}</span>
-                {% include 'includes/avatar.html' with avatar=player.avatar %}
-                <div class="player-info">
-                    <div class="player-info__text">
-                        <div class="player-name-block">
-                            <span class="player-name">{{ player }}</span>
-                            {% include 'includes/subscription_badge.html' with tier=player.paid_subscription_tier %}
-                        </div>
-                        <div class="player-info__meta">
-                            <span class="player-category">{{ player.get_skill_level_display }}</span>
-                            {% include 'includes/rating_badge.html' with player=player %}
-                        </div>
-                    </div>
-                    {% include 'includes/player_trophies_row.html' with trophies=player.trophies %}
-                </div>
-                <div class="player-stats">
-                    {% include 'includes/rating_stat_value.html' with player=player stat_type='ntrp' value=player.ntrp_level %}
-                    {% include 'includes/rating_stat_value.html' with player=player stat_type='fan' value=player.total_points|floatformat:1 %}
-                    <div>
-                        <div class="stat-label">Матчей</div>
-                        <div class="stat-value">{{ player.matches_played }}</div>
-                    </div>
-                    <div>
-                        <div class="stat-label">Побед</div>
-                        <div class="stat-value">{{ player.matches_won }}</div>
-                    </div>
-                    <div>
-                        <div class="stat-label">% побед</div>
-                        <div class="stat-value">{{ player.win_rate }}%</div>
-                    </div>
-                    <div>
-                        <div class="stat-label">Очки сезона</div>
-                        <div class="stat-value text-primary">
-                            {% if player.season_pts %}
-                                {{ player.season_pts }}
-                            {% else %}
-                                0
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </a>
-            {% empty %}
-            <p class="text-secondary">Рейтинг пока не сформирован.</p>
-            {% endfor %}
-        </div>
+<section class="section" id="home-rating-block">
+    <div class="container" data-sport-swap="home-rating">
+        {% include 'core/_home_rating.html' %}
     </div>
 </section>
 

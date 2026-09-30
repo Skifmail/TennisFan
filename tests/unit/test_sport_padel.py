@@ -181,6 +181,8 @@ class ProfileSportSwitcherTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "?sport=padel")
         self.assertContains(response, "profile-sport-switch__track")
+        self.assertContains(response, 'data-sport-swap="profile"')
+        self.assertContains(response, "js/sport_switch.js")
         self.assertNotContains(response, "profile-sport-switch__track is-padel")
         self.assertContains(response, "3,20")
         self.assertNotContains(response, "4,00")
@@ -214,6 +216,25 @@ class HomeSportSwitcherTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "profile-sport-switch__track is-padel")
         self.assertContains(response, "Топ рейтинга — падел")
+        self.assertContains(response, 'data-sport-swap="home-rating"')
+        self.assertContains(response, 'data-sport-swap="home-tournaments"')
+        self.assertContains(response, 'id="home-filter-sport"')
+        self.assertContains(response, "js/sport_switch.js")
+
+    def test_home_sport_partial_returns_swap_fragments(self) -> None:
+        response = self.client.get(
+            reverse("home"),
+            {"sport": "padel", "partial": "sport"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-sport-swap="home-rating"')
+        self.assertContains(response, 'data-sport-swap="home-tournaments"')
+        self.assertContains(response, "Топ рейтинга — падел")
+        self.assertContains(response, "profile-sport-switch__track is-padel")
+        self.assertNotContains(response, "Найди свою игру")
 
 
 class PadelOnboardingLockTestCase(TestCase):

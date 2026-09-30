@@ -7,7 +7,7 @@
 {% if is_club_profile %}
 {% include "clubs/_club_player_nav.html" with current="dashboard" %}
 {% endif %}
-<div class="container container--profile" style="padding-top: var(--spacing-2xl);">
+<div class="container container--profile" data-sport-swap="profile" style="padding-top: var(--spacing-2xl);">
     {% if request.user == player.user and not request.user.email_verified %}
     <div class="alert alert-warning" style="margin-bottom: var(--spacing-lg);">
         Email не подтверждён. Подтвердите адрес, чтобы получать все важные уведомления.
@@ -864,63 +864,70 @@
 </div>
 
 <script>
-document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
-    var p = el.getAttribute('data-width-pct');
-    if (p !== null && p !== '') el.style.width = p + '%';
-});
-
-// Динамическое выравнивание диаграмм с таблицей статистики
-(function() {
+window.TennisonProfile = window.TennisonProfile || {};
+window.TennisonProfile.applySubscriptionBars = function() {
+    document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
+        var p = el.getAttribute('data-width-pct');
+        if (p !== null && p !== '') el.style.width = p + '%';
+    });
+};
+window.TennisonProfile.alignCharts = function() {
     var statsTable = document.querySelector('.profile-stats-table')
         || document.querySelector('.profile-padel-entry');
     var charts = document.querySelector('.profile-charts');
     var profileInfo = document.querySelector('.profile-info');
-
-    if (statsTable && charts && profileInfo) {
-        function alignCharts() {
-            if (window.innerWidth <= 900) {
-                charts.style.marginTop = '0';
-                return;
-            }
-
-            // Получаем позицию таблицы статистики относительно .profile-info
-            var profileInfoTop = profileInfo.getBoundingClientRect().top;
-            var statsTop = statsTable.getBoundingClientRect().top;
-            var offset = statsTop - profileInfoTop;
-
-            // Устанавливаем отступ для диаграмм
-            if (offset > 0) {
-                charts.style.marginTop = offset + 'px';
-            } else {
-                charts.style.marginTop = '0';
-            }
-        }
-
-        // Выравниваем при загрузке
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', alignCharts);
-        } else {
-            alignCharts();
-        }
-
-        // Выравниваем при изменении размера окна
-        window.addEventListener('resize', alignCharts);
-
-        // Выравниваем после небольшой задержки (на случай асинхронной загрузки контента)
-        setTimeout(alignCharts, 100);
-        setTimeout(alignCharts, 500);
+    if (!statsTable || !charts || !profileInfo) {
+        return;
     }
-})();
+    if (window.innerWidth <= 900) {
+        charts.style.marginTop = '0';
+        return;
+    }
+    var offset = statsTable.getBoundingClientRect().top - profileInfo.getBoundingClientRect().top;
+    charts.style.marginTop = offset > 0 ? (offset + 'px') : '0';
+};
+window.TennisonProfile.applySubscriptionBars();
+window.TennisonProfile.alignCharts();
+if (!window.TennisonProfile._alignBound) {
+    window.addEventListener('resize', function() {
+        window.TennisonProfile.alignCharts();
+    });
+    window.TennisonProfile._alignBound = true;
+}
+setTimeout(window.TennisonProfile.alignCharts, 100);
+setTimeout(window.TennisonProfile.alignCharts, 500);
 </script>
 {% if can_view_profile_stats %}
 {{ profile_progress_data|json_script:"profile-progress-data" }}
 {{ season_points_data|json_script:"season-points-data" }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-(function() {
+window.TennisonProfile = window.TennisonProfile || {};
+window.TennisonProfile.destroyCharts = function() {
+    if (typeof Chart === 'undefined') {
+        return;
+    }
+    ['chartProfilePoints', 'chartProfileMatches', 'chartProfileWinRate', 'chartProfileSeasonPoints'].forEach(function(id) {
+        var canvas = document.getElementById(id);
+        if (!canvas) {
+            return;
+        }
+        var instance = Chart.getChart(canvas);
+        if (instance) {
+            instance.destroy();
+        }
+    });
+};
+window.TennisonProfile.initCharts = function() {
+    window.TennisonProfile.destroyCharts();
     var el = document.getElementById('profile-progress-data');
     if (!el || !el.textContent) return;
-    var progressData = JSON.parse(el.textContent);
+    var progressData;
+    try {
+        progressData = JSON.parse(el.textContent);
+    } catch (err) {
+        return;
+    }
     if (!progressData.length) return;
     var chartsRoot = document.querySelector('.profile-charts');
 
@@ -954,6 +961,9 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
     years.sort();
     var yearSelect = document.getElementById('profileProgressYear');
     if (yearSelect) {
+        yearSelect.querySelectorAll('option[value]:not([value=""])').forEach(function(opt) {
+            opt.remove();
+        });
         years.forEach(function(y) { yearSelect.appendChild(new Option(y, y)); });
     }
 
@@ -1732,6 +1742,11 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
         chartsRoot.classList.add('profile-charts--ready');
     }
 
+    if (window.TennisonProfile._modalsBound) {
+        return;
+    }
+    window.TennisonProfile._modalsBound = true;
+
     // Обработка модальных окон отмены подписки
     var cancelSubModal = document.getElementById('cancel-sub-modal');
     if (cancelSubModal) {
@@ -1759,7 +1774,8 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
             }
         });
     }
-})();
+};
+window.TennisonProfile.initCharts();
 </script>
 {% endif %}
 

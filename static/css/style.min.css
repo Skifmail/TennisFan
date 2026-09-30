@@ -20335,33 +20335,40 @@ a.home-activity__actor:hover {
     border-radius: var(--radius-lg);
 }
 
-/*
- * Фильтры и кнопки не помещаются в один ряд даже на ширине контейнера (1400px):
- * поля сжимаются ниже текста («Любой город России», «Все уровни силы»).
- * Если в панели есть фильтры — всегда отдельная строка на всю ширину.
- */
+/* Фильтры не растягиваются на всю панель: компактная группа слева, действия справа. */
 .sparring-toolbar__panel:has(.sparring-toolbar__filters) {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem 0.75rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: var(--spacing-lg);
 }
 
 .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar {
-    flex: 1 1 auto;
-    width: 100%;
+    flex: 0 1 auto;
+    width: min(100%, 40rem);
+    max-width: 40rem;
     min-width: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.95fr) minmax(0, 0.8fr);
     margin-bottom: 0;
     padding: 0;
     background: transparent;
     border: none;
     border-radius: 0;
-    gap: var(--spacing-md);
+    gap: 0.5rem;
 }
 
 .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar .form-control {
     flex: none;
     min-width: 0;
     width: 100%;
+    height: 2.25rem;
+    min-height: 2.25rem;
+    padding: 0 0.65rem;
+    font-size: 0.875rem;
+    line-height: 1.2;
 }
 
 .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar select.form-control {
@@ -20384,16 +20391,19 @@ a.home-activity__actor:hover {
 }
 
 .sparring-toolbar__panel:has(.sparring-toolbar__filters) .sparring-toolbar__actions {
-    width: 100%;
-    padding-top: var(--spacing-md);
-    border-top: 1px solid var(--color-border);
+    width: auto;
+    flex: 0 1 auto;
+    margin-left: auto;
+    padding-top: 0;
+    border-top: none;
 }
 
 .sparring-toolbar__actions .sparring-toolbar__btn {
     text-decoration: none;
-    min-height: 40px;
-    padding-left: var(--spacing-md);
-    padding-right: var(--spacing-md);
+    min-height: 2.25rem;
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+    font-size: 0.8rem;
 }
 
 /* Главное действие: чуть заметнее остальных outline, без «кислотной» заливки */
@@ -20748,6 +20758,16 @@ a.home-activity__actor:hover {
     .sparring-toolbar__panel {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar {
+        width: 100%;
+        grid-template-columns: 1fr;
+    }
+
+    .sparring-toolbar__panel:has(.sparring-toolbar__filters) .sparring-toolbar__actions {
+        width: 100%;
+        margin-left: 0;
     }
 
     .sparring-toolbar__actions {

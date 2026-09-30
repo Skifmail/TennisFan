@@ -384,6 +384,56 @@
     z-index: 1;
 }
 
+.profile-padel-entry {
+    margin-top: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: #013220cf;
+    backdrop-filter: blur(10px) saturate(180%);
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(212, 175, 55, 0.55);
+    box-shadow: 0 8px 32px rgb(0 0 0 / 10%);
+}
+
+.profile-padel-entry__text {
+    margin: 0 0 var(--spacing-md);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    color: var(--color-text, #f8fafc);
+}
+
+.profile-padel-entry__form .form-label {
+    color: var(--color-text, #f8fafc);
+}
+
+.profile-padel-entry__submit,
+.padel-strength-page__submit {
+    margin-top: var(--spacing-md);
+    width: 100%;
+}
+
+.padel-strength-page {
+    max-width: 40rem;
+    padding: var(--spacing-2xl) 0;
+}
+
+.padel-strength-page__title {
+    margin-top: 0;
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-xl);
+}
+
+.padel-strength-page__text {
+    margin: 0 0 var(--spacing-md);
+    line-height: 1.55;
+}
+
+.padel-strength-page__hint {
+    margin: 0 0 var(--spacing-lg);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+
 .profile-stats-table {
     margin-top: var(--spacing-lg);
     margin-bottom: var(--spacing-md);

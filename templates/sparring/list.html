@@ -80,7 +80,7 @@
             {% endif %}
             {% if has_sparring_access %}
             <a href="{% url 'sparring_invite' %}" class="btn btn-outline sparring-toolbar__btn">Пригласить на спарринг</a>
-            <a href="{% url 'sparring_create' %}?type={{ sparring_type }}" class="btn btn-outline sparring-toolbar__btn sparring-toolbar__btn--cta">Создать заявку</a>
+            <a href="{% url 'sparring_create' %}?type={{ sparring_type }}&sport={{ current_sport }}" class="btn btn-outline sparring-toolbar__btn sparring-toolbar__btn--cta">Создать заявку</a>
             {% else %}
             <a href="{% url 'pricing' %}" class="btn btn-outline sparring-toolbar__btn sparring-toolbar__btn--cta">Оформить подписку</a>
             {% endif %}

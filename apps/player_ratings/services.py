@@ -9,6 +9,7 @@ from typing import Any, cast
 from django.db import transaction
 from django.utils import timezone
 
+from apps.core.sports import SportArg, sport_code
 from apps.subscriptions.utils import user_can_rate_opponents
 from apps.tournaments.models import Match
 from apps.tournaments.utils import get_match_participants
@@ -312,16 +313,79 @@ def _recalc_one_aggregate(player: Player, metric_name: str) -> None:
 # --- Чтение для API -----------------------------------------------------------
 
 
+def _aggregates_from_ratings(
+    player: Player, sport: SportArg | None = None
+) -> dict[str, dict[str, Any]]:
+    """Собрать агрегаты навыков из сырых оценок, опционально по виду спорта.
+
+    Args:
+        player: Игрок, чьи полученные оценки считаем.
+        sport: Код вида спорта матча. None — все виды (кэш ``PlayerSkillAggregate``).
+
+    Returns:
+        dict[str, dict[str, Any]]: Метрики с сырым/взвешенным средним и числом голосов.
+    """
+    from django.db.models import Avg, Count
+
+    if sport is None:
+        return {
+            a.metric_name: {
+                "average_raw": round(a.average_raw, 2),
+                "average_weighted": round(a.average_weighted, 2),
+                "votes_count": a.votes_count,
+                "display_value": (
+                    round(a.average_weighted, 1)
+                    if a.votes_count >= MIN_VOTES_TO_DISPLAY
+                    else None
+                ),
+                "insufficient_data": a.votes_count < MIN_VOTES_TO_DISPLAY,
+            }
+            for a in PlayerSkillAggregate.objects.filter(player=player)
+        }
+
+    qs_base = PlayerSkillRating.objects.filter(
+        to_player=player,
+        match__sport=sport_code(sport),
+    )
+    result: dict[str, dict[str, Any]] = {}
+    for metric_name in SkillMetric.all_metric_names():
+        qs = qs_base.exclude(**{metric_name: None}).aggregate(
+            avg=Avg(metric_name),
+            cnt=Count("id"),
+        )
+        votes_count = qs["cnt"] or 0
+        average_raw = float(qs["avg"] or 0.0)
+        average_weighted = _weighted_average(
+            average_raw,
+            votes_count,
+            _system_average_raw(metric_name),
+        )
+        result[metric_name] = {
+            "average_raw": round(average_raw, 2),
+            "average_weighted": round(average_weighted, 2),
+            "votes_count": votes_count,
+            "display_value": (
+                round(average_weighted, 1)
+                if votes_count >= MIN_VOTES_TO_DISPLAY
+                else None
+            ),
+            "insufficient_data": votes_count < MIN_VOTES_TO_DISPLAY,
+        }
+    return result
+
+
 def get_player_skills(
     player: Player,
     request_user: Any,
     *,
     include_lowest_three: bool = False,
+    sport: SportArg | None = None,
 ) -> dict[str, Any]:
     """
     Агрегированные навыки игрока для API.
     Для чужого профиля — только публичные (все 12 метрик, звёзды, кол-во оценок).
     Для своего — дополнительно 3 самых низких weighted (рекомендовано улучшить).
+    Если передан ``sport``, считаем только оценки матчей этого вида спорта.
     """
     is_owner = bool(
         request_user.is_authenticated
@@ -329,20 +393,7 @@ def get_player_skills(
         and request_user.player.pk == player.pk
     )
 
-    aggregates: dict[str, dict[str, Any]] = {
-        a.metric_name: {
-            "average_raw": round(a.average_raw, 2),
-            "average_weighted": round(a.average_weighted, 2),
-            "votes_count": a.votes_count,
-            "display_value": (
-                round(a.average_weighted, 1)
-                if a.votes_count >= MIN_VOTES_TO_DISPLAY
-                else None
-            ),
-            "insufficient_data": a.votes_count < MIN_VOTES_TO_DISPLAY,
-        }
-        for a in PlayerSkillAggregate.objects.filter(player=player)
-    }
+    aggregates: dict[str, dict[str, Any]] = _aggregates_from_ratings(player, sport)
 
     # Метрики в едином порядке, с учётом настроек отображения
     result: dict[str, Any] = {

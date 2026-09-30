@@ -91,6 +91,47 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _padel_entry_redirect(
+    request, player, sport, *, as_json: bool = False, next_url: str = ""
+):
+    """Редирект на стартовый уровень падела, если он ещё не задан.
+
+    Args:
+        request: Текущий HTTP-запрос.
+        player: Игрок, который хочет участвовать.
+        sport: Код вида спорта заявки.
+        as_json: Вернуть JSON вместо редиректа (для POST-откликов).
+        next_url: Адрес возврата после сохранения уровня.
+
+    Returns:
+        HttpResponse | None: Ответ-блокер или None, если можно продолжать.
+    """
+    from apps.core.sports import Sport, sport_code
+    from apps.users.sport_rating import (
+        PADEL_ENTRY_REQUIRED_MSG,
+        padel_entry_complete,
+        redirect_to_padel_strength,
+    )
+
+    if sport_code(sport or Sport.TENNIS) != Sport.PADEL:
+        return None
+    if padel_entry_complete(player):
+        return None
+    if as_json:
+        from apps.core.redirects import append_next
+
+        return_to = next_url or reverse("sparring_list")
+        return JsonResponse(
+            {
+                "success": False,
+                "error": PADEL_ENTRY_REQUIRED_MSG,
+                "redirect": append_next(reverse("padel_strength"), return_to),
+            },
+            status=403,
+        )
+    return redirect_to_padel_strength(request, next_url=next_url or None)
+
+
 def _get_contact_url(player: Player, method: str) -> str | None:
     """Return contact URL for player and method (telegram/whatsapp/max), or None."""
     # TextChoices возвращает кортеж (value, label), используем строковые значения напрямую
@@ -216,6 +257,15 @@ def sparring_create(request):
         messages.error(request, "Заполните профиль игрока.")
         return redirect("profile_edit")
 
+    intended_sport = (
+        request.POST.get("sport")
+        if request.method == "POST"
+        else request.GET.get("sport")
+    )
+    blocked = _padel_entry_redirect(request, player, intended_sport)
+    if blocked is not None:
+        return blocked
+
     sparring_type = request.GET.get("type", "singles")
     if request.method == "POST":
         sparring_type = request.POST.get("sparring_type", "singles")
@@ -300,6 +350,13 @@ def sparring_edit(request, pk):
     if request.method == "POST":
         form = SparringRequestForm(request.POST, instance=sparring)
         if form.is_valid():
+            blocked = _padel_entry_redirect(
+                request,
+                sparring.player,
+                form.cleaned_data.get("sport"),
+            )
+            if blocked is not None:
+                return blocked
             form.save()
             messages.success(request, "Заявка обновлена.")
             return redirect("sparring_my_requests")
@@ -564,6 +621,15 @@ def sparring_respond(request, pk):
         messages.error(request, "Заполните профиль игрока.")
         return redirect("profile_edit")
 
+    blocked = _padel_entry_redirect(
+        request,
+        respondent,
+        sparring.sport,
+        as_json=request.method == "POST",
+    )
+    if blocked is not None:
+        return blocked
+
     if respondent.id == sparring.player_id:
         logger.warning(
             "sparring_respond: user %s tried to respond to own request", request.user.id
@@ -744,6 +810,16 @@ def doubles_join(request, pk):
         messages.error(request, "Заполните профиль игрока.")
         return redirect("profile_edit")
 
+    match_request = get_object_or_404(DoublesMatchRequest, pk=pk)
+    blocked = _padel_entry_redirect(
+        request,
+        player,
+        match_request.sport,
+        next_url=reverse("doubles_detail", kwargs={"pk": pk}),
+    )
+    if blocked is not None:
+        return blocked
+
     target_side = request.POST.get("target_side")
     partner_id = request.POST.get("partner_id")
     if target_side not in (TeamSide.AUTHOR, TeamSide.OPPONENT):
@@ -758,6 +834,20 @@ def doubles_join(request, pk):
                 players.append(partner)
         except (ValueError, Player.DoesNotExist):
             pass
+
+    from apps.core.sports import Sport, sport_code
+    from apps.users.sport_rating import padel_entry_complete
+
+    if sport_code(match_request.sport) == Sport.PADEL:
+        for candidate in players:
+            if candidate.id == player.id:
+                continue
+            if not padel_entry_complete(candidate):
+                messages.error(
+                    request,
+                    "Партнёр ещё не указал уровень игры в паделе.",
+                )
+                return redirect("doubles_detail", pk=pk)
 
     try:
         create_join_request(

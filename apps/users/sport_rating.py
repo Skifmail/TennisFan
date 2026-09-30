@@ -9,9 +9,14 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import cast
 
+from django.db import transaction
 from django.db.models import FloatField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
+from django.http import HttpRequest, HttpResponseRedirect
+from django.shortcuts import redirect
+from django.urls import reverse
 
+from apps.core.redirects import append_next, get_safe_next_url
 from apps.core.sports import Sport, SportArg, sport_code
 from apps.users.models import Player, PlayerSportProfile
 from apps.users.rating_utils import (
@@ -21,13 +26,22 @@ from apps.users.rating_utils import (
 )
 
 PADEL_START_LEVEL = Decimal("1.5")
+PADEL_ENTRY_REQUIRED_MSG = "Чтобы участвовать в паделе, сначала укажите уровень игры."
+PADEL_LEVEL_CHOICES: tuple[str, ...] = tuple(
+    f"{(PADEL_START_LEVEL + Decimal('0.5') * i):.1f}" for i in range(12)
+)
+
+
+class PadelStrengthAlreadySet(Exception):
+    """Стартовый уровень падела уже зафиксирован игроком."""
 
 
 def ensure_sport_profile(player: Player, sport: SportArg) -> PlayerSportProfile:
     """Вернуть профиль вида спорта, создав его при отсутствии.
 
     Для тенниса начальные числа копируются с игрока.
-    Для падела без онбординга старт — сила 1.5 / 1500 FAN.
+    Для падела без онбординга старт — сила 1.5 / 1500 FAN, но
+    ``entry_level_set`` остаётся False, пока игрок сам не задаст уровень.
 
     Args:
         player: Игрок.
@@ -141,6 +155,104 @@ def matches_played_for(player: Player, sport: SportArg) -> int:
     return int(profile.matches_played or 0) if profile else 0
 
 
+def padel_entry_complete(player: Player | None) -> bool:
+    """Проверить, зафиксировал ли игрок стартовый уровень падела.
+
+    Args:
+        player: Игрок или None.
+
+    Returns:
+        bool: True, если уровень уже задан или по паделу уже есть матчи.
+    """
+    if player is None:
+        return False
+    profile = get_sport_profile(player, Sport.PADEL)
+    if profile is None:
+        return False
+    return bool(profile.entry_level_set or int(profile.matches_played or 0) > 0)
+
+
+def sport_chart_totals(player: Player, sport: SportArg) -> dict[str, float | int]:
+    """Итоги рейтинга и матчей для графиков профиля в выбранном виде спорта.
+
+    Падел без онбординга даёт нули, чтобы не подмешивать теннисные числа
+    и не показывать фейковый старт 1.5 / 1500.
+
+    Args:
+        player: Игрок.
+        sport: Код вида спорта вкладки профиля.
+
+    Returns:
+        dict[str, float | int]: ``points``, ``matches``, ``wins``, ``win_rate``, ``ntrp``.
+    """
+    sport = sport_code(sport)
+    if sport != Sport.PADEL:
+        matches = int(player.matches_played or 0)
+        wins = int(player.matches_won or 0)
+        win_rate = round((wins / matches) * 100, 1) if matches else 0.0
+        return {
+            "points": float(player.total_points or 0),
+            "matches": matches,
+            "wins": wins,
+            "win_rate": win_rate,
+            "ntrp": float(player.ntrp_level or 0),
+        }
+    if not padel_entry_complete(player):
+        return {
+            "points": 0.0,
+            "matches": 0,
+            "wins": 0,
+            "win_rate": 0.0,
+            "ntrp": 0.0,
+        }
+    profile = get_sport_profile(player, Sport.PADEL)
+    if profile is None:
+        return {
+            "points": 0.0,
+            "matches": 0,
+            "wins": 0,
+            "win_rate": 0.0,
+            "ntrp": 0.0,
+        }
+    matches = int(profile.matches_played or 0)
+    wins = int(profile.matches_won or 0)
+    win_rate = round((wins / matches) * 100, 1) if matches else 0.0
+    return {
+        "points": float(profile.total_points or 0),
+        "matches": matches,
+        "wins": wins,
+        "win_rate": win_rate,
+        "ntrp": float(profile.ntrp_level or 0),
+    }
+
+
+def redirect_to_padel_strength(
+    request: HttpRequest,
+    next_url: str | None = None,
+) -> HttpResponseRedirect:
+    """Отправить игрока задать уровень падела и вернуть на безопасную страницу.
+
+    Для GET берётся текущий адрес. Для POST — явный ``next_url``, иначе Referer,
+    чтобы после сохранения не открывать POST-only URL методом GET.
+
+    Args:
+        request: Текущий HTTP-запрос.
+        next_url: Явный адрес возврата. Пустое значение включает автовыбор.
+
+    Returns:
+        HttpResponseRedirect: Редирект на ``padel_strength`` с ``next``.
+    """
+    if not next_url:
+        if request.method == "GET":
+            next_url = request.get_full_path()
+        else:
+            next_url = get_safe_next_url(
+                request,
+                fallback=request.META.get("HTTP_REFERER", ""),
+            )
+    return redirect(append_next(reverse("padel_strength"), next_url or ""))
+
+
 def skill_level_for(player: Player, sport: SportArg) -> str | None:
     """Категория силы для допуска в турнир.
 
@@ -154,6 +266,8 @@ def skill_level_for(player: Player, sport: SportArg) -> str | None:
     sport = sport_code(sport)
     if sport != Sport.PADEL:
         return str(player.skill_level)
+    if not padel_entry_complete(player):
+        return None
     profile = get_sport_profile(player, Sport.PADEL)
     if profile is None:
         return None
@@ -249,7 +363,7 @@ def adjust_wins(player: Player | None, sport: SportArg, delta: int) -> None:
 
 
 def set_padel_strength(player: Player, level: Decimal) -> PlayerSportProfile:
-    """Задать стартовую силу падела и синхронный FAN.
+    """Задать стартовую силу падела один раз и синхронный FAN.
 
     Args:
         player: Игрок.
@@ -259,24 +373,38 @@ def set_padel_strength(player: Player, level: Decimal) -> PlayerSportProfile:
         PlayerSportProfile: Обновлённый профиль падела.
 
     Raises:
-        ValueError: Если уровень вне диапазона. Её бросает ``get_starting_points``.
+        ValueError: Если уровень вне диапазона или не кратен 0.5.
+        PadelStrengthAlreadySet: Если игрок уже зафиксировал уровень.
     """
+    normalized = f"{Decimal(str(level)):.1f}"
+    if normalized not in PADEL_LEVEL_CHOICES:
+        raise ValueError("Уровень должен быть от 1.5 до 7.0 с шагом 0.5.")
+    level = Decimal(normalized)
     points = float(get_starting_points(level))
-    profile = ensure_sport_profile(player, Sport.PADEL)
-    profile.total_points = points
-    profile.hidden_rating = points
-    profile.ntrp_level = rating_to_ntrp_level(points)
-    profile.skill_level = rating_to_skill_level(points)
-    profile.save(
-        update_fields=[
-            "total_points",
-            "hidden_rating",
-            "ntrp_level",
-            "skill_level",
-            "updated_at",
-        ]
-    )
-    return profile
+    with transaction.atomic():
+        profile = ensure_sport_profile(player, Sport.PADEL)
+        locked = cast(
+            PlayerSportProfile,
+            PlayerSportProfile.objects.select_for_update().get(pk=profile.pk),
+        )
+        if locked.entry_level_set or int(locked.matches_played or 0) > 0:
+            raise PadelStrengthAlreadySet("Стартовый уровень падела уже задан.")
+        locked.total_points = points
+        locked.hidden_rating = points
+        locked.ntrp_level = rating_to_ntrp_level(points)
+        locked.skill_level = rating_to_skill_level(points)
+        locked.entry_level_set = True
+        locked.save(
+            update_fields=[
+                "total_points",
+                "hidden_rating",
+                "ntrp_level",
+                "skill_level",
+                "entry_level_set",
+                "updated_at",
+            ]
+        )
+    return locked
 
 
 def apply_profile_to_player(player: Player, profile: PlayerSportProfile) -> None:

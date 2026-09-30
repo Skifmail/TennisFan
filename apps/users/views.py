@@ -31,7 +31,13 @@ from apps.legal.utils import get_legal_document_version
 from .context_processors import invalidate_unread_notifications_cache
 from .forms import EmailAuthenticationForm, PlayerProfileForm, UserRegistrationForm
 from .models import EmailVerificationToken, Notification, NtrpTestResult, Player
-from .sport_rating import get_sport_profile, set_padel_strength
+from .sport_rating import (
+    PADEL_LEVEL_CHOICES,
+    PadelStrengthAlreadySet,
+    get_sport_profile,
+    padel_entry_complete,
+    set_padel_strength,
+)
 from .verification import try_auto_verify
 
 logger = logging.getLogger(__name__)
@@ -140,9 +146,10 @@ def _get_profile_progress_data(
     from apps.core.sports import sport_code
     from apps.tournaments.models import Match, TournamentPlayerResult
     from apps.users.rating_utils import rating_to_ntrp_level
-    from apps.users.sport_rating import rating_points
+    from apps.users.sport_rating import sport_chart_totals
 
     sport = sport_code(sport)
+    totals = sport_chart_totals(player, sport)
 
     # Events: (date, rating_after, matches_delta, wins_delta, won, fan_delta, ntrp_before, ntrp_after, match_id, opponent, score, event_dt)
     events: list[tuple[Any, ...]] = []
@@ -174,8 +181,8 @@ def _get_profile_progress_data(
         match_qs = match_qs.filter(tournament__club__isnull=True)
     match_qs = match_qs.filter(sport=sport)
 
-    # Текущий рейтинг для расчета изменений
-    current_rating = float(rating_points(player, sport))
+    # Текущий рейтинг выбранного вида спорта для расчета изменений
+    current_rating = float(totals["points"])
 
     # Проходим матчи в обратном порядке, чтобы вычислить рейтинг до каждого матча
     matches_list = list(match_qs)
@@ -358,36 +365,37 @@ def _get_profile_progress_data(
         result.append(
             {
                 "date": today.isoformat(),
-                "points": player.total_points,
-                "matches": player.matches_played,
-                "win_rate": float(player.win_rate),
+                "points": float(totals["points"]),
+                "matches": int(totals["matches"]),
+                "win_rate": float(totals["win_rate"]),
                 "won": None,
                 "fan_delta": 0.0,
                 "ntrp_before": 0.0,
-                "ntrp_after": float(player.ntrp_level),
+                "ntrp_after": float(totals["ntrp"]),
             }
         )
 
-    # Ensure series matches current totals: fix last point and scale if cumulative was wrong
+    # Последняя точка совпадает с итогами выбранного вида спорта
     if result:
         last_pts = result[-1]["points"]
         last_matches = result[-1]["matches"]
-        if last_pts > 0 and last_pts != player.total_points:
-            ratio_pts = player.total_points / last_pts
+        sport_points = float(totals["points"])
+        sport_matches = int(totals["matches"])
+        if last_pts > 0 and last_pts != sport_points:
+            ratio_pts = sport_points / last_pts
             for r in result:
                 r["points"] = round(float(r["points"]) * ratio_pts, 1)
         else:
-            result[-1]["points"] = float(player.total_points)
-        if last_matches > 0 and last_matches != player.matches_played:
-            ratio_m = player.matches_played / last_matches
+            result[-1]["points"] = sport_points
+        if last_matches > 0 and last_matches != sport_matches:
+            ratio_m = sport_matches / last_matches
             for r in result:
                 r["matches"] = int(round(r["matches"] * ratio_m))
         else:
-            result[-1]["matches"] = player.matches_played
-        result[-1]["win_rate"] = round(float(player.win_rate), 1)
-        # Обновляем уровень силы для последней точки
+            result[-1]["matches"] = sport_matches
+        result[-1]["win_rate"] = float(totals["win_rate"])
         if result[-1].get("ntrp_after") == 0.0:
-            result[-1]["ntrp_after"] = float(player.ntrp_level)
+            result[-1]["ntrp_after"] = float(totals["ntrp"])
 
     return result
 
@@ -897,7 +905,10 @@ def profile(request, pk):
             from apps.player_ratings.services import get_player_skills
 
             player_skills_data = get_player_skills(
-                player, request.user, include_lowest_three=True
+                player,
+                request.user,
+                include_lowest_three=True,
+                sport=profile_sport,
             )
         except Exception:
             pass
@@ -908,21 +919,10 @@ def profile(request, pk):
 
     has_padel_profile = False
     if profile_sport == Sport.PADEL:
-        from apps.users.models import SkillLevel
-        from apps.users.rating_utils import get_starting_points
-
         padel_profile = get_sport_profile(player, Sport.PADEL)
-        has_padel_profile = padel_profile is not None
-        if padel_profile is not None:
+        has_padel_profile = padel_entry_complete(player)
+        if has_padel_profile and padel_profile is not None:
             apply_profile_to_player(player, padel_profile)
-        else:
-            starting = float(get_starting_points(Decimal("1.5")))
-            player.total_points = starting
-            player.hidden_rating = starting
-            player.ntrp_level = Decimal("1.5")
-            player.skill_level = SkillLevel.NOVICE
-            player.matches_played = 0
-            player.matches_won = 0
 
     context = {
         "player": player,
@@ -950,6 +950,7 @@ def profile(request, pk):
         "current_sport": profile_sport,
         "sport_choices": Sport.choices,
         "has_padel_profile": has_padel_profile,
+        "padel_level_choices": PADEL_LEVEL_CHOICES,
     }
     return render(request, "users/profile.html", context)
 
@@ -1127,35 +1128,54 @@ def ntrp_test(request):
 
 @login_required
 def padel_strength(request):
-    """Задать силу игрока в паделе отдельно от теннисного рейтинга."""
+    """Задать стартовый уровень падела один раз или показать уже зафиксированный."""
     player = getattr(request.user, "player", None)
     if player is None:
         messages.error(request, "Сначала заполните профиль игрока.")
         return redirect("profile_edit")
     profile = get_sport_profile(player, Sport.PADEL)
+    entry_complete = padel_entry_complete(player)
     level = profile.ntrp_level if profile is not None else Decimal("1.5")
     points = int(profile.total_points) if profile is not None else 0
-    saved = False
+    profile_padel_url = f"{reverse('profile', kwargs={'pk': player.pk})}?sport=padel"
+    next_url = get_safe_next_url(request, fallback=profile_padel_url)
     if request.method == "POST":
-        raw = (request.POST.get("level") or "").replace(",", ".")
-        try:
-            submitted = Decimal(raw)
-        except InvalidOperation:
-            messages.error(request, "Укажите уровень числом от 1.5 до 7.0.")
+        if entry_complete:
+            messages.error(
+                request,
+                "Стартовый уровень падела уже задан. Дальше он меняется по матчам или через администратора TennisFan.",
+            )
         else:
+            raw = (request.POST.get("level") or "").replace(",", ".")
             try:
-                profile = set_padel_strength(player, submitted)
-            except ValueError:
-                messages.error(request, "Уровень должен быть от 1.5 до 7.0.")
+                submitted = Decimal(raw)
+            except InvalidOperation:
+                messages.error(request, "Укажите уровень числом от 1.5 до 7.0.")
             else:
-                level = profile.ntrp_level
-                points = int(profile.total_points)
-                saved = True
-                messages.success(request, "Уровень силы в паделе сохранён.")
+                try:
+                    profile = set_padel_strength(player, submitted)
+                except PadelStrengthAlreadySet:
+                    messages.error(
+                        request,
+                        "Стартовый уровень падела уже задан. Дальше он меняется по матчам или через администратора TennisFan.",
+                    )
+                    entry_complete = True
+                except ValueError:
+                    messages.error(request, "Уровень должен быть от 1.5 до 7.0.")
+                else:
+                    messages.success(request, "Уровень силы в паделе сохранён.")
+                    return redirect(next_url)
     return render(
         request,
         "users/padel_strength.html",
-        {"level": level, "points": points, "saved": saved},
+        {
+            "level": level,
+            "points": points,
+            "entry_complete": entry_complete,
+            "level_choices": PADEL_LEVEL_CHOICES,
+            "next_url": next_url,
+            "player_id": player.pk,
+        },
     )
 
 

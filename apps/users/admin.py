@@ -544,6 +544,16 @@ class PlayerSportProfileInline(admin.TabularInline):
 
     model = PlayerSportProfile
     extra = 0
+    fields = (
+        "sport",
+        "ntrp_level",
+        "total_points",
+        "hidden_rating",
+        "skill_level",
+        "matches_played",
+        "matches_won",
+        "entry_level_set",
+    )
 
 
 @admin.register(Player)

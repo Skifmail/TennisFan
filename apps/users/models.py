@@ -566,6 +566,15 @@ class PlayerSportProfile(models.Model):
     )
     matches_played = models.PositiveIntegerField("Сыграно матчей", default=0)
     matches_won = models.PositiveIntegerField("Побед", default=0)
+    entry_level_set = models.BooleanField(
+        "Стартовый уровень задан",
+        default=False,
+        help_text=(
+            "Игрок уже зафиксировал входной уровень падела. "
+            "Для тенниса не используется. "
+            "Дальше сила меняется матчами или администратором."
+        ),
+    )
     created_at = models.DateTimeField("Создан", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлён", auto_now=True)
 

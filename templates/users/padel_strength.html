@@ -3,17 +3,32 @@
 {% block title %}Уровень силы в паделе — TennisFan{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 640px; padding: 2rem 0;">
-    <h1>Уровень силы в паделе</h1>
-    <p>Это отдельная шкала, она не меняет ваш теннисный рейтинг. 1.5 — первый выход на корт, 7.0 — соревновательный уровень.</p>
-    {% if saved %}
-    <p>Сохранено: {{ level }} (FAN {{ points }}).</p>
-    {% endif %}
-    <form method="post">
-        {% csrf_token %}
-        <label for="id_level">Ваш уровень</label>
-        <input id="id_level" name="level" type="number" min="1.5" max="7" step="0.5" class="form-control" value="{{ level }}" required>
-        <button type="submit" class="btn btn-primary mt-3">Сохранить</button>
-    </form>
+<div class="container padel-strength-page">
+    <div class="card padel-strength-page__card">
+        <div class="card-body">
+            <h1 class="padel-strength-page__title">Уровень силы в паделе</h1>
+            {% if entry_complete %}
+            <p class="padel-strength-page__text">Ваш стартовый уровень уже зафиксирован: <strong>{{ level }}</strong> (FAN {{ points }}). Самостоятельно изменить его нельзя: сила корректируется по результатам матчей или по запросу администратору платформы TennisFan.</p>
+            <a href="{% url 'profile' pk=player_id %}?sport=padel" class="btn btn-primary">Вернуться в профиль</a>
+            {% else %}
+            <p class="padel-strength-page__text">Пожалуйста, укажите уровень игры в паделе максимально объективно — по своим ощущениям. Это отдельная шкала, теннисный рейтинг не изменится. После сохранения изменить уровень самостоятельно будет нельзя: дальше сила будет корректироваться по результатам матчей или по запросу администратору платформы TennisFan.</p>
+            <p class="padel-strength-page__hint">1.5 — первый выход на корт, 7.0 — соревновательный уровень.</p>
+            <form method="post" class="padel-strength-page__form">
+                {% csrf_token %}
+                {% if next_url %}
+                <input type="hidden" name="next" value="{{ next_url }}">
+                {% endif %}
+                <label class="form-label" for="id_level">Ваш уровень в паделе</label>
+                <select id="id_level" name="level" class="form-control" required>
+                    <option value="" selected disabled>Выберите уровень</option>
+                    {% for choice in level_choices %}
+                    <option value="{{ choice }}">{{ choice }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary padel-strength-page__submit">Задать уровень</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
 </div>
 {% endblock %}

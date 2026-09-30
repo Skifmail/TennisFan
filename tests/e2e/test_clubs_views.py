@@ -33,6 +33,7 @@ from apps.clubs.plan_services import (
     purchase_member_plan,
 )
 from apps.core.models import OutboundEmail, UserTelegramLink
+from apps.core.sports import Sport
 from apps.payments.models import PaymentRecord, SavedPaymentMethod
 from apps.subscriptions.models import SubscriptionTier, UserSubscription
 from apps.tournaments.models import (
@@ -44,6 +45,7 @@ from apps.tournaments.models import (
     TournamentStatus,
     TournamentTeam,
     TournamentType,
+    TournamentVariant,
 )
 from apps.users.models import Notification, Player, SkillLevel, User
 
@@ -475,6 +477,7 @@ class ClubTournamentManagementViewsTestCase(TestCase):
             "name": "Клубный турнир",
             "slug": "club-tour",
             "format": TournamentFormat.WEEKEND_DAY,
+            "sport": "tennis",
             "variant": "singles",
             "entry_fee": "1000",
             "is_one_day": "",
@@ -519,6 +522,48 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         tournament.refresh_from_db()
         self.assertEqual(tournament.name, "Новое имя")
+
+    def test_create_form_offers_padel(self) -> None:
+        response = self.client.get(
+            reverse("clubs:tournament_create", kwargs={"slug": self.club.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="sport"')
+        self.assertContains(response, "Падел")
+
+    def test_club_tournament_list_filters_by_padel(self) -> None:
+        tennis = Tournament.objects.create(
+            name="Клубный теннис",
+            slug="club-tennis-list",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.WEEKEND_DAY,
+            status=TournamentStatus.UPCOMING,
+            sport=Sport.TENNIS,
+            entry_fee=1000,
+        )
+        padel = Tournament.objects.create(
+            name="Клубный падел",
+            slug="club-padel-list",
+            city="Москва",
+            club=self.club,
+            start_date=date.today(),
+            format=TournamentFormat.WEEKEND_DAY,
+            status=TournamentStatus.UPCOMING,
+            sport=Sport.PADEL,
+            variant=TournamentVariant.DOUBLES,
+            entry_fee=1000,
+        )
+        response = self.client.get(
+            reverse("clubs:club_tournaments_list", kwargs={"slug": self.club.slug}),
+            {"sport": "padel"},
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, padel.name)
+        self.assertNotContains(response, tennis.name)
 
     def test_manual_generate_bracket_works_without_registration_deadline(self) -> None:
         tournament = Tournament.objects.create(

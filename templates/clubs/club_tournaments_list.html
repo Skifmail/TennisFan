@@ -80,7 +80,7 @@
                     <h2 class="club-dashboard-panel__title">Все старты в одном обзоре</h2>
                 </div>
                 <div class="club-tournaments-overview__result">
-                    {% if search or status_filter or category_filter or gender_filter or variant_filter %}
+                    {% if search or status_filter or category_filter or gender_filter or variant_filter or sport_filter %}
                     Найдено {{ tournaments|length }} из {{ tournaments_total }}
                     {% else %}
                     Все турниры клуба
@@ -124,6 +124,15 @@
                     </select>
                 </label>
                 <label class="club-members-field">
+                    <span class="club-members-field__label">Вид спорта</span>
+                    <select name="sport">
+                        <option value="">Теннис и падел</option>
+                        {% for value, label in sport_choices %}
+                        <option value="{{ value }}" {% if sport_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="club-members-field">
                     <span class="club-members-field__label">Формат</span>
                     <select name="variant">
                         <option value="">Одиночный и парный</option>
@@ -134,7 +143,7 @@
                 </label>
                 <div class="club-tournaments-filters__actions">
                     <button type="submit" class="btn btn-primary">Найти</button>
-                    {% if search or status_filter or category_filter or gender_filter or variant_filter %}
+                    {% if search or status_filter or category_filter or gender_filter or variant_filter or sport_filter %}
                     <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="btn btn-ghost">Сбросить</a>
                     {% endif %}
                 </div>
@@ -218,6 +227,7 @@
                             <div class="club-tournament-card__meta-card">
                                 <span class="club-tournament-card__meta-label">Параметры</span>
                                 <div class="club-tournament-card__tag-list">
+                                    <span class="club-tournament-card__tag">{{ t.get_sport_display }}</span>
                                     <span class="club-tournament-card__tag">{{ t.get_gender_display }}</span>
                                     <span class="club-tournament-card__tag">{{ t.get_variant_display }}</span>
                                     <span class="club-tournament-card__tag">{{ t.get_format_display }}</span>

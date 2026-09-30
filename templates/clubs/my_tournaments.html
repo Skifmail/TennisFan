@@ -56,9 +56,7 @@
                 <div class="club-dashboard-table__row club-my-tournaments-page__row">
                     <div class="club-dashboard-table__cell club-dashboard-table__cell--title">
                         <a href="{% url 'tournament_detail' slug=t.slug %}">{{ t.name }}</a>
-                        {% if t.registration_deadline %}
-                        <span class="club-dashboard-table__hint">Регистрация до {{ t.registration_deadline|date:"d.m.Y H:i" }}</span>
-                        {% endif %}
+                        <span class="club-dashboard-table__hint">{{ t.get_sport_display }}{% if t.registration_deadline %} · регистрация до {{ t.registration_deadline|date:"d.m.Y H:i" }}{% endif %}</span>
                     </div>
                     <div class="club-dashboard-table__cell club-my-tournaments-page__meta-cell">
                         <span class="club-my-tournaments-page__mobile-label">Дата</span>

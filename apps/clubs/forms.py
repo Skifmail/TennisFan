@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from apps.core.models import GeoArea, UserTelegramLink
+from apps.core.sports import Sport, VenueSport, sport_code
 from apps.courts.models import Court
 from apps.tournaments.models import (
     MatchFormat,
@@ -33,6 +34,61 @@ from .models import (
     ClubRegistrationLimitPeriod,
 )
 from .payment_utils import get_secret_mask
+
+
+class CourtVenueSelect(forms.Select):
+    """Select корта с ``data-venue-sport`` для клиентского фильтра."""
+
+    def __init__(
+        self,
+        *args: Any,
+        venue_by_id: dict[int, str] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.venue_by_id = venue_by_id or {}
+        super().__init__(*args, **kwargs)
+
+    def create_option(
+        self,
+        name: str,
+        value: Any,
+        label: str,
+        selected: bool,
+        index: int,
+        subindex: int | None = None,
+        attrs: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        option = cast(
+            dict[str, Any],
+            super().create_option(
+                name, value, label, selected, index, subindex=subindex, attrs=attrs
+            ),
+        )
+        raw = getattr(value, "value", value)
+        if raw in (None, ""):
+            return option
+        try:
+            pk = int(raw)
+        except (TypeError, ValueError):
+            return option
+        option["attrs"]["data-venue-sport"] = self.venue_by_id.get(pk) or "tennis"
+        return option
+
+
+def _court_matches_sport(court: Court, sport: str) -> bool:
+    """Проверить, подходит ли площадка выбранному виду спорта.
+
+    Args:
+        court: Корт из каталога.
+        sport: ``tennis`` или ``padel``.
+
+    Returns:
+        bool: True, если корт можно выбрать для этого спорта.
+    """
+    venue = court.venue_sport or VenueSport.TENNIS
+    if sport == Sport.PADEL:
+        return venue in {VenueSport.PADEL, VenueSport.BOTH}
+    return venue in {VenueSport.TENNIS, VenueSport.BOTH, ""}
 
 
 class ClubLegalDocumentForm(forms.ModelForm):
@@ -488,6 +544,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "slug",
             "description",
             "image",
+            "sport",
             "format",
             "variant",
             "entry_fee",
@@ -530,6 +587,10 @@ class ClubTournamentCreateForm(forms.ModelForm):
             )
 
         self.fields["city"].initial = club.city if club else self.fields["city"].initial
+        self.fields["sport"].initial = Sport.TENNIS
+        self.fields["sport"].help_text = (
+            "Падел проводится только в парах. Рейтинг падела не смешивается с теннисом."
+        )
         self.fields["format"].initial = TournamentFormat.WEEKEND_DAY
         self.fields["variant"].initial = TournamentVariant.SINGLES
         self.fields["tournament_type"].initial = TournamentType.REGULAR
@@ -604,12 +665,20 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "Чтобы продлить регистрацию, сдвиньте и дату начала: "
             "дедлайн не может быть позже старта турнира."
         )
-        self.fields["court"].queryset = (
+        court_qs = (
             Court.objects.filter(city=club.city).order_by("name")
             if club
             else Court.objects.all().order_by("city", "name")
         )
+        self.fields["court"].queryset = court_qs
         self.fields["court"].empty_label = "Без привязки к корту"
+        self.fields["court"].widget = CourtVenueSelect(
+            venue_by_id=dict(court_qs.values_list("pk", "venue_sport")),
+            attrs=self.fields["court"].widget.attrs,
+        )
+        self.fields["court"].help_text = (
+            "Список кортов сужается по виду спорта: теннисный корт нельзя выбрать для падела."
+        )
         self.fields["geo_area"].empty_label = "Не выбрано"
         self.fields["region"].widget.attrs["data-geo-region"] = "1"
         self.fields["geo_area"].widget.attrs["data-geo-area"] = "1"
@@ -721,6 +790,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
         """Блокирует поля, которые меняют структуру уже запущенного турнира."""
         for field_name in (
             "slug",
+            "sport",
             "format",
             "variant",
             "gender",
@@ -769,7 +839,25 @@ class ClubTournamentCreateForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
+        sport = sport_code(cleaned_data.get("sport") or Sport.TENNIS)
+        cleaned_data["sport"] = sport
+        if sport == Sport.PADEL:
+            cleaned_data["variant"] = TournamentVariant.DOUBLES
+            self.errors.pop("variant", None)
+
         variant = cleaned_data.get("variant")
+        court = cleaned_data.get("court")
+        if court is not None and not _court_matches_sport(court, sport):
+            if sport == Sport.PADEL:
+                self.add_error(
+                    "court",
+                    "Для падела выберите падел-корт или площадку «теннис и падел».",
+                )
+            else:
+                self.add_error(
+                    "court",
+                    "Для тенниса выберите теннисный корт или площадку «теннис и падел».",
+                )
         gender = cleaned_data.get("gender")
         is_one_day = cleaned_data.get("is_one_day")
         allow_postpayment = bool(cleaned_data.get("allow_postpayment"))

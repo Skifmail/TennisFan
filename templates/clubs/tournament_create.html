@@ -11,7 +11,7 @@
                 <span class="club-tournament-create__eyebrow">{% if page_mode == 'edit' %}Редактирование турнира{% else %}Новый турнир клуба{% endif %}</span>
                 <h1 class="page-title club-tournament-create__title">{% if page_mode == 'edit' %}Редактировать турнир{% else %}Создать турнир{% endif %}</h1>
                 <p class="page-subtitle club-tournament-create__subtitle">
-                    Соберите турнир с теми же ключевыми параметрами, что используются на глобальной платформе: формат, лимиты, уровни допуска, взносы и правила проведения.
+                    Соберите турнир с теми же ключевыми параметрами, что используются на глобальной платформе: вид спорта, формат, лимиты, уровни допуска, взносы и правила проведения.
                 </p>
             </div>
             <div class="club-tournament-create__hero-side">
@@ -127,6 +127,12 @@
                     <p class="club-tournament-create__section-text">Тип турнира, дисциплина, пол, уровень игроков и ключевые настройки структуры.</p>
                 </div>
                 <div class="club-tournament-create__grid club-tournament-create__grid--triple">
+                    <div class="club-tournament-create__field">
+                        <label for="{{ form.sport.id_for_label }}" class="form-label">{{ form.sport.label }}</label>
+                        {{ form.sport }}
+                        {% if form.sport.help_text %}<p class="club-tournament-create__help">{{ form.sport.help_text }}</p>{% endif %}
+                        {% for error in form.sport.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
+                    </div>
                     <div class="club-tournament-create__field">
                         <label for="{{ form.format.id_for_label }}" class="form-label">{{ form.format.label }}</label>
                         {{ form.format }}
@@ -335,6 +341,7 @@
 {% block extra_js %}
 {{ form.geo_areas_payload|json_script:"club-geo-areas" }}
 <script src="{% static 'js/club_tournament_geo.js' %}" defer></script>
+<script src="{% static 'js/club_tournament_sport.js' %}" defer></script>
 <script>
 (function () {
     function syncFillModeDates() {

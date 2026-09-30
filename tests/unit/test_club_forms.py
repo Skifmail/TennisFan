@@ -11,12 +11,16 @@ from apps.clubs.models import (
 )
 from apps.core.geo import GeoRegion
 from apps.core.models import GeoArea
+from apps.core.sports import Sport, VenueSport
+from apps.courts.models import Court
+from apps.courts.surfaces import PadelSurface
 from apps.tournaments.models import (
     Tournament,
     TournamentFormat,
     TournamentGender,
     TournamentStatus,
     TournamentType,
+    TournamentVariant,
 )
 
 
@@ -37,6 +41,7 @@ class ClubTournamentCreateFormTestCase(TestCase):
                 "name": "Клубный кубок",
                 "slug": "",
                 "format": TournamentFormat.WEEKEND_DAY,
+                "sport": "tennis",
                 "variant": "singles",
                 "entry_fee": "1000",
                 "is_one_day": "",
@@ -64,6 +69,7 @@ class ClubTournamentCreateFormTestCase(TestCase):
             "name": "Клубный кубок",
             "slug": "",
             "format": TournamentFormat.WEEKEND_DAY,
+            "sport": "tennis",
             "variant": "singles",
             "entry_fee": "1000",
             "is_one_day": "",
@@ -171,6 +177,78 @@ class ClubTournamentCreateFormTestCase(TestCase):
         )
         self.assertTrue(form.is_valid(), form.errors)
         self.assertIsNotNone(form.cleaned_data["registration_deadline"])
+
+    def test_sport_field_defaults_to_tennis(self) -> None:
+        form = ClubTournamentCreateForm(club=self.club, is_pro=False)
+        self.assertIn("sport", form.fields)
+        self.assertEqual(form.fields["sport"].initial, Sport.TENNIS)
+
+    def test_padel_forces_doubles_even_if_singles_posted(self) -> None:
+        form = ClubTournamentCreateForm(
+            data=self._base_tournament_data(
+                sport=Sport.PADEL,
+                variant="singles",
+                max_teams="8",
+            ),
+            club=self.club,
+            is_pro=False,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["sport"], Sport.PADEL)
+        self.assertEqual(form.cleaned_data["variant"], TournamentVariant.DOUBLES)
+        tournament = form.save(commit=False)
+        tournament.club = self.club
+        tournament.save()
+        tournament.refresh_from_db()
+        self.assertEqual(tournament.sport, Sport.PADEL)
+        self.assertEqual(tournament.variant, TournamentVariant.DOUBLES)
+
+    def test_padel_rejects_tennis_only_court(self) -> None:
+        tennis_court = Court.objects.create(
+            name="Теннисный корт клуба",
+            slug="club-tennis-court",
+            city="Москва",
+            address="ул. Кортовая, 1",
+            surface="хард",
+            venue_sport=VenueSport.TENNIS,
+            is_active=True,
+        )
+        form = ClubTournamentCreateForm(
+            data=self._base_tournament_data(
+                sport=Sport.PADEL,
+                variant="doubles",
+                max_teams="8",
+                court=str(tennis_court.pk),
+            ),
+            club=self.club,
+            is_pro=False,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("court", form.errors)
+
+    def test_padel_accepts_padel_court(self) -> None:
+        padel_court = Court.objects.create(
+            name="Падел-корт клуба",
+            slug="club-padel-court",
+            city="Москва",
+            address="ул. Кортовая, 2",
+            surface="падел",
+            venue_sport=VenueSport.PADEL,
+            padel_surfaces=[PadelSurface.ARTIFICIAL_GRASS],
+            is_active=True,
+        )
+        form = ClubTournamentCreateForm(
+            data=self._base_tournament_data(
+                sport=Sport.PADEL,
+                variant="doubles",
+                max_teams="8",
+                court=str(padel_court.pk),
+            ),
+            club=self.club,
+            is_pro=False,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["court"], padel_court)
 
 
 class ClubPlayerPlanFormTestCase(TestCase):

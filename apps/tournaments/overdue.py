@@ -100,11 +100,14 @@ def pick_higher_rated_winner(
         Пара (победивший игрок, победившая команда или None).
     """
     if match.team1_id and match.team2_id and match.team1 and match.team2:
-        t1_pts = match.team1.player1.total_points + (
-            match.team1.player2.total_points if match.team1.player2_id else 0
+        from apps.users.sport_rating import rating_points
+
+        sport = match.sport
+        t1_pts = rating_points(match.team1.player1, sport) + (
+            rating_points(match.team1.player2, sport) if match.team1.player2_id else 0
         )
-        t2_pts = match.team2.player1.total_points + (
-            match.team2.player2.total_points if match.team2.player2_id else 0
+        t2_pts = rating_points(match.team2.player1, sport) + (
+            rating_points(match.team2.player2, sport) if match.team2.player2_id else 0
         )
         if t1_pts != t2_pts:
             winner_team = match.team1 if t1_pts > t2_pts else match.team2
@@ -121,8 +124,12 @@ def pick_higher_rated_winner(
         return player_b, None
     if getattr(player_b, "is_bye", False):
         return player_a, None
-    if player_a.total_points != player_b.total_points:
-        winner = player_a if player_a.total_points > player_b.total_points else player_b
+    from apps.users.sport_rating import rating_points
+
+    points_a = rating_points(player_a, match.sport)
+    points_b = rating_points(player_b, match.sport)
+    if points_a != points_b:
+        winner = player_a if points_a > points_b else player_b
         return winner, None
     winner = player_a if player_a.pk < player_b.pk else player_b
     return winner, None
@@ -915,8 +922,10 @@ def replace_no_show_walkover(
     new_winner = match.player2 if loser.pk == match.player1_id else match.player1
     new_winner_name = new_winner.get_display_name() if new_winner else "—"
 
-    p1_now = float(match.player1.total_points) if match.player1 else 0.0
-    p2_now = float(match.player2.total_points) if match.player2 else 0.0
+    from apps.users.sport_rating import rating_points
+
+    p1_now = rating_points(match.player1, match.sport)
+    p2_now = rating_points(match.player2, match.sport)
     p1_after = p1_now - (old_delta1 if is_walkover else 0.0) + new_delta1
     p2_after = p2_now - (old_delta2 if is_walkover else 0.0) + new_delta2
 

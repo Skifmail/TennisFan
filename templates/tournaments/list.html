@@ -77,6 +77,15 @@
                 </select>
             </div>
             {% endif %}
+            <div class="tournaments-filters__field{% if current_sport %} is-active{% endif %}">
+                <label class="tournaments-filters__label" for="tournament-filter-sport">Вид спорта</label>
+                <select name="sport" id="tournament-filter-sport" class="form-control" onchange="this.form.submit()" aria-label="Вид спорта">
+                    {% for value, label in sport_choices %}
+                    <option value="{{ value }}" {% if current_sport == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                    <option value="all" {% if current_sport == 'all' %}selected{% endif %}>Все</option>
+                </select>
+            </div>
             <div class="tournaments-filters__field{% if current_variant %} is-active{% endif %}">
                 <label class="tournaments-filters__label" for="tournament-filter-variant">Формат</label>
                 <select name="variant" id="tournament-filter-variant" class="form-control" onchange="this.form.submit()" aria-label="Формат">
@@ -132,7 +141,7 @@
                     <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
                     {% else %}
                     <li class="pagination__item">
-                        <a href="?page={{ page_num }}{% if current_region %}&region={{ current_region }}{% endif %}{% if current_area %}&area={{ current_area }}{% endif %}{% if current_variant %}&variant={{ current_variant }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_status and not is_archive %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
+                        <a href="?page={{ page_num }}{% if current_region %}&region={{ current_region }}{% endif %}{% if current_area %}&area={{ current_area }}{% endif %}{% if current_variant %}&variant={{ current_variant }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_sport %}&sport={{ current_sport }}{% endif %}{% if current_status and not is_archive %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
                     </li>
                     {% endif %}
                 {% endfor %}

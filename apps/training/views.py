@@ -68,8 +68,11 @@ def _visible_coaches():
 
 def training_list(request):
     """Список тренировок. Доступен всем пользователям."""
+    from apps.core.sports import Sport, parse_sport_filter
+
     skill_level = request.GET.get("level", "")
     training_type = request.GET.get("type", "")
+    sport_filter = parse_sport_filter(request.GET.get("sport"))
     areas = advertised_training_areas()
     geo = resolve_training_list_geo(
         city=(request.GET.get("city") or "").strip(),
@@ -80,6 +83,8 @@ def training_list(request):
     district_slug = district.slug if district is not None else ""
 
     trainings = Training.objects.filter(is_active=True).select_related("coach")
+    if sport_filter != "all":
+        trainings = trainings.filter(sport=sport_filter)
 
     if skill_level:
         trainings = trainings.filter(skill_levels__contains=[skill_level])
@@ -122,6 +127,8 @@ def training_list(request):
         "trainings": trainings,
         "current_level": skill_level,
         "current_type": training_type,
+        "current_sport": sport_filter,
+        "sport_choices": Sport.choices,
         "current_city": geo.city,
         "current_area": district_slug,
         "show_moscow_zones": geo.show_moscow_zones,

@@ -955,12 +955,14 @@ def _overdue_winner_round_robin(match: Match) -> Player | None:
     При равенстве — с меньшим id. Поддерживает одиночные и парные матчи.
     """
     if match.team1_id and match.team2_id and match.team1 and match.team2:
-        # Парный матч: сравниваем сумму рейтингов команд
-        t1_pts = match.team1.player1.total_points + (
-            match.team1.player2.total_points if match.team1.player2_id else 0
+        from apps.users.sport_rating import rating_points
+
+        sport = match.sport
+        t1_pts = rating_points(match.team1.player1, sport) + (
+            rating_points(match.team1.player2, sport) if match.team1.player2_id else 0
         )
-        t2_pts = match.team2.player1.total_points + (
-            match.team2.player2.total_points if match.team2.player2_id else 0
+        t2_pts = rating_points(match.team2.player1, sport) + (
+            rating_points(match.team2.player2, sport) if match.team2.player2_id else 0
         )
         if t1_pts != t2_pts:
             return cast(
@@ -985,8 +987,12 @@ def _overdue_winner_round_robin(match: Match) -> Player | None:
             return cast(Player | None, b)
         if getattr(b, "is_bye", False):
             return cast(Player | None, a)
-        if a.total_points != b.total_points:
-            return cast(Player | None, a if a.total_points > b.total_points else b)
+        from apps.users.sport_rating import rating_points
+
+        points_a = rating_points(a, match.sport)
+        points_b = rating_points(b, match.sport)
+        if points_a != points_b:
+            return cast(Player | None, a if points_a > points_b else b)
         return cast(Player | None, a if a.pk < b.pk else b)
 
 

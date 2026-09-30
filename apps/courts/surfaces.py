@@ -21,6 +21,14 @@ class CourtSurface(TextChoices):
     OTHER = "other", "Другое"
 
 
+class PadelSurface(TextChoices):
+    """Покрытия падел-корта. Не смешиваются с хардом и грунтом тенниса."""
+
+    ARTIFICIAL_GRASS = "artificial_grass", "Искусственная трава"
+    MONDO = "mondo", "Mondo"
+    OTHER = "other", "Другое"
+
+
 _TOKEN_ALIASES: dict[str, str] = {
     "hard": "hard",
     "хард": "hard",
@@ -54,6 +62,59 @@ def normalize_surface_codes(values: Iterable[str] | None) -> list[str]:
     allowed = set(CourtSurface.values)
     present = {str(code) for code in (values or []) if str(code) in allowed}
     return [code for code in CourtSurface.values if code in present]
+
+
+def normalize_padel_surface_codes(values: Iterable[str] | None) -> list[str]:
+    """Оставить только известные коды покрытия падела без дублей.
+
+    Args:
+        values: Сырые коды из формы или JSON.
+
+    Returns:
+        list[str]: Уникальные коды в порядке ``PadelSurface``.
+    """
+    allowed = set(PadelSurface.values)
+    present = {str(code) for code in (values or []) if str(code) in allowed}
+    return [code for code in PadelSurface.values if code in present]
+
+
+def format_padel_surface_labels(codes: Iterable[str] | None) -> str:
+    """Собрать подписи покрытий падела через запятую.
+
+    Args:
+        codes: Канонические коды ``PadelSurface``.
+
+    Returns:
+        str: Например ``Искусственная трава``.
+    """
+    labels = [PadelSurface(code).label for code in normalize_padel_surface_codes(codes)]
+    return ", ".join(labels)
+
+
+def compose_venue_surface_display(
+    *,
+    tennis_label: str,
+    venue_sport: str,
+    padel_surfaces: Iterable[str] | None,
+) -> str:
+    """Собрать строку покрытия с учётом вида спорта площадки.
+
+    Args:
+        tennis_label: Уже собранная подпись теннисных покрытий.
+        venue_sport: ``tennis``, ``padel`` или ``both``.
+        padel_surfaces: Коды покрытия падела.
+
+    Returns:
+        str: Подпись для карточки. Для тенниса совпадает с прежней строкой.
+    """
+    padel_text = format_padel_surface_labels(padel_surfaces)
+    padel_label = f"Падел: {padel_text}" if padel_text else "Падел"
+    if venue_sport == "padel":
+        return padel_label
+    if venue_sport == "both":
+        parts = [part for part in (tennis_label, padel_label) if part]
+        return "; ".join(parts)
+    return tennis_label
 
 
 def format_surface_labels(codes: Iterable[str] | None) -> str:
@@ -217,5 +278,47 @@ def filter_courts_by_surfaces(queryset: QuerySet, codes: Iterable[str]) -> Query
     ):
         present = set(indoor or []) | set(outdoor or [])
         if selected & present:
+            matching_ids.append(pk)
+    return queryset.filter(pk__in=matching_ids)
+
+
+def filter_courts_by_venue(queryset: QuerySet, sport: str) -> QuerySet:
+    """Оставить площадки выбранного вида спорта.
+
+    Площадка «теннис и падел» видна в обоих каталогах.
+    ``all`` не фильтрует.
+
+    Args:
+        queryset: Исходный queryset кортов.
+        sport: ``tennis``, ``padel`` или ``all``.
+
+    Returns:
+        QuerySet: Отфильтрованный queryset.
+    """
+    if sport == "padel":
+        return queryset.filter(venue_sport__in=["padel", "both"])
+    if sport == "tennis":
+        return queryset.filter(venue_sport__in=["tennis", "both", ""])
+    return queryset
+
+
+def filter_courts_by_padel_surfaces(
+    queryset: QuerySet, codes: Iterable[str]
+) -> QuerySet:
+    """Оставить падел-корты с выбранным покрытием.
+
+    Args:
+        queryset: Исходный queryset кортов.
+        codes: Коды ``PadelSurface``.
+
+    Returns:
+        QuerySet: Отфильтрованный queryset.
+    """
+    selected = set(normalize_padel_surface_codes(codes))
+    if not selected:
+        return queryset
+    matching_ids: list[int] = []
+    for pk, surfaces in queryset.values_list("pk", "padel_surfaces"):
+        if selected & set(surfaces or []):
             matching_ids.append(pk)
     return queryset.filter(pk__in=matching_ids)

@@ -4,6 +4,7 @@ Sparring forms.
 
 from django import forms
 
+from apps.core.sports import Sport
 from apps.users.models import Player, SkillLevel
 
 from .models import SparringPreferredGender, SparringRequest
@@ -15,6 +16,7 @@ class SparringRequestForm(forms.ModelForm):
     class Meta:
         model = SparringRequest
         fields = (
+            "sport",
             "city",
             "preferred_gender",
             "desired_category",
@@ -27,6 +29,7 @@ class SparringRequestForm(forms.ModelForm):
             "is_friendly",
         )
         widgets = {
+            "sport": forms.Select(attrs={"class": "form-control"}),
             "city": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Населённый пункт"}
             ),
@@ -99,6 +102,12 @@ class SparringInviteForm(forms.Form):
 class DoublesMatchRequestForm(forms.Form):
     """Форма создания заявки на парный матч 2×2."""
 
+    sport = forms.ChoiceField(
+        label="Вид спорта",
+        choices=Sport.choices,
+        required=False,
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
     city = forms.CharField(
         max_length=100,
         required=False,

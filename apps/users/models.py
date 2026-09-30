@@ -14,6 +14,7 @@ from apps.core.contact_utils import (
     build_whatsapp_url,
     get_max_display_contact,
 )
+from apps.core.sports import Sport
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
 
@@ -515,3 +516,67 @@ class EmailVerificationToken(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user_id}:{self.token[:8]}"
+
+
+class PlayerSportProfile(models.Model):
+    """Рейтинг и сила игрока в одном виде спорта.
+
+    Теннисный профиль зеркалит поля ``Player`` (их по-прежнему читает текущий UI).
+    Падел хранится только здесь, чтобы матч падела не менял теннисный FAN.
+    """
+
+    player = models.ForeignKey(
+        Player,
+        on_delete=models.CASCADE,
+        related_name="sport_profiles",
+        verbose_name="Игрок",
+    )
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=Sport.choices,
+        default=Sport.TENNIS,
+        db_index=True,
+    )
+    total_points = models.FloatField(
+        "Рейтинг FAN",
+        default=0.0,
+        help_text="Рейтинг силы в этом виде спорта.",
+    )
+    hidden_rating = models.FloatField(
+        "Скрытый рейтинг",
+        default=0.0,
+        help_text="Теневой рейтинг вида спорта.",
+    )
+    ntrp_level = models.DecimalField(
+        "Уровень силы",
+        max_digits=4,
+        decimal_places=2,
+        default=1.5,
+    )
+    skill_level = models.CharField(
+        "Категория силы",
+        max_length=20,
+        choices=SkillLevel.choices,
+        default=SkillLevel.NOVICE,
+    )
+    matches_played = models.PositiveIntegerField("Сыграно матчей", default=0)
+    matches_won = models.PositiveIntegerField("Побед", default=0)
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлён", auto_now=True)
+
+    class Meta:
+        verbose_name = "Профиль вида спорта"
+        verbose_name_plural = "Профили видов спорта"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["player", "sport"],
+                name="users_player_sport_profile_uniq",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["sport", "-total_points"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.player} — {self.get_sport_display()} ({self.total_points:.0f})"

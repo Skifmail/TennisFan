@@ -84,32 +84,29 @@ def _match_result_changed(old: Match, new: Match) -> bool:
     )
 
 
-def _revert_player_rating(player: Any, delta: float) -> None:
+def _revert_player_rating(player: Any, delta: float, sport: str | None = None) -> None:
     """Откатить FAN-рейтинг игрока на величину прежней дельты матча.
 
     Args:
         player: Игрок.
         delta: Ранее применённая дельта рейтинга за этот матч.
+        sport: Вид спорта матча. Пустое значение — теннис.
 
     Returns:
         None
     """
-    from apps.users.rating_utils import rating_to_ntrp_level, rating_to_skill_level
+    from apps.core.sports import Sport
+    from apps.users.sport_rating import commit_rating, rating_points
 
     if not player or getattr(player, "is_bye", False) or not delta:
         return
-    # При пакетном откате Player из select_related может держать старый total_points.
-    player.refresh_from_db(
-        fields=["total_points", "hidden_rating", "skill_level", "ntrp_level"]
-    )
-    new_rating = max(0.0, float(player.total_points) - float(delta))
-    player.hidden_rating = new_rating
-    player.total_points = new_rating
-    player.skill_level = rating_to_skill_level(new_rating)
-    player.ntrp_level = rating_to_ntrp_level(new_rating)
-    player.save(
-        update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
-    )
+    sport_code = sport or Sport.TENNIS
+    if sport_code != Sport.PADEL:
+        player.refresh_from_db(
+            fields=["total_points", "hidden_rating", "skill_level", "ntrp_level"]
+        )
+    current = rating_points(player, sport_code)
+    commit_rating(player, max(0.0, current - float(delta)), sport_code)
 
 
 def _revert_match_result_effects(snapshot: dict[str, Any], match: Match) -> None:
@@ -123,9 +120,15 @@ def _revert_match_result_effects(snapshot: dict[str, Any], match: Match) -> None
         None
     """
     from apps.users.models import Player
+    from apps.users.sport_rating import adjust_wins
 
-    _revert_player_rating(match.player1, snapshot.get("rating_delta_player1") or 0.0)
-    _revert_player_rating(match.player2, snapshot.get("rating_delta_player2") or 0.0)
+    sport = match.sport
+    _revert_player_rating(
+        match.player1, snapshot.get("rating_delta_player1") or 0.0, sport
+    )
+    _revert_player_rating(
+        match.player2, snapshot.get("rating_delta_player2") or 0.0, sport
+    )
 
     old_winner_id = snapshot.get("winner_id")
     new_winner_id = match.winner_id
@@ -142,32 +145,19 @@ def _revert_match_result_effects(snapshot: dict[str, Any], match: Match) -> None
         new_team = match.winner_team
         if old_team:
             for player in (old_team.player1, old_team.player2):
-                if (
-                    player
-                    and not getattr(player, "is_bye", False)
-                    and player.matches_won > 0
-                ):
-                    player.matches_won -= 1
-                    player.save(update_fields=["matches_won"])
+                if player and not getattr(player, "is_bye", False):
+                    adjust_wins(player, sport, -1)
         if new_team:
             for player in (new_team.player1, new_team.player2):
                 if player and not getattr(player, "is_bye", False):
-                    player.matches_won += 1
-                    player.save(update_fields=["matches_won"])
+                    adjust_wins(player, sport, 1)
         return
 
     if old_winner_id:
         old_winner = Player.objects.filter(pk=old_winner_id).first()
-        if (
-            old_winner
-            and not getattr(old_winner, "is_bye", False)
-            and old_winner.matches_won > 0
-        ):
-            old_winner.matches_won -= 1
-            old_winner.save(update_fields=["matches_won"])
+        adjust_wins(old_winner, sport, -1)
     if new_winner_id and match.winner and not getattr(match.winner, "is_bye", False):
-        match.winner.matches_won += 1
-        match.winner.save(update_fields=["matches_won"])
+        adjust_wins(match.winner, sport, 1)
 
 
 @receiver(post_save, sender=Match)
@@ -437,29 +427,23 @@ def update_player_stats(sender, instance, created, **kwargs):
     # ------------------------------------------------------------------
     # 1) Update matches_played / matches_won for all formats
     # ------------------------------------------------------------------
+    from apps.users.sport_rating import record_match_played
+
+    sport = match.sport
+
     def _update_stats_singles(match):
         w = match.winner
         los = match.player2 if w == match.player1 else match.player1
-        if w and not getattr(w, "is_bye", False):
-            w.matches_played += 1
-            w.matches_won += 1
-            w.save(update_fields=["matches_played", "matches_won"])
-        if los and not getattr(los, "is_bye", False):
-            los.matches_played += 1
-            los.save(update_fields=["matches_played"])
+        record_match_played(w, sport, won=True)
+        record_match_played(los, sport, won=False)
 
     def _update_stats_doubles(match):
         wt = match.winner_team
         lt = match.team2 if wt == match.team1 else match.team1
         for p in (wt.player1, wt.player2):
-            if p and not getattr(p, "is_bye", False):
-                p.matches_played += 1
-                p.matches_won += 1
-                p.save(update_fields=["matches_played", "matches_won"])
+            record_match_played(p, sport, won=True)
         for p in (lt.player1, lt.player2):
-            if p and not getattr(p, "is_bye", False):
-                p.matches_played += 1
-                p.save(update_fields=["matches_played"])
+            record_match_played(p, sport, won=False)
 
     def _update_stats_doubles_sparring(match):
         win_side = (
@@ -473,14 +457,9 @@ def update_player_stats(sender, instance, created, **kwargs):
             else (match.player1, match.partner1)
         )
         for p in win_side:
-            if p and not getattr(p, "is_bye", False):
-                p.matches_played += 1
-                p.matches_won += 1
-                p.save(update_fields=["matches_played", "matches_won"])
+            record_match_played(p, sport, won=True)
         for p in lose_side:
-            if p and not getattr(p, "is_bye", False):
-                p.matches_played += 1
-                p.save(update_fields=["matches_played"])
+            record_match_played(p, sport, won=False)
 
     def _update_stats_mutual_no_show(match):
         players = []
@@ -494,9 +473,7 @@ def update_player_stats(sender, instance, created, **kwargs):
                 [match.player1, match.player2, match.partner1, match.partner2]
             )
         for player in players:
-            if player and not getattr(player, "is_bye", False):
-                player.matches_played += 1
-                player.save(update_fields=["matches_played"])
+            record_match_played(player, sport, won=False)
 
     if mutual_no_show:
         _update_stats_mutual_no_show(match)
@@ -543,26 +520,23 @@ def update_player_stats(sender, instance, created, **kwargs):
         tvd_check_and_finalize(t)
 
 
-def _apply_fixed_rating_delta(player, delta: float) -> None:
+def _apply_fixed_rating_delta(player, delta: float, sport: str | None = None) -> None:
     """Изменить рейтинг игрока на фиксированную дельту и обновить уровень силы.
 
     Args:
         player: Игрок или None (bye пропускается).
         delta: Изменение рейтинга (может быть отрицательным).
+        sport: Вид спорта матча. Пустое значение — теннис.
     """
-    from apps.users.rating_utils import rating_to_ntrp_level, rating_to_skill_level
+    from apps.core.sports import Sport
+    from apps.users.sport_rating import commit_rating, rating_points
 
     if player is None or getattr(player, "is_bye", False):
         return
-    old_rating = float(player.total_points)
+    sport_code = sport or Sport.TENNIS
+    old_rating = rating_points(player, sport_code)
     new_rating = max(0.0, old_rating + float(delta))
-    player.hidden_rating = new_rating
-    player.total_points = float(new_rating)
-    player.skill_level = rating_to_skill_level(new_rating)
-    player.ntrp_level = rating_to_ntrp_level(new_rating)
-    player.save(
-        update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
-    )
+    commit_rating(player, new_rating, sport_code)
     logger.info(
         "Player %s: фиксированная дельта рейтинга %.1f (%.1f -> %.1f)",
         player.pk,
@@ -608,19 +582,19 @@ def _apply_no_show_walkover_rating(match: Match) -> None:
 
     if is_doubles_sparring:
         for player in (match.player1, match.partner1):
-            _apply_fixed_rating_delta(player, delta1)
+            _apply_fixed_rating_delta(player, delta1, match.sport)
         for player in (match.player2, match.partner2):
-            _apply_fixed_rating_delta(player, delta2)
+            _apply_fixed_rating_delta(player, delta2, match.sport)
     elif is_doubles:
         if match.team1:
             for player in (match.team1.player1, match.team1.player2):
-                _apply_fixed_rating_delta(player, delta1)
+                _apply_fixed_rating_delta(player, delta1, match.sport)
         if match.team2:
             for player in (match.team2.player1, match.team2.player2):
-                _apply_fixed_rating_delta(player, delta2)
+                _apply_fixed_rating_delta(player, delta2, match.sport)
     else:
-        _apply_fixed_rating_delta(match.player1, delta1)
-        _apply_fixed_rating_delta(match.player2, delta2)
+        _apply_fixed_rating_delta(match.player1, delta1, match.sport)
+        _apply_fixed_rating_delta(match.player2, delta2, match.sport)
 
     Match.objects.filter(pk=match.pk).update(
         rating_delta_player1=delta1,
@@ -635,7 +609,7 @@ def _apply_fan_shadow(match: Match) -> None:
     For doubles: delta is applied to both members of each team.
     Bye players are skipped.
     """
-    from apps.users.rating_utils import rating_to_ntrp_level, rating_to_skill_level
+    from apps.users.rating_utils import rating_to_ntrp_level
 
     from .rating import (
         MatchScore,
@@ -708,41 +682,43 @@ def _apply_fan_shadow(match: Match) -> None:
         _apply_no_show_walkover_rating(match)
         return
 
+    from apps.users.sport_rating import (
+        commit_rating,
+        hidden_rating_points,
+        matches_played_for,
+        rating_points,
+    )
+
+    sport = match.sport
     # K-factor определяется по количеству матчей ДО этого матча
     # (matches_played уже обновлён выше, поэтому вычитаем 1)
-    matches_before_a = max(0, p1.matches_played - 1)
-    matches_before_b = max(0, p2.matches_played - 1)
+    matches_before_a = max(0, matches_played_for(p1, sport) - 1)
+    matches_before_b = max(0, matches_played_for(p2, sport) - 1)
 
-    # Для первого матча используем total_points как начальный рейтинг,
-    # если hidden_rating не был правильно инициализирован
-    rating_a = p1.hidden_rating
-    rating_b = p2.hidden_rating
+    rating_a = hidden_rating_points(p1, sport)
+    rating_b = hidden_rating_points(p2, sport)
+    points_a = rating_points(p1, sport)
+    points_b = rating_points(p2, sport)
 
-    if matches_before_a == 0:
-        # Первый матч: если hidden_rating сильно отличается от total_points,
-        # используем total_points как начальный рейтинг
-        if abs(rating_a - float(p1.total_points)) > 200:
-            rating_a = float(p1.total_points)
-            logger.warning(
-                "Player %s: hidden_rating (%.1f) не соответствует total_points (%.1f) для первого матча. "
-                "Используем total_points как начальный рейтинг.",
-                p1.pk,
-                p1.hidden_rating,
-                p1.total_points,
-            )
+    if matches_before_a == 0 and abs(rating_a - points_a) > 200:
+        rating_a = points_a
+        logger.warning(
+            "Player %s: скрытый рейтинг (%.1f) не соответствует FAN (%.1f) для первого матча. "
+            "Используем FAN как начальный рейтинг.",
+            p1.pk,
+            hidden_rating_points(p1, sport),
+            points_a,
+        )
 
-    if matches_before_b == 0:
-        # Первый матч: если hidden_rating сильно отличается от total_points,
-        # используем total_points как начальный рейтинг
-        if abs(rating_b - float(p2.total_points)) > 200:
-            rating_b = float(p2.total_points)
-            logger.warning(
-                "Player %s: hidden_rating (%.1f) не соответствует total_points (%.1f) для первого матча. "
-                "Используем total_points как начальный рейтинг.",
-                p2.pk,
-                p2.hidden_rating,
-                p2.total_points,
-            )
+    if matches_before_b == 0 and abs(rating_b - points_b) > 200:
+        rating_b = points_b
+        logger.warning(
+            "Player %s: скрытый рейтинг (%.1f) не соответствует FAN (%.1f) для первого матча. "
+            "Используем FAN как начальный рейтинг.",
+            p2.pk,
+            hidden_rating_points(p2, sport),
+            points_b,
+        )
 
     snap_a = PlayerRatingSnapshot(rating=rating_a, total_matches=matches_before_a)
     snap_b = PlayerRatingSnapshot(rating=rating_b, total_matches=matches_before_b)
@@ -829,24 +805,10 @@ def _apply_fan_shadow(match: Match) -> None:
                     logger.info(
                         "Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk
                     )
-                old_rating = p.total_points
-                old_ntrp = rating_to_ntrp_level(
-                    old_rating
-                )  # Вычисляем из рейтинга, а не берем из БД
-                p.hidden_rating = new_rating
-                p.total_points = float(new_rating)
-                # Обновляем skill_level и ntrp_level на основе нового рейтинга
-                p.skill_level = rating_to_skill_level(new_rating)
+                old_rating = rating_points(p, sport)
+                old_ntrp = rating_to_ntrp_level(old_rating)
+                commit_rating(p, new_rating, sport)
                 new_ntrp = rating_to_ntrp_level(new_rating)
-                p.ntrp_level = new_ntrp
-                p.save(
-                    update_fields=[
-                        "hidden_rating",
-                        "total_points",
-                        "skill_level",
-                        "ntrp_level",
-                    ]
-                )
                 logger.debug(
                     "Player %s (doubles team1): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
                     p.pk,
@@ -871,19 +833,10 @@ def _apply_fan_shadow(match: Match) -> None:
         if is_walkover_loss and loser == p1:
             new_rating_a = max(0, new_rating_a - 40.0)
             logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p1.pk)
-        old_rating_p1 = p1.total_points
-        old_ntrp_p1 = rating_to_ntrp_level(
-            old_rating_p1
-        )  # Вычисляем из рейтинга, а не берем из БД
-        p1.hidden_rating = new_rating_a
-        p1.total_points = float(new_rating_a)
-        # Обновляем skill_level и ntrp_level на основе нового рейтинга
-        p1.skill_level = rating_to_skill_level(new_rating_a)
+        old_rating_p1 = rating_points(p1, sport)
+        old_ntrp_p1 = rating_to_ntrp_level(old_rating_p1)
+        commit_rating(p1, new_rating_a, sport)
         new_ntrp_p1 = rating_to_ntrp_level(new_rating_a)
-        p1.ntrp_level = new_ntrp_p1
-        p1.save(
-            update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
-        )
         logger.debug(
             "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
             p1.pk,
@@ -921,24 +874,10 @@ def _apply_fan_shadow(match: Match) -> None:
                     logger.info(
                         "Player %s: штраф -40 очков за тех. поражение (Retired)", p.pk
                     )
-                old_rating = p.total_points
-                old_ntrp = rating_to_ntrp_level(
-                    old_rating
-                )  # Вычисляем из рейтинга, а не берем из БД
-                p.hidden_rating = new_rating
-                p.total_points = float(new_rating)
-                # Обновляем skill_level и ntrp_level на основе нового рейтинга
-                p.skill_level = rating_to_skill_level(new_rating)
+                old_rating = rating_points(p, sport)
+                old_ntrp = rating_to_ntrp_level(old_rating)
+                commit_rating(p, new_rating, sport)
                 new_ntrp = rating_to_ntrp_level(new_rating)
-                p.ntrp_level = new_ntrp
-                p.save(
-                    update_fields=[
-                        "hidden_rating",
-                        "total_points",
-                        "skill_level",
-                        "ntrp_level",
-                    ]
-                )
                 logger.debug(
                     "Player %s (doubles team2): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
                     p.pk,
@@ -963,19 +902,10 @@ def _apply_fan_shadow(match: Match) -> None:
         if is_walkover_loss and loser == p2:
             new_rating_b = max(0, new_rating_b - 40.0)
             logger.info("Player %s: штраф -40 очков за тех. поражение (Retired)", p2.pk)
-        old_rating_p2 = p2.total_points
-        old_ntrp_p2 = rating_to_ntrp_level(
-            old_rating_p2
-        )  # Вычисляем из рейтинга, а не берем из БД
-        p2.hidden_rating = new_rating_b
-        p2.total_points = float(new_rating_b)
-        # Обновляем skill_level и ntrp_level на основе нового рейтинга
-        p2.skill_level = rating_to_skill_level(new_rating_b)
+        old_rating_p2 = rating_points(p2, sport)
+        old_ntrp_p2 = rating_to_ntrp_level(old_rating_p2)
+        commit_rating(p2, new_rating_b, sport)
         new_ntrp_p2 = rating_to_ntrp_level(new_rating_b)
-        p2.ntrp_level = new_ntrp_p2
-        p2.save(
-            update_fields=["hidden_rating", "total_points", "skill_level", "ntrp_level"]
-        )
         logger.debug(
             "Player %s (singles): rating updated %.1f -> %.1f (delta: %.1f), Сила %s -> %s",
             p2.pk,

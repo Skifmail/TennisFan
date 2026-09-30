@@ -135,6 +135,7 @@ class CourtAdmin(admin.ModelAdmin):
         "is_active",
     )
     list_filter = (
+        "venue_sport",
         "region",
         "geo_area",
         "city",
@@ -177,6 +178,9 @@ class CourtAdmin(admin.ModelAdmin):
             "Характеристики",
             {
                 "fields": (
+                    "venue_sport",
+                    "has_glass_walls",
+                    "padel_surfaces",
                     "indoor_surfaces",
                     "outdoor_surfaces",
                     "courts_count",
@@ -355,6 +359,9 @@ class CourtApplicationAdmin(admin.ModelAdmin):
             "Характеристики",
             {
                 "fields": (
+                    "venue_sport",
+                    "has_glass_walls",
+                    "padel_surfaces",
                     "indoor_surfaces",
                     "outdoor_surfaces",
                     "courts_count",

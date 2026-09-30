@@ -10,6 +10,7 @@ from typing import cast
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.sports import Sport
 from apps.users.models import Notification, Player
 
 from .models import (
@@ -51,6 +52,10 @@ def _update_season_points(
         logger.debug("Skipping season points for sparring match %s", match.pk)
         return
 
+    if match is not None and match.sport == Sport.PADEL:
+        _update_padel_season_points(player, points)
+        return
+
     current_season = get_current_season()
     season_points, created = SeasonPoints.objects.get_or_create(
         player=player,
@@ -85,6 +90,46 @@ def _update_season_points(
         points,
         season_points.current_season_points,
         get_season_display(current_season),
+    )
+
+
+def _update_padel_season_points(player: Player, points: int) -> None:
+    """Начислить сезонные очки падела, не трогая теннисный сезон.
+
+    Args:
+        player: Игрок.
+        points: Сколько очков добавить.
+    """
+    from apps.core.sports import Sport
+
+    from .models import SportSeasonPoints
+    from .season_utils import get_current_season
+
+    current_season = get_current_season()
+    season_points, _created = SportSeasonPoints.objects.get_or_create(
+        player=player,
+        sport=Sport.PADEL,
+        defaults={
+            "current_season_points": 0,
+            "season_name": current_season.name,
+            "season_year": current_season.year,
+        },
+    )
+    if (
+        season_points.season_name != current_season.name
+        or season_points.season_year != current_season.year
+    ):
+        season_points.current_season_points = 0
+        season_points.season_name = current_season.name
+        season_points.season_year = current_season.year
+    season_points.current_season_points += points
+    season_points.save(
+        update_fields=[
+            "current_season_points",
+            "season_name",
+            "season_year",
+            "updated_at",
+        ]
     )
 
 
@@ -334,12 +379,34 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
             .select_related("player1__user", "player2__user")
             .order_by("-player1__total_points")
         )
+        if tournament.sport == Sport.PADEL:
+            from apps.users.sport_rating import rating_points
+
+            entities.sort(
+                key=lambda team: -(
+                    rating_points(team.player1, Sport.PADEL)
+                    + (
+                        rating_points(team.player2, Sport.PADEL)
+                        if team.player2_id
+                        else 0
+                    )
+                )
+            )
         max_n = tournament.max_teams
         entity_name = "команд"
     else:
         entities = list(
             tournament.participants.exclude(is_bye=True).order_by("-total_points")
         )
+        if tournament.sport == Sport.PADEL:
+            from apps.users.sport_rating import order_by_sport_rating
+
+            entities = list(
+                order_by_sport_rating(
+                    tournament.participants.exclude(is_bye=True),
+                    Sport.PADEL,
+                )
+            )
         max_n = tournament.max_participants
         entity_name = "участников"
 
@@ -775,8 +842,12 @@ def _overdue_winner(match: Match) -> Player | None:
         return cast(Player | None, b)
     if getattr(b, "is_bye", False):
         return cast(Player | None, a)
-    if a.total_points != b.total_points:
-        return cast(Player | None, a if a.total_points > b.total_points else b)
+    from apps.users.sport_rating import rating_points
+
+    points_a = rating_points(a, match.sport)
+    points_b = rating_points(b, match.sport)
+    if points_a != points_b:
+        return cast(Player | None, a if points_a > points_b else b)
     return cast(Player | None, a if a.pk < b.pk else b)
 
 

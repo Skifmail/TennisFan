@@ -464,7 +464,9 @@
 <section class="section">
     <div class="container">
         <div class="section-header">
-            <h2 class="section-title">Топ рейтинга</h2>
+            <h2 class="section-title">Топ рейтинга{% if home_sport == 'padel' %} — падел{% endif %}</h2>
+            <a href="?sport=tennis" class="btn btn-outline">Теннис</a>
+            <a href="?sport=padel" class="btn btn-outline">Падел</a>
             <a href="{% url 'rating' %}" class="btn btn-outline">Полный рейтинг</a>
         </div>
 

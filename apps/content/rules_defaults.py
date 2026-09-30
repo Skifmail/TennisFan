@@ -14,6 +14,7 @@ from django.conf import settings
 # slug раздела → относительный путь к HTML-шаблону с дефолтным текстом
 RULES_SECTION_TEMPLATES: dict[str, str] = {
     "tennis_rules": "core/rules_tennis_editable.html",
+    "padel_rules": "core/rules_padel_editable.html",
     "rules_fan": "core/rules_fan.html",
     "rules_round_robin": "core/rules_round_robin.html",
     "rules_olympic": "core/rules_olympic.html",
@@ -28,6 +29,7 @@ RULES_SECTION_TEMPLATES: dict[str, str] = {
 # Заголовки для разделов, которые могут отсутствовать в БД
 RULES_SECTION_TITLES: dict[str, str] = {
     "tennis_rules": "Правила тенниса",
+    "padel_rules": "Правила падела",
     "rules_fan": "Одноэтапная сетка",
     "rules_round_robin": "Круговой турнир",
     "rules_olympic": "Олимпийская система (утешительная сетка)",

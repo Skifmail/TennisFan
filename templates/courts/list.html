@@ -9,7 +9,7 @@
         <div class="container">
             <div class="courts-masthead__inner">
                 <div class="courts-masthead__copy">
-                    <h1 class="courts-masthead__title">Теннисные корты</h1>
+                    <h1 class="courts-masthead__title">{{ catalog_title|default:"Теннисные корты" }}</h1>
                     <p class="courts-masthead__lede">Площадки для игры по всей России</p>
                 </div>
                 <div class="courts-masthead__aside">
@@ -23,6 +23,15 @@
     <div class="container">
         <form method="get" class="filter-bar courts-filters">
             <div class="courts-filters__row courts-filters__row--search">
+            <div class="courts-filters__field{% if current_sport %} is-active{% endif %}">
+                <label class="courts-filters__label" for="court-filter-sport">Вид спорта</label>
+                <select id="court-filter-sport" name="sport" class="form-control" onchange="this.form.submit()">
+                    {% for value, label in sport_choices %}
+                    <option value="{{ value }}" {% if current_sport == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                    <option value="all" {% if current_sport == 'all' %}selected{% endif %}>Все</option>
+                </select>
+            </div>
             <div class="courts-filters__field{% if current_query %} is-active{% endif %}">
                 <label class="courts-filters__label" for="court-filter-q">Название</label>
                 <input

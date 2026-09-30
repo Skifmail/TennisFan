@@ -14,6 +14,7 @@ from apps.core.contact_utils import (
     build_whatsapp_url,
     get_max_display_contact,
 )
+from apps.core.sports import Sport
 from apps.users.models import SkillLevel
 from apps.users.skill_levels import SKILL_LEVEL_NTRP
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
@@ -247,6 +248,13 @@ class Training(CompressImageFieldsMixin, models.Model):
 
     title = models.CharField("Название", max_length=200)
     slug = models.SlugField("URL", unique=True)
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=Sport.choices,
+        default=Sport.TENNIS,
+        db_index=True,
+    )
     description = models.TextField("Описание")
     short_description = models.CharField("Краткое описание", max_length=300, blank=True)
 

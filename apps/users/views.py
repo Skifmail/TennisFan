@@ -25,11 +25,13 @@ from apps.core.consent_utils import record_platform_consent
 from apps.core.decorators import login_required_with_message
 from apps.core.models import LegalAcceptanceLog, UserConsent, UserTelegramLink
 from apps.core.redirects import append_next, get_safe_next_url
+from apps.core.sports import Sport
 from apps.legal.utils import get_legal_document_version
 
 from .context_processors import invalidate_unread_notifications_cache
 from .forms import EmailAuthenticationForm, PlayerProfileForm, UserRegistrationForm
 from .models import EmailVerificationToken, Notification, NtrpTestResult, Player
+from .sport_rating import get_sport_profile, set_padel_strength
 from .verification import try_auto_verify
 
 logger = logging.getLogger(__name__)
@@ -1056,6 +1058,40 @@ def ntrp_test(request):
     can_save = False
     logger.info("ntrp_test: page request, can_save=%s", can_save)
     return render(request, "users/ntrp_test.html", {"can_save": can_save})
+
+
+@login_required
+def padel_strength(request):
+    """Задать силу игрока в паделе отдельно от теннисного рейтинга."""
+    player = getattr(request.user, "player", None)
+    if player is None:
+        messages.error(request, "Сначала заполните профиль игрока.")
+        return redirect("profile_edit")
+    profile = get_sport_profile(player, Sport.PADEL)
+    level = profile.ntrp_level if profile is not None else Decimal("1.5")
+    points = int(profile.total_points) if profile is not None else 0
+    saved = False
+    if request.method == "POST":
+        raw = (request.POST.get("level") or "").replace(",", ".")
+        try:
+            submitted = Decimal(raw)
+        except InvalidOperation:
+            messages.error(request, "Укажите уровень числом от 1.5 до 7.0.")
+        else:
+            try:
+                profile = set_padel_strength(player, submitted)
+            except ValueError:
+                messages.error(request, "Уровень должен быть от 1.5 до 7.0.")
+            else:
+                level = profile.ntrp_level
+                points = int(profile.total_points)
+                saved = True
+                messages.success(request, "Уровень силы в паделе сохранён.")
+    return render(
+        request,
+        "users/padel_strength.html",
+        {"level": level, "points": points, "saved": saved},
+    )
 
 
 @login_required

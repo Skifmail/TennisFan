@@ -17,6 +17,9 @@
                 <button class="rules-tabs__btn rules-tabs__btn--active" data-tab="tennis-rules" role="tab" aria-selected="true">
                     Правила тенниса
                 </button>
+                <button class="rules-tabs__btn" data-tab="padel-rules" role="tab" aria-selected="false">
+                    Правила падела
+                </button>
                 {% if user.is_authenticated %}
                 <button class="rules-tabs__btn" data-tab="tournament-rules" role="tab" aria-selected="false">
                     Правила турниров
@@ -52,6 +55,19 @@
                             {{ rules_content.tennis_rules|safe }}
                         {% else %}
                             {% include 'core/rules_tennis_editable.html' %}
+                        {% endif %}
+                    </div>
+                </article>
+            </div>
+
+            <div class="rules-tabs__content" id="padel-rules" role="tabpanel" style="display: none;">
+                <article class="rules-article">
+                    <h2 class="rules-article__title">Правила падела</h2>
+                    <div class="rules-article__content">
+                        {% if rules_content.padel_rules %}
+                            {{ rules_content.padel_rules|safe }}
+                        {% else %}
+                            {% include 'core/rules_padel_editable.html' %}
                         {% endif %}
                     </div>
                 </article>

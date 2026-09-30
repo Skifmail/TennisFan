@@ -187,6 +187,7 @@ def create_match_from_response(sparring_response) -> Match:
         status=Match.MatchStatus.SCHEDULED,
         deadline=timezone.now() + timedelta(days=7),
         rating_status=rating_status,
+        sport=request.sport,
     )
 
     logger.info(

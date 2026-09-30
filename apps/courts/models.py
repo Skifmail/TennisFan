@@ -10,10 +10,16 @@ from django.db import models
 from django.utils.text import slugify
 
 from apps.core.geo import GeoRegion
+from apps.core.sports import VenueSport
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
 from .surfaces import CourtSurface as CourtSurface
-from .surfaces import compose_surface_display, normalize_surface_codes
+from .surfaces import (
+    compose_surface_display,
+    compose_venue_surface_display,
+    normalize_padel_surface_codes,
+    normalize_surface_codes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +28,26 @@ class Court(CompressImageFieldsMixin, models.Model):
     """Tennis court / club model."""
 
     name = models.CharField("Название", max_length=200)
+    venue_sport = models.CharField(
+        "Вид спорта площадки",
+        max_length=20,
+        choices=VenueSport.choices,
+        default=VenueSport.TENNIS,
+        blank=True,
+        db_index=True,
+        help_text="Теннис, падел или оба. Падел-корт не смешивается с хардом и грунтом.",
+    )
+    has_glass_walls = models.BooleanField(
+        "Стеклянные стены",
+        default=False,
+        help_text="Типично для падел-корта.",
+    )
+    padel_surfaces = models.JSONField(
+        "Покрытие падел-корта",
+        default=list,
+        blank=True,
+        help_text="Искусственная трава, Mondo или другое.",
+    )
     slug = models.SlugField(
         "URL",
         unique=True,
@@ -153,7 +179,8 @@ class Court(CompressImageFieldsMixin, models.Model):
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:
             kwargs["update_fields"] = list(
-                set(update_fields) | {"indoor_surfaces", "outdoor_surfaces", "surface"}
+                set(update_fields)
+                | {"indoor_surfaces", "outdoor_surfaces", "padel_surfaces", "surface"}
             )
         super().save(*args, **kwargs)
 
@@ -161,11 +188,19 @@ class Court(CompressImageFieldsMixin, models.Model):
         """Записать канонические коды и человекочитаемую строку покрытия."""
         self.indoor_surfaces = normalize_surface_codes(self.indoor_surfaces)
         self.outdoor_surfaces = normalize_surface_codes(self.outdoor_surfaces)
-        self.surface = compose_surface_display(
+        self.padel_surfaces = normalize_padel_surface_codes(self.padel_surfaces)
+        if not self.venue_sport:
+            self.venue_sport = VenueSport.TENNIS
+        tennis_label = compose_surface_display(
             is_indoor=self.is_indoor,
             indoor_surfaces=self.indoor_surfaces,
             is_outdoor=self.is_outdoor,
             outdoor_surfaces=self.outdoor_surfaces,
+        )
+        self.surface = compose_venue_surface_display(
+            tennis_label=tennis_label,
+            venue_sport=self.venue_sport,
+            padel_surfaces=self.padel_surfaces,
         )
 
     @property
@@ -250,6 +285,19 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
     applicant_phone = models.CharField("Телефон заявителя", max_length=20, blank=True)
 
     name = models.CharField("Название", max_length=200)
+    venue_sport = models.CharField(
+        "Вид спорта площадки",
+        max_length=20,
+        choices=VenueSport.choices,
+        default=VenueSport.TENNIS,
+        blank=True,
+    )
+    has_glass_walls = models.BooleanField("Стеклянные стены", default=False)
+    padel_surfaces = models.JSONField(
+        "Покрытие падел-корта",
+        default=list,
+        blank=True,
+    )
     city = models.CharField("Населённый пункт", max_length=100)
     address = models.CharField("Адрес", max_length=255)
     description = models.TextField("Описание", blank=True)
@@ -314,7 +362,8 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:
             kwargs["update_fields"] = list(
-                set(update_fields) | {"indoor_surfaces", "outdoor_surfaces", "surface"}
+                set(update_fields)
+                | {"indoor_surfaces", "outdoor_surfaces", "padel_surfaces", "surface"}
             )
         super().save(*args, **kwargs)
 
@@ -322,11 +371,19 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
         """Записать канонические коды и человекочитаемую строку покрытия."""
         self.indoor_surfaces = normalize_surface_codes(self.indoor_surfaces)
         self.outdoor_surfaces = normalize_surface_codes(self.outdoor_surfaces)
-        self.surface = compose_surface_display(
+        self.padel_surfaces = normalize_padel_surface_codes(self.padel_surfaces)
+        if not self.venue_sport:
+            self.venue_sport = VenueSport.TENNIS
+        tennis_label = compose_surface_display(
             is_indoor=self.is_indoor,
             indoor_surfaces=self.indoor_surfaces,
             is_outdoor=self.is_outdoor,
             outdoor_surfaces=self.outdoor_surfaces,
+        )
+        self.surface = compose_venue_surface_display(
+            tennis_label=tennis_label,
+            venue_sport=self.venue_sport,
+            padel_surfaces=self.padel_surfaces,
         )
 
     def approve_and_create_court(self) -> Court:
@@ -347,6 +404,9 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
             city=self.city,
             address=self.address,
             description=self.description,
+            venue_sport=self.venue_sport or VenueSport.TENNIS,
+            has_glass_walls=self.has_glass_walls,
+            padel_surfaces=self.padel_surfaces,
             indoor_surfaces=self.indoor_surfaces,
             outdoor_surfaces=self.outdoor_surfaces,
             courts_count=self.courts_count,

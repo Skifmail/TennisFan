@@ -43,7 +43,16 @@ def format_courts_count(count: int) -> str:
 
 def court_list(request):
     """List of courts with average rating."""
+    from apps.core.sports import Sport, parse_sport_filter
+    from apps.courts.surfaces import (
+        PadelSurface,
+        filter_courts_by_padel_surfaces,
+        filter_courts_by_venue,
+        format_padel_surface_labels,
+    )
+
     city = (request.GET.get("city") or "").strip()
+    sport_filter = parse_sport_filter(request.GET.get("sport"))
     query = (request.GET.get("q") or "").strip()
     selected_surfaces = request.GET.getlist("surface")
 
@@ -60,7 +69,11 @@ def court_list(request):
         courts = filter_field_contains_ci(
             courts, "city", city, annotation="_court_list_city_l"
         )
-    courts = filter_courts_by_surfaces(courts, selected_surfaces)
+    courts = filter_courts_by_venue(courts, sport_filter)
+    if sport_filter == Sport.PADEL:
+        courts = filter_courts_by_padel_surfaces(courts, selected_surfaces)
+    else:
+        courts = filter_courts_by_surfaces(courts, selected_surfaces)
 
     courts = list(courts)
     for c in courts:
@@ -78,8 +91,21 @@ def court_list(request):
         "current_city": city,
         "current_query": query,
         "current_surfaces": selected_surfaces,
-        "surface_choices": CourtSurface.choices,
-        "current_surfaces_label": format_surface_labels(selected_surfaces)
+        "current_sport": sport_filter,
+        "sport_choices": Sport.choices,
+        "surface_choices": (
+            PadelSurface.choices
+            if sport_filter == Sport.PADEL
+            else CourtSurface.choices
+        ),
+        "catalog_title": (
+            "Корты для падела" if sport_filter == Sport.PADEL else "Теннисные корты"
+        ),
+        "current_surfaces_label": (
+            format_padel_surface_labels(selected_surfaces)
+            if sport_filter == Sport.PADEL
+            else format_surface_labels(selected_surfaces)
+        )
         or "Все покрытия",
     }
     return render(request, "courts/list.html", context)

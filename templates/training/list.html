@@ -17,6 +17,15 @@
         <form method="get" class="training-browse__filters">
             <input type="hidden" name="area" value="{{ current_area }}">
             <label class="training-browse__field">
+                <span class="training-browse__label">Вид спорта</span>
+                <select name="sport" class="form-control" onchange="this.form.submit()">
+                    {% for value, label in sport_choices %}
+                    <option value="{{ value }}" {% if current_sport == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                    <option value="all" {% if current_sport == 'all' %}selected{% endif %}>Все</option>
+                </select>
+            </label>
+            <label class="training-browse__field">
                 <span class="training-browse__label">Тип</span>
                 <select name="type" class="form-control" onchange="this.form.submit()">
                     <option value="">Все типы</option>

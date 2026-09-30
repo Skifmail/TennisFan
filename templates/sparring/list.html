@@ -23,6 +23,11 @@
         Командный спарринг: формируются две команды по 2 человека. После того как автор одобрит отклики и наберётся 4 участника, бот и ЛК предложат сформировать серию матчей — каждый играет с каждым из противоположной команды 1×1, а затем создаётся один парный матч между командами.
     </p>
     {% endif %}
+    <div class="sparring-tabs mb-3">
+        {% for value, label in sport_choices %}
+        <a href="?sport={{ value }}&type={% if value == 'padel' %}doubles{% else %}{{ sparring_type }}{% endif %}" class="sparring-tab {% if current_sport == value %}sparring-tab--active{% endif %}">{{ label }}</a>
+        {% endfor %}
+    </div>
     <div class="sparring-tabs mb-4">
         <a href="?type=singles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}" 
            class="sparring-tab {% if sparring_type == 'singles' %}sparring-tab--active{% endif %}">

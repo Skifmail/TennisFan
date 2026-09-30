@@ -108,9 +108,13 @@ def sparring_list(request):
 
     Доступен всем пользователям. Неавторизованные могут только просматривать информацию.
     """
-    sparring_type = request.GET.get("type", "singles")
+    from apps.core.sports import Sport, parse_sport_filter
+
+    sport_filter = parse_sport_filter(request.GET.get("sport"))
+    default_type = "doubles" if sport_filter == Sport.PADEL else "singles"
+    sparring_type = request.GET.get("type", default_type)
     if sparring_type not in ("singles", "doubles", "team"):
-        sparring_type = "singles"
+        sparring_type = default_type
 
     city = request.GET.get("city", "")
     category = request.GET.get("category", "")
@@ -125,6 +129,8 @@ def sparring_list(request):
         "current_level": level,
         "current_preferred_gender": preferred_gender,
         "has_sparring_access": has_access,
+        "current_sport": sport_filter,
+        "sport_choices": Sport.choices,
     }
 
     if sparring_type == "singles":
@@ -148,6 +154,8 @@ def sparring_list(request):
             requests_qs = requests_qs.filter(desired_category=category)
         if preferred_gender:
             requests_qs = requests_qs.filter(preferred_gender=preferred_gender)
+        if sport_filter != "all":
+            requests_qs = requests_qs.filter(sport=sport_filter)
         context["sparring_requests"] = Paginator(
             requests_qs.order_by("-created_at"),
             20,
@@ -181,6 +189,8 @@ def sparring_list(request):
             doubles_qs = doubles_qs.filter(desired_level=level)
         if preferred_gender:
             doubles_qs = doubles_qs.filter(preferred_gender=preferred_gender)
+        if sport_filter != "all":
+            doubles_qs = doubles_qs.filter(sport=sport_filter)
         context["doubles_requests"] = Paginator(doubles_qs, 20).get_page(
             request.GET.get("page")
         )
@@ -238,6 +248,7 @@ def sparring_create(request):
                             "preferred_location", ""
                         ),
                         kind=kind,
+                        sport=form.cleaned_data.get("sport") or "tennis",
                     )
                     messages.success(
                         request,

@@ -17,7 +17,8 @@ import logging
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from apps.tournaments.models import SeasonArchive, SeasonPoints
+from apps.core.sports import Sport
+from apps.tournaments.models import SeasonArchive, SeasonPoints, SportSeasonPoints
 from apps.tournaments.season_utils import get_current_season
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,10 @@ class Command(BaseCommand):
         )
 
         if not ended_season_points.exists():
-            self.stdout.write(self.style.WARNING("Нет данных для архивации"))
+            self.stdout.write(self.style.WARNING("Нет теннисных данных для архивации"))
+            self._archive_padel(
+                ended_season_name, ended_season_year, current_season, dry_run
+            )
             return
 
         # Подсчитываем ранги
@@ -142,6 +146,7 @@ class Command(BaseCommand):
                         player=data["player"],
                         season_name=ended_season_name,
                         season_year=ended_season_year,
+                        sport=Sport.TENNIS,
                         defaults={
                             "final_points": data["points"],
                             "final_rank": data["rank"],
@@ -204,4 +209,47 @@ class Command(BaseCommand):
             if len(players_to_archive) > 10:
                 self.stdout.write(f"  ... и ещё {len(players_to_archive) - 10} игроков")
 
+        self._archive_padel(
+            ended_season_name, ended_season_year, current_season, dry_run
+        )
         self.stdout.write(self.style.SUCCESS("Сброс сезонных очков завершён"))
+
+    def _archive_padel(self, ended_name, ended_year, current_season, dry_run):
+        """Архивировать и обнулить сезонные очки падела."""
+        rows = (
+            SportSeasonPoints.objects.filter(
+                sport=Sport.PADEL,
+                season_name=ended_name,
+                season_year=ended_year,
+            )
+            .select_related("player")
+            .order_by("-current_season_points")
+        )
+        if not rows.exists():
+            return
+        rank = 1
+        prev_points = None
+        packed = []
+        for row in rows:
+            if prev_points is not None and row.current_season_points < prev_points:
+                rank = len(packed) + 1
+            prev_points = row.current_season_points
+            packed.append((row.player, row.current_season_points, rank))
+        if dry_run:
+            self.stdout.write(f"Падел: к архивации {len(packed)} игроков")
+            return
+        with transaction.atomic():
+            for player, points, place in packed:
+                SeasonArchive.objects.update_or_create(
+                    player=player,
+                    season_name=ended_name,
+                    season_year=ended_year,
+                    sport=Sport.PADEL,
+                    defaults={"final_points": points, "final_rank": place},
+                )
+            rows.update(
+                current_season_points=0,
+                season_name=current_season.name,
+                season_year=current_season.year,
+            )
+        self.stdout.write(self.style.SUCCESS(f"Падел: заархивировано {len(packed)}"))

@@ -7,9 +7,17 @@
     {% if next_page %}
     <input type="hidden" name="next" value="{{ next_page }}">
     {% endif %}
-    <label class="club-dashboard-announce__field">
-        <span class="club-dashboard-announce__label">Сообщение в ленту событий</span>
-        <textarea name="message" class="form-control" rows="3" maxlength="500" required placeholder="Текст, который увидят все посетители главной"></textarea>
-    </label>
-    <button type="submit" class="btn btn-primary club-dashboard-announce__submit">Отправить в ленту</button>
+    <label class="club-dashboard-announce__label" for="activity-announce-{{ next_page|default:'dashboard' }}">Сообщение в ленту событий</label>
+    <div class="club-dashboard-announce__controls">
+        <textarea
+            id="activity-announce-{{ next_page|default:'dashboard' }}"
+            name="message"
+            class="form-control"
+            rows="3"
+            maxlength="500"
+            required
+            placeholder="Текст, который увидят все посетители главной"
+        ></textarea>
+        <button type="submit" class="btn btn-primary club-dashboard-announce__submit">Отправить в ленту</button>
+    </div>
 </form>

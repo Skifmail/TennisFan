@@ -270,14 +270,66 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (willOpen) {
                     setFooterSectionState(section, true);
                 }
+                syncFooterAnim();
                 return;
             }
             var isOpen = section.classList.toggle('is-open');
             btn.setAttribute('aria-expanded', isOpen === true ? 'true' : 'false');
+            syncFooterAnim();
         });
     });
     initDesktopFooterState();
     window.addEventListener('resize', initDesktopFooterState);
+
+    var footerAnim = document.querySelector('.footer-anim');
+    var footerAnimVideo = footerAnim ? footerAnim.querySelector('video') : null;
+    var footerAnimWide = window.matchMedia('(min-width: 1201px)');
+    var footerAnimReduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    function footerAnimShouldPlay() {
+        if (!footerAnim || !footerAnimVideo) return false;
+        if (!footerAnimWide.matches || footerAnimReduced.matches) return false;
+        return !footerSections.some(function(section) {
+            return section.classList.contains('is-open');
+        });
+    }
+
+    function syncFooterAnim() {
+        if (!footerAnim || !footerAnimVideo) return;
+        var play = footerAnimShouldPlay();
+        footerAnim.classList.toggle('is-hidden', !play);
+        if (!play) {
+            footerAnimVideo.pause();
+            return;
+        }
+        if (!footerAnimVideo.getAttribute('data-footer-loaded')) {
+            var src = footerAnimVideo.getAttribute('data-footer-src');
+            if (!src) return;
+            var source = document.createElement('source');
+            source.src = src;
+            source.type = footerAnimVideo.getAttribute('data-footer-type') || 'video/mp4';
+            footerAnimVideo.appendChild(source);
+            footerAnimVideo.setAttribute('data-footer-loaded', '1');
+            footerAnimVideo.load();
+        }
+        var playPromise = footerAnimVideo.play();
+        if (playPromise && playPromise.catch) {
+            playPromise.catch(function() {});
+        }
+    }
+
+    if (footerAnim && window.IntersectionObserver) {
+        var footerAnimObserver = new IntersectionObserver(function(entries) {
+            if (!entries.some(function(entry) { return entry.isIntersecting; })) return;
+            syncFooterAnim();
+            footerAnimObserver.disconnect();
+        }, { rootMargin: '160px' });
+        footerAnimObserver.observe(footerAnim);
+    } else {
+        syncFooterAnim();
+    }
+    footerAnimWide.addEventListener('change', syncFooterAnim);
+    window.addEventListener('resize', syncFooterAnim);
 
     // Кастомный file picker: русские подписи + имя выбранного файла
     document.querySelectorAll('[data-file-picker], .club-invites-file-picker').forEach(function(picker) {

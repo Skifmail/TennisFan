@@ -56,6 +56,10 @@ class RulesDefaultsTests(TestCase):
         self.assertIn("TennisFan", body)
         self.assertIn("FAN", body)
         self.assertIn("преимущество", body.lower())
+        self.assertIn("Walkover", body)
+        self.assertIn("−40", body)
+        self.assertIn("дедлайн", body.lower())
+        self.assertNotIn("те же, что", body)
         self.assertNotIn("Падел.ру", body)
 
 

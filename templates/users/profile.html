@@ -54,8 +54,12 @@
                             </span>
                             {% endif %}
                             <div style="display: flex; align-items: center; gap: var(--spacing-xs); flex-wrap: wrap;">
+                                {% if current_sport == 'padel' and not has_padel_profile %}
+                                <span class="player-category">Уровень не задан</span>
+                                {% else %}
                                 <span class="player-category">{{ player.get_skill_level_display }}</span>
                                 {% include 'includes/rating_badge.html' with player=player %}
+                                {% endif %}
                             </div>
                         </div>
                         {% if not is_club_profile %}
@@ -98,12 +102,27 @@
                 {% endif %}
 
                 <!-- Статистика в виде таблицы (две строки: уровень/сила/FAN и очки сезона/матчей/побед) -->
-                {% if not is_club_profile and current_sport == 'padel' and is_profile_owner and not has_padel_profile %}
-                <div class="alert alert-warning" style="margin-bottom: var(--spacing-lg);">
-                    Укажите уровень силы в паделе — он не меняет теннисный рейтинг.
-                    <a href="{% url 'padel_strength' %}">Задать уровень</a>
+                {% if not is_club_profile and current_sport == 'padel' and not has_padel_profile %}
+                <div class="profile-padel-entry">
+                    {% if is_profile_owner %}
+                    <p class="profile-padel-entry__text">Пожалуйста, укажите уровень игры в паделе максимально объективно — по своим ощущениям. Это отдельная шкала, теннисный рейтинг не изменится. После сохранения изменить уровень самостоятельно будет нельзя: дальше сила будет корректироваться по результатам матчей или по запросу администратору платформы TennisFan.</p>
+                    <form method="post" action="{% url 'padel_strength' %}" class="profile-padel-entry__form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <label class="form-label" for="id_profile_padel_level">Ваш уровень в паделе</label>
+                        <select id="id_profile_padel_level" name="level" class="form-control" required>
+                            <option value="" selected disabled>Выберите уровень</option>
+                            {% for choice in padel_level_choices %}
+                            <option value="{{ choice }}">{{ choice }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary profile-padel-entry__submit">Задать уровень</button>
+                    </form>
+                    {% else %}
+                    <p class="profile-padel-entry__text">Игрок ещё не указал уровень игры в паделе.</p>
+                    {% endif %}
                 </div>
-                {% endif %}
+                {% else %}
                 <div class="profile-stats-table">
                     <table class="stats-table stats-table--two-rows">
                         <tr class="stats-table__header-row">
@@ -153,6 +172,7 @@
                         </tr>
                     </table>
                 </div>
+                {% endif %}
 
                 <!-- Бейджи чемпионов -->
                 {% if season_championships and not is_club_profile %}
@@ -532,7 +552,7 @@
                 {% endif %}
 
                 {% if can_view_profile_stats %}
-                {% include 'includes/player_skills_block.html' with player_skills_data=player_skills_data is_owner=is_profile_owner only %}
+                {% include 'includes/player_skills_block.html' with player_skills_data=player_skills_data is_owner=is_profile_owner current_sport=current_sport only %}
                 {% elif is_profile_owner %}
                 <div class="profile-stats-placeholder profile-stats-placeholder--inline">
                     <h3 class="profile-stats-placeholder__title">Статистика скрыта</h3>
@@ -561,9 +581,7 @@
 
                 {% if request.user == player.user %}
                 <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3 profile-info__btn-edit profile-info__btn-fullwidth">Редактировать</a>
-                {% if current_sport == 'padel' %}
-                <a href="{% url 'padel_strength' %}" class="btn btn-outline mt-2 profile-info__btn-fullwidth">Уровень силы в паделе</a>
-                {% else %}
+                {% if current_sport != 'padel' %}
                 <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2 profile-info__btn-ntrp profile-info__btn-fullwidth" title="Тест носит информационный характер и не влияет на ваш рейтинг">Проверить уровень силы (информационно)</a>
                 {% endif %}
                 {% endif %}

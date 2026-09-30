@@ -166,3 +166,17 @@ class GetPlayerSkillsTestCase(TestCase):
         )
 
         self.assertEqual(data["recommend_to_improve"], [])
+
+    def test_padel_skills_ignore_tennis_match_ratings(self) -> None:
+        from apps.core.sports import Sport
+
+        padel_data = get_player_skills(self.player, AnonymousUser(), sport=Sport.PADEL)
+        padel_serve = next(m for m in padel_data["metrics"] if m["name"] == "serve")
+        self.assertEqual(padel_serve["votes_count"], 0)
+        self.assertTrue(padel_serve["insufficient_data"])
+
+        tennis_data = get_player_skills(
+            self.player, AnonymousUser(), sport=Sport.TENNIS
+        )
+        tennis_serve = next(m for m in tennis_data["metrics"] if m["name"] == "serve")
+        self.assertGreaterEqual(tennis_serve["votes_count"], 1)

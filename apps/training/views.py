@@ -169,6 +169,18 @@ def training_enroll(request, slug):
         except AttributeError:
             player = None
 
+    if player is not None:
+        from apps.core.sports import Sport, sport_code
+        from apps.users.sport_rating import (
+            padel_entry_complete,
+            redirect_to_padel_strength,
+        )
+
+        if sport_code(training.sport) == Sport.PADEL and not padel_entry_complete(
+            player
+        ):
+            return redirect_to_padel_strength(request)
+
     if request.method == "POST":
         form = TrainingEnrollmentForm(request.POST)
         if form.is_valid():

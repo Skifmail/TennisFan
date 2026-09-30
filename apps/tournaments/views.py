@@ -618,6 +618,18 @@ def tournament_list(
             club_plan_error = error_message or ""
 
         if not can_register:
+            from apps.core.redirects import append_next
+            from apps.users.sport_rating import PADEL_ENTRY_REQUIRED_MSG
+
+            if club_plan_error == PADEL_ENTRY_REQUIRED_MSG:
+                tournament.card_action_label = "Указать уровень"
+                tournament.card_action_url = append_next(
+                    reverse("padel_strength"),
+                    register_url,
+                )
+                tournament.card_action_is_primary = True
+                tournament.card_action_disabled = False
+                continue
             tournament.card_action_label = "Недоступно"
             tournament.card_action_reason = club_plan_error
             continue
@@ -4112,6 +4124,26 @@ def _check_club_fee_access(user, tournament):
     )
 
 
+def _redirect_if_padel_entry_missing(request, err):
+    """Если отказ из-за незаданного падела — отправить на страницу уровня.
+
+    Args:
+        request: Текущий HTTP-запрос.
+        err: Текст ошибки допуска.
+
+    Returns:
+        HttpResponseRedirect | None: Редирект на ``padel_strength`` или None.
+    """
+    from apps.users.sport_rating import (
+        PADEL_ENTRY_REQUIRED_MSG,
+        redirect_to_padel_strength,
+    )
+
+    if err == PADEL_ENTRY_REQUIRED_MSG:
+        return redirect_to_padel_strength(request)
+    return None
+
+
 def _check_tournament_registration_eligibility(request, tournament, player):
     """Проверка подписки, категории и лимитов для регистрации. Возвращает (ok, error_message)."""
     user = getattr(request, "user", None)
@@ -4134,14 +4166,11 @@ def _check_tournament_registration_eligibility(request, tournament, player):
             False,
             "В турнире не указаны допустимые категории участников. Обратитесь к организатору.",
         )
-    from apps.users.sport_rating import skill_level_for
+    from apps.users.sport_rating import PADEL_ENTRY_REQUIRED_MSG, skill_level_for
 
     player_skill = skill_level_for(player, tournament.sport)
     if player_skill is None:
-        return (
-            False,
-            "Сначала укажите уровень силы в паделе в профиле.",
-        )
+        return False, PADEL_ENTRY_REQUIRED_MSG
     if player_skill not in allowed_categories:
         from apps.users.models import SkillLevel
 
@@ -4371,6 +4400,9 @@ def tournament_register(request, slug):
     # Проверка всех условий регистрации (включая категории)
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
+        padel_redirect = _redirect_if_padel_entry_missing(request, err)
+        if padel_redirect is not None:
+            return padel_redirect
         messages.error(request, err)
         if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
             return _build_tournament_payment_redirect(tournament, request=request)
@@ -4530,6 +4562,9 @@ def tournament_register_doubles(request, slug):
 
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
+        padel_redirect = _redirect_if_padel_entry_missing(request, err)
+        if padel_redirect is not None:
+            return padel_redirect
         messages.error(request, err)
         if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
             return _build_tournament_payment_redirect(
@@ -4733,6 +4768,9 @@ def _do_join_team(request, tournament, player, team):
     # Проверка всех условий регистрации (включая категории)
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
+        padel_redirect = _redirect_if_padel_entry_missing(request, err)
+        if padel_redirect is not None:
+            return padel_redirect
         messages.error(request, err)
         if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
             return _build_tournament_payment_redirect(
@@ -4872,6 +4910,9 @@ def _do_add_partner(request, tournament, player, partner_id):
     # Проверка всех условий регистрации для текущего игрока (включая категории)
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
+        padel_redirect = _redirect_if_padel_entry_missing(request, err)
+        if padel_redirect is not None:
+            return padel_redirect
         messages.error(request, err)
         if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
             return _build_tournament_payment_redirect(

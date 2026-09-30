@@ -3,16 +3,22 @@
   is_owner: для блока "Рекомендовано улучшить"
 {% endcomment %}
 {% if player_skills_data %}
-<div class="player-skills-block profile-info__section">
+<div class="player-skills-block profile-info__section{% if not player_skills_data.has_displayable_metrics %} player-skills-block--empty{% endif %}">
     <div class="player-skills-block__head">
         <div>
             <span class="player-skills-block__eyebrow">Игровой профиль</span>
             <h3 class="player-skills-block__title">Сильные стороны</h3>
+            {% if player_skills_data.has_displayable_metrics %}
             <p class="player-skills-block__subtitle">{% if current_sport == 'padel' %}Оценка того, как соперники воспринимают ваши игровые качества в паделе.{% else %}Оценка того, как соперники воспринимают ваши игровые качества на корте.{% endif %}</p>
+            {% else %}
+            <p class="player-skills-block__empty-note">Недостаточно данных для отображения</p>
+            {% endif %}
         </div>
     </div>
+    {% if player_skills_data.has_displayable_metrics %}
     <div class="player-skills-block__grid">
         {% for m in player_skills_data.metrics %}
+        {% if not m.insufficient_data %}
         <div class="player-skills-block__item">
             <div class="player-skills-block__row">
                 <span class="player-skills-block__label">{{ m.label }}</span>
@@ -42,6 +48,7 @@
             </div>
             {% endif %}
         </div>
+        {% endif %}
         {% endfor %}
     </div>
     {% if is_owner and player_skills_data.recommend_to_improve %}
@@ -60,6 +67,7 @@
             {% endfor %}
         </ul>
     </div>
+    {% endif %}
     {% endif %}
 </div>
 {% endif %}

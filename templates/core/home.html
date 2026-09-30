@@ -212,21 +212,21 @@
             {% load skill_tags %}
             <div class="hero-metrics hero-metrics--premium">
                 <a href="{% url 'rating' %}" class="hero-metric hero-metric--link">
-                    <span class="hero-metric__value">{{ hero_stats.players_count|default:"0" }}</span>
+                    <span class="hero-metric__value" data-count-to="{{ hero_stats.players_count|default:'0' }}" aria-label="{{ hero_stats.players_count|default:'0' }}">0</span>
                     <span class="hero-metric__label">
                         {{ hero_stats.players_count|default:"0"|ru_pluralize:"игрок,игрока,игроков" }}
                     </span>
                 </a>
                 <div class="hero-metric-divider"></div>
                 <a href="{% url 'tournament_list' %}" class="hero-metric hero-metric--link">
-                    <span class="hero-metric__value">{{ hero_stats.tournaments_count|default:"0" }}</span>
+                    <span class="hero-metric__value" data-count-to="{{ hero_stats.tournaments_count|default:'0' }}" aria-label="{{ hero_stats.tournaments_count|default:'0' }}">0</span>
                     <span class="hero-metric__label">
                         {{ hero_stats.tournaments_count|default:"0"|ru_pluralize:"активный турнир,активных турнира,активных турниров" }}
                     </span>
                 </a>
                 <div class="hero-metric-divider"></div>
                 <a href="{% url 'results' %}" class="hero-metric hero-metric--link">
-                    <span class="hero-metric__value">{{ hero_stats.matches_count|default:"0" }}</span>
+                    <span class="hero-metric__value" data-count-to="{{ hero_stats.matches_count|default:'0' }}" aria-label="{{ hero_stats.matches_count|default:'0' }}">0</span>
                     <span class="hero-metric__label">
                         {{ hero_stats.matches_count|default:"0"|ru_pluralize:"сыгранный матч,сыгранных матча,сыгранных матчей" }}
                     </span>
@@ -234,21 +234,21 @@
             </div>
             <div class="hero-metrics hero-metrics--premium">
                 <a href="{% url 'court_list' %}" class="hero-metric hero-metric--link">
-                    <span class="hero-metric__value">{{ hero_stats.courts_count|default:"0" }}</span>
+                    <span class="hero-metric__value" data-count-to="{{ hero_stats.courts_count|default:'0' }}" aria-label="{{ hero_stats.courts_count|default:'0' }}">0</span>
                     <span class="hero-metric__label">
                         {{ hero_stats.courts_count|default:"0"|ru_pluralize:"корт,корта,кортов" }}
                     </span>
                 </a>
                 <div class="hero-metric-divider"></div>
                 <a href="{% url 'cities' %}" class="hero-metric hero-metric--link">
-                    <span class="hero-metric__value">{{ hero_stats.cities_count|default:"0" }}</span>
+                    <span class="hero-metric__value" data-count-to="{{ hero_stats.cities_count|default:'0' }}" aria-label="{{ hero_stats.cities_count|default:'0' }}">0</span>
                     <span class="hero-metric__label">
                         {{ hero_stats.cities_count|default:"0"|ru_pluralize:"населённый пункт,населённых пункта,населённых пунктов" }}
                     </span>
                 </a>
                 <div class="hero-metric-divider"></div>
                 <a href="{% url 'coach_list' %}" class="hero-metric hero-metric--link">
-                    <span class="hero-metric__value">{{ hero_stats.coaches_count|default:"0" }}</span>
+                    <span class="hero-metric__value" data-count-to="{{ hero_stats.coaches_count|default:'0' }}" aria-label="{{ hero_stats.coaches_count|default:'0' }}">0</span>
                     <span class="hero-metric__label">
                         {{ hero_stats.coaches_count|default:"0"|ru_pluralize:"тренер,тренера,тренеров" }}
                     </span>

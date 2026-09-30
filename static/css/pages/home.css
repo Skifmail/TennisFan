@@ -677,6 +677,7 @@
     color: #fff;
     line-height: 1;
     font-family: var(--font-heading);
+    font-variant-numeric: tabular-nums;
 }
 
 .hero-metric__label {

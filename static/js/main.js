@@ -2,7 +2,50 @@
  * TennisFan - Main JavaScript
  */
 
+/**
+ * Набирает числа в метриках героя главной от нуля до значения data-count-to.
+ */
+function initHeroMetricCounters() {
+    var nodes = document.querySelectorAll('.hero-metric__value[data-count-to]');
+    if (!nodes.length) {
+        return;
+    }
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var duration = 1400;
+
+    nodes.forEach(function(el) {
+        var target = parseInt(el.getAttribute('data-count-to'), 10);
+        if (!isFinite(target) || target < 0) {
+            return;
+        }
+        if (reduceMotion) {
+            el.textContent = String(target);
+            return;
+        }
+        var start = null;
+        el.textContent = '0';
+
+        function frame(ts) {
+            if (start === null) {
+                start = ts;
+            }
+            var progress = Math.min(1, (ts - start) / duration);
+            var eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = String(Math.round(target * eased));
+            if (progress < 1) {
+                window.requestAnimationFrame(frame);
+            } else {
+                el.textContent = String(target);
+            }
+        }
+
+        window.requestAnimationFrame(frame);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    initHeroMetricCounters();
+
     // Mobile navigation toggle
     const navToggle = document.getElementById('nav-toggle');
     const navMenuMobile = document.getElementById('nav-menu-mobile');

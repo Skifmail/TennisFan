@@ -547,6 +547,7 @@ class PlayerTrophy:
 def get_players_trophies_map(
     player_ids: Iterable[int],
     club: "Club | None" = None,
+    sport: str | None = None,
 ) -> dict[int, list[PlayerTrophy]]:
     """Собирает кубки за призовые места (1–3) для набора игроков одним запросом.
 
@@ -588,6 +589,8 @@ def get_players_trophies_map(
         results = results.filter(tournament__club__isnull=True)
     else:
         results = results.filter(tournament__club=club)
+    if sport:
+        results = results.filter(tournament__sport=sport)
 
     trophies_map: dict[int, list[PlayerTrophy]] = {}
     for result in results:
@@ -616,6 +619,7 @@ def get_players_trophies_map(
 def get_player_trophies(
     player: "Player",
     club: "Club | None" = None,
+    sport: str | None = None,
 ) -> list[PlayerTrophy]:
     """Собирает кубки игрока за призовые места (1–3) в завершённых турнирах.
 
@@ -628,7 +632,9 @@ def get_player_trophies(
         list[PlayerTrophy]: Кубки, отсортированные по месту (1-е выше),
         внутри места — от новых турниров к старым.
     """
-    return get_players_trophies_map([player.pk], club=club).get(player.pk, [])
+    return get_players_trophies_map([player.pk], club=club, sport=sport).get(
+        player.pk, []
+    )
 
 
 def notify_participants_match_deadline_changed(

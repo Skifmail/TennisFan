@@ -128,7 +128,7 @@ def _map_ntrp_to_skill_level(level: Decimal) -> str:
 
 
 def _get_profile_progress_data(
-    player: Player, *, platform_only: bool = False
+    player: Player, *, platform_only: bool = False, sport: str = "tennis"
 ) -> list[dict[str, Any]]:
     """
     Build time series for profile charts: from registration to today,
@@ -137,8 +137,12 @@ def _get_profile_progress_data(
     Each match entry: {"date": "YYYY-MM-DD", "points": int, "matches": int, "win_rate": float,
                        "won": bool, "fan_delta": float, "ntrp_before": float, "ntrp_after": float}.
     """
+    from apps.core.sports import sport_code
     from apps.tournaments.models import Match, TournamentPlayerResult
     from apps.users.rating_utils import rating_to_ntrp_level
+    from apps.users.sport_rating import rating_points
+
+    sport = sport_code(sport)
 
     # Events: (date, rating_after, matches_delta, wins_delta, won, fan_delta, ntrp_before, ntrp_after, match_id, opponent, score, event_dt)
     events: list[tuple[Any, ...]] = []
@@ -168,9 +172,10 @@ def _get_profile_progress_data(
     )
     if platform_only:
         match_qs = match_qs.filter(tournament__club__isnull=True)
+    match_qs = match_qs.filter(sport=sport)
 
     # Текущий рейтинг для расчета изменений
-    current_rating = float(player.total_points)
+    current_rating = float(rating_points(player, sport))
 
     # Проходим матчи в обратном порядке, чтобы вычислить рейтинг до каждого матча
     matches_list = list(match_qs)
@@ -260,6 +265,7 @@ def _get_profile_progress_data(
     )
     if platform_only:
         fan_results = fan_results.filter(tournament__club__isnull=True)
+    fan_results = fan_results.filter(tournament__sport=sport)
     for r in fan_results:
         event_date = (
             r.tournament.end_date or r.tournament.start_date or timezone.now().date()
@@ -554,11 +560,19 @@ def profile(request, pk):
     is_profile_owner = request.user == player.user
     can_view_profile_stats = _can_view_profile_stats(request.user, player)
 
+    from apps.core.sports import Sport, parse_sport_filter, sport_code
     from apps.tournaments.models import Match
     from apps.tournaments.utils import (
         get_player_trophies,
         order_player_matches_for_display,
     )
+    from apps.users.sport_rating import apply_profile_to_player, get_sport_profile
+
+    profile_sport = parse_sport_filter(request.GET.get("sport"))
+    if profile_sport == "all":
+        profile_sport = Sport.TENNIS
+    profile_sport = sport_code(profile_sport)
+    player._profile_sport = profile_sport
 
     all_matches_qs = order_player_matches_for_display(
         Match.objects.filter(
@@ -580,6 +594,7 @@ def profile(request, pk):
             "winner_team",
         )
         .filter(tournament__club__isnull=True)
+        .filter(sport=profile_sport)
     )
 
     # ---------- Фильтрация по месяцу/году/статусу ----------
@@ -651,7 +666,7 @@ def profile(request, pk):
     ]
 
     progress_data = (
-        _get_profile_progress_data(player, platform_only=True)
+        _get_profile_progress_data(player, platform_only=True, sport=profile_sport)
         if can_view_profile_stats
         else []
     )
@@ -676,7 +691,7 @@ def profile(request, pk):
             subscription_autopay_card = None
 
     # Собираем данные о сезонных очках по датам
-    def _get_season_points_data(player: Player) -> list[dict[str, Any]]:
+    def _get_season_points_data(player: Player, sport: str) -> list[dict[str, Any]]:
         """Собрать данные о сезонных очках по датам для графика."""
         from apps.tournaments.models import TournamentPlayerResult
         from apps.tournaments.season_utils import get_current_season
@@ -688,6 +703,7 @@ def profile(request, pk):
                 player=player,
                 tournament__status="completed",
                 tournament__club__isnull=True,
+                tournament__sport=sport,
             )
             .select_related("tournament")
             .order_by(
@@ -750,14 +766,27 @@ def profile(request, pk):
         # Добавляем текущую дату с актуальными очками
         today = timezone.now().date()
         try:
-            season_points_obj = player.season_points
-            if (
-                season_points_obj.season_name == current_season.name
-                and season_points_obj.season_year == current_season.year
-            ):
-                current_points = season_points_obj.current_season_points
+            if sport == Sport.PADEL:
+                from apps.tournaments.models import SportSeasonPoints
+
+                sport_row = SportSeasonPoints.objects.filter(
+                    player=player,
+                    sport=Sport.PADEL,
+                    season_name=current_season.name,
+                    season_year=current_season.year,
+                ).first()
+                current_points = (
+                    sport_row.current_season_points if sport_row is not None else 0
+                )
             else:
-                current_points = 0
+                season_points_obj = player.season_points
+                if (
+                    season_points_obj.season_name == current_season.name
+                    and season_points_obj.season_year == current_season.year
+                ):
+                    current_points = season_points_obj.current_season_points
+                else:
+                    current_points = 0
         except Exception:
             current_points = 0
 
@@ -774,40 +803,54 @@ def profile(request, pk):
         return result
 
     season_points_data = (
-        _get_season_points_data(player) if can_view_profile_stats else []
+        _get_season_points_data(player, profile_sport) if can_view_profile_stats else []
     )
 
     # Получаем сезонные очки
-    from apps.tournaments.models import SeasonArchive, SeasonPoints
+    from types import SimpleNamespace
+
+    from apps.tournaments.models import SeasonArchive, SeasonPoints, SportSeasonPoints
     from apps.tournaments.season_utils import get_current_season, get_season_display
 
-    try:
-        season_points = player.season_points
-        current_season = get_current_season()
-        # Проверяем, что сезон совпадает
-        if (
-            season_points.season_name != current_season.name
-            or season_points.season_year != current_season.year
-        ):
-            # Один SeasonPoints на игрока (OneToOne): при смене сезона обновляем строку
-            season_points.current_season_points = 0
-            season_points.season_name = current_season.name
-            season_points.season_year = current_season.year
-            season_points.save(
-                update_fields=[
-                    "current_season_points",
-                    "season_name",
-                    "season_year",
-                ]
-            )
-    except SeasonPoints.DoesNotExist:
-        current_season = get_current_season()
-        season_points = SeasonPoints.objects.create(
+    current_season = get_current_season()
+    if profile_sport == Sport.PADEL:
+        padel_season = SportSeasonPoints.objects.filter(
             player=player,
-            current_season_points=0,
+            sport=Sport.PADEL,
             season_name=current_season.name,
             season_year=current_season.year,
+        ).first()
+        season_points = SimpleNamespace(
+            current_season_points=(
+                padel_season.current_season_points if padel_season is not None else 0
+            )
         )
+    else:
+        try:
+            season_points = player.season_points
+            # Проверяем, что сезон совпадает
+            if (
+                season_points.season_name != current_season.name
+                or season_points.season_year != current_season.year
+            ):
+                # Один SeasonPoints на игрока (OneToOne): при смене сезона обновляем строку
+                season_points.current_season_points = 0
+                season_points.season_name = current_season.name
+                season_points.season_year = current_season.year
+                season_points.save(
+                    update_fields=[
+                        "current_season_points",
+                        "season_name",
+                        "season_year",
+                    ]
+                )
+        except SeasonPoints.DoesNotExist:
+            season_points = SeasonPoints.objects.create(
+                player=player,
+                current_season_points=0,
+                season_name=current_season.name,
+                season_year=current_season.year,
+            )
 
     current_season_display = get_season_display(current_season)
 
@@ -815,6 +858,7 @@ def profile(request, pk):
     season_championships = SeasonArchive.objects.filter(
         player=player,
         final_rank=1,
+        sport=profile_sport,
     ).order_by("-season_year", "-season_name")
 
     subscription_usage_percent = 0
@@ -860,7 +904,25 @@ def profile(request, pk):
 
     is_rating_visible = bool(player.is_verified or player.avatar)
 
-    player_trophies = get_player_trophies(player)
+    player_trophies = get_player_trophies(player, sport=profile_sport)
+
+    has_padel_profile = False
+    if profile_sport == Sport.PADEL:
+        from apps.users.models import SkillLevel
+        from apps.users.rating_utils import get_starting_points
+
+        padel_profile = get_sport_profile(player, Sport.PADEL)
+        has_padel_profile = padel_profile is not None
+        if padel_profile is not None:
+            apply_profile_to_player(player, padel_profile)
+        else:
+            starting = float(get_starting_points(Decimal("1.5")))
+            player.total_points = starting
+            player.hidden_rating = starting
+            player.ntrp_level = Decimal("1.5")
+            player.skill_level = SkillLevel.NOVICE
+            player.matches_played = 0
+            player.matches_won = 0
 
     context = {
         "player": player,
@@ -885,6 +947,9 @@ def profile(request, pk):
         "can_view_profile_stats": can_view_profile_stats,
         "subscription_autopay_card": subscription_autopay_card,
         "is_rating_visible": is_rating_visible,
+        "current_sport": profile_sport,
+        "sport_choices": Sport.choices,
+        "has_padel_profile": has_padel_profile,
     }
     return render(request, "users/profile.html", context)
 

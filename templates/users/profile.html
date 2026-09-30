@@ -58,6 +58,13 @@
                                 {% include 'includes/rating_badge.html' with player=player %}
                             </div>
                         </div>
+                        {% if not is_club_profile %}
+                        <nav class="profile-sport-switch" aria-label="Вид спорта статистики">
+                            {% for value, label in sport_choices %}
+                            <a href="?sport={{ value }}" class="profile-charts__pill{% if current_sport == value %} is-active{% endif %}">{{ label }}</a>
+                            {% endfor %}
+                        </nav>
+                        {% endif %}
                         {% if player_trophies %}
                         <div class="profile-info__trophies" aria-label="Кубки за призовые места в турнирах">
                             {% for trophy in player_trophies %}
@@ -91,6 +98,12 @@
                 {% endif %}
 
                 <!-- Статистика в виде таблицы (две строки: уровень/сила/FAN и очки сезона/матчей/побед) -->
+                {% if not is_club_profile and current_sport == 'padel' and is_profile_owner and not has_padel_profile %}
+                <div class="alert alert-warning" style="margin-bottom: var(--spacing-lg);">
+                    Укажите уровень силы в паделе — он не меняет теннисный рейтинг.
+                    <a href="{% url 'padel_strength' %}">Задать уровень</a>
+                </div>
+                {% endif %}
                 <div class="profile-stats-table">
                     <table class="stats-table stats-table--two-rows">
                         <tr class="stats-table__header-row">
@@ -548,8 +561,11 @@
 
                 {% if request.user == player.user %}
                 <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3 profile-info__btn-edit profile-info__btn-fullwidth">Редактировать</a>
-                <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2 profile-info__btn-ntrp profile-info__btn-fullwidth" title="Тест носит информационный характер и не влияет на ваш рейтинг">Проверить уровень силы (информационно)</a>
+                {% if current_sport == 'padel' %}
                 <a href="{% url 'padel_strength' %}" class="btn btn-outline mt-2 profile-info__btn-fullwidth">Уровень силы в паделе</a>
+                {% else %}
+                <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2 profile-info__btn-ntrp profile-info__btn-fullwidth" title="Тест носит информационный характер и не влияет на ваш рейтинг">Проверить уровень силы (информационно)</a>
+                {% endif %}
                 {% endif %}
             </div>
 
@@ -559,7 +575,7 @@
                 <div class="profile-charts__header">
                     <div class="profile-charts__title-wrap">
                         <h3 class="profile-charts__title">Прогресс</h3>
-                        <p class="profile-charts__subtitle">{% if is_club_profile %}Живая аналитика игрока внутри выбранного клуба.{% else %}Живая аналитика формы, стабильности и темпа вашего сезона.{% endif %}</p>
+                        <p class="profile-charts__subtitle">{% if is_club_profile %}Живая аналитика игрока внутри выбранного клуба.{% elif current_sport == 'padel' %}Живая аналитика падела: сила, FAN и темп сезона отдельно от тенниса.{% else %}Живая аналитика формы, стабильности и темпа вашего сезона.{% endif %}</p>
                     </div>
                     <div class="profile-charts__controls">
                         <div class="profile-charts__pill-groups">
@@ -685,6 +701,7 @@
 
         <!-- Фильтры -->
         <form method="get" action="#matches" class="matches-filter-form">
+            {% if not is_club_profile %}<input type="hidden" name="sport" value="{{ current_sport }}">{% endif %}
             <div class="matches-filter-bar">
                 <div class="matches-filter-group">
                     <label class="matches-filter-label" for="filter-year">Год</label>
@@ -717,7 +734,7 @@
                 {% if is_club_profile %}
                 <a href="{{ club_profile_url }}#matches" class="matches-filter-reset">Сбросить</a>
                 {% else %}
-                <a href="{% url 'profile' pk=player.pk %}#matches" class="matches-filter-reset">Сбросить</a>
+                <a href="{% url 'profile' pk=player.pk %}{% if current_sport %}?sport={{ current_sport }}{% endif %}#matches" class="matches-filter-reset">Сбросить</a>
                 {% endif %}
                 {% endif %}
             </div>
@@ -727,11 +744,11 @@
         <div class="matches-quick-filters">
             {% now "Y" as current_year %}
             {% now "n" as current_month %}
-            <a href="?year={{ current_year }}&month={{ current_month }}#matches"
+            <a href="?{% if current_sport %}sport={{ current_sport }}&{% endif %}year={{ current_year }}&month={{ current_month }}#matches"
                class="matches-quick-btn {% if active_year|stringformat:'d' == current_year and active_month|stringformat:'d' == current_month %}active{% endif %}">
                 Этот месяц
             </a>
-            <a href="?year={{ current_year }}#matches"
+            <a href="?{% if current_sport %}sport={{ current_sport }}&{% endif %}year={{ current_year }}#matches"
                class="matches-quick-btn {% if active_year|stringformat:'d' == current_year and not active_month %}active{% endif %}">
                 Этот год
             </a>

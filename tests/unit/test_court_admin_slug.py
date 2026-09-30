@@ -5,9 +5,10 @@ from __future__ import annotations
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
+from apps.core.sports import VenueSport
 from apps.courts.forms import CourtAdminForm, _normalize_website, _unique_court_slug
 from apps.courts.models import Court
-from apps.courts.surfaces import CourtSurface
+from apps.courts.surfaces import CourtSurface, PadelSurface
 
 
 class CourtAdminSlugFormTestCase(TestCase):
@@ -70,6 +71,33 @@ class CourtAdminSlugFormTestCase(TestCase):
         )
         self.assertTrue(form.is_valid(), form.errors)
         self.assertTrue(form.cleaned_data["slug"])
+
+    def test_tennis_venue_clears_padel_fields(self) -> None:
+        form = CourtAdminForm(
+            data=self._base_data(
+                venue_sport=VenueSport.TENNIS,
+                has_glass_walls=True,
+                padel_surfaces=[PadelSurface.ARTIFICIAL_GRASS],
+            )
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.cleaned_data["has_glass_walls"])
+        self.assertEqual(form.cleaned_data["padel_surfaces"], [])
+
+    def test_padel_venue_keeps_padel_fields(self) -> None:
+        form = CourtAdminForm(
+            data=self._base_data(
+                venue_sport=VenueSport.PADEL,
+                has_glass_walls=True,
+                padel_surfaces=[PadelSurface.ARTIFICIAL_GRASS],
+            )
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertTrue(form.cleaned_data["has_glass_walls"])
+        self.assertEqual(
+            form.cleaned_data["padel_surfaces"],
+            [PadelSurface.ARTIFICIAL_GRASS],
+        )
 
     def test_unique_court_slug_helper(self) -> None:
         self.assertEqual(_unique_court_slug("Hello Club"), "hello-club")

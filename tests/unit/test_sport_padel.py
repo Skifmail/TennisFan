@@ -3,6 +3,7 @@
 from decimal import Decimal
 
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.sports import Sport, VenueSport, parse_sport_filter
@@ -113,3 +114,40 @@ class PadelCourtFilterTestCase(TestCase):
         )
         self.assertIn(tennis.pk, tennis_ids)
         self.assertNotIn(padel.pk, tennis_ids)
+
+
+class ProfileSportSwitcherTestCase(TestCase):
+    """Профиль показывает силу и FAN выбранного вида спорта."""
+
+    def setUp(self) -> None:
+        self.player = Player.objects.create(
+            user=User.objects.create_user(
+                email="profile-sport@test.local",
+                password="testpass123",
+            ),
+            total_points=3200,
+            hidden_rating=3200,
+            ntrp_level=Decimal("3.2"),
+        )
+        set_padel_strength(self.player, Decimal("4.0"))
+        self.client.force_login(self.player.user)
+
+    def test_default_profile_is_tennis(self) -> None:
+        response = self.client.get(
+            reverse("profile", kwargs={"pk": self.player.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "?sport=padel")
+        self.assertContains(response, "3,20")
+        self.assertNotContains(response, "4,00")
+
+    def test_padel_tab_shows_padel_rating(self) -> None:
+        response = self.client.get(
+            reverse("profile", kwargs={"pk": self.player.pk}),
+            {"sport": "padel"},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "4,00")
+        self.assertNotContains(response, "3,20")

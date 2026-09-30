@@ -16,6 +16,7 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 
+from apps.core.sports import Sport
 from apps.users.models import Player, SkillLevel
 from apps.users.skill_levels import skill_with_ntrp
 
@@ -36,6 +37,7 @@ from .models import (
     TournamentRegistrationCoverage,
     TournamentStatus,
     TournamentTeam,
+    TournamentVariant,
     TVDGroup,
     TVDGroupMember,
     TVDTournament,
@@ -380,6 +382,9 @@ class TournamentAdminForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        if cleaned_data.get("sport") == Sport.PADEL:
+            cleaned_data["variant"] = TournamentVariant.DOUBLES
+            self.errors.pop("variant", None)
         variant = cleaned_data.get("variant")
         gender = cleaned_data.get("gender")
         tournament_format = cleaned_data.get("format")

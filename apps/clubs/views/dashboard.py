@@ -15,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from apps.core.sports import Sport
 from apps.tournaments.models import (
     Match,
     MatchResultProposal,
@@ -1376,6 +1377,7 @@ def club_tournaments_list(request: HttpRequest, slug: str) -> HttpResponse:
     category_filter = request.GET.get("category", "").strip()
     gender_filter = request.GET.get("gender", "").strip()
     variant_filter = request.GET.get("variant", "").strip()
+    sport_filter = request.GET.get("sport", "").strip()
 
     tournaments = (
         club.tournaments.all()
@@ -1414,6 +1416,11 @@ def club_tournaments_list(request: HttpRequest, slug: str) -> HttpResponse:
     else:
         variant_filter = ""
 
+    if sport_filter in Sport.values:
+        tournaments = tournaments.filter(sport=sport_filter)
+    else:
+        sport_filter = ""
+
     tournaments = order_with_cancelled_last(tournaments.distinct(), "-start_date")
     paginator = Paginator(tournaments, 20)
     page_number = request.GET.get("page")
@@ -1431,9 +1438,11 @@ def club_tournaments_list(request: HttpRequest, slug: str) -> HttpResponse:
             "category_filter": category_filter,
             "gender_filter": gender_filter,
             "variant_filter": variant_filter,
+            "sport_filter": sport_filter,
             "category_choices": SkillLevel.choices,
             "gender_choices": TournamentGender.choices,
             "variant_choices": TournamentVariant.choices,
+            "sport_choices": Sport.choices,
             "is_club_panel": True,
             "can_manage_club": can_manage,
         },

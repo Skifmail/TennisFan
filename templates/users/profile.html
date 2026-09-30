@@ -593,7 +593,7 @@
                 <div class="profile-charts__header">
                     <div class="profile-charts__title-wrap">
                         <h3 class="profile-charts__title">Прогресс</h3>
-                        <p class="profile-charts__subtitle">{% if is_club_profile %}Живая аналитика игрока внутри выбранного клуба.{% elif current_sport == 'padel' %}Живая аналитика падела: сила, FAN и темп сезона отдельно от тенниса.{% else %}Живая аналитика формы, стабильности и темпа вашего сезона.{% endif %}</p>
+                        <p class="profile-charts__subtitle">{% if is_club_profile %}Живая аналитика игрока внутри выбранного клуба.{% elif current_sport == 'padel' %}Живая аналитика падела: сила, FAN и темп сезона.{% else %}Живая аналитика формы, стабильности и темпа вашего сезона.{% endif %}</p>
                     </div>
                     <div class="profile-charts__controls">
                         <div class="profile-charts__pill-groups">
@@ -875,7 +875,8 @@ document.querySelectorAll('.subscription-info__bar-fill').forEach(function(el) {
 
 // Динамическое выравнивание диаграмм с таблицей статистики
 (function() {
-    var statsTable = document.querySelector('.profile-stats-table');
+    var statsTable = document.querySelector('.profile-stats-table')
+        || document.querySelector('.profile-padel-entry');
     var charts = document.querySelector('.profile-charts');
     var profileInfo = document.querySelector('.profile-info');
 

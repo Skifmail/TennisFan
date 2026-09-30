@@ -196,7 +196,7 @@
             </li>
             {% else %}
             <li class="pagination__item">
-                <a href="?page={{ page_num }}{% if current_filters.city %}&city={{ current_filters.city }}{% endif %}{% if current_filters.category %}&category={{ current_filters.category }}{% endif %}{% if current_filters.gender %}&gender={{ current_filters.gender }}{% endif %}{% if current_filters.duration %}&duration={{ current_filters.duration }}{% endif %}{% if current_filters.club %}&club={{ current_filters.club }}{% endif %}"
+                <a href="?page={{ page_num }}{% if home_sport %}&sport={{ home_sport }}{% endif %}{% if current_filters.city %}&city={{ current_filters.city }}{% endif %}{% if current_filters.category %}&category={{ current_filters.category }}{% endif %}{% if current_filters.gender %}&gender={{ current_filters.gender }}{% endif %}{% if current_filters.duration %}&duration={{ current_filters.duration }}{% endif %}{% if current_filters.club %}&club={{ current_filters.club }}{% endif %}"
                    data-page-link="home-tournaments">
                     {{ page_num }}
                 </a>

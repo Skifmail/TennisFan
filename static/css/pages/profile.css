@@ -367,6 +367,12 @@
     margin-top: 0.75rem;
 }
 
+[data-sport-swap].is-loading {
+    opacity: 0.6;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
 .profile-sport-switch__choice {
     display: inline-flex;
     align-items: center;

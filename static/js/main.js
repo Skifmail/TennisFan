@@ -515,12 +515,26 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             clearHomeTournamentFilters();
             var url = baseUrl + '?partial=tournaments';
+            var sportInput = document.getElementById('home-filter-sport');
+            if (sportInput && sportInput.value) {
+                url += '&sport=' + encodeURIComponent(sportInput.value);
+            }
             loadTournaments(url, true);
         });
 
         attachPaginationHandlers();
 
+        document.addEventListener('home:tournaments-replaced', function() {
+            revealHomeTournamentCards();
+            attachPaginationHandlers();
+            syncHomeFilterActiveFields();
+            syncHomeFilterChips();
+        });
+
         window.addEventListener('popstate', function() {
+            if (document.getElementById('home-rating-block')) {
+                return;
+            }
             var url = new URL(window.location.href);
             url.searchParams.set('partial', 'tournaments');
             loadTournaments(url.toString(), false);

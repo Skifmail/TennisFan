@@ -23,28 +23,31 @@
         Командный спарринг: формируются две команды по 2 человека. После того как автор одобрит отклики и наберётся 4 участника, бот и ЛК предложат сформировать серию матчей — каждый играет с каждым из противоположной команды 1×1, а затем создаётся один парный матч между командами.
     </p>
     {% endif %}
-    <div class="sparring-tabs mb-3">
-        {% for value, label in sport_choices %}
-        <a href="?sport={{ value }}&type={% if value == 'padel' %}doubles{% else %}{{ sparring_type }}{% endif %}" class="sparring-tab {% if current_sport == value %}sparring-tab--active{% endif %}">{{ label }}</a>
-        {% endfor %}
-    </div>
-    <div class="sparring-tabs mb-4">
-        <a href="?type=singles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}" 
-           class="sparring-tab {% if sparring_type == 'singles' %}sparring-tab--active{% endif %}">
-            Одиночный 1×1
-        </a>
-        <a href="?type=doubles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}" 
-           class="sparring-tab {% if sparring_type == 'doubles' %}sparring-tab--active{% endif %}">
-            Парный 2×2
-        </a>
-        <a href="?type=team{% if current_city %}&city={{ current_city }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}" 
-           class="sparring-tab {% if sparring_type == 'team' %}sparring-tab--active{% endif %}">
-            Командный спарринг
-        </a>
-    </div>
-
     <div class="sparring-toolbar sparring-toolbar__panel">
+        <div class="sparring-toolbar__modes">
+            <div class="sparring-tabs" role="tablist" aria-label="Вид спорта">
+                {% for value, label in sport_choices %}
+                <a href="?sport={{ value }}&type={% if value == 'padel' %}doubles{% else %}{{ sparring_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}{% if sparring_type == 'singles' and current_category %}&category={{ current_category }}{% elif current_level %}&level={{ current_level }}{% endif %}" class="sparring-tab {% if current_sport == value %}sparring-tab--active{% endif %}">{{ label }}</a>
+                {% endfor %}
+            </div>
+            <div class="sparring-tabs" role="tablist" aria-label="Формат спарринга">
+                <a href="?sport={{ current_sport }}&type=singles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
+                   class="sparring-tab {% if sparring_type == 'singles' %}sparring-tab--active{% endif %}">
+                    Одиночный 1×1
+                </a>
+                <a href="?sport={{ current_sport }}&type=doubles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
+                   class="sparring-tab {% if sparring_type == 'doubles' %}sparring-tab--active{% endif %}">
+                    Парный 2×2
+                </a>
+                <a href="?sport={{ current_sport }}&type=team{% if current_city %}&city={{ current_city }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
+                   class="sparring-tab {% if sparring_type == 'team' %}sparring-tab--active{% endif %}">
+                    Командный спарринг
+                </a>
+            </div>
+        </div>
+        <div class="sparring-toolbar__row">
         <form method="get" class="filter-bar sparring-filters sparring-toolbar__filters">
+            <input type="hidden" name="sport" value="{{ current_sport }}">
             <input type="hidden" name="type" value="{{ sparring_type }}">
             <input name="city" class="form-control" placeholder="Любой населённый пункт России" value="{{ current_city }}" onchange="this.form.submit()" aria-label="Населённый пункт">
             {% if sparring_type == 'singles' %}
@@ -84,6 +87,7 @@
             {% else %}
             <a href="{% url 'pricing' %}" class="btn btn-outline sparring-toolbar__btn sparring-toolbar__btn--cta">Оформить подписку</a>
             {% endif %}
+        </div>
         </div>
     </div>
     {% if not has_sparring_access %}

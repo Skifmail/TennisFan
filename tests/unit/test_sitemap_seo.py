@@ -86,7 +86,7 @@ class SitemapSeoTestCase(TestCase):
     def test_catalog_meta_description(self) -> None:
         response = self.client.get(reverse("tournament_list"), secure=True)
         self.assertContains(response, 'name="description"', html=False)
-        self.assertContains(response, "Любительские турниры по теннису")
+        self.assertContains(response, "Любительские турниры по теннису и паделу")
 
     def test_region_landing_meta_uses_heading(self) -> None:
         response = self.client.get(

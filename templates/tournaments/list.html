@@ -2,12 +2,12 @@
 
 {% block title %}{% if is_archive %}Архив турниров{% else %}{{ landing_heading|default:"Турниры" }}{% endif %}{% endblock %}
 
-{% block meta_description %}{% if is_archive %}Архив завершённых любительских турниров по теннису на TennisFan.{% else %}{{ landing_meta_description|default:"Любительские турниры по теннису по всей России." }}{% endif %}{% endblock %}
+{% block meta_description %}{% if is_archive %}Архив завершённых любительских турниров по теннису и паделу на TennisFan.{% else %}{{ landing_meta_description|default:"Любительские турниры по теннису и паделу по всей России." }}{% endif %}{% endblock %}
 
 {% block meta_og %}
     <meta property="og:type" content="website">
     <meta property="og:title" content="{% if is_archive %}Архив турниров{% else %}{{ landing_heading|default:"Турниры" }}{% endif %} — TennisFan">
-    <meta property="og:description" content="{% if is_archive %}Архив завершённых любительских турниров по теннису.{% else %}{{ landing_meta_description|default:"" }}{% endif %}">
+    <meta property="og:description" content="{% if is_archive %}Архив завершённых любительских турниров по теннису и паделу.{% else %}{{ landing_meta_description|default:"" }}{% endif %}">
     <meta property="og:url" content="{{ canonical_url }}">
 {% endblock %}
 

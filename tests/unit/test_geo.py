@@ -296,17 +296,21 @@ class LandingHeadingTestCase(TestCase):
     """Заголовки посадочных страниц."""
 
     def test_general_catalog(self) -> None:
-        self.assertEqual(TournamentLanding().heading, "Любительские турниры по теннису")
+        self.assertEqual(
+            TournamentLanding().heading, "Любительские турниры по теннису и паделу"
+        )
 
     def test_region_and_variant(self) -> None:
         landing = resolve_landing("moscow", None, "doubles")
 
-        self.assertEqual(landing.heading, "Парные турниры по теннису в Москве")
+        self.assertEqual(landing.heading, "Парные турниры по теннису и паделу в Москве")
 
     def test_area_is_added_to_heading(self) -> None:
         landing = resolve_landing("moscow", "yug", "singles")
 
-        self.assertEqual(landing.heading, "Одиночные турниры по теннису в Москве, Юг")
+        self.assertEqual(
+            landing.heading, "Одиночные турниры по теннису и паделу в Москве, Юг"
+        )
 
 
 class GeoAreaChoicesTestCase(TestCase):

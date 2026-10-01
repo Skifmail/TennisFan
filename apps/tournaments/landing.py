@@ -105,13 +105,13 @@ class TournamentLanding:
         """Собрать заголовок H1 страницы.
 
         Returns:
-            str: Например «Парные турниры по теннису в Москве, Юг».
+            str: Например «Парные турниры по теннису и паделу в Москве, Юг».
         """
         prefix = VARIANT_WORDS.get(self.variant, "Любительские")
         place = REGION_IN.get(self.region, "")
         if self.area is not None:
             place = f"{place}, {self.area.name}" if place else self.area.name
-        return f"{prefix} турниры по теннису {place}".strip()
+        return f"{prefix} турниры по теннису и паделу {place}".strip()
 
     @property
     def meta_description(self) -> str:
@@ -122,7 +122,7 @@ class TournamentLanding:
         """
         if not self.is_filtered:
             return (
-                "Любительские турниры по теннису по всей России. "
+                "Любительские турниры по теннису и паделу по всей России. "
                 "Играйте с соперниками своего уровня. "
                 "Точное место проведения сообщим, когда завершится набор."
             )

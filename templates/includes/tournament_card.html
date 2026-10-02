@@ -16,7 +16,9 @@
                 </div>
                 {% else %}
                 <div class="tournament-card-photos tournament-card__media">
-                    <img src="{% static 'images/tournament-placeholder.png' %}" alt="" class="tournament-img" decoding="async">
+                    <video class="tournament-img" autoplay muted loop playsinline preload="metadata" aria-hidden="true">
+                        <source src="{% static 'video/logotip.MP4' %}" type="video/mp4">
+                    </video>
                 </div>
                 {% endif %}
                 <div class="tournament-card__title-col">

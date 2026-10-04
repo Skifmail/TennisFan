@@ -21,3 +21,5 @@ pytest-django>=4.0.0
 django-debug-toolbar>=4.4.6
 django-silk>=5.1.0
 redis>=5.0.0
+weasyprint>=63.0
+python-docx>=1.1.0

@@ -1201,7 +1201,10 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
     postpayment_window_schedule_display.short_description = "Расписание окна постоплаты"
 
     fieldsets = (
-        ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
+        (
+            "Базовая информация",
+            {"fields": ("name", "slug", "description", "regulation_extra", "image")},
+        ),
         ("Формат турнира", {"fields": ("sport", "format", "variant")}),
         (
             "Постоплата: статус оплаты участников",
@@ -1417,7 +1420,10 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
     ]
 
     fieldsets = (
-        ("Базовая информация", {"fields": ("name", "slug", "description", "image")}),
+        (
+            "Базовая информация",
+            {"fields": ("name", "slug", "description", "regulation_extra", "image")},
+        ),
         (
             "ТВД (формат и участники)",
             {

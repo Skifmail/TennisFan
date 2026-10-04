@@ -168,6 +168,14 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     name = models.CharField("Название", max_length=200)
     slug = models.SlugField("URL", unique=True)
     description = models.TextField("Описание", blank=True)
+    regulation_extra = models.TextField(
+        "Дополнительные положения регламента",
+        blank=True,
+        help_text=(
+            "Необязательный текст: особые правила, мячи, судья, контакты на площадке. "
+            "Попадает отдельным разделом в скачиваемый регламент."
+        ),
+    )
     city = models.CharField("Населённый пункт", max_length=100)
     region = models.CharField(
         "Регион",

@@ -1,0 +1,111 @@
+{% extends "tournaments/exports/base_pdf.html" %}
+{% block title %}Положение — {{ regulation.tournament_name }}{% endblock %}
+{% block page_css %}
+@page {
+    size: A4;
+    margin: 16mm 14mm 18mm;
+    @bottom-center {
+        content: "TennisFan  ·  " counter(page) " / " counter(pages);
+        font-family: "Roboto", sans-serif;
+        font-size: 8.5pt;
+        color: #5c6b64;
+    }
+}
+.doc-head {
+    background: #0b3d2e;
+    color: #f7f4ec;
+    padding: 16px 18px 14px;
+    border-bottom: 4px solid #c9a35a;
+    margin-bottom: 16px;
+}
+.brand {
+    font-size: 9pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #c9a35a;
+    margin-bottom: 8px;
+}
+.brand img {
+    height: 28px;
+    width: auto;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+.kicker {
+    font-size: 11pt;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+}
+h1 {
+    font-size: 18pt;
+    line-height: 1.2;
+    margin: 0 0 6px;
+    font-weight: 700;
+}
+.doc-meta { margin: 0; font-size: 9.5pt; color: #d7e4dc; }
+h2 {
+    font-size: 12.5pt;
+    color: #0b3d2e;
+    margin: 16px 0 6px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #c9a35a;
+}
+table { width: 100%; border-collapse: collapse; margin: 6px 0 8px; }
+th, td { padding: 5px 8px; vertical-align: top; font-size: 10pt; }
+th {
+    width: 34%;
+    background: #0b3d2e;
+    color: #fff;
+    font-weight: 700;
+    text-align: left;
+}
+td { background: #f7f4ec; }
+tr:nth-child(even) td { background: #fff; }
+p { margin: 0 0 6px; }
+.public {
+    margin-top: 14px;
+    font-size: 9pt;
+    color: #0b3d2e;
+}
+{% endblock %}
+{% block body %}
+<header class="doc-head">
+    <div class="brand">
+        {% if logo_uri %}<img src="{{ logo_uri }}" alt="">{% endif %}
+        {{ regulation.organizer_name }} · TennisFan
+    </div>
+    <p class="kicker">Положение о проведении турнира</p>
+    <h1>{{ regulation.tournament_name }}</h1>
+    <p class="doc-meta">
+        {{ regulation.sport_label }} · {{ regulation.format_label }} · {{ regulation.variant_label }}
+        · документ от {{ regulation.generated_on }}
+    </p>
+</header>
+{% for section in regulation.sections %}
+<section>
+    <h2>{{ forloop.counter }}. {{ section.title }}</h2>
+    {% if section.rows %}
+    <table>
+        {% for row in section.rows %}
+        <tr>
+            <th>{{ row.label }}</th>
+            <td>{{ row.value }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+    {% for paragraph in section.paragraphs %}
+    <p>{{ paragraph }}</p>
+    {% endfor %}
+    {% if section.bullets %}
+    <ul>
+        {% for bullet in section.bullets %}<li>{{ bullet }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+</section>
+{% endfor %}
+{% if regulation.public_url %}
+<p class="public">Публичная страница: {{ regulation.public_url }}</p>
+{% endif %}
+{% endblock %}

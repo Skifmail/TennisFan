@@ -551,6 +551,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "name",
             "slug",
             "description",
+            "regulation_extra",
             "image",
             "sport",
             "format",
@@ -608,6 +609,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
         self._apply_geo_defaults_from_club()
 
         self.fields["description"].required = False
+        self.fields["regulation_extra"].required = False
         self.fields["image"].required = False
         self.fields["slug"].required = False
         self.fields["region"].required = False
@@ -644,6 +646,15 @@ class ClubTournamentCreateForm(forms.ModelForm):
                 "rows": 5,
                 "placeholder": "Описание турнира, покрытие, правила, регистрация, расписание и важные детали",
             }
+        )
+        self.fields["regulation_extra"].widget = forms.Textarea(
+            attrs={
+                "rows": 4,
+                "placeholder": "Особые правила, мячи, судья, контакты на площадке — попадут в скачиваемый регламент",
+            }
+        )
+        self.fields["regulation_extra"].help_text = (
+            "Необязательно. Отдельный раздел скачиваемого регламента."
         )
         # type=date / datetime-local требуют ISO-формат; при ru-локали без
         # format значения не отображаются и POST не проходит валидацию.

@@ -7,8 +7,9 @@ import logging
 from collections import defaultdict
 from functools import wraps
 from itertools import groupby
+from pathlib import Path
 from typing import cast
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -16,9 +17,11 @@ from django.core.paginator import Paginator
 from django.db import models, transaction
 from django.db.models import Count, Min, Prefetch, Q
 from django.db.models.functions import Lower
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from loguru import logger as log
 
 from apps.clubs.models import (
     ClubJoinRequest,
@@ -5047,3 +5050,83 @@ def tournament_join_team(request, slug, team_id):
     if player is None:
         player = Player.objects.create(user=request.user)
     return _do_join_team(request, tournament, player, team)
+
+
+def _export_attachment(
+    content: bytes, filename: str, content_type: str
+) -> HttpResponse:
+    """Ответ со скачиваемым файлом и UTF-8 именем."""
+    response = HttpResponse(content, content_type=content_type)
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    return response
+
+
+def _club_logo_uri(tournament: Tournament) -> str:
+    """file:// логотипа клуба, если файл есть на диске."""
+    club = tournament.club
+    if club is None or not getattr(club, "logo", None):
+        return ""
+    try:
+        path = Path(club.logo.path)
+    except (ValueError, OSError):
+        return ""
+    if not path.is_file():
+        return ""
+    return path.as_uri()
+
+
+@login_required
+def tournament_export_regulation(request, slug):
+    """Скачать положение о турнире в PDF или Word.
+
+    Формат задаётся query-параметром ``fmt``: ``pdf`` (по умолчанию) или ``docx``.
+    Доступен тем же ролям, что и страница управления.
+    """
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return HttpResponseForbidden("Нет доступа к управлению этим турниром.")
+    fmt = (request.GET.get("fmt") or "pdf").lower()
+    from apps.tournaments.exports.regulation import build_regulation_context
+
+    public_url = request.build_absolute_uri(
+        reverse("tournament_detail", kwargs={"slug": tournament.slug})
+    )
+    regulation = build_regulation_context(tournament, public_url=public_url)
+    if fmt == "docx":
+        from apps.tournaments.exports.docx_regulation import build_regulation_docx
+
+        payload = build_regulation_docx(regulation)
+        content_type = (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        filename = f"reglament-{tournament.slug}.docx"
+    elif fmt == "pdf":
+        from apps.tournaments.exports.pdf import render_pdf
+
+        payload = render_pdf(
+            "tournaments/exports/regulation_pdf.html",
+            {"regulation": regulation, "logo_uri": _club_logo_uri(tournament)},
+        )
+        content_type = "application/pdf"
+        filename = f"reglament-{tournament.slug}.pdf"
+    else:
+        return HttpResponseBadRequest("Формат: pdf или docx.")
+    log.info("Экспорт регламента {} ({})", tournament.slug, fmt)
+    return _export_attachment(payload, filename, content_type)
+
+
+@login_required
+def tournament_export_bracket(request, slug):
+    """Скачать сетку турнира в PDF, в том числе пустую до жеребьёвки."""
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return HttpResponseForbidden("Нет доступа к управлению этим турниром.")
+    from apps.tournaments.exports.bracket import build_bracket_layout
+    from apps.tournaments.exports.pdf import render_pdf
+
+    layout = build_bracket_layout(tournament)
+    payload = render_pdf("tournaments/exports/bracket_pdf.html", {"layout": layout})
+    log.info("Экспорт сетки {}", tournament.slug)
+    return _export_attachment(
+        payload, f"setka-{tournament.slug}.pdf", "application/pdf"
+    )

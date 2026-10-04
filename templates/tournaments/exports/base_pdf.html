@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}TennisFan{% endblock %}</title>
+    <style>
+        @font-face {
+            font-family: "Roboto";
+            src: url("fonts/Roboto-Regular.ttf");
+            font-weight: 400;
+        }
+        @font-face {
+            font-family: "Roboto";
+            src: url("fonts/Roboto-Bold.ttf");
+            font-weight: 700;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Roboto", sans-serif;
+            color: #1c2420;
+            font-size: 10.5pt;
+            line-height: 1.45;
+        }
+        {% block page_css %}{% endblock %}
+    </style>
+</head>
+<body>
+{% block body %}{% endblock %}
+</body>
+</html>

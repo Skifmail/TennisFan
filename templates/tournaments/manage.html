@@ -20,9 +20,19 @@
             <span class="text-secondary">/</span>
             <span>Управление</span>
         </div>
-        <span class="btn-manage-tournament-wrap">
-            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="btn-manage-tournament">Открыть публичную страницу</a>
-        </span>
+        <div class="manage-export">
+            <details class="manage-export__menu">
+                <summary class="btn btn-outline">Скачать регламент</summary>
+                <div class="manage-export__panel">
+                    <a href="{% url 'tournament_export_regulation' slug=tournament.slug %}?fmt=pdf">PDF</a>
+                    <a href="{% url 'tournament_export_regulation' slug=tournament.slug %}?fmt=docx">Word (.docx)</a>
+                </div>
+            </details>
+            <a href="{% url 'tournament_export_bracket' slug=tournament.slug %}" class="btn btn-outline">Скачать сетку (PDF)</a>
+            <span class="btn-manage-tournament-wrap">
+                <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="btn-manage-tournament">Открыть публичную страницу</a>
+            </span>
+        </div>
     </div>
 
     <h1 class="page-title" style="text-align: left;">Управление турниром</h1>

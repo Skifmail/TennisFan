@@ -5,9 +5,15 @@ Training admin configuration.
 import logging
 
 from django.contrib import admin, messages
+from django.http import HttpRequest, JsonResponse
+from django.shortcuts import get_object_or_404
+from django.urls import path
 from django.utils.html import format_html
 
-from .forms import AdminTrainingForm
+from apps.training.coach_defaults import coach_defaults_from_user
+from apps.users.models import User
+
+from .forms import AdminTrainingForm, CoachAdminForm
 from .models import (
     Coach,
     CoachApplication,
@@ -23,8 +29,10 @@ logger = logging.getLogger(__name__)
 class CoachAdmin(admin.ModelAdmin):
     """Admin for Coach model."""
 
+    form = CoachAdminForm
+
     class Media:
-        js = ("js/city_autocomplete.js",)
+        js = ("js/city_autocomplete.js", "js/admin_coach_user_defaults.js")
 
     list_display = (
         "name",
@@ -38,6 +46,32 @@ class CoachAdmin(admin.ModelAdmin):
     search_fields = ("name", "bio", "specialization")
     list_editable = ("is_active",)
     prepopulated_fields = {"slug": ("name",)}
+
+    def get_urls(self):
+        custom_urls = [
+            path(
+                "user-defaults/<int:user_id>/",
+                self.admin_site.admin_view(self.user_defaults_view),
+                name="training_coach_user_defaults",
+            ),
+        ]
+        return custom_urls + super().get_urls()
+
+    def user_defaults_view(self, request: HttpRequest, user_id: int) -> JsonResponse:
+        """Вернуть известные поля профиля для автозаполнения формы тренера.
+
+        Args:
+            request: Запрос сотрудника админки.
+            user_id: Идентификатор выбранного пользователя.
+
+        Returns:
+            JsonResponse: Имя, контакты и город из профиля игрока.
+        """
+        user = get_object_or_404(
+            User.objects.select_related("player"),
+            pk=user_id,
+        )
+        return JsonResponse(coach_defaults_from_user(user))
 
 
 @admin.action(description="Одобрить и добавить тренера на сайт")

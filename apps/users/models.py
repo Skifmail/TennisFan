@@ -86,7 +86,7 @@ class PlayerCategory(models.TextChoices):
     TOUR = "tour", "Тур"
     HARD = "hard", "Хард"
     CHALLENGER = "challenger", "Челленджер"
-    MASTERS = "masters", "Мастерс"
+    MASTERS = "masters", "Мастер"
 
 
 class City(models.TextChoices):
@@ -116,7 +116,7 @@ class SkillLevel(models.TextChoices):
     NOVICE = "novice", "Новичок"
     AMATEUR = "amateur", "Любитель"
     EXPERIENCED = "experienced", "Опытный"
-    ADVANCED = "advanced", "Мастерс"
+    ADVANCED = "advanced", "Мастер"
     PROFESSIONAL = "professional", "Профессионал"
 
 

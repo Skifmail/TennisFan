@@ -23,7 +23,6 @@ SECTION_SYSTEM = "Система проведения"
 SECTION_WALKOVER = "Неявки и сроки матчей"
 SECTION_POINTS = "Система начисления очков"
 SECTION_EXTRA = "Дополнительные положения"
-SECTION_DESCRIPTION = "Описание турнира"
 
 _MATCH_FORMAT_TEXT: dict[str, str] = {
     "1_set_6": "1 сет до 6 геймов. При счёте 6:6 сет играется до 7.",
@@ -140,7 +139,6 @@ def build_regulation_context(
         _walkover_section(tournament),
         _points_section(tournament),
         _extra_section(tournament),
-        _description_section(tournament),
     )
     club = tournament.club
     return RegulationContext(
@@ -338,15 +336,6 @@ def _extra_section(tournament: Tournament) -> Section | None:
         return None
     paragraphs = tuple(part.strip() for part in text.splitlines() if part.strip())
     return Section(title=SECTION_EXTRA, paragraphs=paragraphs)
-
-
-def _description_section(tournament: Tournament) -> Section | None:
-    """Публичное описание турнира."""
-    text = (tournament.description or "").strip()
-    if not text:
-        return None
-    paragraphs = tuple(part.strip() for part in text.splitlines() if part.strip())
-    return Section(title=SECTION_DESCRIPTION, paragraphs=paragraphs)
 
 
 def _dates_label(tournament: Tournament) -> str:

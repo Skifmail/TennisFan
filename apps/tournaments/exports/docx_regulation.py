@@ -67,17 +67,17 @@ def _apply_base_style(document: WordDocument) -> None:
 
 
 def _add_logos(document: WordDocument, logos: tuple[ExportLogo, ...]) -> None:
-    """Ряд логотипов по центру шапки."""
+    """Логотипы в правом верхнем углу шапки."""
     if not logos:
         return
     paragraph = document.add_paragraph()
-    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     for index, logo in enumerate(logos):
         if index:
             paragraph.add_run(" ")
         run = paragraph.add_run()
         try:
-            run.add_picture(BytesIO(logo.content), width=Cm(1.7))
+            run.add_picture(BytesIO(logo.content), width=Cm(2.8))
         except Exception as exc:
             log.warning("Не удалось вставить логотип {} в Word: {}", logo.alt, exc)
 

@@ -11,7 +11,7 @@ from apps.courts.models import Court
 from apps.training.geo import advertised_training_courts
 from apps.users.models import SkillLevel
 
-from .models import CoachApplication, Training, TrainingEnrollment
+from .models import Coach, CoachApplication, Training, TrainingEnrollment
 from .widgets import MultiCheckboxWidget, TypePricesWidget
 
 
@@ -460,3 +460,58 @@ class AdminTrainingForm(forms.ModelForm):
             training.save()
             self.save_m2m()
         return training
+
+
+class CoachAdminForm(forms.ModelForm):
+    """Форма тренера в админке: пустые поля берутся из профиля игрока."""
+
+    class Meta:
+        model = Coach
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        for field_name in ("name", "slug", "city"):
+            self.fields[field_name].required = False
+
+    def clean(self):
+        cleaned = super().clean()
+        user = cleaned.get("user")
+        if user is not None:
+            current = {
+                field: str(cleaned.get(field) or "")
+                for field in (
+                    "name",
+                    "phone",
+                    "telegram",
+                    "whatsapp",
+                    "max_contact",
+                    "city",
+                )
+            }
+            from apps.training.coach_defaults import (
+                apply_coach_defaults,
+                coach_defaults_from_user,
+                unique_coach_slug,
+            )
+
+            filled = apply_coach_defaults(current, coach_defaults_from_user(user))
+            cleaned.update(filled)
+            if filled.get("name") and not str(cleaned.get("slug") or "").strip():
+                cleaned["slug"] = unique_coach_slug(
+                    filled["name"],
+                    exclude_pk=self.instance.pk,
+                )
+        if not str(cleaned.get("name") or "").strip():
+            self.add_error(
+                "name",
+                "Укажите имя или выберите пользователя с заполненным ФИО.",
+            )
+        if not str(cleaned.get("city") or "").strip():
+            self.add_error(
+                "city",
+                "Укажите населённый пункт или выберите пользователя с городом в профиле.",
+            )
+        if not str(cleaned.get("slug") or "").strip():
+            self.add_error("slug", "Укажите URL.")
+        return cleaned

@@ -279,11 +279,21 @@
     }
 
     function wirePageUnloadLoader() {
+        var hideSpinnerIfPageStays = 0;
         window.addEventListener("beforeunload", function () {
             var activeElement = document.activeElement;
             if (activeElement && isInternalLink(activeElement)) {
                 showPageSpinner();
+                // Скачивание файла вызывает beforeunload, но документ остаётся.
+                window.clearTimeout(hideSpinnerIfPageStays);
+                hideSpinnerIfPageStays = window.setTimeout(function () {
+                    hidePageSpinner();
+                }, 1200);
             }
+        });
+        // Реальный переход снимает таймер: мячик гаснет уже на новой странице.
+        window.addEventListener("pagehide", function () {
+            window.clearTimeout(hideSpinnerIfPageStays);
         });
         // bfcache / возврат назад: сбросить зависшие спиннеры на кнопках.
         window.addEventListener("pageshow", function () {

@@ -13,7 +13,7 @@ from django.utils.html import format_html
 from apps.training.coach_defaults import coach_defaults_from_user
 from apps.users.models import User
 
-from .forms import AdminTrainingForm, CoachAdminForm
+from .forms import AdminTrainingForm, CoachAdminForm, CoachApplicationAdminForm
 from .models import (
     Coach,
     CoachApplication,
@@ -38,11 +38,12 @@ class CoachAdmin(admin.ModelAdmin):
         "name",
         "user",
         "city",
+        "sport",
         "experience_years",
         "specialization",
         "is_active",
     )
-    list_filter = ("city", "is_active")
+    list_filter = ("sport", "city", "is_active")
     search_fields = ("name", "bio", "specialization")
     list_editable = ("is_active",)
     prepopulated_fields = {"slug": ("name",)}
@@ -118,12 +119,15 @@ def reject_coach_applications(modeladmin, request, queryset):
 class CoachApplicationAdmin(admin.ModelAdmin):
     """Заявки «Стать тренером». После одобрения создаётся Coach."""
 
+    form = CoachApplicationAdminForm
+
     class Media:
         js = ("js/city_autocomplete.js",)
 
     list_display = (
         "name",
         "city",
+        "sport",
         "applicant_user",
         "applicant_name",
         "applicant_email",
@@ -131,7 +135,7 @@ class CoachApplicationAdmin(admin.ModelAdmin):
         "coach_link",
         "created_at",
     )
-    list_filter = ("status", "city")
+    list_filter = ("status", "sport", "city")
     search_fields = (
         "name",
         "city",
@@ -158,6 +162,7 @@ class CoachApplicationAdmin(admin.ModelAdmin):
                     "experience_years",
                     "specialization",
                     "city",
+                    "sports",
                 )
             },
         ),
@@ -202,6 +207,7 @@ class TrainingAdmin(admin.ModelAdmin):
     form = AdminTrainingForm
     list_display = (
         "title",
+        "sport",
         "types_display",
         "levels_display",
         "coach",
@@ -212,7 +218,7 @@ class TrainingAdmin(admin.ModelAdmin):
         "is_active",
         "is_featured",
     )
-    list_filter = ("city", "is_active", "is_featured")
+    list_filter = ("sport", "city", "is_active", "is_featured")
     search_fields = ("title", "description")
     list_editable = ("is_active", "is_featured")
     prepopulated_fields = {"slug": ("title",)}
@@ -226,6 +232,7 @@ class TrainingAdmin(admin.ModelAdmin):
                 "fields": (
                     "title",
                     "slug",
+                    "sports",
                     "short_description",
                     "description",
                     "image",

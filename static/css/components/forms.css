@@ -749,6 +749,7 @@ form.club-filter-dropdown-open {
 }
 
 .surface-checkboxes,
+.sport-checkboxes,
 .surface-checkboxes-group .surface-checkboxes {
     display: flex;
     flex-wrap: wrap;
@@ -759,11 +760,14 @@ form.club-filter-dropdown-open {
 }
 
 .surface-checkboxes div,
-.surface-checkboxes li {
+.sport-checkboxes div,
+.surface-checkboxes li,
+.sport-checkboxes li {
     margin: 0;
 }
 
-.surface-checkboxes label {
+.surface-checkboxes label,
+.sport-checkboxes label {
     display: flex;
     align-items: center;
     gap: 0.45rem;
@@ -772,7 +776,8 @@ form.club-filter-dropdown-open {
     color: var(--color-text);
 }
 
-.surface-checkboxes input[type="checkbox"] {
+.surface-checkboxes input[type="checkbox"],
+.sport-checkboxes input[type="checkbox"] {
     width: 1.15rem;
     height: 1.15rem;
     margin: 0;

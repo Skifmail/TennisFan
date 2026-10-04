@@ -26,6 +26,13 @@
                 <div class="player-avatar" style="width: 100px; height: 100px; margin: 0 auto var(--spacing-lg);"></div>
                 {% endif %}
                 <h3 class="card-title">{{ coach.name }}</h3>
+                {% if coach.sports_display %}
+                <div class="d-flex gap-1 mt-2" style="flex-wrap: wrap; justify-content: center;">
+                    {% for sport_label in coach.sports_display %}
+                    <span class="player-category">{{ sport_label }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ coach.specialization }}</p>
                 <p class="text-muted mt-2" style="font-size: var(--font-size-sm);">Опыт: {{ coach.experience_years }}
                     {{ coach.experience_years|years_suffix }}</p>

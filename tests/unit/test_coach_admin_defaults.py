@@ -84,6 +84,7 @@ class CoachAdminFormDefaultsTestCase(TestCase):
                 "city": "",
                 "experience_years": "0",
                 "is_active": "on",
+                "sports": ["tennis"],
             }
         )
 
@@ -105,6 +106,7 @@ class CoachAdminFormDefaultsTestCase(TestCase):
                 "phone": "+79990001122",
                 "experience_years": "0",
                 "is_active": "on",
+                "sports": ["tennis", "padel"],
             }
         )
 
@@ -113,6 +115,7 @@ class CoachAdminFormDefaultsTestCase(TestCase):
         self.assertEqual(coach.name, "Тренер вручную")
         self.assertEqual(coach.city, "Сочи")
         self.assertEqual(coach.phone, "+79990001122")
+        self.assertEqual(coach.sport, "both")
 
 
 class CoachAdminUserDefaultsViewTestCase(TestCase):

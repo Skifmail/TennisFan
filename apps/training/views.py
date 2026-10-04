@@ -68,7 +68,7 @@ def _visible_coaches():
 
 def training_list(request):
     """Список тренировок. Доступен всем пользователям."""
-    from apps.core.sports import Sport, parse_sport_filter
+    from apps.core.sports import Sport, parse_sport_filter, venue_sport_catalog_values
 
     skill_level = request.GET.get("level", "")
     training_type = request.GET.get("type", "")
@@ -83,8 +83,9 @@ def training_list(request):
     district_slug = district.slug if district is not None else ""
 
     trainings = Training.objects.filter(is_active=True).select_related("coach")
-    if sport_filter != "all":
-        trainings = trainings.filter(sport=sport_filter)
+    sport_values = venue_sport_catalog_values(sport_filter)
+    if sport_values is not None:
+        trainings = trainings.filter(sport__in=sport_values)
 
     if skill_level:
         trainings = trainings.filter(skill_levels__contains=[skill_level])
@@ -119,6 +120,7 @@ def training_list(request):
                         area="" if is_active else area.slug,
                         type=training_type,
                         level=skill_level,
+                        sport=sport_filter,
                     ),
                 }
             )
@@ -269,13 +271,9 @@ def coach_application_create(request):
             queue_metrika_goal(request, COACH_APPLICATION_SUCCESS)
             return redirect("coach_application_success")
     else:
-        user = request.user
-        initial = {}
-        if user.get_full_name():
-            initial["applicant_name"] = user.get_full_name().strip()
-        if user.email:
-            initial["applicant_email"] = user.email
-        form = CoachApplicationForm(initial=initial)
+        from apps.training.coach_defaults import coach_application_initial
+
+        form = CoachApplicationForm(initial=coach_application_initial(request.user))
 
     return render(
         request,
@@ -379,7 +377,14 @@ def training_add(request):
             messages.success(request, f"Тренировка «{t.title}» создана.")
             return redirect("my_trainings")
     else:
-        form = TrainingForm(initial={"city": coach.city} if coach.city else {})
+        from apps.core.sports import sport_codes_from_venue
+
+        initial: dict[str, object] = {
+            "sports": sport_codes_from_venue(coach.sport),
+        }
+        if coach.city:
+            initial["city"] = coach.city
+        form = TrainingForm(initial=initial)
 
     return render(
         request,

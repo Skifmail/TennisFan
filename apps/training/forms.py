@@ -3,16 +3,22 @@ Training forms.
 """
 
 from decimal import Decimal
+from typing import Any
 
 from django import forms
 
 from apps.core.contact_utils import normalize_max_contact
+from apps.core.sports import (
+    Sport,
+    sport_codes_from_venue,
+    venue_sport_from_codes,
+)
 from apps.courts.models import Court
 from apps.training.geo import advertised_training_courts
 from apps.users.models import SkillLevel
 
 from .models import Coach, CoachApplication, Training, TrainingEnrollment
-from .widgets import MultiCheckboxWidget, TypePricesWidget
+from .widgets import MultiCheckboxWidget, SportCheckboxSelectMultiple, TypePricesWidget
 
 
 class TrainingEnrollmentForm(forms.ModelForm):
@@ -130,7 +136,49 @@ class TrainingEnrollmentForm(forms.ModelForm):
         return enrollment
 
 
-class CoachApplicationForm(forms.ModelForm):
+class VenueSportCheckboxesMixin:
+    """Чекбоксы теннис/падел, в модели одно поле ``sport``."""
+
+    fields: dict[str, Any]
+    initial: dict[str, Any]
+    is_bound: bool
+    cleaned_data: dict[str, Any]
+
+    def _add_sports_field(self, *, initial_sport: str | None = None) -> None:
+        """Добавить поле ``sports`` и подставить текущий вид спорта.
+
+        Args:
+            initial_sport: Явный код ``VenueSport``, иначе берётся из instance.
+        """
+        instance = getattr(self, "instance", None)
+        current = initial_sport
+        if current is None and instance is not None:
+            current = str(getattr(instance, "sport", "") or "")
+        codes = sport_codes_from_venue(current)
+        self.fields["sports"] = forms.MultipleChoiceField(
+            label="Вид спорта",
+            choices=Sport.choices,
+            required=True,
+            widget=SportCheckboxSelectMultiple(),
+            help_text="Можно выбрать теннис, падел или оба.",
+        )
+        if not getattr(self, "is_bound", False):
+            self.initial.setdefault("sports", codes)
+        self.fields["sports"].initial = self.initial.get("sports", codes)
+
+    def clean_sports(self) -> str:
+        """Собрать ``tennis`` / ``padel`` / ``both`` из чекбоксов."""
+        codes = self.cleaned_data.get("sports") or []
+        if not codes:
+            raise forms.ValidationError("Выберите теннис, падел или оба вида спорта.")
+        return venue_sport_from_codes(list(codes))
+
+    def _apply_sports(self, obj: Coach | CoachApplication | Training) -> None:
+        """Записать выбранный вид спорта в модель."""
+        obj.sport = self.cleaned_data["sports"]
+
+
+class CoachApplicationForm(VenueSportCheckboxesMixin, forms.ModelForm):
     """Форма заявки «Стать тренером». Поля как у тренера в админке."""
 
     class Meta:
@@ -224,13 +272,22 @@ class CoachApplicationForm(forms.ModelForm):
         self.fields["telegram"].required = False
         self.fields["whatsapp"].required = False
         self.fields["max_contact"].required = False
+        self._add_sports_field()
 
     def clean_max_contact(self) -> str:
         """Нормализует контакт MAX как ссылку или номер телефона."""
         return normalize_max_contact(self.cleaned_data.get("max_contact"))
 
+    def save(self, commit: bool = True) -> CoachApplication:
+        """Сохранить заявку с выбранным видом спорта."""
+        application: CoachApplication = super().save(commit=False)
+        self._apply_sports(application)
+        if commit:
+            application.save()
+        return application
 
-class TrainingForm(forms.ModelForm):
+
+class TrainingForm(VenueSportCheckboxesMixin, forms.ModelForm):
     """Форма создания/редактирования тренировки тренером (через сайт)."""
 
     type_prices = forms.JSONField(
@@ -255,7 +312,6 @@ class TrainingForm(forms.ModelForm):
         model = Training
         fields = (
             "title",
-            "sport",
             "short_description",
             "description",
             "type_prices",
@@ -327,6 +383,7 @@ class TrainingForm(forms.ModelForm):
         self.fields["court_price_min"].required = False
         self.fields["court_price_max"].required = False
         self.fields["image"].required = False
+        self._add_sports_field()
 
         if self.instance and self.instance.pk:
             self.initial["type_prices"] = self.instance.type_prices or {}
@@ -359,6 +416,7 @@ class TrainingForm(forms.ModelForm):
 
     def save(self, commit: bool = True) -> Training:
         training: Training = super().save(commit=False)
+        self._apply_sports(training)
         self._apply_price_range(training)
         if commit:
             training.save()
@@ -366,7 +424,7 @@ class TrainingForm(forms.ModelForm):
         return training
 
 
-class AdminTrainingForm(forms.ModelForm):
+class AdminTrainingForm(VenueSportCheckboxesMixin, forms.ModelForm):
     """Форма тренировки для админки: чекбоксы + цены по типам в одном блоке."""
 
     type_prices = forms.JSONField(
@@ -391,7 +449,6 @@ class AdminTrainingForm(forms.ModelForm):
         model = Training
         fields = (
             "title",
-            "sport",
             "slug",
             "short_description",
             "description",
@@ -423,6 +480,7 @@ class AdminTrainingForm(forms.ModelForm):
         self.fields["court_price_min"].required = False
         self.fields["court_price_max"].required = False
         self.fields["image"].required = False
+        self._add_sports_field()
 
         if self.instance and self.instance.pk:
             self.initial["type_prices"] = self.instance.type_prices or {}
@@ -455,6 +513,7 @@ class AdminTrainingForm(forms.ModelForm):
 
     def save(self, commit: bool = True) -> Training:
         training: Training = super().save(commit=False)
+        self._apply_sports(training)
         self._apply_price_range(training)
         if commit:
             training.save()
@@ -462,7 +521,7 @@ class AdminTrainingForm(forms.ModelForm):
         return training
 
 
-class CoachAdminForm(forms.ModelForm):
+class CoachAdminForm(VenueSportCheckboxesMixin, forms.ModelForm):
     """Форма тренера в админке: пустые поля берутся из профиля игрока."""
 
     class Meta:
@@ -473,6 +532,8 @@ class CoachAdminForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field_name in ("name", "slug", "city"):
             self.fields[field_name].required = False
+        self.fields.pop("sport", None)
+        self._add_sports_field()
 
     def clean(self):
         cleaned = super().clean()
@@ -515,3 +576,32 @@ class CoachAdminForm(forms.ModelForm):
         if not str(cleaned.get("slug") or "").strip():
             self.add_error("slug", "Укажите URL.")
         return cleaned
+
+    def save(self, commit: bool = True) -> Coach:
+        """Сохранить тренера с выбранным видом спорта."""
+        coach: Coach = super().save(commit=False)
+        self._apply_sports(coach)
+        if commit:
+            coach.save()
+        return coach
+
+
+class CoachApplicationAdminForm(VenueSportCheckboxesMixin, forms.ModelForm):
+    """Форма заявки в админке: вид спорта чекбоксами теннис/падел."""
+
+    class Meta:
+        model = CoachApplication
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields.pop("sport", None)
+        self._add_sports_field()
+
+    def save(self, commit: bool = True) -> CoachApplication:
+        """Сохранить заявку с выбранным видом спорта."""
+        application: CoachApplication = super().save(commit=False)
+        self._apply_sports(application)
+        if commit:
+            application.save()
+        return application

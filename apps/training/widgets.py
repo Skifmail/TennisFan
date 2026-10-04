@@ -200,3 +200,25 @@ class MultiCheckboxWidget(forms.CheckboxSelectMultiple):
             if ntrp:
                 option["label"] = f"{label} ({ntrp})"
         return option
+
+
+class SportCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
+    """Чекбоксы теннис/падел без класса обёртки на каждом input."""
+
+    option_inherits_attrs = False
+
+    def __init__(self, attrs: dict[str, str] | None = None) -> None:
+        merged = dict(attrs or {})
+        extra_class = merged.pop("class", "")
+        merged["class"] = f"sport-checkboxes {extra_class}".strip()
+        super().__init__(attrs=merged)
+
+    def create_option(
+        self, name, value, label, selected, index, subindex=None, attrs=None
+    ):
+        """Пометить каждый чекбокс классом формы, не копируя класс обёртки."""
+        option = super().create_option(
+            name, value, label, selected, index, subindex=subindex, attrs=attrs
+        )
+        option["attrs"]["class"] = "form-checkbox"
+        return option

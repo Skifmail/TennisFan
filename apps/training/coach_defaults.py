@@ -54,6 +54,31 @@ def coach_defaults_from_user(user: User | None) -> dict[str, str]:
     }
 
 
+def coach_application_initial(user: User | None) -> dict[str, str]:
+    """Начальные поля заявки «Стать тренером» из профиля пользователя.
+
+    Args:
+        user: Авторизованный заявитель.
+
+    Returns:
+        dict[str, str]: Только непустые значения для ``initial`` формы.
+    """
+    defaults = coach_defaults_from_user(user)
+    email = str(getattr(user, "email", "") or "").strip() if user is not None else ""
+    initial = {
+        "applicant_name": defaults["name"],
+        "applicant_email": email,
+        "applicant_phone": defaults["phone"],
+        "name": defaults["name"],
+        "phone": defaults["phone"],
+        "telegram": defaults["telegram"],
+        "whatsapp": defaults["whatsapp"],
+        "max_contact": defaults["max_contact"],
+        "city": defaults["city"],
+    }
+    return {key: value for key, value in initial.items() if value}
+
+
 def unique_coach_slug(name: str, *, exclude_pk: int | None = None) -> str:
     """Построить свободный slug карточки тренера.
 

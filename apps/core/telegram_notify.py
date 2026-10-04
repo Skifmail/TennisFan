@@ -340,6 +340,7 @@ def notify_coach_application(app) -> bool:
         "<b>О тренере:</b>",
         f"  • Имя: {_escape(app.name)}",
         f"  • Населённый пункт: {_escape(app.city)}",
+        f"  • Вид спорта: {_escape(app.get_sport_display())}",
         f"  • Опыт: {app.experience_years} лет",
         f"  • Специализация: {_escape(app.specialization) or '—'}",
         "",

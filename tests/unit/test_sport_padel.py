@@ -31,6 +31,27 @@ class ParseSportFilterTestCase(TestCase):
         self.assertEqual(parse_sport_filter("padel"), Sport.PADEL)
 
 
+class VenueSportHelpersTestCase(TestCase):
+    """Чекбоксы теннис/падел складываются в tennis/padel/both."""
+
+    def test_codes_roundtrip(self) -> None:
+        from apps.core.sports import (
+            sport_codes_from_venue,
+            venue_sport_catalog_values,
+            venue_sport_from_codes,
+            venue_sport_labels,
+        )
+
+        self.assertEqual(sport_codes_from_venue("both"), [Sport.TENNIS, Sport.PADEL])
+        self.assertEqual(venue_sport_from_codes(["tennis", "padel"]), VenueSport.BOTH)
+        self.assertEqual(venue_sport_from_codes(["padel"]), VenueSport.PADEL)
+        self.assertEqual(venue_sport_labels(VenueSport.BOTH), ["Теннис", "Падел"])
+        self.assertEqual(
+            venue_sport_catalog_values(Sport.PADEL),
+            (VenueSport.PADEL, VenueSport.BOTH),
+        )
+
+
 class PadelRatingIsolationTestCase(TestCase):
     """Падел не пишет FAN в поля тенниса на игроке."""
 

@@ -13,7 +13,9 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 from docx.table import _Cell
 from docx.text.paragraph import Paragraph
+from loguru import logger as log
 
+from apps.tournaments.exports.logos import ExportLogo
 from apps.tournaments.exports.regulation import RegulationContext, Section
 
 _GREEN = RGBColor(0x0B, 0x3D, 0x2E)
@@ -22,11 +24,15 @@ _CREAM = "F7F4EC"
 _FONT = "Times New Roman"
 
 
-def build_regulation_docx(regulation: RegulationContext) -> bytes:
+def build_regulation_docx(
+    regulation: RegulationContext,
+    logos: tuple[ExportLogo, ...] = (),
+) -> bytes:
     """Собрать .docx положения.
 
     Args:
         regulation: Готовые разделы документа.
+        logos: Логотипы шапки. Клубные либо знак платформы.
 
     Returns:
         bytes: Файл Office Open XML.
@@ -35,6 +41,7 @@ def build_regulation_docx(regulation: RegulationContext) -> bytes:
     _apply_base_style(document)
     _set_margins(document)
     _add_footer(document, regulation)
+    _add_logos(document, logos)
     _add_title(document, regulation)
     for index, section in enumerate(regulation.sections, start=1):
         _add_section(document, index, section)
@@ -57,6 +64,22 @@ def _apply_base_style(document: WordDocument) -> None:
     style.font.size = Pt(11)
     style.font.color.rgb = RGBColor(0x1A, 0x1A, 0x1A)
     _set_style_font(style.element, _FONT)
+
+
+def _add_logos(document: WordDocument, logos: tuple[ExportLogo, ...]) -> None:
+    """Ряд логотипов по центру шапки."""
+    if not logos:
+        return
+    paragraph = document.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for index, logo in enumerate(logos):
+        if index:
+            paragraph.add_run(" ")
+        run = paragraph.add_run()
+        try:
+            run.add_picture(BytesIO(logo.content), width=Cm(1.7))
+        except Exception as exc:
+            log.warning("Не удалось вставить логотип {} в Word: {}", logo.alt, exc)
 
 
 def _add_title(document: WordDocument, regulation: RegulationContext) -> None:

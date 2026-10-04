@@ -8,28 +8,43 @@
 {% include "clubs/_club_dashboard_nav.html" with current="tournaments" %}
 {% endif %}
 <div class="container manage-page" style="padding-top: var(--spacing-2xl);">
-    <div class="manage-page-header mb-4 d-flex flex-wrap gap-2 align-items-center justify-content-between">
-        <div class="d-flex flex-wrap gap-2 align-items-center">
+    <div class="manage-page-header mb-4">
+        <nav class="manage-crumbs" aria-label="Навигация">
             {% if is_club_panel and club %}
-            <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="text-secondary">&larr; Турниры</a>
+            <a href="{% url 'clubs:club_tournaments_list' slug=club.slug %}" class="manage-crumbs__link">&larr; Турниры</a>
             {% else %}
-            <a href="{% url 'tournament_list' %}" class="text-secondary">&larr; Турниры</a>
+            <a href="{% url 'tournament_list' %}" class="manage-crumbs__link">&larr; Турниры</a>
             {% endif %}
-            <span class="text-secondary">/</span>
-            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="text-secondary">{{ tournament.name }}</a>
-            <span class="text-secondary">/</span>
-            <span>Управление</span>
-        </div>
+            <span class="manage-crumbs__sep" aria-hidden="true">/</span>
+            <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="manage-crumbs__link manage-crumbs__name" title="{{ tournament.name }}">{{ tournament.name }}</a>
+            <span class="manage-crumbs__sep" aria-hidden="true">/</span>
+            <span class="manage-crumbs__current" aria-current="page">Управление</span>
+        </nav>
         <div class="manage-export">
-            <details class="manage-export__menu">
-                <summary class="btn btn-outline">Скачать регламент</summary>
-                <div class="manage-export__panel">
-                    <a href="{% url 'tournament_export_regulation' slug=tournament.slug %}?fmt=pdf">PDF</a>
-                    <a href="{% url 'tournament_export_regulation' slug=tournament.slug %}?fmt=docx">Word (.docx)</a>
+            <details class="manage-export__menu" data-export-menu>
+                <summary class="manage-export__btn" aria-haspopup="menu">
+                    <svg class="manage-export__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
+                    <span class="manage-export__label-full">Скачать регламент</span>
+                    <span class="manage-export__label-short">Регламент</span>
+                    <svg class="manage-export__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </summary>
+                <div class="manage-export__panel" role="menu">
+                    <a role="menuitem" data-no-page-spinner href="{% url 'tournament_export_regulation' slug=tournament.slug %}?fmt=pdf">
+                        <span class="manage-export__format">PDF</span>
+                        <span class="manage-export__hint">Для печати и отправки</span>
+                    </a>
+                    <a role="menuitem" data-no-page-spinner href="{% url 'tournament_export_regulation' slug=tournament.slug %}?fmt=docx">
+                        <span class="manage-export__format">Word (.docx)</span>
+                        <span class="manage-export__hint">Можно отредактировать</span>
+                    </a>
                 </div>
             </details>
-            <a href="{% url 'tournament_export_bracket' slug=tournament.slug %}" class="btn btn-outline">Скачать сетку (PDF)</a>
-            <span class="btn-manage-tournament-wrap">
+            <a href="{% url 'tournament_export_bracket' slug=tournament.slug %}" class="manage-export__btn" data-no-page-spinner>
+                <svg class="manage-export__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h5v4H3zM3 15h5v4H3zM16 10h5v4h-5zM8 7h3v10H8M11 12h5"/></svg>
+                <span class="manage-export__label-full">Скачать сетку (PDF)</span>
+                <span class="manage-export__label-short">Сетка PDF</span>
+            </a>
+            <span class="btn-manage-tournament-wrap manage-export__public">
                 <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="btn-manage-tournament">Открыть публичную страницу</a>
             </span>
         </div>
@@ -608,6 +623,40 @@
     }
 </style>
 {% block extra_js %}
+<script>
+(function() {
+    var menus = Array.prototype.slice.call(document.querySelectorAll('[data-export-menu]'));
+    if (!menus.length) return;
+    function closeAll(except) {
+        menus.forEach(function(menu) {
+            if (menu !== except) menu.removeAttribute('open');
+        });
+    }
+    menus.forEach(function(menu) {
+        menu.addEventListener('toggle', function() {
+            if (menu.open) closeAll(menu);
+        });
+        menu.querySelectorAll('a').forEach(function(link) {
+            link.addEventListener('click', function() {
+                menu.removeAttribute('open');
+            });
+        });
+    });
+    document.addEventListener('click', function(event) {
+        menus.forEach(function(menu) {
+            if (menu.open && !menu.contains(event.target)) menu.removeAttribute('open');
+        });
+    });
+    document.addEventListener('keydown', function(event) {
+        if (event.key !== 'Escape') return;
+        menus.forEach(function(menu) {
+            if (!menu.open) return;
+            menu.removeAttribute('open');
+            menu.querySelector('summary').focus();
+        });
+    });
+})();
+</script>
 <script>
 (function() {
     var debounceMs = 250;

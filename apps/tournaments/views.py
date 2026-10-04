@@ -7,7 +7,6 @@ import logging
 from collections import defaultdict
 from functools import wraps
 from itertools import groupby
-from pathlib import Path
 from typing import cast
 from urllib.parse import quote, urlencode
 
@@ -5061,18 +5060,11 @@ def _export_attachment(
     return response
 
 
-def _club_logo_uri(tournament: Tournament) -> str:
-    """file:// логотипа клуба, если файл есть на диске."""
-    club = tournament.club
-    if club is None or not getattr(club, "logo", None):
-        return ""
-    try:
-        path = Path(club.logo.path)
-    except (ValueError, OSError):
-        return ""
-    if not path.is_file():
-        return ""
-    return path.as_uri()
+def _document_logos(request, tournament: Tournament):
+    """Логотипы шапки: клубы турнира либо знак платформы."""
+    from apps.tournaments.exports.logos import logos_for_tournament
+
+    return logos_for_tournament(tournament, request)
 
 
 @login_required
@@ -5095,7 +5087,9 @@ def tournament_export_regulation(request, slug):
     if fmt == "docx":
         from apps.tournaments.exports.docx_regulation import build_regulation_docx
 
-        payload = build_regulation_docx(regulation)
+        payload = build_regulation_docx(
+            regulation, _document_logos(request, tournament)
+        )
         content_type = (
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
@@ -5105,7 +5099,10 @@ def tournament_export_regulation(request, slug):
 
         payload = render_pdf(
             "tournaments/exports/regulation_pdf.html",
-            {"regulation": regulation, "logo_uri": _club_logo_uri(tournament)},
+            {
+                "regulation": regulation,
+                "logos": _document_logos(request, tournament),
+            },
         )
         content_type = "application/pdf"
         filename = f"reglament-{tournament.slug}.pdf"
@@ -5125,7 +5122,10 @@ def tournament_export_bracket(request, slug):
     from apps.tournaments.exports.pdf import render_pdf
 
     layout = build_bracket_layout(tournament)
-    payload = render_pdf("tournaments/exports/bracket_pdf.html", {"layout": layout})
+    payload = render_pdf(
+        "tournaments/exports/bracket_pdf.html",
+        {"layout": layout, "logos": _document_logos(request, tournament)},
+    )
     log.info("Экспорт сетки {}", tournament.slug)
     return _export_attachment(
         payload, f"setka-{tournament.slug}.pdf", "application/pdf"

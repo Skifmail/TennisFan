@@ -25,11 +25,19 @@
     color: #c9a35a;
     margin-bottom: 8px;
 }
-.brand img {
-    height: 28px;
-    width: auto;
-    vertical-align: middle;
-    margin-right: 8px;
+.logos {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+}
+.logos img {
+    height: 52px;
+    width: 52px;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 50%;
+    padding: 2px;
 }
 .kicker {
     font-size: 11pt;
@@ -72,7 +80,13 @@ p { margin: 0 0 6px; }
 {% block body %}
 <header class="doc-head">
     <div class="brand">
-        {% if logo_uri %}<img src="{{ logo_uri }}" alt="">{% endif %}
+        {% if logos %}
+        <div class="logos">
+            {% for logo in logos %}
+            <img src="{{ logo.data_uri }}" alt="{{ logo.alt }}">
+            {% endfor %}
+        </div>
+        {% endif %}
         {{ regulation.organizer_name }} · TennisFan
     </div>
     <p class="kicker">Положение о проведении турнира</p>

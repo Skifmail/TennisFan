@@ -2,21 +2,33 @@
 
 from __future__ import annotations
 
+import io
+import tempfile
+import zipfile
 from decimal import Decimal
+from types import SimpleNamespace
+from typing import cast
 
-from django.test import TestCase
+from django.http import HttpRequest
+from django.template.loader import render_to_string
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 
 from apps.clubs.models import ClubMember, ClubMemberRole, ClubMemberStatus
 from apps.tournaments.exports.bracket import build_bracket_layout
+from apps.tournaments.exports.docx_regulation import build_regulation_docx
+from apps.tournaments.exports.logos import logos_for_tournament
+from apps.tournaments.exports.pdf import render_pdf
 from apps.tournaments.exports.regulation import (
     SECTION_EXTRA,
     SECTION_FEE,
     SECTION_POINTS,
+    RegulationContext,
     build_regulation_context,
 )
-from apps.tournaments.models import Match, TournamentFormat
+from apps.tournaments.models import Match, Tournament, TournamentFormat
 from tests.support.factories import make_club, make_player, make_tournament, make_user
 
 
@@ -218,3 +230,148 @@ class TournamentExportViewTestCase(TestCase):
         self.assertContains(response, "Скачать регламент")
         self.assertContains(response, "Скачать сетку (PDF)")
         self.assertContains(response, "fmt=docx")
+        self.assertEqual(response.content.decode().count("data-no-page-spinner"), 3)
+
+
+class _StorageLogo:
+    """Логотип облачного хранилища: path недоступен, байты читаются через open."""
+
+    def __init__(self, name: str, raw: bytes, *, broken: bool = False) -> None:
+        self.name = name
+        self._raw = raw
+        self._broken = broken
+
+    def __bool__(self) -> bool:
+        return True
+
+    @property
+    def path(self) -> str:
+        raise NotImplementedError("This backend doesn't support absolute paths.")
+
+    def open(self, mode: str = "rb") -> io.BytesIO:
+        if self._broken:
+            raise OSError("нет файла")
+        return io.BytesIO(self._raw)
+
+
+def _png(color: tuple[int, int, int]) -> bytes:
+    """Крошечный PNG для подстановки вместо файла клуба."""
+    buffer = io.BytesIO()
+    Image.new("RGB", (4, 4), color).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _export_request() -> HttpRequest:
+    """Запрос с хостом TennisFan, чтобы взялся логотип платформы."""
+    return cast(HttpRequest, RequestFactory().get("/", HTTP_HOST="tennisfan.ru"))
+
+
+def _club_tournament(logo: object) -> Tournament:
+    """Клубный турнир без обращения к базе."""
+    club = SimpleNamespace(pk=7, name="Альфа", logo=logo)
+    return cast(
+        Tournament,
+        SimpleNamespace(pk=3, club_id=7, club=club, is_open_interclub=False),
+    )
+
+
+class DocumentLogoTestCase(SimpleTestCase):
+    """В шапке документа — знак платформы или логотип клуба."""
+
+    def test_platform_tournament_uses_site_logo(self) -> None:
+        tournament = cast(
+            Tournament,
+            SimpleNamespace(pk=1, club_id=None, club=None, is_open_interclub=False),
+        )
+        logos = logos_for_tournament(tournament, _export_request())
+        self.assertEqual([logo.alt for logo in logos], ["TennisFan"])
+        self.assertTrue(logos[0].content.startswith(b"\x89PNG"))
+        self.assertTrue(logos[0].data_uri.startswith("data:image/png;base64,"))
+
+    def test_s3_club_logo_is_embedded(self) -> None:
+        raw = _png((180, 30, 30))
+        logos = logos_for_tournament(
+            _club_tournament(_StorageLogo("clubs/logo.png", raw)),
+            _export_request(),
+        )
+        self.assertEqual(logos[0].alt, "Альфа")
+        self.assertEqual(logos[0].content, raw)
+
+    def test_missing_club_logo_falls_back_to_platform(self) -> None:
+        logos = logos_for_tournament(
+            _club_tournament(_StorageLogo("clubs/logo.png", b"", broken=True)),
+            _export_request(),
+        )
+        self.assertEqual([logo.alt for logo in logos], ["TennisFan"])
+
+    def test_local_club_file_is_read(self) -> None:
+        raw = _png((20, 90, 40))
+        with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
+            tmp.write(raw)
+            tmp.flush()
+
+            class _LocalLogo:
+                name = "logo.png"
+
+                def __bool__(self) -> bool:
+                    return True
+
+                @property
+                def path(self) -> str:
+                    return tmp.name
+
+                def open(self, mode: str = "rb") -> io.BytesIO:
+                    raise AssertionError("локальный файл читается по path")
+
+            logos = logos_for_tournament(
+                _club_tournament(_LocalLogo()), _export_request()
+            )
+        self.assertEqual(logos[0].content, raw)
+
+    def test_docx_and_pdf_templates_include_logo(self) -> None:
+        tournament = cast(
+            Tournament,
+            SimpleNamespace(pk=1, club_id=None, club=None, is_open_interclub=False),
+        )
+        logos = logos_for_tournament(tournament, _export_request())
+        regulation = RegulationContext(
+            tournament_name="Кубок",
+            sport_label="Теннис",
+            format_label="Олимпийская система",
+            variant_label="Мужчины",
+            organizer_name="TennisFan",
+            generated_on="04.10.2026",
+            public_url="",
+            sections=(),
+        )
+        docx = build_regulation_docx(regulation, logos)
+        names = zipfile.ZipFile(io.BytesIO(docx)).namelist()
+        self.assertTrue(any(name.startswith("word/media/") for name in names))
+
+        html = render_to_string(
+            "tournaments/exports/regulation_pdf.html",
+            {"regulation": regulation, "logos": logos},
+        )
+        self.assertIn(logos[0].data_uri, html)
+        bracket_html = render_to_string(
+            "tournaments/exports/bracket_pdf.html",
+            {
+                "layout": SimpleNamespace(
+                    headline="Кубок",
+                    format_label="Сетка",
+                    status_note="Предварительная сетка",
+                    meta=[],
+                    footnote="",
+                    tables=[],
+                    boards=[],
+                ),
+                "logos": logos,
+            },
+        )
+        self.assertIn(logos[0].data_uri, bracket_html)
+
+        pdf = render_pdf(
+            "tournaments/exports/regulation_pdf.html",
+            {"regulation": regulation, "logos": logos},
+        )
+        self.assertIn(b"/Image", pdf)

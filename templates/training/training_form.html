@@ -22,6 +22,12 @@
                     {% for err in form.title.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
                 <div class="form-group">
+                    <label class="form-label">{{ form.sports.label }} *</label>
+                    {{ form.sports }}
+                    {% if form.sports.help_text %}<p class="form-hint text-muted" style="font-size: var(--font-size-xs);">{{ form.sports.help_text }}</p>{% endif %}
+                    {% for err in form.sports.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+                </div>
+                <div class="form-group">
                     <label class="form-label" for="id_short_description">{{ form.short_description.label }}</label>
                     {{ form.short_description }}
                     {% for err in form.short_description.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}

@@ -20,6 +20,13 @@
                 {% endif %}
 
                 <h1 style="font-size: var(--font-size-xl);">{{ coach.name }}</h1>
+                {% if coach.sports_display %}
+                <div class="d-flex gap-1 mt-2" style="flex-wrap: wrap; justify-content: center;">
+                    {% for sport_label in coach.sports_display %}
+                    <span class="player-category">{{ sport_label }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 <p class="text-secondary">{{ coach.specialization }}</p>
                 <p class="text-muted mt-2">Опыт: {{ coach.experience_years }} {{ coach.experience_years|years_suffix }}</p>
 
@@ -75,6 +82,9 @@
                 <a href="{% url 'training_detail' slug=training.slug %}" class="card">
                     <div class="card-body">
                         <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">
+                            {% for sport_label in training.sports_display %}
+                            <span class="player-category">{{ sport_label }}</span>
+                            {% endfor %}
                             {% for tt in training.training_types_display %}
                             <span class="player-category">{{ tt }}</span>
                             {% endfor %}

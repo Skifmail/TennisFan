@@ -25,7 +25,8 @@
                     <div class="my-trainings-offer__title-block">
                         <h3 class="my-trainings-offer__title">{{ t.title }}</h3>
                         <p class="my-trainings-offer__meta">
-                            {% for tt in t.training_types_display %}{{ tt }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                            {% for sport_label in t.sports_display %}{{ sport_label }}{% if not forloop.last %} / {% endif %}{% endfor %}
+                            {% if t.training_types_display %} · {% for tt in t.training_types_display %}{{ tt }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
                             · {{ t.city }}
                             {% if t.price_display %} · {{ t.price_display }}{% endif %}
                             {% if t.court_price_display %}

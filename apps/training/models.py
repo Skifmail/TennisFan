@@ -6,7 +6,6 @@ import logging
 from typing import cast
 
 from django.db import models
-from django.utils.text import slugify
 
 from apps.core.contact_utils import (
     build_max_url,
@@ -14,7 +13,7 @@ from apps.core.contact_utils import (
     build_whatsapp_url,
     get_max_display_contact,
 )
-from apps.core.sports import Sport
+from apps.core.sports import VenueSport, venue_sport_labels
 from apps.users.models import SkillLevel
 from apps.users.skill_levels import SKILL_LEVEL_NTRP
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
@@ -63,6 +62,13 @@ class Coach(models.Model):
     )
 
     city = models.CharField("Населённый пункт", max_length=100)
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=VenueSport.choices,
+        default=VenueSport.TENNIS,
+        db_index=True,
+    )
     is_active = models.BooleanField("Активен", default=True)
 
     created_at = models.DateTimeField("Создан", auto_now_add=True)
@@ -123,6 +129,11 @@ class Coach(models.Model):
         )
         return get_max_display_contact(raw)
 
+    @property
+    def sports_display(self) -> list[str]:
+        """Подписи видов спорта для публичной карточки тренера."""
+        return venue_sport_labels(self.sport)
+
 
 class CoachApplicationStatus(models.TextChoices):
     PENDING = "pending", "На рассмотрении"
@@ -182,6 +193,13 @@ class CoachApplication(CompressImageFieldsMixin, models.Model):
     max_contact = models.CharField("MAX", max_length=500, blank=True)
 
     city = models.CharField("Населённый пункт", max_length=100)
+    sport = models.CharField(
+        "Вид спорта",
+        max_length=20,
+        choices=VenueSport.choices,
+        default=VenueSport.TENNIS,
+        db_index=True,
+    )
 
     created_at = models.DateTimeField("Создана", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлена", auto_now=True)
@@ -205,12 +223,9 @@ class CoachApplication(CompressImageFieldsMixin, models.Model):
             raise ValueError(
                 "Можно одобрять только заявки со статусом «На рассмотрении»."
             )
-        base_slug = slugify(self.name, allow_unicode=True) or "coach"
-        slug = base_slug
-        n = 0
-        while Coach.objects.filter(slug=slug).exists():
-            n += 1
-            slug = f"{base_slug}-{n}"
+        from apps.training.coach_defaults import unique_coach_slug
+
+        slug = unique_coach_slug(self.name)
         coach = Coach.objects.create(
             user=self.applicant_user,
             name=self.name,
@@ -223,6 +238,7 @@ class CoachApplication(CompressImageFieldsMixin, models.Model):
             whatsapp=self.whatsapp or "",
             max_contact=self.max_contact or "",
             city=self.city,
+            sport=self.sport or VenueSport.TENNIS,
             is_active=True,
         )
         if self.photo:
@@ -251,8 +267,8 @@ class Training(CompressImageFieldsMixin, models.Model):
     sport = models.CharField(
         "Вид спорта",
         max_length=20,
-        choices=Sport.choices,
-        default=Sport.TENNIS,
+        choices=VenueSport.choices,
+        default=VenueSport.TENNIS,
         db_index=True,
     )
     description = models.TextField("Описание")
@@ -355,6 +371,11 @@ class Training(CompressImageFieldsMixin, models.Model):
         """Человекочитаемые названия выбранных типов тренировки."""
         mapping = dict(TrainingType.choices)
         return [mapping.get(t, t) for t in self.training_types]
+
+    @property
+    def sports_display(self) -> list[str]:
+        """Подписи видов спорта для карточки тренировки."""
+        return venue_sport_labels(self.sport)
 
     @property
     def type_prices_display(self) -> list[tuple[str, str]]:

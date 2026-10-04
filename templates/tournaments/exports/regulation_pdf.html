@@ -12,12 +12,17 @@
     }
 }
 .doc-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
     background: #0b3d2e;
     color: #f7f4ec;
-    padding: 16px 18px 14px;
+    padding: 14px 16px 12px;
     border-bottom: 4px solid #c9a35a;
     margin-bottom: 16px;
 }
+.doc-head__main { flex: 1; min-width: 0; }
 .brand {
     font-size: 9pt;
     letter-spacing: 0.08em;
@@ -27,17 +32,18 @@
 }
 .logos {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    justify-content: flex-end;
     gap: 8px;
-    margin: 0 0 8px;
+    flex-shrink: 0;
 }
 .logos img {
-    height: 52px;
-    width: 52px;
+    height: 84px;
+    width: 84px;
     object-fit: contain;
     background: #fff;
     border-radius: 50%;
-    padding: 2px;
+    padding: 3px;
 }
 .kicker {
     font-size: 11pt;
@@ -79,22 +85,22 @@ p { margin: 0 0 6px; }
 {% endblock %}
 {% block body %}
 <header class="doc-head">
-    <div class="brand">
-        {% if logos %}
-        <div class="logos">
-            {% for logo in logos %}
-            <img src="{{ logo.data_uri }}" alt="{{ logo.alt }}">
-            {% endfor %}
-        </div>
-        {% endif %}
-        {{ regulation.organizer_name }} · TennisFan
+    <div class="doc-head__main">
+        <div class="brand">{{ regulation.organizer_name }} · TennisFan</div>
+        <p class="kicker">Положение о проведении турнира</p>
+        <h1>{{ regulation.tournament_name }}</h1>
+        <p class="doc-meta">
+            {{ regulation.sport_label }} · {{ regulation.format_label }} · {{ regulation.variant_label }}
+            · документ от {{ regulation.generated_on }}
+        </p>
     </div>
-    <p class="kicker">Положение о проведении турнира</p>
-    <h1>{{ regulation.tournament_name }}</h1>
-    <p class="doc-meta">
-        {{ regulation.sport_label }} · {{ regulation.format_label }} · {{ regulation.variant_label }}
-        · документ от {{ regulation.generated_on }}
-    </p>
+    {% if logos %}
+    <div class="logos">
+        {% for logo in logos %}
+        <img src="{{ logo.data_uri }}" alt="{{ logo.alt }}">
+        {% endfor %}
+    </div>
+    {% endif %}
 </header>
 {% for section in regulation.sections %}
 <section>

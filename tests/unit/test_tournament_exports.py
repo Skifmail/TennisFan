@@ -59,7 +59,7 @@ class RegulationContextTestCase(TestCase):
         titles = _titles(tournament)
         self.assertIn(SECTION_POINTS, titles)
         self.assertNotIn(SECTION_EXTRA, titles)
-        self.assertIn("Описание турнира", titles)
+        self.assertNotIn("Описание турнира", titles)
         points = _row_map(tournament, SECTION_POINTS)
         self.assertEqual(points["Вылет в 1 круге"], "11")
 

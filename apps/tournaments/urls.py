@@ -74,6 +74,16 @@ urlpatterns = [
         name="tournament_manage",
     ),
     path(
+        "<slug:slug>/manage/export/regulation/",
+        views.tournament_export_regulation,
+        name="tournament_export_regulation",
+    ),
+    path(
+        "<slug:slug>/manage/export/bracket/",
+        views.tournament_export_bracket,
+        name="tournament_export_bracket",
+    ),
+    path(
         "<slug:slug>/manage/generate-bracket/",
         views.tournament_manage_generate_bracket,
         name="tournament_manage_generate_bracket",

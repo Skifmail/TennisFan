@@ -19,7 +19,13 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends \
         libpq-dev \
         gcc \
-        cron; \
+        cron \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+        libpangocairo-1.0-0 \
+        libharfbuzz0b \
+        libharfbuzz-subset0 \
+        fonts-dejavu-core; \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

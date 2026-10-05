@@ -16,6 +16,7 @@ from docx.text.paragraph import Paragraph
 from loguru import logger as log
 
 from apps.tournaments.exports.logos import ExportLogo
+from apps.tournaments.exports.public_qr import PublicPageQr
 from apps.tournaments.exports.regulation import RegulationContext, Section
 
 _GREEN = RGBColor(0x0B, 0x3D, 0x2E)
@@ -27,12 +28,14 @@ _FONT = "Times New Roman"
 def build_regulation_docx(
     regulation: RegulationContext,
     logos: tuple[ExportLogo, ...] = (),
+    page_qr: PublicPageQr | None = None,
 ) -> bytes:
     """Собрать .docx положения.
 
     Args:
         regulation: Готовые разделы документа.
         logos: Логотипы шапки. Клубные либо знак платформы.
+        page_qr: QR-код публичной страницы. Текстовая ссылка не печатается.
 
     Returns:
         bytes: Файл Office Open XML.
@@ -45,16 +48,34 @@ def build_regulation_docx(
     _add_title(document, regulation)
     for index, section in enumerate(regulation.sections, start=1):
         _add_section(document, index, section)
-    if regulation.public_url:
-        paragraph = document.add_paragraph()
-        run = paragraph.add_run(f"Публичная страница: {regulation.public_url}")
-        run.italic = True
-        run.font.size = Pt(10)
-        run.font.color.rgb = _GREEN
-        run.font.name = _FONT
+    _add_public_qr(document, page_qr)
     buffer = BytesIO()
     document.save(buffer)
     return buffer.getvalue()
+
+
+def _add_public_qr(document: WordDocument, page_qr: PublicPageQr | None) -> None:
+    """QR-код страницы турнира в конце документа."""
+    if page_qr is None:
+        return
+    picture = document.add_paragraph()
+    run = picture.add_run()
+    try:
+        run.add_picture(BytesIO(page_qr.content), width=Cm(3.2))
+    except Exception as exc:
+        log.warning("Не удалось вставить QR-код страницы турнира в Word: {}", exc)
+        return
+    caption = document.add_paragraph()
+    label = caption.add_run("Страница турнира")
+    label.bold = True
+    label.font.size = Pt(11)
+    label.font.color.rgb = _GREEN
+    label.font.name = _FONT
+    hint = document.add_paragraph()
+    hint_run = hint.add_run("Наведите камеру телефона на код")
+    hint_run.italic = True
+    hint_run.font.size = Pt(10)
+    hint_run.font.name = _FONT
 
 
 def _apply_base_style(document: WordDocument) -> None:

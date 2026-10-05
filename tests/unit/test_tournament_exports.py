@@ -21,6 +21,7 @@ from apps.tournaments.exports.bracket import build_bracket_layout
 from apps.tournaments.exports.docx_regulation import build_regulation_docx
 from apps.tournaments.exports.logos import logos_for_tournament
 from apps.tournaments.exports.pdf import render_pdf
+from apps.tournaments.exports.public_qr import public_page_qr
 from apps.tournaments.exports.regulation import (
     SECTION_EXTRA,
     SECTION_FEE,
@@ -83,7 +84,9 @@ class RegulationContextTestCase(TestCase):
         titles = _titles(tournament)
         self.assertIn(SECTION_EXTRA, titles)
         fee = _row_map(tournament, SECTION_FEE)
-        self.assertIn("24", fee["Постоплата"])
+        self.assertIn("в течение 24 часа", fee["Постоплата"])
+        self.assertIn("будет направлена ссылка на оплату", fee["Постоплата"])
+        self.assertIn("участие в турнире аннулируется", fee["Постоплата"])
         self.assertEqual(fee["Вступительный взнос"], "1000 ₽")
         context = build_regulation_context(tournament)
         self.assertEqual(context.organizer_name, "Клуб Восток")
@@ -375,3 +378,31 @@ class DocumentLogoTestCase(SimpleTestCase):
             {"regulation": regulation, "logos": logos},
         )
         self.assertIn(b"/Image", pdf)
+
+    def test_public_page_link_is_a_qr_code(self) -> None:
+        page = "https://tennisfan.ru/tournaments/demo/"
+        code = public_page_qr(page)
+        self.assertIsNotNone(code)
+        assert code is not None
+        self.assertTrue(code.content.startswith(b"\x89PNG"))
+        self.assertIsNone(public_page_qr("  "))
+        regulation = RegulationContext(
+            tournament_name="Кубок",
+            sport_label="Теннис",
+            format_label="Олимпийская система",
+            variant_label="Мужчины",
+            organizer_name="TennisFan",
+            generated_on="04.10.2026",
+            public_url=page,
+            sections=(),
+        )
+        html = render_to_string(
+            "tournaments/exports/regulation_pdf.html",
+            {"regulation": regulation, "logos": (), "public_qr": code},
+        )
+        self.assertIn(code.data_uri, html)
+        self.assertNotIn(page, html)
+        docx = build_regulation_docx(regulation, page_qr=code)
+        names = zipfile.ZipFile(io.BytesIO(docx)).namelist()
+        self.assertTrue(any(name.startswith("word/media/") for name in names))
+        self.assertNotIn(page.encode(), docx)

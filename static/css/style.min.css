@@ -2224,6 +2224,18 @@ button {
 
 select.form-control {
     cursor: pointer;
+    color-scheme: dark;
+}
+
+select.form-control option {
+    background-color: var(--color-bg-elevated);
+    color: var(--color-text);
+}
+
+select.form-control option:checked,
+select.form-control option:hover {
+    background-color: var(--color-primary-transparent);
+    color: var(--color-text);
 }
 
 /* Формы страницы управления турниром (мобильная адаптация) */
@@ -15148,6 +15160,16 @@ a.match-details-value__lead:hover {
     line-height: 1.25;
 }
 
+.courts-catalog .courts-filters select.form-control {
+    color-scheme: dark;
+    background-color: var(--color-bg-elevated);
+}
+
+.courts-catalog .courts-filters select.form-control option {
+    background-color: var(--color-bg-elevated);
+    color: var(--color-text);
+}
+
 .courts-filters__field.is-active .form-control,
 .courts-filters__field.is-active .club-filter-select__toggle {
     border-color: rgb(166 130 74 / 0.85);
@@ -17268,6 +17290,12 @@ a.home-activity__actor:hover {
     align-items: center;
 }
 
+.section-header--home-tournaments .home-tournaments-header__actions .profile-sport-switch {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-top: 0;
+}
+
 #home-tournaments-block .home-tournaments-mobile-list {
     display: none;
 }
@@ -17429,6 +17457,14 @@ a.home-activity__actor:hover {
         flex-wrap: wrap;
         width: auto;
         align-items: center;
+        justify-content: flex-end;
+        max-width: 70%;
+    }
+
+    .section-header--home-tournaments .home-tournaments-header__actions .profile-sport-switch {
+        order: -1;
+        width: 100%;
+        justify-content: flex-end;
     }
 
     .section-header--home-tournaments .home-tournaments-header__actions .btn {

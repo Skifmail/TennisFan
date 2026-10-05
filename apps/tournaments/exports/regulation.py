@@ -239,11 +239,16 @@ def _fee_section(tournament: Tournament) -> Section:
     rows = [InfoRow("Вступительный взнос", _money(tournament.entry_fee))]
     paragraphs: list[str] = []
     if tournament.allow_postpayment:
-        hours = tournament.get_postpayment_deadline_hours()
+        hours = _hours_label(tournament.get_postpayment_deadline_hours())
         rows.append(
             InfoRow(
                 "Постоплата",
-                f"Разрешена. На оплату даётся {hours} ч. после открытия окна.",
+                (
+                    "Регистрация проходит без предоплаты. После её закрытия "
+                    "участникам, не оплатившим взнос, будет направлена ссылка "
+                    f"на оплату. Взнос необходимо внести в течение {hours}, "
+                    "в противном случае участие в турнире аннулируется."
+                ),
             )
         )
     else:
@@ -336,6 +341,22 @@ def _extra_section(tournament: Tournament) -> Section | None:
         return None
     paragraphs = tuple(part.strip() for part in text.splitlines() if part.strip())
     return Section(title=SECTION_EXTRA, paragraphs=paragraphs)
+
+
+def _hours_label(hours: int) -> str:
+    """Срок в часах с правильным склонением: «1 час», «24 часа», «12 часов»."""
+    count = abs(int(hours))
+    mod100 = count % 100
+    mod10 = count % 10
+    if 11 <= mod100 <= 14:
+        word = "часов"
+    elif mod10 == 1:
+        word = "час"
+    elif 2 <= mod10 <= 4:
+        word = "часа"
+    else:
+        word = "часов"
+    return f"{count} {word}"
 
 
 def _dates_label(tournament: Tournament) -> str:

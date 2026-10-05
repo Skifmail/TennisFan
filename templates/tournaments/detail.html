@@ -491,8 +491,8 @@
     {% if tournament.description %}
     <div class="card mb-4">
         <div class="card-body">
-            <h3 class="section-title mb-2">Название турнира</h3>
-            {{ tournament.description }}
+            <h3 class="section-title mb-2">Описание</h3>
+            <div class="text-secondary mb-0">{{ tournament.description|linebreaksbr }}</div>
         </div>
     </div>
     {% endif %}

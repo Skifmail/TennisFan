@@ -80,6 +80,14 @@
             }
         });
 
+        document.querySelectorAll('[data-sport-title]').forEach(function(el) {
+            var tennisTitle = el.getAttribute('data-title-tennis');
+            var padelTitle = el.getAttribute('data-title-padel');
+            if (tennisTitle && padelTitle) {
+                el.textContent = isPadel ? padelTitle : tennisTitle;
+            }
+        });
+
         var sportInput = document.getElementById('home-filter-sport');
         if (sportInput) {
             sportInput.value = sport;

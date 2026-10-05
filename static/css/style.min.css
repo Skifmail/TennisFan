@@ -18369,6 +18369,10 @@ a.home-activity__actor:hover {
     gap: var(--spacing-xl);
 }
 
+.page-header--coaches .profile-sport-switch {
+    margin: 1.15rem auto 0;
+}
+
 .coach-list-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -22406,14 +22410,25 @@ a.home-activity__actor:hover {
     pointer-events: none;
 }
 
+.club-public__hero--image {
+    background: #101612;
+    padding: 176px 0 44px;
+    min-height: 480px;
+}
+
 .club-public__hero--image::before {
     content: "";
     position: absolute;
     inset: 0;
     background-image: var(--club-hero-bg-image);
     background-size: cover;
-    background-position: center;
-    opacity: 0.22;
+    background-position: center 42%;
+    opacity: 1;
+}
+
+.club-public__hero--image::after {
+    background:
+        linear-gradient(180deg, rgba(8, 12, 10, 0.22) 0%, rgba(8, 12, 10, 0.05) 34%, rgba(8, 12, 10, 0.18) 68%, rgba(6, 14, 11, 0.42) 100%);
 }
 
 .club-public__hero-grid {
@@ -22917,6 +22932,11 @@ a.home-activity__actor:hover {
 @media (max-width: 768px) {
     .club-public__hero {
         padding: 28px 0 22px;
+    }
+
+    .club-public__hero--image {
+        padding: 118px 0 22px;
+        min-height: 0;
     }
 
     .club-public__identity,

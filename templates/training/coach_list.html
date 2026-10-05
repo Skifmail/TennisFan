@@ -1,12 +1,18 @@
 {% extends 'base.html' %}
 {% load skill_tags %}
 
-{% block title %}Тренеры{% endblock %}
+{% block title %}Тренеры{% if current_sport == 'padel' %} — падел{% endif %}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">Наши тренеры</h1>
+<div class="page-header page-header--coaches">
+    <h1
+        class="page-title"
+        data-sport-title
+        data-title-tennis="Наши тренеры"
+        data-title-padel="Наши тренеры — падел"
+    >Наши тренеры{% if current_sport == 'padel' %} — падел{% endif %}</h1>
     <p class="page-subtitle">Профессиональные тренеры TennisFan</p>
+    {% include 'includes/sport_switch.html' with current_sport=current_sport aria_label='Вид спорта тренеров' %}
 </div>
 
 <div class="container">
@@ -15,32 +21,34 @@
         <a href="{% url 'coach_application_create' %}" class="btn btn-primary btn--filter-size">Стать тренером</a>
     </div>
     {% endif %}
-    <div class="coach-list-grid">
-        {% for coach in coaches %}
-        <a href="{% url 'coach_detail' slug=coach.slug %}" class="card coach-list-card" style="text-align: center;">
-            <div class="card-body">
-                {% if coach.photo_or_avatar %}
-                <img src="{{ coach.photo_or_avatar.url }}" alt="" class="player-avatar"
-                    style="width: 100px; height: 100px; margin: 0 auto var(--spacing-lg);">
-                {% else %}
-                <div class="player-avatar" style="width: 100px; height: 100px; margin: 0 auto var(--spacing-lg);"></div>
-                {% endif %}
-                <h3 class="card-title">{{ coach.name }}</h3>
-                {% if coach.sports_display %}
-                <div class="d-flex gap-1 mt-2" style="flex-wrap: wrap; justify-content: center;">
-                    {% for sport_label in coach.sports_display %}
-                    <span class="player-category">{{ sport_label }}</span>
-                    {% endfor %}
+    <div data-sport-swap="coaches">
+        <div class="coach-list-grid">
+            {% for coach in coaches %}
+            <a href="{% url 'coach_detail' slug=coach.slug %}" class="card coach-list-card" style="text-align: center;">
+                <div class="card-body">
+                    {% if coach.photo_or_avatar %}
+                    <img src="{{ coach.photo_or_avatar.url }}" alt="" class="player-avatar"
+                        style="width: 100px; height: 100px; margin: 0 auto var(--spacing-lg);">
+                    {% else %}
+                    <div class="player-avatar" style="width: 100px; height: 100px; margin: 0 auto var(--spacing-lg);"></div>
+                    {% endif %}
+                    <h3 class="card-title">{{ coach.name }}</h3>
+                    {% if coach.sports_display %}
+                    <div class="d-flex gap-1 mt-2" style="flex-wrap: wrap; justify-content: center;">
+                        {% for sport_label in coach.sports_display %}
+                        <span class="player-category">{{ sport_label }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ coach.specialization }}</p>
+                    <p class="text-muted mt-2" style="font-size: var(--font-size-sm);">Опыт: {{ coach.experience_years }}
+                        {{ coach.experience_years|years_suffix }}</p>
                 </div>
-                {% endif %}
-                <p class="text-secondary" style="font-size: var(--font-size-sm);">{{ coach.specialization }}</p>
-                <p class="text-muted mt-2" style="font-size: var(--font-size-sm);">Опыт: {{ coach.experience_years }}
-                    {{ coach.experience_years|years_suffix }}</p>
-            </div>
-        </a>
-        {% empty %}
-        <p class="text-secondary">Тренеры пока не добавлены.</p>
-        {% endfor %}
+            </a>
+            {% empty %}
+            <p class="text-secondary">Тренеры пока не добавлены.</p>
+            {% endfor %}
+        </div>
     </div>
 </div>
 {% endblock %}

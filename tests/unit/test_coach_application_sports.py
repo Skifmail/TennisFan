@@ -222,3 +222,64 @@ class CoachPublicSportsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Теннис")
         self.assertContains(response, "Падел")
+
+
+class CoachListSportSwitcherTestCase(TestCase):
+    """Список тренеров фильтруется тумблером теннис/падел."""
+
+    def setUp(self) -> None:
+        self.user = make_user(email="coach-list-sport@test.local")
+        self.client.force_login(self.user)
+        Coach.objects.create(
+            name="Теннисный тренер",
+            slug="tennis-coach-list",
+            city="Москва",
+            sport=VenueSport.TENNIS,
+            is_active=True,
+        )
+        Coach.objects.create(
+            name="Падел тренер",
+            slug="padel-coach-list",
+            city="Москва",
+            sport=VenueSport.PADEL,
+            is_active=True,
+        )
+        Coach.objects.create(
+            name="Универсальный тренер",
+            slug="both-coach-list",
+            city="Москва",
+            sport=VenueSport.BOTH,
+            is_active=True,
+        )
+
+    def test_default_shows_tennis_coaches_and_switcher(self) -> None:
+        response = self.client.get(reverse("coach_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        names = [coach.name for coach in response.context["coaches"]]
+        self.assertIn("Теннисный тренер", names)
+        self.assertIn("Универсальный тренер", names)
+        self.assertNotIn("Падел тренер", names)
+        self.assertContains(response, "profile-sport-switch__track")
+        self.assertContains(response, 'aria-label="Вид спорта тренеров"')
+        self.assertContains(response, 'data-sport-swap="coaches"')
+        self.assertContains(response, "js/sport_switch.js")
+        self.assertNotContains(response, "profile-sport-switch__track is-padel")
+        self.assertContains(response, ">Наши тренеры</h1>")
+        self.assertNotContains(response, ">Наши тренеры — падел</h1>")
+
+    def test_padel_shows_padel_coaches(self) -> None:
+        response = self.client.get(
+            reverse("coach_list"),
+            {"sport": "padel"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        names = [coach.name for coach in response.context["coaches"]]
+        self.assertIn("Падел тренер", names)
+        self.assertIn("Универсальный тренер", names)
+        self.assertNotIn("Теннисный тренер", names)
+        self.assertContains(response, "profile-sport-switch__track is-padel")
+        self.assertContains(response, "Наши тренеры — падел")
+        self.assertEqual(response.context["current_sport"], Sport.PADEL)

@@ -62,6 +62,24 @@ class SparringToolbarCssTests(SimpleTestCase):
         self.assertIn("position: sticky", css)
         self.assertIn("top: 3.35rem", css)
 
+    def test_home_mobile_sport_switch_sits_left_of_all_tournaments(self) -> None:
+        """На телефоне тумблер спорта стоит в одном ряду слева от «Все турниры»."""
+        css_path = Path(settings.BASE_DIR) / "static" / "css" / "pages" / "home.css"
+        css = css_path.read_text(encoding="utf-8")
+        self.assertIn(
+            ".section-header--home-tournaments .home-tournaments-header__actions {\n"
+            "        flex-direction: row;\n"
+            "        flex-wrap: nowrap;",
+            css,
+        )
+        self.assertNotIn("order: -1;", css)
+        self.assertNotIn(
+            ".home-tournaments-header__actions .profile-sport-switch {\n"
+            "        order: -1;\n"
+            "        width: 100%;",
+            css,
+        )
+
     def test_filter_grid_wraps_at_readable_min_width(self) -> None:
         """Сетка фильтров на главной не сжимается до 180px."""
         css_path = (

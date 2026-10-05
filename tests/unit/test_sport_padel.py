@@ -221,7 +221,7 @@ class ProfileSportSwitcherTestCase(TestCase):
 
 
 class HomeSportSwitcherTestCase(TestCase):
-    """На главной топ рейтинга использует тот же тумблер спорта, что профиль."""
+    """На главной тумблер спорта стоит у турниров и у топа рейтинга."""
 
     def test_home_rating_uses_sport_switch(self) -> None:
         response = self.client.get(reverse("home"), secure=True)
@@ -229,6 +229,8 @@ class HomeSportSwitcherTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "profile-sport-switch__track")
         self.assertContains(response, "Полный рейтинг")
+        self.assertContains(response, 'aria-label="Вид спорта турниров"')
+        self.assertContains(response, "home-tournaments-header__all")
         self.assertNotContains(response, 'class="btn btn-outline">Теннис')
 
     def test_home_padel_switch_is_active(self) -> None:
@@ -237,6 +239,9 @@ class HomeSportSwitcherTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "profile-sport-switch__track is-padel")
         self.assertContains(response, "Топ рейтинга — падел")
+        self.assertContains(response, "Турниры — падел")
+        self.assertContains(response, 'aria-label="Вид спорта турниров"')
+        self.assertContains(response, "sport=padel")
         self.assertContains(response, 'data-sport-swap="home-rating"')
         self.assertContains(response, 'data-sport-swap="home-tournaments"')
         self.assertContains(response, 'id="home-filter-sport"')

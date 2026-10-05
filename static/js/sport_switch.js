@@ -84,6 +84,23 @@
         if (sportInput) {
             sportInput.value = sport;
         }
+
+        var homeTournamentsTitle = document.querySelector(
+            '.section-header--home-tournaments .section-title'
+        );
+        if (homeTournamentsTitle) {
+            homeTournamentsTitle.textContent = isPadel ? 'Турниры — падел' : 'Турниры';
+        }
+        var allTournamentsLink = document.querySelector('.home-tournaments-header__all');
+        if (allTournamentsLink) {
+            try {
+                var allUrl = new URL(allTournamentsLink.href, window.location.origin);
+                allUrl.searchParams.set('sport', sport);
+                allTournamentsLink.setAttribute('href', allUrl.pathname + allUrl.search);
+            } catch (err) {
+                allTournamentsLink.setAttribute('href', '/tournaments/?sport=' + sport);
+            }
+        }
     }
 
     function parseHtml(html) {
@@ -138,12 +155,21 @@
         });
     }
 
-    function pinSwitcher(anchorTop) {
-        if (anchorTop === null || typeof anchorTop === 'undefined') {
-            return;
+    function switcherIndex(nav) {
+        var navs = document.querySelectorAll('.profile-sport-switch');
+        return Array.prototype.indexOf.call(navs, nav);
+    }
+
+    function switcherAt(index) {
+        var navs = document.querySelectorAll('.profile-sport-switch');
+        if (index >= 0 && index < navs.length) {
+            return navs[index];
         }
-        var switcher = document.querySelector('.profile-sport-switch');
-        if (!switcher) {
+        return navs[0] || null;
+    }
+
+    function pinSwitcher(switcher, anchorTop) {
+        if (!switcher || anchorTop === null || typeof anchorTop === 'undefined') {
             return;
         }
         var delta = switcher.getBoundingClientRect().top - anchorTop;
@@ -184,8 +210,9 @@
         if ('scrollRestoration' in history) {
             history.scrollRestoration = 'manual';
         }
-        var switcher = document.querySelector('.profile-sport-switch');
-        var anchorTop = switcher ? switcher.getBoundingClientRect().top : null;
+        var clickedSwitcher = opts.switcher || null;
+        var clickedIndex = switcherIndex(clickedSwitcher);
+        var anchorTop = clickedSwitcher ? clickedSwitcher.getBoundingClientRect().top : null;
 
         fetch(fetchUrl, {
             headers: {
@@ -219,10 +246,12 @@
                     history.pushState({ sportSwitch: true }, '', publicUrl);
                 }
                 afterSwap();
-                pinSwitcher(anchorTop);
-                requestAnimationFrame(function() {
-                    pinSwitcher(anchorTop);
-                });
+                if (clickedSwitcher) {
+                    pinSwitcher(switcherAt(clickedIndex), anchorTop);
+                    requestAnimationFrame(function() {
+                        pinSwitcher(switcherAt(clickedIndex), anchorTop);
+                    });
+                }
             })
             .catch(function(err) {
                 if (err && err.name === 'AbortError') {
@@ -247,7 +276,10 @@
         if (nextSport === currentSport()) {
             return;
         }
-        loadSport(buildPublicUrl(nextSport), { pushState: true });
+        loadSport(buildPublicUrl(nextSport), {
+            pushState: true,
+            switcher: link.closest('.profile-sport-switch')
+        });
     });
 
     window.addEventListener('popstate', function() {

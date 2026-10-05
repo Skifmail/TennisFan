@@ -77,10 +77,27 @@ th {
 td { background: #f7f4ec; }
 tr:nth-child(even) td { background: #fff; }
 p { margin: 0 0 6px; }
-.public {
-    margin-top: 14px;
-    font-size: 9pt;
+.public-qr {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 18px;
+    break-inside: avoid;
+}
+.public-qr img {
+    width: 32mm;
+    height: 32mm;
+}
+.public-qr__title {
+    margin: 0 0 2px;
+    font-size: 11pt;
+    font-weight: 700;
     color: #0b3d2e;
+}
+.public-qr__hint {
+    margin: 0;
+    font-size: 9pt;
+    color: #3d4a44;
 }
 {% endblock %}
 {% block body %}
@@ -125,7 +142,13 @@ p { margin: 0 0 6px; }
     {% endif %}
 </section>
 {% endfor %}
-{% if regulation.public_url %}
-<p class="public">Публичная страница: {{ regulation.public_url }}</p>
+{% if public_qr %}
+<div class="public-qr">
+    <img src="{{ public_qr.data_uri }}" alt="QR-код страницы турнира">
+    <div>
+        <p class="public-qr__title">Страница турнира</p>
+        <p class="public-qr__hint">Наведите камеру телефона на код</p>
+    </div>
+</div>
 {% endif %}
 {% endblock %}

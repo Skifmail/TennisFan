@@ -127,6 +127,16 @@
     line-height: 1.25;
 }
 
+.courts-catalog .courts-filters select.form-control {
+    color-scheme: dark;
+    background-color: var(--color-bg-elevated);
+}
+
+.courts-catalog .courts-filters select.form-control option {
+    background-color: var(--color-bg-elevated);
+    color: var(--color-text);
+}
+
 .courts-filters__field.is-active .form-control,
 .courts-filters__field.is-active .club-filter-select__toggle {
     border-color: rgb(166 130 74 / 0.85);

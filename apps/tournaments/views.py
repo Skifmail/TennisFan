@@ -5084,11 +5084,14 @@ def tournament_export_regulation(request, slug):
         reverse("tournament_detail", kwargs={"slug": tournament.slug})
     )
     regulation = build_regulation_context(tournament, public_url=public_url)
+    from apps.tournaments.exports.public_qr import public_page_qr
+
+    page_qr = public_page_qr(public_url)
     if fmt == "docx":
         from apps.tournaments.exports.docx_regulation import build_regulation_docx
 
         payload = build_regulation_docx(
-            regulation, _document_logos(request, tournament)
+            regulation, _document_logos(request, tournament), page_qr
         )
         content_type = (
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -5102,6 +5105,7 @@ def tournament_export_regulation(request, slug):
             {
                 "regulation": regulation,
                 "logos": _document_logos(request, tournament),
+                "public_qr": page_qr,
             },
         )
         content_type = "application/pdf"

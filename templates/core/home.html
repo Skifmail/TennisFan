@@ -390,9 +390,10 @@
 <section class="section section-tournaments-spaced">
     <div class="container">
         <div class="section-header section-header--home-tournaments">
-            <h2 class="section-title">Турниры</h2>
+            <h2 class="section-title">Турниры{% if home_sport == 'padel' %} — падел{% endif %}</h2>
             <div class="section-header__actions home-tournaments-header__actions">
-                <a href="{% url 'tournament_list' %}" class="btn btn-outline">Все турниры</a>
+                {% include 'includes/sport_switch.html' with current_sport=home_sport aria_label='Вид спорта турниров' %}
+                <a href="{% url 'tournament_list' %}{% if home_sport %}?sport={{ home_sport }}{% endif %}" class="btn btn-outline home-tournaments-header__all">Все турниры</a>
                 <a href="?" class="btn btn-outline home-tournaments-header__reset" data-home-tournaments-reset="1">Сбросить фильтры</a>
             </div>
         </div>

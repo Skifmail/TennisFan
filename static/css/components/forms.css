@@ -55,6 +55,18 @@
 
 select.form-control {
     cursor: pointer;
+    color-scheme: dark;
+}
+
+select.form-control option {
+    background-color: var(--color-bg-elevated);
+    color: var(--color-text);
+}
+
+select.form-control option:checked,
+select.form-control option:hover {
+    background-color: var(--color-primary-transparent);
+    color: var(--color-text);
 }
 
 /* Формы страницы управления турниром (мобильная адаптация) */

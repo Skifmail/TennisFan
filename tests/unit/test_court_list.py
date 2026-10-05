@@ -1,6 +1,9 @@
 """Список кортов: город на карточке и поиск по названию."""
 
-from django.test import TestCase
+from pathlib import Path
+
+from django.conf import settings
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from apps.courts.models import Court
@@ -60,6 +63,8 @@ class CourtListCatalogTestCase(TestCase):
         self.assertContains(response, "courts-masthead")
         self.assertContains(response, "2 корта")
         self.assertContains(response, "Подать заявку")
+        self.assertContains(response, 'id="court-filter-sport"')
+        self.assertContains(response, "Вид спорта")
         self.assertNotContains(response, "Подать заявку на добавление корта")
         self.assertNotContains(response, "Сбросить фильтры")
 
@@ -87,3 +92,15 @@ class CourtListCatalogTestCase(TestCase):
         self.assertContains(response, "Корты не найдены.")
         self.assertContains(response, "courts-empty__reset")
         self.assertContains(response, "Сбросить фильтры")
+
+
+class CourtSportSelectCssTests(SimpleTestCase):
+    """Пункты «Вид спорта» читаются на тёмной теме."""
+
+    def test_select_options_use_dark_colors(self) -> None:
+        css = (
+            Path(settings.BASE_DIR) / "static" / "css" / "pages" / "courts.css"
+        ).read_text(encoding="utf-8")
+        self.assertIn("select.form-control option", css)
+        self.assertIn("color-scheme: dark", css)
+        self.assertIn("background-color: var(--color-bg-elevated)", css)

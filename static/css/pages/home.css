@@ -1885,6 +1885,7 @@ a.home-activity__actor:hover {
 
     .section-header.section-header--home-tournaments {
         flex-direction: row;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: 0.5rem;
@@ -1895,21 +1896,28 @@ a.home-activity__actor:hover {
         margin: 0;
         font-size: 1.15rem;
         line-height: 1.1;
+        flex: 0 1 auto;
     }
 
     .section-header--home-tournaments .home-tournaments-header__actions {
         flex-direction: row;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         width: auto;
+        max-width: none;
+        min-width: 0;
+        margin-left: auto;
         align-items: center;
         justify-content: flex-end;
-        max-width: 70%;
+        gap: 0.45rem;
     }
 
     .section-header--home-tournaments .home-tournaments-header__actions .profile-sport-switch {
-        order: -1;
-        width: 100%;
-        justify-content: flex-end;
+        flex: 0 1 auto;
+        width: auto;
+        min-width: 0;
+        margin-top: 0;
+        justify-content: flex-start;
+        gap: 0.32rem;
     }
 
     .section-header--home-tournaments .home-tournaments-header__actions .btn {

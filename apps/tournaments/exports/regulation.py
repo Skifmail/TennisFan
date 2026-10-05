@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
+from apps.core.geo import normalize_geo_text
 from apps.tournaments.models import Tournament, TournamentFormat
 from apps.users.skill_levels import skill_with_ntrp
 
@@ -159,10 +160,15 @@ def _general_section(tournament: Tournament) -> Section:
     if club is None:
         organizer = "Организатор — платформа TennisFan."
     else:
+        location = _address_with_locality(club.city, club.address)
         contacts = ", ".join(
-            part for part in (club.address, club.phone, club.email) if part
+            part for part in (location, club.phone, club.email) if part
         )
-        organizer = f"Организатор — {club.name}."
+        responsible = (club.admin_name or "").strip()
+        if responsible and responsible.casefold() != club.name.casefold():
+            organizer = f"Организатор — {club.name}, {responsible}."
+        else:
+            organizer = f"Организатор — {club.name}."
         if contacts:
             organizer = f"{organizer} Контакты: {contacts}."
     return Section(
@@ -195,8 +201,9 @@ def _schedule_section(tournament: Tournament) -> Section:
     ]
     court = tournament.court
     if court is not None and not tournament.venue_is_pending:
-        if court.address:
-            rows.append(InfoRow("Адрес площадки", court.address))
+        venue_address = court.display_address
+        if venue_address:
+            rows.append(InfoRow("Адрес площадки", venue_address))
         surface = (court.surface or "").strip()
         if surface:
             rows.append(InfoRow("Покрытие", surface))
@@ -341,6 +348,33 @@ def _extra_section(tournament: Tournament) -> Section | None:
         return None
     paragraphs = tuple(part.strip() for part in text.splitlines() if part.strip())
     return Section(title=SECTION_EXTRA, paragraphs=paragraphs)
+
+
+def _address_with_locality(locality: str, address: str) -> str:
+    """Адрес с населённым пунктом, если его ещё нет в строке.
+
+    Args:
+        locality: Город или посёлок.
+        address: Улица и дом, иногда уже с городом.
+
+    Returns:
+        Одна строка. Пустая, если оба поля пустые.
+    """
+    place = " ".join((locality or "").split())
+    street = " ".join((address or "").split())
+    if not place:
+        return street
+    if not street:
+        return place
+    place_key = normalize_geo_text(place)
+    already_there = any(
+        normalize_geo_text(part) == place_key
+        for part in street.split(",")
+        if part.strip()
+    )
+    if already_there:
+        return street
+    return f"{place}, {street}"
 
 
 def _hours_label(hours: int) -> str:

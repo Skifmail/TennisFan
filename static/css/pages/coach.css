@@ -14,6 +14,10 @@
     gap: var(--spacing-xl);
 }
 
+.page-header--coaches .profile-sport-switch {
+    margin: 1.15rem auto 0;
+}
+
 .coach-list-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

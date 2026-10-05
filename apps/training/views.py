@@ -235,15 +235,25 @@ def training_enroll(request, slug):
 )
 def coach_list(request):
     """List of coaches. Только для авторизованных пользователей."""
+    from apps.core.sports import parse_sport_filter, venue_sport_catalog_values
+
     city = (request.GET.get("city") or "").strip()
+    sport_filter = parse_sport_filter(request.GET.get("sport"))
 
     coaches = _visible_coaches()
+    sport_values = venue_sport_catalog_values(sport_filter)
+    if sport_values is not None:
+        coaches = coaches.filter(sport__in=sport_values)
     if city:
         coaches = filter_field_contains_ci(
             coaches, "city", city, annotation="_coach_list_city_l"
         )
 
-    context = {"coaches": coaches, "current_city": city}
+    context = {
+        "coaches": coaches,
+        "current_city": city,
+        "current_sport": sport_filter,
+    }
     return render(request, "training/coach_list.html", context)
 
 

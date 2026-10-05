@@ -17,6 +17,7 @@ from django.utils import timezone
 from PIL import Image
 
 from apps.clubs.models import ClubMember, ClubMemberRole, ClubMemberStatus
+from apps.courts.models import Court
 from apps.tournaments.exports.bracket import build_bracket_layout
 from apps.tournaments.exports.docx_regulation import build_regulation_docx
 from apps.tournaments.exports.logos import logos_for_tournament
@@ -26,6 +27,7 @@ from apps.tournaments.exports.regulation import (
     SECTION_EXTRA,
     SECTION_FEE,
     SECTION_POINTS,
+    SECTION_SCHEDULE,
     RegulationContext,
     build_regulation_context,
 )
@@ -72,7 +74,11 @@ class RegulationContextTestCase(TestCase):
         self.assertNotIn(SECTION_POINTS, _titles(tournament))
 
     def test_postpayment_and_extra_clauses(self) -> None:
-        club = make_club(name="Клуб Восток", slug="club-vostok")
+        club = make_club(
+            name="Клуб Восток",
+            slug="club-vostok",
+            admin_name="Иванова Мария Петровна",
+        )
         tournament = make_tournament(
             slug="reg-extra",
             club=club,
@@ -90,10 +96,58 @@ class RegulationContextTestCase(TestCase):
         self.assertEqual(fee["Вступительный взнос"], "1000 ₽")
         context = build_regulation_context(tournament)
         self.assertEqual(context.organizer_name, "Клуб Восток")
+        organizer_text = " ".join(
+            paragraph
+            for section in context.sections
+            for paragraph in section.paragraphs
+        )
+        self.assertIn(
+            "Организатор — Клуб Восток, Иванова Мария Петровна.",
+            organizer_text,
+        )
         extra = next(
             section for section in context.sections if section.title == SECTION_EXTRA
         )
         self.assertEqual(extra.paragraphs, ("Мячи Dunlop.", "Судья на финале."))
+
+    def test_locality_is_in_contacts_and_not_repeated_in_venue(self) -> None:
+        club = make_club(
+            name="Будь первым",
+            slug="bud-pervym",
+            city="Воскресенск",
+            address="Московская область, ул. Фединская, 2",
+            admin_name="Будь первым",
+        )
+        court = Court.objects.create(
+            name="Теннисный центр Воскресенск",
+            slug="tc-voskresensk",
+            city="Воскресенск",
+            address="Воскресенск, Фединская улица 2, село Федино",
+        )
+        tournament = make_tournament(
+            slug="vos-open",
+            name="Воскресенск Опен",
+            club=club,
+            city="Воскресенск",
+            court=court,
+        )
+        context = build_regulation_context(tournament)
+        organizer_text = " ".join(
+            paragraph
+            for section in context.sections
+            for paragraph in section.paragraphs
+        )
+        self.assertIn(
+            "Воскресенск, Московская область, ул. Фединская, 2",
+            organizer_text,
+        )
+        place = _row_map(tournament, SECTION_SCHEDULE)
+        self.assertEqual(
+            place["Адрес площадки"],
+            "Фединская улица 2, село Федино",
+        )
+        self.assertEqual(place["Адрес площадки"].count("Воскресенск"), 0)
+        self.assertIn("Воскресенск", place["Место"])
 
 
 class BracketLayoutTestCase(TestCase):

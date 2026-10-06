@@ -5,7 +5,7 @@
     size: A4 landscape;
     margin: 9mm 9mm 12mm;
     @bottom-right {
-        content: "TennisFan  ·  " counter(page) " / " counter(pages);
+        content: "{{ platform_name|default:'TennisFan' }}  ·  " counter(page) " / " counter(pages);
         font-family: "Roboto", sans-serif;
         font-size: 8pt;
         color: #5c6b64;
@@ -67,6 +67,12 @@ h2 {
 .bracket--short .round-matches { min-height: 24mm; }
 .bracket--compact .side { font-size: 7pt; padding: 1px 4px; }
 .bracket--compact .round-title { font-size: 7.5pt; }
+.bracket--dense { height: 142mm; }
+.bracket--dense .round-title { font-size: 7pt; padding-bottom: 1px; }
+.bracket--dense .match-wrap { padding: 0.5mm 10px 0.5mm 1px; }
+.bracket--dense .side { font-size: 6.5pt; line-height: 1.15; padding: 0.4mm 4px; }
+.bracket--dense .score { font-size: 6.5pt; line-height: 1.1; padding: 0 4px; }
+.bracket--dense .deadline { display: none; }
 .round {
     display: flex;
     flex-direction: column;
@@ -198,7 +204,7 @@ table.chess td.self { background: #efe6d4; color: #8a7a5a; }
 <section class="{% if not forloop.first or layout.tables %}break{% endif %}">
     <h2>{{ board.title }}</h2>
     {% for page in board.pages %}
-    <div class="bracket {% if page.compact %}bracket--compact{% endif %} {% if page.short %}bracket--short{% endif %} {% if not forloop.first %}break{% endif %}">
+    <div class="bracket {% if page.compact %}bracket--compact{% endif %} {% if page.dense %}bracket--dense{% endif %} {% if page.short %}bracket--short{% endif %} {% if not forloop.first %}break{% endif %}">
         {% for round in page.rounds %}
         <div class="round">
             <div class="round-title">{{ round.name }}</div>

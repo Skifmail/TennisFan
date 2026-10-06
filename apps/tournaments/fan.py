@@ -162,9 +162,22 @@ def _get_or_create_bye_team(
     return cast(TournamentTeam, team)
 
 
-def _round_name(round_index: int) -> str:
-    names = {1: "1 круг", 2: "2 круг", 3: "Полуфинал", 4: "Финал"}
-    return names.get(round_index, f"Раунд {round_index}")
+def elimination_round_name(round_index: int, total_rounds: int) -> str:
+    """Название круга по тому, сколько кругов осталось до финала.
+
+    Args:
+        round_index: Номер круга с единицы.
+        total_rounds: Всего кругов в сетке.
+
+    Returns:
+        «Финал», «Полуфинал», «1/4 финала», «1/8 финала» и так далее.
+    """
+    left = total_rounds - round_index
+    if left <= 0:
+        return "Финал"
+    if left == 1:
+        return "Полуфинал"
+    return f"1/{2 ** left} финала"
 
 
 def _fan_points_for_round(t: Tournament, round_index: int) -> int:
@@ -470,9 +483,7 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     for r in range(total_rounds):
         num_matches = bracket_size // (2 ** (r + 1))
         round_index = r + 1
-        round_name = (
-            "Финал" if round_index == total_rounds else _round_name(round_index)
-        )
+        round_name = elimination_round_name(round_index, total_rounds)
         deadline = start + delta * round_index
         for o in range(num_matches):
             m = Match.objects.create(

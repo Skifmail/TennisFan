@@ -10,7 +10,11 @@ from dataclasses import dataclass
 
 from django.utils import timezone
 
-from apps.tournaments.fan import _bracket_params, _round_name, seed_pairs
+from apps.tournaments.fan import (
+    _bracket_params,
+    elimination_round_name,
+    seed_pairs,
+)
 from apps.tournaments.models import (
     Match,
     Tournament,
@@ -27,6 +31,7 @@ from apps.tournaments.tvd import calculate_group_structure
 from apps.users.models import Player
 
 _COMPACT_FROM = 9
+_DENSE_FROM = 16
 _SPLIT_FROM = 17
 _GROUP_NAMES = "ABCDEF"
 
@@ -66,6 +71,7 @@ class BracketPage:
     rounds: tuple[BracketRound, ...]
     compact: bool
     short: bool = False
+    dense: bool = False
 
 
 @dataclass(frozen=True)
@@ -223,20 +229,40 @@ def _boards_by_placement(
 
 
 def _empty_elimination_rounds(draw_size: int) -> tuple[BracketRound, ...]:
-    """Пустые колонки размера ближайшей степени двойки, слоты — по посеву."""
+    """Пустые колонки размера ближайшей степени двойки, слоты — по посеву.
+
+    Посевы сверх ``draw_size`` при жеребьёвке станут «Свободным кругом»,
+    поэтому их соперник сразу показан во втором круге.
+    """
     bracket_size, total_rounds = _bracket_params(draw_size)
     pairs = seed_pairs(bracket_size)
-    rounds: list[BracketRound] = []
-    for offset in range(total_rounds):
+    advanced: list[str | None] = []
+    first_round: list[BracketMatch] = []
+    for top, bottom in pairs:
+        if bottom > draw_size:
+            second = BracketSide(name="Свободный круг", is_bye=True)
+            advanced.append(f"Посев {top}")
+        else:
+            second = _placeholder(f"Посев {bottom}")
+            advanced.append(None)
+        first_round.append(
+            BracketMatch(side1=_placeholder(f"Посев {top}"), side2=second)
+        )
+    rounds = [
+        BracketRound(
+            name=elimination_round_name(1, total_rounds),
+            matches=tuple(first_round),
+        )
+    ]
+    for offset in range(1, total_rounds):
         round_index = offset + 1
         match_count = bracket_size // (2 ** (offset + 1))
-        name = "Финал" if round_index == total_rounds else _round_name(round_index)
+        name = elimination_round_name(round_index, total_rounds)
         matches: list[BracketMatch] = []
         for order in range(match_count):
-            if offset == 0:
-                top, bottom = pairs[order]
-                side1 = _placeholder(f"Посев {top}")
-                side2 = _placeholder(f"Посев {bottom}")
+            if offset == 1:
+                side1 = _placeholder(advanced[2 * order] or "—")
+                side2 = _placeholder(advanced[2 * order + 1] or "—")
             else:
                 side1 = _placeholder("—")
                 side2 = _placeholder("—")
@@ -510,7 +536,14 @@ def _paginate(rounds: tuple[BracketRound, ...]) -> tuple[BracketPage, ...]:
     first_count = len(rounds[0].matches)
     compact = first_count >= _COMPACT_FROM
     if first_count < _SPLIT_FROM:
-        return (BracketPage(rounds=rounds, compact=compact, short=first_count <= 2),)
+        return (
+            BracketPage(
+                rounds=rounds,
+                compact=compact,
+                short=first_count <= 2,
+                dense=first_count >= _DENSE_FROM,
+            ),
+        )
     middle = first_count // 2
     pages: list[BracketPage] = []
     for half_start in (0, middle):
@@ -524,7 +557,14 @@ def _paginate(rounds: tuple[BracketRound, ...]) -> tuple[BracketPage, ...]:
             page_rounds.append(BracketRound(name=round_item.name, matches=tuple(chunk)))
             start //= 2
             count = max(1, count // 2)
-        pages.append(BracketPage(rounds=tuple(page_rounds), compact=True, short=False))
+        pages.append(
+            BracketPage(
+                rounds=tuple(page_rounds),
+                compact=True,
+                short=False,
+                dense=middle >= _DENSE_FROM,
+            )
+        )
     return tuple(pages)
 
 

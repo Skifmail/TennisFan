@@ -67,12 +67,34 @@ h2 {
 .bracket--short .round-matches { min-height: 24mm; }
 .bracket--compact .side { font-size: 7pt; padding: 1px 4px; }
 .bracket--compact .round-title { font-size: 7.5pt; }
-.bracket--dense { height: 142mm; }
+.bracket--dense { height: 138mm; }
+.bracket--final { height: 70mm; }
+.bracket--final .round,
+.bracket .round:only-child { flex: 0 0 70mm; }
+.page-label {
+    margin: 0 0 3px;
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #8a6d2f;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
 .bracket--dense .round-title { font-size: 7pt; padding-bottom: 1px; }
-.bracket--dense .match-wrap { padding: 0.5mm 10px 0.5mm 1px; }
-.bracket--dense .side { font-size: 6.5pt; line-height: 1.15; padding: 0.4mm 4px; }
-.bracket--dense .score { font-size: 6.5pt; line-height: 1.1; padding: 0 4px; }
-.bracket--dense .deadline { display: none; }
+.bracket--dense .match-wrap { padding: 0.3mm 10px 0.3mm 1px; }
+.bracket--dense .side { font-size: 6.5pt; line-height: 1.1; padding: 0.3mm 4px; }
+.bracket--dense .match-card { display: flex; align-items: stretch; }
+.bracket--dense .sides { flex: 1 1 0; min-width: 0; }
+.bracket--dense .side { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bracket--dense .score {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    max-width: 40%;
+    font-size: 6pt;
+    line-height: 1.05;
+    padding: 0 3px;
+    border-left: 1px solid #efe6d4;
+}
 .round {
     display: flex;
     flex-direction: column;
@@ -204,7 +226,8 @@ table.chess td.self { background: #efe6d4; color: #8a7a5a; }
 <section class="{% if not forloop.first or layout.tables %}break{% endif %}">
     <h2>{{ board.title }}</h2>
     {% for page in board.pages %}
-    <div class="bracket {% if page.compact %}bracket--compact{% endif %} {% if page.dense %}bracket--dense{% endif %} {% if page.short %}bracket--short{% endif %} {% if not forloop.first %}break{% endif %}">
+    {% if page.label %}<p class="page-label {% if not forloop.first %}break{% endif %}">{{ page.label }}</p>{% endif %}
+    <div class="bracket {% if page.compact %}bracket--compact{% endif %} {% if page.dense %}bracket--dense{% endif %} {% if page.short %}bracket--short{% endif %} {% if page.final %}bracket--final{% endif %} {% if not forloop.first and not page.label %}break{% endif %}">
         {% for round in page.rounds %}
         <div class="round">
             <div class="round-title">{{ round.name }}</div>
@@ -212,14 +235,16 @@ table.chess td.self { background: #efe6d4; color: #8a7a5a; }
                 {% for match in round.matches %}
                 <div class="match-wrap">
                     <div class="match-card">
+                        <div class="sides">
                         <div class="side {% if match.side1.is_winner %}is-winner{% endif %} {% if match.side1.is_placeholder %}is-placeholder{% endif %} {% if match.side1.is_bye %}is-bye{% endif %}">
                             {{ match.side1.name }}
                         </div>
                         <div class="side {% if match.side2.is_winner %}is-winner{% endif %} {% if match.side2.is_placeholder %}is-placeholder{% endif %} {% if match.side2.is_bye %}is-bye{% endif %}">
                             {{ match.side2.name }}
                         </div>
+                        </div>
                         {% if match.score %}<div class="score">{{ match.score }}</div>{% endif %}
-                        {% if match.deadline %}<div class="deadline">до {{ match.deadline }}</div>{% endif %}
+                        {% if match.deadline and not page.dense %}<div class="deadline">до {{ match.deadline }}</div>{% endif %}
                     </div>
                 </div>
                 {% endfor %}

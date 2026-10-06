@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load humanize club_tags %}
+{% load static humanize club_tags %}
 
 {% block title %}Управление: {{ tournament.name }}{% endblock %}
 
@@ -29,17 +29,17 @@
                     <svg class="manage-export__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                 </summary>
                 <div class="manage-export__panel" role="menu">
-                    <a role="menuitem" data-no-page-spinner href="{% url 'tournament_export_regulation' slug=tournament.slug %}?fmt=pdf">
+                    <a role="menuitem" data-no-page-spinner data-export-download="Подготовка регламента" data-export-filename="reglament-{{ tournament.slug }}.pdf" href="{% url 'tournament_export_regulation' slug=tournament.slug %}?fmt=pdf">
                         <span class="manage-export__format">PDF</span>
                         <span class="manage-export__hint">Для печати и отправки</span>
                     </a>
-                    <a role="menuitem" data-no-page-spinner href="{% url 'tournament_export_regulation' slug=tournament.slug %}?fmt=docx">
+                    <a role="menuitem" data-no-page-spinner data-export-download="Подготовка регламента" data-export-filename="reglament-{{ tournament.slug }}.docx" href="{% url 'tournament_export_regulation' slug=tournament.slug %}?fmt=docx">
                         <span class="manage-export__format">Word (.docx)</span>
                         <span class="manage-export__hint">Можно отредактировать</span>
                     </a>
                 </div>
             </details>
-            <a href="{% url 'tournament_export_bracket' slug=tournament.slug %}" class="manage-export__btn" data-no-page-spinner>
+            <a href="{% url 'tournament_export_bracket' slug=tournament.slug %}" class="manage-export__btn" data-no-page-spinner data-export-download="Подготовка сетки" data-export-filename="setka-{{ tournament.slug }}.pdf">
                 <svg class="manage-export__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h5v4H3zM3 15h5v4H3zM16 10h5v4h-5zM8 7h3v10H8M11 12h5"/></svg>
                 <span class="manage-export__label-full">Скачать сетку (PDF)</span>
                 <span class="manage-export__label-short">Сетка PDF</span>
@@ -623,6 +623,7 @@
     }
 </style>
 {% block extra_js %}
+<script defer src="{% static 'js/export-download.js' %}"></script>
 <script>
 (function() {
     var menus = Array.prototype.slice.call(document.querySelectorAll('[data-export-menu]'));

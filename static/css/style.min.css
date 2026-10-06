@@ -12117,6 +12117,337 @@ a.match-details-value__lead:hover {
     }
 }
 
+/* Окно ожидания скачивания регламента и сетки (static/js/export-download.js) */
+html.export-loader-open {
+    overflow: hidden;
+}
+
+.export-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.export-loader[hidden] {
+    display: none;
+}
+
+.export-loader__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(0 18 11 / 72%);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.export-loader__dialog {
+    position: relative;
+    width: min(360px, 100%);
+    padding: 1.75rem 1.5rem 1.4rem;
+    border: 1px solid rgb(166 130 74 / 70%);
+    border-radius: 18px;
+    background:
+        radial-gradient(120% 80% at 50% 0%, rgb(26 92 69 / 55%), transparent 70%),
+        #012b1c;
+    box-shadow: 0 24px 60px rgb(0 0 0 / 55%);
+    color: #f4efe4;
+    text-align: center;
+    outline: none;
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+}
+
+.export-loader.is-visible .export-loader__backdrop,
+.export-loader.is-visible .export-loader__dialog {
+    opacity: 1;
+}
+
+.export-loader.is-visible .export-loader__dialog {
+    transform: none;
+}
+
+.export-loader__visual {
+    position: relative;
+    width: 92px;
+    height: 92px;
+    margin: 0 auto 1rem;
+}
+
+.export-loader__doc {
+    position: absolute;
+    left: 50%;
+    top: 6px;
+    width: 58px;
+    height: 74px;
+    margin-left: -29px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 14px 10px 0;
+    border: 1.5px solid #cfaa6e;
+    border-radius: 8px;
+    background: rgb(244 239 228 / 6%);
+    box-sizing: border-box;
+    transition: opacity 0.2s ease;
+}
+
+.export-loader__line {
+    display: block;
+    height: 5px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, rgb(207 170 110 / 25%) 0%, #cfaa6e 50%, rgb(207 170 110 / 25%) 100%);
+    background-size: 200% 100%;
+    animation: export-loader-shimmer 1.4s linear infinite;
+}
+
+.export-loader__line:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.export-loader__line:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+.export-loader__line--short {
+    width: 60%;
+    animation-delay: 0.45s;
+}
+
+.export-loader__ball {
+    position: absolute;
+    right: 6px;
+    bottom: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #f3ff8a, #c6e33a 60%, #9fbf1f);
+    box-shadow:
+        inset -3px -3px 0 rgb(0 0 0 / 12%),
+        0 4px 10px rgb(0 0 0 / 35%);
+    transition: opacity 0.2s ease;
+    animation: export-loader-bounce 0.9s cubic-bezier(0.3, 0.1, 0.4, 1) infinite;
+}
+
+.export-loader__check {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 46px;
+    height: 46px;
+    margin: -23px 0 0 -23px;
+    padding: 8px;
+    border-radius: 50%;
+    background: #1a5c45;
+    box-sizing: border-box;
+    fill: none;
+    stroke: #f4efe4;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0;
+    transform: scale(0.6);
+    transition:
+        opacity 0.2s ease,
+        transform 0.25s ease;
+}
+
+.export-loader__title {
+    margin: 0 0 0.35rem;
+    color: #e3c38f;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.export-loader__status {
+    min-height: 2.5em;
+    margin: 0 0 1rem;
+    color: rgb(244 239 228 / 78%);
+    font-size: 0.85rem;
+    line-height: 1.35;
+}
+
+.export-loader__bar {
+    position: relative;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgb(244 239 228 / 12%);
+}
+
+.export-loader__fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #a6824a, #e3c38f);
+    transition: width 0.2s ease;
+}
+
+.export-loader__bar.is-indeterminate .export-loader__fill {
+    position: absolute;
+    left: 0;
+    width: 38%;
+    animation: export-loader-slide 1.2s ease-in-out infinite;
+}
+
+.export-loader__actions {
+    display: none;
+    gap: 0.5rem;
+    margin-top: 1.1rem;
+}
+
+.export-loader__btn {
+    flex: 1;
+    min-height: 42px;
+    padding: 0 0.9rem;
+    border: 1px solid rgb(166 130 74 / 55%);
+    border-radius: 10px;
+    background: transparent;
+    color: #cfaa6e;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.export-loader__btn--primary {
+    border-color: #a6824a;
+    background: #a6824a;
+    color: #012b1c;
+}
+
+.export-loader__btn:focus-visible {
+    outline: 2px solid #e3c38f;
+    outline-offset: 2px;
+}
+
+.export-loader[data-state="done"] .export-loader__doc,
+.export-loader[data-state="done"] .export-loader__ball {
+    opacity: 0.15;
+    animation-play-state: paused;
+}
+
+.export-loader[data-state="done"] .export-loader__check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.export-loader[data-state="error"] .export-loader__ball,
+.export-loader[data-state="error"] .export-loader__line {
+    animation: none;
+}
+
+.export-loader[data-state="error"] .export-loader__doc {
+    border-color: #d9826f;
+}
+
+.export-loader[data-state="error"] .export-loader__status {
+    color: #f2b6a8;
+}
+
+.export-loader[data-state="error"] .export-loader__bar {
+    display: none;
+}
+
+.export-loader[data-state="error"] .export-loader__actions {
+    display: flex;
+}
+
+@keyframes export-loader-shimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes export-loader-bounce {
+    0%,
+    100% {
+        transform: translateY(0) scale(1.04, 0.94);
+    }
+    45% {
+        transform: translateY(-34px) scale(1);
+    }
+}
+
+@keyframes export-loader-slide {
+    from {
+        transform: translateX(-110%);
+    }
+    to {
+        transform: translateX(280%);
+    }
+}
+
+@media (width <= 540px) {
+    .export-loader {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .export-loader__dialog {
+        width: 100%;
+        padding: 1.6rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+        border-width: 1px 0 0;
+        border-radius: 20px 20px 0 0;
+        transform: translateY(100%);
+    }
+
+    .export-loader__dialog::before {
+        content: "";
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        width: 40px;
+        height: 4px;
+        margin-left: -20px;
+        border-radius: 2px;
+        background: rgb(244 239 228 / 22%);
+    }
+
+    .export-loader__visual {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 0.75rem;
+    }
+
+    .export-loader__actions {
+        flex-direction: column-reverse;
+    }
+
+    .export-loader__btn {
+        min-height: 46px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .export-loader__line,
+    .export-loader__ball,
+    .export-loader__bar.is-indeterminate .export-loader__fill {
+        animation: none;
+    }
+
+    .export-loader__bar.is-indeterminate .export-loader__fill {
+        width: 100%;
+        opacity: 0.6;
+    }
+
+    .export-loader__backdrop,
+    .export-loader__dialog {
+        transition: none;
+    }
+}
+
 @media (width <= 768px) {
     .manage-page .manage-page-header {
         flex-direction: column;

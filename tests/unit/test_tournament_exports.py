@@ -473,6 +473,9 @@ class TournamentExportViewTestCase(TestCase):
         self.assertContains(response, "Скачать сетку (PDF)")
         self.assertContains(response, "fmt=docx")
         self.assertEqual(response.content.decode().count("data-no-page-spinner"), 3)
+        self.assertContains(response, 'data-export-download="Подготовка регламента"', 2)
+        self.assertContains(response, 'data-export-download="Подготовка сетки"', 1)
+        self.assertContains(response, "js/export-download.js")
 
 
 class _StorageLogo:

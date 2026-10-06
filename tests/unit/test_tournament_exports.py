@@ -6,15 +6,18 @@ import io
 import tempfile
 import zipfile
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
+from django.conf import settings
 from django.http import HttpRequest
 from django.template.loader import render_to_string
-from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
+from weasyprint import HTML
 
 from apps.clubs.models import ClubMember, ClubMemberRole, ClubMemberStatus
 from apps.courts.models import Court
@@ -92,7 +95,8 @@ class RegulationContextTestCase(TestCase):
         fee = _row_map(tournament, SECTION_FEE)
         self.assertIn("в течение 24 часа", fee["Постоплата"])
         self.assertIn("будет направлена ссылка на оплату", fee["Постоплата"])
-        self.assertIn("участие в турнире аннулируется", fee["Постоплата"])
+        self.assertIn("или участие в турнире аннулируется", fee["Постоплата"])
+        self.assertNotIn("в противном случае", fee["Постоплата"])
         self.assertEqual(fee["Вступительный взнос"], "1000 ₽")
         context = build_regulation_context(tournament)
         self.assertEqual(context.organizer_name, "Клуб Восток")
@@ -149,6 +153,75 @@ class RegulationContextTestCase(TestCase):
         self.assertEqual(place["Адрес площадки"].count("Воскресенск"), 0)
         self.assertIn("Воскресенск", place["Место"])
 
+    def test_platform_name_is_used_in_header_and_general_section(self) -> None:
+        """Бренд домена попадает в шапку платформенного турнира и в общие положения."""
+        platform = make_tournament(slug="brand-platform", club=None)
+        top = build_regulation_context(platform, platform_name="TennisTop")
+        self.assertEqual(top.organizer_name, "TennisTop")
+        self.assertEqual(top.platform_name, "TennisTop")
+        top_text = " ".join(
+            paragraph for section in top.sections for paragraph in section.paragraphs
+        )
+        self.assertIn("Организатор — платформа TennisTop.", top_text)
+        self.assertIn("на платформе TennisTop.", top_text)
+        self.assertNotIn("TennisFan", top_text)
+
+        fan = build_regulation_context(platform)
+        self.assertEqual(fan.organizer_name, "TennisFan")
+        fan_text = " ".join(
+            paragraph for section in fan.sections for paragraph in section.paragraphs
+        )
+        self.assertIn("на платформе TennisFan.", fan_text)
+
+        club = make_club(name="Клуб Восток", slug="brand-club")
+        club_tournament = make_tournament(slug="brand-club-open", club=club)
+        club_top = build_regulation_context(club_tournament, platform_name="TennisTop")
+        self.assertEqual(club_top.organizer_name, "Клуб Восток")
+        club_text = " ".join(
+            paragraph
+            for section in club_top.sections
+            for paragraph in section.paragraphs
+        )
+        self.assertIn("на платформе TennisTop.", club_text)
+        self.assertNotIn("TennisFan", club_text)
+
+    def test_dense_regulation_pdf_stays_on_two_pages(self) -> None:
+        """Плотный регламент занимает два листа, QR закреплён на втором."""
+        club = make_club(
+            name="Будь первым",
+            slug="bud-pages",
+            city="Воскресенск",
+            address="Московская область, ул. Фединская, 2",
+            admin_name="Иванова Мария Петровна",
+            phone="89123451166",
+        )
+        tournament = make_tournament(
+            slug="pages-open",
+            name="Будь первым: Воскресенск Опен",
+            club=club,
+            city="Воскресенск",
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            entry_fee=Decimal("1000.00"),
+            allow_postpayment=True,
+            postpayment_deadline_hours=24,
+            regulation_extra=(
+                "Мячи предоставляет организатор. Разминка не более 5 минут. "
+                "Судья назначается на финал."
+            ),
+        )
+        page = "https://tennisfan.ru/tournaments/pages-open/"
+        regulation = build_regulation_context(tournament, public_url=page)
+        code = public_page_qr(page)
+        html = render_to_string(
+            "tournaments/exports/regulation_pdf.html",
+            {"regulation": regulation, "logos": (), "public_qr": code},
+        )
+        self.assertIn("sheet-two", html)
+        self.assertIn("running(publicqr)", html)
+        static_dir = Path(settings.BASE_DIR) / "static"
+        document = HTML(string=html, base_url=f"{static_dir.as_uri()}/").render()
+        self.assertEqual(len(document.pages), 2)
+
 
 class BracketLayoutTestCase(TestCase):
     """Пустая сетка до жеребьёвки и заполненная после."""
@@ -165,8 +238,31 @@ class BracketLayoutTestCase(TestCase):
         rounds = layout.boards[0].pages[0].rounds
         self.assertEqual(len(rounds), 3)
         self.assertEqual(len(rounds[0].matches), 4)
-        names = [rounds[0].matches[0].side1.name, rounds[0].matches[0].side2.name]
-        self.assertEqual(names, ["Позиция 1", "Позиция 8"])
+        names = [(match.side1.name, match.side2.name) for match in rounds[0].matches]
+        self.assertEqual(
+            names,
+            [
+                ("Посев 1", "Посев 8"),
+                ("Посев 4", "Посев 5"),
+                ("Посев 3", "Посев 6"),
+                ("Посев 2", "Посев 7"),
+            ],
+        )
+
+    def test_empty_elimination_is_drawn_for_maximum(self) -> None:
+        """До жеребьёвки сетка рисуется на максимальный состав, а не на минимум."""
+        tournament = make_tournament(
+            slug="draw-max",
+            format=TournamentFormat.SINGLE_ELIMINATION,
+            min_participants=4,
+            max_participants=16,
+            bracket_generated=False,
+        )
+        layout = build_bracket_layout(tournament)
+        first_round = [
+            match for page in layout.boards[0].pages for match in page.rounds[0].matches
+        ]
+        self.assertEqual(len(first_round), 8)
 
     def test_generated_elimination_uses_match_names(self) -> None:
         tournament = make_tournament(
@@ -277,6 +373,29 @@ class TournamentExportViewTestCase(TestCase):
         self.assertEqual(bracket.status_code, 200)
         self.assertTrue(bracket.content.startswith(b"%PDF"))
 
+    @override_settings(ALLOWED_HOSTS=["testserver", "tennistop.ru"])
+    def test_docx_uses_tennistop_when_downloaded_from_that_host(self) -> None:
+        """Скачивание с tennistop.ru подставляет TennisTop вместо TennisFan."""
+        self.client.force_login(self.manager)
+        url = reverse(
+            "tournament_export_regulation",
+            kwargs={"slug": self.tournament.slug},
+        )
+        response = self.client.get(
+            f"{url}?fmt=docx",
+            secure=True,
+            HTTP_HOST="tennistop.ru",
+        )
+        self.assertEqual(response.status_code, 200)
+        archive = zipfile.ZipFile(io.BytesIO(response.content))
+        text = b"".join(
+            archive.read(name)
+            for name in archive.namelist()
+            if name.startswith("word/") and name.endswith(".xml")
+        )
+        self.assertIn("на платформе TennisTop.".encode(), text)
+        self.assertNotIn(b"TennisFan", text)
+
     def test_manage_page_links_exports(self) -> None:
         self.client.force_login(self.manager)
         response = self.client.get(
@@ -344,6 +463,26 @@ class DocumentLogoTestCase(SimpleTestCase):
         self.assertEqual([logo.alt for logo in logos], ["TennisFan"])
         self.assertTrue(logos[0].content.startswith(b"\x89PNG"))
         self.assertTrue(logos[0].data_uri.startswith("data:image/png;base64,"))
+
+    @override_settings(ALLOWED_HOSTS=["tennisfan.ru", "tennistop.ru", "testserver"])
+    def test_platform_logo_follows_download_host(self) -> None:
+        """Знак платформы в шапке — TennisFan или TennisTop, по домену запроса."""
+        tournament = cast(
+            Tournament,
+            SimpleNamespace(pk=1, club_id=None, club=None, is_open_interclub=False),
+        )
+        factory = RequestFactory()
+        fan = logos_for_tournament(
+            tournament,
+            cast(HttpRequest, factory.get("/", HTTP_HOST="tennisfan.ru")),
+        )
+        top = logos_for_tournament(
+            tournament,
+            cast(HttpRequest, factory.get("/", HTTP_HOST="tennistop.ru")),
+        )
+        self.assertEqual(fan[0].alt, "TennisFan")
+        self.assertEqual(top[0].alt, "TennisTop")
+        self.assertNotEqual(fan[0].content, top[0].content)
 
     def test_s3_club_logo_is_embedded(self) -> None:
         raw = _png((180, 30, 30))

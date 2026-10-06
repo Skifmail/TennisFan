@@ -5083,7 +5083,14 @@ def tournament_export_regulation(request, slug):
     public_url = request.build_absolute_uri(
         reverse("tournament_detail", kwargs={"slug": tournament.slug})
     )
-    regulation = build_regulation_context(tournament, public_url=public_url)
+    from apps.core.context_processors import site_branding
+
+    platform_name = str(site_branding(request)["site_brand_copyright"])
+    regulation = build_regulation_context(
+        tournament,
+        public_url=public_url,
+        platform_name=platform_name,
+    )
     from apps.tournaments.exports.public_qr import public_page_qr
 
     page_qr = public_page_qr(public_url)

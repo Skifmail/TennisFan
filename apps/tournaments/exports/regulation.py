@@ -110,6 +110,7 @@ class RegulationContext:
     generated_on: str
     public_url: str
     sections: tuple[Section, ...]
+    platform_name: str = "TennisFan"
 
 
 def build_regulation_context(
@@ -117,6 +118,7 @@ def build_regulation_context(
     *,
     public_url: str = "",
     generated_at: datetime | None = None,
+    platform_name: str = "TennisFan",
 ) -> RegulationContext:
     """Собрать разделы положения из данных турнира.
 
@@ -124,6 +126,8 @@ def build_regulation_context(
         tournament: Турнир, для которого формируется документ.
         public_url: Абсолютная ссылка на публичную страницу.
         generated_at: Момент формирования. По умолчанию — текущее время.
+        platform_name: Бренд сайта, с которого скачивают документ
+            (TennisFan или TennisTop).
 
     Returns:
         RegulationContext: Разделы, общие для PDF и Word.
@@ -131,8 +135,9 @@ def build_regulation_context(
     moment = generated_at or timezone.localtime()
     if timezone.is_aware(moment):
         moment = timezone.localtime(moment)
+    brand = platform_name.strip() or "TennisFan"
     sections = (
-        _general_section(tournament),
+        _general_section(tournament, brand),
         _schedule_section(tournament),
         _participants_section(tournament),
         _fee_section(tournament),
@@ -147,18 +152,19 @@ def build_regulation_context(
         sport_label=tournament.get_sport_display(),
         format_label=tournament.get_format_display(),
         variant_label=tournament.get_variant_display(),
-        organizer_name=club.name if club else "TennisFan",
+        organizer_name=club.name if club else brand,
         generated_on=moment.strftime("%d.%m.%Y"),
         public_url=public_url,
         sections=tuple(section for section in sections if section is not None),
+        platform_name=brand,
     )
 
 
-def _general_section(tournament: Tournament) -> Section:
+def _general_section(tournament: Tournament, platform_name: str) -> Section:
     """Цели, организатор и вид соревнования."""
     club = tournament.club
     if club is None:
-        organizer = "Организатор — платформа TennisFan."
+        organizer = f"Организатор — платформа {platform_name}."
     else:
         location = _address_with_locality(club.city, club.address)
         contacts = ", ".join(
@@ -175,7 +181,8 @@ def _general_section(tournament: Tournament) -> Section:
         title=SECTION_GENERAL,
         paragraphs=(
             "Положение определяет порядок проведения турнира, условия допуска, "
-            "систему розыгрыша и начисление рейтинговых очков на платформе TennisFan.",
+            "систему розыгрыша и начисление рейтинговых очков "
+            f"на платформе {platform_name}.",
             organizer,
         ),
         rows=(
@@ -254,7 +261,7 @@ def _fee_section(tournament: Tournament) -> Section:
                     "Регистрация проходит без предоплаты. После её закрытия "
                     "участникам, не оплатившим взнос, будет направлена ссылка "
                     f"на оплату. Взнос необходимо внести в течение {hours}, "
-                    "в противном случае участие в турнире аннулируется."
+                    "или участие в турнире аннулируется."
                 ),
             )
         )

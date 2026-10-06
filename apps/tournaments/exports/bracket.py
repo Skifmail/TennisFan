@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from django.utils import timezone
 
@@ -72,6 +72,8 @@ class BracketPage:
     compact: bool
     short: bool = False
     dense: bool = False
+    label: str = ""
+    final: bool = False
 
 
 @dataclass(frozen=True)
@@ -530,42 +532,91 @@ def _empty_chess(title: str, size: int) -> ChessTable:
 
 
 def _paginate(rounds: tuple[BracketRound, ...]) -> tuple[BracketPage, ...]:
-    """Одна страница или две половины, если первый круг не помещается."""
+    """Разложить сетку по листам: не больше 16 матчей первого круга на лист.
+
+    Большая сетка делится на половины или четверти. Круги, где матчей меньше,
+    чем частей, собираются на последнем листе «Финальная часть».
+    """
     if not rounds:
         return ()
     first_count = len(rounds[0].matches)
-    compact = first_count >= _COMPACT_FROM
     if first_count < _SPLIT_FROM:
-        return (
-            BracketPage(
-                rounds=rounds,
-                compact=compact,
-                short=first_count <= 2,
-                dense=first_count >= _DENSE_FROM,
-            ),
-        )
-    middle = first_count // 2
+        return (_single_page(rounds),)
+    parts = 2
+    while first_count / parts > _DENSE_FROM:
+        parts *= 2
+    split_rounds = [item for item in rounds if len(item.matches) >= parts]
+    final_rounds = tuple(item for item in rounds if len(item.matches) < parts)
     pages: list[BracketPage] = []
-    for half_start in (0, middle):
-        page_rounds: list[BracketRound] = []
-        start = half_start
-        count = middle
-        for round_item in rounds:
-            chunk = round_item.matches[start : start + count]
-            if not chunk and round_item.matches:
-                chunk = round_item.matches[:1]
-            page_rounds.append(BracketRound(name=round_item.name, matches=tuple(chunk)))
-            start //= 2
-            count = max(1, count // 2)
+    for part in range(parts):
+        page_rounds = tuple(
+            BracketRound(name=item.name, matches=_part(item.matches, part, parts))
+            for item in split_rounds
+        )
+        per_page = len(page_rounds[0].matches)
         pages.append(
             BracketPage(
-                rounds=tuple(page_rounds),
+                rounds=page_rounds,
                 compact=True,
-                short=False,
-                dense=middle >= _DENSE_FROM,
+                dense=per_page >= _DENSE_FROM,
+                label=_part_label(part, parts),
+            )
+        )
+    if final_rounds:
+        pages.append(
+            BracketPage(
+                rounds=_label_part_winners(final_rounds, parts),
+                compact=False,
+                label="Финальная часть",
+                final=True,
             )
         )
     return tuple(pages)
+
+
+def _label_part_winners(
+    rounds: tuple[BracketRound, ...], parts: int
+) -> tuple[BracketRound, ...]:
+    """Пустые слоты финальной части подписать, из какой части сетки придёт игрок."""
+    first, *rest = rounds
+    matches: list[BracketMatch] = []
+    for index, match in enumerate(first.matches):
+        sides = []
+        for offset, side in enumerate((match.side1, match.side2)):
+            if side.is_placeholder and side.name == "—":
+                label = _part_label(2 * index + offset, parts).lower()
+                side = replace(side, name=f"Победитель: {label}")
+            sides.append(side)
+        matches.append(replace(match, side1=sides[0], side2=sides[1]))
+    return (replace(first, matches=tuple(matches)), *rest)
+
+
+def _single_page(rounds: tuple[BracketRound, ...]) -> BracketPage:
+    """Вся сетка на одном листе."""
+    first_count = len(rounds[0].matches)
+    return BracketPage(
+        rounds=rounds,
+        compact=first_count >= _COMPACT_FROM,
+        short=first_count <= 2,
+        dense=first_count >= _DENSE_FROM,
+    )
+
+
+def _part(
+    matches: tuple[BracketMatch, ...], part: int, parts: int
+) -> tuple[BracketMatch, ...]:
+    """Матчи круга, относящиеся к одной части сетки."""
+    size = len(matches) // parts
+    start = part * size
+    end = len(matches) if part == parts - 1 else start + size
+    return matches[start:end]
+
+
+def _part_label(part: int, parts: int) -> str:
+    """Подпись листа: половина или четверть сетки."""
+    if parts == 2:
+        return "Верхняя половина" if part == 0 else "Нижняя половина"
+    return f"Часть {part + 1} из {parts}"
 
 
 def _planned_draw_size(tournament: Tournament) -> int:

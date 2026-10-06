@@ -264,6 +264,49 @@ class BracketLayoutTestCase(TestCase):
         ]
         self.assertEqual(len(first_round), 8)
 
+    def test_large_brackets_split_into_parts_with_final_page(self) -> None:
+        """64 и 128 мест: части по 16 матчей и отдельный лист финальной части."""
+        expected = {
+            64: (["Верхняя половина", "Нижняя половина"], ["Финал"]),
+            128: (
+                ["Часть 1 из 4", "Часть 2 из 4", "Часть 3 из 4", "Часть 4 из 4"],
+                ["Полуфинал", "Финал"],
+            ),
+        }
+        for size, (labels, final_names) in expected.items():
+            with self.subTest(size=size):
+                tournament = make_tournament(
+                    slug=f"draw-{size}",
+                    format=TournamentFormat.SINGLE_ELIMINATION,
+                    max_participants=size,
+                    bracket_generated=False,
+                )
+                layout = build_bracket_layout(tournament)
+                pages = layout.boards[0].pages
+                self.assertEqual([page.label for page in pages[:-1]], labels)
+                for page in pages[:-1]:
+                    self.assertTrue(page.dense)
+                    self.assertEqual(len(page.rounds[0].matches), 16)
+                    self.assertEqual(
+                        page.rounds[-1].name,
+                        "Полуфинал" if size == 64 else "1/4 финала",
+                    )
+                final = pages[-1]
+                self.assertTrue(final.final)
+                self.assertEqual([item.name for item in final.rounds], final_names)
+                self.assertTrue(
+                    final.rounds[0].matches[0].side1.name.startswith("Победитель:")
+                )
+                html = render_to_string(
+                    "tournaments/exports/bracket_pdf.html",
+                    {"layout": layout, "logos": ()},
+                )
+                static_dir = Path(settings.BASE_DIR) / "static"
+                document = HTML(
+                    string=html, base_url=f"{static_dir.as_uri()}/"
+                ).render()
+                self.assertEqual(len(document.pages), len(pages))
+
     def test_slots_above_maximum_are_byes_and_fit_one_page(self) -> None:
         """Максимум 18 — сетка на 32 места, посевы 19–32 — свободный круг."""
         tournament = make_tournament(

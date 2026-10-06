@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from django.utils import timezone
 
-from apps.tournaments.fan import _bracket_params, _round_name
+from apps.tournaments.fan import _bracket_params, _round_name, seed_pairs
 from apps.tournaments.models import (
     Match,
     Tournament,
@@ -223,8 +223,9 @@ def _boards_by_placement(
 
 
 def _empty_elimination_rounds(draw_size: int) -> tuple[BracketRound, ...]:
-    """Пустые колонки размера ближайшей степени двойки."""
+    """Пустые колонки размера ближайшей степени двойки, слоты — по посеву."""
     bracket_size, total_rounds = _bracket_params(draw_size)
+    pairs = seed_pairs(bracket_size)
     rounds: list[BracketRound] = []
     for offset in range(total_rounds):
         round_index = offset + 1
@@ -233,8 +234,9 @@ def _empty_elimination_rounds(draw_size: int) -> tuple[BracketRound, ...]:
         matches: list[BracketMatch] = []
         for order in range(match_count):
             if offset == 0:
-                side1 = _placeholder(f"Позиция {order + 1}")
-                side2 = _placeholder(f"Позиция {bracket_size - order}")
+                top, bottom = pairs[order]
+                side1 = _placeholder(f"Посев {top}")
+                side2 = _placeholder(f"Посев {bottom}")
             else:
                 side1 = _placeholder("—")
                 side2 = _placeholder("—")
@@ -527,19 +529,23 @@ def _paginate(rounds: tuple[BracketRound, ...]) -> tuple[BracketPage, ...]:
 
 
 def _planned_draw_size(tournament: Tournament) -> int:
-    """Сколько мест рисовать до жеребьёвки: не меньше минимума и не больше максимума."""
+    """Сколько мест рисовать до жеребьёвки: по максимуму состава.
+
+    Если максимум не задан — по числу записавшихся, но не меньше минимума.
+    """
     if tournament.is_doubles():
+        maximum = tournament.max_teams
+        if maximum:
+            return max(int(maximum), 2)
         current = int(tournament.teams.filter(player2__isnull=False).count())
         minimum = int(tournament.min_teams or 0)
-        maximum = tournament.max_teams
     else:
+        maximum = tournament.max_participants
+        if maximum:
+            return max(int(maximum), 2)
         current = int(tournament.participants.filter(is_bye=False).count())
         minimum = int(tournament.min_participants or 0)
-        maximum = tournament.max_participants
-    size = max(current, minimum)
-    if maximum:
-        size = min(size, int(maximum))
-    return max(size, 2)
+    return max(current, minimum, 2)
 
 
 def _status_note(tournament: Tournament, generated: bool) -> str:

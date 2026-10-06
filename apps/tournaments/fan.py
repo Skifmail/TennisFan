@@ -344,6 +344,34 @@ def _bracket_params(n: int) -> tuple[int, int]:
     return bracket_size, total_rounds
 
 
+def seed_pairs(bracket_size: int) -> list[tuple[int, int]]:
+    """Пары посева первого круга сверху вниз по классической теннисной схеме.
+
+    1-й и 2-й сеянные — в разных половинах, 3-й и 4-й — в разных четвертях,
+    и так далее: сеянные встречаются не раньше, чем положено по рейтингу.
+    Для 16 мест: 1–16, 8–9, 5–12, 4–13, 3–14, 6–11, 7–10, 2–15.
+    Внутри пары первым стоит более высокий посев (меньший номер).
+
+    Args:
+        bracket_size: Размер сетки, степень двойки (не меньше 2).
+
+    Returns:
+        Список пар номеров посева (с единицы) в порядке матчей первого круга.
+    """
+    order = [1, 2]
+    while len(order) < bracket_size:
+        size = len(order) * 2
+        expanded: list[int] = []
+        for index, seed in enumerate(order):
+            mirror = size + 1 - seed
+            expanded.extend((seed, mirror) if index % 2 == 0 else (mirror, seed))
+        order = expanded
+    return [
+        (min(order[i], order[i + 1]), max(order[i], order[i + 1]))
+        for i in range(0, len(order), 2)
+    ]
+
+
 def _bracket_r1_count(n: int) -> int:
     """Количество матчей в первом круге для N участников."""
     bracket_size, _ = _bracket_params(n)
@@ -466,9 +494,8 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
             child.next_match = parent
             child.save(update_fields=["next_match"])
 
-    num_r1 = bracket_size // 2
-    for o in range(num_r1):
-        a, b = padded[o], padded[bracket_size - 1 - o]
+    for o, (seed_a, seed_b) in enumerate(seed_pairs(bracket_size)):
+        a, b = padded[seed_a - 1], padded[seed_b - 1]
         m = matches[(0, o)]
         if is_doubles:
             m.team1 = a

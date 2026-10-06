@@ -3,24 +3,44 @@
 {% block page_css %}
 @page {
     size: A4;
-    margin: 16mm 14mm 18mm;
-    @bottom-center {
-        content: "TennisFan  ·  " counter(page) " / " counter(pages);
+    margin: 11mm 12mm 12mm;
+    @bottom-right {
+        content: "{{ regulation.platform_name }}  ·  " counter(page) " / " counter(pages);
         font-family: "Roboto", sans-serif;
-        font-size: 8.5pt;
+        font-size: 8pt;
         color: #5c6b64;
     }
+}
+@page :nth(2) {
+    margin-bottom: 34mm;
+    @bottom-left {
+        content: element(publicqr);
+        width: 75%;
+        vertical-align: bottom;
+    }
+    @bottom-right {
+        content: "{{ regulation.platform_name }}  ·  " counter(page) " / " counter(pages);
+        font-family: "Roboto", sans-serif;
+        font-size: 8pt;
+        color: #5c6b64;
+        vertical-align: bottom;
+        width: 25%;
+    }
+}
+body {
+    font-size: 9.5pt;
+    line-height: 1.32;
 }
 .doc-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 14px;
+    gap: 12px;
     background: #0b3d2e;
     color: #f7f4ec;
-    padding: 14px 16px 12px;
-    border-bottom: 4px solid #c9a35a;
-    margin-bottom: 16px;
+    padding: 10px 14px 9px;
+    border-bottom: 3px solid #c9a35a;
+    margin-bottom: 8px;
 }
 .doc-head__main { flex: 1; min-width: 0; }
 .brand {
@@ -38,35 +58,35 @@
     flex-shrink: 0;
 }
 .logos img {
-    height: 84px;
-    width: 84px;
+    height: 64px;
+    width: 64px;
     object-fit: contain;
     background: #fff;
     border-radius: 50%;
-    padding: 3px;
+    padding: 2px;
 }
 .kicker {
-    font-size: 11pt;
-    letter-spacing: 0.14em;
+    font-size: 9.5pt;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    margin: 0 0 4px;
+    margin: 0 0 2px;
 }
 h1 {
-    font-size: 18pt;
-    line-height: 1.2;
-    margin: 0 0 6px;
+    font-size: 15pt;
+    line-height: 1.15;
+    margin: 0 0 3px;
     font-weight: 700;
 }
-.doc-meta { margin: 0; font-size: 9.5pt; color: #d7e4dc; }
+.doc-meta { margin: 0; font-size: 8.5pt; color: #d7e4dc; }
 h2 {
-    font-size: 12.5pt;
+    font-size: 11pt;
     color: #0b3d2e;
-    margin: 16px 0 6px;
-    padding-bottom: 3px;
+    margin: 8px 0 3px;
+    padding-bottom: 2px;
     border-bottom: 1px solid #c9a35a;
 }
-table { width: 100%; border-collapse: collapse; margin: 6px 0 8px; }
-th, td { padding: 5px 8px; vertical-align: top; font-size: 10pt; }
+table { width: 100%; border-collapse: collapse; margin: 2px 0 4px; }
+th, td { padding: 3px 6px; vertical-align: top; font-size: 9pt; }
 th {
     width: 34%;
     background: #0b3d2e;
@@ -76,27 +96,34 @@ th {
 }
 td { background: #f7f4ec; }
 tr:nth-child(even) td { background: #fff; }
-p { margin: 0 0 6px; }
+p { margin: 0 0 3px; }
+ul { margin: 2px 0 4px; }
+.sheet-two { break-before: page; }
 .public-qr {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 18px;
-    break-inside: avoid;
+    position: running(publicqr);
+}
+.public-qr table {
+    border-collapse: collapse;
+}
+.public-qr td {
+    background: transparent;
+    border: none;
+    padding: 0 8px 0 0;
+    vertical-align: middle;
 }
 .public-qr img {
-    width: 32mm;
-    height: 32mm;
+    width: 22mm;
+    height: 22mm;
 }
 .public-qr__title {
-    margin: 0 0 2px;
-    font-size: 11pt;
+    margin: 0 0 1px;
+    font-size: 10pt;
     font-weight: 700;
     color: #0b3d2e;
 }
 .public-qr__hint {
     margin: 0;
-    font-size: 9pt;
+    font-size: 8.5pt;
     color: #3d4a44;
 }
 {% endblock %}
@@ -119,7 +146,21 @@ p { margin: 0 0 6px; }
     </div>
     {% endif %}
 </header>
+{% if public_qr %}
+<div class="public-qr">
+    <table>
+        <tr>
+            <td><img src="{{ public_qr.data_uri }}" alt="QR-код страницы турнира"></td>
+            <td>
+                <p class="public-qr__title">Страница турнира</p>
+                <p class="public-qr__hint">Наведите камеру телефона на код</p>
+            </td>
+        </tr>
+    </table>
+</div>
+{% endif %}
 {% for section in regulation.sections %}
+{% if forloop.counter == 5 %}<div class="sheet-two"></div>{% endif %}
 <section>
     <h2>{{ forloop.counter }}. {{ section.title }}</h2>
     {% if section.rows %}
@@ -142,13 +183,4 @@ p { margin: 0 0 6px; }
     {% endif %}
 </section>
 {% endfor %}
-{% if public_qr %}
-<div class="public-qr">
-    <img src="{{ public_qr.data_uri }}" alt="QR-код страницы турнира">
-    <div>
-        <p class="public-qr__title">Страница турнира</p>
-        <p class="public-qr__hint">Наведите камеру телефона на код</p>
-    </div>
-</div>
-{% endif %}
 {% endblock %}

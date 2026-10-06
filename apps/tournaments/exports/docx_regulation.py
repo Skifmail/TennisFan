@@ -189,7 +189,9 @@ def _add_footer(document: WordDocument, regulation: RegulationContext) -> None:
     footer.is_linked_to_previous = False
     paragraph = footer.paragraphs[0]
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    left = paragraph.add_run(f"TennisFan · {regulation.organizer_name} · стр. ")
+    left = paragraph.add_run(
+        f"{regulation.platform_name} · {regulation.organizer_name} · стр. "
+    )
     left.font.size = Pt(9)
     left.font.name = _FONT
     left.font.color.rgb = RGBColor(0x5C, 0x6B, 0x64)

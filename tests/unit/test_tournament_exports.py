@@ -242,10 +242,10 @@ class BracketLayoutTestCase(TestCase):
         self.assertEqual(
             names,
             [
-                ("Посев 1", "Посев 8"),
+                ("Посев 1", "Свободный круг"),
                 ("Посев 4", "Посев 5"),
-                ("Посев 3", "Посев 6"),
-                ("Посев 2", "Посев 7"),
+                ("Посев 3", "Свободный круг"),
+                ("Посев 2", "Свободный круг"),
             ],
         )
 
@@ -263,6 +263,29 @@ class BracketLayoutTestCase(TestCase):
             match for page in layout.boards[0].pages for match in page.rounds[0].matches
         ]
         self.assertEqual(len(first_round), 8)
+
+    def test_slots_above_maximum_are_byes_and_fit_one_page(self) -> None:
+        """Максимум 18 — сетка на 32 места, посевы 19–32 — свободный круг."""
+        tournament = make_tournament(
+            slug="draw-eighteen",
+            format=TournamentFormat.OLYMPIC_CONSOLATION,
+            min_participants=8,
+            max_participants=18,
+            bracket_generated=False,
+        )
+        board = build_bracket_layout(tournament).boards[0]
+        self.assertEqual(len(board.pages), 1)
+        page = board.pages[0]
+        self.assertTrue(page.dense)
+        names = [round_item.name for round_item in page.rounds]
+        self.assertEqual(
+            names,
+            ["1/16 финала", "1/8 финала", "1/4 финала", "Полуфинал", "Финал"],
+        )
+        first_round = page.rounds[0].matches
+        self.assertEqual(len(first_round), 16)
+        self.assertEqual(sum(match.side2.is_bye for match in first_round), 14)
+        self.assertEqual(page.rounds[1].matches[0].side1.name, "Посев 1")
 
     def test_generated_elimination_uses_match_names(self) -> None:
         tournament = make_tournament(

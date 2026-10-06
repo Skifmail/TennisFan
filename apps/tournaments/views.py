@@ -5129,13 +5129,18 @@ def tournament_export_bracket(request, slug):
     tournament = _tournament_manage_get_any_tournament(request, slug)
     if tournament is None:
         return HttpResponseForbidden("Нет доступа к управлению этим турниром.")
+    from apps.core.context_processors import site_branding
     from apps.tournaments.exports.bracket import build_bracket_layout
     from apps.tournaments.exports.pdf import render_pdf
 
     layout = build_bracket_layout(tournament)
     payload = render_pdf(
         "tournaments/exports/bracket_pdf.html",
-        {"layout": layout, "logos": _document_logos(request, tournament)},
+        {
+            "layout": layout,
+            "logos": _document_logos(request, tournament),
+            "platform_name": site_branding(request)["site_brand_copyright"],
+        },
     )
     log.info("Экспорт сетки {}", tournament.slug)
     return _export_attachment(

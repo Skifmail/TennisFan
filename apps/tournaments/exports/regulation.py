@@ -186,7 +186,6 @@ def _general_section(tournament: Tournament, platform_name: str) -> Section:
             organizer,
         ),
         rows=(
-            InfoRow("Название", tournament.name),
             InfoRow("Вид спорта", tournament.get_sport_display()),
             InfoRow("Тип турнира", tournament.get_tournament_type_display()),
             InfoRow("Статус", tournament.get_status_display()),
@@ -323,10 +322,8 @@ def _walkover_section(tournament: Tournament) -> Section:
     )
 
 
-def _points_section(tournament: Tournament) -> Section | None:
-    """Таблица очков. Для круговой системы раздел не нужен."""
-    if tournament.format == TournamentFormat.ROUND_ROBIN:
-        return None
+def _points_section(tournament: Tournament) -> Section:
+    """Таблица рейтинговых очков по формату турнира."""
     if tournament.format == TournamentFormat.SINGLE_ELIMINATION:
         rows = (
             InfoRow("Вылет в 1 круге", str(tournament.fan_points_r1)),
@@ -345,6 +342,11 @@ def _points_section(tournament: Tournament) -> Section | None:
             InfoRow("9 место и ниже", str(tournament.fan_points_r1)),
         )
         note = "Очки начисляются по итоговому месту."
+        if tournament.format == TournamentFormat.ROUND_ROBIN:
+            note = (
+                "Очки рейтинга начисляются по итоговому месту. "
+                "Это отдельно от очков за победы внутри турнира."
+            )
     return Section(title=SECTION_POINTS, rows=rows, paragraphs=(note,))
 
 

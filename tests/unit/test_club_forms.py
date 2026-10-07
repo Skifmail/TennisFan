@@ -3,11 +3,16 @@
 from datetime import date, datetime, timedelta
 
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
+from apps.clubs.court_search import search_tournament_courts
 from apps.clubs.forms import ClubPlayerPlanForm, ClubTournamentCreateForm
 from apps.clubs.models import (
     Club,
+    ClubMember,
+    ClubMemberRole,
+    ClubMemberStatus,
 )
 from apps.core.geo import GeoRegion
 from apps.core.models import GeoArea
@@ -22,6 +27,7 @@ from apps.tournaments.models import (
     TournamentType,
     TournamentVariant,
 )
+from tests.support.factories import make_user
 
 
 class ClubTournamentCreateFormTestCase(TestCase):
@@ -222,19 +228,10 @@ class ClubTournamentCreateFormTestCase(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertIsNotNone(form.cleaned_data["registration_deadline"])
 
-    def test_court_select_renders_club_city_courts(self) -> None:
-        court = Court.objects.create(
-            name="Арена Воскресенск",
-            slug="arena-voskresensk",
-            city=self.club.city,
-            address="ул. Кортовая, 3",
-            surface="хард",
-            venue_sport=VenueSport.TENNIS,
-            is_active=True,
-        )
+    def test_court_field_searches_any_city(self) -> None:
         other_city = Court.objects.create(
-            name="Корт другого города",
-            slug="other-city-court",
+            name="Корт Тулы",
+            slug="tula-court",
             city="Тула",
             address="ул. Кортовая, 4",
             surface="хард",
@@ -245,11 +242,20 @@ class ClubTournamentCreateFormTestCase(TestCase):
         form = ClubTournamentCreateForm(club=self.club, is_pro=False)
         html = str(form["court"])
 
-        self.assertIn("Арена Воскресенск", html)
-        self.assertIn(f'value="{court.pk}"', html)
-        self.assertIn('data-venue-sport="tennis"', html)
-        self.assertIn("Без привязки к корту", html)
+        self.assertIn(other_city, form.fields["court"].queryset)
+        self.assertIn("data-court-search", html)
+        self.assertIn("tournaments/courts/search/", html)
+        self.assertNotIn("<select", html)
         self.assertNotIn(other_city.name, html)
+
+        bound = ClubTournamentCreateForm(
+            data=self._base_tournament_data(court=str(other_city.pk), city="Тула"),
+            club=self.club,
+            is_pro=False,
+        )
+        self.assertTrue(bound.is_valid(), bound.errors)
+        self.assertEqual(bound.cleaned_data["court"], other_city)
+        self.assertIn("Корт Тулы — Тула", str(bound["court"]))
 
     def test_sport_field_defaults_to_tennis(self) -> None:
         form = ClubTournamentCreateForm(club=self.club, is_pro=False)
@@ -322,6 +328,86 @@ class ClubTournamentCreateFormTestCase(TestCase):
         )
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data["court"], padel_court)
+
+
+class TournamentCourtSearchTestCase(TestCase):
+    def setUp(self) -> None:
+        self.club = Club.objects.create(
+            name="Клуб поиска",
+            slug="search-club",
+            city="Воскресенск",
+            address="ул. Пушкина, 1",
+            email="search@test.local",
+            admin_name="Администратор",
+        )
+        self.user = make_user(email="manager-search@test.local")
+        ClubMember.objects.create(
+            club=self.club,
+            user=self.user,
+            role=ClubMemberRole.ADMIN,
+            status=ClubMemberStatus.ACTIVE,
+        )
+        self.voskresensk = Court.objects.create(
+            name="Арена Воскресенск",
+            slug="arena-voskresensk-search",
+            city="Воскресенск",
+            address="ул. Советская, 1",
+            surface="хард",
+            venue_sport=VenueSport.TENNIS,
+            is_active=True,
+        )
+        self.tula = Court.objects.create(
+            name="Корт Тулы",
+            slug="tula-court-search",
+            city="Тула",
+            address="ул. Ленина, 2",
+            surface="хард",
+            venue_sport=VenueSport.TENNIS,
+            is_active=True,
+        )
+        self.padel = Court.objects.create(
+            name="Падел Тула",
+            slug="tula-padel-search",
+            city="Тула",
+            address="ул. Ленина, 3",
+            surface="падел",
+            venue_sport=VenueSport.PADEL,
+            padel_surfaces=[PadelSurface.ARTIFICIAL_GRASS],
+            is_active=True,
+        )
+
+    def test_search_matches_name_or_city_and_sport(self) -> None:
+        by_city = search_tournament_courts("тул", Sport.TENNIS)
+        self.assertEqual([court.pk for court in by_city], [self.tula.pk])
+
+        by_name = search_tournament_courts("арена", Sport.TENNIS)
+        self.assertEqual([court.pk for court in by_name], [self.voskresensk.pk])
+
+        padel = search_tournament_courts("тула", Sport.PADEL)
+        self.assertEqual([court.pk for court in padel], [self.padel.pk])
+        self.assertEqual(search_tournament_courts("т", Sport.TENNIS), [])
+
+    def test_endpoint_returns_courts_from_other_cities(self) -> None:
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("clubs:tournament_court_search", kwargs={"slug": self.club.slug}),
+            {"q": "Тула", "sport": "tennis"},
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual([item["id"] for item in payload["results"]], [self.tula.pk])
+        self.assertEqual(payload["results"][0]["city"], "Тула")
+
+    def test_endpoint_rejects_outsider(self) -> None:
+        outsider = make_user(email="outsider-search@test.local")
+        self.client.force_login(outsider)
+        response = self.client.get(
+            reverse("clubs:tournament_court_search", kwargs={"slug": self.club.slug}),
+            {"q": "Тула"},
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 403)
 
 
 class ClubPlayerPlanFormTestCase(TestCase):

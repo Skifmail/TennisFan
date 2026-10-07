@@ -9,7 +9,7 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -36,6 +36,7 @@ from apps.tournaments.utils import (
 )
 from apps.users.models import SkillLevel
 
+from ..court_search import search_tournament_courts
 from ..finance_services import credit_member_balance
 from ..forms import (
     ClubMemberPlanAssignForm,
@@ -1524,6 +1525,41 @@ def tournament_plan_access(
             "can_manage_fees": user_can_manage_fees(request.user, club),
             "can_manage_managers": user_can_manage_managers(request.user, club),
         },
+    )
+
+
+@login_required
+@require_GET
+def tournament_court_search(request: HttpRequest, slug: str) -> JsonResponse:
+    """Подсказки кортов для формы турнира: название, город или адрес.
+
+    Args:
+        request: GET с параметрами ``q`` и ``sport``.
+        slug: Слаг клуба, из кабинета которого идёт поиск.
+
+    Returns:
+        JsonResponse: Список ``results`` либо 403, если нет доступа к клубу.
+    """
+    club = get_object_or_404(Club, slug=slug)
+    if not user_can_manage_club(request.user, club) or not club_is_operational(club):
+        return JsonResponse({"results": []}, status=403)
+    courts = search_tournament_courts(
+        request.GET.get("q") or "",
+        request.GET.get("sport") or "tennis",
+    )
+    return JsonResponse(
+        {
+            "results": [
+                {
+                    "id": court.pk,
+                    "name": court.name,
+                    "city": court.city,
+                    "address": court.display_address,
+                    "venue_sport": court.venue_sport or "tennis",
+                }
+                for court in courts
+            ]
+        }
     )
 
 

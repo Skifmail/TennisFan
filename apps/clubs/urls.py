@@ -23,6 +23,7 @@ from .views.dashboard import (
     plan_edit,
     plan_toggle_usage,
     plans_manage,
+    tournament_court_search,
     tournament_create,
     tournament_edit,
     tournament_plan_access,
@@ -263,6 +264,11 @@ urlpatterns = [
         "<slug:slug>/tournaments/create/",
         tournament_create,
         name="tournament_create",
+    ),
+    path(
+        "<slug:slug>/tournaments/courts/search/",
+        tournament_court_search,
+        name="tournament_court_search",
     ),
     path(
         "<slug:slug>/tournaments/<int:tournament_id>/edit/",

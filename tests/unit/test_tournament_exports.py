@@ -29,6 +29,7 @@ from apps.tournaments.exports.public_qr import public_page_qr
 from apps.tournaments.exports.regulation import (
     SECTION_EXTRA,
     SECTION_FEE,
+    SECTION_GENERAL,
     SECTION_POINTS,
     SECTION_SCHEDULE,
     RegulationContext,
@@ -68,13 +69,31 @@ class RegulationContextTestCase(TestCase):
         self.assertNotIn("Описание турнира", titles)
         points = _row_map(tournament, SECTION_POINTS)
         self.assertEqual(points["Вылет в 1 круге"], "11")
+        general = _row_map(tournament, SECTION_GENERAL)
+        self.assertNotIn("Название", general)
+        self.assertEqual(
+            build_regulation_context(tournament).tournament_name,
+            tournament.name,
+        )
 
-    def test_round_robin_has_no_points_section(self) -> None:
+    def test_round_robin_points_follow_final_place(self) -> None:
+        """Круговой турнир публикует рейтинговые очки по занятому месту."""
         tournament = make_tournament(
             slug="reg-rr",
             format=TournamentFormat.ROUND_ROBIN,
+            fan_points_winner=100,
+            fan_points_final=70,
+            fan_points_sf=50,
+            fan_points_r2=30,
+            fan_points_r1=10,
         )
-        self.assertNotIn(SECTION_POINTS, _titles(tournament))
+        self.assertIn(SECTION_POINTS, _titles(tournament))
+        points = _row_map(tournament, SECTION_POINTS)
+        self.assertEqual(points["1 место"], "100")
+        self.assertEqual(points["2 место"], "70")
+        self.assertEqual(points["3–4 места"], "50")
+        self.assertEqual(points["5–8 места"], "30")
+        self.assertEqual(points["9 место и ниже"], "10")
 
     def test_postpayment_and_extra_clauses(self) -> None:
         club = make_club(

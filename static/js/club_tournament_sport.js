@@ -1,5 +1,5 @@
 /**
- * Форма клубного турнира: падел только в парах, корты по виду спорта.
+ * Форма клубного турнира: падел только в парах.
  *
  * Подключается из templates/clubs/tournament_create.html.
  */
@@ -9,14 +9,6 @@
     var PADEL = "padel";
     var DOUBLES = "doubles";
     var LOCK_ID = "id_variant_padel_lock";
-
-    function courtMatchesSport(venue, sport) {
-        var value = venue || "tennis";
-        if (sport === PADEL) {
-            return value === "padel" || value === "both";
-        }
-        return value === "tennis" || value === "both" || value === "";
-    }
 
     function syncPadelVariant() {
         var sport = document.querySelector("#id_sport, select[name='sport']");
@@ -55,32 +47,8 @@
         }
     }
 
-    function syncCourts() {
-        var sport = document.querySelector("#id_sport, select[name='sport']");
-        var court = document.querySelector("#id_court, select[name='court']");
-        if (!sport || !court) {
-            return;
-        }
-        var selected = sport.value || "tennis";
-        Array.prototype.forEach.call(court.options, function (option) {
-            if (!option.value) {
-                option.hidden = false;
-                option.disabled = false;
-                return;
-            }
-            var ok = courtMatchesSport(option.getAttribute("data-venue-sport"), selected);
-            option.hidden = !ok;
-            option.disabled = !ok;
-        });
-        var current = court.options[court.selectedIndex];
-        if (current && current.disabled) {
-            court.value = "";
-        }
-    }
-
     function syncSportFields() {
         syncPadelVariant();
-        syncCourts();
     }
 
     document.addEventListener("DOMContentLoaded", function () {

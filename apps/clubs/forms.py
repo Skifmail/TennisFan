@@ -6,7 +6,11 @@ from typing import Any, cast
 
 from django import forms
 from django.core.exceptions import ValidationError
+from django.db.models import Q
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import format_html
+from django.utils.safestring import SafeString
 from django.utils.text import slugify
 
 from apps.core.geo import (
@@ -30,6 +34,7 @@ from apps.tournaments.models import (
 from apps.tournaments.utils import generate_unique_tournament_slug
 from apps.users.models import SkillLevel
 
+from .court_search import active_courts
 from .models import (
     Club,
     ClubLegalDocument,
@@ -44,43 +49,61 @@ from .models import (
 from .payment_utils import get_secret_mask
 
 
-class CourtVenueSelect(forms.Select):
-    """Select корта с ``data-venue-sport`` для клиентского фильтра."""
+class CourtSearchWidget(forms.Widget):
+    """Поле поиска корта: в форму уходит id выбранной площадки."""
 
-    def __init__(
-        self,
-        *args: Any,
-        venue_by_id: dict[int, str] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        self.venue_by_id = venue_by_id or {}
+    def __init__(self, *args: Any, search_url: str = "", **kwargs: Any) -> None:
+        self.search_url = search_url
         super().__init__(*args, **kwargs)
 
-    def create_option(
+    def render(
         self,
         name: str,
         value: Any,
-        label: str,
-        selected: bool,
-        index: int,
-        subindex: int | None = None,
-        attrs: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
-        option = cast(
-            dict[str, Any],
-            super().create_option(
-                name, value, label, selected, index, subindex=subindex, attrs=attrs
-            ),
+        attrs: dict[str, Any] | None = None,
+        renderer: Any = None,
+    ) -> SafeString:
+        final_attrs = self.build_attrs(self.attrs, attrs)
+        input_id = str(final_attrs.get("id") or f"id_{name}")
+        css_class = str(final_attrs.get("class") or "form-control")
+        disabled = " disabled" if final_attrs.get("disabled") else ""
+        court_id = ""
+        label = ""
+        venue = ""
+        if value not in (None, ""):
+            try:
+                court = (
+                    Court.objects.filter(pk=int(value))
+                    .only("name", "city", "venue_sport")
+                    .first()
+                )
+            except (TypeError, ValueError):
+                court = None
+            if court is not None:
+                court_id = str(court.pk)
+                label = f"{court.name} — {court.city}"
+                venue = court.venue_sport or "tennis"
+        clear_hidden = "" if court_id else " hidden"
+        return format_html(
+            '<div class="court-search" data-court-search data-search-url="{}" data-venue-sport="{}">'
+            '<input type="hidden" name="{}" value="{}" data-court-value>'
+            '<input type="search" id="{}" class="{} court-search__input" value="{}" '
+            'placeholder="Название или город" autocomplete="off" spellcheck="false" '
+            'aria-autocomplete="list" data-court-query{}>'
+            '<button type="button" class="court-search__clear" data-court-clear{}{}>Сбросить</button>'
+            '<ul class="court-search__list" role="listbox" hidden data-court-list></ul>'
+            "</div>",
+            self.search_url,
+            venue,
+            name,
+            court_id,
+            input_id,
+            css_class,
+            label,
+            disabled,
+            clear_hidden,
+            disabled,
         )
-        raw = getattr(value, "value", value)
-        if raw in (None, ""):
-            return option
-        try:
-            pk = int(raw)
-        except (TypeError, ValueError):
-            return option
-        option["attrs"]["data-venue-sport"] = self.venue_by_id.get(pk) or "tennis"
-        return option
 
 
 def _court_matches_sport(court: Court, sport: str) -> bool:
@@ -684,21 +707,25 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "Чтобы продлить регистрацию, сдвиньте и дату начала: "
             "дедлайн не может быть позже старта турнира."
         )
-        court_qs = (
-            Court.objects.filter(city=club.city).order_by("name")
-            if club
-            else Court.objects.all().order_by("city", "name")
-        )
+        court_qs = active_courts()
+        if self.instance and self.instance.court_id:
+            court_qs = Court.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.court_id)
+            ).order_by("city", "name")
+        search_url = ""
+        if club is not None:
+            search_url = reverse(
+                "clubs:tournament_court_search",
+                kwargs={"slug": club.slug},
+            )
         self.fields["court"].queryset = court_qs
-        self.fields["court"].empty_label = "Без привязки к корту"
-        self.fields["court"].widget = CourtVenueSelect(
-            venue_by_id=dict(court_qs.values_list("pk", "venue_sport")),
+        self.fields["court"].widget = CourtSearchWidget(
+            search_url=search_url,
             attrs=self.fields["court"].widget.attrs,
         )
-        # Замена виджета сбрасывает choices: без этой строки select рендерится пустым.
-        self.fields["court"].widget.choices = self.fields["court"].choices
         self.fields["court"].help_text = (
-            "Список кортов сужается по виду спорта: теннисный корт нельзя выбрать для падела."
+            "Начните вводить название или город. Список учитывает вид спорта: "
+            "теннисный корт нельзя выбрать для падела."
         )
         self.fields["geo_area"].empty_label = "Не выбрано"
         self.fields["city"].widget.attrs["data-geo-city"] = "1"

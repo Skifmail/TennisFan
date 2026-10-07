@@ -30100,6 +30100,72 @@ a.home-activity__actor:hover {
     background-color: #2a5b41;
 }
 
+.court-search {
+    position: relative;
+}
+
+.club-tournament-create__field .court-search__input {
+    width: 100%;
+    padding-right: 96px;
+}
+
+.court-search__clear {
+    position: absolute;
+    top: 14px;
+    right: 12px;
+    border: 0;
+    background: transparent;
+    color: rgba(248, 250, 252, 0.72);
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.court-search__list {
+    position: absolute;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    background: #11271d;
+    border: 1px solid rgba(201, 168, 76, 0.28);
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.court-search__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: #f8fafc;
+}
+
+.court-search__item.is-active,
+.court-search__item:hover {
+    background: #2a5b41;
+}
+
+.court-search__name {
+    font-weight: 600;
+}
+
+.court-search__meta,
+.court-search__empty {
+    color: rgba(203, 213, 225, 0.72);
+    font-size: 0.8rem;
+}
+
+.court-search__empty {
+    padding: 10px 12px;
+}
+
 .club-tournament-create__field textarea.form-control {
     min-height: 140px;
     resize: vertical;

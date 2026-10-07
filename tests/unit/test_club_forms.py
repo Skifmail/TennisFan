@@ -222,6 +222,35 @@ class ClubTournamentCreateFormTestCase(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertIsNotNone(form.cleaned_data["registration_deadline"])
 
+    def test_court_select_renders_club_city_courts(self) -> None:
+        court = Court.objects.create(
+            name="Арена Воскресенск",
+            slug="arena-voskresensk",
+            city=self.club.city,
+            address="ул. Кортовая, 3",
+            surface="хард",
+            venue_sport=VenueSport.TENNIS,
+            is_active=True,
+        )
+        other_city = Court.objects.create(
+            name="Корт другого города",
+            slug="other-city-court",
+            city="Тула",
+            address="ул. Кортовая, 4",
+            surface="хард",
+            venue_sport=VenueSport.TENNIS,
+            is_active=True,
+        )
+
+        form = ClubTournamentCreateForm(club=self.club, is_pro=False)
+        html = str(form["court"])
+
+        self.assertIn("Арена Воскресенск", html)
+        self.assertIn(f'value="{court.pk}"', html)
+        self.assertIn('data-venue-sport="tennis"', html)
+        self.assertIn("Без привязки к корту", html)
+        self.assertNotIn(other_city.name, html)
+
     def test_sport_field_defaults_to_tennis(self) -> None:
         form = ClubTournamentCreateForm(club=self.club, is_pro=False)
         self.assertIn("sport", form.fields)

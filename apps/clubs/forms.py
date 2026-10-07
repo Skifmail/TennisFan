@@ -695,6 +695,8 @@ class ClubTournamentCreateForm(forms.ModelForm):
             venue_by_id=dict(court_qs.values_list("pk", "venue_sport")),
             attrs=self.fields["court"].widget.attrs,
         )
+        # Замена виджета сбрасывает choices: без этой строки select рендерится пустым.
+        self.fields["court"].widget.choices = self.fields["court"].choices
         self.fields["court"].help_text = (
             "Список кортов сужается по виду спорта: теннисный корт нельзя выбрать для падела."
         )

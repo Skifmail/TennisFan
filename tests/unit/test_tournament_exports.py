@@ -237,6 +237,8 @@ class RegulationContextTestCase(TestCase):
         )
         self.assertIn("sheet-two", html)
         self.assertIn("running(publicqr)", html)
+        self.assertIn("margin-bottom: 44mm", html)
+        self.assertIn("padding-bottom: 10mm", html)
         static_dir = Path(settings.BASE_DIR) / "static"
         document = HTML(string=html, base_url=f"{static_dir.as_uri()}/").render()
         self.assertEqual(len(document.pages), 2)

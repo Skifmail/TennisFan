@@ -12,11 +12,12 @@
     }
 }
 @page :nth(2) {
-    margin-bottom: 34mm;
+    margin-bottom: 44mm;
     @bottom-left {
         content: element(publicqr);
         width: 75%;
         vertical-align: bottom;
+        padding-bottom: 10mm;
     }
     @bottom-right {
         content: "{{ regulation.platform_name }}  ·  " counter(page) " / " counter(pages);

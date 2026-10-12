@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Редактировать заявку на спарринг{% endblock %}
 
@@ -10,12 +11,13 @@
 <div class="container" style="max-width: 600px;">
     <div class="card">
         <div class="card-body" style="padding: var(--spacing-2xl);">
-            <form method="post" class="sparring-create__form">
+            <form method="post" class="sparring-create__form" novalidate>
                 {% csrf_token %}
+                {{ form.sport }}
 
                 <div class="d-flex gap-2 sparring-create__row--top">
                     <div class="form-group" style="flex: 1;">
-                        <label class="form-label">Населённый пункт</label>
+                        <label class="form-label">Населённый пункт <span class="sparring-create__req">обязательно</span></label>
                         {{ form.city }}
                     </div>
                     <div class="form-group" style="flex: 1;">
@@ -30,7 +32,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Описание</label>
+                    <label class="form-label">Описание <span class="sparring-create__req">обязательно</span></label>
                     {{ form.description }}
                     <p class="text-muted mt-1" style="font-size: var(--font-size-xs);">Расскажите о себе, когда и где хотите играть</p>
                 </div>
@@ -71,12 +73,26 @@
                     <p class="text-muted mt-1" style="font-size: var(--font-size-xs);">Результат не влияет на рейтинг и силу</p>
                 </div>
 
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary btn-lg" style="flex: 1;">Сохранить</button>
-                    <a href="{% url 'sparring_my_requests' %}" class="btn btn-ghost btn-lg">Отмена</a>
+                <div class="sparring-create__submit">
+                    <div class="sparring-create__errors" data-sparring-errors role="alert"{% if not form_error_messages %} hidden{% endif %}>
+                        <p class="sparring-create__errors-title">Заявку пока нельзя сохранить:</p>
+                        <ul data-sparring-errors-list>
+                            {% for message in form_error_messages %}
+                            <li>{{ message }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" style="flex: 1;">Сохранить</button>
+                        <a href="{% url 'sparring_my_requests' %}" class="btn btn-ghost btn-lg">Отмена</a>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/sparring-form-errors.js' %}"></script>
 {% endblock %}

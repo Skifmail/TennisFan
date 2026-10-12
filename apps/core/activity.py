@@ -34,6 +34,20 @@ HOME_ACTIVITY_SEEN_MAX_AGE = 60 * 60 * 24 * 365
 ActivityEventType = str | PlatformActivityEvent.EventType | tuple[str, ...]
 
 
+def doubles_sparring_noun(kind: str) -> str:
+    """Вернуть название вида спарринга для текста ленты.
+
+    Args:
+        kind: Значение ``DoublesMatchKind`` (``team`` или ``classic``).
+
+    Returns:
+        str: «командный спарринг» или «парный спарринг».
+    """
+    if kind == "team":
+        return "командный спарринг"
+    return "парный спарринг"
+
+
 def normalize_event_type(event_type: ActivityEventType) -> str:
     """Привести тип события к строковому значению для записи в БД.
 

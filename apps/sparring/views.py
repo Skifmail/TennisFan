@@ -36,6 +36,7 @@ from apps.core.contact_utils import (
     get_max_display_contact,
 )
 from apps.core.decorators import require_filled_profile, require_verified_player
+from apps.core.sports import sport_code
 from apps.core.text_search import filter_field_contains_ci
 from apps.users.models import Notification, Player
 
@@ -56,6 +57,7 @@ from .forms import (
     DoublesMatchRequestForm,
     SparringInviteForm,
     SparringRequestForm,
+    sparring_form_error_messages,
 )
 from .models import (
     DoublesJoinRequest,
@@ -379,6 +381,9 @@ def sparring_create(request):
     if sparring_type not in ("singles", "doubles", "team"):
         sparring_type = "singles"
 
+    sport_value = sport_code(intended_sport)
+    form_initial = {"city": getattr(player, "city", "") or "", "sport": sport_value}
+
     if sparring_type in ("doubles", "team"):
         if request.method == "POST":
             form = DoublesMatchRequestForm(request.POST)
@@ -418,9 +423,7 @@ def sparring_create(request):
                 except Exception as e:
                     messages.error(request, str(e))
         else:
-            form = DoublesMatchRequestForm(
-                initial={"city": getattr(player, "city", "")}
-            )
+            form = DoublesMatchRequestForm(initial=form_initial)
     else:
         if request.method == "POST":
             form = SparringRequestForm(request.POST)
@@ -429,15 +432,22 @@ def sparring_create(request):
                 sparring.player = player
                 sparring.match_type = SparringMatchType.SINGLES
                 sparring.save()
-                messages.success(request, "Заявка на спарринг создана.")
-                return redirect("sparring_list")
+                messages.success(
+                    request,
+                    "Заявка создана. Она в списке «Мои заявки».",
+                )
+                return redirect(f"{reverse('sparring_my_requests')}?type=singles")
         else:
-            form = SparringRequestForm(initial={"city": player.city})
+            form = SparringRequestForm(initial=form_initial)
 
     return render(
         request,
         "sparring/create.html",
-        {"form": form, "sparring_type": sparring_type},
+        {
+            "form": form,
+            "sparring_type": sparring_type,
+            "form_error_messages": sparring_form_error_messages(form),
+        },
     )
 
 
@@ -469,7 +479,15 @@ def sparring_edit(request, pk):
     else:
         form = SparringRequestForm(instance=sparring)
 
-    return render(request, "sparring/edit.html", {"form": form, "sparring": sparring})
+    return render(
+        request,
+        "sparring/edit.html",
+        {
+            "form": form,
+            "sparring": sparring,
+            "form_error_messages": sparring_form_error_messages(form),
+        },
+    )
 
 
 @require_POST

@@ -16,7 +16,12 @@ from typing import Any
 from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.urls import NoReverseMatch, reverse
 
-from apps.core.activity import log_activity, normalize_event_type, player_user
+from apps.core.activity import (
+    doubles_sparring_noun,
+    log_activity,
+    normalize_event_type,
+    player_user,
+)
 from apps.core.models import PlatformActivityEvent
 
 logger = logging.getLogger(__name__)
@@ -400,11 +405,14 @@ def register() -> None:
         user = player_user(instance.created_by)
         if user is None:
             return
+        kind = str(getattr(instance, "kind", "") or "")
+        noun = doubles_sparring_noun(kind)
         log_activity(
             event_type=EventType.DOUBLES_CREATED,
             actor=user,
-            description=f"Создал парный спарринг ({instance.get_kind_display()})",
+            description=f"Создал {noun}",
             target_url=_safe_reverse("sparring_list"),
+            metadata={"sparring_kind": kind},
             dedupe_key=f"doubles_request:{instance.pk}",
             created_at=getattr(instance, "created_at", None),
         )
@@ -417,14 +425,21 @@ def register() -> None:
     )
 
     def on_doubles_join_saved(sender, instance, created, **kwargs):
+        kind = ""
+        try:
+            kind = str(instance.match_request.kind or "")
+        except Exception:  # noqa: BLE001
+            kind = ""
+        noun = doubles_sparring_noun(kind)
         if created:
             user = player_user(instance.created_by)
             if user is not None:
                 log_activity(
                     event_type=EventType.DOUBLES_JOIN_REQUESTED,
                     actor=user,
-                    description="Подал заявку в парный спарринг",
+                    description=f"Подал заявку в {noun}",
                     target_url=_safe_reverse("sparring_list"),
+                    metadata={"sparring_kind": kind},
                     dedupe_key=f"doubles_join:{instance.pk}",
                     created_at=getattr(instance, "created_at", None),
                 )
@@ -440,11 +455,12 @@ def register() -> None:
                 event_type=EventType.DOUBLES_JOIN_APPROVED,
                 actor=owner_user,
                 description=(
-                    f"Одобрил заявку игрока {applicant_name} в парный спарринг".strip()
+                    f"Одобрил заявку игрока {applicant_name} в {noun}".strip()
                     if applicant_name
-                    else "Одобрил заявку в парный спарринг"
+                    else f"Одобрил заявку в {noun}"
                 ),
                 target_url=_safe_reverse("sparring_list"),
+                metadata={"sparring_kind": kind},
                 dedupe_key=f"doubles_join_approved:{instance.pk}",
             )
         if instance.status == DoublesJoinRequestStatus.REJECTED:
@@ -459,11 +475,12 @@ def register() -> None:
                 event_type=EventType.DOUBLES_JOIN_REJECTED,
                 actor=owner_user,
                 description=(
-                    f"Отклонил заявку игрока {applicant_name} в парный спарринг".strip()
+                    f"Отклонил заявку игрока {applicant_name} в {noun}".strip()
                     if applicant_name
-                    else "Отклонил заявку в парный спарринг"
+                    else f"Отклонил заявку в {noun}"
                 ),
                 target_url=_safe_reverse("sparring_list"),
+                metadata={"sparring_kind": kind},
                 dedupe_key=f"doubles_join_rejected:{instance.pk}",
             )
 

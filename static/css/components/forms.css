@@ -133,12 +133,13 @@ select.form-control option:hover {
     }
 }
 
-/* Форма ввода счёта: строки = игроки, столбцы = сеты */
+/* Форма ввода счёта: строки = игроки, столбцы = сеты фиксированной ширины. */
 .match-score-input {
     display: grid;
-    grid-template-columns: minmax(120px, 1fr) repeat(3, minmax(0, 80px));
-    gap: var(--spacing-xs) var(--spacing-sm);
+    grid-template-columns: minmax(0, 1fr) repeat(3, 3.5rem);
+    gap: 0.35rem 0.4rem;
     align-items: center;
+    width: 100%;
 }
 
 .match-score-input__row {
@@ -146,18 +147,39 @@ select.form-control option:hover {
 }
 
 .match-score-input__header .match-score-input__cell {
-    font-size: var(--font-size-sm);
+    font-size: 0.75rem;
     font-weight: 600;
+    line-height: 1.15;
     color: var(--color-text-muted);
+    text-align: center;
 }
 
 .match-score-input__label {
+    min-width: 0;
     font-size: var(--font-size-sm);
+    line-height: 1.25;
     color: var(--color-text);
+    overflow-wrap: break-word;
 }
 
-.match-score-input__cell input {
+.match-score-input .form-control.match-score-input__cell {
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.15rem;
+    box-sizing: border-box;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.match-score-input .form-control.match-score-input__cell::-webkit-outer-spin-button,
+.match-score-input .form-control.match-score-input__cell::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .auth-form.register {

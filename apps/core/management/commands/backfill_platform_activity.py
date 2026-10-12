@@ -14,7 +14,12 @@ from django.core.management.base import BaseCommand
 from django.db.models import QuerySet
 from django.urls import NoReverseMatch, reverse
 
-from apps.core.activity import log_activity, normalize_event_type, player_user
+from apps.core.activity import (
+    doubles_sparring_noun,
+    log_activity,
+    normalize_event_type,
+    player_user,
+)
 from apps.core.models import PlatformActivityEvent
 
 EventType = PlatformActivityEvent.EventType
@@ -339,11 +344,13 @@ class Command(BaseCommand):
             user = player_user(dreq.created_by)
             if user is None:
                 continue
+            kind = str(getattr(dreq, "kind", "") or "")
             log_activity(
                 event_type=EventType.DOUBLES_CREATED,
                 actor=user,
-                description=f"Создал парный спарринг ({dreq.get_kind_display()})",
+                description=f"Создал {doubles_sparring_noun(kind)}",
                 target_url=sparring_url,
+                metadata={"sparring_kind": kind},
                 dedupe_key=f"doubles_request:{dreq.pk}",
                 created_at=getattr(dreq, "created_at", None),
             )
@@ -352,13 +359,20 @@ class Command(BaseCommand):
         for join in DoublesJoinRequest.objects.select_related(
             "created_by__user", "match_request__created_by__user"
         ).iterator():
+            kind = ""
+            try:
+                kind = str(join.match_request.kind or "")
+            except Exception:  # noqa: BLE001
+                kind = ""
+            noun = doubles_sparring_noun(kind)
             user = player_user(join.created_by)
             if user is not None:
                 log_activity(
                     event_type=EventType.DOUBLES_JOIN_REQUESTED,
                     actor=user,
-                    description="Подал заявку в парный спарринг",
+                    description=f"Подал заявку в {noun}",
                     target_url=sparring_url,
+                    metadata={"sparring_kind": kind},
                     dedupe_key=f"doubles_join:{join.pk}",
                     created_at=getattr(join, "created_at", None),
                 )
@@ -375,11 +389,12 @@ class Command(BaseCommand):
                     event_type=EventType.DOUBLES_JOIN_APPROVED,
                     actor=owner_user,
                     description=(
-                        f"Одобрил заявку игрока {applicant_name} в парный спарринг".strip()
+                        f"Одобрил заявку игрока {applicant_name} в {noun}".strip()
                         if applicant_name
-                        else "Одобрил заявку в парный спарринг"
+                        else f"Одобрил заявку в {noun}"
                     ),
                     target_url=sparring_url,
+                    metadata={"sparring_kind": kind},
                     dedupe_key=f"doubles_join_approved:{join.pk}",
                     created_at=getattr(join, "processed_at", None)
                     or getattr(join, "updated_at", None),

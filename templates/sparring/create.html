@@ -1,10 +1,21 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Создать заявку на спарринг{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <h1 class="page-title">Создать заявку на спарринг</h1>
+    <div class="container sparring-create__errors-wrap">
+        <div class="sparring-create__errors" data-sparring-errors role="alert"{% if not form_error_messages %} hidden{% endif %}>
+            <p class="sparring-create__errors-title">Заявку пока нельзя создать:</p>
+            <ul data-sparring-errors-list>
+                {% for message in form_error_messages %}
+                <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
     <p class="page-subtitle">
         {% if sparring_type == 'doubles' %}
         Парный спарринг 2×2: вы собираете команду из двух человек и ищете соперников. После того как обе команды будут укомплектованы, автор заявки подтвердит состав и будет создан один парный матч.
@@ -31,14 +42,16 @@
 
     <div class="card">
         <div class="card-body" style="padding: var(--spacing-2xl);">
-            <form method="post" class="sparring-create__form">
+            <form method="post" class="sparring-create__form" novalidate>
                 {% csrf_token %}
                 <input type="hidden" name="sparring_type" value="{{ sparring_type }}">
+                {{ form.sport }}
 
                 <div class="d-flex gap-2 sparring-create__row--top">
                     <div class="form-group" style="flex: 1;">
-                        <label class="form-label">Населённый пункт</label>
+                        <label class="form-label">Населённый пункт{% if sparring_type == 'singles' %} <span class="sparring-create__req">обязательно</span>{% endif %}</label>
                         {{ form.city }}
+                        {% for error in form.city.errors %}<p class="sparring-create__field-error">{{ error }}</p>{% endfor %}
                     </div>
                     <div class="form-group" style="flex: 1;">
                         <label class="form-label">Желаемый уровень {% if sparring_type == 'doubles' %}партнёров{% else %}партнёра{% endif %}</label>
@@ -63,8 +76,9 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Описание</label>
+                    <label class="form-label">Описание{% if sparring_type == 'singles' %} <span class="sparring-create__req">обязательно</span>{% endif %}</label>
                     {{ form.description }}
+                    {% for error in form.description.errors %}<p class="sparring-create__field-error">{{ error }}</p>{% endfor %}
                     <p class="text-muted mt-1" style="font-size: var(--font-size-xs);">Расскажите о себе, когда и где хотите играть</p>
                 </div>
 
@@ -112,12 +126,18 @@
                     <p class="text-muted mt-1" style="font-size: var(--font-size-xs);">Результат не будет влиять на рейтинг и силу ни у вас, ни у соперника</p>
                 </div>
 
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary btn-lg" style="flex: 1;">Создать заявку</button>
-                    <a href="{% url 'sparring_list' %}?type={{ sparring_type }}" class="btn btn-ghost btn-lg">Отмена</a>
+                <div class="sparring-create__submit">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg" style="flex: 1;">Создать заявку</button>
+                        <a href="{% url 'sparring_list' %}?type={{ sparring_type }}" class="btn btn-ghost btn-lg">Отмена</a>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/sparring-form-errors.js' %}"></script>
 {% endblock %}

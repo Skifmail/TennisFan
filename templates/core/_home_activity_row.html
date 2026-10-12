@@ -14,15 +14,15 @@
     </div>
     <div class="home-activity__cell home-activity__cell--action{% if event.shows_brand_actor %} home-activity__cell--action-plain{% endif %}">
         {% if not event.shows_brand_actor %}
-        <span class="club-dashboard-activity__badge club-dashboard-activity__badge--{{ event.get_tone }}">{{ event.get_event_type_display }}</span>
+        <span class="club-dashboard-activity__badge club-dashboard-activity__badge--{{ event.get_tone }}">{{ event.get_feed_badge }}</span>
         {% endif %}
         <div class="home-activity__body">
-            {% if event.description %}
+            {% if event.get_feed_description %}
             <span class="home-activity__desc">
                 {% if event.get_public_target_url %}
-                <a href="{{ event.get_public_target_url }}">{{ event.description }}</a>
+                <a href="{{ event.get_public_target_url }}">{{ event.get_feed_description }}</a>
                 {% else %}
-                {{ event.description }}
+                {{ event.get_feed_description }}
                 {% endif %}
             </span>
             {% endif %}

@@ -876,8 +876,67 @@ class PlatformActivityEvent(models.Model):
         """
         return (
             f"{self.created_at:%d.%m.%Y %H:%M} / {self.actor_name or 'Система'} / "
-            f"{self.get_event_type_display()}"
+            f"{self.get_feed_badge()}"
         )
+
+    def sparring_kind(self) -> str:
+        """Вернуть вид спарринга, если событие его различает.
+
+        Берётся из ``metadata['sparring_kind']``, а для старых записей — из
+        текста описания, где вид указан в скобках.
+
+        Returns:
+            str: ``team``, ``classic`` или пустая строка.
+        """
+        meta = self.metadata if isinstance(self.metadata, dict) else {}
+        kind = str(meta.get("sparring_kind") or "")
+        if kind in {"team", "classic"}:
+            return kind
+        text = self.description or ""
+        if "Командный" in text:
+            return "team"
+        if "Парный 2" in text or "2×2" in text:
+            return "classic"
+        return ""
+
+    def get_feed_badge(self) -> str:
+        """Вернуть подпись бейджа с учётом вида спарринга.
+
+        Для командного спарринга общая подпись «парный» заменяется на
+        «командный», чтобы бейдж совпадал с текстом события.
+
+        Returns:
+            str: Текст бейджа.
+        """
+        if self.sparring_kind() != "team":
+            return str(self.get_event_type_display())
+        labels = {
+            self.EventType.DOUBLES_CREATED: "Создан командный спарринг",
+            self.EventType.DOUBLES_JOIN_REQUESTED: "Заявка в командный спарринг",
+            self.EventType.DOUBLES_JOIN_APPROVED: (
+                "Одобрена заявка в командный спарринг"
+            ),
+            self.EventType.DOUBLES_JOIN_REJECTED: (
+                "Отклонена заявка в командный спарринг"
+            ),
+        }
+        return labels.get(self.event_type, str(self.get_event_type_display()))
+
+    def get_feed_description(self) -> str:
+        """Вернуть описание события с согласованным видом спарринга.
+
+        Старые записи создания выглядят как «парный спарринг (Командный
+        спарринг)». Для ленты это сворачивается в одну формулировку.
+
+        Returns:
+            str: Текст описания.
+        """
+        kind = self.sparring_kind()
+        if self.event_type == self.EventType.DOUBLES_CREATED and kind == "team":
+            return "Создал командный спарринг"
+        if self.event_type == self.EventType.DOUBLES_CREATED and kind == "classic":
+            return "Создал парный спарринг"
+        return str(self.description or "")
 
     def get_actor_display(self) -> str:
         """Вернуть имя действующего лица для отображения в ленте.

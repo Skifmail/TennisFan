@@ -4,10 +4,52 @@ Sparring forms.
 
 from django import forms
 
-from apps.core.sports import Sport
+from apps.core.sports import Sport, parse_sport_filter
 from apps.users.models import Player, SkillLevel
 
 from .models import SparringPreferredGender, SparringRequest
+
+
+def sparring_form_error_messages(form: forms.BaseForm) -> list[str]:
+    """Собрать тексты ошибок формы без повторов.
+
+    Args:
+        form: Форма создания или правки заявки на спарринг.
+
+    Returns:
+        list[str]: Сообщения, которые нужно показать над кнопкой.
+    """
+    seen: list[str] = []
+    for errors in form.errors.values():
+        for error in errors:
+            text = str(error).strip()
+            if text and text not in seen:
+                seen.append(text)
+    return seen
+
+
+def _reject_age_out_of_range(
+    form: forms.BaseForm,
+    field_name: str,
+    message: str,
+) -> bool:
+    """Добавить ошибку, если возраст указан и выходит за 1–100.
+
+    Args:
+        form: Форма с уже собранным ``cleaned_data``.
+        field_name: Имя поля возраста.
+        message: Текст ошибки.
+
+    Returns:
+        bool: True, если значение пригодно для сравнения «от» и «до».
+    """
+    value = form.cleaned_data.get(field_name)
+    if value is None:
+        return False
+    if 1 <= value <= 100:
+        return True
+    form.add_error(field_name, message)
+    return False
 
 
 class SparringRequestForm(forms.ModelForm):
@@ -29,7 +71,7 @@ class SparringRequestForm(forms.ModelForm):
             "is_friendly",
         )
         widgets = {
-            "sport": forms.Select(attrs={"class": "form-control"}),
+            "sport": forms.HiddenInput(),
             "city": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "Населённый пункт"}
             ),
@@ -59,20 +101,79 @@ class SparringRequestForm(forms.ModelForm):
         self.fields["desired_category"].choices = [("", "Любой уровень")] + [
             c for c in SkillLevel.choices
         ]
+        self.fields["sport"] = forms.CharField(
+            required=False,
+            widget=forms.HiddenInput(),
+        )
         self.fields["desired_partner_age_min"].required = False
         self.fields["desired_partner_age_max"].required = False
         self.fields["preferred_location"].required = False
+        self.fields["city"].error_messages["required"] = "Укажите населённый пункт."
+        self.fields["description"].error_messages[
+            "required"
+        ] = "Напишите описание: когда и где хотите играть."
+        self.fields["desired_partner_age_min"].error_messages[
+            "invalid"
+        ] = "Возраст партнёра «от» — целое число от 1 до 100."
+        self.fields["desired_partner_age_max"].error_messages[
+            "invalid"
+        ] = "Возраст партнёра «до» — целое число от 1 до 100."
+        self.fields["city"].widget.attrs[
+            "data-sparring-required"
+        ] = "Укажите населённый пункт."
+        self.fields["description"].widget.attrs[
+            "data-sparring-required"
+        ] = "Напишите описание: когда и где хотите играть."
+        self.fields["desired_partner_age_min"].widget.attrs.update(
+            {
+                "data-sparring-age": "min",
+                "data-sparring-age-error": (
+                    "Возраст партнёра «от» — целое число от 1 до 100."
+                ),
+            }
+        )
+        self.fields["desired_partner_age_max"].widget.attrs.update(
+            {
+                "data-sparring-age": "max",
+                "data-sparring-age-error": (
+                    "Возраст партнёра «до» — целое число от 1 до 100."
+                ),
+            }
+        )
+
+    def clean_sport(self) -> str:
+        """Подставить теннис, если вид спорта не пришёл вместе с формой.
+
+        Returns:
+            str: Код вида спорта.
+        """
+        parsed = parse_sport_filter(
+            str(self.cleaned_data.get("sport") or ""),
+            default="tennis",
+        )
+        if parsed == "all":
+            return "tennis"
+        return parsed
 
     def clean(self):
         cleaned_data = super().clean()
+        min_ok = _reject_age_out_of_range(
+            self,
+            "desired_partner_age_min",
+            "Возраст партнёра «от» — целое число от 1 до 100.",
+        )
+        max_ok = _reject_age_out_of_range(
+            self,
+            "desired_partner_age_max",
+            "Возраст партнёра «до» — целое число от 1 до 100.",
+        )
         age_min = cleaned_data.get("desired_partner_age_min")
         age_max = cleaned_data.get("desired_partner_age_max")
-
-        if age_min and age_max and age_min > age_max:
-            raise forms.ValidationError(
-                "Минимальный возраст не может быть больше максимального."
+        if min_ok and max_ok and age_min > age_max:
+            self.add_error(
+                None,
+                "Минимальный возраст не может быть больше максимального.",
             )
-
         return cleaned_data
 
 
@@ -106,7 +207,7 @@ class DoublesMatchRequestForm(forms.Form):
         label="Вид спорта",
         choices=Sport.choices,
         required=False,
-        widget=forms.Select(attrs={"class": "form-control"}),
+        widget=forms.HiddenInput(),
     )
     city = forms.CharField(
         max_length=100,
@@ -155,11 +256,37 @@ class DoublesMatchRequestForm(forms.Form):
     )
     desired_age_min = forms.IntegerField(
         required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 100}),
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": 1,
+                "max": 100,
+                "data-sparring-age": "min",
+                "data-sparring-age-error": (
+                    "Возраст партнёров «от» — целое число от 1 до 100."
+                ),
+            }
+        ),
+        error_messages={
+            "invalid": "Возраст партнёров «от» — целое число от 1 до 100.",
+        },
     )
     desired_age_max = forms.IntegerField(
         required=False,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 100}),
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": 1,
+                "max": 100,
+                "data-sparring-age": "max",
+                "data-sparring-age-error": (
+                    "Возраст партнёров «до» — целое число от 1 до 100."
+                ),
+            }
+        ),
+        error_messages={
+            "invalid": "Возраст партнёров «до» — целое число от 1 до 100.",
+        },
     )
     preferred_location = forms.CharField(
         max_length=200,
@@ -176,14 +303,23 @@ class DoublesMatchRequestForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        min_ok = _reject_age_out_of_range(
+            self,
+            "desired_age_min",
+            "Возраст партнёров «от» — целое число от 1 до 100.",
+        )
+        max_ok = _reject_age_out_of_range(
+            self,
+            "desired_age_max",
+            "Возраст партнёров «до» — целое число от 1 до 100.",
+        )
         age_min = cleaned_data.get("desired_age_min")
         age_max = cleaned_data.get("desired_age_max")
-
-        if age_min and age_max and age_min > age_max:
-            raise forms.ValidationError(
-                "Минимальный возраст не может быть больше максимального."
+        if min_ok and max_ok and age_min > age_max:
+            self.add_error(
+                None,
+                "Минимальный возраст не может быть больше максимального.",
             )
-
         return cleaned_data
 
 

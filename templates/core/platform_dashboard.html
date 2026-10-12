@@ -134,11 +134,11 @@
                     </div>
                     <div class="club-dashboard-activity__cell club-dashboard-activity__cell--action">
                         {% if not event.shows_brand_actor %}
-                        <span class="club-dashboard-activity__badge club-dashboard-activity__badge--{{ event.get_tone }}">{{ event.get_event_type_display }}</span>
+                        <span class="club-dashboard-activity__badge club-dashboard-activity__badge--{{ event.get_tone }}">{{ event.get_feed_badge }}</span>
                         {% endif %}
-                        {% if event.description %}
+                        {% if event.get_feed_description %}
                         <span class="club-dashboard-activity__desc">
-                            {% if event.target_url %}<a href="{{ event.target_url }}">{{ event.description }}</a>{% else %}{{ event.description }}{% endif %}
+                            {% if event.target_url %}<a href="{{ event.target_url }}">{{ event.get_feed_description }}</a>{% else %}{{ event.get_feed_description }}{% endif %}
                         </span>
                         {% endif %}
                         {% include 'core/_platform_activity_announce_manage.html' %}

@@ -82,7 +82,7 @@
     {% if search_query and search_query|length >= 2 %}
         {% if search_results %}
         <h2 class="sparring-invite__section-title mt-4">Результаты</h2>
-        <div class="d-flex flex-column gap-3">
+        <div class="sparring-invite__results">
             {% for p in search_results %}
             <div class="card sparring-invite__result">
                 <div class="card-body">

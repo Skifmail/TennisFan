@@ -140,6 +140,7 @@
     min-width: 0;
     display: grid;
     grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 0.85fr);
+    align-items: center;
     margin-bottom: 0;
     padding: 0;
     background: transparent;
@@ -154,10 +155,12 @@
     width: 100%;
     height: 2.15rem;
     min-height: 2.15rem;
+    max-height: 2.15rem;
     padding: 0 0.85rem;
     border-radius: 999px;
     font-size: 0.875rem;
     line-height: 1.2;
+    box-sizing: border-box;
 }
 
 .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar select.form-control {
@@ -172,11 +175,11 @@
 
 .sparring-toolbar__actions {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-end;
-    gap: var(--spacing-sm);
-    flex: 1 1 auto;
+    gap: 0.4rem;
+    flex: 0 0 auto;
 }
 
 .sparring-toolbar__panel:has(.sparring-toolbar__filters) .sparring-toolbar__actions {
@@ -188,14 +191,24 @@
     gap: 0.4rem;
 }
 
+.sparring-nearby-launch {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+
 .sparring-toolbar__panel .sparring-toolbar__btn,
 .sparring-nearby__radius {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
+    height: 2.15rem;
     min-height: 2.15rem;
+    max-height: 2.15rem;
     padding: 0 0.8rem;
+    box-sizing: border-box;
     border: 1px solid rgb(166 130 74 / 0.45);
     border-radius: 999px;
     background: transparent;
@@ -250,18 +263,13 @@
     color: var(--color-text);
 }
 
-.sparring-toolbar__filters .sparring-nearby__toggle--on:hover {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: var(--color-bg, #012b1c);
-}
-
-.sparring-nearby-launch {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem;
+.sparring-toolbar__panel .sparring-nearby__toggle,
+.sparring-toolbar__panel .btn-outline.sparring-nearby__toggle:hover,
+.sparring-toolbar__filters .sparring-nearby__toggle--on:hover,
+.sparring-toolbar__panel .sparring-nearby__toggle--on {
+    background: rgb(86 168 104 / 0.28);
+    border-color: rgb(130 196 140 / 0.75);
+    color: var(--color-text);
 }
 
 .sparring-nearby__radii {
@@ -284,6 +292,12 @@
         background: var(--color-primary);
         border-color: var(--color-primary);
         color: var(--color-bg, #012b1c);
+    }
+
+    .sparring-toolbar__panel .btn-outline.sparring-nearby__toggle:hover {
+        background: rgb(86 168 104 / 0.42);
+        border-color: rgb(150 210 155 / 0.9);
+        color: var(--color-text);
     }
 }
 
@@ -640,16 +654,22 @@
     }
 
     .sparring-toolbar__panel:has(.sparring-toolbar__filters) .sparring-toolbar__actions {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
         width: 100%;
+        justify-content: flex-start;
     }
 
-    .sparring-toolbar__actions .sparring-toolbar__btn {
-        width: 100%;
-        padding: 0.28rem 0.4rem;
+    .sparring-toolbar__actions .sparring-toolbar__btn,
+    .sparring-nearby__radius {
+        width: auto;
+        flex: 0 0 auto;
+        height: 2.15rem;
+        max-height: 2.15rem;
+        padding: 0 0.7rem;
         font-size: 0.78rem;
-        white-space: normal;
+        white-space: nowrap;
         text-align: center;
     }
 }
@@ -707,19 +727,24 @@
     }
 
     .sparring-toolbar__panel:has(.sparring-toolbar__filters) .sparring-toolbar__actions {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
         width: 100%;
         margin-left: 0;
+        justify-content: flex-start;
     }
 
-    .sparring-toolbar__actions .sparring-toolbar__btn {
+    .sparring-toolbar__actions .sparring-toolbar__btn,
+    .sparring-nearby__radius {
         width: auto;
         min-width: 0;
+        height: 2.15rem;
         min-height: 2.15rem;
-        padding: 0.28rem 0.3rem;
-        font-size: 0.68rem;
-        white-space: normal;
+        max-height: 2.15rem;
+        padding: 0 0.7rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
         text-align: center;
         justify-content: center;
     }

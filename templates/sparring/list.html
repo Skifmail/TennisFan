@@ -78,6 +78,8 @@
             {% if current_nearby %}
             <input type="hidden" name="nearby" value="{{ current_nearby }}">
             {% endif %}
+        </form>
+        <div class="sparring-toolbar__actions" role="toolbar" aria-label="Действия спарринга">
             <div class="sparring-nearby-launch">
                 <a href="{% if current_nearby %}?{{ sparring_filter_query }}{% else %}?{{ sparring_filter_query }}&amp;nearby={{ nearby_default }}{% endif %}" class="btn btn-outline sparring-toolbar__btn sparring-nearby__toggle{% if current_nearby %} sparring-nearby__toggle--on{% endif %}">
                     <svg class="sparring-nearby__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -93,8 +95,6 @@
                 </div>
                 {% endif %}
             </div>
-        </form>
-        <div class="sparring-toolbar__actions" role="toolbar" aria-label="Действия спарринга">
             <a href="{% url 'sparring_my_requests' %}?type={{ sparring_type }}" class="btn btn-outline sparring-toolbar__btn">Мои заявки</a>
             {% if user.is_authenticated %}
             <a href="{% url 'sparring_my_invitations' %}" class="btn btn-outline sparring-toolbar__btn">Мои приглашения</a>

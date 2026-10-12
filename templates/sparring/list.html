@@ -79,15 +79,18 @@
             <input type="hidden" name="nearby" value="{{ current_nearby }}">
             {% endif %}
             <div class="sparring-nearby-launch">
+                <a href="{% if current_nearby %}?{{ sparring_filter_query }}{% else %}?{{ sparring_filter_query }}&amp;nearby={{ nearby_default }}{% endif %}" class="btn btn-outline sparring-toolbar__btn sparring-nearby__toggle{% if current_nearby %} sparring-nearby__toggle--on{% endif %}">
+                    <svg class="sparring-nearby__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+                    </svg>
+                    Искать рядом
+                </a>
                 {% if current_nearby %}
-                <a href="?{{ sparring_filter_query }}" class="btn btn-outline sparring-toolbar__btn sparring-nearby__toggle sparring-nearby__toggle--on">Поиск рядом</a>
                 <div class="sparring-nearby__radii" role="group" aria-label="Расстояние">
                     {% for radius in nearby_radius_choices %}
                     <a href="?{{ sparring_filter_query }}&amp;nearby={{ radius }}" class="sparring-nearby__radius{% if current_nearby == radius %} sparring-nearby__radius--active{% endif %}">{{ radius }} км</a>
                     {% endfor %}
                 </div>
-                {% else %}
-                <a href="?{{ sparring_filter_query }}&amp;nearby={{ nearby_default }}" class="btn btn-outline sparring-toolbar__btn sparring-nearby__toggle">Поиск рядом</a>
                 {% endif %}
             </div>
         </form>

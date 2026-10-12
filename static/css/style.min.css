@@ -21080,14 +21080,47 @@ a.home-activity__actor:hover {
     gap: 0.4rem;
 }
 
-.sparring-toolbar__actions .sparring-toolbar__btn {
-    text-decoration: none;
+.sparring-toolbar__panel .sparring-toolbar__btn,
+.sparring-nearby__radius {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
     min-height: 2.15rem;
     padding: 0 0.8rem;
+    border: 1px solid rgb(166 130 74 / 0.45);
     border-radius: 999px;
+    background: transparent;
+    color: var(--color-text);
     font-size: 0.8rem;
     line-height: 1.15;
+    text-decoration: none;
     white-space: nowrap;
+    transition-property: transform, background-color, border-color, color;
+    transition-duration: 160ms;
+    transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.sparring-toolbar__panel .sparring-toolbar__btn:active,
+.sparring-nearby__radius:active {
+    transform: scale(0.97);
+}
+
+.sparring-toolbar__panel .sparring-toolbar__btn:focus-visible,
+.sparring-nearby__radius:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.sparring-nearby__icon {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+    transform: translate(0.5px, -0.5px);
+}
+
+.sparring-nearby__radius {
+    font-variant-numeric: tabular-nums;
 }
 
 /* Главное действие: чуть заметнее остальных outline, без «кислотной» заливки */
@@ -21118,28 +21151,32 @@ a.home-activity__actor:hover {
     gap: 0.35rem;
 }
 
-.sparring-nearby__radius {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 2.15rem;
-    padding: 0 0.8rem;
-    border: 1px solid rgb(166 130 74 / 0.45);
-    border-radius: 999px;
-    color: var(--color-text);
-    background: transparent;
-    font-size: 0.8rem;
-    line-height: 1.15;
-    text-decoration: none;
-    white-space: nowrap;
-}
-
 .sparring-toolbar__filters .sparring-nearby__toggle--on,
-.sparring-nearby__radius--active,
-.sparring-nearby__radius:hover {
+.sparring-nearby__radius--active {
     background: var(--color-primary);
     border-color: var(--color-primary);
     color: var(--color-bg, #012b1c);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .sparring-toolbar__panel .btn-outline.sparring-toolbar__btn:hover,
+    .sparring-nearby__radius:hover {
+        background: var(--color-primary);
+        border-color: var(--color-primary);
+        color: var(--color-bg, #012b1c);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sparring-toolbar__panel .sparring-toolbar__btn,
+    .sparring-nearby__radius {
+        transition: none;
+    }
+
+    .sparring-toolbar__panel .sparring-toolbar__btn:active,
+    .sparring-nearby__radius:active {
+        transform: none;
+    }
 }
 
 .sparring-card > .card-body.sparring-card__inner {

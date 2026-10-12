@@ -73,7 +73,7 @@ class NearbySparringTests(TestCase):
         self.assertNotContains(response, "Далеко")
         invite_url = f"{reverse('sparring_invite')}?invitee={self.near_player.pk}"
         self.assertContains(response, invite_url)
-        self.assertContains(response, "Поиск рядом")
+        self.assertContains(response, "Искать рядом")
         self.assertContains(response, "25 км")
         self.assertContains(response, "10 км")
         self.assertNotContains(response, "Любое расстояние")
@@ -82,7 +82,7 @@ class NearbySparringTests(TestCase):
         """До нажатия «Поиск рядом» кнопок расстояния нет."""
         response = self.client.get(reverse("sparring_list"), secure=True)
 
-        self.assertContains(response, "Поиск рядом")
+        self.assertContains(response, "Искать рядом")
         self.assertContains(response, "nearby=25")
         self.assertNotContains(response, "10 км")
         self.assertNotContains(response, "Любое расстояние")

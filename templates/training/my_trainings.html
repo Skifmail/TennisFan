@@ -12,6 +12,42 @@
 <div class="container my-trainings">
 
     {% if coach %}
+    <section class="my-trainings__section" aria-labelledby="my-trainings-profile-title">
+        <div class="section-header my-trainings__section-head">
+            <h2 id="my-trainings-profile-title" class="section-title">Профиль тренера</h2>
+            <a href="{% url 'coach_profile_edit' %}" class="btn btn-primary my-trainings__btn">Редактировать профиль</a>
+        </div>
+        <article class="card my-trainings-offer">
+            <div class="card-body my-trainings-offer__body">
+                <header class="my-trainings-offer__head">
+                    <div class="my-trainings-offer__title-block">
+                        <h3 class="my-trainings-offer__title">{{ coach.name }}</h3>
+                        <p class="my-trainings-offer__meta">
+                            {% for sport_label in coach.sports_display %}{{ sport_label }}{% if not forloop.last %} / {% endif %}{% endfor %}
+                            · {{ coach.city }}
+                            · {% if coach.is_active %}Опубликован{% else %}Скрыт с сайта{% endif %}
+                        </p>
+                    </div>
+                    <div class="my-trainings-offer__actions">
+                        {% if coach.is_active %}
+                        <a href="{% url 'coach_detail' slug=coach.slug %}" class="btn btn-outline my-trainings__btn">На сайт</a>
+                        <form action="{% url 'coach_profile_deactivate' %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline my-trainings__btn" onclick="return confirm('Скрыть профиль? Ваши тренировки тоже будут сняты с публикации.');">Скрыть</button>
+                        </form>
+                        {% else %}
+                        <form action="{% url 'coach_profile_activate' %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline my-trainings__btn">Опубликовать</button>
+                        </form>
+                        {% endif %}
+                        <a href="{% url 'coach_profile_delete' %}" class="btn btn-ghost my-trainings__btn">Удалить</a>
+                    </div>
+                </header>
+            </div>
+        </article>
+    </section>
+
     <section class="my-trainings__section" aria-labelledby="my-trainings-coach-title">
         <div class="section-header my-trainings__section-head">
             <h2 id="my-trainings-coach-title" class="section-title">Как тренер</h2>

@@ -136,8 +136,38 @@ class TrainingEnrollmentForm(forms.ModelForm):
         return enrollment
 
 
+class TypePricesField(forms.JSONField):
+    """JSON-поле цен по типам тренировки для ``TypePricesWidget``.
+
+    Виджет собирает из POST уже готовый словарь, поэтому при повторном показе
+    формы с ошибками его нельзя разбирать через ``json.loads``.
+    """
+
+    def bound_data(self, data: Any, initial: Any) -> Any:
+        """Вернуть словарь из виджета как есть, строку — разобрать как JSON."""
+        if isinstance(data, dict):
+            return data
+        return super().bound_data(data, initial)
+
+
+def sports_form_field() -> forms.MultipleChoiceField:
+    """Создать поле-чекбоксы «теннис / падел» для форм с ``VenueSport``."""
+    return forms.MultipleChoiceField(
+        label="Вид спорта",
+        choices=Sport.choices,
+        required=True,
+        widget=SportCheckboxSelectMultiple(),
+        help_text="Можно выбрать теннис, падел или оба.",
+    )
+
+
 class VenueSportCheckboxesMixin:
-    """Чекбоксы теннис/падел, в модели одно поле ``sport``."""
+    """Чекбоксы теннис/падел, в модели одно поле ``sport``.
+
+    Админ-формам поле ``sports`` нужно объявлять на уровне класса, а ``sport``
+    исключать в ``Meta``: Django admin строит форму по ``fieldsets`` до вызова
+    ``__init__`` и не видит полей, добавленных в нём.
+    """
 
     fields: dict[str, Any]
     initial: dict[str, Any]
@@ -155,13 +185,7 @@ class VenueSportCheckboxesMixin:
         if current is None and instance is not None:
             current = str(getattr(instance, "sport", "") or "")
         codes = sport_codes_from_venue(current)
-        self.fields["sports"] = forms.MultipleChoiceField(
-            label="Вид спорта",
-            choices=Sport.choices,
-            required=True,
-            widget=SportCheckboxSelectMultiple(),
-            help_text="Можно выбрать теннис, падел или оба.",
-        )
+        self.fields["sports"] = sports_form_field()
         if not getattr(self, "is_bound", False):
             self.initial.setdefault("sports", codes)
         self.fields["sports"].initial = self.initial.get("sports", codes)
@@ -290,7 +314,7 @@ class CoachApplicationForm(VenueSportCheckboxesMixin, forms.ModelForm):
 class TrainingForm(VenueSportCheckboxesMixin, forms.ModelForm):
     """Форма создания/редактирования тренировки тренером (через сайт)."""
 
-    type_prices = forms.JSONField(
+    type_prices = TypePricesField(
         label="Типы тренировки и цены",
         required=True,
         widget=TypePricesWidget(),
@@ -427,7 +451,8 @@ class TrainingForm(VenueSportCheckboxesMixin, forms.ModelForm):
 class AdminTrainingForm(VenueSportCheckboxesMixin, forms.ModelForm):
     """Форма тренировки для админки: чекбоксы + цены по типам в одном блоке."""
 
-    type_prices = forms.JSONField(
+    sports = sports_form_field()
+    type_prices = TypePricesField(
         label="Типы тренировки и цены",
         required=True,
         widget=TypePricesWidget(),
@@ -521,18 +546,118 @@ class AdminTrainingForm(VenueSportCheckboxesMixin, forms.ModelForm):
         return training
 
 
-class CoachAdminForm(VenueSportCheckboxesMixin, forms.ModelForm):
-    """Форма тренера в админке: пустые поля берутся из профиля игрока."""
+class CoachProfileForm(VenueSportCheckboxesMixin, forms.ModelForm):
+    """Форма редактирования тренером собственного профиля на сайте."""
 
     class Meta:
         model = Coach
-        fields = "__all__"
+        fields = (
+            "name",
+            "photo",
+            "bio",
+            "experience_years",
+            "specialization",
+            "phone",
+            "telegram",
+            "whatsapp",
+            "max_contact",
+            "city",
+        )
+        widgets = {
+            "name": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Как вас представлять"}
+            ),
+            "photo": forms.ClearableFileInput(
+                attrs={"class": "form-control", "accept": "image/*"}
+            ),
+            "bio": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 5,
+                    "placeholder": "Опыт, достижения, подход к тренировкам",
+                }
+            ),
+            "experience_years": forms.NumberInput(
+                attrs={"class": "form-control", "min": 0, "max": 50}
+            ),
+            "specialization": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Например: взрослые, дети, мини-теннис",
+                }
+            ),
+            "phone": forms.TextInput(
+                attrs={
+                    "class": "form-control js-phone-input",
+                    "placeholder": "+7",
+                    "autocomplete": "tel",
+                }
+            ),
+            "telegram": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "@username"}
+            ),
+            "whatsapp": forms.TextInput(
+                attrs={
+                    "class": "form-control js-phone-input",
+                    "placeholder": "+7",
+                    "autocomplete": "tel",
+                }
+            ),
+            "max_contact": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Ссылка на профиль MAX или номер телефона",
+                }
+            ),
+            "city": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Населённый пункт"}
+            ),
+        }
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._add_sports_field()
+
+    def clean_name(self) -> str:
+        """Проверить, что имя не пустое после обрезки пробелов."""
+        name = str(self.cleaned_data.get("name") or "").strip()
+        if not name:
+            raise forms.ValidationError("Укажите имя.")
+        return name
+
+    def clean_city(self) -> str:
+        """Проверить, что населённый пункт не пустой после обрезки пробелов."""
+        city = str(self.cleaned_data.get("city") or "").strip()
+        if not city:
+            raise forms.ValidationError("Укажите населённый пункт.")
+        return city
+
+    def clean_max_contact(self) -> str:
+        """Нормализует контакт MAX как ссылку или номер телефона."""
+        return normalize_max_contact(self.cleaned_data.get("max_contact"))
+
+    def save(self, commit: bool = True) -> Coach:
+        """Сохранить профиль тренера с выбранным видом спорта."""
+        coach: Coach = super().save(commit=False)
+        self._apply_sports(coach)
+        if commit:
+            coach.save()
+        return coach
+
+
+class CoachAdminForm(VenueSportCheckboxesMixin, forms.ModelForm):
+    """Форма тренера в админке: пустые поля берутся из профиля игрока."""
+
+    sports = sports_form_field()
+
+    class Meta:
+        model = Coach
+        exclude = ("sport",)
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         for field_name in ("name", "slug", "city"):
             self.fields[field_name].required = False
-        self.fields.pop("sport", None)
         self._add_sports_field()
 
     def clean(self):
@@ -589,13 +714,14 @@ class CoachAdminForm(VenueSportCheckboxesMixin, forms.ModelForm):
 class CoachApplicationAdminForm(VenueSportCheckboxesMixin, forms.ModelForm):
     """Форма заявки в админке: вид спорта чекбоксами теннис/падел."""
 
+    sports = sports_form_field()
+
     class Meta:
         model = CoachApplication
-        fields = "__all__"
+        exclude = ("sport",)
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.fields.pop("sport", None)
         self._add_sports_field()
 
     def save(self, commit: bool = True) -> CoachApplication:

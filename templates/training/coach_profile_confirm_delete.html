@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}Удалить профиль тренера{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Удалить профиль тренера</h1>
+    <p class="page-subtitle">{{ coach.name }}</p>
+</div>
+
+<div class="container" style="max-width: 640px;">
+    <div class="card">
+        <div class="card-body" style="padding: var(--spacing-2xl);">
+            <p>Профиль пропадёт из раздела «Наши тренеры». Действие нельзя отменить.</p>
+            <ul style="margin: var(--spacing-md) 0 var(--spacing-lg);">
+                <li>Будут удалены тренировки: {{ summary.trainings }}</li>
+                <li>Будут удалены записи игроков на них: {{ summary.enrollments }}</li>
+                <li>Аккаунт и профиль игрока останутся без изменений.</li>
+            </ul>
+            <p class="text-secondary">Если нужно временно пропасть с сайта, лучше скрыть профиль — его можно будет снова опубликовать.</p>
+
+            <div class="d-flex gap-2" style="flex-wrap: wrap; margin-top: var(--spacing-lg);">
+                <form action="{% url 'coach_profile_delete' %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-lg">Удалить навсегда</button>
+                </form>
+                <a href="{% url 'my_trainings' %}" class="btn btn-ghost btn-lg">Отмена</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

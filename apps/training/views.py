@@ -3,11 +3,13 @@ Training views.
 """
 
 import logging
+from typing import cast
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch, Q
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
@@ -21,8 +23,15 @@ from apps.core.metrika import (
 )
 from apps.core.text_search import filter_field_contains_ci
 
+from .coach_services import (
+    activate_coach,
+    coach_deletion_summary,
+    deactivate_coach,
+    delete_coach,
+)
 from .forms import (
     CoachApplicationForm,
+    CoachProfileForm,
     TrainingEnrollmentForm,
     TrainingForm,
 )
@@ -358,6 +367,92 @@ def my_trainings(request):
             "coach_trainings": coach_trainings,
             "my_enrollments": my_enrollments,
         },
+    )
+
+
+def _own_coach(request: HttpRequest) -> Coach | None:
+    """Вернуть профиль тренера текущего пользователя или ``None``."""
+    return cast(Coach | None, getattr(request.user, "coach", None))
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def coach_profile_edit(request: HttpRequest) -> HttpResponse:
+    """Редактирование тренером собственного профиля."""
+    coach = _own_coach(request)
+    if coach is None:
+        messages.error(request, "Доступно только тренерам.")
+        return redirect("my_trainings")
+
+    if request.method == "POST":
+        form = CoachProfileForm(request.POST, request.FILES, instance=coach)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Профиль тренера обновлён.")
+            return redirect("my_trainings")
+    else:
+        form = CoachProfileForm(instance=coach)
+
+    return render(
+        request,
+        "training/coach_profile_form.html",
+        {"form": form, "coach": coach},
+    )
+
+
+@login_required
+@require_POST
+def coach_profile_activate(request: HttpRequest) -> HttpResponse:
+    """Опубликовать свой профиль тренера."""
+    coach = _own_coach(request)
+    if coach is None:
+        messages.error(request, "Доступно только тренерам.")
+        return redirect("my_trainings")
+
+    activate_coach(coach)
+    messages.success(
+        request,
+        "Профиль опубликован в разделе «Наши тренеры». "
+        "Тренировки включаются отдельно в их настройках.",
+    )
+    return redirect("my_trainings")
+
+
+@login_required
+@require_POST
+def coach_profile_deactivate(request: HttpRequest) -> HttpResponse:
+    """Скрыть свой профиль тренера и снять тренировки с публикации."""
+    coach = _own_coach(request)
+    if coach is None:
+        messages.error(request, "Доступно только тренерам.")
+        return redirect("my_trainings")
+
+    hidden = deactivate_coach(coach)
+    text = "Профиль скрыт с сайта."
+    if hidden:
+        text += f" Снято с публикации тренировок: {hidden}."
+    messages.success(request, text)
+    return redirect("my_trainings")
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def coach_profile_delete(request: HttpRequest) -> HttpResponse:
+    """Подтверждение и удаление своего профиля тренера."""
+    coach = _own_coach(request)
+    if coach is None:
+        messages.error(request, "Доступно только тренерам.")
+        return redirect("my_trainings")
+
+    if request.method == "POST":
+        delete_coach(coach)
+        messages.success(request, "Профиль тренера удалён.")
+        return redirect("my_trainings")
+
+    return render(
+        request,
+        "training/coach_profile_confirm_delete.html",
+        {"coach": coach, "summary": coach_deletion_summary(coach)},
     )
 
 

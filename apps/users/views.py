@@ -31,6 +31,7 @@ from apps.legal.utils import get_legal_document_version
 from .context_processors import invalidate_unread_notifications_cache
 from .forms import EmailAuthenticationForm, PlayerProfileForm, UserRegistrationForm
 from .models import EmailVerificationToken, Notification, NtrpTestResult, Player
+from .notification_inbox import build_inbox_context
 from .sport_rating import (
     PADEL_LEVEL_CHOICES,
     PadelStrengthAlreadySet,
@@ -1029,13 +1030,21 @@ def profile_edit(request):
 
 @login_required
 def notifications(request):
-    """User notifications inbox."""
+    """Лента уведомлений пользователя.
 
-    notes = Notification.objects.filter(user=request.user).order_by("-created_at")
-    if notes.filter(is_read=False).exists():
-        notes.filter(is_read=False).update(is_read=True)
+    Непрочитанные помечаются прочитанными при открытии. В этой отрисовке
+    они ещё показаны как новые, чтобы было видно, что пришло с прошлого визита.
+    """
+    notes = list(Notification.objects.filter(user=request.user).order_by("-created_at"))
+    unread_ids = {note.pk for note in notes if not note.is_read}
+    if unread_ids:
+        Notification.objects.filter(pk__in=unread_ids).update(is_read=True)
         invalidate_unread_notifications_cache(request.user.pk)
-    return render(request, "users/notifications.html", {"notifications": notes})
+    return render(
+        request,
+        "users/notifications.html",
+        build_inbox_context(notes, unread_ids=unread_ids),
+    )
 
 
 def verify_email_confirm(request, token: str):

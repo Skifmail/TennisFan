@@ -20631,6 +20631,436 @@ a.home-activity__actor:hover {
 
 /* END applications.css */
 
+/* BEGIN notifications.css */
+
+/*
+ * notifications.css
+ *
+ * Описание: Полноширинная лента уведомлений. Тёмное стекло и золото бренда,
+ * раскладка полей как в спокойном системном inbox. Размытие фона здесь
+ * только веб-приближение матового материала, не системный материал Apple.
+ * Радиусы: панели 16px, кнопки 10px, метки-пилюли полностью скруглены.
+ * Используется на: /users/notifications/
+ *
+ * Последнее обновление: 2026-10
+ */
+
+.inbox {
+    --inbox-gold: #c6a15a;
+    --inbox-gold-deep: #a6824a;
+    --inbox-ink: #1a1208;
+    --inbox-text: #e4e4e4;
+    --inbox-muted: #c8c8c8;
+    --inbox-line: rgb(166 130 74 / 32%);
+    --inbox-radius: 16px;
+    --inbox-control: 10px;
+    width: 100%;
+    padding-top: 1.75rem;
+    padding-bottom: 3rem;
+    font-family: -apple-system, blinkmacsystemfont, "Segoe UI", var(--font-family);
+    color: var(--inbox-text);
+}
+
+.inbox__head {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.main .inbox__title {
+    margin: 0;
+    font-family: -apple-system, blinkmacsystemfont, "Segoe UI", var(--font-heading);
+    font-size: clamp(1.75rem, 2.4vw, 2.25rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    text-transform: none;
+    color: var(--inbox-gold);
+}
+
+.inbox__lead {
+    margin: 0.4rem 0 0;
+    max-width: 42rem;
+    color: var(--inbox-muted);
+    font-size: 0.975rem;
+    line-height: 1.45;
+}
+
+.inbox-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    border: 1px solid var(--inbox-line);
+    border-radius: var(--inbox-radius);
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, rgb(255 255 255 / 5%), rgb(255 255 255 / 1.5%)),
+        rgb(0 31 20 / 78%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%);
+}
+
+.inbox-summary__item {
+    min-width: 0;
+    padding: 0.8rem 0.75rem 0.85rem;
+}
+
+.inbox-summary__item + .inbox-summary__item {
+    border-left: 1px solid rgb(166 130 74 / 22%);
+}
+
+.inbox-summary__label {
+    margin: 0;
+    color: var(--inbox-gold-deep);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.inbox-summary__value {
+    margin: 0.15rem 0 0;
+    color: var(--inbox-text);
+    font-size: 1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.inbox-filters {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+    scrollbar-width: none;
+}
+
+.inbox-filters::-webkit-scrollbar {
+    display: none;
+}
+
+.inbox-filters__btn {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 44px;
+    padding: 0 0.85rem;
+    border: 1px solid var(--inbox-line);
+    border-radius: var(--inbox-control);
+    background: rgb(0 31 20 / 55%);
+    color: var(--inbox-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 180ms ease, color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.inbox-filters__btn:hover {
+    border-color: var(--inbox-gold-deep);
+    color: var(--inbox-text);
+}
+
+.inbox-filters__btn:active {
+    transform: scale(0.98);
+}
+
+.inbox-filters__btn:focus-visible {
+    outline: 2px solid var(--inbox-gold);
+    outline-offset: 2px;
+}
+
+.inbox-filters__btn.is-active {
+    border-color: transparent;
+    background: var(--inbox-gold);
+    color: var(--inbox-ink);
+}
+
+.inbox-filters__count {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.inbox-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.inbox-card {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+        "kind"
+        "text"
+        "time"
+        "action";
+    gap: 0.75rem;
+    margin: 0;
+    padding: 1rem;
+    border: 1px solid var(--inbox-line);
+    border-radius: var(--inbox-radius);
+    background:
+        linear-gradient(180deg, rgb(255 255 255 / 4.5%), rgb(255 255 255 / 1.5%)),
+        rgb(0 31 20 / 82%);
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 8%),
+        0 10px 28px rgb(0 0 0 / 18%);
+    backdrop-filter: blur(18px) saturate(140%);
+}
+
+.inbox-card--new {
+    box-shadow:
+        inset 3px 0 0 var(--inbox-gold),
+        inset 0 1px 0 rgb(255 255 255 / 8%),
+        0 10px 28px rgb(0 0 0 / 18%);
+}
+
+.inbox-card__kind {
+    display: flex;
+    grid-area: kind;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.inbox-chip,
+.inbox-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.6rem;
+    padding: 0 0.55rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.inbox-chip {
+    border: 1px solid rgb(166 130 74 / 40%);
+    background: rgb(166 130 74 / 14%);
+    color: #e4c99a;
+}
+
+.inbox-pill {
+    background: var(--inbox-gold);
+    color: var(--inbox-ink);
+}
+
+.inbox-card__text {
+    grid-area: text;
+    margin: 0;
+    color: var(--inbox-text);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.45;
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+}
+
+.inbox-card__time {
+    display: flex;
+    grid-area: time;
+    gap: 0.55rem;
+    align-items: baseline;
+    color: var(--inbox-muted);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
+.inbox-card__clock {
+    color: var(--inbox-gold-deep);
+}
+
+.inbox-card__action {
+    grid-area: action;
+}
+
+.inbox-card:not(.inbox-card--link) .inbox-card__action {
+    display: none;
+}
+
+.inbox-card__go {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 1rem;
+    border-radius: var(--inbox-control);
+    background: var(--inbox-gold);
+    color: var(--inbox-ink);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 180ms ease, transform 180ms ease;
+}
+
+.inbox-card__go:hover,
+.inbox-card__go:focus {
+    background: #d4b56e;
+    color: var(--inbox-ink);
+}
+
+.inbox-card__go:active {
+    transform: scale(0.98);
+}
+
+.inbox-card__go:focus-visible {
+    outline: 2px solid #f4e7cf;
+    outline-offset: 2px;
+}
+
+.inbox-empty {
+    padding: 2rem 1.25rem;
+    border: 1px solid var(--inbox-line);
+    border-radius: var(--inbox-radius);
+    background:
+        linear-gradient(180deg, rgb(255 255 255 / 4%), rgb(255 255 255 / 1%)),
+        rgb(0 31 20 / 78%);
+    text-align: left;
+}
+
+.main .inbox-empty__title {
+    margin: 0 0 0.4rem;
+    color: var(--inbox-gold);
+    font-family: -apple-system, blinkmacsystemfont, "Segoe UI", var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-transform: none;
+}
+
+.inbox-empty__text,
+.inbox-empty--filter {
+    margin: 0;
+    max-width: 38rem;
+    color: var(--inbox-muted);
+    font-size: 0.975rem;
+    line-height: 1.5;
+}
+
+@media (min-width: 720px) {
+    .inbox-summary__item {
+        padding: 0.95rem 1.1rem 1rem;
+    }
+
+    .inbox-summary__value {
+        font-size: 1.35rem;
+    }
+
+    .inbox-card {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "kind time"
+            "text text"
+            "action action";
+        gap: 0.7rem 1.25rem;
+        padding: 1.1rem 1.25rem;
+    }
+
+    .inbox-card__time {
+        flex-direction: column;
+        gap: 0.1rem;
+        align-items: flex-end;
+        justify-self: end;
+        text-align: right;
+    }
+
+    .inbox-card__action {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .inbox-card__go {
+        width: auto;
+        min-width: 8.5rem;
+    }
+}
+
+@media (min-width: 900px) {
+    .inbox__head {
+        grid-template-columns: minmax(0, 1fr) minmax(18rem, 26rem);
+        gap: 1.5rem;
+        align-items: end;
+        margin-bottom: 1.5rem;
+    }
+}
+
+@media (min-width: 1100px) {
+    .inbox-card {
+        grid-template-columns: 9.25rem minmax(0, 1fr) 6.5rem 8.75rem;
+        grid-template-areas: "kind text time action";
+        align-items: center;
+        min-height: 5.5rem;
+        column-gap: 1.25rem;
+    }
+
+    .inbox-card__kind {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .inbox-card:not(.inbox-card--link) .inbox-card__action {
+        display: block;
+    }
+
+    .inbox-card__go {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .inbox-card {
+        animation: inbox-card-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: calc(min(var(--inbox-i, 0), 8) * 40ms);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .inbox-card,
+    .inbox-filters__btn,
+    .inbox-card__go {
+        animation: none;
+        transition: none;
+    }
+
+    .inbox-filters__btn:active,
+    .inbox-card__go:active {
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .inbox-summary,
+    .inbox-card,
+    .inbox-empty {
+        backdrop-filter: none;
+        background: #063024;
+    }
+}
+
+@keyframes inbox-card-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* END notifications.css */
+
 /* BEGIN calculator.css */
 
 /*

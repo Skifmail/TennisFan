@@ -1,33 +1,78 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Уведомления{% endblock %}
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">Уведомления</h1>
-</div>
-<div class="container" style="max-width: 700px;">
-    <div class="card">
-        <div class="card-body" style="padding: var(--spacing-2xl);">
-            {% if notifications %}
-            <div class="list" style="display: flex; flex-direction: column; gap: var(--spacing-md);">
-                {% for note in notifications %}
-                <div class="d-flex" style="justify-content: space-between; align-items: center; gap: var(--spacing-md);">
-                    <div>
-                        <div>{{ note.message }}</div>
-                        {% if note.url %}
-                        <a href="{{ note.url }}" class="text-primary" style="font-size: var(--font-size-sm);">Перейти</a>
-                        {% endif %}
-                        <div class="text-secondary" style="font-size: var(--font-size-xs);">{{ note.created_at|date:"d.m.Y H:i" }}</div>
-                    </div>
-                    {% if not note.is_read %}
-                    <span class="badge">Новый</span>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-secondary">Нет уведомлений.</p>
-            {% endif %}
+<section class="inbox container" data-inbox aria-labelledby="inbox-title">
+    <header class="inbox__head">
+        <div class="inbox__intro">
+            <h1 id="inbox-title" class="inbox__title">Уведомления</h1>
+            <p class="inbox__lead">Турниры, спарринги, матчи и клубы в одной ленте.</p>
         </div>
+        <dl class="inbox-summary">
+            <div class="inbox-summary__item">
+                <dt class="inbox-summary__label">Всего</dt>
+                <dd class="inbox-summary__value">{{ inbox_total }}</dd>
+            </div>
+            <div class="inbox-summary__item">
+                <dt class="inbox-summary__label">Новых</dt>
+                <dd class="inbox-summary__value">{{ inbox_unread }}</dd>
+            </div>
+            <div class="inbox-summary__item">
+                <dt class="inbox-summary__label">Последнее</dt>
+                <dd class="inbox-summary__value">
+                    {% if inbox_latest %}{{ inbox_latest|date:"d.m.Y" }}{% else %}нет{% endif %}
+                </dd>
+            </div>
+        </dl>
+    </header>
+
+    {% if inbox_groups %}
+    <div class="inbox-filters" role="toolbar" aria-label="Группы уведомлений">
+        <button type="button" class="inbox-filters__btn is-active" data-inbox-filter="all" aria-pressed="true">
+            Все
+            <span class="inbox-filters__count">{{ inbox_total }}</span>
+        </button>
+        {% for group in inbox_groups %}
+        <button type="button" class="inbox-filters__btn" data-inbox-filter="{{ group.kind }}" aria-pressed="false">
+            {{ group.label }}
+            <span class="inbox-filters__count">{{ group.count }}</span>
+        </button>
+        {% endfor %}
     </div>
-</div>
+    {% endif %}
+
+    {% if inbox_cards %}
+    <ul class="inbox-list" id="inbox-list">
+        {% for card in inbox_cards %}
+        <li class="inbox-card{% if card.was_unread %} inbox-card--new{% endif %}{% if card.url %} inbox-card--link{% endif %}" data-kind="{{ card.kind }}" style="--inbox-i: {{ forloop.counter0 }}">
+            <div class="inbox-card__kind">
+                <span class="inbox-chip">{{ card.kind_label }}</span>
+                {% if card.was_unread %}
+                <span class="inbox-pill">Новое</span>
+                {% endif %}
+            </div>
+            <p class="inbox-card__text">{{ card.message }}</p>
+            <time class="inbox-card__time" datetime="{{ card.created_at|date:'c' }}">
+                <span class="inbox-card__date">{{ card.created_at|date:"d.m.Y" }}</span>
+                <span class="inbox-card__clock">{{ card.created_at|date:"H:i" }}</span>
+            </time>
+            <div class="inbox-card__action">
+                {% if card.url %}
+                <a class="inbox-card__go" href="{{ card.url }}">Перейти</a>
+                {% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    <p class="inbox-empty inbox-empty--filter" id="inbox-filter-empty" hidden>В этой группе записей нет.</p>
+    {% else %}
+    <div class="inbox-empty">
+        <h2 class="inbox-empty__title">Пока тихо</h2>
+        <p class="inbox-empty__text">Когда появится приглашение, результат матча или новость турнира, запись будет здесь.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
+{% block extra_js %}
+<script defer src="{% static 'js/notifications_inbox.js' %}"></script>
 {% endblock %}

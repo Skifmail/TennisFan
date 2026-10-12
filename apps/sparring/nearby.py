@@ -13,6 +13,7 @@ from apps.core.models import City
 from apps.users.models import Player
 
 NEARBY_RADIUS_CHOICES: tuple[int, ...] = (10, 25, 50, 100)
+NEARBY_DEFAULT_RADIUS: int = 25
 
 
 @dataclass(frozen=True)

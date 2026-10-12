@@ -4,6 +4,7 @@ Sparring views.
 
 import json
 import logging
+from urllib.parse import urlencode
 
 from django.contrib import messages  # pyright: ignore[reportMissingImports]
 from django.contrib.auth.decorators import (
@@ -69,6 +70,7 @@ from .models import (
     TeamSide,
 )
 from .nearby import (
+    NEARBY_DEFAULT_RADIUS,
     NEARBY_RADIUS_CHOICES,
     coordinates_for_locality,
     filter_by_locality_names,
@@ -96,6 +98,43 @@ except ImportError:
     notify_sparring_invitation_accepted_inviter = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
+
+
+def _sparring_filter_query(
+    *,
+    sport: str,
+    sparring_type: str,
+    city: str,
+    category: str,
+    level: str,
+    preferred_gender: str,
+) -> str:
+    """Собрать query string фильтров списка без радиуса «рядом».
+
+    Args:
+        sport: Вид спорта.
+        sparring_type: Формат спарринга.
+        city: Подстрока населённого пункта.
+        category: Уровень силы для одиночного спарринга.
+        level: Уровень силы для парного и командного спарринга.
+        preferred_gender: Предпочитаемый пол соперника.
+
+    Returns:
+        str: Параметры запроса без ``nearby``.
+    """
+    params: list[tuple[str, str]] = [
+        ("sport", sport),
+        ("type", sparring_type),
+    ]
+    if city:
+        params.append(("city", city))
+    if sparring_type == "singles" and category:
+        params.append(("category", category))
+    elif level:
+        params.append(("level", level))
+    if preferred_gender:
+        params.append(("preferred_gender", preferred_gender))
+    return urlencode(params)
 
 
 def _nearby_radius(raw: str | None) -> int | None:
@@ -211,9 +250,18 @@ def sparring_list(request):
         "current_sport": sport_filter,
         "sport_choices": Sport.choices,
         "nearby_radius_choices": NEARBY_RADIUS_CHOICES,
+        "nearby_default": NEARBY_DEFAULT_RADIUS,
         "current_nearby": nearby_radius or "",
         "nearby_error": nearby_error,
         "nearby_player_list": [],
+        "sparring_filter_query": _sparring_filter_query(
+            sport=sport_filter,
+            sparring_type=sparring_type,
+            city=city,
+            category=category,
+            level=level,
+            preferred_gender=preferred_gender,
+        ),
     }
 
     if sparring_type == "singles":

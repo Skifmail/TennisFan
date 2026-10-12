@@ -68,6 +68,13 @@ from .models import (
     SparringResponse,
     TeamSide,
 )
+from .nearby import (
+    NEARBY_RADIUS_CHOICES,
+    coordinates_for_locality,
+    filter_by_locality_names,
+    nearby_players,
+    places_within_radius,
+)
 from .player_search import search_players_for_sparring_invite
 from .services import (
     accept_sparring_invitation,
@@ -89,6 +96,17 @@ except ImportError:
     notify_sparring_invitation_accepted_inviter = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
+
+
+def _nearby_radius(raw: str | None) -> int | None:
+    """Радиус поиска в километрах, если он выбран из допустимых значений."""
+    try:
+        radius = int(raw or "")
+    except (TypeError, ValueError):
+        return None
+    if radius not in NEARBY_RADIUS_CHOICES:
+        return None
+    return radius
 
 
 def _padel_entry_redirect(
@@ -157,11 +175,31 @@ def sparring_list(request):
     if sparring_type not in ("singles", "doubles", "team"):
         sparring_type = default_type
 
-    city = request.GET.get("city", "")
+    city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
     level = request.GET.get("level", "")
     preferred_gender = request.GET.get("preferred_gender", "")
     has_access = user_has_sparring_access(request.user)
+    nearby_radius = _nearby_radius(request.GET.get("nearby"))
+    nearby_places = []
+    nearby_error = ""
+    viewer = None
+    if request.user.is_authenticated:
+        viewer = getattr(request.user, "player", None)
+    if nearby_radius is not None:
+        if viewer is None or not getattr(viewer, "city", ""):
+            nearby_error = (
+                "Чтобы искать рядом, войдите и укажите населённый пункт в профиле."
+            )
+        else:
+            origin = coordinates_for_locality(viewer.city)
+            if origin is None:
+                nearby_error = (
+                    f"Для населённого пункта «{viewer.city}» нет координат. "
+                    "Пока можно фильтровать по названию."
+                )
+            else:
+                nearby_places = places_within_radius(*origin, nearby_radius)
 
     context = {
         "sparring_type": sparring_type,
@@ -172,6 +210,10 @@ def sparring_list(request):
         "has_sparring_access": has_access,
         "current_sport": sport_filter,
         "sport_choices": Sport.choices,
+        "nearby_radius_choices": NEARBY_RADIUS_CHOICES,
+        "current_nearby": nearby_radius or "",
+        "nearby_error": nearby_error,
+        "nearby_player_list": [],
     }
 
     if sparring_type == "singles":
@@ -187,7 +229,11 @@ def sparring_list(request):
             )
             .prefetch_related("responses")
         )
-        if city:
+        if nearby_places:
+            requests_qs = filter_by_locality_names(
+                requests_qs, [place.name for place in nearby_places]
+            )
+        elif city:
             requests_qs = filter_field_contains_ci(
                 requests_qs, "city", city, annotation="_spr_req_city_l"
             )
@@ -222,7 +268,11 @@ def sparring_list(request):
             doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.CLASSIC)
         else:
             doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.TEAM)
-        if city:
+        if nearby_places:
+            doubles_qs = filter_by_locality_names(
+                doubles_qs, [place.name for place in nearby_places]
+            )
+        elif city:
             doubles_qs = filter_field_contains_ci(
                 doubles_qs, "city", city, annotation="_spr_dbl_city_l"
             )
@@ -235,6 +285,14 @@ def sparring_list(request):
         context["doubles_requests"] = Paginator(doubles_qs, 20).get_page(
             request.GET.get("page")
         )
+
+    if nearby_places and viewer is not None:
+        origin = coordinates_for_locality(viewer.city)
+        if origin is not None:
+            context["nearby_player_list"] = nearby_players(
+                places=nearby_places,
+                exclude_player_id=viewer.pk,
+            )
 
     return render(request, "sparring/list.html", context)
 
@@ -1086,6 +1144,15 @@ def sparring_invite(request):
 
     search_query = (request.GET.get("q") or request.POST.get("return_q") or "").strip()
     search_results: list[Player] = []
+    selected_player = None
+    invitee_raw = request.GET.get("invitee") or request.POST.get("invitee_id")
+    if invitee_raw and not search_query:
+        selected_player = (
+            Player.objects.select_related("user")
+            .filter(pk=invitee_raw, is_bye=False)
+            .exclude(pk=player.pk)
+            .first()
+        )
     if search_query and len(search_query) >= 2:
         search_results = list(
             search_players_for_sparring_invite(
@@ -1146,6 +1213,7 @@ def sparring_invite(request):
         {
             "search_query": search_query,
             "search_results": search_results,
+            "selected_player": selected_player,
         },
     )
 

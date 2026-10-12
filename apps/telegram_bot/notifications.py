@@ -1554,9 +1554,32 @@ def _sparring_inviter_card_lines(inviter) -> list[str]:
     return lines
 
 
+def _notify_by_email_and_telegram(
+    user,
+    text: str,
+    reply_markup: dict | None = None,
+) -> bool:
+    """Отправить уведомление на почту и в Telegram.
+
+    Письмо уходит и без настроенного бота. Если бот настроен, почту и Telegram
+    отправляет ``send_to_user_by_user``, чтобы письмо не ушло дважды.
+
+    Args:
+        user: Получатель.
+        text: Текст в HTML, как для Telegram.
+        reply_markup: Клавиатура Telegram.
+
+    Returns:
+        True, если доставлено хотя бы в один канал.
+    """
+    if bot.is_configured():
+        return send_to_user_by_user(user, text, reply_markup=reply_markup)
+    return _send_notification_email_to_user(user=user, text=text)
+
+
 def notify_sparring_invitation_created(invitation) -> None:
     """
-    Уведомление приглашённому: приглашение на спарринг (ЛК и Telegram с кнопкой «Подтвердить»).
+    Уведомление приглашённому: приглашение на спарринг (ЛК, почта и Telegram).
     """
     from django.urls import reverse
 
@@ -1584,9 +1607,8 @@ def notify_sparring_invitation_created(invitation) -> None:
             e,
         )
 
-    if not bot.is_configured():
-        return
-
+    site_base = _get_site_base_url().rstrip("/")
+    invitations_url = f"{site_base}{url}"
     lines = [
         "🎾 <b>Приглашение на спарринг</b>",
         "",
@@ -1596,10 +1618,10 @@ def notify_sparring_invitation_created(invitation) -> None:
         f"<b>Предполагаемая дата:</b> {date_str}",
         "",
         "Подтвердите приглашение — будет создан матч в «Мои матчи».",
+        "",
+        invitations_url,
     ]
     text = "\n".join(lines)
-    site_base = _get_site_base_url().rstrip("/")
-    invitations_url = f"{site_base}{url}"
     reply_markup = {
         "inline_keyboard": [
             [
@@ -1611,7 +1633,7 @@ def notify_sparring_invitation_created(invitation) -> None:
             [{"text": "📋 Мои приглашения", "url": invitations_url}],
         ],
     }
-    ok = send_to_user_by_user(invitee_user, text, reply_markup=reply_markup)
+    ok = _notify_by_email_and_telegram(invitee_user, text, reply_markup=reply_markup)
     logger.info(
         "notify_sparring_invitation_created: invitation=%s invitee=%s sent=%s",
         invitation.pk,
@@ -1622,7 +1644,7 @@ def notify_sparring_invitation_created(invitation) -> None:
 
 def notify_sparring_invitation_accepted_inviter(invitation, match) -> None:
     """
-    Уведомление пригласившему: приглашение принято, матч создан (ЛК и Telegram).
+    Уведомление пригласившему: приглашение принято, матч создан (ЛК, почта и Telegram).
     """
     from django.urls import reverse
 
@@ -1644,14 +1666,14 @@ def notify_sparring_invitation_accepted_inviter(invitation, match) -> None:
             e,
         )
 
-    if not bot.is_configured():
-        return
+    absolute_match_url = f"{_get_site_base_url().rstrip('/')}{match_url}"
     text = (
         f"✅ <b>Приглашение принято</b>\n\n"
-        f"{invitee} согласился на спарринг.\n"
+        f"{html.escape(str(invitee))} согласился на спарринг.\n"
         f"Матч: {html.escape(match.get_player1_display())} — "
         f"{html.escape(match.get_player2_display())}\n"
-        f"Дедлайн: {deadline_str}"
+        f"Дедлайн: {deadline_str}\n\n"
+        f"{absolute_match_url}"
     )
     reply_markup = {
         "inline_keyboard": [
@@ -1664,7 +1686,7 @@ def notify_sparring_invitation_accepted_inviter(invitation, match) -> None:
             [{"text": "📅 Мои матчи", "callback_data": "menu_my_matches"}],
         ],
     }
-    ok = send_to_user_by_user(inviter_user, text, reply_markup=reply_markup)
+    ok = _notify_by_email_and_telegram(inviter_user, text, reply_markup=reply_markup)
     logger.info(
         "notify_sparring_invitation_accepted_inviter: invitation=%s inviter=%s sent=%s",
         invitation.pk,

@@ -27,19 +27,19 @@
         <div class="sparring-toolbar__modes">
             <div class="sparring-tabs" role="tablist" aria-label="Вид спорта">
                 {% for value, label in sport_choices %}
-                <a href="?sport={{ value }}&type={% if value == 'padel' %}doubles{% else %}{{ sparring_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}{% if sparring_type == 'singles' and current_category %}&category={{ current_category }}{% elif current_level %}&level={{ current_level }}{% endif %}" class="sparring-tab {% if current_sport == value %}sparring-tab--active{% endif %}">{{ label }}</a>
+                <a href="?sport={{ value }}&type={% if value == 'padel' %}doubles{% else %}{{ sparring_type }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_nearby %}&nearby={{ current_nearby }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}{% if sparring_type == 'singles' and current_category %}&category={{ current_category }}{% elif current_level %}&level={{ current_level }}{% endif %}" class="sparring-tab {% if current_sport == value %}sparring-tab--active{% endif %}">{{ label }}</a>
                 {% endfor %}
             </div>
             <div class="sparring-tabs" role="tablist" aria-label="Формат спарринга">
-                <a href="?sport={{ current_sport }}&type=singles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
+                <a href="?sport={{ current_sport }}&type=singles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_nearby %}&nearby={{ current_nearby }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
                    class="sparring-tab {% if sparring_type == 'singles' %}sparring-tab--active{% endif %}">
                     Одиночный 1×1
                 </a>
-                <a href="?sport={{ current_sport }}&type=doubles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
+                <a href="?sport={{ current_sport }}&type=doubles{% if current_city %}&city={{ current_city }}{% endif %}{% if current_nearby %}&nearby={{ current_nearby }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
                    class="sparring-tab {% if sparring_type == 'doubles' %}sparring-tab--active{% endif %}">
                     Парный 2×2
                 </a>
-                <a href="?sport={{ current_sport }}&type=team{% if current_city %}&city={{ current_city }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
+                <a href="?sport={{ current_sport }}&type=team{% if current_city %}&city={{ current_city }}{% endif %}{% if current_nearby %}&nearby={{ current_nearby }}{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
                    class="sparring-tab {% if sparring_type == 'team' %}sparring-tab--active{% endif %}">
                     Командный спарринг
                 </a>
@@ -75,6 +75,12 @@
                 <option value="female" {% if current_preferred_gender == 'female' %}selected{% endif %}>Женщины</option>
                 <option value="mixed" {% if current_preferred_gender == 'mixed' %}selected{% endif %}>Микст</option>
             </select>
+            <select name="nearby" class="form-control" onchange="this.form.submit()" aria-label="Искать рядом">
+                <option value="">Любое расстояние</option>
+                {% for radius in nearby_radius_choices %}
+                <option value="{{ radius }}" {% if current_nearby == radius %}selected{% endif %}>Рядом, {{ radius }} км</option>
+                {% endfor %}
+            </select>
         </form>
         <div class="sparring-toolbar__actions" role="toolbar" aria-label="Действия спарринга">
             <a href="{% url 'sparring_my_requests' %}?type={{ sparring_type }}" class="btn btn-outline sparring-toolbar__btn">Мои заявки</a>
@@ -92,6 +98,42 @@
     </div>
     {% if not has_sparring_access %}
     <p class="text-muted mb-3" style="font-size: var(--font-size-sm);">Чтобы создавать заявки и откликаться на заявки других игроков — оформите подписку.</p>
+    {% endif %}
+    {% if nearby_error %}
+    <p class="text-muted mb-3" style="font-size: var(--font-size-sm);">{{ nearby_error }}</p>
+    {% endif %}
+    {% if current_nearby and nearby_player_list %}
+    <section class="mb-4" aria-labelledby="nearby-players-title">
+        <h2 id="nearby-players-title" class="section-title mb-3">Игроки рядом</h2>
+        <div class="grid grid-2">
+            {% for p in nearby_player_list %}
+            <article class="card sparring-card">
+                <div class="card-body sparring-card__inner">
+                    <div class="sparring-card__layout">
+                        <div class="sparring-card__col sparring-card__col--avatar">
+                            {% include 'includes/avatar.html' with avatar=p.avatar class="player-avatar sparring-card__avatar" %}
+                        </div>
+                        <div class="sparring-card__col sparring-card__col--main">
+                            <a href="{% url 'profile' pk=p.pk %}" class="player-name">{{ p }}</a>
+                            <p class="text-secondary" style="font-size: var(--font-size-sm);">
+                                {{ p.city }} · {{ p.distance_km }} км · {{ p.get_skill_level_display }}
+                            </p>
+                        </div>
+                        <div class="sparring-card__col sparring-card__col--cta">
+                            {% if has_sparring_access %}
+                            <a href="{% url 'sparring_invite' %}?invitee={{ p.pk }}" class="btn btn-outline sparring-toolbar__btn">Пригласить</a>
+                            {% else %}
+                            <a href="{% url 'pricing' %}" class="btn btn-outline sparring-toolbar__btn">Нужна подписка</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% elif current_nearby and not nearby_error %}
+    <p class="text-muted mb-3" style="font-size: var(--font-size-sm);">В радиусе {{ current_nearby }} км других игроков пока нет.</p>
     {% endif %}
 
     {% if sparring_type == 'singles' %}

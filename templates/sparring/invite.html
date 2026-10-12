@@ -18,6 +18,43 @@
         <a href="{% url 'sparring_my_invitations' %}" class="text-primary">Мои приглашения</a>
     </p>
 
+    {% if selected_player %}
+    <div class="card mb-4 sparring-invite__result">
+        <div class="card-body">
+            <h2 class="sparring-invite__section-title">Игрок рядом</h2>
+            <div class="sparring-invite__profile">
+                <div class="sparring-invite__profile-text">
+                    <div class="sparring-invite__profile-name">
+                        <a href="{% url 'profile' pk=selected_player.pk %}">{{ selected_player }}</a>
+                    </div>
+                    <div class="sparring-invite__profile-meta">{{ selected_player.city }}</div>
+                </div>
+            </div>
+            <form method="post" class="sparring-invite__invite-form">
+                {% csrf_token %}
+                <input type="hidden" name="invitee_id" value="{{ selected_player.pk }}">
+                <div class="sparring-invite__actions-grid">
+                    <div class="sparring-invite__cell sparring-invite__cell--check">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_friendly" id="friendly_selected">
+                            <label class="form-check-label" for="friendly_selected">Дружеская игра</label>
+                        </div>
+                    </div>
+                    <div class="sparring-invite__cell sparring-invite__cell--date">
+                        <div class="form-group">
+                            <label class="form-label" for="id_proposed_date_selected">Дата</label>
+                            <input type="date" name="proposed_date" id="id_proposed_date_selected" class="form-control">
+                        </div>
+                    </div>
+                    <div class="sparring-invite__cell sparring-invite__cell--submit">
+                        <button type="submit" class="btn btn-primary">Пригласить</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="card mb-4">
         <div class="card-body" style="padding: var(--spacing-2xl);">
             <h2 class="sparring-invite__section-title">Поиск игрока</h2>

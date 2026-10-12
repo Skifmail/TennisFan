@@ -302,13 +302,15 @@ class PlayerProfileForm(forms.ModelForm):
             return cleaned_data
         try:
             sub = self.user.subscription
-            if (
-                not sub.is_valid()
-                or not sub.purchase_city
-                or sub.purchase_city == "moscow"
-            ):
-                return cleaned_data
         except Exception:
+            return cleaned_data
+        if getattr(sub.tier, "is_free_tier", False):
+            return cleaned_data
+        if (
+            not sub.is_valid()
+            or not sub.purchase_city
+            or normalize_city_for_pricing(sub.purchase_city) == "moscow"
+        ):
             return cleaned_data
         raise ValidationError(
             "Нельзя сменить населённый пункт на Москву: у вас активна подписка по региональному тарифу. "

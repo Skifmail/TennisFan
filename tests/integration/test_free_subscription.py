@@ -8,7 +8,25 @@ from apps.sparring.utils import user_has_sparring_access
 from apps.subscriptions.models import SubscriptionTier, UserSubscription
 from apps.subscriptions.services import ensure_current_subscription
 from apps.subscriptions.utils import user_can_write_comments
+from apps.users.forms import PlayerProfileForm
 from tests.support.factories import make_player, make_user
+
+
+def _profile_data(*, city: str) -> dict[str, str]:
+    """Минимальные поля формы профиля для проверки смены населённого пункта."""
+    return {
+        "first_name": "Александр",
+        "last_name": "Шатайло",
+        "phone": "+79381138222",
+        "birth_date": "1990-09-24",
+        "gender": "male",
+        "forehand": "right",
+        "city": city,
+        "bio": "",
+        "telegram": "",
+        "whatsapp": "",
+        "max_contact": "",
+    }
 
 
 class FreeSubscriptionTests(TestCase):
@@ -91,6 +109,68 @@ class FreeSubscriptionTests(TestCase):
         self.assertTrue(current.is_valid())
         self.assertEqual(current.fancoin_balance, 9)
         self.assertFalse(user_has_sparring_access(self.user))
+
+    def test_free_clears_regional_purchase_city(self) -> None:
+        """На Free не остаётся город прошлой оплаты, иначе Москву нельзя выбрать."""
+        subscription = self.user.subscription
+        subscription.purchase_city = "сочи"
+        subscription.save(update_fields=["purchase_city"])
+
+        current = ensure_current_subscription(self.user)
+
+        assert current is not None
+        self.assertEqual(current.purchase_city, "")
+
+    def test_free_can_change_city_to_moscow(self) -> None:
+        """Бессрочный Free не блокирует смену населённого пункта на Москву."""
+        player = make_player(
+            email_suffix="city-free",
+            first_name="Александр",
+            last_name="Шатайло",
+        )
+        player.city = "Сочи"
+        player.birth_date = timezone.now().date().replace(year=1990)
+        player.gender = "male"
+        player.forehand = "right"
+        player.save()
+        subscription = player.user.subscription
+        subscription.purchase_city = "сочи"
+        subscription.save(update_fields=["purchase_city"])
+
+        form = PlayerProfileForm(
+            instance=player,
+            user=player.user,
+            data=_profile_data(city="Москва"),
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_paid_regional_subscription_blocks_moscow(self) -> None:
+        """Действующий платный региональный тариф по-прежнему не пускает в Москву."""
+        player = make_player(
+            email_suffix="city-paid",
+            first_name="Александр",
+            last_name="Шатайло",
+        )
+        paid = SubscriptionTier.objects.create(
+            name="silver",
+            display_name="Silver",
+            duration_days=30,
+        )
+        subscription = player.user.subscription
+        subscription.tier = paid
+        subscription.end_date = timezone.now() + timezone.timedelta(days=10)
+        subscription.purchase_city = "сочи"
+        subscription.save()
+
+        form = PlayerProfileForm(
+            instance=player,
+            user=player.user,
+            data=_profile_data(city="Москва"),
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("региональному тарифу", form.errors.as_text())
 
     def test_free_tier_cannot_be_cancelled(self) -> None:
         """Бесплатный тариф нельзя отменить."""

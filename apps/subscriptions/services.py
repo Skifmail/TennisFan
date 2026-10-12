@@ -32,7 +32,8 @@ def ensure_current_subscription(user: Any) -> UserSubscription | None:
     """Выдать бессрочный Free или вернуть на него после окончания платного тарифа.
 
     Платный тариф не трогается, пока его ``end_date`` в будущем. Баланс FAN-token
-    при возврате на Free сохраняется. Галочки тарифа читаются с актуальной подписки.
+    при возврате на Free сохраняется. Город покупки сбрасывается: запрет смены
+    населённого пункта на Москву действует только у платного регионального тарифа.
 
     Args:
         user: Пользователь Django. Аноним и пользователь без pk пропускаются.
@@ -69,11 +70,13 @@ def ensure_current_subscription(user: Any) -> UserSubscription | None:
             subscription.end_date is not None
             or not subscription.is_active
             or subscription.cancelled_at is not None
+            or subscription.purchase_city
         ):
             subscription.tier = free
             subscription.is_active = True
             subscription.cancelled_at = None
             subscription.end_date = None
+            subscription.purchase_city = ""
             subscription.save()
         return cast(UserSubscription, subscription)
 
@@ -87,6 +90,7 @@ def ensure_current_subscription(user: Any) -> UserSubscription | None:
         subscription.is_active = True
         subscription.cancelled_at = None
         subscription.end_date = None
+        subscription.purchase_city = ""
         subscription.start_date = timezone.now()
         subscription.save()
     return cast(UserSubscription, subscription)

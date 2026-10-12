@@ -58,7 +58,9 @@ def _get_valid_subscription_tier(user: Any) -> Any | None:
     if not getattr(user, "is_authenticated", False):
         return None
 
-    subscription = getattr(user, "subscription", None)
+    from apps.subscriptions.services import ensure_current_subscription
+
+    subscription = ensure_current_subscription(user)
     if subscription is None or not subscription.is_valid():
         return None
 
@@ -141,7 +143,11 @@ def send_subscription_purchase_email(
     subject = f"Оплата подписки «{tier.get_name_display()}» на TennisFan"
 
     start_str = subscription.start_date.strftime("%d.%m.%Y")
-    end_str = subscription.end_date.strftime("%d.%m.%Y")
+    end_str = (
+        subscription.end_date.strftime("%d.%m.%Y")
+        if subscription.end_date
+        else "бессрочно"
+    )
 
     if tier.is_unlimited:
         registrations_text = "Безлимитный баланс FAN-token."

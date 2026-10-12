@@ -445,7 +445,12 @@ class UserSubscription(models.Model):
         verbose_name="Тариф",
     )
     start_date = models.DateTimeField("Дата начала", default=timezone.now)
-    end_date = models.DateTimeField("Дата окончания")
+    end_date = models.DateTimeField(
+        "Дата окончания",
+        null=True,
+        blank=True,
+        help_text="Пусто у бесплатного тарифа: он действует бессрочно.",
+    )
     is_active = models.BooleanField("Активна", default=True)
     cancelled_at = models.DateTimeField(
         "Дата отмены",
@@ -491,11 +496,13 @@ class UserSubscription(models.Model):
     def status_display(self) -> str:
         now = timezone.now()
         if self.is_cancelled:
-            if self.end_date > now:
+            if self.end_date is not None and self.end_date > now:
                 return "Отменена (действует до окончания периода)"
             return "Отменена"
         if not self.is_active:
             return "Неактивна"
+        if self.end_date is None:
+            return "Бессрочно"
         if self.end_date < now:
             return "Истекла"
         return "Активна"
@@ -514,8 +521,14 @@ class UserSubscription(models.Model):
         Returns:
             None: Метод сохраняет объект в базе данных.
         """
-        if not self.end_date:
-            self.end_date = self.tier.apply_duration(self.start_date)
+        if self.tier_id and self.tier.is_free_tier:
+            self.end_date = None
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = list(set(update_fields) | {"end_date"})
+        elif not self.end_date:
+            base = self.start_date or timezone.now()
+            self.end_date = self.tier.apply_duration(base)
         super().save(*args, **kwargs)
 
     # ------------------------------------------------------------------
@@ -524,14 +537,15 @@ class UserSubscription(models.Model):
 
     def is_valid(self) -> bool:
         """
-        Подписка считается действующей, если:
-        - is_active = True
-        - end_date ещё не наступил
-        Отменённая подписка (cancelled_at != None) продолжает действовать
-        до end_date — пользователь сохраняет доступ до конца оплаченного
-        периода.
+        Подписка считается действующей, если is_active и срок не вышел.
+        Пустой end_date означает бессрочный тариф Free.
+        Отменённая платная подписка действует до end_date.
         """
-        return bool(self.is_active and self.end_date > timezone.now())
+        if not self.is_active:
+            return False
+        if self.end_date is None:
+            return True
+        return bool(self.end_date > timezone.now())
 
     def has_unlimited_fancoin(self) -> bool:
         """Проверить, есть ли у подписки безлимитный FANcoin.

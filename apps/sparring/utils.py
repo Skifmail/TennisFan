@@ -5,15 +5,14 @@ Sparring app utilities.
 
 def user_has_sparring_access(user) -> bool:
     """
-    Return True if user has access to sparring (create, respond) based on subscription tier.
-    Requires tier.has_sparring; free tier and no subscription = no access.
+    Вернуть True, если текущий тариф пользователя разрешает спарринги.
+
+    Учитывается действующая подписка, включая бессрочный Free.
+    Галочка ``has_sparring`` читается с тарифа, который сейчас назначен.
     """
-    if not user or not user.is_authenticated:
+    from apps.subscriptions.services import ensure_current_subscription
+
+    subscription = ensure_current_subscription(user)
+    if subscription is None or not subscription.is_valid():
         return False
-    try:
-        sub = user.subscription
-        if not sub.is_valid():
-            return False
-        return bool(sub.tier.has_sparring)
-    except Exception:
-        return False
+    return bool(subscription.tier.has_sparring)

@@ -1796,7 +1796,9 @@ def _handle_menu_callback_action(
 
             # Получаем информацию о подписке
             try:
-                sub = getattr(user, "subscription", None)
+                from apps.subscriptions.services import ensure_current_subscription
+
+                sub = ensure_current_subscription(user)
                 if sub:
                     tier = sub.tier
                     tier_name = tier.get_name_display()
@@ -1897,7 +1899,9 @@ def _handle_menu_callback_action(
 
     elif callback_data == "menu_my_subscription":
         try:
-            sub = getattr(user, "subscription", None)
+            from apps.subscriptions.services import ensure_current_subscription
+
+            sub = ensure_current_subscription(user)
         except Exception:
             sub = None
 

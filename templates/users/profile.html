@@ -450,7 +450,12 @@
                             <span class="badge badge-danger">Истек</span>
                         {% endif %}
                     </div>
-                    {% if player.user.subscription.is_valid %}
+                    {% if player.user.subscription.tier.is_free_tier %}
+                    <div class="subscription-info__row">
+                        <span class="subscription-info__label">Срок:</span>
+                        <span>Бессрочно</span>
+                    </div>
+                    {% elif player.user.subscription.is_valid %}
                     <div class="subscription-info__row">
                         <span class="subscription-info__label">{% if player.user.subscription.is_cancelled %}Действует до:{% else %}Истекает:{% endif %}</span>
                         <span>{{ player.user.subscription.end_date|date:"d.m.Y" }}</span>
@@ -474,7 +479,9 @@
 
                     {# --- Кнопки управления подпиской --- #}
                     <div class="subscription-info__actions">
-                        {% if player.user.subscription.is_valid and not player.user.subscription.is_cancelled %}
+                        {% if player.user.subscription.tier.is_free_tier %}
+                            <a href="{% url 'pricing' %}" class="btn btn-sm btn-outline" style="width: 100%;">Сменить тариф</a>
+                        {% elif player.user.subscription.is_valid and not player.user.subscription.is_cancelled %}
                             <a href="{% url 'pricing' %}" class="btn btn-sm btn-outline" style="flex: 1;">Сменить тариф</a>
                             <button type="button" class="btn btn-sm btn-ghost btn-danger-text" onclick="document.getElementById('cancel-sub-modal').style.display='flex'">Отменить подписку</button>
                         {% elif player.user.subscription.is_cancelled and player.user.subscription.is_valid %}
@@ -1782,7 +1789,7 @@ window.TennisonProfile.initCharts();
 {% endif %}
 
 {# --- Модальное окно подтверждения отмены подписки (в конце страницы для правильного z-index) --- #}
-{% if not is_club_profile and user.is_authenticated and player.user.subscription.is_valid and not player.user.subscription.is_cancelled %}
+{% if not is_club_profile and user.is_authenticated and player.user.subscription.is_valid and not player.user.subscription.is_cancelled and not player.user.subscription.tier.is_free_tier %}
 <div id="cancel-sub-modal" class="modal-overlay" style="display:none;">
     <div class="modal-dialog">
         <h3 class="modal-dialog__title">Отменить подписку?</h3>

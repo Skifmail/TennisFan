@@ -1253,7 +1253,11 @@ def notify_subscription_expiring(
 
     tier = subscription.tier
     tier_name = tier.get_name_display()
-    end_date_str = subscription.end_date.strftime("%d.%m.%Y")
+    end_date_str = (
+        subscription.end_date.strftime("%d.%m.%Y")
+        if subscription.end_date
+        else "бессрочно"
+    )
 
     # Продающий текст о том, чего лишится игрок
     features_lost = []

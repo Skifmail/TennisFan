@@ -226,12 +226,11 @@ class Player(CompressImageFieldsMixin, models.Model):
 
     @property
     def active_subscription_tier(self):
-        try:
-            sub = self.user.subscription
-            if sub.is_valid():
-                return sub.tier
-        except Exception:
-            pass
+        from apps.subscriptions.services import ensure_current_subscription
+
+        subscription = ensure_current_subscription(self.user)
+        if subscription is not None and subscription.is_valid():
+            return subscription.tier
         return None
 
     @property

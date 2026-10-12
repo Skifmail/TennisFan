@@ -221,11 +221,23 @@ def cancel_subscription(request):
         messages.warning(request, "У вас нет активной подписки.")
         return redirect("pricing")
 
-    if sub.is_cancelled:
+    if sub.tier.is_free_tier:
         messages.info(
             request,
-            "Подписка уже отменена. Доступ сохраняется "
-            f"до {sub.end_date.strftime('%d.%m.%Y')}.",
+            "Бесплатный тариф действует бессрочно. "
+            "Его нельзя отменить — можно перейти на платный.",
+        )
+        return redirect("profile", pk=request.user.player.pk)
+
+    if sub.is_cancelled:
+        until = (
+            f"до {sub.end_date.strftime('%d.%m.%Y')}."
+            if sub.end_date
+            else "до конца оплаченного периода."
+        )
+        messages.info(
+            request,
+            f"Подписка уже отменена. Доступ сохраняется {until}",
         )
         return redirect("profile", pk=request.user.player.pk)
 
@@ -243,9 +255,10 @@ def cancel_subscription(request):
         sub.end_date,
     )
 
+    until = sub.end_date.strftime("%d.%m.%Y") if sub.end_date else "конца периода"
     messages.success(
         request,
         f"Подписка «{sub.tier.get_name_display()}» отменена. "
-        f"Доступ к функциям сохраняется до {sub.end_date.strftime('%d.%m.%Y')}.",
+        f"Доступ к функциям сохраняется до {until}.",
     )
     return redirect("profile", pk=request.user.player.pk)

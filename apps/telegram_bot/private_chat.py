@@ -15,10 +15,9 @@ def get_private_chat_access_status(user: Any) -> tuple[bool, str]:
         (True, "") если доступ разрешён;
         (False, reason) если доступ запрещён.
     """
-    try:
-        subscription = getattr(user, "subscription", None)
-    except Exception:
-        subscription = None
+    from apps.subscriptions.services import ensure_current_subscription
+
+    subscription = ensure_current_subscription(user)
 
     if not subscription:
         return False, "Нет активной подписки."

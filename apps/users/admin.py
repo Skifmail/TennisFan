@@ -318,7 +318,11 @@ class UserAdmin(BaseUserAdmin):
                 subscription.tier.get_name_display(),
                 current_status,
                 subscription.start_date.strftime("%d.%m.%Y %H:%M"),
-                subscription.end_date.strftime("%d.%m.%Y %H:%M"),
+                (
+                    subscription.end_date.strftime("%d.%m.%Y %H:%M")
+                    if subscription.end_date
+                    else "бессрочно"
+                ),
                 cancelled_at,
                 subscription.fancoin_balance,
                 subscription.purchase_city or "не указан",

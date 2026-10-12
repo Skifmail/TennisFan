@@ -20967,6 +20967,18 @@ a.home-activity__actor:hover {
     border-color: var(--color-primary);
 }
 
+/* Рядом: заявки и игроки не в одной ленте */
+.sparring-nearby-switch {
+    width: 100%;
+    max-width: 28rem;
+    margin-bottom: var(--spacing-lg);
+}
+
+.sparring-nearby-switch .sparring-tab {
+    flex: 1 1 0;
+    justify-content: center;
+}
+
 .sparring-toolbar {
     align-items: stretch;
     justify-content: space-between;
@@ -21041,8 +21053,8 @@ a.home-activity__actor:hover {
 
 .sparring-toolbar__row {
     display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     gap: 0.45rem;
     width: 100%;
 }
@@ -21089,20 +21101,21 @@ a.home-activity__actor:hover {
 
 .sparring-toolbar__actions {
     display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.4rem;
-    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.45rem;
+    flex: 1 1 auto;
+    width: 100%;
 }
 
 .sparring-toolbar__panel:has(.sparring-toolbar__filters) .sparring-toolbar__actions {
-    width: auto;
-    flex: 0 0 auto;
+    width: 100%;
+    flex: 1 1 auto;
     margin-left: 0;
     padding-top: 0;
     border-top: none;
-    gap: 0.4rem;
+    gap: 0.45rem;
 }
 
 .sparring-nearby-launch {
@@ -21110,6 +21123,96 @@ a.home-activity__actor:hover {
     flex-wrap: nowrap;
     align-items: center;
     gap: 0.4rem;
+}
+
+/* «Искать рядом» и расстояния — одна капсула. Точка горит, только когда поиск включён. */
+.sparring-nearby-capsule {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    gap: 0.15rem;
+    padding: 0.15rem;
+    border: 1px solid rgb(166 130 74 / 0.45);
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.15);
+}
+
+.sparring-nearby__dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.38);
+}
+
+.sparring-toolbar__panel .sparring-nearby-capsule .sparring-nearby__toggle {
+    flex: 0 1 auto;
+    border-color: transparent;
+    background: transparent;
+    padding: 0 0.7rem;
+}
+
+.sparring-toolbar__panel .sparring-nearby-capsule .sparring-nearby__toggle--on,
+.sparring-toolbar__panel .sparring-nearby-capsule .btn-outline.sparring-nearby__toggle--on:hover {
+    background: rgb(86 168 104 / 0.28);
+    border-color: transparent;
+    color: var(--color-text);
+}
+
+.sparring-nearby__toggle--on .sparring-nearby__dot {
+    background: #3ddc84;
+    box-shadow: 0 0 0 3px rgb(61 220 132 / 0.38);
+}
+
+.sparring-nearby-capsule .sparring-nearby__radii {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.sparring-toolbar__panel .sparring-nearby-capsule .sparring-nearby__radius {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    border-color: transparent;
+    background: transparent;
+    color: rgb(255 255 255 / 0.38);
+    padding: 0 0.2rem;
+    font-size: 0.72rem;
+}
+
+.sparring-nearby-capsule .sparring-nearby__radius--idle {
+    opacity: 0.72;
+    pointer-events: none;
+    cursor: default;
+}
+
+.sparring-nearby-capsule--on .sparring-nearby__radius {
+    color: var(--color-text);
+    opacity: 1;
+}
+
+.sparring-toolbar__action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    width: 100%;
+}
+
+.sparring-toolbar__panel .sparring-toolbar__action-grid .sparring-toolbar__btn {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 2.15rem;
+    max-height: none;
+    white-space: normal;
+    text-align: center;
+    padding: 0.35rem 0.55rem;
 }
 
 .sparring-toolbar__panel .sparring-toolbar__btn,
@@ -21200,6 +21303,27 @@ a.home-activity__actor:hover {
     color: var(--color-bg, #012b1c);
 }
 
+.sparring-toolbar__panel .sparring-nearby-capsule .sparring-nearby__toggle,
+.sparring-toolbar__panel .sparring-nearby-capsule .btn-outline.sparring-nearby__toggle:hover {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-text);
+}
+
+.sparring-toolbar__panel .sparring-nearby-capsule .sparring-nearby__toggle--on,
+.sparring-toolbar__panel .sparring-nearby-capsule .btn-outline.sparring-nearby__toggle--on:hover {
+    background: rgb(86 168 104 / 0.28);
+    border-color: transparent;
+    color: var(--color-text);
+}
+
+.sparring-toolbar__panel .sparring-nearby-capsule--on .sparring-nearby__radius--active,
+.sparring-toolbar__panel .sparring-nearby-capsule--on .sparring-nearby__radius--active:hover {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-bg, #012b1c);
+}
+
 @media (hover: hover) and (pointer: fine) {
     .sparring-toolbar__panel .btn-outline.sparring-toolbar__btn:hover,
     .sparring-nearby__radius:hover {
@@ -21212,6 +21336,12 @@ a.home-activity__actor:hover {
         background: rgb(86 168 104 / 0.42);
         border-color: rgb(150 210 155 / 0.9);
         color: var(--color-text);
+    }
+
+    .sparring-toolbar__panel .sparring-nearby-capsule--on .sparring-nearby__radius:hover {
+        background: var(--color-primary);
+        border-color: var(--color-primary);
+        color: var(--color-bg, #012b1c);
     }
 }
 
@@ -21357,11 +21487,16 @@ a.home-activity__actor:hover {
     text-decoration: underline;
 }
 
-.sparring-card__member-avatar {
+img.player-avatar.sparring-card__member-avatar {
     width: 40px;
     height: 40px;
     min-width: 40px;
     min-height: 40px;
+    max-width: 40px;
+    max-height: 40px;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    object-fit: cover;
     flex-shrink: 0;
 }
 
@@ -21422,9 +21557,18 @@ a.home-activity__actor:hover {
     color: var(--color-text-secondary);
 }
 
-.sparring-card__avatar {
+/* Круг на мобильном: глобальное img { max-width: 100%; height: auto } сжимает
+   ширину до колонки 40px, а высота остаётся 48px — border-radius: 50% даёт овал. */
+img.player-avatar.sparring-card__avatar {
     width: 48px;
     height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 48px;
+    max-height: 48px;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    object-fit: cover;
     flex-shrink: 0;
 }
 
@@ -21517,7 +21661,7 @@ a.home-activity__actor:hover {
 
 @media (width <= 640px) {
     .sparring-card__layout {
-        grid-template-columns: 40px minmax(0, 1fr);
+        grid-template-columns: 48px minmax(0, 1fr);
     }
 
     .sparring-card__layout--my-request {

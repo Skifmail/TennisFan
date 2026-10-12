@@ -73,9 +73,11 @@ from .models import (
 )
 from .nearby import (
     NEARBY_DEFAULT_RADIUS,
+    NEARBY_PLAYERS_PAGE_SIZE,
     NEARBY_RADIUS_CHOICES,
     coordinates_for_locality,
     filter_by_locality_names,
+    narrow_places_by_query,
     nearby_players,
     places_within_radius,
 )
@@ -222,7 +224,11 @@ def sparring_list(request):
     preferred_gender = request.GET.get("preferred_gender", "")
     has_access = user_has_sparring_access(request.user)
     nearby_radius = _nearby_radius(request.GET.get("nearby"))
+    nearby_list = request.GET.get("nearby_list", "requests")
+    if nearby_radius is None or nearby_list not in ("requests", "players"):
+        nearby_list = "requests"
     nearby_places = []
+    nearby_resolved = False
     nearby_error = ""
     viewer = None
     if request.user.is_authenticated:
@@ -240,7 +246,10 @@ def sparring_list(request):
                     "Пока можно фильтровать по названию."
                 )
             else:
+                nearby_resolved = True
                 nearby_places = places_within_radius(*origin, nearby_radius)
+                if city:
+                    nearby_places = narrow_places_by_query(nearby_places, city)
 
     context = {
         "sparring_type": sparring_type,
@@ -254,8 +263,9 @@ def sparring_list(request):
         "nearby_radius_choices": NEARBY_RADIUS_CHOICES,
         "nearby_default": NEARBY_DEFAULT_RADIUS,
         "current_nearby": nearby_radius or "",
+        "nearby_list": nearby_list,
         "nearby_error": nearby_error,
-        "nearby_player_list": [],
+        "nearby_players_page": None,
         "sparring_filter_query": _sparring_filter_query(
             sport=sport_filter,
             sparring_type=sparring_type,
@@ -279,7 +289,7 @@ def sparring_list(request):
             )
             .prefetch_related("responses")
         )
-        if nearby_places:
+        if nearby_resolved:
             requests_qs = filter_by_locality_names(
                 requests_qs, [place.name for place in nearby_places]
             )
@@ -318,7 +328,7 @@ def sparring_list(request):
             doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.CLASSIC)
         else:
             doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.TEAM)
-        if nearby_places:
+        if nearby_resolved:
             doubles_qs = filter_by_locality_names(
                 doubles_qs, [place.name for place in nearby_places]
             )
@@ -336,13 +346,16 @@ def sparring_list(request):
             request.GET.get("page")
         )
 
-    if nearby_places and viewer is not None:
+    if nearby_list == "players" and nearby_places and viewer is not None:
         origin = coordinates_for_locality(viewer.city)
         if origin is not None:
-            context["nearby_player_list"] = nearby_players(
-                places=nearby_places,
-                exclude_player_id=viewer.pk,
-            )
+            context["nearby_players_page"] = Paginator(
+                nearby_players(
+                    places=nearby_places,
+                    exclude_player_id=viewer.pk,
+                ),
+                NEARBY_PLAYERS_PAGE_SIZE,
+            ).get_page(request.GET.get("players_page"))
 
     return render(request, "sparring/list.html", context)
 

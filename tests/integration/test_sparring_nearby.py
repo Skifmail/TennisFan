@@ -46,6 +46,11 @@ class NearbySparringTests(TestCase):
         )
         self.far_player.city = "Sochi"
         self.far_player.save(update_fields=["city"])
+        self.both_player = make_player(
+            email_suffix="both", first_name="Олег", last_name="Два"
+        )
+        self.both_player.city = "Ramenskoe, Zhukovsky"
+        self.both_player.save(update_fields=["city"])
         SparringRequest.objects.create(
             player=self.near_player,
             city="Zhukovsky",
@@ -69,22 +74,109 @@ class NearbySparringTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Пётр Жук")
         self.assertContains(response, "Рядом")
+        self.assertContains(response, "Заявки рядом")
         self.assertNotContains(response, "Анна Море")
         self.assertNotContains(response, "Далеко")
+        self.assertNotContains(response, "Олег Два")
         invite_url = f"{reverse('sparring_invite')}?invitee={self.near_player.pk}"
-        self.assertContains(response, invite_url)
+        self.assertNotContains(response, invite_url)
         self.assertContains(response, "Искать рядом")
         self.assertContains(response, "25 км")
         self.assertContains(response, "10 км")
         self.assertNotContains(response, "Любое расстояние")
 
+        players = self.client.get(
+            reverse("sparring_list"),
+            {"nearby": "25", "type": "singles", "nearby_list": "players"},
+            secure=True,
+        )
+        self.assertContains(players, "Игроки рядом")
+        self.assertContains(players, "Олег Два")
+        self.assertContains(players, invite_url)
+        self.assertNotContains(players, "Рядом")
+        self.assertNotContains(players, "Далеко")
+        self.assertNotContains(players, "Анна Море")
+
+    def test_nearby_players_are_paged_nearest_first(self) -> None:
+        """Все игроки в радиусе идут от ближних к дальним, по 20 на странице."""
+        for index in range(19):
+            player = make_player(
+                email_suffix=f"near-page-{index}",
+                first_name="Близкий",
+                last_name=f"Ноль{index}",
+            )
+            player.city = "Ramenskoe"
+            player.save(update_fields=["city"])
+
+        first_page = self.client.get(
+            reverse("sparring_list"),
+            {"nearby": "25", "type": "singles", "nearby_list": "players"},
+            secure=True,
+        )
+        self.assertEqual(first_page.status_code, 200)
+        self.assertContains(first_page, "Олег Два")
+        self.assertContains(first_page, "Страница 1 из 2")
+        self.assertContains(first_page, "players_page=2")
+        self.assertNotContains(
+            first_page,
+            f"{reverse('sparring_invite')}?invitee={self.near_player.pk}",
+        )
+
+        second_page = self.client.get(
+            reverse("sparring_list"),
+            {
+                "nearby": "25",
+                "type": "singles",
+                "players_page": "2",
+                "nearby_list": "players",
+            },
+            secure=True,
+        )
+        self.assertContains(second_page, "Пётр Жук")
+        self.assertContains(second_page, "Страница 2 из 2")
+        self.assertContains(second_page, "players_page=1")
+        self.assertNotContains(second_page, "Олег Два")
+        self.assertNotContains(second_page, "Анна Море")
+
+    def test_profile_with_two_cities_matches_each_name(self) -> None:
+        """Строка «Ramenskoe, Zhukovsky» находится по обоим городам в радиусе."""
+        response = self.client.get(
+            reverse("sparring_list"),
+            {
+                "nearby": "25",
+                "type": "singles",
+                "city": "Ramenskoe, Zhukovsky",
+                "nearby_list": "players",
+            },
+            secure=True,
+        )
+
+        self.assertContains(response, "Олег Два")
+        self.assertContains(response, "Пётр Жук")
+        self.assertNotContains(response, "Анна Море")
+
+    def test_profile_form_rejects_two_catalog_cities(self) -> None:
+        """В профиле нельзя сохранить два города из справочника одной строкой."""
+        from apps.core.localities import several_catalog_cities_message
+
+        message = several_catalog_cities_message("Ramenskoe, Zhukovsky")
+        self.assertIn("Ramenskoe", message)
+        self.assertIn("Zhukovsky", message)
+        self.assertEqual(
+            several_catalog_cities_message("деревня Кимжа, Архангельская область"),
+            "",
+        )
+
     def test_nearby_button_hides_radius_until_clicked(self) -> None:
-        """До нажатия «Поиск рядом» кнопок расстояния нет."""
+        """Расстояния видны сразу, но не нажимаются, пока «Искать рядом» выключено."""
         response = self.client.get(reverse("sparring_list"), secure=True)
 
         self.assertContains(response, "Искать рядом")
         self.assertContains(response, "nearby=25")
-        self.assertNotContains(response, "10 км")
+        self.assertContains(response, "10 км")
+        self.assertContains(response, "sparring-nearby__radius--idle")
+        self.assertContains(response, 'aria-pressed="false"')
+        self.assertNotContains(response, "nearby=10")
         self.assertNotContains(response, "Любое расстояние")
         self.assertNotContains(response, "Игроки рядом")
 

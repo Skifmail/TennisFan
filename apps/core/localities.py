@@ -273,6 +273,73 @@ def split_typed_name(raw: str) -> tuple[str, str]:
     return ST_CITY, text
 
 
+_REGION_TAIL_RE = re.compile(
+    r"(область|край|район|республик|округ|россия|автономн)",
+    re.IGNORECASE,
+)
+
+
+def locality_tokens(value: str) -> list[str]:
+    """Разбить строку населённого пункта на сравнимые названия.
+
+    «Раменское, Жуковский» даёт оба города. Хвост вроде «Архангельская
+    область» отбрасывается: это регион, а не второй город.
+
+    Args:
+        value: Строка из профиля или фильтра.
+
+    Returns:
+        list[str]: Названия без типа поселения, в нижнем регистре.
+    """
+    raw = (value or "").strip()
+    if not raw:
+        return []
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for part in re.split(r"[,;/|]", raw):
+        if _REGION_TAIL_RE.search(part):
+            continue
+        token = strip_settlement_prefix(part)
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        tokens.append(token)
+    if tokens:
+        return tokens
+    whole = strip_settlement_prefix(raw)
+    return [whole] if whole else []
+
+
+def several_catalog_cities_message(value: str) -> str:
+    """Сообщение, если в одной строке указаны два города из справочника.
+
+    Args:
+        value: Населённый пункт из профиля или регистрации.
+
+    Returns:
+        str: Текст ошибки либо пустая строка, если город один.
+    """
+    from apps.core.models import City
+
+    found: list[str] = []
+    for token in locality_tokens(value):
+        city = (
+            City.objects.filter(name__iexact=token).order_by("pk").only("name").first()
+        )
+        if city is not None and city.name not in found:
+            found.append(city.name)
+    if len(found) < 2:
+        return ""
+    if len(found) == 2:
+        names = f"«{found[0]}» и «{found[1]}»"
+    else:
+        names = ", ".join(f"«{name}»" for name in found)
+    return (
+        f"Укажите один населённый пункт. {names} — разные города, "
+        "поиск рядом считает расстояние от одного места."
+    )
+
+
 def strip_settlement_prefix(raw: str) -> str:
     """Нормализовать имя для сравнения: без типа, нижний регистр, ё→е."""
 

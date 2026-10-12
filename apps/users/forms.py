@@ -68,7 +68,7 @@ class UserRegistrationForm(forms.ModelForm):
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
-                "placeholder": "Город, село, деревня, пгт…",
+                "placeholder": "Один населённый пункт, например Раменское",
             }
         ),
     )
@@ -135,6 +135,11 @@ class UserRegistrationForm(forms.ModelForm):
         city = (self.cleaned_data.get("city") or "").strip()
         if not city:
             raise forms.ValidationError("Укажите населённый пункт.")
+        from apps.core.localities import several_catalog_cities_message
+
+        message = several_catalog_cities_message(city)
+        if message:
+            raise forms.ValidationError(message)
         return city
 
     def clean_phone(self):
@@ -247,7 +252,7 @@ class PlayerProfileForm(forms.ModelForm):
             "city": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Город, село, деревня, пгт…",
+                    "placeholder": "Один населённый пункт, например Раменское",
                 }
             ),
             "bio": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
@@ -294,6 +299,12 @@ class PlayerProfileForm(forms.ModelForm):
             return cleaned_data
         city = (cleaned_data.get("city") or "").strip()
         if not city:
+            return cleaned_data
+        from apps.core.localities import several_catalog_cities_message
+
+        message = several_catalog_cities_message(city)
+        if message:
+            self.add_error("city", message)
             return cleaned_data
         from apps.subscriptions.utils import normalize_city_for_pricing
 

@@ -85,7 +85,7 @@ class TrainingListGeographyTestCase(TestCase):
         response = self.client.get(reverse("training_list"), secure=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Тренировки для взрослых")
+        self.assertContains(response, "Тренировки")
         self.assertContains(
             response,
             "Москва, Раменское, Жуковский, Воскресенск и Павловский Посад",

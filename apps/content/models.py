@@ -557,7 +557,11 @@ class StringerPage(models.Model):
     Хранит настройки страницы: заголовок, описание.
     """
 
-    title = models.CharField("Заголовок страницы", max_length=200, default="Стрингеры")
+    title = models.CharField(
+        "Заголовок страницы",
+        max_length=200,
+        default="Натяжка струн - услуги стрингеров",
+    )
     description = models.TextField(
         "Описание страницы",
         blank=True,
@@ -582,7 +586,10 @@ class StringerPage(models.Model):
     @classmethod
     def get_singleton(cls) -> "StringerPage":
         """Получить или создать единственный экземпляр."""
-        obj, _ = cls.objects.get_or_create(pk=1, defaults={"title": "Стрингеры"})
+        obj, _ = cls.objects.get_or_create(
+            pk=1,
+            defaults={"title": "Натяжка струн - услуги стрингеров"},
+        )
         return cast("StringerPage", obj)
 
 

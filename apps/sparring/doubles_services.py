@@ -396,6 +396,37 @@ def cancel_match_request(match_request_id: int, cancelled_by: "Player") -> None:
         logger.info("Doubles match request %s cancelled", match_request_id)
 
 
+def delete_match_request(match_request_id: int, deleted_by: "Player") -> str:
+    """Удалить заявку на парный или командный спарринг. Только автор.
+
+    Команды и отклики удаляются вместе с заявкой. Уже созданные матчи
+    остаются: связь с заявкой обнуляется.
+
+    Args:
+        match_request_id: Идентификатор заявки.
+        deleted_by: Игрок, который удаляет заявку.
+
+    Returns:
+        str: Тип заявки (``classic`` или ``team``) до удаления.
+
+    Raises:
+        DoublesMatchRequest.DoesNotExist: Если заявки нет.
+        PermissionError: Если удаляет не автор.
+    """
+    with transaction.atomic():
+        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        if req.created_by_id != deleted_by.id:
+            raise PermissionError("Только автор может удалить заявку")
+        kind = str(req.kind)
+        req.delete()
+        logger.info(
+            "Doubles match request %s deleted by player %s",
+            match_request_id,
+            deleted_by.id,
+        )
+        return kind
+
+
 def _recompute_request_status(req: DoublesMatchRequest) -> None:
     author_team = req.teams.filter(side=TeamSide.AUTHOR).first()
     opponent_team = req.teams.filter(side=TeamSide.OPPONENT).first()

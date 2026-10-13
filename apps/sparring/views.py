@@ -41,6 +41,7 @@ from apps.core.text_search import filter_field_contains_ci
 from apps.users.models import Notification, Player
 
 from .city_notify import schedule_published_sparring_notify
+from .court_suggest import suggest_sparring_courts
 from .doubles_services import (
     accept_join_request,
     add_partner_to_author_team,
@@ -50,6 +51,7 @@ from .doubles_services import (
     confirm_team_sparring_series,
     create_doubles_request,
     create_join_request,
+    delete_match_request,
     reject_join_request,
     remove_team_member,
 )
@@ -359,6 +361,20 @@ def sparring_list(request):
             ).get_page(request.GET.get("players_page"))
 
     return render(request, "sparring/list.html", context)
+
+
+@login_required
+def sparring_court_suggest(request):
+    """Корты каталога для поля «Предпочтительное место»."""
+    return JsonResponse(
+        {
+            "courts": suggest_sparring_courts(
+                query=request.GET.get("q", ""),
+                city=request.GET.get("city", ""),
+                sport=request.GET.get("sport", ""),
+            )
+        }
+    )
 
 
 @login_required
@@ -1202,6 +1218,24 @@ def doubles_cancel_request(request, pk):
     except (PermissionError, ValueError) as e:
         messages.error(request, str(e))
     return redirect("doubles_my_requests")
+
+
+@require_POST
+@login_required
+def doubles_delete_request(request, pk):
+    """Удалить свою заявку на парный или командный спарринг."""
+    try:
+        player = request.user.player
+    except (AttributeError, Player.DoesNotExist):
+        return redirect("profile_edit")
+    match_request = get_object_or_404(DoublesMatchRequest, pk=pk)
+    list_type = "team" if match_request.kind == DoublesMatchKind.TEAM else "doubles"
+    try:
+        delete_match_request(match_request_id=pk, deleted_by=player)
+        messages.success(request, "Заявка удалена.")
+    except PermissionError as exc:
+        messages.error(request, str(exc))
+    return redirect(f"{reverse('sparring_my_requests')}?type={list_type}")
 
 
 # ---------------------------------------------------------------------------

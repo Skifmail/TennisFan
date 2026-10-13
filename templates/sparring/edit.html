@@ -51,7 +51,7 @@
                 <div class="form-group">
                     <label class="form-label">Предпочтительное место</label>
                     {{ form.preferred_location }}
-                    <p class="text-muted mt-1" style="font-size: var(--font-size-xs);">Название корта или района (необязательно)</p>
+                    <p class="text-muted mt-1" style="font-size: var(--font-size-xs);">Название корта из каталога или район (необязательно)</p>
                 </div>
 
                 <div class="d-flex gap-2 sparring-create__row--age">
@@ -95,4 +95,5 @@
 
 {% block extra_js %}
 <script src="{% static 'js/sparring-form-errors.js' %}"></script>
+<script src="{% static 'js/sparring-court-suggest.js' %}"></script>
 {% endblock %}

@@ -214,6 +214,10 @@
                                 <button type="submit" class="btn btn-outline btn-sm sparring-card__btn text-error">Отменить</button>
                             </form>
                             {% endif %}
+                            <form action="{% url 'doubles_delete_request' pk=req.pk %}" method="post" class="d-inline" onsubmit="return confirm('Удалить заявку?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline btn-sm sparring-card__btn text-error">Удалить</button>
+                            </form>
                         </div>
                     </div>
                 </div>

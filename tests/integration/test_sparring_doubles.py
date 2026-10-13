@@ -16,6 +16,7 @@ from apps.sparring.doubles_services import (
 from apps.sparring.models import (
     DoublesJoinRequestStatus,
     DoublesMatchKind,
+    DoublesMatchRequest,
     DoublesMatchRequestStatus,
     TeamSide,
 )
@@ -140,6 +141,45 @@ class DoublesRequestFlowTestCase(TestCase):
         cancel_match_request(match_request_id=req.pk, cancelled_by=self.author)
         req.refresh_from_db()
         self.assertEqual(req.status, DoublesMatchRequestStatus.CANCELLED)
+
+    def test_author_deletes_cancelled_team_request_from_my_list(self) -> None:
+        """Автор удаляет отменённую командную заявку, чужой игрок — нет."""
+        req = create_doubles_request(
+            created_by=self.author,
+            city="Раменское",
+            kind=DoublesMatchKind.TEAM,
+        )
+        cancel_match_request(match_request_id=req.pk, cancelled_by=self.author)
+        client = Client()
+        client.force_login(self.opp1.user)
+        denied = client.post(
+            reverse("doubles_delete_request", args=[req.pk]),
+            secure=True,
+        )
+        self.assertRedirects(
+            denied,
+            f"{reverse('sparring_my_requests')}?type=team",
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(DoublesMatchRequest.objects.filter(pk=req.pk).exists())
+
+        client.force_login(self.author.user)
+        page = client.get(
+            reverse("sparring_my_requests"),
+            {"type": "team"},
+            secure=True,
+        )
+        self.assertContains(page, "Удалить")
+        deleted = client.post(
+            reverse("doubles_delete_request", args=[req.pk]),
+            secure=True,
+        )
+        self.assertRedirects(
+            deleted,
+            f"{reverse('sparring_my_requests')}?type=team",
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(DoublesMatchRequest.objects.filter(pk=req.pk).exists())
 
 
 class DoublesListRosterTestCase(TestCase):

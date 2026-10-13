@@ -202,6 +202,12 @@
                     <button type="submit" class="btn btn-ghost text-error">Отменить заявку</button>
                 </form>
                 {% endif %}
+                {% if is_author %}
+                <form method="post" action="{% url 'doubles_delete_request' pk=doubles_request.pk %}" class="d-inline" onsubmit="return confirm('Удалить заявку?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-ghost text-error">Удалить заявку</button>
+                </form>
+                {% endif %}
             </div>
         </div>
     </div>

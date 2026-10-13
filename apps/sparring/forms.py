@@ -3,11 +3,26 @@ Sparring forms.
 """
 
 from django import forms
+from django.urls import reverse
 
 from apps.core.sports import Sport, parse_sport_filter
 from apps.users.models import Player, SkillLevel
 
 from .models import SparringPreferredGender, SparringRequest
+
+
+def _enable_court_suggest(form: forms.BaseForm) -> None:
+    """Подключить автодополнение кортов к полю предпочтительного места.
+
+    Args:
+        form: Форма заявки на одиночный или парный спарринг.
+    """
+    field = form.fields.get("preferred_location")
+    if field is None:
+        return
+    field.widget.attrs["data-court-suggest"] = reverse("sparring_court_suggest")
+    field.widget.attrs["autocomplete"] = "off"
+    field.widget.attrs["aria-autocomplete"] = "list"
 
 
 def sparring_form_error_messages(form: forms.BaseForm) -> list[str]:
@@ -108,6 +123,7 @@ class SparringRequestForm(forms.ModelForm):
         self.fields["desired_partner_age_min"].required = False
         self.fields["desired_partner_age_max"].required = False
         self.fields["preferred_location"].required = False
+        _enable_court_suggest(self)
         self.fields["city"].error_messages["required"] = "Укажите населённый пункт."
         self.fields["description"].error_messages[
             "required"
@@ -300,6 +316,10 @@ class DoublesMatchRequestForm(forms.Form):
         initial=False,
         widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _enable_court_suggest(self)
 
     def clean(self):
         cleaned_data = super().clean()

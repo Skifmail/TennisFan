@@ -28,6 +28,7 @@ urlpatterns = [
     ),
     path("my/", views.sparring_my_requests, name="sparring_my_requests"),
     path("create/", views.sparring_create, name="sparring_create"),
+    path("courts/", views.sparring_court_suggest, name="sparring_court_suggest"),
     path("<int:pk>/edit/", views.sparring_edit, name="sparring_edit"),
     path("<int:pk>/delete/", views.sparring_delete, name="sparring_delete"),
     path("<int:pk>/cancel/", views.sparring_cancel, name="sparring_cancel"),
@@ -71,6 +72,11 @@ urlpatterns = [
         "doubles/<int:pk>/cancel/",
         views.doubles_cancel_request,
         name="doubles_cancel_request",
+    ),
+    path(
+        "doubles/<int:pk>/delete/",
+        views.doubles_delete_request,
+        name="doubles_delete_request",
     ),
     path(
         "doubles/<int:pk>/join/<int:join_request_id>/accept/",

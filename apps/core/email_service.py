@@ -1126,3 +1126,55 @@ def send_tournament_completed_email(
         recipient=email,
         category="tournament",
     )
+
+
+def send_city_sparring_email(
+    user: User,
+    *,
+    player_name: str,
+    city: str,
+    sparring_path: str,
+    kind_label: str,
+) -> bool:
+    """Письмо игрокам города: кто-то ищет партнёра для спарринга.
+
+    Args:
+        user: Получатель.
+        player_name: Имя автора заявки.
+        city: Населённый пункт заявки.
+        sparring_path: Относительная ссылка на заявку.
+        kind_label: Вид спарринга для текста письма.
+
+    Returns:
+        bool: ``True``, если письмо отправлено.
+    """
+    if not bool(getattr(settings, "USER_NOTIFICATIONS_EMAIL_ENABLED", True)):
+        return False
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    base_url = _get_site_base_url()
+    sparring_url = f"{base_url}{sparring_path}"
+    user_name = user.get_display_name() or email.split("@")[0]
+    logo_url = f"{base_url}/static/images/logo.png"
+    support_email = getattr(settings, "DEFAULT_FROM_EMAIL", "tennis@tennisfan.ru")
+    subject_name = player_name.strip() or "Игрок"
+    if len(subject_name) > 80:
+        subject_name = subject_name[:77].rstrip() + "..."
+    return _send_html_email(
+        subject=f"TennisFan: {subject_name} ищет партнёра для спарринга",
+        template_name="emails/city_sparring.html",
+        context={
+            "user": user,
+            "user_name": user_name,
+            "player_name": player_name,
+            "city": city,
+            "kind_label": kind_label,
+            "sparring_url": sparring_url,
+            "base_url": base_url,
+            "logo_url": logo_url,
+            "support_email": support_email,
+        },
+        recipient=email,
+        category="other",
+    )

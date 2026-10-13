@@ -39,6 +39,7 @@ class InboxCard:
         kind: Ключ группы.
         kind_label: Подпись группы на русском.
         was_unread: Уведомление было непрочитанным в момент открытия страницы.
+        action_label: Подпись кнопки перехода по ссылке.
     """
 
     message: str
@@ -47,6 +48,7 @@ class InboxCard:
     kind: str
     kind_label: str
     was_unread: bool
+    action_label: str
 
 
 def classify_notification(message: str) -> str:
@@ -70,6 +72,20 @@ def classify_notification(message: str) -> str:
     if any(token in text for token in ("матч", "результат", "дедлайн")):
         return "match"
     return "general"
+
+
+def notification_action_label(kind: str) -> str:
+    """Подпись кнопки на карточке уведомления.
+
+    Args:
+        kind: Ключ группы из ``classify_notification``.
+
+    Returns:
+        str: Текст кнопки.
+    """
+    if kind == "sparring":
+        return "Открыть спарринг"
+    return "Перейти"
 
 
 def safe_notification_url(url: str) -> str:
@@ -111,6 +127,7 @@ def build_inbox_context(
             kind=(kind := classify_notification(note.message)),
             kind_label=KIND_LABELS[kind],
             was_unread=note.pk in unread_ids,
+            action_label=notification_action_label(kind),
         )
         for note in notes
     ]

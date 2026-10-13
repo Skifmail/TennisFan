@@ -40,6 +40,7 @@ from apps.core.sports import sport_code
 from apps.core.text_search import filter_field_contains_ci
 from apps.users.models import Notification, Player
 
+from .city_notify import schedule_published_sparring_notify
 from .doubles_services import (
     accept_join_request,
     add_partner_to_author_team,
@@ -424,6 +425,10 @@ def sparring_create(request):
                         kind=kind,
                         sport=form.cleaned_data.get("sport") or "tennis",
                     )
+                    schedule_published_sparring_notify(
+                        kind="team" if sparring_type == "team" else "doubles",
+                        pk=req.pk,
+                    )
                     messages.success(
                         request,
                         (
@@ -445,6 +450,7 @@ def sparring_create(request):
                 sparring.player = player
                 sparring.match_type = SparringMatchType.SINGLES
                 sparring.save()
+                schedule_published_sparring_notify(kind="singles", pk=sparring.pk)
                 messages.success(
                     request,
                     "Заявка создана. Она в списке «Мои заявки».",

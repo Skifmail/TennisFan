@@ -58,7 +58,7 @@
             </time>
             <div class="inbox-card__action">
                 {% if card.url %}
-                <a class="inbox-card__go" href="{{ card.url }}">Перейти</a>
+                <a class="inbox-card__go" href="{{ card.url }}">{{ card.action_label }}</a>
                 {% endif %}
             </div>
         </li>

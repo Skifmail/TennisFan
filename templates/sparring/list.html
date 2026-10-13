@@ -185,7 +185,7 @@
     {% if sparring_type == 'singles' %}
     <div class="grid grid-2">
         {% for req in sparring_requests %}
-        <div class="card sparring-card">
+        <div class="card sparring-card" id="sparring-{{ req.pk }}">
             <div class="card-body sparring-card__inner">
                 <div class="sparring-card__flags">
                     <span class="sparring-flag sparring-flag--type">Одиночный 1×1</span>

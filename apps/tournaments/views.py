@@ -40,6 +40,7 @@ from apps.clubs.plan_services import (
 from apps.clubs.services import get_fee_status_for_member, user_can_manage_club
 from apps.core.decorators import require_filled_profile
 from apps.core.geo import region_to_slug, should_show_moscow_geo_fields
+from apps.core.home_city_counters import TOURNAMENTS_SEEN_COOKIE, mark_list_seen
 from apps.core.metrika import (
     TOURNAMENT_PAYMENT_STARTED,
     TOURNAMENT_REGISTRATION_SUCCESS,
@@ -671,7 +672,10 @@ def tournament_list(
         "filter_chips": filter_chips,
         "is_archive": archive,
     }
-    return render(request, "tournaments/list.html", context)
+    response = render(request, "tournaments/list.html", context)
+    if not archive:
+        mark_list_seen(response, TOURNAMENTS_SEEN_COOKIE, secure=request.is_secure())
+    return response
 
 
 def tournament_region_landing(

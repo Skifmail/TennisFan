@@ -210,7 +210,7 @@
                 <a href="{% url 'tournament_list' %}?club=__club_only__" class="btn btn-outline btn-lg hero-btn-outline">Клубные турниры</a>
             </div>
             {% load skill_tags %}
-            <div class="hero-metrics hero-metrics--premium">
+            <div class="hero-metrics hero-metrics--premium hero-metrics--quad">
                 <a href="{% url 'rating' %}" class="hero-metric hero-metric--link">
                     <span class="hero-metric__value" data-count-to="{{ hero_stats.players_count|default:'0' }}" aria-label="{{ hero_stats.players_count|default:'0' }}">0</span>
                     <span class="hero-metric__label">
@@ -218,12 +218,33 @@
                     </span>
                 </a>
                 <div class="hero-metric-divider"></div>
-                <a href="{% url 'tournament_list' %}" class="hero-metric hero-metric--link">
-                    <span class="hero-metric__value" data-count-to="{{ hero_stats.tournaments_count|default:'0' }}" aria-label="{{ hero_stats.tournaments_count|default:'0' }}">0</span>
+                {% with counter=home_city_counters.tournaments %}
+                <a href="{{ counter.url }}" class="hero-metric hero-metric--link" data-home-city-counter="tournaments"{% if home_city_counters.city %} title="Активные турниры: {{ home_city_counters.city }}"{% endif %}>
+                    <span class="hero-metric__value-wrap">
+                        <span class="hero-metric__value" data-count-to="{{ counter.total }}" aria-label="{{ counter.total }}">0</span>
+                        {% if counter.new %}
+                        <span class="hero-metric__badge" aria-label="{{ counter.new }} {{ counter.new|ru_pluralize:'новый турнир,новых турнира,новых турниров' }}">{% if counter.new > 99 %}99+{% else %}{{ counter.new }}{% endif %}</span>
+                        {% endif %}
+                    </span>
                     <span class="hero-metric__label">
-                        {{ hero_stats.tournaments_count|default:"0"|ru_pluralize:"активный турнир,активных турнира,активных турниров" }}
+                        {{ counter.total|ru_pluralize:"активный турнир,активных турнира,активных турниров" }}
                     </span>
                 </a>
+                {% endwith %}
+                <div class="hero-metric-divider"></div>
+                {% with counter=home_city_counters.sparrings %}
+                <a href="{{ counter.url }}" class="hero-metric hero-metric--link" data-home-city-counter="sparrings"{% if home_city_counters.city %} title="Активные спарринги: {{ home_city_counters.city }}"{% endif %}>
+                    <span class="hero-metric__value-wrap">
+                        <span class="hero-metric__value" data-count-to="{{ counter.total }}" aria-label="{{ counter.total }}">0</span>
+                        {% if counter.new %}
+                        <span class="hero-metric__badge" aria-label="{{ counter.new }} {{ counter.new|ru_pluralize:'новый спарринг,новых спарринга,новых спаррингов' }}">{% if counter.new > 99 %}99+{% else %}{{ counter.new }}{% endif %}</span>
+                        {% endif %}
+                    </span>
+                    <span class="hero-metric__label">
+                        {{ counter.total|ru_pluralize:"активный спарринг,активных спарринга,активных спаррингов" }}
+                    </span>
+                </a>
+                {% endwith %}
                 <div class="hero-metric-divider"></div>
                 <a href="{% url 'results' %}" class="hero-metric hero-metric--link">
                     <span class="hero-metric__value" data-count-to="{{ hero_stats.matches_count|default:'0' }}" aria-label="{{ hero_stats.matches_count|default:'0' }}">0</span>

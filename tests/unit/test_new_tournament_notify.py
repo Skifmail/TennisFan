@@ -68,6 +68,15 @@ class NewTournamentNotifyTestCase(TestCase):
             last_name="Игрок",
         )
         Player.objects.create(user=self.user, city="Москва", is_bye=False)
+        self.other_city_user = User.objects.create_user(
+            email="spb@test.local",
+            password="x",
+            first_name="Пётр",
+            last_name="Нева",
+        )
+        Player.objects.create(
+            user=self.other_city_user, city="Санкт-Петербург", is_bye=False
+        )
         self.tournament = Tournament.objects.create(
             name="Кубок лета",
             slug="kubok-leta-notify",
@@ -99,6 +108,10 @@ class NewTournamentNotifyTestCase(TestCase):
         lk_count, email_count = _notify_new_tournament_lk_and_email(self.tournament)
         self.assertEqual(lk_count, 1)
         self.assertEqual(email_count, 1)
+        self.assertFalse(
+            Notification.objects.filter(user=self.other_city_user).exists()
+        )
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
         note = Notification.objects.get(user=self.user)
         self.assertIn("Кубок лета", note.message)
         self.assertIn(self.tournament.slug, note.url)

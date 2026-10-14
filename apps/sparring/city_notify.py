@@ -37,11 +37,40 @@ _PUBLISHED_DOUBLES = (
 )
 
 
-def same_city_players(city: str, *, exclude_player_id: int) -> QuerySet[Player]:
-    """Игроки с тем же населённым пунктом, кроме автора заявки.
+def same_city_player_ids(
+    city: str, *, exclude_player_id: int | None = None
+) -> list[int]:
+    """Идентификаторы игроков с тем же населённым пунктом.
 
     Сравнение идёт по нормализованному названию: «Москва» и «г. Москва»
     считаются одним городом. Служебные bye и неактивные аккаунты не входят.
+
+    Args:
+        city: Населённый пункт заявки или турнира.
+        exclude_player_id: Игрок, которого не включать. ``None`` — никого не исключать.
+
+    Returns:
+        list[int]: Первичные ключи подходящих игроков.
+    """
+    wanted = set(locality_tokens(city))
+    if not wanted:
+        return []
+    rows = (
+        Player.objects.filter(is_bye=False, user__is_active=True)
+        .exclude(city="")
+        .values_list("pk", "city")
+    )
+    if exclude_player_id is not None:
+        rows = rows.exclude(pk=exclude_player_id)
+    return [
+        player_id
+        for player_id, player_city in rows
+        if wanted.intersection(locality_tokens(player_city))
+    ]
+
+
+def same_city_players(city: str, *, exclude_player_id: int) -> QuerySet[Player]:
+    """Игроки с тем же населённым пунктом, кроме автора заявки.
 
     Args:
         city: Населённый пункт из заявки.
@@ -50,20 +79,7 @@ def same_city_players(city: str, *, exclude_player_id: int) -> QuerySet[Player]:
     Returns:
         QuerySet[Player]: Получатели с подгруженным пользователем.
     """
-    wanted = set(locality_tokens(city))
-    if not wanted:
-        return Player.objects.none()
-    rows = (
-        Player.objects.filter(is_bye=False, user__is_active=True)
-        .exclude(pk=exclude_player_id)
-        .exclude(city="")
-        .values_list("pk", "city")
-    )
-    matched_ids = [
-        player_id
-        for player_id, player_city in rows
-        if wanted.intersection(locality_tokens(player_city))
-    ]
+    matched_ids = same_city_player_ids(city, exclude_player_id=exclude_player_id)
     if not matched_ids:
         return Player.objects.none()
     return (

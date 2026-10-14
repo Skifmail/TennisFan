@@ -310,6 +310,27 @@ def locality_tokens(value: str) -> list[str]:
     return [whole] if whole else []
 
 
+def primary_locality_name(value: str) -> str:
+    """Вернуть первый населённый пункт из строки профиля в исходном регистре.
+
+    Нужен для подстановки в фильтр ``?city=``: «г. Раменское, Жуковский» даёт
+    «Раменское», а хвост региона вроде «Московская область» пропускается.
+
+    Args:
+        value: Строка из поля «Населённый пункт».
+
+    Returns:
+        str: Название без типа поселения или пустая строка.
+    """
+    for part in re.split(r"[,;/|]", (value or "").strip()):
+        if _REGION_TAIL_RE.search(part):
+            continue
+        name = " ".join(_PREFIX_STRIP_RE.sub("", part.strip()).split())
+        if name:
+            return name
+    return ""
+
+
 def several_catalog_cities_message(value: str) -> str:
     """Сообщение, если в одной строке указаны два города из справочника.
 

@@ -79,6 +79,14 @@ from .activity import (
     set_home_activity_seen_cookie,
 )
 from .forms import FeedbackForm, PlatformActivityAnnounceForm
+from .home_city_counters import (
+    SPARRINGS_SEEN_COOKIE,
+    TOURNAMENTS_SEEN_COOKIE,
+    build_home_city_counters,
+    parse_seen_at,
+    viewer_city,
+    viewer_player_id,
+)
 from .localities import (
     ST_CITY,
     YANDEX_SUGGEST_MIN_QUERY,
@@ -2316,11 +2324,6 @@ def home(request):
             "players_count": format_number(
                 Player.objects.filter(is_bye=False, is_verified=True).count()
             ),
-            "tournaments_count": format_number(
-                Tournament.objects.filter(
-                    status__in=[TournamentStatus.UPCOMING, TournamentStatus.ACTIVE],
-                ).count()
-            ),
             "matches_count": format_number(
                 Match.objects.filter(
                     status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]
@@ -2333,7 +2336,13 @@ def home(request):
             ),
         }
 
-    hero_stats = cache.get_or_set("home_hero_stats:v3", _build_hero_stats, timeout=300)
+    hero_stats = cache.get_or_set("home_hero_stats:v4", _build_hero_stats, timeout=300)
+    home_city_counters = build_home_city_counters(
+        city=viewer_city(request.user),
+        tournaments_seen_at=parse_seen_at(request.COOKIES.get(TOURNAMENTS_SEEN_COOKIE)),
+        sparrings_seen_at=parse_seen_at(request.COOKIES.get(SPARRINGS_SEEN_COOKIE)),
+        exclude_player_id=viewer_player_id(request.user),
+    )
 
     home_activity_events = get_public_home_activity_events()
     home_activity_seen_id = parse_home_activity_seen_id(
@@ -2360,6 +2369,7 @@ def home(request):
         ),
         "latest_news": News.objects.filter(is_published=True)[:4],
         "hero_stats": hero_stats,
+        "home_city_counters": home_city_counters,
         "current_filters": {
             "city": city,
             "category": category,

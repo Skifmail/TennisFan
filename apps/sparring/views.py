@@ -36,6 +36,7 @@ from apps.core.contact_utils import (
     get_max_display_contact,
 )
 from apps.core.decorators import require_filled_profile, require_verified_player
+from apps.core.home_city_counters import SPARRINGS_SEEN_COOKIE, mark_list_seen
 from apps.core.sports import sport_code
 from apps.core.text_search import filter_field_contains_ci
 from apps.users.models import Notification, Player
@@ -360,7 +361,9 @@ def sparring_list(request):
                 NEARBY_PLAYERS_PAGE_SIZE,
             ).get_page(request.GET.get("players_page"))
 
-    return render(request, "sparring/list.html", context)
+    response = render(request, "sparring/list.html", context)
+    mark_list_seen(response, SPARRINGS_SEEN_COOKIE, secure=request.is_secure())
+    return response
 
 
 @login_required

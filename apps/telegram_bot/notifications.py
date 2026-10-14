@@ -972,7 +972,8 @@ def _get_new_tournament_users(tournament) -> list:
         tournament: Созданный турнир.
 
     Returns:
-        list: Список User (платформенный турнир — все игроки; клубный — активные члены).
+        list: Список User. Клубный турнир — активные члены клуба.
+        Платформенный — игроки того же населённого пункта, что и турнир.
     """
     from apps.users.models import User
 
@@ -989,8 +990,13 @@ def _get_new_tournament_users(tournament) -> list:
             return []
         return list(User.objects.filter(pk__in=user_ids).order_by("pk"))
 
+    from apps.sparring.city_notify import same_city_player_ids
+
+    player_ids = same_city_player_ids(getattr(tournament, "city", "") or "")
+    if not player_ids:
+        return []
     return list(
-        User.objects.filter(player__isnull=False, player__is_bye=False)
+        User.objects.filter(player__pk__in=player_ids, is_active=True)
         .distinct()
         .order_by("pk")
     )
@@ -1077,8 +1083,14 @@ def _get_new_tournament_recipients(tournament) -> list[UserTelegramLink]:
             .distinct()
         )
 
+    city_user_ids = [user.pk for user in _get_new_tournament_users(tournament)]
+    if not city_user_ids:
+        return []
     return list(
-        UserTelegramLink.objects.filter(user_bot_chat_id__isnull=False)
+        UserTelegramLink.objects.filter(
+            user_id__in=city_user_ids,
+            user_bot_chat_id__isnull=False,
+        )
         .exclude(user_bot_chat_id=0)
         .distinct()
     )

@@ -156,6 +156,11 @@
     list-style: none;
 }
 
+/* display: grid у карточки перекрывает браузерное [hidden], без этого фильтр не прячет строки. */
+.inbox-card[hidden] {
+    display: none;
+}
+
 .inbox-card {
     display: grid;
     grid-template-columns: 1fr;

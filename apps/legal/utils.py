@@ -4,18 +4,23 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from typing import Final
 
 from django.conf import settings
 
-DOCS_ROOT = Path(settings.BASE_DIR) / "static" / "documents"
+DOCS_ROOT: Final = Path(settings.BASE_DIR) / "static" / "documents"
+LEGAL_VERSION_LENGTH: Final = 12
 
-LEGAL_DOCUMENT_PATHS: dict[str, Path] = {
+LEGAL_DOCUMENT_PATHS: Final[dict[str, Path]] = {
     "personal-data": DOCS_ROOT / "personal_data.txt",
     "privacy": DOCS_ROOT / "privacy.txt",
     "offer": DOCS_ROOT / "public_offer.txt",
     "terms": DOCS_ROOT / "user_agreement.txt",
     "club-organizer-rules": DOCS_ROOT / "club_organizer_rules.txt",
     "fan-token": DOCS_ROOT / "fan_token.txt",
+    "chat-rules": DOCS_ROOT / "chat_rules.txt",
+    "chat-personal-data": DOCS_ROOT / "chat_personal_data.txt",
+    "chat-disclosure": DOCS_ROOT / "chat_disclosure.txt",
 }
 
 
@@ -37,4 +42,4 @@ def get_legal_document_version(slug: str) -> str:
         return "unknown"
 
     content = path.read_bytes()
-    return hashlib.sha256(content).hexdigest()[:12]
+    return hashlib.sha256(content).hexdigest()[:LEGAL_VERSION_LENGTH]

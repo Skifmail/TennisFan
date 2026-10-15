@@ -1932,3 +1932,183 @@
         min-width: 32px;
     }
 }
+
+/* Согласия читаются по отдельности: тихий материал, чёткие состояния и ссылки. */
+.chat-consent-form {
+    overflow-wrap: anywhere;
+}
+
+.chat-legal-links, .chat-settings-legal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    color: var(--chat-secondary);
+    font-size: 0.75rem;
+    line-height: 1.6;
+}
+
+.chat-legal-links {
+    padding-top: 24px;
+    margin-top: 24px;
+    border-top: 1px solid var(--chat-line);
+}
+
+.chat-settings-legal {
+    flex-direction: column;
+    padding: 16px 0;
+}
+
+.chat-consent-dialog {
+    width: min(620px, calc(100vw - 24px));
+    max-height: calc(var(--chat-viewport-height, 100dvh) - 32px);
+    padding: 28px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+.chat-consent-page {
+    max-width: 720px;
+    padding: 40px 28px;
+    margin: auto;
+    line-height: 1.65;
+}
+
+.chat-consent-page [data-consent-close] {
+    display: none;
+}
+
+.chat-consent-city {
+    color: var(--chat-accent);
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 12px 0;
+}
+
+.chat-consent-items {
+    display: grid;
+    gap: 12px;
+    margin: 24px 0;
+}
+
+.chat-consent-item {
+    padding: 16px;
+    border: 1px solid var(--chat-line);
+    border-radius: 14px;
+    background: var(--chat-field);
+}
+
+.chat-consent-item label, .chat-consent-options label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 36px;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    cursor: pointer;
+}
+
+.chat-consent-form input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 19px;
+    height: 19px;
+    margin: 2px 0;
+    accent-color: var(--chat-accent);
+    cursor: pointer;
+}
+
+.chat-consent-item a, .chat-consent-conditions a {
+    display: inline-block;
+    color: var(--chat-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-size: 0.75rem;
+    margin: 4px 12px 0 31px;
+}
+
+.chat-consent-detail, .chat-withdraw-form p {
+    color: var(--chat-secondary);
+    font-size: 0.75rem;
+    line-height: 1.65;
+    margin: 8px 0;
+}
+
+.chat-consent-options {
+    border: 0;
+    padding: 0;
+    margin: 20px 0;
+}
+
+.chat-consent-options legend {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.chat-consent-conditions {
+    padding: 16px 0;
+    border-top: 1px solid var(--chat-line);
+    border-bottom: 1px solid var(--chat-line);
+    margin-bottom: 16px;
+    font-size: 0.875rem;
+}
+
+.chat-consent-conditions summary {
+    min-height: 28px;
+    cursor: pointer;
+}
+
+.chat-consent-conditions textarea {
+    display: block;
+    width: 100%;
+    resize: vertical;
+    padding: 12px;
+    margin-top: 8px;
+    border: 1px solid var(--chat-border);
+    border-radius: 10px;
+    color: var(--chat-ink);
+    background: var(--chat-field);
+}
+
+.chat-consent-form .chat-dialog-actions {
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+
+.chat-consent-form button:disabled {
+    color: var(--chat-disabled-ink);
+    background: var(--chat-disabled);
+}
+
+.chat-withdraw-form {
+    border-top: 1px solid var(--chat-line);
+    padding-top: 12px;
+}
+
+.chat-message-conditions {
+    font-size: 0.625rem;
+    color: var(--chat-secondary);
+    text-decoration: underline !important;
+    text-underline-offset: 2px;
+}
+
+@media (width <= 520px) {
+    .chat-consent-dialog {
+        padding: 20px 16px;
+        max-height: calc(var(--chat-viewport-height, 100dvh) - 16px);
+    }
+
+    .chat-consent-page {
+        padding: 24px 16px;
+    }
+
+    .chat-consent-form .chat-dialog-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .chat-consent-form .chat-dialog-actions .chat-button {
+        min-height: 44px;
+        text-align: center;
+    }
+}

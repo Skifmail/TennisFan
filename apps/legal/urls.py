@@ -3,6 +3,24 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path(
+        "chat-rules/",
+        views.legal_document,
+        {"slug": "chat-rules"},
+        name="legal_chat_rules",
+    ),
+    path(
+        "chat-personal-data/",
+        views.legal_document,
+        {"slug": "chat-personal-data"},
+        name="legal_chat_personal_data",
+    ),
+    path(
+        "chat-disclosure/",
+        views.legal_document,
+        {"slug": "chat-disclosure"},
+        name="legal_chat_disclosure",
+    ),
     path("", views.legal_index, name="legal_index"),
     path(
         "personal-data/",

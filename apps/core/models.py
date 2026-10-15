@@ -134,6 +134,14 @@ class LegalAcceptanceLog(models.Model):
     Модель хранит подтверждение того, что пользователь принял конкретный
     юридический документ: согласие на обработку ПДн, политику
     конфиденциальности, публичную оферту и т.д.
+
+    Attributes:
+        user: Аккаунт субъекта либо None после его удаления.
+        document_slug: Документ, к которому относится событие.
+        document_version: Принятая редакция, не заменяемая текущей.
+        source: Сценарий подтверждения, отзыва или проверки оператором.
+        metadata: Снимки документов, субъекта и контекста для новых событий.
+        accepted_at: Время фиксации события журналом.
     """
 
     class DocumentSlug(models.TextChoices):
@@ -143,10 +151,15 @@ class LegalAcceptanceLog(models.Model):
         PRIVACY = "privacy", "Политика конфиденциальности"
         OFFER = "offer", "Публичная оферта"
         TERMS = "terms", "Пользовательское соглашение"
+        CHAT_PERSONAL_DATA = "chat-personal-data", "Согласие на обработку ПДн для чата"
+        CHAT_RULES = "chat-rules", "Правила городских чатов"
+        CHAT_DISCLOSURE = "chat-disclosure", "Согласие на распространение данных в чате"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="legal_acceptances",
         verbose_name="Пользователь",
     )

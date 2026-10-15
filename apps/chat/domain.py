@@ -45,6 +45,38 @@ class ChatNotFoundError(ChatError):
     status: ClassVar[int] = 404
 
 
+class ChatConsentRequiredError(ChatAccessError):
+    """Требуется личное подтверждение действующих документов чата.
+
+    Attributes:
+        code: Причина отказа, по которой интерфейс предлагает форму согласий.
+    """
+
+    code: ClassVar[str] = "consent_required"
+
+
+class ChatConsentVersionError(ChatError):
+    """Подтверждаемая редакция или подписанная форма устарела.
+
+    Attributes:
+        status: Конфликт версии, требующий повторного открытия формы.
+    """
+
+    code: ClassVar[str] = "consent_stale"
+    status: ClassVar[int] = 409
+
+
+class ChatConsentDocumentError(ChatError):
+    """Обязательный документ недоступен, поэтому вступление закрыто.
+
+    Attributes:
+        status: Временная недоступность юридических документов.
+    """
+
+    code: ClassVar[str] = "consent_document_unavailable"
+    status: ClassVar[int] = 503
+
+
 class ChatRateLimitError(ChatError):
     """Превышена допустимая частота сообщений."""
 

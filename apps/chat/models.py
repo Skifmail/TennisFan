@@ -45,6 +45,14 @@ class ChatMembership(models.Model):
         banned_until: До какого момента запрещено писать.
         last_read_message_id: Монотонная отметка прочтения.
         notifications_enabled: Получать ли уведомления об ответах.
+        consent_version: Отпечаток комплекта лично подтверждённых документов.
+        consent_id: Идентификатор соответствующего события в журнале Ядра.
+        consented_at: Время личного подтверждения, не заполняемое администратором.
+        consent_withdrawn_at: Момент отзыва согласий.
+        disclosure_name: Разрешён ли показ имени и фамилии.
+        disclosure_avatar: Разрешён ли показ фотографии.
+        disclosure_conditions: Дополнительные запреты и условия субъекта.
+        disclosure_reviewed: Проверил ли оператор возможность соблюдения условий.
     """
 
     room = models.ForeignKey(
@@ -61,6 +69,26 @@ class ChatMembership(models.Model):
     notifications_enabled = models.BooleanField("Уведомлять об ответах", default=True)
     last_read_message_id = models.PositiveBigIntegerField(default=0)
     joined_at = models.DateTimeField(auto_now_add=True)
+    consent_version = models.CharField(
+        "Комплект принятых документов", max_length=64, blank=True
+    )
+    consent_id = models.UUIDField("Идентификатор подтверждения", null=True, blank=True)
+    consented_at = models.DateTimeField("Согласия получены", null=True, blank=True)
+    consent_withdrawn_at = models.DateTimeField(
+        "Согласия отозваны", null=True, blank=True
+    )
+    disclosure_name = models.BooleanField(
+        "Разрешён показ имени и фамилии", default=False
+    )
+    disclosure_avatar = models.BooleanField("Разрешён показ фотографии", default=False)
+    disclosure_conditions = models.TextField(
+        "Особые условия распространения", max_length=1000, blank=True
+    )
+    disclosure_reviewed = models.BooleanField(
+        "Возможность соблюдения особых условий проверена оператором",
+        default=False,
+        help_text="Не заменяет согласие игрока. Отметьте только после проверки возможности выполнить все его условия.",
+    )
 
     class Meta:
         constraints = [

@@ -14,6 +14,13 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
+from apps.core.models import LegalAcceptanceLog
+
+from .consent import (
+    MAX_USER_AGENT_LENGTH,
+    consent_request_ip,
+    publish_disclosure_change,
+)
 from .domain import MAX_DATABASE_ID
 from .models import ChatMembership, ChatMessage, ChatReport, ChatRoom
 from .realtime import publish_room_change
@@ -23,16 +30,14 @@ MESSAGE_PREVIEW_LENGTH: Final = 240
 
 
 def _can_view_rooms(request: HttpRequest) -> bool:
-    return cast(
-        bool,
+    return bool(
         request.user.has_perm("chat.view_chatroom")
         or request.user.has_perm("chat.change_chatroom"),
     )
 
 
 def _can_view(request: HttpRequest, model: str) -> bool:
-    return cast(
-        bool,
+    return bool(
         request.user.has_perm(f"chat.view_{model}")
         or request.user.has_perm(f"chat.change_{model}"),
     )
@@ -322,7 +327,17 @@ class ChatMembershipAdmin(_RoomChildAdmin):
     """
 
     autocomplete_fields = ("user",)
-    readonly_fields = ("joined_at", "last_read_message_id")
+    readonly_fields = (
+        "joined_at",
+        "last_read_message_id",
+        "consent_version",
+        "consent_id",
+        "consented_at",
+        "consent_withdrawn_at",
+        "disclosure_name",
+        "disclosure_avatar",
+        "disclosure_conditions",
+    )
     delete_confirmation_template = "admin/chat/member_delete_confirmation.html"
 
     def add_view(
@@ -395,6 +410,10 @@ class ChatMembershipAdmin(_RoomChildAdmin):
         if "room" in form.base_fields:
             form.base_fields["room"].disabled = True
             form.base_fields["room"].initial = room.pk
+        if obj is not None and "user" in form.base_fields:
+            form.base_fields["user"].disabled = True
+        if "disclosure_reviewed" in form.base_fields and not request.user.is_superuser:
+            form.base_fields["disclosure_reviewed"].disabled = True
         return cast(type[forms.ModelForm[Model]], form)
 
     def save_model(
@@ -412,8 +431,51 @@ class ChatMembershipAdmin(_RoomChildAdmin):
             form: Проверенная форма.
             change: Изменяется ли существующая запись.
         """
-        super().save_model(request, obj, form, change)
         room_id = _child_room(obj).pk
+        review_changed = (
+            isinstance(obj, ChatMembership)
+            and "disclosure_reviewed" in form.changed_data
+        )
+        if change and isinstance(obj, ChatMembership):
+            ChatRoom.objects.select_for_update().get(pk=room_id)
+            current = ChatMembership.objects.select_for_update().get(pk=obj.pk)
+            fields = list(form.changed_data)
+            if review_changed and current.consent_id != obj.consent_id:
+                fields.remove("disclosure_reviewed")
+                review_changed = False
+                self.message_user(
+                    request,
+                    "Игрок изменил согласие. Особые условия необходимо проверить заново.",
+                    level="warning",
+                )
+            # Не сохраняем старую копию readonly-полей поверх нового согласия игрока.
+            if fields:
+                obj.save(update_fields=fields)
+            obj.refresh_from_db()
+        else:
+            super().save_model(request, obj, form, change)
+        if isinstance(obj, ChatMembership) and review_changed:
+            if obj.consented_at:
+                LegalAcceptanceLog.objects.create(
+                    user_id=obj.user_id,
+                    document_slug="chat-disclosure",
+                    document_version=obj.consent_version or "unknown",
+                    source="chat_conditions_review",
+                    ip_address=consent_request_ip(request),
+                    user_agent=request.META.get("HTTP_USER_AGENT", "")[
+                        :MAX_USER_AGENT_LENGTH
+                    ],
+                    metadata={
+                        "room_id": room_id,
+                        "city_id": obj.room.city_id,
+                        "acceptance_id": str(obj.consent_id),
+                        "operator_user_id": request.user.pk,
+                        "conditions": obj.disclosure_conditions,
+                        "reviewed": obj.disclosure_reviewed,
+                        "event": "operator_conditions_review_not_player_consent",
+                    },
+                )
+            publish_disclosure_change(room_id=room_id, user_id=obj.user_id)
         transaction.on_commit(lambda: publish_room_change(room_id))
 
     def delete_view(

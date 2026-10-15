@@ -126,7 +126,7 @@
             const response = await fetch(url, options);
             const data = await response.json();
             if (!response.ok) {
-                if (response.status === 403 && data.code === "forbidden" && !payload) stopAccess();
+                if (response.status === 403 && ["forbidden", "consent_required"].includes(data.code) && !payload) stopAccess();
                 throw new Error(data.error || "Не удалось выполнить запрос.");
             }
             return data;
@@ -413,6 +413,13 @@
             if (moderator) identity.append(element("span", "chat-moderator-label", "Модератор"));
             column.append(identity);
         }
+        if (message.conditions_url) {
+            const conditions = element("a", "chat-message-conditions", "Условия использования данных");
+            conditions.href = message.conditions_url;
+            conditions.target = "_blank";
+            conditions.rel = "noopener";
+            column.append(conditions);
+        }
         const bubble = element("div", "chat-bubble");
         if (message.reply_to && !message.is_deleted) {
             const original = messages.get(message.reply_to.id);
@@ -562,7 +569,7 @@
         if (socket) socket.close();
         status("Доступ завершён", false);
         updateSend();
-        showError("Вы вышли из чата или комната закрыта. Вернитесь в список городов.");
+        showError("Доступ завершён: участие, документы или условия изменились. Обновите страницу, чтобы продолжить.");
     }
 
     function connect() {

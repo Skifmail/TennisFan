@@ -16,6 +16,7 @@ from loguru import logger
 from apps.core.models import City
 from apps.users.models import Notification, User
 
+from .consent import ensure_chat_consent
 from .domain import (
     EDIT_WINDOW_SECONDS,
     MAX_DATABASE_ID,
@@ -96,6 +97,7 @@ def require_member(
     )
     if member is None:
         raise ChatAccessError("Сначала вступите в чат.")
+    ensure_chat_consent(member)
     if writing and member.banned_until and member.banned_until > timezone.now():
         raise ChatAccessError("Отправка сообщений временно ограничена модератором.")
     return cast(ChatMembership, member)
@@ -128,6 +130,9 @@ def _moderator_ids(room_id: int) -> frozenset[int]:
     return frozenset(
         ChatMembership.objects.filter(
             Q(is_moderator=True) | Q(user__is_staff=True),
+            Q(disclosure_conditions="") | Q(disclosure_reviewed=True),
+            consented_at__isnull=False,
+            consent_withdrawn_at__isnull=True,
             room_id=room_id,
             room__is_active=True,
             is_active=True,
@@ -137,7 +142,10 @@ def _moderator_ids(room_id: int) -> frozenset[int]:
 
 
 def serialize_message(
-    message: ChatMessage, *, moderator_ids: frozenset[int] | None = None
+    message: ChatMessage,
+    *,
+    moderator_ids: frozenset[int] | None = None,
+    disclosures: dict[int, ChatMembership] | None = None,
 ) -> dict[str, Any]:
     """Возвращает публичные данные без email, телефона и удалённого текста.
 
@@ -145,13 +153,28 @@ def serialize_message(
         message: Сообщение с предварительно загруженным автором.
         moderator_ids: Актуальные модераторы комнаты для пакетной сериализации.
             Если не переданы, роли загружаются из базы.
+        disclosures: Выбор данных авторами, загруженный одним запросом на страницу.
 
     Returns:
         Поля для безопасного отображения как обычного текста.
     """
-    player = getattr(message.author, "player", None)
-    avatar = player.avatar.url if player and player.avatar else ""
     reply = message.reply_to
+    if disclosures is None:
+        disclosures = _message_disclosures(message.room_id, [message])
+    author_member = disclosures.get(message.author_id or 0)
+    permitted = _may_publish(author_member)
+    player = getattr(message.author, "player", None)
+    avatar = (
+        player.avatar.url
+        if permitted
+        and author_member
+        and author_member.disclosure_avatar
+        and player
+        and player.avatar
+        else ""
+    )
+    reply_member = disclosures.get(reply.author_id or 0) if reply else None
+    reply_permitted = _may_publish(reply_member)
     moderators = (
         _moderator_ids(message.room_id) if moderator_ids is None else moderator_ids
     )
@@ -159,24 +182,70 @@ def serialize_message(
         "id": message.pk,
         "revision": message.revision,
         "author_id": message.author_id,
-        "author": _name(message.author),
-        "author_is_moderator": message.author_id in moderators,
+        "author": _disclosed_name(message.author, author_member),
+        "author_is_moderator": permitted and message.author_id in moderators,
         "avatar": avatar,
-        "profile_url": reverse("profile", args=[player.pk]) if player else "",
-        "text": "" if message.deleted_at else message.text,
+        # Ссылка на полный профиль раскрывает больше данных, чем выбрано для чата.
+        "profile_url": "",
+        "conditions_url": reverse("chat:data_conditions", args=[message.room_id])
+        + f"#participant-{message.author_id}",
+        "text": "" if message.deleted_at or not permitted else message.text,
         "client_id": str(message.client_id),
         "created_at": message.created_at.isoformat(),
         "is_edited": message.edited_at is not None,
-        "is_deleted": message.deleted_at is not None,
+        "is_deleted": message.deleted_at is not None or not permitted,
         "reply_to": (
             {
                 "id": reply.pk,
-                "author": _name(reply.author),
-                "text": "Сообщение удалено" if reply.deleted_at else reply.text[:120],
+                "author": _disclosed_name(reply.author, reply_member),
+                "text": (
+                    "Сообщение недоступно"
+                    if reply.deleted_at or not reply_permitted
+                    else reply.text[:120]
+                ),
             }
             if reply
             else None
         ),
+    }
+
+
+def _may_publish(member: ChatMembership | None) -> bool:
+    return bool(
+        member
+        and member.consented_at
+        and not member.consent_withdrawn_at
+        and (not member.disclosure_conditions or member.disclosure_reviewed)
+    )
+
+
+def _disclosed_name(user: User | None, member: ChatMembership | None) -> str:
+    if user is None:
+        return "Удалённый аккаунт"
+    return (
+        _name(user)
+        if _may_publish(member) and member and member.disclosure_name
+        else f"Участник #{user.pk}"
+    )
+
+
+def _message_disclosures(
+    room_id: int, messages: list[ChatMessage]
+) -> dict[int, ChatMembership]:
+    author_ids = {
+        author_id
+        for message in messages
+        for author_id in (
+            message.author_id,
+            message.reply_to.author_id if message.reply_to else None,
+        )
+        if author_id is not None
+    }
+    return {
+        member.user_id: member
+        for member in ChatMembership.objects.filter(
+            room_id=room_id, user_id__in=author_ids
+        )
     }
 
 
@@ -354,9 +423,10 @@ def history(
         query = query.filter(pk__lt=before_id)
     rows = list(query.order_by("-id")[: PAGE_SIZE + 1])
     moderator_ids = _moderator_ids(room_id)
+    disclosures = _message_disclosures(room_id, rows)
     return {
         "messages": [
-            serialize_message(m, moderator_ids=moderator_ids)
+            serialize_message(m, moderator_ids=moderator_ids, disclosures=disclosures)
             for m in reversed(rows[:PAGE_SIZE])
         ],
         "has_more": len(rows) > PAGE_SIZE,
@@ -390,11 +460,14 @@ def sync_events(*, user: User, room_id: int, after_id: int) -> dict[str, Any]:
         .order_by("id")[: MAX_PAGE_SIZE + 1]
     )
     moderator_ids = _moderator_ids(room_id)
+    disclosures = _message_disclosures(room_id, [event.message for event in rows])
     return {
         "events": [
             {
                 "id": e.pk,
-                "message": serialize_message(e.message, moderator_ids=moderator_ids),
+                "message": serialize_message(
+                    e.message, moderator_ids=moderator_ids, disclosures=disclosures
+                ),
             }
             for e in rows[:MAX_PAGE_SIZE]
         ],

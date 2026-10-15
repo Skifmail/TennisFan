@@ -4,8 +4,8 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-from apps.chat import services
 from apps.core.models import City
+from tests.support.chat_legal import join_city_with_consent
 from tests.support.factories import make_user
 
 pytestmark = pytest.mark.django_db
@@ -16,10 +16,10 @@ def test_room_when_member_should_render_light_shell_and_joined_cities(
 ) -> None:
     """Комната использует свой интерфейс и даёт переход в другие свои города."""
     user = make_user(email="chat-design@test.local", first_name="Анна")
-    first = services.join_city(
+    first = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Казань")[0].pk
     )
-    second = services.join_city(
+    second = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Самара")[0].pk
     )
     client.force_login(user)

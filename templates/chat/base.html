@@ -11,6 +11,7 @@
     <link rel="icon" href="{% static site_favicon_path %}">
     <link rel="stylesheet" href="{% static 'css/pages/chat.css' %}">
     <script src="{% static 'js/chat_shell.js' %}" defer></script>
+    <script src="{% static 'js/chat_consent.js' %}" defer></script>
 </head>
 <body class="chat-app">
 {% include 'chat/_icons.html' %}
@@ -37,6 +38,7 @@
     </aside>
     <main class="chat-main {% block main_class %}{% endblock %}" id="chat-main" tabindex="-1">{% block content %}{% endblock %}</main>
 </div>
+<dialog id="chat-join-dialog" class="chat-dialog chat-consent-dialog" aria-label="Вступление в городской чат"></dialog>
 {% block overlays %}{% endblock %}
 {% block extra_js %}{% endblock %}
 </body>

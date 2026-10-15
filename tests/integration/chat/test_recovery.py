@@ -7,6 +7,7 @@ import pytest
 from apps.chat import services
 from apps.chat.models import ChatEvent, ChatMessage
 from apps.core.models import City
+from tests.support.chat_legal import join_city_with_consent
 from tests.support.factories import make_user
 
 pytestmark = pytest.mark.django_db
@@ -15,7 +16,7 @@ pytestmark = pytest.mark.django_db
 def test_recovery_when_old_message_edited_and_deleted_should_replay_changes() -> None:
     """Правки за пределами первой страницы не теряются при reconnect."""
     user = make_user(email="recover-chat@test.local")
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Рязань")[0].pk
     )
     first = services.send_message(
@@ -39,7 +40,7 @@ def test_recovery_when_old_message_edited_and_deleted_should_replay_changes() ->
 def test_recovery_when_more_than_page_should_return_all_events_without_gaps() -> None:
     """Пагинация журнала не пропускает сообщения при массовом восстановлении."""
     user = make_user(email="many-events@test.local")
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Псков")[0].pk
     )
     message = ChatMessage.objects.create(

@@ -11,6 +11,7 @@ from pytest_mock import MockerFixture
 from apps.chat import services
 from apps.chat.domain import ChatRateLimitError
 from apps.core.models import City
+from tests.support.chat_legal import join_city_with_consent
 from tests.support.factories import make_user
 
 pytestmark = [
@@ -24,7 +25,7 @@ pytestmark = [
 def test_send_when_concurrent_retry_should_commit_once() -> None:
     """Два одновременных запроса одного UUID сохраняют единственный результат."""
     user = make_user(email="race-chat@test.local")
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Тула")[0].pk
     )
     key = uuid4()
@@ -52,7 +53,7 @@ def test_send_when_concurrent_different_cities_should_limit_account() -> None:
     """Переключение между комнатами не обходит антиспам одного аккаунта."""
     user = make_user(email="race-two-chat@test.local")
     rooms = [
-        services.join_city(
+        join_city_with_consent(
             user=user, city_id=City.objects.get_or_create(name=name)[0].pk
         )
         for name in ("Казань", "Омск")
@@ -88,13 +89,13 @@ def test_send_when_cross_replies_concurrent_should_not_deadlock(
 
     authors = [make_user(email=f"cross-reply-{index}@test.local") for index in range(2)]
     rooms = [
-        services.join_city(
+        join_city_with_consent(
             user=authors[0], city_id=City.objects.get_or_create(name=name)[0].pk
         )
         for name in ("Казань", "Омск")
     ]
     for room in rooms:
-        services.join_city(user=authors[1], city_id=room.city_id)
+        join_city_with_consent(user=authors[1], city_id=room.city_id)
     originals = [
         ChatMessage.objects.create(
             room=room, author=authors[1 - index], text="Вопрос", client_id=uuid4()

@@ -13,6 +13,7 @@ from apps.chat.domain import ChatAccessError, ChatRateLimitError, ChatValidation
 from apps.chat.models import ChatMembership, ChatMessage, ChatReport, ChatRoom
 from apps.core.models import City
 from apps.users.models import Player, User
+from tests.support.chat_legal import join_city_with_consent
 from tests.support.factories import make_user
 
 pytestmark = pytest.mark.django_db
@@ -30,14 +31,14 @@ def user() -> User:
 def room(user: User) -> ChatRoom:
     """Вступает в комнату другого города."""
     city = City.objects.get_or_create(name="Казань")[0]
-    return services.join_city(user=user, city_id=city.pk)
+    return join_city_with_consent(user=user, city_id=city.pk)
 
 
 def test_join_city_when_other_city_should_allow_and_be_idempotent(
     user: User, room: ChatRoom
 ) -> None:
     """Город профиля не ограничивает участие, повторное вступление безопасно."""
-    assert services.join_city(user=user, city_id=room.city_id).pk == room.pk
+    assert join_city_with_consent(user=user, city_id=room.city_id).pk == room.pk
     assert (
         ChatMembership.objects.filter(room=room, user=user, is_active=True).count() == 1
     )
@@ -82,7 +83,7 @@ def test_send_when_fast_or_cross_room_reply_should_reject(
     )
     with pytest.raises(ChatRateLimitError):
         services.send_message(user=user, room_id=room.pk, text="Ещё", client_id=uuid4())
-    other = services.join_city(
+    other = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Омск")[0].pk
     )
     with pytest.raises(ChatValidationError):
@@ -100,7 +101,7 @@ def test_history_when_paging_and_read_should_not_lose_or_mark_future(
 ) -> None:
     """История пагинируется, отметка прочтения не движется назад."""
     author = make_user(email="other-chat@test.local", first_name="Иван")
-    services.join_city(user=author, city_id=room.city_id)
+    join_city_with_consent(user=author, city_id=room.city_id)
     messages = [
         ChatMessage.objects.create(
             room=room, author=author, text=str(index), client_id=uuid4()
@@ -132,7 +133,7 @@ def test_moderation_when_author_or_staff_should_enforce_permissions(
         user=user, room_id=room.pk, text="Первый", client_id=uuid4()
     )
     other = make_user(email="mod-chat@test.local")
-    services.join_city(user=other, city_id=room.city_id)
+    join_city_with_consent(user=other, city_id=room.city_id)
     with pytest.raises(ChatAccessError):
         services.edit_message(
             user=other, room_id=room.pk, message_id=message.pk, text="Подмена"
@@ -168,7 +169,7 @@ def test_report_and_ban_when_moderated_should_preserve_ban_on_rejoin(
         user=user, room_id=room.pk, text="Сообщение", client_id=uuid4()
     )
     staff = make_user(email="staff-chat@test.local", is_staff=True)
-    services.join_city(user=staff, city_id=room.city_id)
+    join_city_with_consent(user=staff, city_id=room.city_id)
     services.report_message(
         user=staff, room_id=room.pk, message_id=message.pk, reason="Спам"
     )
@@ -184,7 +185,7 @@ def test_report_and_ban_when_moderated_should_preserve_ban_on_rejoin(
         user=staff, room_id=room.pk, target_id=user.pk, banned=True
     )
     services.leave_room(user=user, room_id=room.pk)
-    services.join_city(user=user, city_id=room.city_id)
+    join_city_with_consent(user=user, city_id=room.city_id)
     with pytest.raises(ChatAccessError):
         services.send_message(
             user=user, room_id=room.pk, text="Обход", client_id=uuid4()
@@ -200,7 +201,7 @@ def test_membership_when_muted_should_not_receive_reply_notification(
     )
     services.set_notifications(user=user, room_id=room.pk, enabled=False)
     other = make_user(email="reply-chat@test.local")
-    services.join_city(user=other, city_id=room.city_id)
+    join_city_with_consent(user=other, city_id=room.city_id)
     services.send_message(
         user=other,
         room_id=room.pk,

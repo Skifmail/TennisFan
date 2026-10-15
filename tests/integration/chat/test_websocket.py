@@ -12,6 +12,7 @@ from django.test import Client
 from apps.chat import services
 from apps.core.models import City
 from config.asgi import create_application
+from tests.support.chat_legal import join_city_with_consent
 from tests.support.factories import make_user
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -21,7 +22,7 @@ def test_websocket_when_two_members_should_broadcast_and_revoke_after_leave() ->
     """Commit виден обоим клиентам, выход закрывает уже открытый сокет."""
     user = make_user(email="socket-chat@test.local")
     city = City.objects.get_or_create(name="Самара")[0]
-    room = services.join_city(user=user, city_id=city.pk)
+    room = join_city_with_consent(user=user, city_id=city.pk)
     client = Client()
     client.force_login(user)
     cookie = "; ".join(f"{k}={v.value}" for k, v in client.cookies.items()).encode()
@@ -75,7 +76,7 @@ def test_websocket_when_ping_invalid_frame_or_account_disabled_should_enforce_po
 ):
     """Сокет обрабатывает heartbeat и повторно проверяет активность аккаунта."""
     user = make_user(email="ping-chat@test.local")
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Клин")[0].pk
     )
     client = Client()

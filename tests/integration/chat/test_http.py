@@ -7,8 +7,8 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-from apps.chat import services
 from apps.core.models import City
+from tests.support.chat_legal import join_city_with_consent
 from tests.support.factories import make_user
 
 pytestmark = pytest.mark.django_db
@@ -20,7 +20,19 @@ def test_pages_when_logged_in_should_join_other_city_and_render(client: Client) 
     client.force_login(user)
     city = City.objects.get_or_create(name="Омск", region="Омская область")[0]
     assert client.get(reverse("chat:index")).status_code == 200
-    response = client.post(reverse("chat:join"), {"city_id": city.pk})
+    from apps.chat.consent import build_consent_form
+
+    form = build_consent_form(user=user, city=city)
+    response = client.post(
+        reverse("chat:join"),
+        {
+            "city_id": city.pk,
+            "token": str(form["token"].value()),
+            "personal_data": "on",
+            "rules": "on",
+            "disclosure": "on",
+        },
+    )
     assert response.status_code == 302
     page = client.get(response.headers["Location"])
     assert page.status_code == 200
@@ -49,7 +61,7 @@ def test_action_when_invalid_payload_should_return_400(
     """Повреждённые данные не приводят к внутренним ошибкам."""
     user = make_user(email="bad-http@test.local")
     client.force_login(user)
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Тверь")[0].pk
     )
     response = client.post(
@@ -65,7 +77,7 @@ def test_actions_when_authorized_should_send_sync_and_reject_outsider(
 ) -> None:
     """Сообщения и изменения изолированы участием в комнате."""
     user = make_user(email="send-http@test.local", first_name="Ира")
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Тула")[0].pk
     )
     client.force_login(user)
@@ -107,7 +119,7 @@ def test_action_when_no_csrf_should_reject(client: Client) -> None:
     user = make_user(email="csrf-chat@test.local")
     secured = Client(enforce_csrf_checks=True)
     secured.force_login(user)
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Пермь")[0].pk
     )
     assert (

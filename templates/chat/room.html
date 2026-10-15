@@ -22,7 +22,7 @@
             {% csrf_token %}
             <div class="chat-reply-context" id="chat-context" hidden><svg class="chat-icon"><use href="#chat-icon-reply"/></svg><span id="chat-context-text"></span><button type="button" class="chat-icon-button" id="chat-cancel" aria-label="Отменить ответ или редактирование"><svg class="chat-icon"><use href="#chat-icon-close"/></svg></button></div>
             <div class="chat-input-wrap"><label for="chat-text" class="chat-sr-only">Сообщение в чат</label><textarea id="chat-text" maxlength="2000" rows="1" placeholder="Сообщение…" required></textarea><button type="submit" class="chat-send" id="chat-send" aria-label="Отправить" title="Отправить сообщение" disabled><svg class="chat-icon"><use id="chat-send-icon" href="#chat-icon-up"/></svg></button></div>
-            <div class="chat-composer-caption"><span class="chat-keyboard-hint">Enter — отправить · Shift + Enter — новая строка</span><span class="chat-mobile-hint">Общайтесь уважительно</span><span id="chat-character-count" hidden></span><span class="chat-composer-private"><svg class="chat-icon"><use href="#chat-icon-shield"/></svg>Только для участников</span></div>
+            <div class="chat-composer-caption"><span class="chat-keyboard-hint">Enter — отправить</span><a href="{% url 'legal_chat_rules' %}" target="_blank" rel="noopener">Правила чата</a><span class="chat-mobile-hint">Общайтесь уважительно</span><span id="chat-character-count" hidden></span><span class="chat-composer-private"><svg class="chat-icon"><use href="#chat-icon-shield"/></svg>Только для участников</span></div>
         </form>
     </div>
     <noscript><p>Включите JavaScript для мгновенного чата.</p></noscript>
@@ -36,6 +36,8 @@
     <div class="chat-settings-identity"><span class="chat-city-avatar" aria-hidden="true">{{ room.city.name|slice:':1' }}</span><h3>{{ room.city.name }}</h3><p>{{ room.city.region|default:'Городское сообщество TennisFan' }}</p></div>
     <div class="chat-settings-rule"><span class="chat-settings-label"><svg class="chat-icon"><use href="#chat-icon-pin"/></svg>Правила общения</span><p id="chat-rules">{{ room.rules }}</p></div>
     <label class="chat-switch-row" for="chat-notifications"><span><strong>Уведомления об ответах</strong><small>В вашей ленте на платформе</small></span><input type="checkbox" id="chat-notifications" role="switch" {% if membership.notifications_enabled %}checked{% endif %}><span class="chat-switch" aria-hidden="true"></span></label>
+    <div class="chat-settings-legal"><a href="{% url 'legal_chat_rules' %}" target="_blank" rel="noopener">Полные правила городских чатов ↗</a><a href="{% url 'chat:data_conditions' room.pk %}" target="_blank" rel="noopener">Условия использования данных участников ↗</a><a href="{% url 'chat:join' %}?city_id={{ room.city_id }}">Изменить выбор данных и согласия</a></div>
+    <form method="post" action="{% url 'chat:withdraw_consent' room.pk %}" class="chat-withdraw-form">{% csrf_token %}<p>Отзыв отключит доступ и скроет ваши сообщения в этом чате. Это не обычный выход.</p><button type="submit" class="chat-leave-button">Отозвать согласия на этот чат</button></form>
     <p id="chat-settings-error" class="chat-dialog-error" role="alert" hidden></p>
     <button type="button" class="chat-leave-button" id="chat-leave"><svg class="chat-icon"><use href="#chat-icon-leave"/></svg>Покинуть чат</button>
 </dialog>

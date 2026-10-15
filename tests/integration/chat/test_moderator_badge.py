@@ -9,6 +9,7 @@ from django.test.utils import CaptureQueriesContext
 from apps.chat import services
 from apps.chat.models import ChatMembership, ChatMessage
 from apps.core.models import City
+from tests.support.chat_legal import join_city_with_consent
 from tests.support.factories import make_user
 
 pytestmark = pytest.mark.django_db
@@ -44,10 +45,10 @@ def test_badge_when_author_role_checked_should_match_active_room_permissions(
     """
     viewer = make_user(email="badge-viewer@test.local")
     author = make_user(email="badge-author@test.local", is_staff=staff)
-    room = services.join_city(
+    room = join_city_with_consent(
         user=viewer, city_id=City.objects.create(name="Город бейджа").pk
     )
-    services.join_city(user=author, city_id=room.city_id)
+    join_city_with_consent(user=author, city_id=room.city_id)
     message = ChatMessage.objects.create(room=room, author=author, text="Привет")
     ChatMembership.objects.filter(room=room, user=author).update(
         is_moderator=moderator, is_active=active_member
@@ -63,7 +64,7 @@ def test_badge_when_author_moderates_other_city_should_not_leak_role() -> None:
     """Назначение в одном городе не даёт бейдж в другом."""
     author = make_user(email="badge-local@test.local")
     rooms = [
-        services.join_city(
+        join_city_with_consent(
             user=author, city_id=City.objects.create(name=f"Город роли {index}").pk
         )
         for index in range(2)
@@ -80,7 +81,7 @@ def test_badge_when_author_moderates_other_city_should_not_leak_role() -> None:
 def test_badge_when_author_removed_should_not_mark_deleted_account() -> None:
     """Сообщения без автора не получают знак модератора."""
     user = make_user(email="badge-deleted@test.local")
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.create(name="Город удалённого автора").pk
     )
     ChatMessage.objects.create(room=room, author=None, text="Старое сообщение")
@@ -93,7 +94,7 @@ def test_badge_when_role_changes_without_messages_should_refresh_existing_histor
 ):
     """Назначение и снятие роли обновляют старые сообщения без новых событий."""
     user = make_user(email="badge-refresh@test.local")
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.create(name="Город смены роли").pk
     )
     message = services.send_message(
@@ -115,7 +116,7 @@ def test_badge_when_role_changes_without_messages_should_refresh_existing_histor
 def test_badge_when_many_messages_loaded_should_not_query_role_per_message() -> None:
     """История и журнал загружают роли одним запросом на всю страницу."""
     user = make_user(email="badge-batch@test.local")
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.create(name="Город пакетной загрузки").pk
     )
     ChatMembership.objects.filter(room=room, user=user).update(is_moderator=True)
@@ -128,7 +129,7 @@ def test_badge_when_many_messages_loaded_should_not_query_role_per_message() -> 
         services.sync_events(user=user, room_id=room.pk, after_id=0)
     for index in range(10):
         author = make_user(email=f"badge-batch-{index}@test.local")
-        services.join_city(user=author, city_id=room.city_id)
+        join_city_with_consent(user=author, city_id=room.city_id)
         services.send_message(
             user=author, room_id=room.pk, text="Привет", client_id=uuid4()
         )

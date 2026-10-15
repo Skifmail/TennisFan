@@ -1,16 +1,14 @@
-"""
-Views for legal documents (privacy, offer, terms, personal data).
-"""
+"""Публичные страницы правовых документов платформы."""
 
-import logging
 from pathlib import Path
-from typing import TypedDict
+from typing import Final, TypedDict
 
 import markdown
-from django.conf import settings
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+from .utils import LEGAL_DOCUMENT_PATHS
 
 
 class _DocMeta(TypedDict):
@@ -18,82 +16,78 @@ class _DocMeta(TypedDict):
     title: str
 
 
-DOCS_ROOT = Path(settings.BASE_DIR) / "static" / "documents"
-DOCS: dict[str, _DocMeta] = {
-    "personal-data": {
-        "file": DOCS_ROOT / "personal_data.txt",
-        "title": "Согласие на обработку персональных данных",
-    },
-    "privacy": {
-        "file": DOCS_ROOT / "privacy.txt",
-        "title": "Политика конфиденциальности",
-    },
-    "offer": {
-        "file": DOCS_ROOT / "public_offer.txt",
-        "title": "Публичная оферта",
-    },
-    "terms": {
-        "file": DOCS_ROOT / "user_agreement.txt",
-        "title": "Пользовательское соглашение",
-    },
-    "club-organizer-rules": {
-        "file": DOCS_ROOT / "club_organizer_rules.txt",
-        "title": "Правила для организаторов клубов",
-    },
-    "fan-token": {
-        "file": DOCS_ROOT / "fan_token.txt",
-        "title": "Правила использования FAN-token",
-    },
+_TITLES: Final = {
+    "personal-data": "Согласие на обработку персональных данных",
+    "privacy": "Политика конфиденциальности",
+    "offer": "Публичная оферта",
+    "terms": "Пользовательское соглашение",
+    "club-organizer-rules": "Правила для организаторов клубов",
+    "fan-token": "Правила использования FAN-token",
+    "chat-rules": "Правила городских чатов",
+    "chat-personal-data": "Согласие на обработку персональных данных для городского чата",
+    "chat-disclosure": "Согласие на распространение персональных данных в городском чате",
+}
+DOCS: Final[dict[str, _DocMeta]] = {
+    slug: {"file": path, "title": _TITLES[slug]}
+    for slug, path in LEGAL_DOCUMENT_PATHS.items()
 }
 
 
 def _load_document(slug: str) -> tuple[str, str] | None:
-    """Load document content and title by slug. Returns (html_content, title) or None."""
     meta = DOCS.get(slug)
-    if not meta:
-        return None
-    path = meta["file"]
-    if not path.exists():
-        logger.warning("Legal document not found: %s", path)
+    if meta is None:
         return None
     try:
-        raw = path.read_text(encoding="utf-8")
-    except OSError as e:
-        logger.exception("Failed to read %s: %s", path, e)
+        raw = meta["file"].read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        logger.exception("Не удалось прочитать правовой документ", document_slug=slug)
         return None
-    html = markdown.markdown(raw, extensions=["extra"])
-    return (html, meta["title"])
+    return markdown.markdown(raw, extensions=["extra"]), meta["title"]
 
 
-def legal_document(request, slug: str):
-    """Render a legal document page."""
+def legal_document(request: HttpRequest, slug: str) -> HttpResponse:
+    """Показывает правовой документ из контролируемого реестра файлов.
+
+    Args:
+        request: Публичный запрос.
+        slug: Идентификатор документа.
+
+    Returns:
+        Страница полного текста документа.
+
+    Raises:
+        Http404: Документ отсутствует или его не удалось прочитать.
+    """
     result = _load_document(slug)
-    if not result:
-        from django.http import Http404
-
+    if result is None:
         raise Http404("Документ не найден")
-
-    html_content, title = result
-    return render(
+    content, title = result
+    response = render(
         request,
         "legal/document.html",
-        {"content": html_content, "title": title, "slug": slug},
+        {"content": content, "title": title, "slug": slug},
     )
+    # Текст по ссылке из формы не должен оставаться в кэше после смены редакции.
+    response["Cache-Control"] = "no-cache"
+    return response
 
 
-def legal_index(request):
-    """Index page linking to all legal documents."""
-    url_names = {
-        "personal-data": "legal_personal_data",
-        "privacy": "legal_privacy",
-        "offer": "legal_offer",
-        "terms": "legal_terms",
-        "club-organizer-rules": "legal_club_organizer_rules",
-        "fan-token": "legal_fan_token",
-    }
+def legal_index(request: HttpRequest) -> HttpResponse:
+    """Показывает доступные правовые документы сайта.
+
+    Args:
+        request: Публичный запрос.
+
+    Returns:
+        Каталог документов с действующими маршрутами.
+    """
     items = [
-        {"slug": k, "title": v["title"], "url_name": url_names[k]}
-        for k, v in DOCS.items()
-        if v["file"].exists()
+        {
+            "slug": slug,
+            "title": meta["title"],
+            "url_name": "legal_" + slug.replace("-", "_"),
+        }
+        for slug, meta in DOCS.items()
+        if meta["file"].exists()
     ]
     return render(request, "legal/index.html", {"documents": items})

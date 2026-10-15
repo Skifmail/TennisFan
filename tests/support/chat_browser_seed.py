@@ -8,9 +8,9 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.chat.models import ChatMembership, ChatMessage
-from apps.chat.services import join_city
 from apps.core.models import City
 from apps.users.models import User
+from tests.support.chat_legal import join_city_with_consent as join_city
 
 
 class ChatSmokeSetupError(RuntimeError):
@@ -35,6 +35,10 @@ def create_smoke_sessions(path: Path) -> None:
             "Для браузерной проверки нужна отдельная локальная база *_smoke."
         )
     city, _ = City.objects.get_or_create(name="Казань", region="Тест браузера")
+    consent_city, _ = City.objects.get_or_create(
+        name="Тест согласий браузера", region="Изолированная проверка"
+    )
+    ChatMembership.objects.filter(room__city=consent_city).delete()
     cookies: list[list[dict[str, str]]] = []
     for index, name in enumerate(("Анна", "Михаил")):
         user, created = User.objects.get_or_create(
@@ -73,6 +77,8 @@ def create_smoke_sessions(path: Path) -> None:
             {
                 "cookies": cookies,
                 "room_path": f"/chats/{room.pk}/",
+                "consent_city_id": consent_city.pk,
+                "consent_city_name": consent_city.name,
                 "admin_cookies": [
                     {"name": key, "value": cookie.value}
                     for key, cookie in admin_client.cookies.items()

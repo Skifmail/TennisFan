@@ -11,17 +11,32 @@ from uuid import UUID
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
+from django.urls import reverse
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.core.localities import primary_locality_name
 from apps.core.models import City
 from apps.users.models import User
 
 from . import services
-from .domain import MAX_DATABASE_ID, MAX_HTTP_BODY_BYTES, ChatError, ChatValidationError
+from .consent import (
+    BASE_DISCLOSURE_CONDITIONS,
+    accept_chat_consent,
+    build_consent_form,
+    consent_request_ip,
+    withdraw_chat_consent,
+)
+from .domain import (
+    MAX_DATABASE_ID,
+    MAX_HTTP_BODY_BYTES,
+    ChatConsentRequiredError,
+    ChatError,
+    ChatValidationError,
+)
+from .models import ChatMembership, ChatRoom
 
 CITY_SEARCH_LIMIT: Final = 100
 
@@ -153,6 +168,15 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
     """
     try:
         member = services.require_member(user=cast(User, request.user), room_id=room_id)
+    except ChatConsentRequiredError:
+        current = (
+            ChatMembership.objects.select_related("room")
+            .filter(user=cast(User, request.user), room_id=room_id)
+            .first()
+        )
+        if current:
+            return redirect(reverse("chat:join") + f"?city_id={current.room.city_id}")
+        return redirect("chat:index")
     except ChatError:
         return redirect("chat:index")
     return render(
@@ -180,21 +204,124 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
     )
 
 
-@require_POST
+@login_required
+@never_cache
+@require_http_methods(["GET", "POST"])
 @_api
 def join(request: HttpRequest) -> HttpResponse:
-    """Вступает в выбранный город без ограничения городом профиля.
+    """Предъявляет документы и вступает только после трёх личных подтверждений.
 
     Args:
-        request: Форма с идентификатором города.
+        request: Запрос формы либо её отправка с подписанным контекстом города.
 
     Returns:
-        Перенаправление в комнату либо ошибка данных.
+        Форма, ожидание проверки особых условий или перенаправление в комнату.
     """
-    selected = services.join_city(
-        user=cast(User, request.user), city_id=_id(request.POST.get("city_id"))
+    city_id = _id(
+        request.POST.get("city_id")
+        if request.method == "POST"
+        else request.GET.get("city_id")
     )
-    return redirect("chat:room", room_id=selected.pk)
+    city = get_object_or_404(City, pk=city_id)
+    user = cast(User, request.user)
+    error = ""
+    status = 200
+    if request.method == "POST":
+        try:
+            member = accept_chat_consent(
+                user=user,
+                city=city,
+                data=request.POST,
+                ip_address=consent_request_ip(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            )
+        except ChatError as exc:
+            error, status = str(exc), exc.status
+        else:
+            if member.disclosure_conditions and not member.disclosure_reviewed:
+                return render(
+                    request,
+                    "chat/join_pending.html",
+                    {"city": city, "membership": member},
+                    status=202,
+                )
+            return redirect("chat:room", room_id=member.room_id)
+    # После ошибки все галочки снова пусты: новая редакция не принимается молча.
+    template = (
+        "chat/_join_form.html"
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        else "chat/join.html"
+    )
+    return render(
+        request,
+        template,
+        {
+            "city": city,
+            "consent_form": build_consent_form(user=user, city=city),
+            "consent_error": error,
+            "base_conditions": BASE_DISCLOSURE_CONDITIONS,
+            "memberships": list(services.my_memberships(user=user)),
+        },
+        status=status,
+    )
+
+
+@require_GET
+@never_cache
+def data_conditions(request: HttpRequest, room_id: int) -> HttpResponse:
+    """Публикует условия распространения без email и неразрешённых данных профиля.
+
+    Args:
+        request: Запрос пользователя или гостя.
+        room_id: Городской чат.
+
+    Returns:
+        Публичный перечень условий по техническим обозначениям участников.
+    """
+    selected = get_object_or_404(ChatRoom.objects.select_related("city"), pk=room_id)
+    members = (
+        ChatMembership.objects.filter(room=selected, consented_at__isnull=False)
+        .only(
+            "user_id",
+            "disclosure_name",
+            "disclosure_avatar",
+            "disclosure_conditions",
+            "consented_at",
+            "consent_withdrawn_at",
+        )
+        .order_by("user_id")
+    )
+    return render(
+        request,
+        "chat/data_conditions.html",
+        {
+            "chat_room": selected,
+            "conditions_members": members,
+            "base_conditions": BASE_DISCLOSURE_CONDITIONS,
+        },
+    )
+
+
+@require_POST
+@_api
+def withdraw_consent(request: HttpRequest, room_id: int) -> HttpResponse:
+    """Принимает личный отзыв согласий, не требуя их актуального состояния.
+
+    Args:
+        request: Авторизованный CSRF-защищённый запрос.
+        room_id: Городской чат.
+
+    Returns:
+        Перенаправление в каталог после отзыва.
+    """
+    get_object_or_404(ChatRoom, pk=room_id)
+    withdraw_chat_consent(
+        user=cast(User, request.user),
+        room_id=room_id,
+        ip_address=consent_request_ip(request),
+        user_agent=request.META.get("HTTP_USER_AGENT", ""),
+    )
+    return redirect("chat:index")
 
 
 @require_GET

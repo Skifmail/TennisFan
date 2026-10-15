@@ -10,6 +10,7 @@ from apps.chat import services
 from apps.chat.domain import ChatAccessError, ChatNotFoundError
 from apps.chat.models import ChatRoom
 from apps.core.models import City
+from tests.support.chat_legal import join_city_with_consent
 from tests.support.factories import make_user
 
 pytestmark = pytest.mark.django_db
@@ -20,17 +21,17 @@ def test_join_when_homonymous_cities_should_not_merge_rooms() -> None:
     user = make_user(email="names-chat@test.local")
     a = City.objects.create(name="Тестовый", region="Первый регион")
     b = City.objects.create(name="Тестовый", region="Второй регион")
-    first = services.join_city(user=user, city_id=a.pk)
-    second = services.join_city(user=user, city_id=b.pk)
+    first = join_city_with_consent(user=user, city_id=a.pk)
+    second = join_city_with_consent(user=user, city_id=b.pk)
     assert first.pk != second.pk
     with pytest.raises(ChatNotFoundError):
-        services.join_city(user=user, city_id=99999999)
+        join_city_with_consent(user=user, city_id=99999999)
     ChatRoom.objects.filter(pk=first.pk).update(is_active=False)
     with pytest.raises(ChatNotFoundError):
-        services.join_city(user=user, city_id=a.pk)
+        join_city_with_consent(user=user, city_id=a.pk)
     user.is_active = False
     with pytest.raises(ChatAccessError):
-        services.join_city(user=user, city_id=b.pk)
+        join_city_with_consent(user=user, city_id=b.pk)
 
 
 def test_actions_when_member_should_edit_report_read_delete_and_leave(
@@ -38,7 +39,7 @@ def test_actions_when_member_should_edit_report_read_delete_and_leave(
 ) -> None:
     """HTTP-команды проходят общий сервисный путь и настройки действуют."""
     user = make_user(email="all-actions@test.local", is_staff=True)
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Владимир")[0].pk
     )
     message = services.send_message(
@@ -65,10 +66,10 @@ def test_unread_when_own_deleted_and_other_messages_should_count_only_other() ->
     """Непрочитанные не включают свои и удалённые сообщения."""
     user = make_user(email="unread-a@test.local")
     other = make_user(email="unread-b@test.local")
-    room = services.join_city(
+    room = join_city_with_consent(
         user=user, city_id=City.objects.get_or_create(name="Клин")[0].pk
     )
-    services.join_city(user=other, city_id=room.city_id)
+    join_city_with_consent(user=other, city_id=room.city_id)
     first = services.send_message(
         user=other, room_id=room.pk, text="Вопрос", client_id=uuid4()
     )
@@ -104,10 +105,10 @@ def test_ban_when_staff_should_enforce_and_allow_explicit_unban(client: Client) 
 
     staff = make_user(email="http-staff-ban@test.local", is_staff=True)
     target = make_user(email="http-target-ban@test.local")
-    room = services.join_city(
+    room = join_city_with_consent(
         user=staff, city_id=City.objects.get_or_create(name="Брянск")[0].pk
     )
-    services.join_city(user=target, city_id=room.city_id)
+    join_city_with_consent(user=target, city_id=room.city_id)
     client.force_login(staff)
     url = reverse("chat:action", args=[room.pk])
     assert (

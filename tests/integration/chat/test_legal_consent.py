@@ -16,7 +16,7 @@ from apps.chat.domain import ChatError
 from apps.chat.models import ChatMembership
 from apps.core.models import City, LegalAcceptanceLog
 from apps.legal.utils import LEGAL_DOCUMENT_PATHS
-from apps.users.models import User
+from apps.users.models import Player, User
 from tests.support.factories import make_user
 
 pytestmark = pytest.mark.django_db
@@ -70,6 +70,11 @@ def test_join_form_when_opened_should_have_three_unchecked_required_consents(
     for name in ("personal_data", "rules", "disclosure"):
         assert form.fields[name].required
         assert not form[name].value()
+    assert "мои сообщения" in form.fields["disclosure"].label
+    assert "выбранных ниже" not in form.fields["disclosure"].label
+    for name in ("show_name", "show_avatar", "conditions"):
+        assert not form.fields[name].required
+    assert "Имя и фото — необязательно" in response.content.decode()
     assert not ChatMembership.objects.filter(user=user).exists()
     assert not LegalAcceptanceLog.objects.filter(user=user).exists()
 
@@ -548,3 +553,37 @@ def test_audit_when_subject_changed_email_should_export_original_identity() -> N
     assert len(rows) == 3
     assert all(row["user_email"] == "legal-original@test.local" for row in rows)
     assert all(row["user_name"] == "Исходное имя" for row in rows)
+
+
+@pytest.mark.parametrize("show_avatar", [False, True])
+@pytest.mark.parametrize("has_avatar", [False, True])
+def test_photo_when_choice_recorded_should_publish_only_permitted_profile_photo(
+    show_avatar: bool, has_avatar: bool
+) -> None:
+    """Фото публикуется только по выбору игрока, независимо от раскрытия имени.
+
+    Args:
+        show_avatar: Отдельное разрешение на показ фотографии.
+        has_avatar: Наличие фотографии в профиле игрока.
+    """
+    user = make_user(email="chat-photo@test.local", first_name="Анна")
+    player = Player.objects.create(user=user)
+    # Проверяем сериализацию пути, не загрузку и преобразование файла.
+    Player.objects.filter(pk=player.pk).update(
+        avatar="avatars/chat-photo.jpg" if has_avatar else ""
+    )
+    player.refresh_from_db()
+    city = City.objects.create(name="Город фотографии")
+    member = _accept(
+        user, city, _submission(user, city, show_avatar="on" if show_avatar else "")
+    )
+    message = services.send_message(
+        user=user, room_id=member.room_id, text="Фото по выбору", client_id=uuid4()
+    )
+    payload = services.serialize_message(message)
+    assert payload["avatar"] == (
+        player.avatar.url if show_avatar and has_avatar else ""
+    )
+    assert payload["author"] == f"Участник #{user.pk}"
+    assert payload["profile_url"] == ""
+    assert member.disclosure_reviewed

@@ -414,7 +414,7 @@ class ChatMembershipAdmin(_RoomChildAdmin):
             form.base_fields["user"].disabled = True
         if "disclosure_reviewed" in form.base_fields and not request.user.is_superuser:
             form.base_fields["disclosure_reviewed"].disabled = True
-        return cast(type[forms.ModelForm[Model]], form)
+        return cast("type[forms.ModelForm[Model]]", form)
 
     def save_model(
         self,

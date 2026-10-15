@@ -42,6 +42,12 @@ def test_join_when_modal_opened_should_reset_checkboxes_and_support_mobile_keybo
             trigger.click()
             dialog = page.get_by_role("dialog", name="Вступление в городской чат")
             expect(dialog).to_be_visible()
+            expect(
+                dialog.get_by_text("Имя и фото — необязательно", exact=True)
+            ).to_be_visible()
+            for name in ("show_name", "show_avatar"):
+                expect(dialog.locator(f'input[name="{name}"]')).not_to_be_checked()
+            expect(dialog.locator('textarea[name="conditions"]')).to_have_value("")
             consents = dialog.locator('input[type="checkbox"][required]')
             expect(consents).to_have_count(3)
             for checkbox in consents.all():

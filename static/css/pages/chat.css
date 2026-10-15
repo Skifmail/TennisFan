@@ -1,56 +1,56 @@
 /* Изолированное пространство общения: системная типографика и спокойные материалы. */
 
 .chat-document {
-    /* Хвоя, шалфей и песок: фирменная гамма на светлых материалах. */
-    --chat-forest: #185642;
-    --chat-forest-deep: #104332;
-    --chat-sage: #e8f0e9;
-    --chat-sage-deep: #dbe9de;
-    --chat-sand: #f2ebdc;
-    --chat-ink: #20372d;
-    --chat-secondary: #59695e;
-    --chat-secondary-strong: #465b4e;
+    /* Хвойный фон платформы, светлый шалфей и сдержанные стеклянные поверхности. */
+    --chat-forest: #9ed6b5;
+    --chat-forest-deep: #b9e6ca;
+    --chat-sage: #193f30;
+    --chat-sage-deep: #214d39;
+    --chat-sand: #403c29;
+    --chat-ink: #edf5ef;
+    --chat-secondary: #b9cdc0;
+    --chat-secondary-strong: #d0e2d5;
     --chat-accent: var(--chat-forest);
     --chat-accent-hover: var(--chat-forest-deep);
-    --chat-on-accent: var(--chat-canvas);
+    --chat-on-accent: #103c2c;
     --chat-accent-soft: var(--chat-sage);
     --chat-accent-soft-hover: var(--chat-sage-deep);
-    --chat-gold-ink: #7c6236;
+    --chat-gold-ink: #e0c991;
     --chat-gold-soft: var(--chat-sand);
-    --chat-canvas: #fff;
-    --chat-surface: #f3f5f1;
-    --chat-sidebar: #eef2ed;
-    --chat-field: #f7f9f5;
-    --chat-muted: #edf1eb;
-    --chat-selected: #e2ece3;
-    --chat-hover: #e3eae1;
-    --chat-line: #e0e6dd;
-    --chat-border: #d5dfd3;
+    --chat-canvas: #083b2c;
+    --chat-surface: #052e23;
+    --chat-sidebar: #103f31;
+    --chat-field: #164936;
+    --chat-muted: #174331;
+    --chat-selected: #245b43;
+    --chat-hover: #20543f;
+    --chat-line: #315e4b;
+    --chat-border: #406c58;
     --chat-avatar: #dfece2;
     --chat-avatar-ink: #315f48;
     --chat-avatar-alt: #e9eee3;
     --chat-avatar-alt-ink: #526543;
-    --chat-bubble-incoming: #edf2ec;
-    --chat-disabled: #e0e6dd;
+    --chat-bubble-incoming: #174c39;
+    --chat-disabled: #254c3b;
     --chat-disabled-ink: var(--chat-secondary);
-    --chat-focus: #42745a;
-    --chat-focus-soft: #1856420d;
-    --chat-status: #2e7553;
-    --chat-danger: #b13b35;
-    --chat-danger-soft: #fcf0ed;
-    --chat-scrollbar: #c4cfc2;
-    --chat-quote-line: #59695e80;
-    --chat-quote-line-own: #ffffff8c;
-    --chat-glass: #fffffff2;
-    --chat-composer-glass: #fffffff5;
-    --chat-shadow-soft: #193d2705;
-    --chat-shadow-line: #193d270a;
-    --chat-shadow-small: #193d2712;
-    --chat-shadow-medium: #193d2720;
-    --chat-shadow-large: #193d2725;
-    --chat-backdrop: #152f2438;
-    --chat-contrast-ink: #354b3c;
-    --chat-contrast-line: #82947e;
+    --chat-focus: #b9e6ca;
+    --chat-focus-soft: #9ed6b51f;
+    --chat-status: #9ed6b5;
+    --chat-danger: #ffb4aa;
+    --chat-danger-soft: #482923;
+    --chat-scrollbar: #527961;
+    --chat-quote-line: #b9cdc080;
+    --chat-quote-line-own: #103c2c8c;
+    --chat-glass: #123f32ed;
+    --chat-composer-glass: #103d2ff0;
+    --chat-shadow-soft: #00170e14;
+    --chat-shadow-line: #00170e26;
+    --chat-shadow-small: #00170e33;
+    --chat-shadow-medium: #00170e4d;
+    --chat-shadow-large: #00170e80;
+    --chat-backdrop: #001d14a6;
+    --chat-contrast-ink: #e3f2e7;
+    --chat-contrast-line: #94b7a0;
     --chat-ease: cubic-bezier(0.23, 1, 0.32, 1);
 
     height: 100%;
@@ -66,7 +66,7 @@
 }
 
 .chat-app {
-    color-scheme: light;
+    color-scheme: dark;
     margin: 0;
     color: var(--chat-ink);
     background: var(--chat-surface);
@@ -1390,6 +1390,7 @@
     gap: 12px;
     min-width: 0;
     min-height: 90px;
+    background: var(--chat-sidebar);
     padding: 16px;
     border: 1px solid var(--chat-line);
     border-radius: 15px;
@@ -1887,8 +1888,8 @@
 
 @media (prefers-contrast: more) {
     .chat-document {
-        --chat-secondary: var(--chat-contrast-ink);
-        --chat-line: var(--chat-contrast-line);
+        --chat-secondary: #b9cdc0;
+        --chat-line: #315e4b;
     }
 
     .chat-bubble, .chat-input-wrap, .chat-room-link.is-selected, .chat-city-card {
@@ -2085,12 +2086,6 @@
     padding-top: 12px;
 }
 
-.chat-message-conditions {
-    font-size: 0.625rem;
-    color: var(--chat-secondary);
-    text-decoration: underline !important;
-    text-underline-offset: 2px;
-}
 
 @media (width <= 520px) {
     .chat-consent-dialog {
@@ -2110,5 +2105,21 @@
     .chat-consent-form .chat-dialog-actions .chat-button {
         min-height: 44px;
         text-align: center;
+    }
+}
+
+/* Непрозрачная основа сохраняет читаемость без поддержки стеклянных материалов. */
+@supports (backdrop-filter: blur(1px)) {
+    .chat-sidebar, .chat-dialog, .chat-city-card {
+        background: var(--chat-glass);
+        backdrop-filter: blur(20px) saturate(120%);
+        box-shadow: inset 0 1px 0 var(--chat-line);
+    }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    .chat-sidebar, .chat-dialog, .chat-city-card {
+        background: var(--chat-sidebar);
+        backdrop-filter: none;
     }
 }

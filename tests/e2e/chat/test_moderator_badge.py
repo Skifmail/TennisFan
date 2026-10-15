@@ -44,7 +44,12 @@ def test_badge_when_role_updated_should_render_own_and_other_names_accessibly() 
                     "author_id": author_id,
                     "author": name,
                     "author_is_moderator": author_id in moderators,
-                    "avatar": "",
+                    "avatar": (
+                        config["moderatorBadgeUrl"]
+                        if index < 3
+                        else "/missing-chat-avatar.png"
+                    ),
+                    "conditions_url": "/chats/1/data-conditions/",
                     "profile_url": "",
                     "text": "До встречи на корте!",
                     "client_id": str(index),
@@ -90,6 +95,19 @@ def test_badge_when_role_updated_should_render_own_and_other_names_accessibly() 
             page.reload()
             badges = page.locator(".chat-moderator-badge")
             expect(badges).to_have_count(2)
+            expect(page.locator(".chat-message-conditions")).to_have_count(0)
+            for message_id in (1, 2):
+                avatar = page.locator(
+                    f'.city-chat-message[data-message-id="{message_id}"] .chat-message-avatar img'
+                )
+                expect(avatar).to_be_visible()
+                expect(avatar).to_have_js_property("complete", True)
+                assert avatar.evaluate("node => node.naturalWidth > 0")
+            fallback = page.locator(
+                '.city-chat-message[data-message-id="3"] .chat-message-avatar'
+            )
+            expect(fallback).to_have_text("О")
+            expect(fallback.locator("img")).to_have_count(0)
             normal = page.locator('.city-chat-message[data-message-id="3"]')
             expect(normal.locator(".chat-moderator-label")).to_have_count(0)
             expect(normal.locator(".chat-message-author img")).to_have_count(0)

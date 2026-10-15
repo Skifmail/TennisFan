@@ -17,7 +17,7 @@ SRGB_SCALE: Final = 1.055
 SRGB_EXPONENT: Final = 2.4
 LUMINANCE_OFFSET: Final = 0.05
 LUMINANCE_WEIGHTS: Final = (0.2126, 0.7152, 0.0722)
-LIGHT_CANVAS_LUMINANCE: Final = 0.9
+DARK_CANVAS_LUMINANCE: Final = 0.05
 CSS: Final = ROOT / "static/css/pages/chat.css"
 
 
@@ -103,11 +103,12 @@ def test_palette_when_keyboard_focus_should_have_distinct_indicator(
     assert contrast >= CONTROL_CONTRAST
 
 
-def test_palette_when_brand_applied_should_use_forest_accent_and_light_canvas() -> None:
-    """Фирменный акцент зелёный, а рабочая область остаётся светлой."""
+def test_palette_when_brand_applied_should_use_forest_accent_and_dark_canvas() -> None:
+    """Фирменный зелёный фон объединяет чат с основной платформой."""
     red, green, blue = _rgb("--chat-accent")
     assert green > red and green > blue
-    assert _luminance(_rgb("--chat-canvas")) > LIGHT_CANVAS_LUMINANCE
+    assert _luminance(_rgb("--chat-canvas")) < DARK_CANVAS_LUMINANCE
+    assert _luminance(_rgb("--chat-surface")) < DARK_CANVAS_LUMINANCE
     assert "--chat-blue" not in CSS.read_text()
 
 
@@ -126,3 +127,11 @@ def test_palette_when_browser_chrome_shown_should_match_page_surface() -> None:
         f"{round(channel * RGB_MAX):02x}" for channel in (red, green, blue)
     )
     assert f'<meta name="theme-color" content="{surface}">' in template
+
+
+def test_glass_when_transparency_unavailable_should_keep_opaque_surfaces() -> None:
+    """Стеклянные панели имеют непрозрачную подложку и доступный режим без blur."""
+    css = CSS.read_text()
+    assert "@supports (backdrop-filter:" in css
+    assert "prefers-reduced-transparency: reduce" in css
+    assert "color-scheme: dark" in css

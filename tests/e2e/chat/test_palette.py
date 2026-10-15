@@ -99,6 +99,11 @@ def test_palette_when_chat_states_rendered_should_keep_brand_and_text_readable()
             page.locator("#chat-info").click()
             dialog = page.get_by_role("dialog", name="О чате")
             _assert_readable(dialog.locator(".chat-settings-identity p"))
+            expect(
+                dialog.get_by_role(
+                    "link", name="Условия использования данных участников ↗"
+                )
+            ).to_be_visible()
             for button in dialog.locator(".chat-leave-button").all():
                 _assert_readable(button)
             page.keyboard.press("Escape")

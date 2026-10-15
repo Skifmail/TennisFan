@@ -381,18 +381,19 @@
         item.dataset.deleted = String(message.is_deleted);
         item.dataset.moderator = String(moderator);
         item.dataset.messageId = String(message.id);
-        if (!own) {
-            const avatar = element("span", "chat-message-avatar");
-            avatar.setAttribute("aria-hidden", "true");
-            if (message.avatar) {
-                const img = element("img", "");
-                img.src = message.avatar;
-                img.alt = "";
-                img.loading = "lazy";
-                avatar.append(img);
-            } else avatar.textContent = Array.from(message.author)[0] || "И";
-            item.append(avatar);
+        const avatar = element("span", "chat-message-avatar");
+        avatar.setAttribute("aria-hidden", "true");
+        const initial = Array.from(message.author)[0] || "И";
+        avatar.textContent = initial;
+        if (message.avatar) {
+            const img = element("img", "");
+            img.alt = "";
+            img.loading = "lazy";
+            img.addEventListener("error", () => { avatar.textContent = initial; }, { once: true });
+            img.src = message.avatar;
+            avatar.replaceChildren(img);
         }
+        item.append(avatar);
         const column = element("div", "chat-message-column");
         if (!own || moderator) {
             const identity = element("div", "chat-message-identity");
@@ -412,13 +413,6 @@
             identity.append(authorRow);
             if (moderator) identity.append(element("span", "chat-moderator-label", "Модератор"));
             column.append(identity);
-        }
-        if (message.conditions_url) {
-            const conditions = element("a", "chat-message-conditions", "Условия использования данных");
-            conditions.href = message.conditions_url;
-            conditions.target = "_blank";
-            conditions.rel = "noopener";
-            column.append(conditions);
         }
         const bubble = element("div", "chat-bubble");
         if (message.reply_to && !message.is_deleted) {

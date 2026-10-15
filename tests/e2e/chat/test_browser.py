@@ -46,7 +46,7 @@ def test_chat_when_two_processes_should_deliver_recover_edit_and_escape() -> Non
                 expect(page.locator("#chat-status")).to_have_text(
                     "На связи", timeout=15000
                 )
-                expect(page.locator(".chat-app")).to_have_css("color-scheme", "light")
+                expect(page.locator(".chat-app")).to_have_css("color-scheme", "dark")
                 expect(page.locator("#chat-text")).to_have_css(
                     "background-color", "rgba(0, 0, 0, 0)"
                 )

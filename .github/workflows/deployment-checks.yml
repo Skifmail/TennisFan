@@ -117,7 +117,7 @@ jobs:
       - name: Chat stylesheet and JavaScript checks
         run: |
           npm ci --ignore-scripts
-          npx stylelint static/css/pages/chat.css static/css/pages/sparring.css
+          npx stylelint static/css/pages/chat.css static/css/pages/sparring.css static/admin/css/chat_room.css
           node --check static/js/chat_shell.js
           node --check static/js/city_chat.js
 

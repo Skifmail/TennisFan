@@ -46,12 +46,12 @@
         >
           <ul class="admin-nav-accordion__models">
             {% for model in app.models %}
-            <li class="admin-nav-accordion__item{% if model.admin_url in request.path|urlencode %} admin-nav-accordion__item--current{% endif %}">
+            <li class="admin-nav-accordion__item{% if model.admin_url in request.path|urlencode or model.admin_url == chat_parent_admin_url %} admin-nav-accordion__item--current{% endif %}">
               {% if model.admin_url %}
               <a
                 href="{{ model.admin_url }}"
                 class="admin-nav-accordion__item-link"
-                {% if model.admin_url in request.path|urlencode %}aria-current="page"{% endif %}
+                {% if model.admin_url in request.path|urlencode or model.admin_url == chat_parent_admin_url %}aria-current="page"{% endif %}
               >
                 {{ model.name }}
               </a>

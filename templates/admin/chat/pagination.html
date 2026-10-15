@@ -1,0 +1,7 @@
+{% if page.paginator.num_pages > 1 %}
+<nav class="chat-admin-pagination" aria-label="{% if kind == 'messages' %}Страницы сообщений{% else %}Страницы участников{% endif %}">
+{% if page.has_previous %}{% if kind == 'messages' %}<a href="{% querystring messages_page=page.previous_page_number %}#chat-room-messages">← Предыдущая</a>{% else %}<a href="{% querystring members_page=page.previous_page_number %}#chat-room-members">← Предыдущая</a>{% endif %}{% endif %}
+<span>Страница {{ page.number }} из {{ page.paginator.num_pages }}</span>
+{% if page.has_next %}{% if kind == 'messages' %}<a href="{% querystring messages_page=page.next_page_number %}#chat-room-messages">Следующая →</a>{% else %}<a href="{% querystring members_page=page.next_page_number %}#chat-room-members">Следующая →</a>{% endif %}{% endif %}
+</nav>
+{% endif %}

@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any, Final, TypedDict, cast
 from uuid import UUID
 
 from django.db import transaction
-from django.db.models import Count, F, Q, QuerySet
+from django.db.models import Count, F, IntegerField, OuterRef, Q, QuerySet, Subquery
+from django.db.models.functions import Coalesce
 from django.urls import reverse
 from django.utils import timezone
 from loguru import logger
@@ -35,8 +36,9 @@ if TYPE_CHECKING:
     from django_stubs_ext import WithAnnotations
 
 
-class _UnreadCount(TypedDict):
+class _MembershipCounts(TypedDict):
     unread: int
+    member_count: int
 
 
 BAN_DURATION_DAYS: Final = 1
@@ -122,11 +124,27 @@ def _name(user: User | None) -> str:
     return f"{user.first_name} {user.last_name}".strip() or f"Игрок #{user.pk}"
 
 
-def serialize_message(message: ChatMessage) -> dict[str, Any]:
+def _moderator_ids(room_id: int) -> frozenset[int]:
+    return frozenset(
+        ChatMembership.objects.filter(
+            Q(is_moderator=True) | Q(user__is_staff=True),
+            room_id=room_id,
+            room__is_active=True,
+            is_active=True,
+            user__is_active=True,
+        ).values_list("user_id", flat=True)
+    )
+
+
+def serialize_message(
+    message: ChatMessage, *, moderator_ids: frozenset[int] | None = None
+) -> dict[str, Any]:
     """Возвращает публичные данные без email, телефона и удалённого текста.
 
     Args:
         message: Сообщение с предварительно загруженным автором.
+        moderator_ids: Актуальные модераторы комнаты для пакетной сериализации.
+            Если не переданы, роли загружаются из базы.
 
     Returns:
         Поля для безопасного отображения как обычного текста.
@@ -134,11 +152,15 @@ def serialize_message(message: ChatMessage) -> dict[str, Any]:
     player = getattr(message.author, "player", None)
     avatar = player.avatar.url if player and player.avatar else ""
     reply = message.reply_to
+    moderators = (
+        _moderator_ids(message.room_id) if moderator_ids is None else moderator_ids
+    )
     return {
         "id": message.pk,
         "revision": message.revision,
         "author_id": message.author_id,
         "author": _name(message.author),
+        "author_is_moderator": message.author_id in moderators,
         "avatar": avatar,
         "profile_url": reverse("profile", args=[player.pk]) if player else "",
         "text": "" if message.deleted_at else message.text,
@@ -331,8 +353,12 @@ def history(
     if before_id:
         query = query.filter(pk__lt=before_id)
     rows = list(query.order_by("-id")[: PAGE_SIZE + 1])
+    moderator_ids = _moderator_ids(room_id)
     return {
-        "messages": [serialize_message(m) for m in reversed(rows[:PAGE_SIZE])],
+        "messages": [
+            serialize_message(m, moderator_ids=moderator_ids)
+            for m in reversed(rows[:PAGE_SIZE])
+        ],
         "has_more": len(rows) > PAGE_SIZE,
         "cursor": cursor,
     }
@@ -363,9 +389,13 @@ def sync_events(*, user: User, room_id: int, after_id: int) -> dict[str, Any]:
         )
         .order_by("id")[: MAX_PAGE_SIZE + 1]
     )
+    moderator_ids = _moderator_ids(room_id)
     return {
         "events": [
-            {"id": e.pk, "message": serialize_message(e.message)}
+            {
+                "id": e.pk,
+                "message": serialize_message(e.message, moderator_ids=moderator_ids),
+            }
             for e in rows[:MAX_PAGE_SIZE]
         ],
         "cursor": (
@@ -375,6 +405,7 @@ def sync_events(*, user: User, room_id: int, after_id: int) -> dict[str, Any]:
         ),
         "has_more": len(rows) > MAX_PAGE_SIZE,
         "can_moderate": _moderator(user, member),
+        "moderator_ids": sorted(moderator_ids),
         "banned_until": (
             member.banned_until.isoformat() if member.banned_until else None
         ),
@@ -542,23 +573,36 @@ def moderate_member(*, user: User, room_id: int, target_id: int, banned: bool) -
 
 def my_memberships(
     *, user: User
-) -> QuerySet[WithAnnotations[ChatMembership, _UnreadCount]]:
-    """Возвращает комнаты с числом непрочитанных без сообщений самого автора.
+) -> QuerySet[WithAnnotations[ChatMembership, _MembershipCounts]]:
+    """Возвращает комнаты с численностью участников и количеством непрочитанных.
 
     Args:
         user: Участник платформы.
 
     Returns:
-        Участие, город и число непрочитанных.
+        Участие, город, число активных читателей и непрочитанных чужих сообщений.
 
     Raises:
         ChatAccessError: Неактивный аккаунт.
     """
     require_active_user(user)
+    # Подзапрос не перемножает участников на сообщения при подсчёте непрочитанного.
+    member_counts = (
+        ChatMembership.objects.filter(
+            room_id=OuterRef("room_id"), is_active=True, user__is_active=True
+        )
+        .order_by()
+        .values("room_id")
+        .annotate(total=Count("pk"))
+        .values("total")
+    )
     return (
         ChatMembership.objects.filter(user=user, is_active=True, room__is_active=True)
         .select_related("room__city")
         .annotate(
+            member_count=Coalesce(
+                Subquery(member_counts, output_field=IntegerField()), 0
+            ),
             unread=Count(
                 "room__messages",
                 filter=Q(
@@ -566,7 +610,7 @@ def my_memberships(
                     room__messages__deleted_at__isnull=True,
                 )
                 & ~Q(room__messages__author=user),
-            )
+            ),
         )
         .order_by("room__city__name")
     )

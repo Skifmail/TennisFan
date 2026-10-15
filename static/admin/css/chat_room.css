@@ -1,0 +1,63 @@
+/* Вложенные списки используют цвета текущей темы Django Admin. */
+.chat-admin-panels {
+    clear: both;
+    margin-top: 24px;
+}
+
+.chat-admin-section {
+    border: 1px solid var(--hairline-color);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    scroll-margin-top: 20px;
+}
+
+.chat-admin-section h2 span {
+    font-weight: normal;
+}
+
+.chat-admin-toolbar {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--hairline-color);
+}
+
+.chat-admin-scroll {
+    overflow: auto;
+}
+
+.chat-admin-table {
+    width: 100%;
+}
+
+.chat-admin-nowrap {
+    white-space: nowrap;
+}
+
+.chat-admin-message {
+    min-width: 200px;
+    max-width: 38rem;
+    overflow-wrap: anywhere;
+}
+
+.chat-admin-email {
+    display: block;
+    margin-top: 4px;
+    color: var(--body-quiet-color);
+}
+
+.chat-admin-actions a {
+    display: inline-block;
+    margin: 0 12px 8px 0;
+}
+
+.chat-admin-actions .chat-admin-delete {
+    color: var(--delete-button-bg);
+}
+
+.chat-admin-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+}

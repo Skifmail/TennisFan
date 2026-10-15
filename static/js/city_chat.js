@@ -28,6 +28,7 @@
     const EDIT_WINDOW_MS = 900000;
     const NOTICE_MS = 6000;
     const MAX_INPUT_HEIGHT = 128;
+    const MODERATOR_BADGE_SIZE = 18;
     const SVG_NS = "http://www.w3.org/2000/svg";
     const supportsPopover = typeof menu.showPopover === "function";
     let cursor = 0;
@@ -187,6 +188,20 @@
     function storeMessage(message) {
         const current = messages.get(message.id);
         if (!current || message.revision >= current.revision) messages.set(message.id, message);
+    }
+
+    function updateModeratorRoles(ids) {
+        if (!Array.isArray(ids)) return false;
+        const moderators = new Set(ids);
+        let changed = false;
+        messages.forEach((message, id) => {
+            const isModerator = moderators.has(message.author_id);
+            if (message.author_is_moderator !== isModerator) {
+                messages.set(id, {...message, author_is_moderator: isModerator});
+                changed = true;
+            }
+        });
+        return changed;
     }
 
     function closeMenu(restoreFocus = false) {
@@ -360,9 +375,11 @@
 
     function messageNode(message) {
         const own = message.author_id === config.userId;
+        const moderator = message.author_is_moderator === true;
         const item = element("li", "city-chat-message");
         item.dataset.own = String(own);
         item.dataset.deleted = String(message.is_deleted);
+        item.dataset.moderator = String(moderator);
         item.dataset.messageId = String(message.id);
         if (!own) {
             const avatar = element("span", "chat-message-avatar");
@@ -377,10 +394,24 @@
             item.append(avatar);
         }
         const column = element("div", "chat-message-column");
-        if (!own) {
+        if (!own || moderator) {
+            const identity = element("div", "chat-message-identity");
+            const authorRow = element("div", "chat-message-author-row");
             const author = element(message.profile_url ? "a" : "span", "chat-message-author", message.author);
             if (message.profile_url) author.href = message.profile_url;
-            column.append(author);
+            authorRow.append(author);
+            if (moderator) {
+                const badge = element("img", "chat-moderator-badge");
+                badge.src = config.moderatorBadgeUrl;
+                badge.alt = "";
+                badge.width = MODERATOR_BADGE_SIZE;
+                badge.height = MODERATOR_BADGE_SIZE;
+                badge.setAttribute("aria-hidden", "true");
+                authorRow.append(badge);
+            }
+            identity.append(authorRow);
+            if (moderator) identity.append(element("span", "chat-moderator-label", "Модератор"));
+            column.append(identity);
         }
         const bubble = element("div", "chat-bubble");
         if (message.reply_to && !message.is_deleted) {
@@ -501,9 +532,10 @@
                 cursor = data.cursor;
                 bannedUntil = data.banned_until;
                 canModerate = data.can_moderate;
+                const rolesChanged = updateModeratorRoles(data.moderator_ids);
                 byId("chat-rules").textContent = data.rules;
                 updateSend();
-                if (data.events.length) {
+                if (data.events.length || rolesChanged) {
                     render();
                     if (nearBottom && !menuOpen) viewport.scrollTop = viewport.scrollHeight;
                     else if (newIncoming) byId("chat-new").hidden = false;

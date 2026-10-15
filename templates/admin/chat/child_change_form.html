@@ -1,0 +1,5 @@
+{% extends "admin/change_form.html" %}
+{% block breadcrumbs %}
+<ol class="breadcrumbs"><li><a href="{% url 'admin:index' %}">Начало</a></li><li><a href="{% url 'admin:chat_chatroom_changelist' %}">Городские чаты</a></li><li><a href="{{ chat_room_url }}">{{ chat_room.city.name }}</a></li><li aria-current="page">{{ title }}</li></ol>
+{% endblock %}
+{% block form_top %}{{ block.super }}<p><a href="{{ chat_room_url }}{% if opts.model_name == 'chatmembership' %}#chat-room-members{% else %}#chat-room-messages{% endif %}">← Вернуться в чат «{{ chat_room.city.name }}»</a></p>{% endblock %}

@@ -5,8 +5,9 @@ from pathlib import Path
 
 from django.db import connection
 from django.test import Client
+from django.urls import reverse
 
-from apps.chat.models import ChatMessage
+from apps.chat.models import ChatMembership, ChatMessage
 from apps.chat.services import join_city
 from apps.core.models import City
 from apps.users.models import User
@@ -17,7 +18,7 @@ class ChatSmokeSetupError(RuntimeError):
 
 
 def create_smoke_sessions(path: Path) -> None:
-    """Создаёт тестовую комнату и приватный файл двух сессий.
+    """Создаёт комнату и приватные сессии двух участников и администратора стенда.
 
     Args:
         path: Путь файла для CHAT_E2E_SESSION_FILE.
@@ -52,9 +53,35 @@ def create_smoke_sessions(path: Path) -> None:
             ]
         )
     ChatMessage.objects.filter(room=room).delete()
+    admin_user, _ = User.objects.update_or_create(
+        email="city-chat-admin-browser@test.local",
+        defaults={
+            "first_name": "Администратор стенда",
+            "password": "!",
+            "is_staff": True,
+            "is_superuser": True,
+            "is_active": True,
+        },
+    )
+    ChatMembership.objects.filter(room=room, user=admin_user).delete()
+    admin_client = Client()
+    admin_client.force_login(admin_user)
     path.touch(mode=0o600, exist_ok=True)
     path.chmod(0o600)
     path.write_text(
-        json.dumps({"cookies": cookies, "room_path": f"/chats/{room.pk}/"}),
+        json.dumps(
+            {
+                "cookies": cookies,
+                "room_path": f"/chats/{room.pk}/",
+                "admin_cookies": [
+                    {"name": key, "value": cookie.value}
+                    for key, cookie in admin_client.cookies.items()
+                ],
+                "admin_email": admin_user.email,
+                "admin_room_path": reverse(
+                    "admin:chat_chatroom_change", args=[room.pk]
+                ),
+            }
+        ),
         encoding="utf-8",
     )

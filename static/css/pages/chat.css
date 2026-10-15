@@ -375,6 +375,15 @@
     white-space: nowrap;
 }
 
+.chat-participant-count {
+    display: block;
+    color: var(--chat-secondary);
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 .chat-unread {
     min-width: 19px;
     height: 19px;
@@ -611,12 +620,49 @@
     max-width: min(76%, 520px);
 }
 
+.chat-message-identity {
+    display: flex;
+    flex-direction: column;
+    margin: 0 0 4px 11px;
+}
+
+.chat-message-author-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
 .chat-message-author {
     display: block;
+    min-width: 0;
     font-size: 0.6875rem;
     font-weight: 550;
     color: var(--chat-secondary-strong) !important;
-    margin: 0 0 4px 11px;
+    overflow-wrap: anywhere;
+}
+
+.chat-moderator-badge {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    object-fit: contain;
+}
+
+.chat-moderator-label {
+    margin-top: 1px;
+    color: var(--chat-secondary);
+    font-size: 0.625rem;
+    font-weight: 450;
+    line-height: 1.4;
+}
+
+.city-chat-message[data-own="true"] .chat-message-identity {
+    align-items: flex-end;
+    margin-inline: 0 11px;
+}
+
+.city-chat-message[data-moderator="true"] .chat-message-avatar {
+    margin-top: 37px;
 }
 
 .chat-bubble {
@@ -1380,6 +1426,10 @@
     white-space: nowrap;
 }
 
+.chat-city-card-copy .chat-participant-count {
+    margin-top: 4px;
+}
+
 .chat-join-button {
     display: inline-flex;
     align-items: center;
@@ -1762,6 +1812,12 @@
         font-size: 0.75rem;
         padding: 8px 14px;
         white-space: nowrap;
+    }
+
+    .chat-mobile-room-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
     }
 
     .chat-city-card {

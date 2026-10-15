@@ -9,9 +9,10 @@ from typing import Any, Final, cast
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, QuerySet
+from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.templatetags.static import static
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
@@ -110,9 +111,18 @@ def index(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", suggested).strip()[:CITY_SEARCH_LIMIT]
     cities_query = _search_cities(query)
     cities_list = list(
-        cities_query.select_related("chat_room").order_by("name", "region")[
-            :CITY_SEARCH_LIMIT
-        ]
+        cities_query.select_related("chat_room")
+        .annotate(
+            member_count=Count(
+                "chat_room__memberships",
+                filter=Q(
+                    chat_room__is_active=True,
+                    chat_room__memberships__is_active=True,
+                    chat_room__memberships__user__is_active=True,
+                ),
+            )
+        )
+        .order_by("name", "region")[:CITY_SEARCH_LIMIT]
     )
     own = list(services.my_memberships(user=cast(User, request.user)))
     joined = {member.room.city_id for member in own}
@@ -152,7 +162,9 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
             "membership": member,
             "room": member.room,
             "memberships": list(services.my_memberships(user=cast(User, request.user))),
-            "member_count": member.room.memberships.filter(is_active=True).count(),
+            "member_count": member.room.memberships.filter(
+                is_active=True, user__is_active=True
+            ).count(),
             "chat_config": {
                 "roomId": room_id,
                 "userId": request.user.pk,
@@ -161,6 +173,7 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
                 "syncUrl": f"/chats/api/rooms/{room_id}/sync/",
                 "socketPath": f"/ws/chats/{room_id}/",
                 "indexUrl": "/chats/",
+                "moderatorBadgeUrl": static("images/chat/moderator-badge.png"),
                 "canModerate": bool(request.user.is_staff or member.is_moderator),
             },
         },

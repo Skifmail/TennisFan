@@ -39,6 +39,9 @@ def test_design_when_resized_or_keyboard_used_should_keep_composer_and_focus_acc
             expect(
                 page.get_by_role("navigation", name="Мои городские чаты")
             ).to_be_visible()
+            expect(
+                page.locator(".chat-room-link.is-selected .chat-participant-count")
+            ).to_have_text("2 участника")
             for width, height in (
                 (1440, 1000),
                 (768, 1024),
@@ -99,6 +102,18 @@ def test_design_when_resized_or_keyboard_used_should_keep_composer_and_focus_acc
             expect(page.locator("#chat-text")).to_have_value("Несохранённый черновик")
             page.goto(base + "/chats/?q=Казань")
             expect(page.get_by_role("heading", name="Найти свой город")).to_be_visible()
+            joined = page.locator(".chat-city-card").filter(
+                has=page.locator(f'a[href="{sessions["room_path"]}"]')
+            )
+            expect(joined.locator(".chat-participant-count")).to_have_text(
+                "2 участника"
+            )
+            mobile_room = page.locator(
+                f'.chat-mobile-memberships a[href="{sessions["room_path"]}"]'
+            )
+            expect(mobile_room.locator(".chat-participant-count")).to_have_text(
+                "2 участника"
+            )
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         finally:
             context.close()

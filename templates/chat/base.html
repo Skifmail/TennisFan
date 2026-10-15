@@ -28,7 +28,7 @@
         {% for member in memberships %}
             <a class="chat-room-link{% if room.pk == member.room_id %} is-selected{% endif %}" href="{% url 'chat:room' member.room_id %}" {% if room.pk == member.room_id %}aria-current="page"{% endif %}>
                 <span class="chat-room-avatar" aria-hidden="true">{{ member.room.city.name|slice:':1' }}</span>
-                <span class="chat-room-copy"><strong>{{ member.room.city.name }}</strong><small>{{ member.room.city.region|default:'Городской чат' }}</small></span>
+                <span class="chat-room-copy"><strong>{{ member.room.city.name }}</strong><small>{{ member.room.city.region|default:'Городской чат' }}</small>{% include 'chat/_participant_count.html' with count=member.member_count only %}</span>
                 {% if member.unread %}<span class="chat-unread" {% if room.pk == member.room_id %}id="chat-room-unread"{% endif %} aria-label="Непрочитанных: {{ member.unread }}">{{ member.unread }}</span>{% endif %}
             </a>
         {% empty %}<div class="chat-sidebar-empty"><p>Ваши города появятся здесь</p><span>Найдите сообщество и начните общение.</span></div>{% endfor %}

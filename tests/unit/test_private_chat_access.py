@@ -1,55 +1,42 @@
-"""Юнит-тесты: доступ в закрытый Telegram-чат."""
-
-from __future__ import annotations
+"""Контракт доступа к закрытому чату после нормализации подписки."""
 
 from types import SimpleNamespace
 
-from django.test import SimpleTestCase
+import pytest
+from pytest_mock import MockerFixture
 
 from apps.telegram_bot.private_chat import get_private_chat_access_status
 
 
-class PrivateChatAccessStatusTests(SimpleTestCase):
-    """Проверки бизнес-правил доступа в закрытый чат по подписке."""
-
-    def test_access_denied_without_subscription(self) -> None:
-        """Без подписки доступ в чат запрещен."""
-        user = SimpleNamespace(subscription=None)
-
-        allowed, reason = get_private_chat_access_status(user)
-
-        self.assertFalse(allowed)
-        self.assertEqual(reason, "Нет активной подписки.")
-
-    def test_access_denied_for_expired_subscription(self) -> None:
-        """Истекшая подписка не дает доступ в чат."""
-        tier = SimpleNamespace(has_private_chat=True)
-        subscription = SimpleNamespace(tier=tier, is_valid=lambda: False)
-        user = SimpleNamespace(subscription=subscription)
-
-        allowed, reason = get_private_chat_access_status(user)
-
-        self.assertFalse(allowed)
-        self.assertEqual(reason, "Подписка неактивна или истекла.")
-
-    def test_access_denied_when_tier_has_no_private_chat(self) -> None:
-        """Тариф без флага has_private_chat должен блокировать доступ."""
-        tier = SimpleNamespace(has_private_chat=False)
-        subscription = SimpleNamespace(tier=tier, is_valid=lambda: True)
-        user = SimpleNamespace(subscription=subscription)
-
-        allowed, reason = get_private_chat_access_status(user)
-
-        self.assertFalse(allowed)
-        self.assertEqual(reason, "Ваш тариф не включает доступ в закрытый чат.")
-
-    def test_access_allowed_for_active_supported_tier(self) -> None:
-        """Активная подписка с has_private_chat=True дает доступ."""
-        tier = SimpleNamespace(has_private_chat=True)
-        subscription = SimpleNamespace(tier=tier, is_valid=lambda: True)
-        user = SimpleNamespace(subscription=subscription)
-
-        allowed, reason = get_private_chat_access_status(user)
-
-        self.assertTrue(allowed)
-        self.assertEqual(reason, "")
+@pytest.mark.parametrize(
+    ("has_subscription", "valid", "includes_chat", "expected"),
+    [
+        (False, False, False, (False, "Нет активной подписки.")),
+        (True, False, True, (False, "Подписка неактивна или истекла.")),
+        (True, True, False, (False, "Ваш тариф не включает доступ в закрытый чат.")),
+        (True, True, True, (True, "")),
+    ],
+)
+def test_private_chat_access_when_subscription_normalized_should_obey_tier_and_validity(
+    mocker: MockerFixture,
+    has_subscription: bool,
+    valid: bool,
+    includes_chat: bool,
+    expected: tuple[bool, str],
+) -> None:
+    """Отсутствующая, неактивная и неподдерживаемая подписки не дают доступ."""
+    user = SimpleNamespace()
+    subscription = (
+        SimpleNamespace(
+            tier=SimpleNamespace(has_private_chat=includes_chat),
+            is_valid=lambda: valid,
+        )
+        if has_subscription
+        else None
+    )
+    normalize = mocker.patch(
+        "apps.subscriptions.services.ensure_current_subscription",
+        return_value=subscription,
+    )
+    assert get_private_chat_access_status(user) == expected
+    normalize.assert_called_once_with(user)

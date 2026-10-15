@@ -122,6 +122,7 @@ INSTALLED_APPS = [
     "apps.training",
     "apps.content",
     "apps.comments",
+    "apps.chat",
     "apps.subscriptions",
     "apps.payments",
     "apps.legal",
@@ -142,6 +143,7 @@ if PROFILING and DEBUG:
 # ------------------------------------------------------------------------------
 
 MIDDLEWARE = [
+    "apps.core.health.HealthMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     # После WhiteNoise: статика уже сжата, HTML динамических страниц — нет.
@@ -721,3 +723,14 @@ LOGGING = {
 
 # Создаем директорию для логов, если её нет
 (BASE_DIR / "logs").mkdir(exist_ok=True)
+
+# Городские чаты: Redis обязателен для обмена между процессами.
+CHAT_REDIS_URL = os.environ.get("CHAT_REDIS_URL", REDIS_URL)
+# Отказ транспорта чата не снимает HTTP-сайт с маршрутизации.
+HEALTHCHECK_CHAT_REDIS = os.environ.get("HEALTHCHECK_CHAT_REDIS", "False") == "True"
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {"hosts": [CHAT_REDIS_URL], "prefix": "tennison_chat"},
+    }
+}

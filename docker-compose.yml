@@ -1,5 +1,3 @@
-version: "3.9"
-
 x-app-env: &app-env
   DEBUG: "False"
   USE_POSTGRES: "True"
@@ -9,6 +7,7 @@ x-app-env: &app-env
   POSTGRES_HOST: ${POSTGRES_HOST}
   POSTGRES_PORT: "5432"
   SECRET_KEY: ${SECRET_KEY}
+  CHAT_REDIS_URL: ${CHAT_REDIS_URL:-redis://chat_redis:6379/0}
   ALLOWED_HOSTS: ${ALLOWED_HOSTS}
   CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
   TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
@@ -41,6 +40,22 @@ x-app-env: &app-env
 services:
   web:
     build: .
+    logging: &app-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "10001:10001"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    restart: unless-stopped
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD", "python", "-m", "scripts.healthcheck", "8000"]
+      interval: 20s
+      timeout: 10s
+      start_period: 180s
+      retries: 3
     environment:
       <<: *app-env
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
@@ -50,22 +65,60 @@ services:
       GUNICORN_KEEPALIVE: ${GUNICORN_KEEPALIVE:-5}
     expose:
       - "8000"
-    volumes:
-      - static_data:/app/staticfiles
     deploy:
       replicas: 1
       restart_policy:
         condition: any
+
+  # Отдельный Redis: кэш сайта не должен вытеснять события WebSocket.
+  chat_redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  chat:
+    build: .
+    logging: *app-logging
+    user: "10001:10001"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD", "python", "-m", "scripts.healthcheck", "8001"]
+      interval: 20s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    entrypoint: ["daphne", "-b", "0.0.0.0", "-p", "8001", "--proxy-headers", "--ping-interval", "20", "--ping-timeout", "30", "config.asgi:application"]
+    environment:
+      <<: *app-env
+      CONN_MAX_AGE: "0"
+      HEALTHCHECK_CHAT_REDIS: "True"
+    expose:
+      - "8001"
+    restart: unless-stopped
+    depends_on:
+      chat_redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
 
   cron:
     build: .
+    logging: *app-logging
+    restart: unless-stopped
     entrypoint: ["/cron-entrypoint.sh"]
     environment:
       <<: *app-env
+    depends_on:
+      web:
+        condition: service_healthy
     deploy:
       replicas: 1
       restart_policy:
         condition: any
-
-volumes:
-  static_data:

@@ -11,6 +11,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.utils.html import strip_tags
 
+from apps.core.db_context import background_connection
 from apps.core.models import UserTelegramLink
 from apps.tournaments.utils import (
     get_match_opponent_users,
@@ -1098,9 +1099,12 @@ def _get_new_tournament_recipients(tournament) -> list[UserTelegramLink]:
 
 def _send_new_tournament_notification(tournament_pk: int) -> None:
     """В фоне отправить ЛК, email и Telegram о новом турнире."""
-    from django.db import connection
+    with background_connection():
+        _deliver_new_tournament_notification(tournament_pk)
 
-    connection.close()
+
+def _deliver_new_tournament_notification(tournament_pk: int) -> None:
+    """Читает турнир и отправляет уведомления через настроенные каналы."""
     try:
         from apps.tournaments.models import Tournament
 

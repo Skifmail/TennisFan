@@ -21,6 +21,7 @@ urlpatterns = [
     ),
     path("robots.txt", robots_txt, name="robots_txt"),
     path("", include("apps.core.urls")),
+    path("chats/", include("apps.chat.urls")),
     path("users/", include("apps.users.urls")),
     path("ratings/", include("apps.player_ratings.urls")),
     path("tournaments/", include("apps.tournaments.urls")),

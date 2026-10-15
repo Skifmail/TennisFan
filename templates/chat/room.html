@@ -1,0 +1,52 @@
+{% extends 'chat/base.html' %}
+{% load static %}
+{% block title %}{{ room.city.name }} — чат города{% endblock %}
+{% block main_class %}chat-conversation{% endblock %}
+{% block content %}
+<div class="city-chat" id="city-chat">
+    <header class="chat-header">
+        <a href="{% url 'chat:index' %}" class="chat-icon-button chat-mobile-back" aria-label="Все городские чаты"><svg class="chat-icon"><use href="#chat-icon-back"/></svg></a>
+        <span class="chat-city-avatar" aria-hidden="true">{{ room.city.name|slice:':1' }}</span>
+        <div class="chat-heading"><h1>{{ room.city.name }}</h1><div class="chat-heading-subtitle"><span>Участники: {{ member_count }}</span><span aria-hidden="true">·</span><span class="city-chat-status" id="chat-status" role="status">Подключение…</span></div></div>
+        <button type="button" id="chat-info" class="chat-icon-button chat-info-button" aria-label="О чате" aria-haspopup="dialog"><svg class="chat-icon"><use href="#chat-icon-info"/></svg></button>
+    </header>
+    <div class="chat-feedback-stack"><p id="chat-error" class="chat-feedback chat-feedback-error" role="alert" hidden></p><p id="chat-notice" class="chat-feedback" role="status" hidden></p></div>
+    <div class="chat-timeline" id="chat-window" tabindex="0" aria-label="История сообщений">
+        <button type="button" class="chat-history-button" id="chat-history" hidden>Загрузить предыдущие сообщения</button>
+        <div class="chat-empty" id="chat-empty"><span class="chat-empty-icon"><svg class="chat-icon"><use href="#chat-icon-message"/></svg></span><h2 id="chat-empty-title">Загружаем переписку</h2><p id="chat-empty-description">Ещё немного — и можно общаться.</p></div>
+        <ol class="city-chat-messages" id="chat-messages" aria-label="Сообщения"></ol>
+    </div>
+    <div class="chat-composer-area">
+        <button type="button" class="chat-new-button" id="chat-new" hidden>Новые сообщения <svg class="chat-icon"><use href="#chat-icon-up"/></svg></button>
+        <form id="chat-compose" class="chat-compose">
+            {% csrf_token %}
+            <div class="chat-reply-context" id="chat-context" hidden><svg class="chat-icon"><use href="#chat-icon-reply"/></svg><span id="chat-context-text"></span><button type="button" class="chat-icon-button" id="chat-cancel" aria-label="Отменить ответ или редактирование"><svg class="chat-icon"><use href="#chat-icon-close"/></svg></button></div>
+            <div class="chat-input-wrap"><label for="chat-text" class="chat-sr-only">Сообщение в чат</label><textarea id="chat-text" maxlength="2000" rows="1" placeholder="Сообщение…" required></textarea><button type="submit" class="chat-send" id="chat-send" aria-label="Отправить" title="Отправить сообщение" disabled><svg class="chat-icon"><use id="chat-send-icon" href="#chat-icon-up"/></svg></button></div>
+            <div class="chat-composer-caption"><span class="chat-keyboard-hint">Enter — отправить · Shift + Enter — новая строка</span><span class="chat-mobile-hint">Общайтесь уважительно</span><span id="chat-character-count" hidden></span><span class="chat-composer-private"><svg class="chat-icon"><use href="#chat-icon-shield"/></svg>Только для участников</span></div>
+        </form>
+    </div>
+    <noscript><p>Включите JavaScript для мгновенного чата.</p></noscript>
+</div>
+{{ chat_config|json_script:'chat-config' }}
+{% endblock %}
+{% block overlays %}
+<div id="chat-message-menu" class="chat-message-menu" role="menu" aria-label="Действия с сообщением" popover="auto"></div>
+<dialog id="chat-settings" class="chat-dialog chat-settings" aria-labelledby="chat-settings-title">
+    <div class="chat-dialog-heading"><h2 id="chat-settings-title">О чате</h2><button class="chat-icon-button" type="button" data-close-dialog aria-label="Закрыть"><svg class="chat-icon"><use href="#chat-icon-close"/></svg></button></div>
+    <div class="chat-settings-identity"><span class="chat-city-avatar" aria-hidden="true">{{ room.city.name|slice:':1' }}</span><h3>{{ room.city.name }}</h3><p>{{ room.city.region|default:'Городское сообщество TennisFan' }}</p></div>
+    <div class="chat-settings-rule"><span class="chat-settings-label"><svg class="chat-icon"><use href="#chat-icon-pin"/></svg>Правила общения</span><p id="chat-rules">{{ room.rules }}</p></div>
+    <label class="chat-switch-row" for="chat-notifications"><span><strong>Уведомления об ответах</strong><small>В вашей ленте на платформе</small></span><input type="checkbox" id="chat-notifications" role="switch" {% if membership.notifications_enabled %}checked{% endif %}><span class="chat-switch" aria-hidden="true"></span></label>
+    <p id="chat-settings-error" class="chat-dialog-error" role="alert" hidden></p>
+    <button type="button" class="chat-leave-button" id="chat-leave"><svg class="chat-icon"><use href="#chat-icon-leave"/></svg>Покинуть чат</button>
+</dialog>
+<dialog id="chat-action-dialog" class="chat-dialog" aria-labelledby="chat-action-title" aria-describedby="chat-action-description">
+    <form id="chat-action-form">
+        <div class="chat-dialog-heading"><h2 id="chat-action-title"></h2><button class="chat-icon-button" type="button" data-close-dialog aria-label="Закрыть"><svg class="chat-icon"><use href="#chat-icon-close"/></svg></button></div>
+        <p id="chat-action-description" class="chat-dialog-description"></p>
+        <div id="chat-report-field" hidden><label for="chat-report-reason" class="chat-field-label">Причина жалобы</label><textarea id="chat-report-reason" class="chat-report-input" rows="3" maxlength="500" placeholder="Расскажите, что не так…"></textarea></div>
+        <p id="chat-action-error" class="chat-dialog-error" role="alert" hidden></p>
+        <div class="chat-dialog-actions"><button type="button" class="chat-button chat-button-secondary" data-close-dialog>Отмена</button><button type="submit" class="chat-button" id="chat-action-confirm"></button></div>
+    </form>
+</dialog>
+{% endblock %}
+{% block extra_js %}<script src="{% static 'js/city_chat.js' %}" defer></script>{% endblock %}

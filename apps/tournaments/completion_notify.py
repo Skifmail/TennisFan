@@ -6,6 +6,7 @@ import html
 import logging
 import threading
 from collections import defaultdict
+from functools import partial
 from typing import Any
 
 from django.conf import settings
@@ -13,6 +14,7 @@ from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.core.db_context import background_connection
 from apps.users.models import Notification, Player, User
 
 from .models import (
@@ -53,7 +55,7 @@ def complete_tournament_and_notify(tournament: Tournament) -> None:
         if tournament.completion_notified_at:
             return
         transaction.on_commit(
-            lambda pk=tournament_pk: dispatch_completion_notify(pk),
+            partial(dispatch_completion_notify, tournament_pk),
         )
 
 
@@ -81,13 +83,14 @@ def _notify_completed_safe(tournament_pk: int) -> None:
     Args:
         tournament_pk: Идентификатор турнира.
     """
-    try:
-        notify_tournament_completed(tournament_pk)
-    except Exception:
-        logger.exception(
-            "Completion notify crashed tournament=%s",
-            tournament_pk,
-        )
+    with background_connection():
+        try:
+            notify_tournament_completed(tournament_pk)
+        except Exception:
+            logger.exception(
+                "Completion notify crashed tournament=%s",
+                tournament_pk,
+            )
 
 
 def notify_tournament_completed(tournament_pk: int) -> int:
@@ -106,7 +109,7 @@ def notify_tournament_completed(tournament_pk: int) -> int:
     claimed_at = None
     with transaction.atomic():
         locked = (
-            Tournament.objects.select_for_update()
+            Tournament.objects.select_for_update(of=("self",))
             .select_related("club")
             .filter(
                 pk=tournament_pk,

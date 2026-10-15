@@ -6,14 +6,15 @@
 x-app-env: &app-env
   DEBUG: "False"
   USE_POSTGRES: "True"
-  POSTGRES_DB: ${POSTGRES_DB}
-  POSTGRES_USER: ${POSTGRES_USER}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in Dokploy Environment}
+  POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in Dokploy Environment}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Dokploy Environment}
   POSTGRES_HOST: db
   POSTGRES_PORT: "5432"
-  SECRET_KEY: ${SECRET_KEY}
-  ALLOWED_HOSTS: ${ALLOWED_HOSTS}
-  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+  SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in Dokploy Environment}
+  CHAT_REDIS_URL: ${CHAT_REDIS_URL:-redis://chat_redis:6379/0}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:?Set ALLOWED_HOSTS in Dokploy Environment}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?Set CSRF_TRUSTED_ORIGINS in Dokploy Environment}
   TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
   TELEGRAM_SUPPORT_BOT_TOKEN: ${TELEGRAM_SUPPORT_BOT_TOKEN}
   TELEGRAM_USER_BOT_TOKEN: ${TELEGRAM_USER_BOT_TOKEN}
@@ -71,9 +72,9 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in Dokploy Environment}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in Dokploy Environment}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Dokploy Environment}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -108,16 +109,31 @@ services:
 
   web:
     build: .
+    logging: &app-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    user: "10001:10001"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [default, dokploy-network]
+    restart: unless-stopped
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD", "python", "-m", "scripts.healthcheck", "8000"]
+      interval: 20s
+      timeout: 10s
+      start_period: 180s
+      retries: 3
     environment:
       <<: *app-env
-    command: ["/entrypoint.sh"]
     expose:
       - "8000"
-    volumes:
-      - static_data:/app/staticfiles
     labels:
       # Включаем Traefik для этого сервиса
       - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
 
       # Явно описываем HTTP‑router для боевого сайта
       - "traefik.http.routers.tennisfan.rule=Host(`tennisfan.ru`) || Host(`www.tennisfan.ru`) || Host(`tennistop.ru`) || Host(`www.tennistop.ru`)"
@@ -145,12 +161,64 @@ services:
       restart_policy:
         condition: on-failure
 
+  # Отдельный Redis: кэш сайта не должен вытеснять события WebSocket.
+  chat_redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  chat:
+    build: .
+    logging: *app-logging
+    user: "10001:10001"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    networks: [default, dokploy-network]
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD", "python", "-m", "scripts.healthcheck", "8001"]
+      interval: 20s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    entrypoint: ["daphne", "-b", "0.0.0.0", "-p", "8001", "--proxy-headers", "--ping-interval", "20", "--ping-timeout", "30", "config.asgi:application"]
+    environment:
+      <<: *app-env
+      CONN_MAX_AGE: "0"
+      HEALTHCHECK_CHAT_REDIS: "True"
+    expose:
+      - "8001"
+    restart: unless-stopped
+    depends_on:
+      chat_redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      - "traefik.http.routers.tennisfan-chat.rule=(Host(`tennisfan.ru`) || Host(`www.tennisfan.ru`) || Host(`tennistop.ru`) || Host(`www.tennistop.ru`)) && PathPrefix(`/ws/chats/`)"
+      - "traefik.http.routers.tennisfan-chat.entrypoints=websecure"
+      - "traefik.http.routers.tennisfan-chat.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.tennisfan-chat.priority=1100"
+      - "traefik.http.routers.tennisfan-chat.service=tennisfan-chat"
+      - "traefik.http.services.tennisfan-chat.loadbalancer.server.port=8001"
+
   cron:
     build: .
+    logging: *app-logging
+    restart: unless-stopped
     entrypoint: ["/cron-entrypoint.sh"]
     environment:
       <<: *app-env
     depends_on:
+      web:
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:
@@ -161,5 +229,9 @@ services:
 
 volumes:
   postgres_data:
-  static_data:
   redis_data:
+
+networks:
+  default:
+  dokploy-network:
+    external: true

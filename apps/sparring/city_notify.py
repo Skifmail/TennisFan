@@ -7,10 +7,11 @@ import threading
 from typing import cast
 from urllib.parse import urlencode
 
-from django.db import connection, transaction
+from django.db import transaction
 from django.db.models import QuerySet
 from django.urls import reverse
 
+from apps.core.db_context import background_connection
 from apps.core.localities import locality_tokens
 from apps.sparring.models import (
     DoublesMatchRequest,
@@ -100,7 +101,7 @@ def sparring_public_path(*, kind: str, pk: int, sport: str) -> str:
     """
     if kind == KIND_SINGLES:
         params = urlencode({"type": "singles", "sport": sport or "tennis"})
-        return f"{reverse('sparring_list')}?{params}#sparring-{pk}"
+        return f"{cast(str, reverse('sparring_list'))}?{params}#sparring-{pk}"
     return cast(str, reverse("doubles_detail", args=[pk]))
 
 
@@ -196,19 +197,19 @@ def schedule_published_sparring_notify(*, kind: str, pk: int) -> None:
 
 def _notify_published_sparring_background(*, kind: str, pk: int) -> None:
     """Фоновая отправка: своё соединение с БД и журнал итога."""
-    connection.close()
-    try:
-        lk_count, email_count = notify_published_sparring(kind=kind, pk=pk)
-    except Exception:
-        logger.exception("city sparring notify failed kind=%s pk=%s", kind, pk)
-        return
-    logger.info(
-        "city sparring notify kind=%s pk=%s lk=%s email=%s",
-        kind,
-        pk,
-        lk_count,
-        email_count,
-    )
+    with background_connection():
+        try:
+            lk_count, email_count = notify_published_sparring(kind=kind, pk=pk)
+        except Exception:
+            logger.exception("city sparring notify failed kind=%s pk=%s", kind, pk)
+            return
+        logger.info(
+            "city sparring notify kind=%s pk=%s lk=%s email=%s",
+            kind,
+            pk,
+            lk_count,
+            email_count,
+        )
 
 
 def _load_published(kind: str, pk: int) -> tuple[str, str, str, int, str] | None:

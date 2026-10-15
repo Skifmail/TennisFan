@@ -297,7 +297,17 @@ class RoundRobinWithdrawTestCase(TestCase):
     def test_withdraw_lk_notification_fits_charfield(self) -> None:
         """Длинное имя турнира + список матчей не ломает Notification.message."""
         long_name = "Многодневный турнир " + ("Воскресенск " * 20)
-        self.tournament.name = long_name
+        name_limit = Tournament._meta.get_field("name").max_length
+        assert name_limit is not None
+        self.tournament.name = long_name[:name_limit]
+        self.assertEqual(len(self.tournament.name), name_limit)
+        message_limit = Notification._meta.get_field("message").max_length
+        assert message_limit is not None
+        full_message = (
+            f"Вы сняты с турнира «{self.tournament.name}». "
+            "Несыгранные матчи закрыты без игры."
+        )
+        self.assertGreater(len(full_message), message_limit)
         self.tournament.save(update_fields=["name"])
         leaver = self.players[0]
 

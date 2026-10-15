@@ -1,0 +1,165 @@
+name: Deployment safety
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-safety-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: tennison_ci_smoke
+          POSTGRES_USER: tennison
+          POSTGRES_PASSWORD: ci-only-not-a-secret
+          POSTGRES_INITDB_ARGS: --encoding=UTF8
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U tennison -d tennison_ci_smoke"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      SECRET_KEY: ci-only-secret-key-not-used-in-production-0123456789
+      DEBUG: 'False'
+      USE_POSTGRES: 'True'
+      POSTGRES_DB: tennison_ci_smoke
+      POSTGRES_USER: tennison
+      POSTGRES_PASSWORD: ci-only-not-a-secret
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '5432'
+      CONN_MAX_AGE: '0'
+      ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+      USE_REDIS: 'False'
+      CHAT_REDIS_URL: redis://127.0.0.1:6379/0
+      USE_S3: 'False'
+      TELEGRAM_ENABLED: 'False'
+      EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.lock
+            requirements-dev.txt
+      - name: Install locked runtime and test tools
+        run: |
+          python -m venv venv
+          venv/bin/python -m pip install --require-hashes -r requirements.lock
+          venv/bin/python -m pip install -r requirements-dev.txt
+          venv/bin/python -m pip check
+      - name: Audit locked runtime dependencies
+        run: venv/bin/pip-audit -r requirements.lock --no-deps --disable-pip
+      - name: Django and Compose configuration
+        run: |
+          venv/bin/python manage.py check
+          venv/bin/python manage.py makemigrations --check --dry-run
+          docker compose --env-file /dev/null -f docker-compose.dokploy.yml config --no-interpolate --quiet
+          docker compose --env-file /dev/null -f docker-compose.yml config --no-interpolate --quiet
+          bash -n entrypoint.sh cron-entrypoint.sh scripts/backup-postgres.sh
+      - name: Full regression suite on UTF-8 PostgreSQL
+        run: venv/bin/pytest tests/ --no-cov -q
+      - name: Strict typing and formatting of changed modules
+        run: |
+          venv/bin/mypy --config-file=mypy-chat.ini apps/chat config/asgi.py apps/core/deployment.py apps/core/health.py apps/core/db_context.py apps/tournaments/completion_notify.py apps/sparring/city_notify.py apps/core/management/commands/prepare_deployment.py scripts/healthcheck.py scripts/save_cron_environment.py tests/unit/chat tests/integration/chat tests/e2e/chat tests/unit/deployment tests/integration/deployment tests/unit/core tests/integration/test_background_connection.py tests/integration/test_completion_postgres_lock.py tests/integration/test_database_encoding.py tests/integration/test_private_chat_subscription.py tests/unit/test_private_chat_access.py tests/unit/test_completion_connection.py tests/e2e/test_sparring_toolbar_browser.py
+          venv/bin/black --check apps/chat config/asgi.py apps/core/deployment.py apps/core/health.py apps/core/db_context.py apps/tournaments/completion_notify.py apps/sparring/city_notify.py apps/core/management/commands/prepare_deployment.py scripts/healthcheck.py scripts/save_cron_environment.py tests/unit/chat tests/integration/chat tests/e2e/chat tests/unit/deployment tests/integration/deployment tests/unit/core tests/integration/test_background_connection.py tests/integration/test_completion_postgres_lock.py tests/integration/test_database_encoding.py tests/integration/test_private_chat_subscription.py tests/unit/test_private_chat_access.py tests/unit/test_completion_connection.py tests/e2e/test_sparring_toolbar_browser.py apps/telegram_bot/notifications.py tests/integration/test_tournament_withdraw.py apps/subscriptions/migrations/0022_alter_usersubscription_end_date.py apps/users/migrations/0039_alter_playersportprofile_entry_level_set.py
+          venv/bin/ruff check --no-fix apps/chat config/asgi.py apps/core/deployment.py apps/core/health.py apps/core/db_context.py apps/tournaments/completion_notify.py apps/sparring/city_notify.py apps/core/management/commands/prepare_deployment.py scripts/healthcheck.py scripts/save_cron_environment.py tests/unit/chat tests/integration/chat tests/e2e/chat tests/unit/deployment tests/integration/deployment tests/unit/core tests/integration/test_background_connection.py tests/integration/test_completion_postgres_lock.py tests/integration/test_database_encoding.py tests/integration/test_private_chat_subscription.py tests/unit/test_private_chat_access.py tests/unit/test_completion_connection.py tests/e2e/test_sparring_toolbar_browser.py apps/telegram_bot/notifications.py tests/integration/test_tournament_withdraw.py apps/subscriptions/migrations/0022_alter_usersubscription_end_date.py apps/users/migrations/0039_alter_playersportprofile_entry_level_set.py
+      - name: Browser tests with real Redis and two ASGI processes
+        run: |
+          venv/bin/playwright install --with-deps chromium
+          venv/bin/python manage.py migrate --noinput --settings=tests.support.chat_browser_settings
+          venv/bin/python scripts/build_css_bundle.py
+          venv/bin/python manage.py collectstatic --noinput --settings=tests.support.chat_browser_settings
+          DJANGO_SETTINGS_MODULE=tests.support.chat_browser_settings venv/bin/python -c 'import django; django.setup(); from pathlib import Path; from tests.support.chat_browser_seed import create_smoke_sessions; create_smoke_sessions(Path("/tmp/chat-ci-sessions.json"))'
+          export DJANGO_SETTINGS_MODULE=tests.support.chat_browser_settings
+          venv/bin/daphne -b 127.0.0.1 -p 18765 config.asgi:application > /tmp/chat-first.log 2>&1 &
+          first=$!
+          venv/bin/daphne -b 127.0.0.1 -p 18766 config.asgi:application > /tmp/chat-second.log 2>&1 &
+          second=$!
+          trap 'kill "$first" "$second" 2>/dev/null || true' EXIT
+          for port in 18765 18766; do
+            PORT="$port" venv/bin/python - <<'PY'
+          import os, time, urllib.request
+          from urllib.error import URLError
+          for attempt in range(60):
+              try:
+                  urllib.request.urlopen('http://127.0.0.1:' + os.environ['PORT'] + '/health/ready/', timeout=2)
+                  break
+              except (URLError, OSError):
+                  time.sleep(1)
+          else:
+              raise SystemExit('ASGI readiness timed out')
+          PY
+          done
+          CHAT_E2E_URL=http://127.0.0.1:18765 CHAT_E2E_SECOND_URL=http://127.0.0.1:18766 CHAT_E2E_SESSION_FILE=/tmp/chat-ci-sessions.json venv/bin/pytest tests/e2e/chat tests/e2e/test_sparring_toolbar_browser.py --no-cov -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Chat stylesheet and JavaScript checks
+        run: |
+          npm ci --ignore-scripts
+          npx stylelint static/css/pages/chat.css static/css/pages/sparring.css
+          node --check static/js/chat_shell.js
+          node --check static/js/city_chat.js
+
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build actual production image
+        run: docker build -t tennison:ci .
+      - name: Check dependencies and static manifest without production secrets
+        run: |
+          docker run --rm --entrypoint python tennison:ci -m pip check
+          docker run --rm --user 10001:10001 --entrypoint python tennison:ci -c 'import json; from pathlib import Path; p=Path("/app/staticfiles/staticfiles.json"); assert "css/pages/chat.css" in json.loads(p.read_text())["paths"]; assert not Path("/app/.env").exists(); assert not Path("/app/.passwords").exists()'
+
+  # Optional CI gate. Enable only AFTER setting secrets and disabling Dokploy's
+  # direct push trigger, otherwise each push starts two independent deployments.
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DOKPLOY_DEPLOY_ENABLED == 'true'
+    needs: [checks, image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trigger Dokploy after successful checks
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_COMPOSE_ID: ${{ secrets.DOKPLOY_COMPOSE_ID }}
+        run: |
+          set -euo pipefail
+          latest=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [[ "$latest" != "$GITHUB_SHA" ]]; then
+            echo 'Newer commit exists; its own workflow will deploy it.'
+            exit 0
+          fi
+          [[ "$DOKPLOY_URL" == https://* ]]
+          test -n "$DOKPLOY_API_KEY"
+          test -n "$DOKPLOY_COMPOSE_ID"
+          payload=$(jq -nc --arg id "$DOKPLOY_COMPOSE_ID" --arg title "Verified $GITHUB_SHA" '{composeId:$id,title:$title}')
+          curl --fail --silent --show-error --max-time 60 --output /dev/null \
+            -X POST "${DOKPLOY_URL%/}/api/compose.deploy" \
+            -H "x-api-key: $DOKPLOY_API_KEY" \
+            -H 'Content-Type: application/json' --data "$payload"

@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12.15-slim-trixie
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -28,8 +28,8 @@ RUN set -eux; \
         fonts-dejavu-core; \
     rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt
+COPY requirements.txt requirements.lock ./
+RUN pip install --no-cache-dir --root-user-action=ignore --require-hashes -r requirements.lock
 
 # Удаляем gcc после установки зависимостей
 RUN apt-get purge -y gcc && apt-get autoremove -y
@@ -40,6 +40,14 @@ COPY entrypoint.sh /entrypoint.sh
 COPY cron-entrypoint.sh /cron-entrypoint.sh
 COPY cron-run-wrapper.py /app/cron-run-wrapper.py
 RUN chmod +x /entrypoint.sh /cron-entrypoint.sh /app/cron-run-wrapper.py
+
+# Статика создаётся один раз на образ, без боевых ключей и подключения к БД.
+RUN python scripts/build_css_bundle.py \
+    && SECRET_KEY=build-only-not-used-at-runtime DEBUG=False USE_POSTGRES=False \
+       USE_S3=False USE_REDIS=False TELEGRAM_ENABLED=False \
+       python manage.py collectstatic --noinput \
+    && useradd --uid 10001 --create-home app \
+    && chown -R app:app /app/logs /app/staticfiles
 
 EXPOSE 8000
 

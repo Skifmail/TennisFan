@@ -1,0 +1,43 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru" class="chat-document">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#f5f5f7">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{% block title %}Городские чаты{% endblock %} · TennisFan</title>
+    <link rel="icon" href="{% static site_favicon_path %}">
+    <link rel="stylesheet" href="{% static 'css/pages/chat.css' %}">
+    <script src="{% static 'js/chat_shell.js' %}" defer></script>
+</head>
+<body class="chat-app">
+{% include 'chat/_icons.html' %}
+<a href="#chat-main" class="chat-skip-link">К содержимому</a>
+<header class="chat-app-toolbar">
+    <a href="{% url 'chat:index' %}" class="chat-brand" aria-label="TennisFan — городские чаты"><span class="chat-brand-mark"><svg class="chat-icon"><use href="#chat-icon-message"/></svg></span>TennisFan<span class="chat-brand-divider"></span><span class="chat-brand-caption">Сообщества</span></a>
+    <a class="chat-platform-link" href="/">На платформу <svg class="chat-icon"><use href="#chat-icon-external"/></svg></a>
+</header>
+<div class="chat-app-frame">
+    <aside class="chat-sidebar">
+        <div class="chat-sidebar-heading"><h2>Сообщения</h2><a class="chat-icon-button" href="{% url 'chat:index' %}?q=" aria-label="Найти городской чат"><svg class="chat-icon"><use href="#chat-icon-plus"/></svg></a></div>
+        <a href="{% url 'chat:index' %}?q=" class="chat-sidebar-search{% if not room %} is-selected{% endif %}" {% if not room %}aria-current="page"{% endif %}><svg class="chat-icon"><use href="#chat-icon-search"/></svg>Найти город<span>↗</span></a>
+        <p class="chat-sidebar-label">МОИ ГОРОДА</p>
+        <nav class="chat-room-list" aria-label="Мои городские чаты">
+        {% for member in memberships %}
+            <a class="chat-room-link{% if room.pk == member.room_id %} is-selected{% endif %}" href="{% url 'chat:room' member.room_id %}" {% if room.pk == member.room_id %}aria-current="page"{% endif %}>
+                <span class="chat-room-avatar" aria-hidden="true">{{ member.room.city.name|slice:':1' }}</span>
+                <span class="chat-room-copy"><strong>{{ member.room.city.name }}</strong><small>{{ member.room.city.region|default:'Городской чат' }}</small></span>
+                {% if member.unread %}<span class="chat-unread" {% if room.pk == member.room_id %}id="chat-room-unread"{% endif %} aria-label="Непрочитанных: {{ member.unread }}">{{ member.unread }}</span>{% endif %}
+            </a>
+        {% empty %}<div class="chat-sidebar-empty"><p>Ваши города появятся здесь</p><span>Найдите сообщество и начните общение.</span></div>{% endfor %}
+        </nav>
+        <div class="chat-sidebar-footer"><span class="chat-account-avatar" aria-hidden="true">{{ request.user.first_name|default:'И'|slice:':1' }}</span><span><strong>{{ request.user.first_name|default:'Игрок' }} {{ request.user.last_name }}</strong><small>Ваши городские сообщества</small></span></div>
+    </aside>
+    <main class="chat-main {% block main_class %}{% endblock %}" id="chat-main" tabindex="-1">{% block content %}{% endblock %}</main>
+</div>
+{% block overlays %}{% endblock %}
+{% block extra_js %}{% endblock %}
+</body>
+</html>

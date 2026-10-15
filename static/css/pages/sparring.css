@@ -37,7 +37,7 @@
 
 .sparring-tab:hover {
     color: var(--color-text);
-    background: rgb(166 130 74 / 0.12);
+    background: rgb(166 130 74 / 12%);
 }
 
 .sparring-tab--active {
@@ -122,7 +122,7 @@
     justify-content: center;
     min-height: 2.15rem;
     padding: 0.2rem 0.65rem;
-    border: 1px solid rgb(166 130 74 / 0.45);
+    border: 1px solid rgb(166 130 74 / 45%);
     border-radius: 999px;
     box-shadow: none;
     text-align: center;
@@ -151,7 +151,7 @@
     max-width: none;
     min-width: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 0.85fr);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
     align-items: center;
     margin-bottom: 0;
     padding: 0;
@@ -219,9 +219,9 @@
     min-width: 0;
     gap: 0.15rem;
     padding: 0.15rem;
-    border: 1px solid rgb(166 130 74 / 0.45);
+    border: 1px solid rgb(166 130 74 / 45%);
     border-radius: 999px;
-    background: rgb(0 0 0 / 0.15);
+    background: rgb(0 0 0 / 15%);
 }
 
 .sparring-nearby__dot {
@@ -230,7 +230,7 @@
     border-radius: 50%;
     flex-shrink: 0;
     background: transparent;
-    box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.38);
+    box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 38%);
 }
 
 .sparring-toolbar__panel .sparring-nearby-capsule .sparring-nearby__toggle {
@@ -240,16 +240,9 @@
     padding: 0 0.7rem;
 }
 
-.sparring-toolbar__panel .sparring-nearby-capsule .sparring-nearby__toggle--on,
-.sparring-toolbar__panel .sparring-nearby-capsule .btn-outline.sparring-nearby__toggle--on:hover {
-    background: rgb(86 168 104 / 0.28);
-    border-color: transparent;
-    color: var(--color-text);
-}
-
 .sparring-nearby__toggle--on .sparring-nearby__dot {
     background: #3ddc84;
-    box-shadow: 0 0 0 3px rgb(61 220 132 / 0.38);
+    box-shadow: 0 0 0 3px rgb(61 220 132 / 38%);
 }
 
 .sparring-nearby-capsule .sparring-nearby__radii {
@@ -267,7 +260,7 @@
     min-width: 0;
     border-color: transparent;
     background: transparent;
-    color: rgb(255 255 255 / 0.38);
+    color: rgb(255 255 255 / 38%);
     padding: 0 0.2rem;
     font-size: 0.72rem;
 }
@@ -312,7 +305,7 @@
     max-height: 2.15rem;
     padding: 0 0.8rem;
     box-sizing: border-box;
-    border: 1px solid rgb(166 130 74 / 0.45);
+    border: 1px solid rgb(166 130 74 / 45%);
     border-radius: 999px;
     background: transparent;
     color: var(--color-text);
@@ -349,19 +342,19 @@
 
 /* Главное действие: чуть заметнее остальных outline, без «кислотной» заливки */
 .sparring-toolbar__btn--cta {
-    background: rgb(166 130 74 / 0.2);
+    background: rgb(166 130 74 / 20%);
     border-color: var(--color-primary);
     color: var(--color-text);
 }
 
 .sparring-toolbar__panel .btn-outline.sparring-toolbar__btn:hover {
     background: transparent;
-    border-color: rgb(166 130 74 / 0.45);
+    border-color: rgb(166 130 74 / 45%);
     color: var(--color-text);
 }
 
 .sparring-toolbar__panel .sparring-toolbar__btn--cta:hover {
-    background: rgb(166 130 74 / 0.2);
+    background: rgb(166 130 74 / 20%);
     border-color: var(--color-primary);
     color: var(--color-text);
 }
@@ -370,8 +363,8 @@
 .sparring-toolbar__panel .btn-outline.sparring-nearby__toggle:hover,
 .sparring-toolbar__filters .sparring-nearby__toggle--on:hover,
 .sparring-toolbar__panel .sparring-nearby__toggle--on {
-    background: rgb(86 168 104 / 0.28);
-    border-color: rgb(130 196 140 / 0.75);
+    background: rgb(86 168 104 / 28%);
+    border-color: rgb(130 196 140 / 75%);
     color: var(--color-text);
 }
 
@@ -398,7 +391,7 @@
 
 .sparring-toolbar__panel .sparring-nearby-capsule .sparring-nearby__toggle--on,
 .sparring-toolbar__panel .sparring-nearby-capsule .btn-outline.sparring-nearby__toggle--on:hover {
-    background: rgb(86 168 104 / 0.28);
+    background: rgb(86 168 104 / 28%);
     border-color: transparent;
     color: var(--color-text);
 }
@@ -419,8 +412,8 @@
     }
 
     .sparring-toolbar__panel .btn-outline.sparring-nearby__toggle:hover {
-        background: rgb(86 168 104 / 0.42);
-        border-color: rgb(150 210 155 / 0.9);
+        background: rgb(86 168 104 / 42%);
+        border-color: rgb(150 210 155 / 90%);
         color: var(--color-text);
     }
 
@@ -693,8 +686,7 @@ img.player-avatar.sparring-card__avatar {
 
 .sparring-card__actions {
     display: flex;
-    flex-direction: column;
-    flex-wrap: wrap;
+    flex-flow: column wrap;
     gap: var(--spacing-xs);
     align-items: flex-end;
     justify-content: center;
@@ -775,8 +767,7 @@ img.player-avatar.sparring-card__avatar {
     }
 
     .sparring-card__actions {
-        flex-direction: row;
-        flex-wrap: wrap;
+        flex-flow: row wrap;
         width: 100%;
         align-items: stretch;
     }
@@ -794,7 +785,7 @@ img.player-avatar.sparring-card__avatar {
 
     .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar {
         flex: 1 1 100%;
-        grid-template-columns: minmax(0, 1.5fr) minmax(8.5rem, 1fr) minmax(7.5rem, 0.85fr);
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
     }
 
     .sparring-toolbar__panel:has(.sparring-toolbar__filters) .sparring-toolbar__actions {

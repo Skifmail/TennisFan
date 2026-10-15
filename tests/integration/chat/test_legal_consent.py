@@ -30,6 +30,7 @@ def _submission(user: User, city: City, **changes: str) -> dict[str, str]:
         "personal_data": "on",
         "rules": "on",
         "disclosure": "on",
+        "show_name": "on",
         **changes,
     }
 
@@ -57,7 +58,7 @@ def test_document_when_opened_should_be_public_and_versioned(
     assert len(LEGAL_DOCUMENT_PATHS[slug].read_text()) > 1000
 
 
-def test_join_form_when_opened_should_have_three_unchecked_required_consents(
+def test_join_form_when_opened_should_have_two_unchecked_required_consents(
     client: Client,
 ) -> None:
     """Открытие формы не вступает в чат и не создаёт фиктивных согласий."""
@@ -67,19 +68,20 @@ def test_join_form_when_opened_should_have_three_unchecked_required_consents(
     response = client.get(reverse("chat:join"), {"city_id": city.pk})
     assert response.status_code == 200
     form = response.context["consent_form"]
-    for name in ("personal_data", "rules", "disclosure"):
+    for name in ("personal_data", "rules"):
         assert form.fields[name].required
         assert not form[name].value()
-    assert "мои сообщения" in form.fields["disclosure"].label
-    assert "выбранных ниже" not in form.fields["disclosure"].label
+    assert not form.fields["disclosure"].required
+    assert "имени" in form.fields["disclosure"].label
+    assert "мои сообщения" not in form.fields["disclosure"].label
     for name in ("show_name", "show_avatar", "conditions"):
         assert not form.fields[name].required
-    assert "Имя и фото — необязательно" in response.content.decode()
+    assert "Выберите, что показывать" in response.content.decode()
     assert not ChatMembership.objects.filter(user=user).exists()
     assert not LegalAcceptanceLog.objects.filter(user=user).exists()
 
 
-@pytest.mark.parametrize("field", ["personal_data", "rules", "disclosure", "token"])
+@pytest.mark.parametrize("field", ["personal_data", "rules", "token"])
 @pytest.mark.parametrize("value", ["", "false", "0"])
 def test_join_when_required_confirmation_missing_should_not_create_membership(
     field: str, value: str
@@ -217,7 +219,7 @@ def test_disclosure_when_fields_not_selected_should_hide_name_photo_and_profile_
     """Отказ от показа имени и фото не мешает общению под обозначением участника."""
     user = make_user(email="legal-minimal@test.local", first_name="Секретное имя")
     city = City.objects.create(name="Город минимизации")
-    member = _accept(user, city, _submission(user, city))
+    member = _accept(user, city, _submission(user, city, disclosure="", show_name=""))
     message = services.send_message(
         user=user, room_id=member.room_id, text="Привет", client_id=uuid4()
     )
@@ -575,7 +577,15 @@ def test_photo_when_choice_recorded_should_publish_only_permitted_profile_photo(
     player.refresh_from_db()
     city = City.objects.create(name="Город фотографии")
     member = _accept(
-        user, city, _submission(user, city, show_avatar="on" if show_avatar else "")
+        user,
+        city,
+        _submission(
+            user,
+            city,
+            disclosure="on" if show_avatar else "",
+            show_name="",
+            show_avatar="on" if show_avatar else "",
+        ),
     )
     message = services.send_message(
         user=user, room_id=member.room_id, text="Фото по выбору", client_id=uuid4()
@@ -587,3 +597,183 @@ def test_photo_when_choice_recorded_should_publish_only_permitted_profile_photo(
     assert payload["author"] == f"Участник #{user.pk}"
     assert payload["profile_url"] == ""
     assert member.disclosure_reviewed
+
+
+@pytest.mark.parametrize("selection", ["", "show_name", "show_avatar", "both"])
+def test_join_when_optional_choice_made_should_record_only_confirmed_documents(
+    client: Client, selection: str
+) -> None:
+    """Два согласия дают доступ; третье записывается только при выборе категории.
+
+    Args:
+        client: Клиент авторизованного игрока.
+        selection: Выбранные дополнительные поля профиля либо пустой выбор.
+    """
+    user = make_user(email="optional-choice@test.local", first_name="Анна")
+    city = City.objects.create(name="Город добровольных согласий")
+    data = _submission(
+        user,
+        city,
+        disclosure="on" if selection else "",
+        show_name="on" if selection in ("show_name", "both") else "",
+        show_avatar="on" if selection in ("show_avatar", "both") else "",
+    )
+    client.force_login(user)
+    assert client.post(reverse("chat:join"), data).status_code == 302
+    member = ChatMembership.objects.get(user=user, room__city=city)
+    assert services.require_member(user=user, room_id=member.room_id).pk == member.pk
+    logs = LegalAcceptanceLog.objects.filter(user=user, source="chat_join")
+    assert logs.count() == (3 if selection else 2)
+    assert logs.filter(document_slug="chat-disclosure").exists() is bool(selection)
+    assert member.disclosure_name is (selection in ("show_name", "both"))
+    assert member.disclosure_avatar is (selection in ("show_avatar", "both"))
+    if not selection:
+        message = services.send_message(
+            user=user,
+            room_id=member.room_id,
+            text="Без дополнительных согласий",
+            client_id=uuid4(),
+        )
+        payload = services.serialize_message(message)
+        assert not payload["is_deleted"]
+        assert payload["author"] == f"Участник #{user.pk}"
+        assert payload["avatar"] == ""
+    client.post(reverse("chat:withdraw_consent", args=[member.room_id]))
+    withdrawal = LegalAcceptanceLog.objects.get(user=user, source="chat_withdrawal")
+    assert ("chat-disclosure" in withdrawal.metadata["withdrawn_documents"]) is bool(
+        selection
+    )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"disclosure": "on", "show_name": ""},
+        {"disclosure": "", "show_name": "on"},
+        {"disclosure": "", "show_name": "", "show_avatar": "on"},
+        {"disclosure": "", "show_name": "", "conditions": "Запрет рекламы"},
+    ],
+)
+def test_join_when_optional_fields_inconsistent_should_reject_direct_post(
+    client: Client, changes: dict[str, str]
+) -> None:
+    """Прямой запрос не обходит зависимость согласия от выбранных категорий.
+
+    Args:
+        client: HTTP-клиент игрока.
+        changes: Несогласованный выбор добровольного согласия и полей.
+    """
+    user = make_user(email="optional-forged@test.local")
+    city = City.objects.create(name="Город проверки допов")
+    client.force_login(user)
+    response = client.post(reverse("chat:join"), _submission(user, city, **changes))
+    assert response.status_code == 400
+    assert not ChatMembership.objects.filter(user=user).exists()
+    assert not LegalAcceptanceLog.objects.filter(user=user).exists()
+
+
+def test_join_when_optional_consent_disabled_later_should_hide_previous_profile_data() -> (
+    None
+):
+    """Повторное вступление с двумя отметками не сохраняет прежние разрешения."""
+    user = make_user(email="optional-switch@test.local", first_name="Анна")
+    city = City.objects.create(name="Город смены выбора")
+    member = _accept(user, city, _submission(user, city, show_avatar="on"))
+    message = services.send_message(
+        user=user, room_id=member.room_id, text="Остаюсь в чате", client_id=uuid4()
+    )
+    assert services.serialize_message(message)["author"] == "Анна"
+    data = _submission(user, city, disclosure="", show_name="")
+    member = _accept(user, city, data)
+    _accept(user, city, data)
+    assert not member.disclosure_name and not member.disclosure_avatar
+    assert LegalAcceptanceLog.objects.filter(user=user, source="chat_join").count() == 5
+    assert (
+        LegalAcceptanceLog.objects.filter(
+            user=user, document_slug="chat-disclosure"
+        ).count()
+        == 1
+    )
+    payload = services.serialize_message(message)
+    assert payload["author"] == f"Участник #{user.pk}"
+    assert payload["avatar"] == ""
+    assert payload["text"] == "Остаюсь в чате"
+    assert not payload["is_deleted"]
+
+
+@pytest.mark.parametrize("selection", ["", "show_name", "show_avatar", "both"])
+def test_settings_when_choices_changed_should_keep_membership_and_show_current_state(
+    client: Client, selection: str
+) -> None:
+    """Настройки доступны слева; изменение показа данных не исключает игрока.
+
+    Args:
+        client: Авторизованный клиент игрока.
+        selection: Новый выбор полей профиля.
+    """
+    user = make_user(email="chat-settings-choice@test.local", first_name="Анна")
+    city = City.objects.create(name="Город настроек согласий")
+    member = _accept(user, city, _submission(user, city))
+    client.force_login(user)
+    room_url = reverse("chat:room", args=[member.room_id])
+    page = client.get(room_url).content.decode()
+    assert 'id="chat-sidebar-settings"' in page
+    assert "Настройки чата" in page
+    assert "Изменить согласия" in page
+    assert "Отозвать основные согласия и выйти" in page
+    edit = client.get(reverse("chat:join"), {"city_id": city.pk})
+    assert "Изменить согласия" in edit.content.decode()
+    response = client.post(
+        reverse("chat:join"),
+        _submission(
+            user,
+            city,
+            disclosure="on" if selection else "",
+            show_name="on" if selection in ("show_name", "both") else "",
+            show_avatar="on" if selection in ("show_avatar", "both") else "",
+        ),
+        follow=True,
+    )
+    assert response.status_code == 200
+    assert response.redirect_chain[-1][0] == room_url
+    assert "Согласия обновлены" in response.content.decode()
+    member.refresh_from_db()
+    assert member.is_active
+    assert member.disclosure_name is (selection in ("show_name", "both"))
+    assert member.disclosure_avatar is (selection in ("show_avatar", "both"))
+
+
+def test_settings_when_main_consents_withdrawn_should_exclude_and_explain_exit(
+    client: Client,
+) -> None:
+    """Отзыв основных согласий отключает участие и показывает сообщение после перехода.
+
+    Args:
+        client: Авторизованный клиент игрока.
+    """
+    user = make_user(email="chat-settings-withdraw@test.local")
+    city = City.objects.create(name="Город полного отзыва")
+    member = _accept(user, city, _submission(user, city, disclosure="", show_name=""))
+    other_city = City.objects.create(name="Другой город без отзыва")
+    other = _accept(
+        user, other_city, _submission(user, other_city, disclosure="", show_name="")
+    )
+    client.force_login(user)
+    response = client.post(
+        reverse("chat:withdraw_consent", args=[member.room_id]), follow=True
+    )
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert "исключены из чата" in html and city.name in html
+    assert "Доступ к переписке закрыт" in html
+    member.refresh_from_db()
+    assert services.require_member(user=user, room_id=other.room_id).pk == other.pk
+    assert not member.is_active
+    assert member.consent_withdrawn_at
+    withdrawal = LegalAcceptanceLog.objects.get(user=user, source="chat_withdrawal")
+    assert set(withdrawal.metadata["withdrawn_documents"]) == {
+        "chat-personal-data",
+        "chat-rules",
+    }
+    with pytest.raises(ChatError):
+        services.require_member(user=user, room_id=member.room_id)

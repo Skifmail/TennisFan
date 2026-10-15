@@ -7,9 +7,30 @@
     function initialize(form) {
         const submit = form.querySelector('button[type="submit"]');
         const required = Array.from(form.querySelectorAll('input[type="checkbox"][required]'));
-        function update() { submit.disabled = !required.every((input) => input.checked); }
+        const disclosure = form.querySelector('input[name="disclosure"]');
+        const options = form.querySelector("[data-disclosure-fields]");
+        const categories = Array.from(options.querySelectorAll('input[type="checkbox"]'));
+        const optionalFields = options.querySelectorAll("input, textarea");
+        function update() {
+            const enabled = disclosure.checked;
+            options.hidden = !enabled;
+            disclosure.setAttribute("aria-expanded", String(enabled));
+            optionalFields.forEach((input) => {
+                input.disabled = !enabled;
+                if (!enabled) {
+                    if (input.type === "checkbox") input.checked = false;
+                    else input.value = "";
+                }
+            });
+            submit.disabled = !required.every((input) => input.checked)
+                || (enabled && !categories.some((input) => input.checked));
+        }
         form.addEventListener("change", update);
-        form.addEventListener("submit", () => { submit.disabled = true; });
+        form.addEventListener("submit", (event) => {
+            update();
+            if (submit.disabled) event.preventDefault();
+            else submit.disabled = true;
+        });
         update();
     }
     document.querySelectorAll("[data-consent-form]").forEach(initialize);

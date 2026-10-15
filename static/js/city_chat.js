@@ -635,7 +635,20 @@
         }
     });
     byId("chat-cancel").addEventListener("click", () => { clearContext(true); persist(); input.focus({preventScroll: true}); });
-    byId("chat-info").addEventListener("click", () => openDialog(settingsDialog, byId("chat-info")));
+    document.querySelectorAll("[data-open-chat-settings]").forEach((button) => {
+        button.addEventListener("click", () => openDialog(settingsDialog, button));
+    });
+    const withdrawalForm = byId("chat-withdraw-form");
+    withdrawalForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        ask({
+            title: "Отозвать основные согласия?",
+            description: "Вы будете исключены из этого чата. Ваши сообщения, имя и фото будут скрыты. Для возвращения нужно заново подтвердить обязательные пункты.",
+            confirm: "Отозвать и выйти", destructive: true,
+            origin: dialogOrigins.get(settingsDialog) || byId("chat-info"),
+            execute: async () => { stopped = true; withdrawalForm.submit(); },
+        });
+    });
     byId("chat-leave").addEventListener("click", () => ask({
         title: "Покинуть чат?", description: "Вы сможете снова вступить в этот город в любое время. История переписки сохранится.", confirm: "Покинуть чат", destructive: true, origin: byId("chat-info"),
         execute: async () => { await request(config.actionUrl, {action: "leave"}); stopped = true; location.assign(config.indexUrl); },

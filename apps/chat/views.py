@@ -8,6 +8,7 @@ from functools import wraps
 from typing import Any, Final, cast
 from uuid import UUID
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -209,7 +210,7 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
 @require_http_methods(["GET", "POST"])
 @_api
 def join(request: HttpRequest) -> HttpResponse:
-    """Предъявляет документы и вступает только после трёх личных подтверждений.
+    """Предъявляет два обязательных подтверждения и добровольный выбор профиля.
 
     Args:
         request: Запрос формы либо её отправка с подписанным контекстом города.
@@ -224,6 +225,13 @@ def join(request: HttpRequest) -> HttpResponse:
     )
     city = get_object_or_404(City, pk=city_id)
     user = cast(User, request.user)
+    current = ChatMembership.objects.filter(user=user, room__city=city).first()
+    is_consent_update = bool(
+        current
+        and current.is_active
+        and current.consented_at
+        and not current.consent_withdrawn_at
+    )
     error = ""
     status = 200
     if request.method == "POST":
@@ -245,6 +253,11 @@ def join(request: HttpRequest) -> HttpResponse:
                     {"city": city, "membership": member},
                     status=202,
                 )
+            if is_consent_update:
+                messages.success(
+                    request,
+                    "Согласия обновлены. Выбранные настройки показа имени и фото применены.",
+                )
             return redirect("chat:room", room_id=member.room_id)
     # После ошибки все галочки снова пусты: новая редакция не принимается молча.
     template = (
@@ -259,6 +272,8 @@ def join(request: HttpRequest) -> HttpResponse:
             "city": city,
             "consent_form": build_consent_form(user=user, city=city),
             "consent_error": error,
+            "is_consent_update": is_consent_update,
+            "consent_room_id": current.room_id if current else None,
             "base_conditions": BASE_DISCLOSURE_CONDITIONS,
             "memberships": list(services.my_memberships(user=user)),
         },
@@ -314,12 +329,18 @@ def withdraw_consent(request: HttpRequest, room_id: int) -> HttpResponse:
     Returns:
         Перенаправление в каталог после отзыва.
     """
-    get_object_or_404(ChatRoom, pk=room_id)
+    selected = get_object_or_404(ChatRoom.objects.select_related("city"), pk=room_id)
     withdraw_chat_consent(
         user=cast(User, request.user),
         room_id=room_id,
         ip_address=consent_request_ip(request),
         user_agent=request.META.get("HTTP_USER_AGENT", ""),
+    )
+    messages.success(
+        request,
+        f"Вы отозвали основные согласия и исключены из чата «{selected.city.name}». "
+        "Доступ к переписке закрыт, ваши сообщения и данные скрыты. "
+        "Для возвращения потребуется снова подтвердить обязательные пункты.",
     )
     return redirect("chat:index")
 

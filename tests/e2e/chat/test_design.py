@@ -58,7 +58,7 @@ def test_design_when_resized_or_keyboard_used_should_keep_composer_and_focus_acc
                     "document.documentElement.scrollHeight <= innerHeight + 1"
                 )
                 page.locator("#chat-info").click()
-                settings = page.get_by_role("dialog", name="О чате")
+                settings = page.get_by_role("dialog", name="Настройки чата")
                 expect(settings).to_be_visible()
                 page.keyboard.press("Escape")
                 expect(settings).not_to_be_visible()

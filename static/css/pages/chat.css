@@ -2123,3 +2123,68 @@
         backdrop-filter: none;
     }
 }
+
+/* Настройки выбранного города всегда доступны перед блоком аккаунта. */
+.chat-sidebar-settings {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    margin-top: auto;
+    margin-bottom: 12px;
+    border: 1px solid var(--chat-line);
+    border-radius: 12px;
+    background: var(--chat-field);
+    color: var(--chat-ink);
+    font: inherit;
+    text-align: left;
+}
+
+.chat-settings-visibility {
+    padding-top: 16px;
+    border-top: 1px solid var(--chat-line);
+}
+
+.chat-settings-visibility h3 {
+    font-size: 0.875rem;
+}
+
+.chat-settings-visibility dl {
+    margin: 12px 0;
+}
+
+.chat-settings-visibility dl > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 6px 0;
+    font-size: 0.8125rem;
+}
+
+.chat-settings-visibility dd {
+    margin: 0;
+    color: var(--chat-accent);
+}
+
+.chat-settings-visibility p {
+    color: var(--chat-secondary);
+    font-size: 0.75rem;
+}
+
+.chat-account-notice {
+    padding: 16px;
+    margin-bottom: 24px !important;
+    border: 1px solid var(--chat-border);
+    border-radius: 14px;
+    background: var(--chat-field);
+    color: var(--chat-ink);
+    overflow-wrap: anywhere;
+}
+
+.chat-sidebar-settings + .chat-sidebar-footer {
+    margin-top: 0;
+    flex-shrink: 0;
+}

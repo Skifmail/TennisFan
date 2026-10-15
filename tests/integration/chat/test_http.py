@@ -30,7 +30,6 @@ def test_pages_when_logged_in_should_join_other_city_and_render(client: Client) 
             "token": str(form["token"].value()),
             "personal_data": "on",
             "rules": "on",
-            "disclosure": "on",
         },
     )
     assert response.status_code == 302

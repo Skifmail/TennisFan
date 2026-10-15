@@ -1,4 +1,4 @@
 {% extends 'chat/base.html' %}
-{% block title %}Вступление в чат · {{ city.name }}{% endblock %}
+{% block title %}{% if is_consent_update %}Изменить согласия{% else %}Вступление в чат{% endif %} · {{ city.name }}{% endblock %}
 {% block main_class %}chat-discover{% endblock %}
 {% block content %}<div class="chat-consent-page">{% include 'chat/_join_form.html' %}{% include 'chat/_legal_links.html' %}</div>{% endblock %}

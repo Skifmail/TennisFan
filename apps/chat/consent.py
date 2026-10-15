@@ -44,9 +44,9 @@ CONSENT_DOCUMENTS: Final = {
     "disclosure": "chat-disclosure",
 }
 CONSENT_LABELS: Final = {
-    "personal_data": "Даю согласие на обработку персональных данных для работы городского чата.",
+    "personal_data": "Даю согласие на обработку персональных данных для работы городского чата, включая показ моих сообщений его участникам.",
     "rules": "Я прочитал(а) правила городских чатов и обязуюсь их соблюдать.",
-    "disclosure": "Даю отдельное согласие на распространение: разрешаю показывать мои сообщения участникам этого городского чата.",
+    "disclosure": "Даю дополнительное согласие на показ выбранных ниже имени и фамилии и/или фотографии участникам этого городского чата.",
 }
 BASE_DISCLOSURE_CONDITIONS: Final = (
     "Доступ только участникам выбранного чата. Запрещены дальнейшая передача "
@@ -79,7 +79,11 @@ class ChatConsentForm(forms.Form):
     token = forms.CharField(widget=forms.HiddenInput, max_length=MAX_SIGNED_FORM_LENGTH)
     personal_data = forms.BooleanField(label=CONSENT_LABELS["personal_data"])
     rules = forms.BooleanField(label=CONSENT_LABELS["rules"])
-    disclosure = forms.BooleanField(label=CONSENT_LABELS["disclosure"])
+    disclosure = forms.BooleanField(
+        required=False,
+        label=CONSENT_LABELS["disclosure"],
+        widget=forms.CheckboxInput(attrs={"aria-controls": "chat-disclosure-options"}),
+    )
     show_name = forms.BooleanField(
         required=False, label="Показывать имя и фамилию из моего профиля"
     )
@@ -100,12 +104,20 @@ class ChatConsentForm(forms.Form):
             Проверенные поля формы.
         """
         cleaned = super().clean() or {}
-        for name in CONSENT_DOCUMENTS:
+        for name in ("personal_data", "rules"):
             if self.data.get(name) != "on":
                 self.add_error(name, "Необходимо отдельное подтверждение.")
-        for name in ("show_name", "show_avatar"):
+        for name in ("disclosure", "show_name", "show_avatar"):
             if self.data.get(name) not in (None, "", "on"):
                 self.add_error(name, "Некорректное значение выбора данных.")
+        disclosure = cleaned.get("disclosure", False)
+        selected = cleaned.get("show_name", False) or cleaned.get("show_avatar", False)
+        if disclosure and not selected:
+            self.add_error("disclosure", "Выберите имя и фамилию и/или фотографию.")
+        if not disclosure and (selected or cleaned.get("conditions")):
+            self.add_error(
+                "disclosure", "Для показа данных необходимо дополнительное согласие."
+            )
         return cleaned
 
 
@@ -230,7 +242,7 @@ def accept_chat_consent(
     ip_address: str | None,
     user_agent: str,
 ) -> ChatMembership:
-    """Атомарно фиксирует три подтверждения и участие, не дублируя повтор запроса.
+    """Атомарно фиксирует выданные согласия и участие без дублей повторного запроса.
 
     Args:
         user: Игрок, самостоятельно подтверждающий документы.
@@ -255,7 +267,7 @@ def accept_chat_consent(
     form = ChatConsentForm(data=data)
     if not form.is_valid():
         raise ChatValidationError(
-            "Отметьте три независимых подтверждения и проверьте заполнение формы."
+            "Подтвердите обработку данных и правила. При дополнительном согласии выберите имя и фамилию и/или фото."
         )
     documents = load_consent_documents()
     version = _bundle_version(documents)
@@ -312,6 +324,8 @@ def accept_chat_consent(
     join_city(user=user, city_id=city.pk)
     member = ChatMembership.objects.select_for_update().get(user=user, room=room)
     for field, slug in CONSENT_DOCUMENTS.items():
+        if not form.cleaned_data[field]:
+            continue
         snapshot = documents[slug]
         LegalAcceptanceLog.objects.create(
             user=user,
@@ -393,9 +407,17 @@ def withdraw_chat_consent(
         raise ChatConsentRequiredError("Участие не найдено.")
     if member.consent_withdrawn_at:
         return
+    withdrawn_documents = ["chat-personal-data", "chat-rules"]
+    if LegalAcceptanceLog.objects.filter(
+        user=user,
+        source=CONSENT_SOURCE,
+        document_slug="chat-disclosure",
+        metadata__acceptance_id=str(member.consent_id),
+    ).exists():
+        withdrawn_documents.append("chat-disclosure")
     LegalAcceptanceLog.objects.create(
         user=user,
-        document_slug="chat-disclosure",
+        document_slug=withdrawn_documents[0],
         document_version=member.consent_version or "unknown",
         source="chat_withdrawal",
         ip_address=ip_address,
@@ -405,7 +427,7 @@ def withdraw_chat_consent(
             "room_id": room_id,
             "city_id": member.room.city_id,
             "acceptance_id": str(member.consent_id),
-            "withdrawn_documents": ["chat-personal-data", "chat-disclosure"],
+            "withdrawn_documents": withdrawn_documents,
             "method": "authenticated_explicit_withdrawal",
         },
     )

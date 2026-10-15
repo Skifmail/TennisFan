@@ -3,6 +3,7 @@
 {% block main_class %}chat-discover{% endblock %}
 {% block content %}
 <div class="chat-discover-inner">
+    {% for message in messages %}<p class="chat-account-notice" role="status">{{ message }}</p>{% endfor %}
     <div class="chat-discover-heading"><span class="chat-discover-icon"><svg class="chat-icon"><use href="#chat-icon-city"/></svg></span><p class="chat-eyebrow">ЛЮДИ РЯДОМ. ОБЩИЙ ИНТЕРЕС.</p><h1>Найти свой город</h1><p>Договоритесь об игре, обсудите корты<br class="chat-desktop-break"> или просто познакомьтесь. Теннис объединяет.</p></div>
     <form method="get" class="chat-city-search" role="search" aria-label="Поиск городских чатов"><svg class="chat-icon"><use href="#chat-icon-search"/></svg><label for="chat-city-search" class="chat-sr-only">Название населённого пункта</label><input id="chat-city-search" name="q" type="search" value="{{ query }}" placeholder="Город или населённый пункт" maxlength="100"><button class="chat-button" type="submit">Найти</button></form>
     {% if memberships %}<div class="chat-mobile-memberships"><h2>Мои города</h2><div>{% for member in memberships %}<a href="{% url 'chat:room' member.room_id %}"><span class="chat-mobile-room-copy">{{ member.room.city.name }}{% include 'chat/_participant_count.html' with count=member.member_count only %}</span>{% if member.unread %}<span class="chat-unread">{{ member.unread }}</span>{% endif %}</a>{% endfor %}</div></div>{% endif %}

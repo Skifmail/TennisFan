@@ -97,7 +97,7 @@ def test_palette_when_chat_states_rendered_should_keep_brand_and_text_readable()
                 )
             page.emulate_media(contrast="no-preference")
             page.locator("#chat-info").click()
-            dialog = page.get_by_role("dialog", name="О чате")
+            dialog = page.get_by_role("dialog", name="Настройки чата")
             _assert_readable(dialog.locator(".chat-settings-identity p"))
             expect(
                 dialog.get_by_role(

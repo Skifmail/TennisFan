@@ -290,8 +290,11 @@ def test_settings_when_profile_choices_changed_and_withdrawn_should_apply_and_ex
                     "Показываются" if name_enabled else "Скрыты"
                 )
                 expect(page.locator('[data-profile-visibility="avatar"]')).to_have_text(
-                    "Показывается" if photo_enabled else "Скрыто"
+                    "Не загружено" if photo_enabled else "Скрыто"
                 )
+                expect(
+                    page.get_by_role("link", name="Добавить фото в профиль", exact=True)
+                ).to_be_visible()
                 page.keyboard.press("Escape")
             page.set_viewport_size({"width": 390, "height": 844})
             page.locator("#chat-info").click()

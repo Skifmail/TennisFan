@@ -962,3 +962,43 @@ def test_settings_when_saved_form_used_after_withdrawal_should_not_reactivate_ol
     assert client.post(reverse("chat:join"), data).status_code == 409
     member.refresh_from_db()
     assert not member.is_active
+
+
+@pytest.mark.parametrize("has_photo", [False, True])
+@pytest.mark.parametrize("allowed", [False, True])
+def test_settings_when_photo_permission_and_file_differ_should_show_honest_status(
+    client: Client, has_photo: bool, allowed: bool
+) -> None:
+    """Разрешение на показ не выдаётся интерфейсом за наличие загруженной фотографии.
+
+    Args:
+        client: Клиент участника чата.
+        has_photo: Задан ли файл аватара в профиле.
+        allowed: Разрешён ли показ фотографии в комнате.
+    """
+    user = make_user(email="photo-state@test.local")
+    player = Player.objects.create(user=user)
+    if has_photo:
+        Player.objects.filter(pk=player.pk).update(avatar="avatars/profile-test.webp")
+    city = City.objects.create(name="Город наличия фото")
+    member = _accept(
+        user,
+        city,
+        _submission(
+            user,
+            city,
+            disclosure="on" if allowed else "",
+            show_name="",
+            show_avatar="on" if allowed else "",
+        ),
+    )
+    client.force_login(user)
+    response = client.get(reverse("chat:room", args=[member.room_id]))
+    html = response.content.decode()
+    expected = (
+        ("Показ разрешён" if has_photo else "Не загружено") if allowed else "Скрыто"
+    )
+    assert f'data-profile-visibility="avatar">{expected}</dd>' in html
+    assert ("Добавить фото в профиль" in html) is (not has_photo)
+    member.refresh_from_db()
+    assert member.disclosure_avatar is allowed

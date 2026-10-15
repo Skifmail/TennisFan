@@ -18,7 +18,8 @@
     --chat-gold-ink: #e0c991;
     --chat-gold-soft: var(--chat-sand);
     --chat-canvas: #083b2c;
-    --chat-surface: #052e23;
+    --chat-surface: #012b1c;
+    --chat-background-image: url("../../images/site-bg.svg?v=5");
     --chat-sidebar: #103f31;
     --chat-field: #164936;
     --chat-muted: #174331;
@@ -70,6 +71,10 @@
     margin: 0;
     color: var(--chat-ink);
     background: var(--chat-surface);
+    background-image: var(--chat-background-image);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
     font: 0.875rem/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     font-optical-sizing: auto;
@@ -226,7 +231,7 @@
     max-width: 1536px;
     width: calc(100% - 48px);
     margin: 0 auto 24px;
-    background: var(--chat-canvas);
+    background: transparent;
     border: 1px solid var(--chat-border);
     border-radius: 20px;
     overflow: hidden;
@@ -454,7 +459,7 @@
     min-height: 0;
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr) auto;
-    background: var(--chat-canvas);
+    background: transparent;
     position: relative;
 }
 

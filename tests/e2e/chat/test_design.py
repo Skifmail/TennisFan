@@ -1,4 +1,4 @@
-"""Браузерные проверки удобства светлого адаптивного чата."""
+"""Браузерные проверки удобства адаптивного чата."""
 
 import json
 from os import environ
@@ -36,6 +36,19 @@ def test_design_when_resized_or_keyboard_used_should_keep_composer_and_focus_acc
         try:
             page.goto(base + sessions["room_path"])
             expect(page.locator("#chat-status")).to_have_text("На связи", timeout=15000)
+            background = page.locator(".chat-app").evaluate(
+                "node => getComputedStyle(node).backgroundImage"
+            )
+            assert "site-bg" in background
+            artwork_url = background.split('"')[1]
+            artwork = page.request.get(artwork_url)
+            assert artwork.status == 200
+            assert '<pattern id="dots"' in artwork.text()
+            for selector in (".chat-app-frame", ".city-chat"):
+                expect(page.locator(selector)).to_have_css(
+                    "background-color", "rgba(0, 0, 0, 0)"
+                )
+
             expect(
                 page.get_by_role("navigation", name="Мои городские чаты")
             ).to_be_visible()

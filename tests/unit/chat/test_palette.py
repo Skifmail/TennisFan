@@ -135,3 +135,21 @@ def test_glass_when_transparency_unavailable_should_keep_opaque_surfaces() -> No
     assert "@supports (backdrop-filter:" in css
     assert "prefers-reduced-transparency: reduce" in css
     assert "color-scheme: dark" in css
+
+
+def test_background_when_chat_opened_should_reuse_platform_artwork_without_opaque_canvas() -> (
+    None
+):
+    """Чат использует оригинальный фон платформы, не закрывая его сплошной заливкой."""
+    css = CSS.read_text()
+    platform_css = (ROOT / "static/css/base/reset.css").read_text()
+    artwork = 'url("../../images/site-bg.svg?v=5")'
+    assert artwork in platform_css
+    assert artwork in css
+    assert (ROOT / "static/images/site-bg.svg").is_file()
+    for selector in (".chat-app-frame", ".city-chat"):
+        block = css.split(selector + " {", 1)[1].split("}", 1)[0]
+        assert "background: transparent;" in block
+    app = css.split(".chat-app {", 1)[1].split("}", 1)[0]
+    assert "background-image: var(--chat-background-image);" in app
+    assert "background-size: cover;" in app

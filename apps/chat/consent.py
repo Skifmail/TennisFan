@@ -6,7 +6,7 @@ import hashlib
 import ipaddress
 import json
 from collections.abc import Mapping
-from typing import Any, Final, TypedDict, cast
+from typing import Any, Final, TypedDict
 from uuid import UUID, uuid4
 
 from django import forms
@@ -165,12 +165,15 @@ def _subject(user: User) -> dict[str, str | int]:
     return {"id": user.pk, "name": user.get_full_name(), "email": user.email}
 
 
-def build_consent_form(*, user: User, city: City) -> ChatConsentForm:
-    """Готовит новую незаполненную форму для конкретного игрока и города.
+def build_consent_form(
+    *, user: User, city: City, membership: ChatMembership | None = None
+) -> ChatConsentForm:
+    """Готовит форму вступления либо отображает действующий сохранённый выбор.
 
     Args:
         user: Авторизованный игрок.
         city: Выбранный населённый пункт.
+        membership: Собственное участие для отображения текущих согласий в настройках.
 
     Returns:
         Форма с подписью редакций и одноразовым идентификатором подтверждения.
@@ -178,17 +181,41 @@ def build_consent_form(*, user: User, city: City) -> ChatConsentForm:
     Raises:
         ChatConsentDocumentError: Не удалось загрузить обязательные документы.
     """
-    token = signing.dumps(
+    version = _bundle_version(load_consent_documents())
+    initial: dict[str, Any] = {}
+    if (
+        membership is not None
+        and membership.user_id == user.pk
+        and membership.room.city_id == city.pk
+        and membership.is_active
+        and membership.consented_at
+        and not membership.consent_withdrawn_at
+        and membership.consent_version == version
+    ):
+        initial.update(
+            personal_data=True,
+            rules=True,
+            disclosure=membership.disclosure_name or membership.disclosure_avatar,
+            show_name=membership.disclosure_name,
+            show_avatar=membership.disclosure_avatar,
+            conditions=membership.disclosure_conditions,
+        )
+    initial["token"] = signing.dumps(
         {
             "subject": _subject(user),
             "city_id": city.pk,
-            "version": _bundle_version(load_consent_documents()),
+            "version": version,
             "nonce": str(uuid4()),
+            "previous_acceptance_id": (
+                str(membership.consent_id)
+                if membership is not None and initial.get("personal_data")
+                else None
+            ),
         },
         salt=CONSENT_SALT,
         compress=True,
     )
-    return ChatConsentForm(initial={"token": token})
+    return ChatConsentForm(initial=initial)
 
 
 def ensure_chat_consent(member: ChatMembership) -> None:
@@ -320,7 +347,22 @@ def accept_chat_consent(
             raise ChatConsentVersionError(
                 "Это подтверждение уже использовано. Откройте новую форму."
             )
-        return cast(ChatMembership, member)
+        return member
+    previous_acceptance_id = payload.get("previous_acceptance_id")
+    if (
+        previous_acceptance_id is not None
+        and not ChatMembership.objects.filter(
+            user=user,
+            room=room,
+            is_active=True,
+            consent_withdrawn_at__isnull=True,
+            consent_id=previous_acceptance_id,
+            consent_version=version,
+        ).exists()
+    ):
+        raise ChatConsentVersionError(
+            "Настройки изменились или согласия отозваны. Откройте актуальную форму заново."
+        )
     join_city(user=user, city_id=city.pk)
     member = ChatMembership.objects.select_for_update().get(user=user, room=room)
     for field, slug in CONSENT_DOCUMENTS.items():
@@ -346,7 +388,12 @@ def accept_chat_consent(
                 "disclosure": choices,
                 "base_conditions": BASE_DISCLOSURE_CONDITIONS,
                 "privacy": documents["privacy"],
-                "method": "authenticated_explicit_checkbox",
+                "method": (
+                    "authenticated_settings_save"
+                    if previous_acceptance_id
+                    else "authenticated_explicit_checkbox"
+                ),
+                "previous_acceptance_id": previous_acceptance_id,
                 "ip_kind": "connection_peer",
                 "operator_review_required": bool(choices["conditions"]),
             },
@@ -378,7 +425,7 @@ def accept_chat_consent(
         room_id=room.pk,
         acceptance_id=str(nonce),
     )
-    return cast(ChatMembership, member)
+    return member
 
 
 @transaction.atomic

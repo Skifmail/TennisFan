@@ -20,7 +20,7 @@ MIN_PING_INTERVAL: Final = 1.0
 
 
 # Channels не поставляет py.typed; типы прикладного интерфейса заданы ниже.
-class CityChatConsumer(JsonWebsocketConsumer):
+class CityChatConsumer(JsonWebsocketConsumer):  # type: ignore[misc]
     """Доставляет сигналы участникам с повторной проверкой доступа.
 
     Attributes:

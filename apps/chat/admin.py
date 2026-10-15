@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Final, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 
 from django import forms
 from django.contrib import admin
@@ -25,6 +25,12 @@ from .domain import MAX_DATABASE_ID
 from .models import ChatMembership, ChatMessage, ChatReport, ChatRoom
 from .realtime import publish_room_change
 
+# Django не поддерживает параметризацию ModelAdmin во время исполнения.
+if TYPE_CHECKING:
+    _ModelAdmin = admin.ModelAdmin[Any]
+else:
+    _ModelAdmin = admin.ModelAdmin
+
 ADMIN_PAGE_SIZE: Final = 25
 MESSAGE_PREVIEW_LENGTH: Final = 240
 
@@ -44,14 +50,14 @@ def _can_view(request: HttpRequest, model: str) -> bool:
 
 
 def _room_url(room: ChatRoom, *, members: bool = False) -> str:
-    url = cast(str, reverse("admin:chat_chatroom_change", args=[room.pk]))
+    url = reverse("admin:chat_chatroom_change", args=[room.pk])
     return url + ("#chat-room-members" if members else "")
 
 
 def _child_room(obj: Model) -> ChatRoom:
     if not isinstance(obj, (ChatMembership, ChatMessage)):
         raise Http404("Объект не относится к городскому чату.")
-    return cast(ChatRoom, obj.room)
+    return obj.room
 
 
 def _requested_room(request: HttpRequest) -> ChatRoom:
@@ -61,14 +67,11 @@ def _requested_room(request: HttpRequest) -> ChatRoom:
         raise Http404("Выберите городской чат.") from exc
     if not 0 < room_id <= MAX_DATABASE_ID:
         raise Http404("Городской чат не найден.")
-    return cast(
-        ChatRoom,
-        get_object_or_404(ChatRoom.objects.select_related("city"), pk=room_id),
-    )
+    return get_object_or_404(ChatRoom.objects.select_related("city"), pk=room_id)
 
 
 @admin.register(ChatRoom)
-class ChatRoomAdmin(admin.ModelAdmin):
+class ChatRoomAdmin(_ModelAdmin):
     """Объединяет настройки комнаты, сообщения и управление её участниками.
 
     Attributes:
@@ -138,7 +141,7 @@ class ChatRoomAdmin(admin.ModelAdmin):
         return super().render_change_form(request, context, add, change, form_url, obj)
 
 
-class _RoomChildAdmin(admin.ModelAdmin):
+class _RoomChildAdmin(_ModelAdmin):
     """Сохраняет дочерние формы доступными только в контексте городского чата."""
 
     change_form_template = "admin/chat/child_change_form.html"
@@ -577,7 +580,7 @@ class ChatMessageAdmin(_RoomChildAdmin):
 
 
 @admin.register(ChatReport)
-class ChatReportAdmin(admin.ModelAdmin):
+class ChatReportAdmin(_ModelAdmin):
     """Обрабатывает жалобы в отдельном разделе административной панели.
 
     Attributes:

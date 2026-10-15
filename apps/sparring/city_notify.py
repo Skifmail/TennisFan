@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import cast
 from urllib.parse import urlencode
 
 from django.db import transaction
@@ -101,8 +100,8 @@ def sparring_public_path(*, kind: str, pk: int, sport: str) -> str:
     """
     if kind == KIND_SINGLES:
         params = urlencode({"type": "singles", "sport": sport or "tennis"})
-        return f"{cast(str, reverse('sparring_list'))}?{params}#sparring-{pk}"
-    return cast(str, reverse("doubles_detail", args=[pk]))
+        return f"{reverse('sparring_list')}?{params}#sparring-{pk}"
+    return reverse("doubles_detail", args=[pk])
 
 
 def cabinet_message(*, player_name: str, city: str, kind_label: str) -> str:

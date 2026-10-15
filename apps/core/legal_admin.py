@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from django.contrib import admin
 from django.db.models import QuerySet
@@ -12,6 +12,12 @@ from django.utils.html import format_html
 
 from .models import LegalAcceptanceLog
 
+# Параметризация используется только проверкой типов, не самим Django.
+if TYPE_CHECKING:
+    _LegalAdminBase = admin.ModelAdmin[LegalAcceptanceLog]
+else:
+    _LegalAdminBase = admin.ModelAdmin
+
 
 def _csv_safe(value: Any) -> str:
     text = str(value)
@@ -19,7 +25,7 @@ def _csv_safe(value: Any) -> str:
 
 
 @admin.register(LegalAcceptanceLog)
-class LegalAcceptanceLogAdmin(admin.ModelAdmin):
+class LegalAcceptanceLogAdmin(_LegalAdminBase):
     """Закрытый журнал независимых акцептов, отзывов и действий оператора.
 
     Attributes:

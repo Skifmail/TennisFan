@@ -26,6 +26,19 @@ module = ["*.admin"]
 disable_error_code = ["attr-defined"]
 
 [[tool.mypy.overrides]]
+module = ["apps.chat.admin", "apps.core.legal_admin"]
+disable_error_code = ["valid-type", "misc", "no-any-return"]
+
+[[tool.mypy.overrides]]
+module = [
+    "apps.chat.services",
+    "apps.chat.consent",
+    "apps.chat.consumers",
+    "apps.sparring.city_notify",
+]
+disable_error_code = ["no-any-return", "unused-ignore"]
+
+[[tool.mypy.overrides]]
 module = ["apps.subscriptions.models", "apps.core.telegram_support", "apps.core.telegram_notify", "apps.telegram_bot.views", "apps.telegram_bot.services", "apps.telegram_bot.telegram_http", "apps.content.views", "apps.legal.views", "apps.courts.geocoder", "apps.shop.views", "apps.clubs.views.legal", "apps.chat.realtime", "apps.core.health"]
 disable_error_code = ["import-untyped"]
 

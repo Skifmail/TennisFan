@@ -8,6 +8,7 @@ import pytest
 from django.db import IntegrityError
 from django.test import Client
 from django.urls import reverse
+from pytest_django.fixtures import SettingsWrapper
 from pytest_mock import MockerFixture
 
 from apps.chat import services
@@ -777,3 +778,187 @@ def test_settings_when_main_consents_withdrawn_should_exclude_and_explain_exit(
     }
     with pytest.raises(ChatError):
         services.require_member(user=user, room_id=member.room_id)
+
+
+@pytest.mark.parametrize("selection", ["", "show_name", "show_avatar", "both"])
+def test_settings_when_saved_consents_opened_should_restore_choices_without_new_logs(
+    client: Client, selection: str
+) -> None:
+    """Настройки отображают сохранённые отметки, а GET не создаёт новых согласий.
+
+    Args:
+        client: Клиент участника чата.
+        selection: Сохранённый выбор дополнительных данных.
+    """
+    user = make_user(email="saved-consents@test.local")
+    city = City.objects.create(name="Город сохранённых отметок")
+    _accept(
+        user,
+        city,
+        _submission(
+            user,
+            city,
+            disclosure="on" if selection else "",
+            show_name="on" if selection in ("show_name", "both") else "",
+            show_avatar="on" if selection in ("show_avatar", "both") else "",
+        ),
+    )
+    before = LegalAcceptanceLog.objects.filter(user=user).count()
+    client.force_login(user)
+    for _ in range(2):
+        response = client.get(reverse("chat:join"), {"city_id": city.pk})
+        form = response.context["consent_form"]
+        assert form["personal_data"].value() is True
+        assert form["rules"].value() is True
+        assert bool(form["disclosure"].value()) is bool(selection)
+        assert bool(form["show_name"].value()) is (selection in ("show_name", "both"))
+        assert bool(form["show_avatar"].value()) is (
+            selection in ("show_avatar", "both")
+        )
+        assert "data-consent-withdraw-dialog" in response.content.decode()
+    assert LegalAcceptanceLog.objects.filter(user=user).count() == before
+
+
+@pytest.mark.parametrize("state", ["stale", "withdrawn", "inactive"])
+def test_settings_when_saved_consents_not_current_should_not_pretend_new_acceptance(
+    client: Client, state: str
+) -> None:
+    """Недействующие отметки не переносятся в форму нового подтверждения.
+
+    Args:
+        client: Клиент участника чата.
+        state: Причина отсутствия действующего согласия.
+    """
+    from django.utils import timezone
+
+    user = make_user(email="expired-settings@test.local")
+    city = City.objects.create(name="Город новых подтверждений")
+    member = _accept(user, city, _submission(user, city))
+    if state == "stale":
+        member.consent_version = "obsolete"
+    elif state == "withdrawn":
+        member.consent_withdrawn_at = timezone.now()
+    else:
+        member.is_active = False
+    member.save()
+    client.force_login(user)
+    response = client.get(reverse("chat:join"), {"city_id": city.pk})
+    form = response.context["consent_form"]
+    for name in ("personal_data", "rules", "disclosure", "show_name", "show_avatar"):
+        assert not form[name].value()
+
+
+@pytest.mark.parametrize("field", ["personal_data", "rules"])
+def test_settings_when_unchecked_post_not_confirmed_should_not_silently_revoke(
+    client: Client, field: str
+) -> None:
+    """Невалидное сохранение без отдельного действия отзыва не исключает игрока.
+
+    Args:
+        client: Клиент участника.
+        field: Снятая основная отметка.
+    """
+    user = make_user(email="no-silent-withdraw@test.local")
+    city = City.objects.create(name="Город явного отзыва")
+    member = _accept(user, city, _submission(user, city))
+    before = LegalAcceptanceLog.objects.filter(user=user).count()
+    client.force_login(user)
+    response = client.post(reverse("chat:join"), _submission(user, city, **{field: ""}))
+    assert response.status_code == 400
+    member.refresh_from_db()
+    assert member.is_active and not member.consent_withdrawn_at
+    assert LegalAcceptanceLog.objects.filter(user=user).count() == before
+
+
+def test_photo_when_profile_file_uploaded_should_reach_chat_history_unchanged(
+    client: Client, tmp_path: Path, settings: "SettingsWrapper"
+) -> None:
+    """История отдаёт URL настоящего файла аватара из профиля, а не иной источник.
+
+    Args:
+        client: Авторизованный клиент игрока.
+        tmp_path: Изолированное хранилище файлов теста.
+        settings: Временные настройки локального файлового хранилища.
+    """
+    from django.core.files.base import ContentFile
+
+    settings.MEDIA_ROOT = tmp_path
+    user = make_user(email="chat-real-avatar@test.local")
+    player = Player.objects.create(user=user)
+    fixture = (
+        Path(__file__).resolve().parents[3] / "static/images/chat/moderator-badge.png"
+    )
+    player.avatar.save(
+        "chat-profile-fixture.png", ContentFile(fixture.read_bytes()), save=True
+    )
+    assert Path(player.avatar.path).is_file()
+    city = City.objects.create(name="Город файла профиля")
+    member = _accept(user, city, _submission(user, city, show_avatar="on"))
+    services.send_message(
+        user=user, room_id=member.room_id, text="Фото из профиля", client_id=uuid4()
+    )
+    client.force_login(user)
+    response = client.get(reverse("chat:history", args=[member.room_id]))
+    assert response.status_code == 200
+    assert response.json()["messages"][-1]["avatar"] == player.avatar.url
+
+
+def test_settings_when_saved_state_submitted_should_reference_previous_confirmation(
+    client: Client,
+) -> None:
+    """Журнал отличает сохранение настроек от новой ручной установки пустых галочек.
+
+    Args:
+        client: Клиент участника с действующими согласиями.
+    """
+    user = make_user(email="settings-proof-chain@test.local")
+    city = City.objects.create(name="Город истории настроек")
+    member = _accept(user, city, _submission(user, city, disclosure="", show_name=""))
+    previous_id = str(member.consent_id)
+    client.force_login(user)
+    response = client.get(reverse("chat:join"), {"city_id": city.pk})
+    form = response.context["consent_form"]
+    data = {
+        "city_id": city.pk,
+        "token": str(form["token"].value()),
+        "personal_data": "on",
+        "rules": "on",
+        "disclosure": "on",
+        "show_avatar": "on",
+    }
+    assert client.post(reverse("chat:join"), data).status_code == 302
+    member.refresh_from_db()
+    log = LegalAcceptanceLog.objects.get(
+        user=user,
+        document_slug="chat-personal-data",
+        metadata__acceptance_id=str(member.consent_id),
+    )
+    assert log.metadata["method"] == "authenticated_settings_save"
+    assert log.metadata["previous_acceptance_id"] == previous_id
+
+
+def test_settings_when_saved_form_used_after_withdrawal_should_not_reactivate_old_checks(
+    client: Client,
+) -> None:
+    """Старая вкладка с отмеченными согласиями не возвращает исключённого игрока.
+
+    Args:
+        client: Клиент участника с открытой формой настроек.
+    """
+    user = make_user(email="saved-form-after-withdraw@test.local")
+    city = City.objects.create(name="Город устаревшей вкладки")
+    member = _accept(user, city, _submission(user, city))
+    client.force_login(user)
+    form = client.get(reverse("chat:join"), {"city_id": city.pk}).context[
+        "consent_form"
+    ]
+    client.post(reverse("chat:withdraw_consent", args=[member.room_id]))
+    data = {
+        "city_id": city.pk,
+        "token": str(form["token"].value()),
+        "personal_data": "on",
+        "rules": "on",
+    }
+    assert client.post(reverse("chat:join"), data).status_code == 409
+    member.refresh_from_db()
+    assert not member.is_active

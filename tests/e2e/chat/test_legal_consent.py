@@ -271,13 +271,13 @@ def test_settings_when_profile_choices_changed_and_withdrawn_should_apply_and_ex
                 for checkbox in page.locator(
                     '[data-consent-form] input[required][type="checkbox"]'
                 ).all():
-                    checkbox.check()
+                    expect(checkbox).to_be_checked()
                 if name_enabled or photo_enabled:
                     page.locator('input[name="disclosure"]').check()
-                    if name_enabled:
-                        page.locator('input[name="show_name"]').check()
-                    if photo_enabled:
-                        page.locator('input[name="show_avatar"]').check()
+                    page.locator('input[name="show_name"]').set_checked(name_enabled)
+                    page.locator('input[name="show_avatar"]').set_checked(photo_enabled)
+                else:
+                    page.locator('input[name="disclosure"]').uncheck()
                 page.get_by_role(
                     "button", name="Сохранить изменения", exact=True
                 ).click()
@@ -312,6 +312,73 @@ def test_settings_when_profile_choices_changed_and_withdrawn_should_apply_and_ex
             expect(page).to_have_url(base + "/chats/")
             page.goto(room_path)
             expect(page).to_have_url(base + "/chats/")
+        finally:
+            context.close()
+            browser.close()
+
+
+@pytest.mark.parametrize("field", ["personal_data", "rules"])
+def test_settings_when_main_checkbox_unchecked_should_confirm_restore_or_exclude(
+    field: str,
+) -> None:
+    """Снятие любой основной отметки требует подтверждения; отмена сохраняет участие.
+
+    Args:
+        field: Основное подтверждение, отзываемое пользователем.
+    """
+    from playwright.sync_api import expect, sync_playwright
+
+    sessions = json.loads(Path(environ["CHAT_E2E_SESSION_FILE"]).read_text())
+    base = environ["CHAT_E2E_URL"]
+    with sync_playwright() as driver:
+        browser = driver.chromium.launch(
+            executable_path=environ.get("CHAT_BROWSER_EXECUTABLE"), headless=True
+        )
+        context = browser.new_context(viewport={"width": 390, "height": 844})
+        context.add_cookies(
+            [
+                {"name": cookie["name"], "value": cookie["value"], "url": base}
+                for cookie in sessions["cookies"][0]
+            ]
+        )
+        page = context.new_page()
+        try:
+            page.goto(base + f'/chats/join/?city_id={sessions["consent_city_id"]}')
+            for checkbox in page.locator(
+                '[data-consent-form] input[required][type="checkbox"]'
+            ).all():
+                checkbox.check()
+            page.locator('[data-consent-form] button[type="submit"]').click()
+            expect(page.locator("#chat-status")).to_have_text("На связи", timeout=15000)
+            page.locator("#chat-info").click()
+            page.get_by_role("link", name="Изменить согласия", exact=True).click()
+            edit_url = page.url
+            main = page.locator(f'input[name="{field}"]')
+            expect(main).to_be_checked()
+            other_field = "rules" if field == "personal_data" else "personal_data"
+            expect(page.locator(f'input[name="{other_field}"]')).to_be_checked()
+            main.uncheck()
+            confirm = page.get_by_role(
+                "dialog", name="Отозвать согласие и выйти из чата?"
+            )
+            expect(confirm).to_be_visible()
+            expect(confirm).to_contain_text("будете исключены")
+            confirm.get_by_role("button", name="Нет, остаться", exact=True).click()
+            expect(main).to_be_checked()
+            expect(page).to_have_url(edit_url)
+            main.uncheck()
+            expect(confirm).to_be_visible()
+            page.keyboard.press("Escape")
+            expect(main).to_be_checked()
+            main.uncheck()
+            expect(confirm).to_be_visible()
+            confirm.get_by_role(
+                "button", name="Да, отозвать и выйти", exact=True
+            ).click()
+            expect(page).to_have_url(base + "/chats/")
+            expect(
+                page.get_by_role("status").filter(has_text="исключены из чата")
+            ).to_be_visible()
         finally:
             context.close()
             browser.close()

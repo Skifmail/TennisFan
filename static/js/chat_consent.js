@@ -25,7 +25,35 @@
             submit.disabled = !required.every((input) => input.checked)
                 || (enabled && !categories.some((input) => input.checked));
         }
-        form.addEventListener("change", update);
+        const withdrawalDialog = form.parentElement.querySelector("[data-consent-withdraw-dialog]");
+        const withdrawalForm = form.parentElement.querySelector("[data-consent-withdraw-form]");
+        let pendingWithdrawal = null;
+        let withdrawing = false;
+        if (withdrawalDialog && withdrawalForm && form.hasAttribute("data-consent-manage-existing")) {
+            withdrawalDialog.querySelector("[data-consent-withdraw-cancel]").addEventListener("click", () => withdrawalDialog.close());
+            withdrawalDialog.addEventListener("close", () => {
+                if (pendingWithdrawal && !withdrawing) {
+                    pendingWithdrawal.checked = true;
+                    update();
+                    pendingWithdrawal.focus({preventScroll: true});
+                    pendingWithdrawal = null;
+                }
+            });
+            withdrawalDialog.querySelector("[data-consent-withdraw-confirm]").addEventListener("click", (event) => {
+                if (withdrawing) return;
+                withdrawing = true;
+                event.currentTarget.disabled = true;
+                withdrawalDialog.querySelector("[data-consent-withdraw-cancel]").disabled = true;
+                withdrawalForm.submit();
+            });
+        }
+        form.addEventListener("change", (event) => {
+            update();
+            if (withdrawalDialog && required.includes(event.target) && !event.target.checked) {
+                pendingWithdrawal = event.target;
+                withdrawalDialog.showModal();
+            }
+        });
         form.addEventListener("submit", (event) => {
             update();
             if (submit.disabled) event.preventDefault();

@@ -225,7 +225,11 @@ def join(request: HttpRequest) -> HttpResponse:
     )
     city = get_object_or_404(City, pk=city_id)
     user = cast(User, request.user)
-    current = ChatMembership.objects.filter(user=user, room__city=city).first()
+    current = (
+        ChatMembership.objects.select_related("room")
+        .filter(user=user, room__city=city)
+        .first()
+    )
     is_consent_update = bool(
         current
         and current.is_active
@@ -259,7 +263,8 @@ def join(request: HttpRequest) -> HttpResponse:
                     "Согласия обновлены. Выбранные настройки показа имени и фото применены.",
                 )
             return redirect("chat:room", room_id=member.room_id)
-    # После ошибки все галочки снова пусты: новая редакция не принимается молча.
+    # В настройках показываем только действующие сохранённые значения, не неподтверждённый POST.
+    consent_form = build_consent_form(user=user, city=city, membership=current)
     template = (
         "chat/_join_form.html"
         if request.headers.get("X-Requested-With") == "XMLHttpRequest"
@@ -270,7 +275,8 @@ def join(request: HttpRequest) -> HttpResponse:
         template,
         {
             "city": city,
-            "consent_form": build_consent_form(user=user, city=city),
+            "consent_form": consent_form,
+            "has_saved_consents": bool(consent_form.initial.get("personal_data")),
             "consent_error": error,
             "is_consent_update": is_consent_update,
             "consent_room_id": current.room_id if current else None,

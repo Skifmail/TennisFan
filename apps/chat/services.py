@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Final, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Final, TypedDict
 from uuid import UUID
 
 from django.db import transaction
@@ -67,7 +67,7 @@ def _room(room_id: int, *, lock: bool = False) -> ChatRoom:
     room = query.filter(pk=room_id, is_active=True).first()
     if room is None:
         raise ChatNotFoundError("Чат не найден или закрыт.")
-    return cast(ChatRoom, room)
+    return room
 
 
 def require_member(
@@ -100,7 +100,7 @@ def require_member(
     ensure_chat_consent(member)
     if writing and member.banned_until and member.banned_until > timezone.now():
         raise ChatAccessError("Отправка сообщений временно ограничена модератором.")
-    return cast(ChatMembership, member)
+    return member
 
 
 def _moderator(user: User, member: ChatMembership) -> bool:
@@ -117,7 +117,7 @@ def _message(room_id: int, message_id: int) -> ChatMessage:
     )
     if message is None:
         raise ChatNotFoundError("Сообщение не найдено.")
-    return cast(ChatMessage, message)
+    return message
 
 
 def _name(user: User | None) -> str:
@@ -292,7 +292,7 @@ def join_city(*, user: User, city_id: int) -> ChatRoom:
     logger.info(
         "Пользователь вступил в городской чат", room_id=room.pk, user_id=user.pk
     )
-    return cast(ChatRoom, room)
+    return room
 
 
 def leave_room(*, user: User, room_id: int) -> None:
@@ -351,7 +351,7 @@ def send_message(
     if existing:
         if existing.room_id != room_id:
             raise ChatValidationError("Ключ отправки уже использован в другом чате.")
-        return cast(ChatMessage, existing)
+        return existing
     cleaned = normalize_message(text)
     reply = None
     if reply_to_id is not None:
@@ -389,7 +389,7 @@ def send_message(
         message_id=message.pk,
         user_id=user.pk,
     )
-    return cast(ChatMessage, message)
+    return message
 
 
 def history(

@@ -55,13 +55,13 @@ def test_admin_when_member_managed_should_stay_inside_selected_room() -> None:
                 has_text=sessions["admin_email"]
             )
             expect(row).to_have_count(1)
-            expect(row.locator("td").nth(2)).to_have_text("Да")
+            expect(row.locator("td").nth(2)).to_have_text("Модератор")
             row.get_by_role("link", name="Редактировать", exact=True).click()
             expect(page.locator("#id_is_moderator")).to_be_checked()
             page.locator("#id_is_moderator").uncheck()
             page.locator("#id_notifications_enabled").uncheck()
             page.locator('[name="_save"]').click()
-            expect(row.locator("td").nth(2)).to_have_text("Нет")
+            expect(row.locator("td").nth(2)).to_have_text("Участник")
             expect(row.locator("td").nth(4)).to_have_text("Нет")
             row.get_by_role("link", name="Удалить", exact=True).click()
             expect(

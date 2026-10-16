@@ -17,6 +17,7 @@ urlpatterns = [
         name="withdraw_consent",
     ),
     path("<int:room_id>/", views.room, name="room"),
+    path("<int:room_id>/management/", views.management, name="management"),
     path("api/cities/", views.cities, name="cities"),
     path("api/rooms/<int:room_id>/history/", views.history, name="history"),
     path("api/rooms/<int:room_id>/sync/", views.sync, name="sync"),

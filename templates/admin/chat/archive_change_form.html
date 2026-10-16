@@ -1,0 +1,20 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/chat_room.css' %}">{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Начало</a> › <a href="{% url 'admin:chat_chatarchive_changelist' %}">Архивы городских чатов</a> › {{ original }}</div>{% endblock %}
+{% block content_title %}<h1>Архив переписки: {{ original.city_label }}</h1>{% endblock %}
+{% block content_subtitle %}{% endblock %}
+{% block content %}
+<p>Исходный чат #{{ original.source_room_id }} · создан {{ original.room_created_at|date:'d.m.Y H:i' }} · {% if original.room_removed_at %}удалён {{ original.room_removed_at|date:'d.m.Y H:i' }}{% else %}чат не удалён{% endif %}.</p>
+<p>Сообщений: {{ archive_counts.total }} · удалены из переписки: {{ archive_counts.deleted }}. Переписка доступна здесь только уполномоченным сотрудникам платформы.</p>
+<div class="chat-admin-toolbar">{% if original.room_id %}<a href="{% url 'admin:chat_chatroom_change' original.room_id %}">Вернуться к чату</a>{% endif %}{% if has_delete_permission %}<a class="deletelink" href="{% url 'admin:chat_chatarchive_delete' original.pk %}">Удалить архив безвозвратно</a>{% elif original.room_id %}<span>Удаление архива доступно владельцу платформы после удаления самого чата.</span>{% endif %}</div>
+<form method="get" class="chat-archive-filters">{{ archive_search_form.as_p }}<button type="submit" class="button">Найти</button> <a href="{% url 'admin:chat_chatarchive_change' original.pk %}">Сбросить фильтры</a></form>
+<section class="module chat-admin-section" id="chat-archive-messages">
+<h2>Найдено сообщений: {{ archive_messages_page.paginator.count }}</h2>
+<div class="chat-admin-scroll"><table class="chat-admin-table"><thead><tr><th>Отправлено</th><th>Автор</th><th>Последний известный текст</th><th>Состояние</th><th>История</th></tr></thead><tbody>
+{% for message in archive_messages_page %}<tr><td>{{ message.sent_at|date:'d.m.Y H:i:s' }}</td><td>{{ message.author_label }}<small class="chat-admin-email">#{{ message.author_reference|default:'неизвестен' }}</small></td><td class="chat-archive-text">{{ message.text|truncatechars:240|default:'Текст не сохранился до появления архива' }}</td><td>{% if message.deleted_at %}Удалено из чата{% elif message.edited_at %}Изменено{% else %}Не удалено{% endif %}{% if message.history_incomplete %}<small>Ранняя история неполная</small>{% endif %}</td><td><a href="{% url 'admin:chat_chatarchivedmessage_change' message.pk %}">Все версии</a></td></tr>
+{% empty %}<tr><td colspan="5">По заданным условиям сообщений нет.</td></tr>{% endfor %}
+</tbody></table></div>
+{% include 'admin/chat/archive_pagination.html' with page=archive_messages_page %}
+</section>
+{% endblock %}

@@ -15,7 +15,7 @@ from pytest_mock import MockerFixture
 from apps.chat import services
 from apps.chat.consent import accept_chat_consent, build_consent_form
 from apps.chat.domain import ChatError
-from apps.chat.models import ChatMembership
+from apps.chat.models import ChatMembership, ChatRoom
 from apps.core.models import City, LegalAcceptanceLog
 from apps.legal.utils import LEGAL_DOCUMENT_PATHS
 from apps.users.models import Player, User
@@ -181,6 +181,7 @@ def test_access_when_admin_added_without_consent_should_require_confirmation(
     """Ручное участие не означает согласия игрока; API также закрыто."""
     user = make_user(email="legal-admin-added@test.local")
     city = City.objects.create(name="Город ручного участия")
+    ChatRoom.objects.get_or_create(city=city)
     room = services.join_city(user=user, city_id=city.pk)
     client.force_login(user)
     response = client.get(reverse("chat:room", args=[room.pk]))
@@ -334,6 +335,7 @@ def test_join_when_replayed_after_leave_should_not_reactivate_old_confirmation()
     """Повторная доставка старого POST после выхода не означает новое вступление."""
     user = make_user(email="legal-left-replay@test.local")
     city = City.objects.create(name="Город старой формы")
+    ChatRoom.objects.create(city=city)
     data = _submission(user, city)
     member = _accept(user, city, data)
     services.leave_room(user=user, room_id=member.room_id)
@@ -441,6 +443,7 @@ def test_join_when_another_city_selected_should_require_independent_confirmation
     first = City.objects.create(name="Первая независимая комната")
     second = City.objects.create(name="Вторая независимая комната")
     _accept(user, first, _submission(user, first))
+    ChatRoom.objects.get_or_create(city=second)
     room = services.join_city(user=user, city_id=second.pk)
     with pytest.raises(ChatError):
         services.require_member(user=user, room_id=room.pk)

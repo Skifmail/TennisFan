@@ -26,7 +26,7 @@ module = ["*.admin"]
 disable_error_code = ["attr-defined"]
 
 [[tool.mypy.overrides]]
-module = ["apps.chat.admin", "apps.core.legal_admin"]
+module = ["apps.chat.admin", "apps.chat.archive_admin", "apps.core.legal_admin"]
 disable_error_code = ["valid-type", "misc", "no-any-return"]
 
 [[tool.mypy.overrides]]
@@ -34,6 +34,7 @@ module = [
     "apps.chat.services",
     "apps.chat.consent",
     "apps.chat.consumers",
+    "apps.chat.archive",
     "apps.sparring.city_notify",
 ]
 disable_error_code = ["no-any-return", "unused-ignore"]

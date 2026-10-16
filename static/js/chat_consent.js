@@ -95,6 +95,7 @@
             const form = dialog.querySelector("[data-consent-form]");
             if (!form) throw new Error("Некорректная форма");
             initialize(form);
+            dialog.setAttribute("aria-label", form.querySelector("h2").textContent);
             dialog.showModal();
         } catch (error) {
             // При ошибке сети или устаревшем браузере остаётся серверная форма.

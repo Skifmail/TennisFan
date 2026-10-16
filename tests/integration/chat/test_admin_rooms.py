@@ -7,7 +7,14 @@ from django.contrib.auth.models import Permission
 from django.test import Client
 from django.urls import reverse
 
-from apps.chat.models import ChatEvent, ChatMembership, ChatMessage, ChatRoom
+from apps.chat.archive import ensure_message_snapshot
+from apps.chat.models import (
+    ChatArchive,
+    ChatEvent,
+    ChatMembership,
+    ChatMessage,
+    ChatRoom,
+)
 from apps.core.models import City
 from apps.users.models import User
 from tests.support.factories import make_user
@@ -76,7 +83,7 @@ def test_admin_when_menu_opened_should_show_rooms_and_reports_without_child_sect
         if app["app_label"] == "chat"
         for model in app["models"]
     }
-    assert models == {"ChatRoom", "ChatReport"}
+    assert models == {"ChatRoom", "ChatReport", "ChatArchive"}
 
 
 def test_admin_when_room_opened_should_show_only_its_messages_and_members(
@@ -96,12 +103,22 @@ def test_admin_when_room_opened_should_show_only_its_messages_and_members(
         room=room, author=user, text="Текст этого города"
     )
     ChatMessage.objects.create(room=other, author=outsider, text="Чужая переписка")
+    ensure_message_snapshot(message)
     response = admin_client.get(_room_url(room))
     html = response.content.decode()
     assert response.status_code == 200
     assert 'id="chat-room-messages"' in html
     assert 'id="chat-room-members"' in html
-    assert message.text in html and user.email in html
+    assert message.text not in html and user.email in html
+    assert "Открыть архив переписки" in html
+    archived = admin_client.get(
+        reverse(
+            "admin:chat_chatarchive_change",
+            args=[ChatArchive.objects.get(room=room).pk],
+        )
+    )
+    assert message.text in archived.content.decode()
+    assert "Чужая переписка" not in archived.content.decode()
     assert "Чужая переписка" not in html and outsider.email not in html
     assert _member_url("add", room) in html
     assert _member_url("change", room, member).replace("&", "&amp;") in html
@@ -132,15 +149,21 @@ def test_admin_when_lists_large_should_paginate_each_block_independently(
             for user in users
         ]
     )
-    first = admin_client.get(_room_url(room))
-    assert len(first.context["chat_messages_page"]) == 25
-    assert len(first.context["chat_members_page"]) == 25
-    second = admin_client.get(_room_url(room), {"messages_page": 2, "members_page": 1})
-    assert len(second.context["chat_messages_page"]) == 6
-    assert len(second.context["chat_members_page"]) == 25
+    for message in room.messages.select_related("author", "room__city"):
+        ensure_message_snapshot(message)
+    card = admin_client.get(_room_url(room))
+    assert card.context["chat_archive_counts"]["total"] == 31
+    assert len(card.context["chat_members_page"]) == 25
+    url = reverse(
+        "admin:chat_chatarchive_change", args=[ChatArchive.objects.get(room=room).pk]
+    )
+    first = admin_client.get(url)
+    second = admin_client.get(url, {"page": 2})
+    assert len(first.context["archive_messages_page"]) == 25
+    assert len(second.context["archive_messages_page"]) == 6
     assert not {
-        message.pk for message in first.context["chat_messages_page"]
-    }.intersection(message.pk for message in second.context["chat_messages_page"])
+        message.pk for message in first.context["archive_messages_page"]
+    }.intersection(message.pk for message in second.context["archive_messages_page"])
 
 
 def test_admin_when_member_added_and_edited_should_return_to_room_and_save_all_settings(
@@ -273,7 +296,7 @@ def test_admin_when_only_room_permission_should_not_expose_children_or_mutate_me
     response = client.get(_room_url(room))
     assert response.status_code == 200
     assert "Закрытый текст сообщения" not in response.content.decode()
-    assert response.context["chat_messages_page"] is None
+    assert response.context["chat_archive"] is None
     assert response.context["chat_members_page"] is None
     assert client.get(_member_url("add", room)).status_code == 403
     assert (
@@ -314,7 +337,15 @@ def test_admin_when_message_opened_should_remain_readonly_and_escape_user_text(
     message = ChatMessage.objects.create(room=room, text="<script>alert(1)</script>")
     html = admin_client.get(_room_url(room)).content.decode()
     assert "<script>alert(1)</script>" not in html
-    assert "&lt;script&gt;" in html
+    assert "&lt;script&gt;" not in html
+    ensure_message_snapshot(message)
+    archived_html = admin_client.get(
+        reverse(
+            "admin:chat_chatarchive_change",
+            args=[ChatArchive.objects.get(room=room).pk],
+        )
+    ).content.decode()
+    assert "&lt;script&gt;" in archived_html
     url = reverse("admin:chat_chatmessage_change", args=[message.pk])
     response = admin_client.get(url)
     assert response.status_code == 200

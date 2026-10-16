@@ -7,7 +7,7 @@ from django.db import connection
 from django.test import Client
 from django.urls import reverse
 
-from apps.chat.models import ChatMembership, ChatMessage
+from apps.chat.models import ChatMembership, ChatMessage, ChatRoom
 from apps.core.models import City
 from apps.users.models import User
 from tests.support.chat_legal import join_city_with_consent as join_city
@@ -39,6 +39,18 @@ def create_smoke_sessions(path: Path) -> None:
         name="Тест согласий браузера", region="Изолированная проверка"
     )
     ChatMembership.objects.filter(room__city=consent_city).delete()
+    ChatRoom.objects.update_or_create(
+        city=consent_city,
+        defaults={"is_created": True, "administrator": None, "is_active": True},
+    )
+    creation_city, _ = City.objects.get_or_create(
+        name="Тест создания сообщества", region="Изолированная проверка"
+    )
+    ChatRoom.objects.filter(city=creation_city).delete()
+    archive_city, _ = City.objects.get_or_create(
+        name="Тест закрытого архива", region="Изолированная проверка"
+    )
+    ChatRoom.objects.filter(city=archive_city).delete()
     cookies: list[list[dict[str, str]]] = []
     for index, name in enumerate(("Анна", "Михаил")):
         user, created = User.objects.get_or_create(
@@ -77,6 +89,10 @@ def create_smoke_sessions(path: Path) -> None:
             {
                 "cookies": cookies,
                 "room_path": f"/chats/{room.pk}/",
+                "archive_city_id": archive_city.pk,
+                "archive_city_name": archive_city.name,
+                "creation_city_id": creation_city.pk,
+                "creation_city_name": creation_city.name,
                 "consent_city_id": consent_city.pk,
                 "consent_city_name": consent_city.name,
                 "admin_cookies": [

@@ -34,7 +34,7 @@
             </a>
         {% empty %}<div class="chat-sidebar-empty"><p>Ваши города появятся здесь</p><span>Найдите сообщество и начните общение.</span></div>{% endfor %}
         </nav>
-        {% if room %}<button type="button" id="chat-sidebar-settings" class="chat-sidebar-settings" data-open-chat-settings aria-haspopup="dialog" aria-controls="chat-settings"><svg class="chat-icon" aria-hidden="true"><use href="#chat-icon-settings"/></svg>Настройки чата</button>{% endif %}
+        {% block sidebar_settings %}{% if room %}<button type="button" id="chat-sidebar-settings" class="chat-sidebar-settings" data-open-chat-settings aria-haspopup="dialog" aria-controls="chat-settings"><svg class="chat-icon" aria-hidden="true"><use href="#chat-icon-settings"/></svg>Настройки чата</button>{% endif %}{% endblock %}
         <div class="chat-sidebar-footer"><span class="chat-account-avatar" aria-hidden="true">{{ request.user.first_name|default:'И'|slice:':1' }}</span><span><strong>{{ request.user.first_name|default:'Игрок' }} {{ request.user.last_name }}</strong><small>Ваши городские сообщества</small></span></div>
     </aside>
     <main class="chat-main {% block main_class %}{% endblock %}" id="chat-main" tabindex="-1">{% block content %}{% endblock %}</main>

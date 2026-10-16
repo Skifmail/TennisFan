@@ -16,6 +16,7 @@ from loguru import logger
 from apps.core.models import City
 from apps.users.models import Notification, User
 
+from .archive import ensure_message_snapshot, record_message_change
 from .consent import ensure_chat_consent
 from .domain import (
     EDIT_WINDOW_SECONDS,
@@ -30,6 +31,7 @@ from .domain import (
     ChatValidationError,
     normalize_message,
 )
+from .governance import can_manage
 from .models import ChatEvent, ChatMembership, ChatMessage, ChatReport, ChatRoom
 from .realtime import publish_room_change
 
@@ -64,7 +66,7 @@ def _room(room_id: int, *, lock: bool = False) -> ChatRoom:
     query = ChatRoom.objects.select_related("city")
     if lock:
         query = query.select_for_update(of=("self",))
-    room = query.filter(pk=room_id, is_active=True).first()
+    room = query.filter(pk=room_id, is_active=True, is_created=True).first()
     if room is None:
         raise ChatNotFoundError("Чат не найден или закрыт.")
     return room
@@ -92,7 +94,13 @@ def require_member(
         raise ChatNotFoundError("Чат не найден.")
     member = (
         ChatMembership.objects.select_related("room", "room__city")
-        .filter(user=user, room_id=room_id, is_active=True, room__is_active=True)
+        .filter(
+            user=user,
+            room_id=room_id,
+            is_active=True,
+            room__is_active=True,
+            room__is_created=True,
+        )
         .first()
     )
     if member is None:
@@ -104,7 +112,9 @@ def require_member(
 
 
 def _moderator(user: User, member: ChatMembership) -> bool:
-    return bool(user.is_staff or member.is_moderator)
+    return bool(
+        user.is_staff or member.is_moderator or member.room.administrator_id == user.pk
+    )
 
 
 def _message(room_id: int, message_id: int) -> ChatMessage:
@@ -129,7 +139,9 @@ def _name(user: User | None) -> str:
 def _moderator_ids(room_id: int) -> frozenset[int]:
     return frozenset(
         ChatMembership.objects.filter(
-            Q(is_moderator=True) | Q(user__is_staff=True),
+            Q(is_moderator=True)
+            | Q(user__is_staff=True)
+            | Q(user_id=F("room__administrator_id")),
             Q(disclosure_conditions="") | Q(disclosure_reviewed=True),
             consented_at__isnull=False,
             consent_withdrawn_at__isnull=True,
@@ -184,6 +196,13 @@ def serialize_message(
         "author_id": message.author_id,
         "author": _disclosed_name(message.author, author_member),
         "author_is_moderator": permitted and message.author_id in moderators,
+        "author_is_administrator": bool(
+            permitted
+            and author_member
+            and author_member.is_active
+            and author_member.user.is_active
+            and author_member.room.administrator_id == message.author_id
+        ),
         "avatar": avatar,
         # Ссылка на полный профиль раскрывает больше данных, чем выбрано для чата.
         "profile_url": "",
@@ -243,7 +262,7 @@ def _message_disclosures(
     }
     return {
         member.user_id: member
-        for member in ChatMembership.objects.filter(
+        for member in ChatMembership.objects.select_related("user", "room").filter(
             room_id=room_id, user_id__in=author_ids
         )
     }
@@ -274,7 +293,9 @@ def join_city(*, user: User, city_id: int) -> ChatRoom:
     require_active_user(user)
     if not City.objects.filter(pk=city_id).exists():
         raise ChatNotFoundError("Населённый пункт не найден.")
-    room, _ = ChatRoom.objects.get_or_create(city_id=city_id)
+    room = ChatRoom.objects.filter(city_id=city_id, is_created=True).first()
+    if room is None:
+        raise ChatNotFoundError("Чат ещё не создан. Сначала подтвердите его создание.")
     room = _room(room.pk, lock=True)
     member, created = ChatMembership.objects.get_or_create(
         room=room,
@@ -307,7 +328,11 @@ def leave_room(*, user: User, room_id: int) -> None:
     """
     require_active_user(user)
     with transaction.atomic():
-        _room(room_id, lock=True)
+        room = _room(room_id, lock=True)
+        if room.administrator_id == user.pk:
+            raise ChatAccessError(
+                "Сначала передайте управление другому участнику. Отзыв согласий доступен без передачи."
+            )
         changed = ChatMembership.objects.filter(
             room_id=room_id, user=user, is_active=True
         ).update(is_active=False)
@@ -367,6 +392,9 @@ def send_message(
         room_id=room_id, author=user, text=cleaned, client_id=client_id, reply_to=reply
     )
     _event(message)
+    record_message_change(
+        message=message, actor=user, action="created", text=message.text
+    )
     if (
         reply
         and reply.author_id is not None
@@ -478,7 +506,13 @@ def sync_events(*, user: User, room_id: int, after_id: int) -> dict[str, Any]:
         ),
         "has_more": len(rows) > MAX_PAGE_SIZE,
         "can_moderate": _moderator(user, member),
+        "can_manage": can_manage(user=user, room=member.room),
         "moderator_ids": sorted(moderator_ids),
+        "administrator_id": (
+            member.room.administrator_id
+            if member.room.administrator_id in moderator_ids
+            else None
+        ),
         "banned_until": (
             member.banned_until.isoformat() if member.banned_until else None
         ),
@@ -510,10 +544,15 @@ def edit_message(*, user: User, room_id: int, message_id: int, text: str) -> Non
         raise ChatAccessError(
             "Можно редактировать только своё сообщение в течение 15 минут."
         )
-    message.text = normalize_message(text)
+    cleaned = normalize_message(text)
+    ensure_message_snapshot(message)
+    message.text = cleaned
     message.edited_at = timezone.now()
     message.save(update_fields=["text", "edited_at"])
     _event(message)
+    record_message_change(
+        message=message, actor=user, action="edited", text=message.text
+    )
 
 
 @transaction.atomic
@@ -534,10 +573,15 @@ def delete_message(*, user: User, room_id: int, message_id: int) -> None:
     if message.author_id != user.pk and not _moderator(user, member):
         raise ChatAccessError("Удалить сообщение может автор или модератор.")
     if not message.deleted_at:
+        ensure_message_snapshot(message)
+        previous_text = message.text
         message.text = ""
         message.deleted_at = timezone.now()
         message.save(update_fields=["text", "deleted_at"])
         _event(message)
+        record_message_change(
+            message=message, actor=user, action="deleted", text=previous_text
+        )
         logger.info(
             "Сообщение чата удалено",
             room_id=room_id,
@@ -628,7 +672,12 @@ def moderate_member(*, user: User, room_id: int, target_id: int, banned: bool) -
     )
     if target is None:
         raise ChatNotFoundError("Участник не найден.")
-    if target.user.is_staff or target.is_moderator or target_id == user.pk:
+    if (
+        target.user.is_staff
+        or target.is_moderator
+        or target_id == user.pk
+        or target_id == member.room.administrator_id
+    ):
         raise ChatAccessError("Нельзя ограничить этого участника.")
     target.banned_until = (
         timezone.now() + timedelta(days=BAN_DURATION_DAYS) if banned else None

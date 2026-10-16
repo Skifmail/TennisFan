@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from functools import partial
 from typing import TYPE_CHECKING, Any, Final, cast
 
 from django import forms
@@ -9,20 +11,30 @@ from django.contrib import admin
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Model, QuerySet
+from django.db.models import Count, Exists, Model, OuterRef, Q, QuerySet
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
 from apps.core.models import LegalAcceptanceLog
+from apps.users.models import Notification, User
 
+from . import archive_admin as archive_admin
 from .consent import (
     MAX_USER_AGENT_LENGTH,
     consent_request_ip,
+    ensure_chat_consent,
     publish_disclosure_change,
 )
-from .domain import MAX_DATABASE_ID
-from .models import ChatMembership, ChatMessage, ChatReport, ChatRoom
+from .domain import MAX_DATABASE_ID, ChatError
+from .models import (
+    ChatArchive,
+    ChatManagementEvent,
+    ChatMembership,
+    ChatMessage,
+    ChatReport,
+    ChatRoom,
+)
 from .realtime import publish_room_change
 
 # Django не поддерживает параметризацию ModelAdmin во время исполнения.
@@ -32,7 +44,6 @@ else:
     _ModelAdmin = admin.ModelAdmin
 
 ADMIN_PAGE_SIZE: Final = 25
-MESSAGE_PREVIEW_LENGTH: Final = 240
 
 
 def _can_view_rooms(request: HttpRequest) -> bool:
@@ -70,6 +81,101 @@ def _requested_room(request: HttpRequest) -> ChatRoom:
     return get_object_or_404(ChatRoom.objects.select_related("city"), pk=room_id)
 
 
+if TYPE_CHECKING:
+    _RoomForm = forms.ModelForm[ChatRoom]
+else:
+    _RoomForm = forms.ModelForm
+
+
+class ChatRoomForm(_RoomForm):
+    """Проверяет назначение администратора платформой на действующего участника.
+
+    Attributes:
+        Meta: Модель комнаты и её редактируемые поля.
+    """
+
+    class Meta:
+        model = ChatRoom
+        fields = "__all__"
+
+    def clean_administrator(self) -> User | None:
+        """Допускает только активного участника с действующими согласиями.
+
+        Returns:
+            Проверенный администратор либо пустое назначение.
+
+        Raises:
+            forms.ValidationError: Выбран посторонний, заблокированный участник или нет согласий.
+        """
+        user = cast(User | None, self.cleaned_data.get("administrator"))
+        if user is None:
+            return None
+        member = ChatMembership.objects.filter(
+            room_id=self.instance.pk, user=user, is_active=True, user__is_active=True
+        ).first()
+        if member is None:
+            raise forms.ValidationError(
+                "Сначала участник должен вступить в этот чат и подтвердить согласия."
+            )
+        try:
+            ensure_chat_consent(member)
+        except ChatError as exc:
+            raise forms.ValidationError(str(exc)) from exc
+        return user
+
+
+class AdministratorFilter(admin.SimpleListFilter):
+    """Выделяет сообщества без действующего администратора для команды платформы.
+
+    Attributes:
+        title: Название фильтра.
+        parameter_name: Параметр адреса списка.
+    """
+
+    title = "Администратор чата"
+    parameter_name = "administrator_state"
+
+    def lookups(
+        self, request: HttpRequest, model_admin: admin.ModelAdmin[Any]
+    ) -> list[tuple[str, str]]:
+        """Возвращает варианты наличия управления.
+
+        Args:
+            request: Запрос списка.
+            model_admin: Администратор модели.
+
+        Returns:
+            Варианты фильтра.
+        """
+        return [("missing", "Без администратора"), ("assigned", "С администратором")]
+
+    def queryset(
+        self, request: HttpRequest, queryset: QuerySet[ChatRoom]
+    ) -> QuerySet[ChatRoom]:
+        """Находит также комнаты заблокированных или исключённых управляющих.
+
+        Args:
+            request: Запрос списка.
+            queryset: Исходные комнаты.
+
+        Returns:
+            Комнаты согласно выбранному состоянию.
+        """
+        valid = ChatMembership.objects.filter(
+            room_id=OuterRef("pk"),
+            user_id=OuterRef("administrator_id"),
+            is_active=True,
+            user__is_active=True,
+            consented_at__isnull=False,
+            consent_withdrawn_at__isnull=True,
+        ).filter(Q(disclosure_conditions="") | Q(disclosure_reviewed=True))
+        if self.value() in {"missing", "assigned"}:
+            return queryset.annotate(has_administrator=Exists(valid)).filter(
+                is_created=True, has_administrator=self.value() == "assigned"
+            )
+        return queryset
+
+
 @admin.register(ChatRoom)
 class ChatRoomAdmin(_ModelAdmin):
     """Объединяет настройки комнаты, сообщения и управление её участниками.
@@ -78,11 +184,63 @@ class ChatRoomAdmin(_ModelAdmin):
         change_form_template: Шаблон карточки с двумя вложенными блоками.
     """
 
-    list_display = ("city", "is_active", "created_at")
-    list_filter = ("is_active",)
+    form = ChatRoomForm
+    readonly_fields = ("is_created",)
+    list_display = ("city", "is_created", "is_active", "administrator", "created_at")
+    list_filter = ("is_active", "is_created", AdministratorFilter)
     search_fields = ("city__name", "city__region")
-    autocomplete_fields = ("city",)
+    autocomplete_fields = ("city", "administrator")
     change_form_template = "admin/chat/room_change_form.html"
+    delete_confirmation_template = "admin/chat/room_delete_confirmation.html"
+    delete_selected_confirmation_template = (
+        "admin/chat/room_delete_selected_confirmation.html"
+    )
+
+    def get_deleted_objects(
+        self, objs: Sequence[Model] | QuerySet[Model], request: HttpRequest
+    ) -> tuple[list[str], dict[str, int], set[str], list[str]]:
+        """Разрешает каскад сообщений только при удалении самой комнаты.
+
+        Args:
+            objs: Выбранные городские чаты.
+            request: Запрос удаления владельца либо уполномоченного сотрудника.
+
+        Returns:
+            Стандартное подтверждение Django с сохранением остальных проверок прав и защит.
+        """
+        deleted, counts, missing, protected = super().get_deleted_objects(objs, request)
+        if self.has_delete_permission(request) and request.user.has_perm(
+            "chat.delete_chatmessage"
+        ):
+            missing.discard(str(ChatMessage._meta.verbose_name))
+        return deleted, counts, missing, protected
+
+    def delete_model(self, request: HttpRequest, obj: Model) -> None:
+        """Удаляет один чат тем же атомарным путём, что и массовая операция.
+
+        Args:
+            request: Подтверждённый запрос удаления.
+            obj: Городской чат.
+        """
+        self.delete_queryset(request, ChatRoom.objects.filter(pk=obj.pk))
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[Model]) -> None:
+        """Удаляет комнаты, зависимые записи и уведомления только выбранных чатов.
+
+        Args:
+            request: Уполномоченный сотрудник платформы.
+            queryset: Подтверждённый набор городских чатов.
+        """
+        with transaction.atomic():
+            room_ids = list(
+                queryset.select_for_update(of=("self",)).values_list("pk", flat=True)
+            )
+            Notification.objects.filter(
+                url__in=[reverse("chat:room", args=[pk]) for pk in room_ids]
+            ).delete()
+            queryset.filter(pk__in=room_ids).delete()
+            for room_id in room_ids:
+                transaction.on_commit(partial(publish_room_change, room_id))
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[ChatRoom]:
         """Загружает города вместе с комнатами без дополнительных запросов.
@@ -93,7 +251,40 @@ class ChatRoomAdmin(_ModelAdmin):
         Returns:
             Комнаты с населёнными пунктами.
         """
-        return super().get_queryset(request).select_related("city")
+        return super().get_queryset(request).select_related("city", "administrator")
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: Model,
+        form: forms.ModelForm[Model],
+        change: bool,
+    ) -> None:
+        """Фиксирует назначение администратора платформой в журнале комнаты.
+
+        Args:
+            request: Сотрудник с разрешением изменять комнаты.
+            obj: Комната с проверенной формой.
+            form: Данные Django-формы.
+            change: Изменяется ли существующая комната.
+        """
+        assert isinstance(obj, ChatRoom)
+        with transaction.atomic():
+            old = (
+                ChatRoom.objects.select_for_update().get(pk=obj.pk) if change else None
+            )
+            super().save_model(request, obj, form, change)
+            if old and old.administrator_id != obj.administrator_id:
+                ChatManagementEvent.objects.create(
+                    room=obj,
+                    actor=cast(User, request.user),
+                    target=obj.administrator,
+                    action="assigned" if obj.administrator_id else "released",
+                )
+                publish_disclosure_change(
+                    room_id=obj.pk,
+                    user_id=obj.administrator_id or old.administrator_id or 0,
+                )
 
     def render_change_form(
         self,
@@ -118,19 +309,29 @@ class ChatRoomAdmin(_ModelAdmin):
             Карточка с данными, разрешёнными правами пользователя.
         """
         context.update(
-            chat_messages_page=None,
+            chat_management_events=(),
+            chat_archive=None,
+            chat_archive_counts=None,
             chat_members_page=None,
             chat_can_add_member=request.user.has_perm("chat.add_chatmembership"),
             chat_can_change_member=request.user.has_perm("chat.change_chatmembership"),
             chat_can_delete_member=request.user.has_perm("chat.delete_chatmembership"),
-            chat_message_preview_length=MESSAGE_PREVIEW_LENGTH,
         )
         if obj is not None:
-            if _can_view(request, "chatmessage"):
-                context["chat_messages_page"] = Paginator(
-                    obj.messages.select_related("author").order_by("-pk"),
-                    ADMIN_PAGE_SIZE,
-                ).get_page(request.GET.get("messages_page"))
+            if request.user.has_perm("chat.change_chatroom"):
+                context["chat_management_events"] = (
+                    obj.management_events.select_related("actor", "target")[
+                        :ADMIN_PAGE_SIZE
+                    ]
+                )
+            if request.user.has_perm("chat.view_chatarchive"):
+                archive = ChatArchive.objects.filter(source_room_id=obj.pk).first()
+                if archive:
+                    context["chat_archive"] = archive
+                    context["chat_archive_counts"] = archive.messages.aggregate(
+                        total=Count("pk"),
+                        deleted=Count("pk", filter=Q(deleted_at__isnull=False)),
+                    )
             if _can_view(request, "chatmembership"):
                 context["chat_members_page"] = Paginator(
                     obj.memberships.select_related("user").order_by(
@@ -435,6 +636,7 @@ class ChatMembershipAdmin(_RoomChildAdmin):
             change: Изменяется ли существующая запись.
         """
         room_id = _child_room(obj).pk
+        role_changed = False
         review_changed = (
             isinstance(obj, ChatMembership)
             and "disclosure_reviewed" in form.changed_data
@@ -442,6 +644,7 @@ class ChatMembershipAdmin(_RoomChildAdmin):
         if change and isinstance(obj, ChatMembership):
             ChatRoom.objects.select_for_update().get(pk=room_id)
             current = ChatMembership.objects.select_for_update().get(pk=obj.pk)
+            role_changed = current.is_moderator != obj.is_moderator
             fields = list(form.changed_data)
             if review_changed and current.consent_id != obj.consent_id:
                 fields.remove("disclosure_reviewed")
@@ -457,6 +660,14 @@ class ChatMembershipAdmin(_RoomChildAdmin):
             obj.refresh_from_db()
         else:
             super().save_model(request, obj, form, change)
+            role_changed = isinstance(obj, ChatMembership) and obj.is_moderator
+        if isinstance(obj, ChatMembership) and role_changed:
+            ChatManagementEvent.objects.create(
+                room_id=room_id,
+                actor=cast(User, request.user),
+                target=obj.user,
+                action="moderator_added" if obj.is_moderator else "moderator_removed",
+            )
         if isinstance(obj, ChatMembership) and review_changed:
             if obj.consented_at:
                 LegalAcceptanceLog.objects.create(

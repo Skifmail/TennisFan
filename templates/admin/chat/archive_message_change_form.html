@@ -1,0 +1,13 @@
+{% extends 'admin/base_site.html' %}
+{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/chat_room.css' %}">{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Начало</a> › <a href="{% url 'admin:chat_chatarchive_changelist' %}">Архивы городских чатов</a> › <a href="{% url 'admin:chat_chatarchive_change' private_archive.pk %}">{{ private_archive }}</a> › Сообщение #{{ original.source_message_id }}</div>{% endblock %}
+{% block content_title %}<h1>История сообщения #{{ original.source_message_id }}</h1>{% endblock %}
+{% block content_subtitle %}{% endblock %}
+{% block content %}
+<p>{{ private_archive.city_label }} · автор: {{ original.author_label }} (#{{ original.author_reference|default:'неизвестен' }}) · отправлено {{ original.sent_at|date:'d.m.Y H:i:s' }}.</p>
+{% if original.history_incomplete %}<p class="errornote">Сообщение изменялось или удалялось до появления архива. Перенесён только сохранившийся снимок. Утраченные ранние тексты здесь восстановить невозможно.</p>{% endif %}
+<p><a href="{% url 'admin:chat_chatarchive_change' private_archive.pk %}">Вернуться в архив чата</a></p>
+{% for version in archive_versions_page %}<section class="module chat-admin-section"><h2>Версия {{ version.sequence }} · {{ version.get_action_display }} · {{ version.occurred_at|date:'d.m.Y H:i:s' }}</h2><p>Инициатор: {% if version.actor_reference %}{{ version.actor_label }} (#{{ version.actor_reference }}){% else %}неизвестен для перенесённого снимка{% endif %}</p><div class="chat-archive-text">{{ version.text|default:'Текст не сохранился до появления архива' }}</div></section>{% endfor %}
+{% include 'admin/chat/archive_pagination.html' with page=archive_versions_page %}
+{% endblock %}

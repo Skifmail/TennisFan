@@ -2193,3 +2193,21 @@
     margin-top: 0;
     flex-shrink: 0;
 }
+
+.chat-management-card {
+  align-items: start;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chat-management-card form {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.chat-management-card label {
+  color: var(--chat-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}

@@ -1,0 +1,26 @@
+{% extends 'chat/base.html' %}
+{% block title %}Управление чатом — {{ room.city.name }}{% endblock %}
+{% block main_class %}chat-discover{% endblock %}
+{% block sidebar_settings %}<a class="chat-sidebar-settings" href="{% url 'chat:room' room.pk %}">Вернуться в чат</a>{% endblock %}
+{% block content %}
+<div class="chat-discover-inner">
+    <p class="chat-eyebrow">УПРАВЛЕНИЕ СООБЩЕСТВОМ</p>
+    <h1>{{ room.city.display_label }}</h1>
+    {% for message in messages %}<p class="chat-account-notice" role="status">{{ message }}</p>{% endfor %}
+    <p>Модераторы следят за порядком. Администратор также назначает модераторов и передаёт управление. Передача управления снимает с вас права администратора.</p>
+    <a class="chat-button chat-button-secondary" href="{% url 'chat:room' room.pk %}">Вернуться в чат</a>
+    <ul class="chat-city-grid">
+    {% for participant in participants %}
+    <li class="chat-city-card chat-management-card">
+        <div class="chat-city-card-copy"><strong>{{ participant.label|default:'Участник' }}</strong><small>{% if participant.administrator %}Администратор{% elif participant.moderator %}Модератор{% else %}Участник{% endif %}</small></div>
+        {% if not participant.administrator %}
+        <form method="post">{% csrf_token %}<input type="hidden" name="target_id" value="{{ participant.id }}"><input type="hidden" name="operation" value="moderator"><input type="hidden" name="enabled" value="{% if participant.moderator %}0{% else %}1{% endif %}"><button type="submit" class="chat-button chat-button-secondary">{% if participant.moderator %}Снять модератора{% else %}Назначить модератором{% endif %}</button></form>
+        <form method="post" data-transfer-form>{% csrf_token %}<input type="hidden" name="target_id" value="{{ participant.id }}"><input type="hidden" name="operation" value="transfer"><label><input type="checkbox" required> Подтверждаю передачу управления этому участнику</label><button type="submit" class="chat-button">Передать управление</button></form>
+        {% endif %}
+    </li>
+    {% empty %}<li class="chat-no-results">Нет участников с действующими согласиями на этой странице.</li>{% endfor %}
+    </ul>
+    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">Назад</a>{% endif %}
+    {% if page.has_next %}<a href="?page={{ page.next_page_number }}">Далее</a>{% endif %}
+</div>
+{% endblock %}

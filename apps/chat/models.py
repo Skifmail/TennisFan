@@ -15,12 +15,23 @@ class ChatRoom(models.Model):
         city: Однозначная ссылка на населённый пункт.
         is_active: Разрешён ли доступ к комнате.
         rules: Закреплённые правила общения.
+        is_created: Создано ли сообщество, а не только техническая заготовка.
+        administrator: Единственный управляющий комнатой, не сотрудник платформы.
     """
 
     city = models.OneToOneField(
         "core.City", on_delete=models.PROTECT, related_name="chat_room"
     )
     is_active = models.BooleanField("Открыта", default=True)
+    is_created = models.BooleanField("Сообщество создано", default=True)
+    administrator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="Администратор чата",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="administered_chat_rooms",
+    )
     rules = models.TextField(
         "Закреплённые правила",
         default="Общайтесь уважительно. Без спама, оскорблений и публикации чужих контактов.",
@@ -184,3 +195,172 @@ class ChatReport(models.Model):
         ]
         verbose_name = "жалоба на сообщение"
         verbose_name_plural = "жалобы на сообщения"
+
+
+class ChatManagementEvent(models.Model):
+    """Неизменяемая история создания и назначения управляющих.
+
+    Attributes:
+        room: Городское сообщество.
+        actor: Инициатор действия; сохраняется событие и после удаления аккаунта.
+        target: Пользователь, чьи права изменены.
+        action: Вид совершённого действия.
+        created_at: Время изменения.
+    """
+
+    room = models.ForeignKey(
+        ChatRoom, on_delete=models.CASCADE, related_name="management_events"
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="chat_management_actions",
+    )
+    target = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="chat_role_changes",
+    )
+    action = models.CharField(
+        "Действие",
+        max_length=32,
+        choices=[
+            ("created", "Создание сообщества"),
+            ("transferred", "Передача управления"),
+            ("assigned", "Назначение платформой"),
+            ("moderator_added", "Назначение модератора"),
+            ("moderator_removed", "Снятие модератора"),
+            ("released", "Освобождение управления"),
+        ],
+    )
+    created_at = models.DateTimeField("Время", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "событие управления чатом"
+        verbose_name_plural = "история управления чатами"
+        ordering = ("-pk",)
+
+
+class ChatArchive(models.Model):
+    """Независимый от жизненного цикла комнаты закрытый архив поколения чата.
+
+    Attributes:
+        room: Живая комната; после её удаления ссылка обнуляется.
+        source_room_id: Неизменяемый номер исходной комнаты.
+        city_label: Название населённого пункта на момент создания архива.
+        room_created_at: Время появления исходной комнаты.
+        room_removed_at: Время удаления комнаты, не архива.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    room = models.OneToOneField(
+        ChatRoom,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="private_archive",
+    )
+    source_room_id = models.PositiveBigIntegerField("Номер исходного чата", unique=True)
+    city_label = models.CharField("Город", max_length=512)
+    room_created_at = models.DateTimeField("Чат создан")
+    room_removed_at = models.DateTimeField("Чат удалён", null=True, blank=True)
+    created_at = models.DateTimeField("Архив создан", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "архив городского чата"
+        verbose_name_plural = "архивы городских чатов"
+        ordering = ("-room_created_at", "-pk")
+
+    def __str__(self) -> str:
+        """Возвращает город и номер поколения, различая повторно созданные чаты."""
+        return f"{self.city_label} · чат #{self.source_room_id}"
+
+
+class ChatArchivedMessage(models.Model):
+    """Снимок сообщения без каскадной зависимости от живой переписки и аккаунта.
+
+    Attributes:
+        archive: Архив исходного поколения комнаты.
+        source_message_id: Номер исходного сообщения.
+        author_reference: Номер автора, сохраняемый после удаления аккаунта.
+        author_label: Имя автора для закрытого служебного просмотра, без контактов.
+        text: Последний известный текст, включая удалённые сообщения.
+        history_incomplete: До появления архива часть истории могла быть утрачена.
+    """
+
+    archive = models.ForeignKey(
+        ChatArchive, on_delete=models.CASCADE, related_name="messages"
+    )
+    source_message_id = models.PositiveBigIntegerField("Номер сообщения")
+    author_reference = models.PositiveBigIntegerField("Номер автора", null=True)
+    author_label = models.CharField("Автор", max_length=384)
+    text = models.TextField("Последний известный текст", blank=True)
+    sent_at = models.DateTimeField("Отправлено")
+    edited_at = models.DateTimeField("Изменено", null=True)
+    deleted_at = models.DateTimeField("Удалено из переписки", null=True)
+    history_incomplete = models.BooleanField("Ранняя история неполная", default=False)
+
+    class Meta:
+        verbose_name = "архивное сообщение"
+        verbose_name_plural = "архивные сообщения"
+        ordering = ("-sent_at", "-pk")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["archive", "source_message_id"],
+                name="chat_archive_message_unique",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["archive", "-sent_at", "-id"], name="chat_archive_page_idx"
+            )
+        ]
+
+    def __str__(self) -> str:
+        """Возвращает техническое обозначение сообщения без раскрытия его текста."""
+        return f"Сообщение #{self.source_message_id}"
+
+
+class ChatMessageVersion(models.Model):
+    """Сохранённая версия сообщения, не редактируемая из интерфейса.
+
+    Attributes:
+        message: Независимый архивный снимок сообщения.
+        sequence: Порядок версии внутри сообщения.
+        action: Создание, редактирование, удаление либо перенос старых данных.
+        text: Текст данной версии.
+        actor_reference: Номер инициатора операции; не ссылка на удаляемый аккаунт.
+        actor_label: Служебное обозначение инициатора без email и телефона.
+        occurred_at: Время операции или снимка перенесённых данных.
+    """
+
+    message = models.ForeignKey(
+        ChatArchivedMessage, on_delete=models.CASCADE, related_name="versions"
+    )
+    sequence = models.PositiveIntegerField("Версия")
+    action = models.CharField(
+        "Действие",
+        max_length=16,
+        choices=[
+            ("created", "Отправлено"),
+            ("edited", "Изменено"),
+            ("deleted", "Удалено из чата"),
+            ("imported", "Перенесённый снимок"),
+        ],
+    )
+    text = models.TextField("Текст версии", blank=True)
+    actor_reference = models.PositiveBigIntegerField("Номер инициатора", null=True)
+    actor_label = models.CharField("Инициатор", max_length=384, blank=True)
+    occurred_at = models.DateTimeField("Время")
+
+    class Meta:
+        verbose_name = "версия сообщения"
+        verbose_name_plural = "версии сообщений"
+        ordering = ("sequence",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["message", "sequence"], name="chat_message_version_unique"
+            )
+        ]

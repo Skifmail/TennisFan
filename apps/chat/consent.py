@@ -206,6 +206,9 @@ def build_consent_form(
             "city_id": city.pk,
             "version": version,
             "nonce": str(uuid4()),
+            "create_chat": not ChatRoom.objects.filter(
+                city=city, is_created=True
+            ).exists(),
             "previous_acceptance_id": (
                 str(membership.consent_id)
                 if membership is not None and initial.get("personal_data")
@@ -322,12 +325,26 @@ def accept_chat_consent(
         "conditions": form.cleaned_data["conditions"],
     }
     # Общий с отправкой порядок блокировок: сначала комната, затем аккаунт.
-    room, _ = ChatRoom.objects.get_or_create(city=city)
+    # Блокировка города сериализует и первые запросы, когда комнаты ещё нет.
+    City.objects.select_for_update().get(pk=city.pk)
+    room, _ = ChatRoom.objects.get_or_create(city=city, defaults={"is_created": False})
     room = ChatRoom.objects.select_for_update().get(pk=room.pk)
     if not room.is_active:
         raise ChatNotFoundError("Чат закрыт.")
     user = User.objects.select_for_update(no_key=True).get(pk=user.pk)
     require_active_user(user)
+    creating = not room.is_created
+    if not room.is_created:
+        if not payload.get("create_chat"):
+            raise ChatConsentVersionError("Сначала подтвердите создание сообщества.")
+        from .models import ChatManagementEvent
+
+        room.is_created = True
+        room.administrator = user
+        room.save(update_fields=["is_created", "administrator"])
+        ChatManagementEvent.objects.create(
+            room=room, actor=user, target=user, action="created"
+        )
     if payload["subject"] != _subject(user):
         raise ChatConsentVersionError(
             "Данные аккаунта изменились. Откройте форму заново."
@@ -348,6 +365,10 @@ def accept_chat_consent(
                 "Это подтверждение уже использовано. Откройте новую форму."
             )
         return member
+    if payload.get("create_chat") and not creating:
+        raise ChatConsentVersionError(
+            "Чат уже создан другим запросом. Теперь подтвердите вступление как участник."
+        )
     previous_acceptance_id = payload.get("previous_acceptance_id")
     if (
         previous_acceptance_id is not None
@@ -443,7 +464,7 @@ def withdraw_chat_consent(
     Raises:
         ChatConsentRequiredError: Участие отсутствует.
     """
-    ChatRoom.objects.select_for_update().get(pk=room_id)
+    room = ChatRoom.objects.select_for_update().get(pk=room_id)
     User.objects.select_for_update(no_key=True).get(pk=user.pk)
     member = (
         ChatMembership.objects.select_for_update()
@@ -454,6 +475,9 @@ def withdraw_chat_consent(
         raise ChatConsentRequiredError("Участие не найдено.")
     if member.consent_withdrawn_at:
         return
+    from .governance import release_administrator
+
+    release_administrator(room=room, user=user)
     withdrawn_documents = ["chat-personal-data", "chat-rules"]
     if LegalAcceptanceLog.objects.filter(
         user=user,

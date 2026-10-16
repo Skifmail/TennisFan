@@ -37,6 +37,7 @@ from .domain import (
     ChatError,
     ChatValidationError,
 )
+from .governance import can_manage, change_role
 from .models import ChatMembership, ChatRoom
 
 CITY_SEARCH_LIMIT: Final = 100
@@ -186,6 +187,9 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
         "chat/room.html",
         {
             "membership": member,
+            "can_manage_chat": can_manage(
+                user=cast(User, request.user), room=member.room
+            ),
             "profile_has_photo": bool(profile and profile.avatar),
             "room": member.room,
             "memberships": list(services.my_memberships(user=cast(User, request.user))),
@@ -201,7 +205,12 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
                 "socketPath": f"/ws/chats/{room_id}/",
                 "indexUrl": "/chats/",
                 "moderatorBadgeUrl": static("images/chat/moderator-badge.png"),
-                "canModerate": bool(request.user.is_staff or member.is_moderator),
+                "administratorBadgeUrl": static("images/chat/administrator-badge.webp"),
+                "canModerate": bool(
+                    request.user.is_staff
+                    or member.is_moderator
+                    or member.room.administrator_id == request.user.pk
+                ),
             },
         },
     )
@@ -281,6 +290,9 @@ def join(request: HttpRequest) -> HttpResponse:
             "has_saved_consents": bool(consent_form.initial.get("personal_data")),
             "consent_error": error,
             "is_consent_update": is_consent_update,
+            "is_chat_creation": not ChatRoom.objects.filter(
+                city=city, is_created=True
+            ).exists(),
             "consent_room_id": current.room_id if current else None,
             "base_conditions": BASE_DISCLOSURE_CONDITIONS,
             "memberships": list(services.my_memberships(user=user)),
@@ -497,3 +509,90 @@ def action(request: HttpRequest, room_id: int) -> JsonResponse:
     else:
         raise ChatValidationError("Неизвестное действие.")
     return JsonResponse(result)
+
+
+@login_required
+@never_cache
+@require_http_methods(["GET", "POST"])
+@_api
+def management(request: HttpRequest, room_id: int) -> HttpResponse:
+    """Показывает управление ролями без публикации скрытых имён и контактов.
+
+    Args:
+        request: Запрос администратора сообщества или платформы.
+        room_id: Выбранная комната.
+
+    Returns:
+        Страница ролей либо перенаправление после сохранения.
+
+    Raises:
+        ChatAccessError: Нет полномочий в выбранной комнате.
+    """
+    from django.core.paginator import Paginator
+
+    from .consent import ensure_chat_consent
+    from .domain import ChatAccessError
+
+    user = cast(User, request.user)
+    selected = get_object_or_404(
+        ChatRoom.objects.select_related("city"), pk=room_id, is_created=True
+    )
+    if not can_manage(user=user, room=selected):
+        raise ChatAccessError("Требуются права администратора этого чата.")
+    if not (user.is_staff and user.has_perm("chat.change_chatroom")):
+        services.require_member(user=user, room_id=room_id)
+    if request.method == "POST":
+        if request.POST.get("operation") == "moderator" and request.POST.get(
+            "enabled"
+        ) not in {"0", "1"}:
+            raise ChatValidationError("Некорректное значение роли.")
+        change_role(
+            user=user,
+            room_id=room_id,
+            target_id=_id(request.POST.get("target_id")),
+            operation=request.POST.get("operation", ""),
+            enabled=request.POST.get("enabled") == "1",
+        )
+        messages.success(request, "Права участника обновлены.")
+        return redirect(
+            (
+                "chat:room"
+                if request.POST.get("operation") == "transfer"
+                else "chat:management"
+            ),
+            room_id=room_id,
+        )
+    page = Paginator(
+        ChatMembership.objects.select_related("user")
+        .filter(room=selected, is_active=True, user__is_active=True)
+        .order_by("pk"),
+        CITY_SEARCH_LIMIT,
+    ).get_page(request.GET.get("page"))
+    participants = []
+    for member in page:
+        try:
+            ensure_chat_consent(member)
+        except ChatError:
+            continue
+        participants.append(
+            {
+                "id": member.user_id,
+                "label": (
+                    member.user.get_full_name()
+                    if member.disclosure_name
+                    else f"Участник #{member.user_id}"
+                ),
+                "moderator": member.is_moderator,
+                "administrator": selected.administrator_id == member.user_id,
+            }
+        )
+    return render(
+        request,
+        "chat/management.html",
+        {
+            "room": selected,
+            "participants": participants,
+            "page": page,
+            "memberships": list(services.my_memberships(user=user)),
+        },
+    )

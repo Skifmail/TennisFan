@@ -23,7 +23,7 @@ pytestmark = pytest.mark.django_db
 def test_directory_when_chat_empty_should_show_zero_participants(
     client: Client, has_room: bool
 ) -> None:
-    """Пустой чат отображает ноль, даже если комната ещё не создана.
+    """Пустой чат отображает ноль, а ещё не созданный город предлагает создание.
 
     Args:
         client: Тестовый HTTP-клиент.
@@ -37,7 +37,7 @@ def test_directory_when_chat_empty_should_show_zero_participants(
     response = client.get(reverse("chat:index"), {"q": city.name})
     assert response.status_code == 200
     assert getattr(response.context["cities"][0], "member_count", None) == 0
-    assert "0 участников" in response.content.decode()
+    assert ("0 участников" if has_room else "Создать чат") in response.content.decode()
     assert not ChatMembership.objects.filter(user=user).exists()
 
 

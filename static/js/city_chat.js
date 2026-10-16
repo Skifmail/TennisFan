@@ -190,14 +190,15 @@
         if (!current || message.revision >= current.revision) messages.set(message.id, message);
     }
 
-    function updateModeratorRoles(ids) {
+    function updateModeratorRoles(ids, administratorId) {
         if (!Array.isArray(ids)) return false;
         const moderators = new Set(ids);
         let changed = false;
         messages.forEach((message, id) => {
             const isModerator = moderators.has(message.author_id);
-            if (message.author_is_moderator !== isModerator) {
-                messages.set(id, {...message, author_is_moderator: isModerator});
+            const isAdministrator = isModerator && message.author_id === administratorId;
+            if (message.author_is_moderator !== isModerator || message.author_is_administrator !== isAdministrator) {
+                messages.set(id, {...message, author_is_moderator: isModerator, author_is_administrator: isAdministrator});
                 changed = true;
             }
         });
@@ -403,7 +404,7 @@
             authorRow.append(author);
             if (moderator) {
                 const badge = element("img", "chat-moderator-badge");
-                badge.src = config.moderatorBadgeUrl;
+                badge.src = message.author_is_administrator ? config.administratorBadgeUrl : config.moderatorBadgeUrl;
                 badge.alt = "";
                 badge.width = MODERATOR_BADGE_SIZE;
                 badge.height = MODERATOR_BADGE_SIZE;
@@ -411,7 +412,7 @@
                 authorRow.append(badge);
             }
             identity.append(authorRow);
-            if (moderator) identity.append(element("span", "chat-moderator-label", "Модератор"));
+            if (moderator) identity.append(element("span", "chat-moderator-label", message.author_is_administrator ? "Администратор" : "Модератор"));
             column.append(identity);
         }
         const bubble = element("div", "chat-bubble");
@@ -533,7 +534,9 @@
                 cursor = data.cursor;
                 bannedUntil = data.banned_until;
                 canModerate = data.can_moderate;
-                const rolesChanged = updateModeratorRoles(data.moderator_ids);
+                const managementControl = byId("chat-management-control");
+                if (managementControl) managementControl.hidden = data.can_manage !== true;
+                const rolesChanged = updateModeratorRoles(data.moderator_ids, data.administrator_id);
                 byId("chat-rules").textContent = data.rules;
                 updateSend();
                 if (data.events.length || rolesChanged) {

@@ -2,6 +2,7 @@
 
 from hashlib import sha256
 from pathlib import Path
+from urllib.parse import quote
 from uuid import uuid4
 
 import pytest
@@ -1000,5 +1001,9 @@ def test_settings_when_photo_permission_and_file_differ_should_show_honest_statu
     )
     assert f'data-profile-visibility="avatar">{expected}</dd>' in html
     assert ("Добавить фото в профиль" in html) is (not has_photo)
+    if not has_photo:
+        return_url = quote(reverse("chat:room", args=[member.room_id]), safe="/")
+        upload_url = f'{reverse("profile_edit")}?next={return_url}'
+        assert f'href="{upload_url}"' in html
     member.refresh_from_db()
     assert member.disclosure_avatar is allowed

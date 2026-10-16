@@ -180,11 +180,13 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
         return redirect("chat:index")
     except ChatError:
         return redirect("chat:index")
+    profile = getattr(request.user, "player", None)
     return render(
         request,
         "chat/room.html",
         {
             "membership": member,
+            "profile_has_photo": bool(profile and profile.avatar),
             "room": member.room,
             "memberships": list(services.my_memberships(user=cast(User, request.user))),
             "member_count": member.room.memberships.filter(

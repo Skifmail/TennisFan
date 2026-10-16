@@ -1,5 +1,5 @@
 {% extends "admin/delete_confirmation.html" %}
 {% block breadcrumbs %}
-<ol class="breadcrumbs"><li><a href="{% url 'admin:index' %}">Начало</a></li><li><a href="{% url 'admin:chat_chatroom_changelist' %}">Городские чаты</a></li><li><a href="{{ chat_room_url }}#chat-room-members">{{ chat_room.city.name }}</a></li><li aria-current="page">Удалить участника</li></ol>
+<ol class="breadcrumbs"><li><a href="{% url 'admin:index' %}">Начало</a></li><li><a href="{% url 'admin:chat_chatroom_changelist' %}">Городские чаты</a></li><li><a href="{{ chat_room_url }}#chat-room-members">{{ chat_room.display_name }}</a></li><li aria-current="page">Удалить участника</li></ol>
 {% endblock %}
-{% block content %}<p>Будет удалено только участие в чате «{{ chat_room.city.name }}». Аккаунт пользователя и его сообщения сохранятся.</p>{{ block.super }}{% endblock %}
+{% block content %}<p>Будет удалено только участие в чате «{{ chat_room.display_name }}». Аккаунт пользователя и его сообщения сохранятся.</p>{{ block.super }}{% endblock %}

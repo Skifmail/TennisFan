@@ -42,7 +42,7 @@ def ensure_archive(room: ChatRoom, *, using: str = DEFAULT_DB_ALIAS) -> ChatArch
         source_room_id=room.pk,
         defaults={
             "room_id": room.pk,
-            "city_label": str(room.city),
+            "city_label": str(room),
             "room_created_at": room.created_at,
         },
     )

@@ -296,7 +296,26 @@ def join_city(*, user: User, city_id: int) -> ChatRoom:
     room = ChatRoom.objects.filter(city_id=city_id, is_created=True).first()
     if room is None:
         raise ChatNotFoundError("Чат ещё не создан. Сначала подтвердите его создание.")
-    room = _room(room.pk, lock=True)
+    return join_room(user=user, room_id=room.pk)
+
+
+@transaction.atomic
+def join_room(*, user: User, room_id: int) -> ChatRoom:
+    """Создаёт участие; личные согласия проверяются отдельным слоем доступа.
+
+    Args:
+        user: Авторизованный игрок.
+        room_id: Городская либо отдельная комната.
+
+    Returns:
+        Открытая существующая комната.
+
+    Raises:
+        ChatAccessError: Аккаунт неактивен.
+        ChatNotFoundError: Комната закрыта либо отсутствует.
+    """
+    require_active_user(user)
+    room = _room(room_id, lock=True)
     member, created = ChatMembership.objects.get_or_create(
         room=room,
         user=user,
@@ -408,7 +427,9 @@ def send_message(
     ):
         Notification.objects.create(
             user_id=reply.author_id,
-            message=f"Вам ответили в городском чате «{message.room.city.name}»"[:255],
+            message=f"Вам ответили в городском чате «{message.room.display_name}»"[
+                :255
+            ],
             url=reverse("chat:room", args=[room_id]),
         )
     logger.info(
@@ -487,6 +508,8 @@ def sync_events(*, user: User, room_id: int, after_id: int) -> dict[str, Any]:
         )
         .order_by("id")[: MAX_PAGE_SIZE + 1]
     )
+    from .invitations import can_invite
+
     moderator_ids = _moderator_ids(room_id)
     disclosures = _message_disclosures(room_id, [event.message for event in rows])
     return {
@@ -507,6 +530,7 @@ def sync_events(*, user: User, room_id: int, after_id: int) -> dict[str, Any]:
         "has_more": len(rows) > MAX_PAGE_SIZE,
         "can_moderate": _moderator(user, member),
         "can_manage": can_manage(user=user, room=member.room),
+        "can_invite": can_invite(user=user, room_id=room_id),
         "moderator_ids": sorted(moderator_ids),
         "administrator_id": (
             member.room.administrator_id

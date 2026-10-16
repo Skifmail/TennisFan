@@ -44,9 +44,9 @@ CONSENT_DOCUMENTS: Final = {
     "disclosure": "chat-disclosure",
 }
 CONSENT_LABELS: Final = {
-    "personal_data": "Даю согласие на обработку персональных данных для работы городского чата, включая показ моих сообщений его участникам.",
-    "rules": "Я прочитал(а) правила городских чатов и обязуюсь их соблюдать.",
-    "disclosure": "Даю дополнительное согласие на показ выбранных ниже имени и фамилии и/или фотографии участникам этого городского чата.",
+    "personal_data": "Даю согласие на обработку персональных данных для работы выбранного чата, включая показ моих сообщений его участникам.",
+    "rules": "Я прочитал(а) правила чатов платформы и обязуюсь их соблюдать.",
+    "disclosure": "Даю дополнительное согласие на показ выбранных ниже имени и фамилии и/или фотографии участникам этого чата.",
 }
 BASE_DISCLOSURE_CONDITIONS: Final = (
     "Доступ только участникам выбранного чата. Запрещены дальнейшая передача "
@@ -166,13 +166,13 @@ def _subject(user: User) -> dict[str, str | int]:
 
 
 def build_consent_form(
-    *, user: User, city: City, membership: ChatMembership | None = None
+    *, user: User, city: City | ChatRoom, membership: ChatMembership | None = None
 ) -> ChatConsentForm:
     """Готовит форму вступления либо отображает действующий сохранённый выбор.
 
     Args:
         user: Авторизованный игрок.
-        city: Выбранный населённый пункт.
+        city: Населённый пункт либо отдельная комната платформы.
         membership: Собственное участие для отображения текущих согласий в настройках.
 
     Returns:
@@ -186,7 +186,11 @@ def build_consent_form(
     if (
         membership is not None
         and membership.user_id == user.pk
-        and membership.room.city_id == city.pk
+        and (
+            membership.room_id == city.pk
+            if isinstance(city, ChatRoom)
+            else membership.room.city_id == city.pk
+        )
         and membership.is_active
         and membership.consented_at
         and not membership.consent_withdrawn_at
@@ -203,12 +207,14 @@ def build_consent_form(
     initial["token"] = signing.dumps(
         {
             "subject": _subject(user),
-            "city_id": city.pk,
+            "city_id": city.city_id if isinstance(city, ChatRoom) else city.pk,
+            "custom_room_id": city.pk if isinstance(city, ChatRoom) else None,
             "version": version,
             "nonce": str(uuid4()),
-            "create_chat": not ChatRoom.objects.filter(
-                city=city, is_created=True
-            ).exists(),
+            "create_chat": (
+                not isinstance(city, ChatRoom)
+                and not ChatRoom.objects.filter(city=city, is_created=True).exists()
+            ),
             "previous_acceptance_id": (
                 str(membership.consent_id)
                 if membership is not None and initial.get("personal_data")
@@ -267,7 +273,7 @@ def consent_request_ip(request: HttpRequest) -> str | None:
 def accept_chat_consent(
     *,
     user: User,
-    city: City,
+    city: City | ChatRoom,
     data: Mapping[str, str],
     ip_address: str | None,
     user_agent: str,
@@ -276,7 +282,7 @@ def accept_chat_consent(
 
     Args:
         user: Игрок, самостоятельно подтверждающий документы.
-        city: Город, связанный с подписанной формой.
+        city: Город либо отдельная комната, связанные с подписанной формой.
         data: Поля отправленной формы.
         ip_address: Проверенный адрес соединения.
         user_agent: Ограниченное по размеру описание браузера.
@@ -291,7 +297,7 @@ def accept_chat_consent(
         ChatAccessError: Аккаунт неактивен.
         ChatNotFoundError: Город или комната недоступны.
     """
-    from .services import join_city, require_active_user
+    from .services import join_room, require_active_user
 
     require_active_user(user)
     form = ChatConsentForm(data=data)
@@ -308,7 +314,10 @@ def accept_chat_consent(
         nonce = UUID(payload["nonce"])
         matches = (
             payload["subject"] == _subject(user)
-            and payload["city_id"] == city.pk
+            and payload["city_id"]
+            == (city.city_id if isinstance(city, ChatRoom) else city.pk)
+            and payload.get("custom_room_id")
+            == (city.pk if isinstance(city, ChatRoom) else None)
             and payload["version"] == version
         )
     except (signing.BadSignature, KeyError, TypeError, ValueError) as exc:
@@ -326,8 +335,20 @@ def accept_chat_consent(
     }
     # Общий с отправкой порядок блокировок: сначала комната, затем аккаунт.
     # Блокировка города сериализует и первые запросы, когда комнаты ещё нет.
-    City.objects.select_for_update().get(pk=city.pk)
-    room, _ = ChatRoom.objects.get_or_create(city=city, defaults={"is_created": False})
+    if isinstance(city, ChatRoom):
+        selected_room = (
+            ChatRoom.objects.select_for_update()
+            .filter(pk=city.pk, city__isnull=True, is_created=True)
+            .first()
+        )
+        if selected_room is None:
+            raise ChatNotFoundError("Чат недоступен.")
+        room = selected_room
+    else:
+        City.objects.select_for_update().get(pk=city.pk)
+        room, _ = ChatRoom.objects.get_or_create(
+            city=city, defaults={"is_created": False}
+        )
     room = ChatRoom.objects.select_for_update().get(pk=room.pk)
     if not room.is_active:
         raise ChatNotFoundError("Чат закрыт.")
@@ -355,7 +376,7 @@ def accept_chat_consent(
     if previous is not None:
         member = ChatMembership.objects.filter(
             user=user,
-            room__city=city,
+            room=room,
             is_active=True,
             consent_id=nonce,
             consent_withdrawn_at__isnull=True,
@@ -384,7 +405,7 @@ def accept_chat_consent(
         raise ChatConsentVersionError(
             "Настройки изменились или согласия отозваны. Откройте актуальную форму заново."
         )
-    join_city(user=user, city_id=city.pk)
+    join_room(user=user, room_id=room.pk)
     member = ChatMembership.objects.select_for_update().get(user=user, room=room)
     for field, slug in CONSENT_DOCUMENTS.items():
         if not form.cleaned_data[field]:
@@ -402,8 +423,9 @@ def accept_chat_consent(
                 "acceptance_id": str(nonce),
                 "bundle_version": version,
                 "room_id": room.pk,
-                "city_id": city.pk,
-                "city_label": str(city),
+                "city_id": room.city_id,
+                "city_label": str(room),
+                "room_label": str(room),
                 "subject": _subject(user),
                 "checkbox_text": CONSENT_LABELS[field],
                 "disclosure": choices,
@@ -438,6 +460,11 @@ def accept_chat_consent(
             "disclosure_conditions",
             "disclosure_reviewed",
         ]
+    )
+    from .models import ChatInvitation
+
+    ChatInvitation.objects.filter(room=room, recipient=user, status="pending").update(
+        status="accepted", answered_at=timezone.now()
     )
     publish_disclosure_change(room_id=room.pk, user_id=user.pk)
     logger.info(

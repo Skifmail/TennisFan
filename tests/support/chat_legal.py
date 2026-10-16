@@ -8,7 +8,7 @@ from apps.core.models import City
 from apps.users.models import User
 
 
-def join_city_with_consent(*, user: User, city_id: int) -> ChatRoom:
+def join_city_with_consent(*, user: User, city_id: int | None) -> ChatRoom:
     """Создаёт тестовое участие и отдельно фиксирует явный выбор тестового игрока.
 
     Args:
@@ -18,12 +18,14 @@ def join_city_with_consent(*, user: User, city_id: int) -> ChatRoom:
     Returns:
         Комната с принятыми действующими документами.
     """
+    assert city_id is not None, "Городская фабрика требует идентификатор города"
     services.require_active_user(user)
     if not City.objects.filter(pk=city_id).exists():
         raise ChatNotFoundError("Город не найден.")
     # Старые тестовые комнаты намеренно моделируют существующие сообщества без владельца.
     ChatRoom.objects.get_or_create(city_id=city_id)
     room = services.join_city(user=user, city_id=city_id)
+    assert room.city is not None
     try:
         services.require_member(user=user, room_id=room.pk)
     except ChatConsentRequiredError:

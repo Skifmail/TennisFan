@@ -254,6 +254,7 @@ def test_archive_when_owner_purges_detached_archive_should_remove_only_it(
     assert not ChatArchive.objects.filter(pk=archive.pk).exists()
     assert not ChatArchivedMessage.objects.filter(archive_id=archive.pk).exists()
     assert not ChatMessageVersion.objects.exists()
+    assert room.city_id is not None
     assert City.objects.filter(pk=room.city_id).exists()
 
 

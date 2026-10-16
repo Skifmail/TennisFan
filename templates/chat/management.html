@@ -1,11 +1,11 @@
 {% extends 'chat/base.html' %}
-{% block title %}Управление чатом — {{ room.city.name }}{% endblock %}
+{% block title %}Управление чатом — {{ room.display_name }}{% endblock %}
 {% block main_class %}chat-discover{% endblock %}
 {% block sidebar_settings %}<a class="chat-sidebar-settings" href="{% url 'chat:room' room.pk %}">Вернуться в чат</a>{% endblock %}
 {% block content %}
 <div class="chat-discover-inner">
     <p class="chat-eyebrow">УПРАВЛЕНИЕ СООБЩЕСТВОМ</p>
-    <h1>{{ room.city.display_label }}</h1>
+    <h1>{{ room.display_label }}</h1>
     {% for message in messages %}<p class="chat-account-notice" role="status">{{ message }}</p>{% endfor %}
     <p>Модераторы следят за порядком. Администратор также назначает модераторов и передаёт управление. Передача управления снимает с вас права администратора.</p>
     <a class="chat-button chat-button-secondary" href="{% url 'chat:room' room.pk %}">Вернуться в чат</a>

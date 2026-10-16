@@ -1,0 +1,4 @@
+{% extends 'chat/base.html' %}
+{% block title %}Email-приглашения в чаты{% endblock %}
+{% block main_class %}chat-discover{% endblock %}
+{% block content %}<div class="chat-discover-inner chat-invitations"><h1>Email-приглашения в чаты</h1>{% if saved %}<p role="status">Email-приглашения из городских чатов отключены. Внутренние уведомления и другие сервисные письма платформы не изменены.</p>{% else %}<p>Отключить приглашения из всех городских чатов на вашу почту? Другие сервисные письма и уведомления на сайте останутся.</p><form method="post">{% csrf_token %}<button type="submit" class="chat-button">Отключить email-приглашения</button></form>{% endif %}<p><a href="{% url 'chat:index' %}">Вернуться к чатам</a></p></div>{% endblock %}

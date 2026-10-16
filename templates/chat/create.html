@@ -1,0 +1,4 @@
+{% extends 'chat/base.html' %}
+{% block title %}Создать чат{% endblock %}
+{% block main_class %}chat-discover{% endblock %}
+{% block content %}<div class="chat-consent-page"><p class="chat-eyebrow">СООБЩЕСТВО TENNISFAN</p><h1>Создать отдельный чат</h1><p>Задайте название. Чат будет виден в общем списке, и игроки смогут вступить после подтверждения правил и согласий. Привязки к городу нет.</p><form method="post">{% csrf_token %}{{ form.title.errors }}<label for="id_title">Название чата</label><div class="chat-city-search">{{ form.title }}</div>{{ form.non_field_errors }}<div class="chat-dialog-actions"><a class="chat-button chat-button-secondary" href="{% url 'chat:index' %}">Отмена</a><button class="chat-button" type="submit">Создать чат</button></div></form></div>{% endblock %}

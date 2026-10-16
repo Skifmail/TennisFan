@@ -536,6 +536,8 @@
                 canModerate = data.can_moderate;
                 const managementControl = byId("chat-management-control");
                 if (managementControl) managementControl.hidden = data.can_manage !== true;
+                const invitationControl = byId("chat-invitation-control");
+                if (invitationControl) invitationControl.hidden = data.can_invite !== true;
                 const rolesChanged = updateModeratorRoles(data.moderator_ids, data.administrator_id);
                 byId("chat-rules").textContent = data.rules;
                 updateSend();

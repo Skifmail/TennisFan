@@ -3,16 +3,18 @@
 from uuid import uuid4
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
-from .domain import MAX_MESSAGE_LENGTH, MAX_REPORT_LENGTH
+from .domain import MAX_CHAT_TITLE_LENGTH, MAX_MESSAGE_LENGTH, MAX_REPORT_LENGTH
 
 
 class ChatRoom(models.Model):
     """Общая комната населённого пункта.
 
     Attributes:
-        city: Однозначная ссылка на населённый пункт.
+        city: Однозначная ссылка на населённый пункт либо пустое значение.
+        title: Название отдельного чата без привязки к городу.
         is_active: Разрешён ли доступ к комнате.
         rules: Закреплённые правила общения.
         is_created: Создано ли сообщество, а не только техническая заготовка.
@@ -20,7 +22,14 @@ class ChatRoom(models.Model):
     """
 
     city = models.OneToOneField(
-        "core.City", on_delete=models.PROTECT, related_name="chat_room"
+        "core.City",
+        on_delete=models.PROTECT,
+        related_name="chat_room",
+        null=True,
+        blank=True,
+    )
+    title = models.CharField(
+        "Название отдельного чата", max_length=MAX_CHAT_TITLE_LENGTH, blank=True
     )
     is_active = models.BooleanField("Открыта", default=True)
     is_created = models.BooleanField("Сообщество создано", default=True)
@@ -39,12 +48,49 @@ class ChatRoom(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(city__isnull=False, title="")
+                    | (models.Q(city__isnull=True) & ~models.Q(title=""))
+                ),
+                name="chat_room_city_or_title",
+            ),
+        ]
         verbose_name = "городской чат"
         verbose_name_plural = "городские чаты"
 
     def __str__(self) -> str:
         """Возвращает название комнаты для администрирования."""
-        return str(self.city)
+        return self.display_label
+
+    @property
+    def display_name(self) -> str:
+        """Возвращает краткое имя городского или отдельного сообщества."""
+        return self.city.name if self.city is not None else self.title
+
+    @property
+    def display_label(self) -> str:
+        """Возвращает имя с регионом для городов и название отдельного чата."""
+        return str(self.city) if self.city_id else self.title
+
+    @property
+    def join_query(self) -> str:
+        """Возвращает однозначный параметр формы личных согласий."""
+        return f"city_id={self.city_id}" if self.city_id else f"room_id={self.pk}"
+
+    def clean(self) -> None:
+        """Проверяет взаимоисключающие способы именования комнаты.
+
+        Raises:
+            ValidationError: Нет имени либо городскому чату задано отдельное название.
+        """
+        super().clean()
+        self.title = self.title.strip()
+        if bool(self.city_id) == bool(self.title):
+            raise ValidationError(
+                "Выберите город ИЛИ укажите название отдельного чата."
+            )
 
 
 class ChatMembership(models.Model):
@@ -364,3 +410,157 @@ class ChatMessageVersion(models.Model):
                 fields=["message", "sequence"], name="chat_message_version_unique"
             )
         ]
+
+
+class ChatInvitationCampaign(models.Model):
+    """Хранит подтверждённую отправку и курсор фонового отбора получателей.
+
+    Attributes:
+        id: Одноразовый идентификатор подписанного подтверждения.
+        room: Чат назначения.
+        sender: Инициатор с проверяемыми при доставке полномочиями.
+        audience: Персональная, городская либо общеплатформенная аудитория.
+        upper_user_id: Верхняя граница аккаунтов на момент предпросмотра.
+        cursor_user_id: Последний проверенный аккаунт.
+        created_count: Число созданных приглашений без дублей.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    room = models.ForeignKey(
+        ChatRoom, on_delete=models.CASCADE, related_name="invitation_campaigns"
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL
+    )
+    audience = models.CharField(
+        "Аудитория",
+        max_length=16,
+        choices=[
+            ("person", "Один игрок"),
+            ("city", "Игроки города"),
+            ("platform", "Вся платформа"),
+        ],
+    )
+    target_id = models.PositiveBigIntegerField(
+        "Номер выбранного игрока", null=True, blank=True
+    )
+    upper_user_id = models.PositiveBigIntegerField()
+    cursor_user_id = models.PositiveBigIntegerField(default=0)
+    estimated_count = models.PositiveIntegerField("Получателей при подтверждении")
+    created_count = models.PositiveIntegerField("Приглашений создано", default=0)
+    status = models.CharField(
+        "Состояние",
+        max_length=16,
+        choices=[
+            ("queued", "В очереди"),
+            ("done", "Получатели обработаны"),
+            ("cancelled", "Отменено: нет доступа"),
+        ],
+        default="queued",
+        db_index=True,
+    )
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    finished_at = models.DateTimeField("Обработка завершена", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "отправка приглашений в чат"
+        verbose_name_plural = "отправки приглашений в чаты"
+        ordering = ["-created_at", "-pk"]
+
+    def __str__(self) -> str:
+        """Возвращает номер комнаты и тип аудитории без контактов получателей."""
+        return f"Чат #{self.room_id}: {self.get_audience_display()}"
+
+
+class ChatInvitation(models.Model):
+    """Связывает единственное приглашение игрока с уведомлением и состоянием письма.
+
+    Attributes:
+        recipient: Получатель, самостоятельно подтверждающий вступление.
+        campaign: Исходная подтверждённая отправка.
+        status: Решение игрока, не заменяющее согласия.
+        email_status: Отдельное состояние доставки письма.
+        email_reason: Технический код причины без текста SMTP и адреса.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    room = models.ForeignKey(
+        ChatRoom, on_delete=models.CASCADE, related_name="invitations"
+    )
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="chat_invitations",
+    )
+    campaign = models.ForeignKey(
+        ChatInvitationCampaign, on_delete=models.CASCADE, related_name="invitations"
+    )
+    notification = models.OneToOneField(
+        "users.Notification",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="chat_invitation",
+    )
+    status = models.CharField(
+        "Решение",
+        max_length=16,
+        default="pending",
+        choices=[
+            ("pending", "Ожидает решения"),
+            ("accepted", "Игрок вступил"),
+            ("declined", "Отклонено"),
+        ],
+    )
+    email_status = models.CharField(
+        "Email",
+        max_length=16,
+        default="pending",
+        db_index=True,
+        choices=[
+            ("pending", "В очереди"),
+            ("sending", "Передача почтовому сервису"),
+            ("sent", "Принято почтовым сервисом"),
+            ("failed", "Ошибка отправки"),
+            ("skipped", "Не отправляется"),
+        ],
+    )
+    email_reason = models.CharField("Причина", max_length=40, blank=True)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    email_attempted_at = models.DateTimeField("Попытка email", null=True, blank=True)
+    email_sent_at = models.DateTimeField("Email передан", null=True, blank=True)
+    answered_at = models.DateTimeField("Решение принято", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "приглашение в чат"
+        verbose_name_plural = "приглашения в чаты"
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["room", "recipient"], name="chat_invitation_room_user_uniq"
+            )
+        ]
+
+    def __str__(self) -> str:
+        """Возвращает технические номера без email и телефона."""
+        return f"Чат #{self.room_id}, игрок #{self.recipient_id}"
+
+
+class ChatInvitationEmailBlock(models.Model):
+    """Запоминает отказ игрока от email-приглашений из любых городских чатов.
+
+    Attributes:
+        user: Игрок, отписавшийся от данного типа писем.
+        created_at: Время явного отказа.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="chat_invitation_email_block",
+    )
+    created_at = models.DateTimeField("Отключено", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "отказ от email-приглашений в чаты"
+        verbose_name_plural = "отказы от email-приглашений в чаты"

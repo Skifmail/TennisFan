@@ -13,7 +13,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
+from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
@@ -68,6 +68,7 @@ def _send_html_email(
     context: dict[str, Any],
     recipient: str,
     category: str = "",
+    timeout_seconds: float | None = None,
 ) -> bool:
     """Отправить HTML-письмо с текстовой fallback-версией.
 
@@ -77,6 +78,7 @@ def _send_html_email(
         context (dict[str, Any]): Контекст шаблона.
         recipient (str): Email получателя.
         category (str): Раздел письма для журнала ``OutboundEmail``.
+        timeout_seconds: Ограничение ожидания почтового транспорта для фоновых задач.
 
     Returns:
         bool: ``True`` при успешной отправке, иначе ``False``.
@@ -97,6 +99,8 @@ def _send_html_email(
             from_email=from_email,
             to=[recipient],
         )
+        if timeout_seconds is not None:
+            msg.connection = get_connection(timeout=timeout_seconds)
         msg.attach_alternative(html_content, "text/html")
         if category:
             msg.outbound_category = category

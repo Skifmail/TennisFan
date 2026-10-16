@@ -5,6 +5,7 @@
 {{ block.super }}
 {% if original %}
 <div class="chat-admin-panels">
+{% if chat_invitation_campaigns %}<section class="module chat-admin-section"><h2>Приглашения (последние 25 отправок)</h2><ul>{% for campaign in chat_invitation_campaigns %}<li><a href="{% url 'admin:chat_chatinvitationcampaign_change' campaign.pk %}">{{ campaign.created_at|date:'d.m.Y H:i' }} · {{ campaign.get_audience_display }}</a> · {{ campaign.get_status_display }} · создано {{ campaign.created_count }}</li>{% endfor %}</ul></section>{% endif %}
 {% if chat_management_events %}<section class="module chat-admin-section"><h2>История управления (последние 25 событий)</h2><ul>{% for event in chat_management_events %}<li>{{ event.created_at|date:'d.m.Y H:i' }} — {{ event.get_action_display }} · инициатор #{{ event.actor_id|default:'удалён' }} · участник #{{ event.target_id|default:'удалён' }}</li>{% endfor %}</ul></section>{% endif %}
 {% if chat_archive %}
 <section class="module chat-admin-section" id="chat-room-messages"><h2>Архив переписки</h2><p>Сообщений: {{ chat_archive_counts.total }} · удалены из чата: {{ chat_archive_counts.deleted }}.</p><p><a class="viewlink" href="{% url 'admin:chat_chatarchive_change' chat_archive.pk %}">Открыть архив переписки</a></p></section>

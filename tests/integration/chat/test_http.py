@@ -147,15 +147,19 @@ def test_room_when_identifier_exceeds_database_range_should_reject_without_500(
     assert response.status_code == 404
 
 
-def test_index_when_profile_city_should_suggest_it_without_restricting_membership(
+def test_index_when_profile_city_should_not_prefill_search(
     client: Client,
 ) -> None:
-    """Город профиля используется как стартовый поисковый запрос, а не запрет."""
+    """Начальный каталог не ограничивается городом из профиля игрока.
+
+    Args:
+        client: Авторизованный HTTP-клиент.
+    """
     from apps.users.models import Player
 
     user = make_user(email="profile-city-chat@test.local")
     Player.objects.create(user=user, city="г. Казань")
     client.force_login(user)
     response = client.get(reverse("chat:index"))
-    assert response.context["query"] == "Казань"
+    assert response.context["query"] == ""
     assert client.get(reverse("chat:index"), {"q": "Омск"}).context["query"] == "Омск"

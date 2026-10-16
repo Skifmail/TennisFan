@@ -1,13 +1,13 @@
 {% extends 'chat/base.html' %}
 {% load static %}
-{% block title %}{{ room.city.name }} — чат города{% endblock %}
+{% block title %}{{ room.display_name }} — чат города{% endblock %}
 {% block main_class %}chat-conversation{% endblock %}
 {% block content %}
 <div class="city-chat" id="city-chat">
     <header class="chat-header">
         <a href="{% url 'chat:index' %}" class="chat-icon-button chat-mobile-back" aria-label="Все городские чаты"><svg class="chat-icon"><use href="#chat-icon-back"/></svg></a>
-        <span class="chat-city-avatar" aria-hidden="true">{{ room.city.name|slice:':1' }}</span>
-        <div class="chat-heading"><h1>{{ room.city.name }}</h1><div class="chat-heading-subtitle"><span>Участники: {{ member_count }}</span><span aria-hidden="true">·</span><span class="city-chat-status" id="chat-status" role="status">Подключение…</span></div></div>
+        <span class="chat-city-avatar" aria-hidden="true">{{ room.display_name|slice:':1' }}</span>
+        <div class="chat-heading"><h1>{{ room.display_name }}</h1><div class="chat-heading-subtitle"><span>Участники: {{ member_count }}</span><span aria-hidden="true">·</span><span class="city-chat-status" id="chat-status" role="status">Подключение…</span></div></div>
         <button type="button" id="chat-info" class="chat-icon-button chat-info-button" aria-label="Настройки чата" aria-haspopup="dialog" aria-controls="chat-settings" data-open-chat-settings><svg class="chat-icon"><use href="#chat-icon-settings"/></svg></button>
     </header>
     <div class="chat-feedback-stack">{% for message in messages %}<p class="chat-feedback chat-feedback-success" role="status">{{ message }}</p>{% endfor %}<p id="chat-error" class="chat-feedback chat-feedback-error" role="alert" hidden></p><p id="chat-notice" class="chat-feedback" role="status" hidden></p></div>
@@ -33,9 +33,10 @@
 <div id="chat-message-menu" class="chat-message-menu" role="menu" aria-label="Действия с сообщением" popover="auto"></div>
 <dialog id="chat-settings" class="chat-dialog chat-settings" aria-labelledby="chat-settings-title">
     <div class="chat-dialog-heading"><h2 id="chat-settings-title">Настройки чата</h2><button class="chat-icon-button" type="button" data-close-dialog aria-label="Закрыть"><svg class="chat-icon"><use href="#chat-icon-close"/></svg></button></div>
-    <div class="chat-settings-identity"><span class="chat-city-avatar" aria-hidden="true">{{ room.city.name|slice:':1' }}</span><h3>{{ room.city.name }}</h3><p>{{ room.city.region|default:'Городское сообщество TennisFan' }}</p></div>
-    <section class="chat-settings-visibility" aria-label="Показ данных профиля"><h3>Что видят участники</h3><dl><div><dt>Имя и фамилия</dt><dd data-profile-visibility="name">{{ membership.disclosure_name|yesno:'Показываются,Скрыты' }}</dd></div><div><dt>Фото профиля</dt><dd data-profile-visibility="avatar">{% if not membership.disclosure_avatar %}Скрыто{% elif profile_has_photo %}Показ разрешён{% else %}Не загружено{% endif %}</dd></div></dl>{% if not profile_has_photo %}{% url 'chat:room' room.pk as photo_return_url %}<p><a class="chat-button chat-button-secondary" href="{% url 'profile_edit' %}?next={{ photo_return_url|urlencode }}">Добавить фото в профиль</a></p>{% endif %}<a class="chat-button chat-button-secondary" href="{% url 'chat:join' %}?city_id={{ room.city_id }}">Изменить согласия</a></section>
+    <div class="chat-settings-identity"><span class="chat-city-avatar" aria-hidden="true">{{ room.display_name|slice:':1' }}</span><h3>{{ room.display_name }}</h3><p>{{ room.city.region|default:'Сообщество TennisFan' }}</p></div>
+    <section class="chat-settings-visibility" aria-label="Показ данных профиля"><h3>Что видят участники</h3><dl><div><dt>Имя и фамилия</dt><dd data-profile-visibility="name">{{ membership.disclosure_name|yesno:'Показываются,Скрыты' }}</dd></div><div><dt>Фото профиля</dt><dd data-profile-visibility="avatar">{% if not membership.disclosure_avatar %}Скрыто{% elif profile_has_photo %}Показ разрешён{% else %}Не загружено{% endif %}</dd></div></dl>{% if not profile_has_photo %}{% url 'chat:room' room.pk as photo_return_url %}<p><a class="chat-button chat-button-secondary" href="{% url 'profile_edit' %}?next={{ photo_return_url|urlencode }}">Добавить фото в профиль</a></p>{% endif %}<a class="chat-button chat-button-secondary" href="{% url 'chat:join' %}?{{ room.join_query }}">Изменить согласия</a></section>
     <p id="chat-management-control"{% if not can_manage_chat %} hidden{% endif %}><a class="chat-button chat-button-secondary" href="{% url 'chat:management' room.pk %}">Управление участниками</a></p>
+    <p id="chat-invitation-control"{% if not can_invite_chat %} hidden{% endif %}><a class="chat-button chat-button-secondary" href="{% url 'chat:invitations' room.pk %}">Пригласить участников</a></p>
     <div class="chat-settings-legal"><a href="{% url 'legal_chat_rules' %}" target="_blank" rel="noopener">Полные правила городских чатов ↗</a><a href="{% url 'chat:data_conditions' room.pk %}" target="_blank" rel="noopener">Условия использования данных участников ↗</a></div>
     <form method="post" action="{% url 'chat:withdraw_consent' room.pk %}" class="chat-withdraw-form" id="chat-withdraw-form">{% csrf_token %}<p>Отзыв двух основных согласий исключит вас из этого чата и скроет ваши сообщения и данные. Для возвращения нужно снова подтвердить обязательные пункты.</p><button type="submit" class="chat-leave-button">Отозвать основные согласия и выйти</button></form>
     <div class="chat-settings-rule"><span class="chat-settings-label"><svg class="chat-icon"><use href="#chat-icon-pin"/></svg>Правила общения</span><p id="chat-rules">{{ room.rules }}</p></div>

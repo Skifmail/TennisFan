@@ -23,8 +23,9 @@ pytestmark = pytest.mark.django_db
 
 
 def _accept(
-    user: User, city: City, data: dict[str, str] | None = None
+    user: User, city: City | None, data: dict[str, str] | None = None
 ) -> ChatMembership:
+    assert city is not None
     form = build_consent_form(user=user, city=city)
     return accept_chat_consent(
         user=user,

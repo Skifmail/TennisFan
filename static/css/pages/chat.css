@@ -2245,3 +2245,95 @@
   font-size: 13px;
   line-height: 1.5;
 }
+
+.chat-invitations > h1 {
+    margin-top: 8px;
+}
+
+.chat-invitation-description {
+    color: var(--chat-secondary);
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+}
+
+.chat-invitation-section {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--chat-line);
+}
+
+.chat-invitation-section h2,
+.chat-invitation-confirm h2 {
+    font-size: 1.125rem;
+    line-height: 1.4;
+    margin: 0 0 16px;
+}
+
+.chat-invitation-confirm {
+    padding: 24px;
+    margin-top: 24px;
+    border: 1px solid var(--chat-accent);
+    border-radius: 16px;
+    background: var(--chat-field);
+    overflow-wrap: anywhere;
+}
+
+.chat-invitation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.chat-invitation-bulk {
+    display: grid;
+    gap: 16px;
+}
+
+.chat-invitation-bulk form {
+    border: 1px solid var(--chat-border);
+    border-radius: 16px;
+    padding: 20px;
+    background: var(--chat-field);
+}
+
+.chat-invitation-bulk button {
+    height: auto;
+    min-height: 44px;
+    white-space: normal;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+.chat-invitation-bulk p {
+    color: var(--chat-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    margin-bottom: 0;
+}
+
+.chat-invitation-results,
+.chat-invitation-history {
+    list-style: none;
+    margin: 16px 0;
+    padding: 0;
+}
+
+.chat-invitation-results li,
+.chat-invitation-history li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--chat-line);
+    overflow-wrap: anywhere;
+}
+
+.chat-invitation-history small {
+    display: block;
+    color: var(--chat-secondary);
+    margin-top: 4px;
+}

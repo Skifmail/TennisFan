@@ -20,6 +20,7 @@ from apps.core.models import LegalAcceptanceLog
 from apps.users.models import Notification, User
 
 from . import archive_admin as archive_admin
+from . import invitation_admin as invitation_admin
 from .consent import (
     MAX_USER_AGENT_LENGTH,
     consent_request_ip,
@@ -29,6 +30,7 @@ from .consent import (
 from .domain import MAX_DATABASE_ID, ChatError
 from .models import (
     ChatArchive,
+    ChatInvitationCampaign,
     ChatManagementEvent,
     ChatMembership,
     ChatMessage,
@@ -186,15 +188,38 @@ class ChatRoomAdmin(_ModelAdmin):
 
     form = ChatRoomForm
     readonly_fields = ("is_created",)
-    list_display = ("city", "is_created", "is_active", "administrator", "created_at")
+    list_display = (
+        "display_label",
+        "city",
+        "is_created",
+        "is_active",
+        "administrator",
+        "created_at",
+    )
     list_filter = ("is_active", "is_created", AdministratorFilter)
-    search_fields = ("city__name", "city__region")
+    search_fields = ("title", "city__name", "city__region")
     autocomplete_fields = ("city", "administrator")
     change_form_template = "admin/chat/room_change_form.html"
     delete_confirmation_template = "admin/chat/room_delete_confirmation.html"
     delete_selected_confirmation_template = (
         "admin/chat/room_delete_selected_confirmation.html"
     )
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: ChatRoom | None = None
+    ) -> tuple[str, ...]:
+        """Разрешает создавать и именовать отдельные комнаты только владельцу.
+
+        Args:
+            request: Запрос сотрудника платформы.
+            obj: Редактируемый чат либо новая запись.
+
+        Returns:
+            Поля, недоступные для редактирования текущему сотруднику.
+        """
+        if not request.user.is_superuser:
+            return (*self.readonly_fields, "title")
+        return self.readonly_fields
 
     def get_deleted_objects(
         self, objs: Sequence[Model] | QuerySet[Model], request: HttpRequest
@@ -209,6 +234,10 @@ class ChatRoomAdmin(_ModelAdmin):
             Стандартное подтверждение Django с сохранением остальных проверок прав и защит.
         """
         deleted, counts, missing, protected = super().get_deleted_objects(objs, request)
+        if self.has_delete_permission(request) and request.user.has_perm(
+            "chat.delete_chatinvitationcampaign"
+        ):
+            missing.discard(str(ChatInvitationCampaign._meta.verbose_name))
         if self.has_delete_permission(request) and request.user.has_perm(
             "chat.delete_chatmessage"
         ):
@@ -273,7 +302,20 @@ class ChatRoomAdmin(_ModelAdmin):
             old = (
                 ChatRoom.objects.select_for_update().get(pk=obj.pk) if change else None
             )
+            if not change and obj.city_id is None:
+                if not request.user.is_superuser:
+                    raise PermissionDenied(
+                        "Создавать отдельные чаты может только владелец платформы."
+                    )
+                obj.administrator = request.user
             super().save_model(request, obj, form, change)
+            if not change and obj.city_id is None:
+                ChatManagementEvent.objects.create(
+                    room=obj,
+                    actor=cast(User, request.user),
+                    target=obj.administrator,
+                    action="created",
+                )
             if old and old.administrator_id != obj.administrator_id:
                 ChatManagementEvent.objects.create(
                     room=obj,
@@ -310,6 +352,7 @@ class ChatRoomAdmin(_ModelAdmin):
         """
         context.update(
             chat_management_events=(),
+            chat_invitation_campaigns=(),
             chat_archive=None,
             chat_archive_counts=None,
             chat_members_page=None,
@@ -318,6 +361,10 @@ class ChatRoomAdmin(_ModelAdmin):
             chat_can_delete_member=request.user.has_perm("chat.delete_chatmembership"),
         )
         if obj is not None:
+            if request.user.has_perm("chat.view_chatinvitationcampaign"):
+                context["chat_invitation_campaigns"] = (
+                    obj.invitation_campaigns.select_related("sender")[:ADMIN_PAGE_SIZE]
+                )
             if request.user.has_perm("chat.change_chatroom"):
                 context["chat_management_events"] = (
                     obj.management_events.select_related("actor", "target")[

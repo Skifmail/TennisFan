@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import wraps
 from typing import Any, Final, cast
 from uuid import UUID
@@ -18,7 +18,6 @@ from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from apps.core.localities import primary_locality_name
 from apps.core.models import City
 from apps.users.models import User
 
@@ -38,6 +37,7 @@ from .domain import (
     ChatValidationError,
 )
 from .governance import can_manage, change_role
+from .invitations import can_invite
 from .models import ChatMembership, ChatRoom
 
 CITY_SEARCH_LIMIT: Final = 100
@@ -111,6 +111,54 @@ def _search_cities(query: str) -> QuerySet[City]:
     return rows.filter(condition)
 
 
+def _catalog_cards(
+    cities: Sequence[City],
+    rooms: Sequence[ChatRoom],
+    memberships: Sequence[ChatMembership],
+    *,
+    ranked: bool,
+) -> list[dict[str, Any]]:
+    joined = {member.room_id for member in memberships}
+    cards: list[dict[str, Any]] = []
+    for city in cities:
+        room = getattr(city, "chat_room", None)
+        cards.append(
+            {
+                "name": city.name,
+                "label": city.display_label,
+                "region": city.region or "Городской чат",
+                "member_count": getattr(city, "member_count", 0),
+                "room_id": room.pk if room else None,
+                "created": bool(room and room.is_created),
+                "active": not room or room.is_active,
+                "joined": bool(room and room.pk in joined),
+                "join_query": f"city_id={city.pk}",
+            }
+        )
+    for room in rooms:
+        cards.append(
+            {
+                "name": room.display_name,
+                "label": room.display_label,
+                "region": "Сообщество TennisFan",
+                "member_count": getattr(room, "member_count", 0),
+                "room_id": room.pk,
+                "created": True,
+                "active": True,
+                "joined": room.pk in joined,
+                "join_query": room.join_query,
+            }
+        )
+    return sorted(
+        cards,
+        key=lambda card: (
+            -card["member_count"] if ranked else 0,
+            card["name"],
+            card["region"],
+        ),
+    )[:CITY_SEARCH_LIMIT]
+
+
 @login_required
 @never_cache
 @require_GET
@@ -123,12 +171,10 @@ def index(request: HttpRequest) -> HttpResponse:
     Returns:
         Каталог городских комнат.
     """
-    profile = getattr(request.user, "player", None)
-    suggested = primary_locality_name(getattr(profile, "city", "") or "")
-    query = request.GET.get("q", suggested).strip()[:CITY_SEARCH_LIMIT]
-    cities_query = _search_cities(query)
-    cities_list = list(
-        cities_query.select_related("chat_room")
+    query = request.GET.get("q", "").strip()[:CITY_SEARCH_LIMIT]
+    cities_query = (
+        _search_cities(query)
+        .select_related("chat_room")
         .annotate(
             member_count=Count(
                 "chat_room__memberships",
@@ -139,7 +185,37 @@ def index(request: HttpRequest) -> HttpResponse:
                 ),
             )
         )
-        .order_by("name", "region")[:CITY_SEARCH_LIMIT]
+    )
+    if "q" not in request.GET:
+        cities_query = cities_query.filter(
+            chat_room__is_active=True, chat_room__is_created=True, member_count__gt=0
+        ).order_by("-member_count", "name", "region", "pk")
+    else:
+        cities_query = cities_query.order_by("name", "region")
+    cities_list = list(cities_query[:CITY_SEARCH_LIMIT])
+    custom_query = ChatRoom.objects.filter(
+        city__isnull=True, is_active=True, is_created=True
+    ).annotate(
+        member_count=Count(
+            "memberships",
+            filter=Q(memberships__is_active=True, memberships__user__is_active=True),
+        )
+    )
+    if "q" not in request.GET:
+        custom_query = custom_query.filter(member_count__gt=0)
+    if query:
+        title_filter = Q()
+        for variant in {
+            query,
+            query.lower(),
+            query.upper(),
+            query.capitalize(),
+            query.title(),
+        }:
+            title_filter |= Q(title__icontains=variant)
+        custom_query = custom_query.filter(title_filter)
+    custom_rooms = list(
+        custom_query.order_by("-member_count", "title", "pk")[:CITY_SEARCH_LIMIT]
     )
     own = list(services.my_memberships(user=cast(User, request.user)))
     joined = {member.room.city_id for member in own}
@@ -149,6 +225,11 @@ def index(request: HttpRequest) -> HttpResponse:
         {
             "memberships": own,
             "cities": cities_list,
+            "custom_rooms": custom_rooms,
+            "catalog_cards": _catalog_cards(
+                cities_list, custom_rooms, own, ranked="q" not in request.GET
+            ),
+            "joined_rooms": {member.room_id for member in own},
             "joined_cities": joined,
             "query": query,
         },
@@ -177,7 +258,7 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
             .first()
         )
         if current:
-            return redirect(reverse("chat:join") + f"?city_id={current.room.city_id}")
+            return redirect(reverse("chat:join") + f"?{current.room.join_query}")
         return redirect("chat:index")
     except ChatError:
         return redirect("chat:index")
@@ -189,6 +270,9 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
             "membership": member,
             "can_manage_chat": can_manage(
                 user=cast(User, request.user), room=member.room
+            ),
+            "can_invite_chat": can_invite(
+                user=cast(User, request.user), room_id=room_id
             ),
             "profile_has_photo": bool(profile and profile.avatar),
             "room": member.room,
@@ -229,16 +313,23 @@ def join(request: HttpRequest) -> HttpResponse:
     Returns:
         Форма, ожидание проверки особых условий или перенаправление в комнату.
     """
-    city_id = _id(
-        request.POST.get("city_id")
-        if request.method == "POST"
-        else request.GET.get("city_id")
-    )
-    city = get_object_or_404(City, pk=city_id)
+    params = request.POST if request.method == "POST" else request.GET
+    if params.get("room_id"):
+        city: City | ChatRoom = get_object_or_404(
+            ChatRoom,
+            pk=_id(params.get("room_id")),
+            city__isnull=True,
+            is_created=True,
+            is_active=True,
+        )
+        current_filter: dict[str, Any] = {"room": city}
+    else:
+        city = get_object_or_404(City, pk=_id(params.get("city_id")))
+        current_filter = {"room__city": city}
     user = cast(User, request.user)
     current = (
         ChatMembership.objects.select_related("room")
-        .filter(user=user, room__city=city)
+        .filter(user=user, **current_filter)
         .first()
     )
     is_consent_update = bool(
@@ -265,7 +356,12 @@ def join(request: HttpRequest) -> HttpResponse:
                 return render(
                     request,
                     "chat/join_pending.html",
-                    {"city": city, "membership": member},
+                    {
+                        "city": city,
+                        "membership": member,
+                        "target_name": str(city),
+                        "join_query": member.room.join_query,
+                    },
                     status=202,
                 )
             if is_consent_update:
@@ -286,13 +382,17 @@ def join(request: HttpRequest) -> HttpResponse:
         template,
         {
             "city": city,
+            "custom_room": city if isinstance(city, ChatRoom) else None,
+            "target_name": (
+                city.display_name if isinstance(city, ChatRoom) else city.name
+            ),
+            "target_label": str(city),
             "consent_form": consent_form,
             "has_saved_consents": bool(consent_form.initial.get("personal_data")),
             "consent_error": error,
             "is_consent_update": is_consent_update,
-            "is_chat_creation": not ChatRoom.objects.filter(
-                city=city, is_created=True
-            ).exists(),
+            "is_chat_creation": not isinstance(city, ChatRoom)
+            and not ChatRoom.objects.filter(city=city, is_created=True).exists(),
             "consent_room_id": current.room_id if current else None,
             "base_conditions": BASE_DISCLOSURE_CONDITIONS,
             "memberships": list(services.my_memberships(user=user)),
@@ -358,7 +458,7 @@ def withdraw_consent(request: HttpRequest, room_id: int) -> HttpResponse:
     )
     messages.success(
         request,
-        f"Вы отозвали основные согласия и исключены из чата «{selected.city.name}». "
+        f"Вы отозвали основные согласия и исключены из чата «{selected.display_name}». "
         "Доступ к переписке закрыт, ваши сообщения и данные скрыты. "
         "Для возвращения потребуется снова подтвердить обязательные пункты.",
     )

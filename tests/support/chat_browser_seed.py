@@ -7,7 +7,12 @@ from django.db import connection
 from django.test import Client
 from django.urls import reverse
 
-from apps.chat.models import ChatMembership, ChatMessage, ChatRoom
+from apps.chat.models import (
+    ChatInvitationEmailBlock,
+    ChatMembership,
+    ChatMessage,
+    ChatRoom,
+)
 from apps.core.models import City
 from apps.users.models import User
 from tests.support.chat_legal import join_city_with_consent as join_city
@@ -51,6 +56,10 @@ def create_smoke_sessions(path: Path) -> None:
         name="Тест закрытого архива", region="Изолированная проверка"
     )
     ChatRoom.objects.filter(city=archive_city).delete()
+    invitation_city, _ = City.objects.get_or_create(
+        name="Тест приглашений", region="Изолированная проверка"
+    )
+    ChatRoom.objects.filter(city=invitation_city).delete()
     cookies: list[list[dict[str, str]]] = []
     for index, name in enumerate(("Анна", "Михаил")):
         user, created = User.objects.get_or_create(
@@ -60,6 +69,7 @@ def create_smoke_sessions(path: Path) -> None:
             user.set_unusable_password()
             user.save(update_fields=["password"])
         room = join_city(user=user, city_id=city.pk)
+        ChatInvitationEmailBlock.objects.filter(user=user).delete()
         client = Client()
         client.force_login(user)
         cookies.append(
@@ -91,6 +101,10 @@ def create_smoke_sessions(path: Path) -> None:
                 "room_path": f"/chats/{room.pk}/",
                 "archive_city_id": archive_city.pk,
                 "archive_city_name": archive_city.name,
+                "invitation_city_id": invitation_city.pk,
+                "invitation_target_id": User.objects.get(
+                    email="city-chat-browser-1@test.local"
+                ).pk,
                 "creation_city_id": creation_city.pk,
                 "creation_city_name": creation_city.name,
                 "consent_city_id": consent_city.pk,
@@ -107,3 +121,27 @@ def create_smoke_sessions(path: Path) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def process_smoke_invitations() -> None:
+    """Обрабатывает браузерные приглашения только локально и только в тестовую почту.
+
+    Raises:
+        ChatSmokeSetupError: База не изолирована от рабочего окружения.
+    """
+    from django.test import override_settings
+
+    from apps.chat.invitations import process_invitation_queue
+
+    database = connection.settings_dict
+    if not str(database["NAME"]).endswith("_smoke") or database["HOST"] not in {
+        "127.0.0.1",
+        "localhost",
+    }:
+        raise ChatSmokeSetupError(
+            "Обработка браузерных приглашений разрешена только в локальной *_smoke базе."
+        )
+    with override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+    ):
+        process_invitation_queue()

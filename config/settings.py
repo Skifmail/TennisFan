@@ -494,6 +494,7 @@ CRONTAB_COMMAND_PREFIX = f"{sys.executable} {BASE_DIR / 'cron-run-wrapper.py'}"
 CRONTAB_COMMAND_SUFFIX = ">> /proc/1/fd/1 2>> /proc/1/fd/2"
 
 CRONJOBS = [
+    ("* * * * *", "django.core.management.call_command", ["process_chat_invitations"]),
     (
         "*/10 * * * *",
         "django.core.management.call_command",

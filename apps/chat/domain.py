@@ -2,6 +2,8 @@
 
 from typing import ClassVar, Final
 
+MAX_CHAT_TITLE_LENGTH: Final = 120
+
 MAX_MESSAGE_LENGTH: Final = 2000
 MAX_REPORT_LENGTH: Final = 500
 MESSAGE_INTERVAL_SECONDS: Final = 2

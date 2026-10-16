@@ -4,6 +4,8 @@ from typing import Any
 
 from django.db.models.signals import post_save, pre_delete
 
+from apps.users.models import Notification
+
 from .archive import ensure_archive, preserve_room_archive
 from .models import ChatRoom
 
@@ -19,6 +21,7 @@ def _room_deleted(
     sender: type[ChatRoom], instance: ChatRoom, using: str, **kwargs: Any
 ) -> None:
     preserve_room_archive(instance, using=using)
+    Notification.objects.using(using).filter(chat_invitation__room=instance).delete()
 
 
 def connect_archive_signals() -> None:

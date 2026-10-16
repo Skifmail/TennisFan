@@ -2189,6 +2189,40 @@
     overflow-wrap: anywhere;
 }
 
+.chat-creation-notice {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+    padding: 20px;
+    margin: 20px 0 24px;
+    border: 1px solid var(--chat-accent);
+    border-radius: 16px;
+    background: var(--chat-avatar);
+    color: var(--chat-on-accent);
+    box-shadow: 0 8px 24px var(--chat-shadow-small);
+    overflow-wrap: anywhere;
+}
+
+.chat-creation-notice img {
+    display: block;
+    object-fit: contain;
+}
+
+.chat-creation-notice strong {
+    display: block;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.35;
+    text-wrap: balance;
+}
+
+.chat-creation-notice p {
+    margin: 6px 0 0;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+}
+
 .chat-sidebar-settings + .chat-sidebar-footer {
     margin-top: 0;
     flex-shrink: 0;

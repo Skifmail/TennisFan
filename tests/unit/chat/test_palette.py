@@ -68,6 +68,7 @@ def _luminance(rgb: tuple[float, ...]) -> float:
         ("--chat-accent", "--chat-accent-soft"),
         ("--chat-accent", "--chat-accent-soft-hover"),
         ("--chat-avatar-ink", "--chat-avatar"),
+        ("--chat-on-accent", "--chat-avatar"),
         ("--chat-avatar-alt-ink", "--chat-avatar-alt"),
         ("--chat-gold-ink", "--chat-gold-soft"),
         ("--chat-danger", "--chat-danger-soft"),

@@ -1,3 +1,4 @@
+{% load static %}
 <form method="post" action="{% url 'chat:join' %}" class="chat-consent-form" data-consent-form{% if has_saved_consents %} data-consent-manage-existing{% endif %}>
     {% csrf_token %}
     <input type="hidden" name="city_id" value="{{ city.pk }}">
@@ -6,7 +7,7 @@
     <p class="chat-consent-city">{{ city.display_label }}</p>
     <p class="chat-consent-detail">Подтверждает: {{ request.user.get_full_name|default:"Игрок" }} · {{ request.user.email }}. Документы по ссылкам откроются в новой вкладке.</p>
     <p class="chat-dialog-description">{% if is_consent_update %}Вы можете включить или отключить показ имени и фото, не выходя из чата. {% if has_saved_consents %}Ниже показаны сохранённые согласия. Снятие любого основного пункта потребует подтверждения выхода из чата.{% else %}Редакция документов обновилась. Ознакомьтесь с ней и подтвердите актуальные пункты.{% endif %}{% else %}Здесь общаются игроки вашего города. Историю видят и те, кто вступит позже.{% endif %} {% if has_saved_consents %}Измените дополнительный выбор и нажмите «Сохранить изменения».{% else %}{% if is_consent_update %}Для сохранения{% else %}Для вступления{% endif %} подтвердите обработку данных и правила чата.{% endif %} Дополнительное согласие на показ имени и фото — по вашему желанию.</p>
-    {% if is_chat_creation %}<p class="chat-account-notice">Вы станете администратором этого чата: сможете следить за порядком, назначать модераторов и передавать управление.</p>{% endif %}
+    {% if is_chat_creation %}<div class="chat-creation-notice"><img src="{% static 'images/chat/administrator-badge.webp' %}" width="40" height="46" alt=""><div><strong>Вы станете администратором</strong><p>В этом чате вы сможете следить за порядком, назначать модераторов и передавать управление.</p></div></div>{% endif %}
     {% if consent_error %}<p class="chat-dialog-error" role="alert">{{ consent_error }} {% if has_saved_consents %}Изменения не сохранены. Показаны действующие настройки.{% else %}Все отметки сброшены. Проверьте документы и подтвердите заново.{% endif %}</p>{% endif %}
     <div class="chat-consent-items">
         <div class="chat-consent-item"><label for="{{ consent_form.personal_data.id_for_label }}">{{ consent_form.personal_data }}<span>{{ consent_form.personal_data.label }}</span></label><a href="{% url 'legal_chat_personal_data' %}" target="_blank" rel="noopener">Прочитать согласие ↗</a><a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политика конфиденциальности ↗</a></div>

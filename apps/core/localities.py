@@ -267,6 +267,9 @@ def split_typed_name(raw: str) -> tuple[str, str]:
     for prefix, stype in _TYPED_NAME_PREFIXES:
         prefix_cf = prefix.casefold()
         if lowered.startswith(prefix_cf):
+            suffix = text[len(prefix) :]
+            if suffix and not (suffix[0].isspace() or suffix[0] == "."):
+                continue
             rest = text[len(prefix) :].strip(" \t.,")
             if rest:
                 return stype, rest

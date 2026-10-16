@@ -9,7 +9,6 @@ import re
 from calendar import monthrange
 from datetime import datetime, timedelta
 from decimal import Decimal
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,6 +28,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import linebreaks
 from django.views.decorators.http import require_http_methods, require_safe
+from loguru import logger as map_logger
 
 from apps.clubs.models import (
     Club,
@@ -78,6 +78,12 @@ from .activity import (
     parse_home_activity_seen_id,
     set_home_activity_seen_cookie,
 )
+from .city_map_coordinates import (
+    AmbiguousLocalityError,
+    LocalityCoordinates,
+    load_reference_localities,
+    resolve_locality,
+)
 from .forms import FeedbackForm, PlatformActivityAnnounceForm
 from .home_city_counters import (
     SPARRINGS_SEEN_COOKIE,
@@ -91,8 +97,6 @@ from .localities import (
     ST_CITY,
     YANDEX_SUGGEST_MIN_QUERY,
     fetch_yandex_localities,
-    parse_kladr_row,
-    strip_settlement_prefix,
     upsert_locality,
 )
 from .models import City, PlatformActivityEvent, SupportMessage, SupportThread
@@ -133,68 +137,6 @@ def _get_geocoder_referer() -> str:
     return str(getattr(settings, "YANDEX_GEOCODER_REFERER", "") or "")
 
 
-@lru_cache(maxsize=1)
-def _load_city_coordinates_from_csv() -> dict[str, tuple[float, float]]:
-    """Загрузить координаты городов из статического CSV-справочника."""
-    csv_path = Path(settings.BASE_DIR) / "static" / "documents" / "city.csv"
-    if not csv_path.exists():
-        return {}
-
-    coordinates: dict[str, tuple[float, float]] = {}
-    try:
-        with csv_path.open("r", encoding="utf-8") as csv_file:
-            reader = csv.DictReader(csv_file)
-            for row in reader:
-                parsed = parse_kladr_row(row)
-                if parsed is None:
-                    continue
-                lat = parsed.get("lat")
-                lng = parsed.get("lng")
-                if lat is None or lng is None:
-                    continue
-                normalized_city_name = _normalize_city_name(str(parsed["name"]))
-                if normalized_city_name and normalized_city_name not in coordinates:
-                    coordinates[normalized_city_name] = (float(lat), float(lng))
-    except OSError:
-        logger.exception("Не удалось прочитать city.csv для координат городов.")
-        return {}
-
-    return coordinates
-
-
-def _normalize_city_name(raw_name: str) -> str:
-    """Нормализовать название населённого пункта для устойчивого сравнения."""
-    return strip_settlement_prefix(raw_name)
-
-
-def _resolve_city_coordinates(
-    city_name: str,
-    city_coords_exact: dict[str, tuple[float, float]],
-    city_coords_normalized: dict[str, tuple[float, float]],
-) -> tuple[float, float] | None:
-    """Найти координаты города по точному и нормализованному имени."""
-    coords = city_coords_exact.get(city_name)
-    if coords is not None:
-        return coords
-
-    normalized_city_name = _normalize_city_name(city_name)
-    if not normalized_city_name:
-        return None
-
-    coords = city_coords_normalized.get(normalized_city_name)
-    if coords is not None:
-        return coords
-
-    # Частый случай: "Москва, Россия" или "Санкт-Петербург, РФ".
-    if "," in normalized_city_name:
-        short_name = normalized_city_name.split(",", 1)[0].strip()
-        coords = city_coords_normalized.get(short_name)
-        if coords is not None:
-            return coords
-
-    return None
-
-
 def _build_cities_map_payload() -> list[dict[str, Any]]:
     """Собрать данные городов и игроков для карты."""
     players = (
@@ -206,16 +148,22 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
     if not players:
         return []
 
-    city_coords_exact = {
-        row["name"]: (row["lat"], row["lng"])
-        for row in City.objects.exclude(lat__isnull=True)
-        .exclude(lng__isnull=True)
-        .values("name", "lat", "lng")
-    }
-    city_coords_normalized = {
-        _normalize_city_name(name): coords for name, coords in city_coords_exact.items()
-    }
-    csv_coords_normalized = _load_city_coordinates_from_csv()
+    localities = [
+        LocalityCoordinates(
+            row.name,
+            row.region,
+            row.settlement_type,
+            (
+                (float(row.lat), float(row.lng))
+                if row.lat is not None and row.lng is not None
+                else None
+            ),
+        )
+        for row in City.objects.all()
+    ]
+    reference = load_reference_localities(
+        Path(settings.BASE_DIR) / "static" / "documents" / "city.csv"
+    )
     fallback_coords = {
         "Москва": (55.7558, 37.6173),
         "Санкт-Петербург": (59.9343, 30.3351),
@@ -224,34 +172,30 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
         "Новосибирск": (55.0084, 82.9357),
     }
 
-    normalized_to_display_name: dict[str, str] = {}
-    for city_name in City.objects.values_list("name", flat=True):
-        normalized_name = _normalize_city_name(str(city_name))
-        if normalized_name and normalized_name not in normalized_to_display_name:
-            normalized_to_display_name[normalized_name] = str(city_name)
-
-    grouped: dict[str, dict[str, Any]] = {}
+    grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
     next_city_id = 1
 
     for player in players:
         raw_city_name = (player.city or "").strip()
-        normalized_city_name = _normalize_city_name(raw_city_name)
-        if not normalized_city_name:
+        if not raw_city_name:
             continue
-
-        if normalized_city_name not in grouped:
-            city_name = (
-                normalized_to_display_name.get(normalized_city_name) or raw_city_name
+        try:
+            locality = resolve_locality(raw_city_name, localities, reference)
+        except AmbiguousLocalityError:
+            map_logger.warning(
+                "Неоднозначный населённый пункт на карте", city=raw_city_name
             )
-            coords = (
-                _resolve_city_coordinates(
-                    city_name=city_name,
-                    city_coords_exact=city_coords_exact,
-                    city_coords_normalized=city_coords_normalized,
-                )
-                or csv_coords_normalized.get(normalized_city_name)
-                or fallback_coords.get(city_name)
-            )
+            continue
+        locality_key = locality.identity
+        if locality_key not in grouped:
+            city_name = locality.label
+            coords = locality.coordinates
+            if (
+                coords is None
+                and not locality.region
+                and locality.settlement_type == ST_CITY
+            ):
+                coords = fallback_coords.get(locality.name)
             if coords is None:
                 # Пробуем геокодировать и сохраняем в справочник, чтобы не терять города.
                 yandex_geocoder_api_key = _get_geocoder_api_key()
@@ -259,27 +203,29 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
                 if yandex_geocoder_api_key:
                     from apps.courts.geocoder import geocode_address
 
+                    geocode_query = city_name
+                    if locality.settlement_type == ST_CITY and locality.region:
+                        geocode_query = f"{locality.name}, {locality.region}"
                     lat, lng = geocode_address(
-                        city_name,
+                        geocode_query,
                         api_key=yandex_geocoder_api_key,
                         referer=yandex_geocoder_referer or None,
-                        hint_city=city_name,
+                        hint_city=geocode_query,
                     )
                     if lat is not None and lng is not None:
                         coords = (float(lat), float(lng))
                         city_obj, _ = upsert_locality(
-                            name=city_name,
-                            settlement_type=ST_CITY,
+                            name=locality.name,
+                            settlement_type=locality.settlement_type,
+                            region=locality.region,
                         )
                         if city_obj.lat is None or city_obj.lng is None:
                             city_obj.lat = coords[0]
                             city_obj.lng = coords[1]
                             city_obj.save(update_fields=["lat", "lng"])
-                        city_coords_exact[city_name] = coords
-                        city_coords_normalized[_normalize_city_name(city_name)] = coords
             if coords is None:
                 continue
-            grouped[normalized_city_name] = {
+            grouped[locality_key] = {
                 "id": next_city_id,
                 "name": city_name,
                 "lat": float(coords[0]),
@@ -289,7 +235,7 @@ def _build_cities_map_payload() -> list[dict[str, Any]]:
             next_city_id += 1
 
         full_name = str(player).strip()
-        grouped[normalized_city_name]["players"].append(
+        grouped[locality_key]["players"].append(
             {
                 "id": player.pk,
                 "name": full_name,

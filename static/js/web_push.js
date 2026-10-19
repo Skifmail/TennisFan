@@ -45,6 +45,9 @@
                 appId: config.appId,
                 notifyButton: { enable: false },
                 welcomeNotification: { disable: true },
+                // На iOS используем уже открытое окно PWA с переходом по ссылке.
+                notificationClickHandlerMatch: 'origin',
+                notificationClickHandlerAction: 'navigate',
                 promptOptions: {
                     slidedown: { prompts: [{ type: 'push', autoPrompt: false }] },
                 },

@@ -224,7 +224,9 @@ def notification_confirm(request: HttpRequest) -> HttpResponse:
         },
         status=200 if valid else 409,
     )
-    response["Referrer-Policy"] = "no-referrer"
+    # HTTPS-форма требует same-origin Origin/Referer; no-referrer даёт Origin null.
+    # Секрет остаётся во фрагменте и POST, сторонних ресурсов на странице нет.
+    response["Referrer-Policy"] = "same-origin"
     response["Content-Security-Policy"] = (
         "default-src 'none'; script-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
     )

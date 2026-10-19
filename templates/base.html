@@ -33,6 +33,9 @@
     <link rel="icon" type="image/png" sizes="32x32" href="{% static site_favicon_path %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static site_favicon_path %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static site_favicon_path %}">
+    {% if web_push_enabled %}
+    {% include "includes/web_push_head.html" %}
+    {% endif %}
     <link rel="preconnect" href="https://mc.yandex.ru" crossorigin>
     {% if media_origin %}
     <link rel="preconnect" href="{{ media_origin }}" crossorigin>
@@ -272,6 +275,10 @@
     <main class="main">
         {% block content %}{% endblock %}
     </main>
+
+    {% if web_push_enabled %}
+    {% include "includes/web_push_controls.html" %}
+    {% endif %}
 
     <!-- Footer -->
     {% if not is_club_panel or not club %}

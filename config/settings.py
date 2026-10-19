@@ -9,6 +9,7 @@ import os
 import sys
 from datetime import timedelta
 from pathlib import Path
+from typing import Final
 
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
@@ -42,6 +43,15 @@ if not SECRET_KEY:
 
 _allowed = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1")
 ALLOWED_HOSTS = [h.strip() for h in _allowed.split(",") if h.strip()]
+
+# Публичный App ID OneSignal. Пустая строка отключает SDK и новые подписки.
+ONESIGNAL_APP_ID: Final = os.environ.get(
+    "ONESIGNAL_APP_ID", "c6e46e19-f9f8-4df3-b53d-44f49da24af2"
+).strip()
+# Один проект OneSignal обслуживает только один точный origin (без www по умолчанию).
+ONESIGNAL_SITE_ORIGIN: Final = (
+    os.environ.get("ONESIGNAL_SITE_ORIGIN", "https://tennisfan.ru").strip().rstrip("/")
+)
 
 _csrf = os.environ.get(
     "CSRF_TRUSTED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"
@@ -195,6 +205,7 @@ TEMPLATES = [
                 "apps.core.context_processors.site_meta",
                 "apps.core.context_processors.metrika_goals",
                 "apps.core.context_processors.site_branding",
+                "apps.core.web_push.web_push_context",
                 "apps.core.context_processors.platform_activity_unseen",
                 "apps.clubs.context_processors.club_context",
             ],

@@ -59,12 +59,13 @@ jobs:
           cache: pip
           cache-dependency-path: |
             requirements.lock
+            requirements-dev.in
             requirements-dev.txt
       - name: Install locked runtime and test tools
         run: |
           python -m venv venv
           venv/bin/python -m pip install --require-hashes -r requirements.lock
-          venv/bin/python -m pip install -r requirements-dev.txt
+          venv/bin/python -m pip install --require-hashes -r requirements-dev.txt
           venv/bin/python -m pip check
       - name: Audit locked runtime dependencies
         run: venv/bin/pip-audit -r requirements.lock --no-deps --disable-pip
@@ -110,6 +111,15 @@ jobs:
           PY
           done
           CHAT_E2E_URL=http://127.0.0.1:18765 CHAT_E2E_SECOND_URL=http://127.0.0.1:18766 CHAT_E2E_SESSION_FILE=/tmp/chat-ci-sessions.json venv/bin/pytest tests/e2e/chat tests/e2e/test_sparring_toolbar_browser.py --no-cov -q
+      - name: OneSignal subscription browser tests without external requests
+        env:
+          WEB_PUSH_BROWSER_TESTS: '1'
+        run: venv/bin/pytest tests/e2e/test_web_push_browser.py --no-cov -q
+      - name: OneSignal strict typing and formatting
+        run: |
+          venv/bin/mypy --config-file=mypy-chat.ini apps/core/web_push.py tests/unit/test_web_push.py tests/integration/test_web_push.py tests/e2e/test_web_push_browser.py
+          venv/bin/black --check apps/core/web_push.py tests/unit/test_web_push.py tests/integration/test_web_push.py tests/e2e/test_web_push_browser.py
+          venv/bin/ruff check --no-fix apps/core/web_push.py tests/unit/test_web_push.py tests/integration/test_web_push.py tests/e2e/test_web_push_browser.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -121,6 +131,7 @@ jobs:
           node --check static/js/chat_shell.js
           node --check static/js/chat_consent.js
           node --check static/js/city_chat.js
+          node --check static/js/web_push.js
 
   image:
     runs-on: ubuntu-latest

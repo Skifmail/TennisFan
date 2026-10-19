@@ -1,0 +1,5 @@
+{% load static %}
+<link rel="manifest" href="{% url 'web_app_manifest' %}">
+{{ web_push_config|json_script:"web-push-config" }}
+<script defer src="{% static 'js/web_push.js' %}"></script>
+<script id="onesignal-sdk" defer src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"></script>

@@ -91,9 +91,9 @@ jobs:
           venv/bin/python manage.py collectstatic --noinput --settings=tests.support.chat_browser_settings
           DJANGO_SETTINGS_MODULE=tests.support.chat_browser_settings venv/bin/python -c 'import django; django.setup(); from pathlib import Path; from tests.support.chat_browser_seed import create_smoke_sessions; create_smoke_sessions(Path("/tmp/chat-ci-sessions.json"))'
           export DJANGO_SETTINGS_MODULE=tests.support.chat_browser_settings
-          venv/bin/daphne -b 127.0.0.1 -p 18765 config.asgi:application > /tmp/chat-first.log 2>&1 &
+          venv/bin/uvicorn config.asgi:application --host 127.0.0.1 --port 18765 --ws websockets-sansio --ws-ping-interval 20 --ws-ping-timeout 30 --lifespan off --timeout-graceful-shutdown 30 > /tmp/chat-first.log 2>&1 &
           first=$!
-          venv/bin/daphne -b 127.0.0.1 -p 18766 config.asgi:application > /tmp/chat-second.log 2>&1 &
+          venv/bin/uvicorn config.asgi:application --host 127.0.0.1 --port 18766 --ws websockets-sansio --ws-ping-interval 20 --ws-ping-timeout 30 --lifespan off --timeout-graceful-shutdown 30 > /tmp/chat-second.log 2>&1 &
           second=$!
           trap 'kill "$first" "$second" 2>/dev/null || true' EXIT
           for port in 18765 18766; do
@@ -143,6 +143,7 @@ jobs:
       - name: Check dependencies and static manifest without production secrets
         run: |
           docker run --rm --entrypoint python tennison:ci -m pip check
+          docker run --rm --entrypoint python tennison:ci -c 'from importlib.util import find_spec; assert all(find_spec(name) is None for name in ("daphne", "twisted")); import uvicorn, websockets'
           docker run --rm --user 10001:10001 --entrypoint python tennison:ci -c 'import json; from pathlib import Path; p=Path("/app/staticfiles/staticfiles.json"); assert "css/pages/chat.css" in json.loads(p.read_text())["paths"]; assert not Path("/app/.env").exists(); assert not Path("/app/.passwords").exists()'
 
   # Optional CI gate. Enable only AFTER setting secrets and disabling Dokploy's

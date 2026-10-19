@@ -44,7 +44,8 @@ venv/bin/pytest tests/unit/deployment/test_dependency_locks.py
 Это исправляет установку инструментов, а не устраняет уязвимости runtime-пакетов.
 `pip check` проверяет совместимость зависимостей, а не их безопасность.
 Аудит `pip-audit -r requirements.lock --no-deps --disable-pip` остаётся отдельным
-обязательным шагом CI. На момент подготовки обнаружение Twisted требует отдельного решения.
+обязательным шагом CI. После согласованной замены Daphne на Uvicorn Twisted
+отсутствует в обоих lock-файлах и чистой установке; локальный аудит проходит без исключений.
 
 Источники:
 - [pip: обязательные хеши и точные версии](https://pip.pypa.io/en/stable/topics/secure-installs/).

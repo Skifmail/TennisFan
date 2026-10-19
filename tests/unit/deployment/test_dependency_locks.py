@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Final
 
+import pytest
 import yaml
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
@@ -98,3 +99,17 @@ def test_ci_when_installing_dev_tools_should_explicitly_require_hashes() -> None
     )
     assert "pip install --require-hashes -r requirements-dev.txt" in installation
     assert "--no-require-hashes" not in installation
+
+
+@pytest.mark.parametrize("filename", ["requirements.lock", "requirements-dev.txt"])
+def test_asgi_dependencies_when_locked_should_use_uvicorn_without_twisted(
+    filename: str,
+) -> None:
+    """Проверяет удаление уязвимого сервера из обоих устанавливаемых наборов.
+
+    Args:
+        filename: Боевой либо тестовый lock-файл.
+    """
+    packages = _locked_packages(ROOT / filename)
+    assert {"uvicorn", "websockets"} <= packages.keys()
+    assert {"daphne", "twisted", "pyopenssl"}.isdisjoint(packages)

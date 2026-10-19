@@ -22,9 +22,8 @@ redis>=5.0.0
 weasyprint>=63.0
 python-docx>=1.1.0
 qrcode>=7.4.2
-channels[daphne]>=4.3,<5
+channels>=4.3,<5
 channels-redis>=4.3,<5
-
-# Минимальные исправленные версии транзитивных TLS/ASGI-зависимостей.
-pyOpenSSL>=26.4,<27
-Twisted>=26.4,<27
+# ASGI без Twisted; SansIO WebSocket используется явно в командах запуска.
+uvicorn>=0.54,<0.55
+websockets>=17.2,<18

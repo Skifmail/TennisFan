@@ -54,6 +54,8 @@
             let busy = false;
             let accountPushEnabled = true;
             let boundExternalId = null;
+            let verifiedSubscriptionId = null;
+            let confirmationPending = false;
 
             async function api(url, data) {
                 const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
@@ -74,16 +76,18 @@
                 if (config.notificationCenter && config.authenticated) {
                     const state = await api(config.deviceUrl, {
                         externalId: boundExternalId,
+                        subscriptionId: subscription.id,
                         active: Boolean(subscription.optedIn && subscription.id && Notification.permission !== 'denied'),
                         enableAccount: enableAccount === true,
                     });
                     accountPushEnabled = state.accountPushEnabled !== false;
+                    verifiedSubscriptionId = state.active ? subscription.id : null;
+                    if (state.pending) confirmationPending = true;
                 }
             }
 
             if (config.notificationCenter) {
                 if (!config.authenticated) {
-                    await OneSignal.logout();
                     button.disabled = true;
                     status.textContent = 'Войдите в аккаунт, чтобы подключить персональные уведомления.';
                     return;
@@ -91,7 +95,7 @@
                 const identity = await api(config.identityUrl, {});
                 boundExternalId = identity.externalId;
                 accountPushEnabled = identity.pushEnabled !== false;
-                await OneSignal.login(identity.externalId, identity.jwt);
+                verifiedSubscriptionId = identity.verifiedSubscriptionId;
                 await syncDevice(false);
             }
 
@@ -101,8 +105,13 @@
                 if (window.Notification && Notification.permission === 'denied') {
                     status.textContent = 'Уведомления запрещены. Разрешите их в настройках браузера или устройства.';
                     button.disabled = true;
+                } else if (config.notificationCenter && confirmationPending) {
+                    status.textContent = 'Откройте полученный push и подтвердите подключение. Если он не пришёл, повторите через минуту.';
+                    button.textContent = 'Отправить подтверждение повторно';
                 } else if (!accountPushEnabled) {
                     status.textContent = 'Push отключены в настройках аккаунта. Можно включить их этой кнопкой.';
+                } else if (config.notificationCenter && verifiedSubscriptionId !== subscription.id) {
+                    status.textContent = 'Подтвердите это устройство, чтобы получать персональные уведомления.';
                 } else if (subscription.optedIn && subscription.id) {
                     status.textContent = 'Уведомления включены.';
                     button.textContent = 'Отключить уведомления';
@@ -117,14 +126,20 @@
             OneSignal.Notifications.addEventListener('permissionChange', update);
             subscription.addEventListener('change', function () {
                 update();
-                syncDevice(false).catch(unavailable);
+                if (!busy) syncDevice(false).catch(unavailable);
             });
             button.addEventListener('click', async function () {
                 if (busy) return;
                 busy = true;
                 button.disabled = true;
                 try {
-                    if (subscription.optedIn && subscription.id && accountPushEnabled) {
+                    if (subscription.optedIn && subscription.id && accountPushEnabled &&
+                        (!config.notificationCenter || verifiedSubscriptionId === subscription.id)) {
+                        if (config.notificationCenter) {
+                            await api(config.deviceUrl, {externalId: boundExternalId, active: false});
+                            verifiedSubscriptionId = null;
+                            confirmationPending = false;
+                        }
                         await subscription.optOut();
                     } else {
                         // Вызов до первого await сохраняет прямое действие пользователя для iOS.

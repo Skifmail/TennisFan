@@ -191,6 +191,7 @@ def test_worker_when_push_succeeds_should_not_send_again(
         user=recipient,
         device_hash="a" * 64,
         active=True,
+        subscription_id="00000000-0000-4000-8000-000000000001",
         expires_at=timezone.now() + timedelta(days=1),
     )
     create_notification(event_key="match.created", user=recipient, message="Матч")
@@ -200,6 +201,9 @@ def test_worker_when_push_succeeds_should_not_send_again(
     process_deliveries(limit=10)
     process_deliveries(limit=10)
     assert send.call_count == 1
+    assert send.call_args.kwargs["subscription_ids"] == [
+        "00000000-0000-4000-8000-000000000001"
+    ]
     assert Delivery.objects.get().status == "accepted"
 
 
@@ -327,6 +331,7 @@ def test_worker_when_push_times_out_should_reuse_key(
         user=recipient,
         device_hash="b" * 64,
         active=True,
+        subscription_id="00000000-0000-4000-8000-000000000001",
         expires_at=timezone.now() + timedelta(days=1),
     )
     create_notification(event_key="match.created", user=recipient, message="Матч")

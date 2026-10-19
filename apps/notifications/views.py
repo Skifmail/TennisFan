@@ -1,32 +1,39 @@
-"""CSRF-защищённые настройки и серверная JWT-идентичность устройства."""
+"""CSRF-защищённые настройки и подтверждение браузерной подписки."""
 
 import hashlib
 import json
 import secrets
 import uuid
-from datetime import timedelta
 from typing import Final, cast
 
-import jwt
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.users.models import User
 
+from .device_binding import (
+    CONFIRMATION_COOLDOWN,
+    CONFIRMATION_LIFETIME,
+    ConfirmationThrottled,
+    DeviceBindingError,
+    confirm_device,
+    request_confirmation,
+)
 from .forms import PreferenceForm
+from .infrastructure.push import PushRejectedError, PushTransportError, send_push
 from .models import NotificationPreference, PushDevice
 from .services import center_enabled, preferences
 
 COOKIE_NAME: Final = "notification_device"
 COOKIE_SALT: Final = "notification-device"
 COOKIE_AGE_SECONDS: Final = 1209600
-JWT_LIFETIME: Final = timedelta(minutes=5)
 DEVICE_TOKEN_BYTES: Final = 32
 
 
@@ -62,48 +69,42 @@ def notification_settings(request: HttpRequest) -> HttpResponse:
 @never_cache
 @transaction.atomic
 def notification_identity(request: HttpRequest) -> HttpResponse:
-    """Выдаёт короткий JWT только для серверного псевдонима этого браузера.
+    """Выдаёт поколение привязки браузера, не используя JWT Web SDK.
 
     Args:
-        request: Сессия пользователя; user_id/external_id в POST игнорируются.
+        request: Авторизованная сессия; клиентские user_id игнорируются.
 
     Returns:
-        Публичный псевдоним и краткоживущий JWT либо 503 до настройки ключа.
+        Поколение и ранее проверенная подписка без секретов подтверждения.
     """
-    if not center_enabled() or not settings.ONESIGNAL_IDENTITY_PRIVATE_KEY:
-        return JsonResponse({"error": "identity_not_configured"}, status=503)
+    if not center_enabled() or not settings.ONESIGNAL_REST_API_KEY:
+        return JsonResponse({"error": "push_not_configured"}, status=503)
+    User.objects.select_for_update().get(pk=request.user.pk)
     token = request.get_signed_cookie(
         COOKIE_NAME, default="", salt=COOKIE_SALT
     ) or secrets.token_urlsafe(DEVICE_TOKEN_BYTES)
-    digest = hashlib.sha256(token.encode()).hexdigest()
     device, _ = PushDevice.objects.select_for_update().get_or_create(
-        device_hash=digest,
+        device_hash=hashlib.sha256(token.encode()).hexdigest(),
         defaults={
             "user": request.user,
             "expires_at": request.session.get_expiry_date(),
         },
     )
-    if device.user_id != request.user.pk:
+    if device.user_id != request.user.pk or device.expires_at <= timezone.now():
         device.user = cast(User, request.user)
         device.external_id = uuid.uuid4()
         device.active = False
+        device.subscription_id = None
     device.expires_at = request.session.get_expiry_date()
     device.save()
-    payload = {
-        "iss": settings.ONESIGNAL_APP_ID,
-        "exp": int((timezone.now() + JWT_LIFETIME).timestamp()),
-        "identity": {"external_id": str(device.external_id)},
-    }
-    try:
-        signed = jwt.encode(
-            payload, settings.ONESIGNAL_IDENTITY_PRIVATE_KEY, algorithm="ES256"
-        )
-    except (ValueError, jwt.PyJWTError):
-        return JsonResponse({"error": "identity_not_configured"}, status=503)
     response = JsonResponse(
         {
             "externalId": str(device.external_id),
-            "jwt": signed,
+            "verifiedSubscriptionId": (
+                str(device.subscription_id)
+                if device.active and device.subscription_id
+                else None
+            ),
             "pushEnabled": preferences(cast(User, request.user).pk)[0],
         }
     )
@@ -119,51 +120,112 @@ def notification_identity(request: HttpRequest) -> HttpResponse:
     return response
 
 
+def _device_hash(request: HttpRequest) -> str:
+    token = request.get_signed_cookie(COOKIE_NAME, default="", salt=COOKIE_SALT) or ""
+    return hashlib.sha256(token.encode()).hexdigest() if token else ""
+
+
 @login_required
 @require_POST
 @never_cache
-@transaction.atomic
 def notification_device(request: HttpRequest) -> HttpResponse:
-    """Подтверждает или отзывает только собственное текущее устройство.
+    """Отзывает устройство либо отправляет код только после явного действия.
 
     Args:
-        request: JSON с серверным externalId, булевым active и опциональным enableAccount.
+        request: JSON с поколением привязки, ID подписки и булевым active.
 
     Returns:
-        Подтверждение без ID устройства и без возможности чужой привязки.
+        Состояние либо безопасный код отказа; секрет отсутствует в JSON.
     """
-    if not center_enabled():
+    if not center_enabled() or not settings.ONESIGNAL_REST_API_KEY:
         return JsonResponse({"error": "disabled"}, status=503)
-    token = request.get_signed_cookie(COOKIE_NAME, default="", salt=COOKIE_SALT) or ""
     try:
         data = json.loads(request.body)
+        if not isinstance(data, dict) or not isinstance(data.get("active"), bool):
+            return JsonResponse({"error": "invalid_active"}, status=400)
+        uuid.UUID(str(data.get("externalId", "")))
     except (ValueError, UnicodeDecodeError):
-        return JsonResponse({"error": "invalid_json"}, status=400)
-    if not isinstance(data, dict) or not isinstance(data.get("active"), bool):
-        return JsonResponse({"error": "invalid_active"}, status=400)
+        return JsonResponse({"error": "invalid_identity_or_json"}, status=400)
     try:
-        alias = uuid.UUID(str(data.get("externalId", "")))
-    except ValueError:
-        return JsonResponse({"error": "no_identity"}, status=409)
-    # Условный UPDATE повторно проверяет владельца после ожидания блокировки:
-    # старая вкладка не может активировать уже перепривязанную строку.
-    if not token:
-        return JsonResponse({"error": "no_identity"}, status=409)
-    updated = PushDevice.objects.filter(
-        device_hash=hashlib.sha256(token.encode()).hexdigest(),
-        user=request.user,
-        external_id=alias,
-        expires_at__gt=timezone.now(),
-    ).update(active=data["active"], updated_at=timezone.now())
-    if not updated:
-        return JsonResponse({"error": "no_identity"}, status=409)
-    if data["active"] and data.get("enableAccount") is True:
-        NotificationPreference.objects.update_or_create(
-            user=request.user, defaults={"push_enabled": True}
+        state = request_confirmation(
+            user=cast(User, request.user),
+            device_hash=_device_hash(request),
+            generation=uuid.UUID(str(data["externalId"])),
+            active=data["active"],
+            subscription_id=str(data.get("subscriptionId", "")),
+            enable_account=data.get("enableAccount") is True,
         )
+    except ConfirmationThrottled:
+        response = JsonResponse({"error": "confirmation_rate_limited"}, status=429)
+        response["Retry-After"] = str(int(CONFIRMATION_COOLDOWN.total_seconds()))
+        return response
+    except DeviceBindingError as exc:
+        return JsonResponse({"error": str(exc)}, status=409)
+    except IntegrityError:
+        return JsonResponse({"error": "confirmation_conflict"}, status=409)
+    if state.subscription_id:
+        url = (
+            settings.ONESIGNAL_SITE_ORIGIN.rstrip("/")
+            + reverse("notification_confirm")
+            + "#code="
+            + state.code
+        )
+        try:
+            send_push(
+                subscription_ids=[state.subscription_id],
+                title="Подтвердите уведомления",
+                body="Нажмите, чтобы подключить уведомления TennisFan на этом устройстве.",
+                url=url,
+                key=str(uuid.uuid4()),
+                ttl_seconds=int(CONFIRMATION_LIFETIME.total_seconds()),
+            )
+        except (PushRejectedError, PushTransportError):
+            return JsonResponse({"error": "confirmation_unavailable"}, status=503)
     return JsonResponse(
         {
-            "active": data["active"],
-            "accountPushEnabled": preferences(cast(User, request.user).pk)[0],
-        }
+            "active": state.active,
+            "pending": bool(state.subscription_id),
+            "accountPushEnabled": state.account_push_enabled,
+        },
+        status=202 if state.subscription_id else 200,
     )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+@never_cache
+def notification_confirm(request: HttpRequest) -> HttpResponse:
+    """Подтверждает получение секрета в том же браузере и поколении аккаунта.
+
+    Args:
+        request: GET для просмотра; POST с CSRF для одноразового подтверждения.
+
+    Returns:
+        Изолированная HTML-страница без сторонних ресурсов либо отказ 409/503.
+    """
+    if not center_enabled():
+        return HttpResponse(status=503)
+    code = request.POST.get("code", "") if request.method == "POST" else ""
+    complete = request.method == "POST" and request.POST.get("confirm") == "yes"
+    valid = confirm_device(
+        user=cast(User, request.user),
+        device_hash=_device_hash(request),
+        code=code if request.method == "POST" else None,
+        consume=complete,
+    )
+    complete = complete and valid
+    response = render(
+        request,
+        "notifications/confirm.html",
+        {
+            "valid": valid,
+            "complete": complete,
+            "code": code if valid and not complete else "",
+        },
+        status=200 if valid else 409,
+    )
+    response["Referrer-Policy"] = "no-referrer"
+    response["Content-Security-Policy"] = (
+        "default-src 'none'; script-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+    )
+    return response

@@ -1,11 +1,11 @@
-"""Браузерная проверка JWT-привязки без запросов к настоящему провайдеру."""
+"""Подтверждение Web-подписки без неподдерживаемого JWT и без сетевых отправок."""
 
 import json
 from os import environ
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import expect, sync_playwright
+from playwright.sync_api import Route, expect, sync_playwright
 
 from tests.e2e.test_web_push_browser import SDK_MOCK, SITE_ORIGIN
 
@@ -16,22 +16,21 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.mark.parametrize(
-    "authenticated,identity_ok,account_push",
-    [(True, True, True), (True, True, False), (False, True, True), (True, False, True)],
+    "state", ["anonymous", "unverified", "verified", "failure", "account_off"]
 )
-def test_binding_when_session_changes_should_login_only_verified_alias(
-    authenticated: bool, identity_ok: bool, account_push: bool
+def test_binding_when_state_changes_should_require_confirmation_without_login(
+    state: str,
 ) -> None:
-    """Аноним выходит из SDK, ошибка JWT не включает персональную подписку."""
+    """SDK не получает alias/JWT, неподтверждённый браузер не объявляется включённым."""
     with sync_playwright() as driver:
         browser = driver.chromium.launch(
             executable_path=environ.get("CHAT_BROWSER_EXECUTABLE"), headless=True
         )
         page = browser.new_page()
         config = {
-            "appId": "test-app-id",
+            "appId": "test-app",
             "notificationCenter": True,
-            "authenticated": authenticated,
+            "authenticated": state != "anonymous",
             "identityUrl": "/identity",
             "deviceUrl": "/device",
         }
@@ -49,56 +48,103 @@ def test_binding_when_session_changes_should_login_only_verified_alias(
         page.route(
             "**/identity",
             lambda route: route.fulfill(
-                status=200 if identity_ok else 503,
+                status=503 if state == "failure" else 200,
                 json={
-                    "externalId": "server-alias",
-                    "jwt": "test-jwt",
-                    "pushEnabled": account_push,
+                    "externalId": "generation",
+                    "pushEnabled": state != "account_off",
+                    "verifiedSubscriptionId": (
+                        "test-subscription"
+                        if state in ("verified", "account_off")
+                        else None
+                    ),
                 },
             ),
         )
-        page.route(
-            "**/device",
-            lambda route: route.fulfill(
+        requests: list[dict[str, object]] = []
+
+        def device_route(route: Route) -> None:
+            """Фиксирует только изолированные запросы к тестовому серверу."""
+            data = route.request.post_data_json
+            assert isinstance(data, dict)
+            requests.append(data)
+            route.fulfill(
+                status=202 if data.get("enableAccount") else 200,
                 json={
-                    "active": True,
-                    "accountPushEnabled": account_push
-                    or route.request.post_data_json.get("enableAccount", False),
-                }
-            ),
-        )
+                    "active": state == "verified",
+                    "pending": bool(data.get("enableAccount")),
+                    "accountPushEnabled": state != "account_off",
+                },
+            )
+
+        page.route("**/device", device_route)
         page.goto(SITE_ORIGIN)
         page.evaluate(SDK_MOCK)
         identity_mock = """() => {
+            window.mockSubscription.id = 'test-subscription';
+            window.mockSubscription.optedIn = true;
+            window.mockNotificationPermission = 'granted';
+            window.mockOneSignal.Notifications.permission = true;
             window.identityCalls = [];
-            window.mockOneSignal.login = async (id, token) => {window.identityCalls.push(['login', id, token]);};
-            window.mockOneSignal.logout = async () => {window.identityCalls.push(['logout']);};
+            window.mockOneSignal.login = async () => {window.identityCalls.push('login');};
+            window.mockOneSignal.logout = async () => {window.identityCalls.push('logout');};
         }"""
         page.evaluate(identity_mock)
-        script = (
-            Path(__file__).resolve().parents[2] / "static/js/web_push.js"
-        ).read_text()
-        page.add_script_tag(content=script)
+        page.add_script_tag(
+            content=(
+                Path(__file__).resolve().parents[2] / "static/js/web_push.js"
+            ).read_text()
+        )
         page.evaluate(
             "async () => {await window.OneSignalDeferred[0](window.mockOneSignal);}"
         )
-        if not authenticated:
-            assert page.evaluate("window.identityCalls") == [["logout"]]
+        assert page.evaluate("window.identityCalls") == []
+        if state == "anonymous":
             expect(page.locator("#web-push-status")).to_contain_text("Войдите")
-            expect(page.locator("#web-push-toggle")).to_be_disabled()
-        elif not identity_ok:
-            assert page.evaluate("window.identityCalls") == []
+        elif state == "failure":
             expect(page.locator("#web-push-status")).to_contain_text("недоступен")
+        elif state == "verified":
+            expect(page.locator("#web-push-toggle")).to_have_text(
+                "Отключить уведомления"
+            )
         else:
-            assert page.evaluate("window.identityCalls") == [
-                ["login", "server-alias", "test-jwt"]
-            ]
-            expect(page.locator("#web-push-toggle")).to_be_enabled()
-            if not account_push:
-                expect(page.locator("#web-push-status")).to_contain_text("аккаунта")
-                page.click("#web-push-toggle")
-                expect(page.locator("#web-push-status")).to_have_text(
-                    "Уведомления включены."
-                )
-                assert page.evaluate("window.pushCalls.optOut") == 0
+            expect(page.locator("#web-push-status")).not_to_have_text(
+                "Уведомления включены."
+            )
+            page.click("#web-push-toggle")
+            expect(page.locator("#web-push-status")).to_contain_text("подтвердите")
+            assert any(data.get("enableAccount") is True for data in requests)
+            assert page.evaluate("window.pushCalls.optOut") == 0
+        browser.close()
+
+
+def test_confirmation_when_opened_from_push_should_keep_secret_out_of_get() -> None:
+    """Фрагмент удаляется из адресной строки и попадает только в подтверждающий POST."""
+    with sync_playwright() as driver:
+        browser = driver.chromium.launch(
+            executable_path=environ.get("CHAT_BROWSER_EXECUTABLE"), headless=True
+        )
+        page = browser.new_page()
+        urls: list[str] = []
+
+        def document_route(route: Route) -> None:
+            """Отдаёт изолированную форму без запросов к провайдеру."""
+            urls.append(route.request.url)
+            route.fulfill(
+                content_type="text/html; charset=utf-8",
+                body='<form method="post"><input name="code"><button name="confirm" value="yes">Подтвердить</button></form>',
+            )
+
+        page.route("**/*", document_route)
+        page.goto(SITE_ORIGIN + "/notification-center/confirm/#code=delivered-secret")
+        page.add_script_tag(
+            content=(
+                Path(__file__).resolve().parents[2] / "static/js/push_confirm.js"
+            ).read_text()
+        )
+        expect(page.locator('input[name="code"]')).to_have_value("delivered-secret")
+        assert "delivered-secret" not in page.url
+        assert all("delivered-secret" not in url for url in urls)
+        with page.expect_request(lambda request: request.method == "POST") as submitted:
+            page.click('button[name="confirm"]')
+        assert "code=delivered-secret" in (submitted.value.post_data or "")
         browser.close()

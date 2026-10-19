@@ -1,0 +1,13 @@
+{% load static %}
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>Подтверждение уведомлений — TennisFan</title></head>
+<body><main>
+{% if complete %}
+<h1>Уведомления подключены</h1><p>Это устройство подтверждено для вашего аккаунта.</p><a href="{% url 'notification_settings' %}">Перейти к настройкам</a>
+{% elif valid %}
+<h1>Подключить уведомления?</h1><p>Подтвердите подключение этого устройства к вашему аккаунту TennisFan.</p>
+<form method="post" action="{% url 'notification_confirm' %}">{% csrf_token %}<input type="hidden" name="code" value="{{ code }}"><button name="confirm" value="yes" type="submit">Подтвердить подключение</button></form>
+{% else %}
+<h1>Подтверждение недействительно</h1><p>Код истёк, уже использован или открыт в другом браузере либо аккаунте. Откройте настройки в исходном браузере и запросите новое подтверждение.</p><a href="{% url 'notification_settings' %}">Настройки уведомлений</a>
+{% endif %}
+</main>{% if valid and not complete %}<script src="{% static 'js/push_confirm.js' %}" defer></script>{% endif %}</body></html>

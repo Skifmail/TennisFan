@@ -82,13 +82,14 @@ class NotificationPreference(models.Model):
 
 
 class PushDevice(models.Model):
-    """Подтверждённый псевдоним устройства без email и ID игрока у провайдера.
+    """Подтверждённая подписка браузера без передачи email и ID игрока провайдеру.
 
     Attributes:
         device_hash: Хэш случайного HttpOnly-cookie устройства.
-        external_id: Случайный псевдоним для JWT-проверки OneSignal.
+        external_id: Случайное поколение привязки для отзыва старых вкладок.
+        subscription_id: Проверенный доставленным кодом адрес подписки OneSignal.
         user: Текущий владелец привязки.
-        active: SDK подтвердил привязку и локальную подписку.
+        active: Подписка подтверждена одноразовым кодом и разрешена пользователем.
         expires_at: Конечный срок привязки, вычисленный из настроек текущей сессии.
     """
 
@@ -97,6 +98,9 @@ class PushDevice(models.Model):
     )
     external_id: models.UUIDField[uuid.UUID, uuid.UUID] = models.UUIDField(
         default=uuid.uuid4, unique=True, editable=False
+    )
+    subscription_id: models.UUIDField[uuid.UUID | None, uuid.UUID | None] = (
+        models.UUIDField(null=True, blank=True, unique=True, editable=False)
     )
     user_id: int
     user: models.ForeignKey[User, User] = models.ForeignKey(
@@ -111,6 +115,36 @@ class PushDevice(models.Model):
     class Meta:
         verbose_name = "Push-устройство"
         verbose_name_plural = "Push-устройства"
+
+
+class PushConfirmation(models.Model):
+    """Одноразовое доказательство получения push конкретным браузером.
+
+    Attributes:
+        device: Браузер, запросивший подтверждение в авторизованной сессии.
+        subscription_id: Единственная подписка, на которую отправлен секрет.
+        generation: Поколение привязки до выхода или смены аккаунта.
+        token_hash: SHA-256 секрета; открытый код не хранится в базе.
+        expires_at: Предельный срок использования кода.
+        requested_at: Время запроса для ограничения повторных отправок.
+    """
+
+    device: models.OneToOneField[PushDevice, PushDevice] = models.OneToOneField(
+        PushDevice, on_delete=models.CASCADE
+    )
+    subscription_id: models.UUIDField[uuid.UUID, uuid.UUID] = models.UUIDField(
+        unique=True
+    )
+    generation: models.UUIDField[uuid.UUID, uuid.UUID] = models.UUIDField()
+    token_hash: models.CharField[str, str] = models.CharField(
+        max_length=64, unique=True
+    )
+    expires_at: models.DateTimeField[datetime, datetime] = models.DateTimeField()
+    requested_at: models.DateTimeField[datetime, datetime] = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "Подтверждение push-подписки"
+        verbose_name_plural = "Подтверждения push-подписок"
 
 
 class Broadcast(models.Model):

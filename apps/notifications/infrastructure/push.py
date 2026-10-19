@@ -1,4 +1,4 @@
-"""Ограниченный транспорт OneSignal: только проверенные псевдонимы устройств."""
+"""Ограниченный транспорт OneSignal: только проверенные подписки устройств."""
 
 from typing import Final
 
@@ -28,15 +28,24 @@ class PushRejectedError(NotificationError):
     """
 
 
-def send_push(*, aliases: list[str], title: str, body: str, url: str, key: str) -> str:
+def send_push(
+    *,
+    subscription_ids: list[str],
+    title: str,
+    body: str,
+    url: str,
+    key: str,
+    ttl_seconds: int = PUSH_TTL_SECONDS,
+) -> str:
     """Передаёт персональное сообщение OneSignal без возможности массового сегмента.
 
     Args:
-        aliases: Проверенные сервером активные псевдонимы устройств одного пользователя.
+        subscription_ids: Проверенные сервером подписки одного пользователя.
         title: Короткий заголовок.
         body: Короткий текст без секретов.
         url: Проверенная HTTPS-ссылка.
         key: Стабильный UUID задания для безопасного повтора.
+        ttl_seconds: Срок хранения сообщения у провайдера в секундах.
 
     Returns:
         ID принятого сообщения, не подтверждение доставки на экран.
@@ -46,7 +55,7 @@ def send_push(*, aliases: list[str], title: str, body: str, url: str, key: str) 
         PushRejectedError: Не настроен транспорт, неверный запрос либо нет подписчиков.
     """
     if (
-        not aliases
+        not subscription_ids
         or not settings.ONESIGNAL_REST_API_KEY
         or not settings.ONESIGNAL_APP_ID
     ):
@@ -61,12 +70,12 @@ def send_push(*, aliases: list[str], title: str, body: str, url: str, key: str) 
             json={
                 "app_id": settings.ONESIGNAL_APP_ID,
                 "target_channel": "push",
-                "include_aliases": {"external_id": aliases},
+                "include_subscription_ids": subscription_ids,
                 "headings": {"en": title, "ru": title},
                 "contents": {"en": body, "ru": body},
                 "url": url,
                 "idempotency_key": key,
-                "ttl": PUSH_TTL_SECONDS,
+                "ttl": ttl_seconds,
             },
             timeout=HTTP_TIMEOUT,
             allow_redirects=False,

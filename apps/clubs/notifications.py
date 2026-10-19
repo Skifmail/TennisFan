@@ -10,10 +10,11 @@ import logging
 from typing import Any, cast
 
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import escape, strip_tags
 
+from apps.notifications.infrastructure.email import EventEmail as EmailMultiAlternatives
+from apps.notifications.services import center_enabled
 from apps.telegram_bot.notifications import send_to_user_by_user
 
 from .models import (
@@ -84,6 +85,9 @@ def _send_club_email(
     template_name: str,
     context: dict[str, Any],
     recipient_email: str,
+    *,
+    event_key: str,
+    email_allowed: bool = True,
 ) -> bool:
     """
     Отправляет HTML-письмо клубного раздела.
@@ -93,6 +97,8 @@ def _send_club_email(
         template_name: путь к шаблону (например 'emails/clubs/fee_reminder.html').
         context: контекст для рендера шаблона.
         recipient_email: email получателя.
+        event_key: Явный ключ события.
+        email_allowed: Прежнее ограничение клубного email.
 
     Returns:
         True при успешной отправке.
@@ -105,10 +111,13 @@ def _send_club_email(
             body=text_body,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[recipient_email],
+            event_key=event_key,
+            delivery_allowed=email_allowed,
         )
         msg.attach_alternative(html_body, "text/html")
         msg.outbound_category = "clubs"
-        msg.send(fail_silently=False)
+        if not msg.send(fail_silently=False):
+            return False
         logger.info(
             "club_email_sent | to=%s | subject=%s",
             _mask_email(recipient_email),
@@ -136,7 +145,7 @@ def _send_club_telegram(user: Any, text: str) -> bool:
         True при успешной отправке.
     """
     try:
-        ok = send_to_user_by_user(user, text)
+        ok = send_to_user_by_user(user, text, skip_email=center_enabled())
         if ok:
             logger.info(
                 "club_telegram_sent | user_id=%s",
@@ -190,6 +199,7 @@ def send_club_invite_email(
                 "accept_url": accept_url,
             },
             recipient_email=player_email,
+            event_key="club.invited",
         )
     except Exception:
         logger.exception("send_club_invite_email failed | club=%s", club.pk)
@@ -221,7 +231,7 @@ def send_fee_reminder_notifications(
     ms = _get_member_settings(member.user, club)
     player_name = member.user.get_full_name() or member.user.email
 
-    if _should_send_email(config, ms):
+    if (_should_send_email(config, ms)) or center_enabled():
         try:
             _send_club_email(
                 subject=f"Напоминание: взнос в клуб «{club.name}» (осталось {days_left} дн.)",
@@ -235,6 +245,8 @@ def send_fee_reminder_notifications(
                     "pay_url": pay_url,
                 },
                 recipient_email=member.user.email,
+                event_key="club.fee_reminder",
+                email_allowed=bool(_should_send_email(config, ms)),
             )
         except Exception:
             logger.exception("send_fee_reminder email failed | member=%s", member.pk)
@@ -278,7 +290,7 @@ def send_fee_overdue_notifications(
     ms = _get_member_settings(member.user, club)
     player_name = member.user.get_full_name() or member.user.email
 
-    if _should_send_email(config, ms):
+    if (_should_send_email(config, ms)) or center_enabled():
         try:
             _send_club_email(
                 subject=f"Просрочка взноса в клубе «{club.name}»",
@@ -292,6 +304,8 @@ def send_fee_overdue_notifications(
                     "pay_url": pay_url,
                 },
                 recipient_email=member.user.email,
+                event_key="club.fee_overdue",
+                email_allowed=bool(_should_send_email(config, ms)),
             )
         except Exception:
             logger.exception("send_fee_overdue email failed | member=%s", member.pk)
@@ -331,7 +345,7 @@ def send_fee_paid_notification(
     ms = _get_member_settings(member.user, club)
     player_name = member.user.get_full_name() or member.user.email
 
-    if _should_send_email(config, ms):
+    if (_should_send_email(config, ms)) or center_enabled():
         try:
             _send_club_email(
                 subject=f"Взнос в клуб «{club.name}» оплачен",
@@ -343,6 +357,8 @@ def send_fee_paid_notification(
                     "period_label": period_label,
                 },
                 recipient_email=member.user.email,
+                event_key="club.fee_paid",
+                email_allowed=bool(_should_send_email(config, ms)),
             )
         except Exception:
             logger.exception("send_fee_paid email failed | member=%s", member.pk)
@@ -385,7 +401,7 @@ def send_subscription_expiring_notifications(
         admin_name = admin_member.user.get_full_name() or admin_member.user.email
         ms = _get_member_settings(admin_member.user, club)
 
-        if _should_send_email(config, ms):
+        if (_should_send_email(config, ms)) or center_enabled():
             try:
                 _send_club_email(
                     subject=f"Подписка клуба «{club.name}» истекает через {days_left} дн.",
@@ -399,6 +415,8 @@ def send_subscription_expiring_notifications(
                         "renew_url": renew_url,
                     },
                     recipient_email=admin_member.user.email,
+                    event_key="club.subscription_expiring",
+                    email_allowed=bool(_should_send_email(config, ms)),
                 )
             except Exception:
                 logger.exception(
@@ -446,7 +464,7 @@ def send_new_member_notification(
         admin_name = admin_member.user.get_full_name() or admin_member.user.email
         ms = _get_member_settings(admin_member.user, club)
 
-        if _should_send_email(config, ms):
+        if (_should_send_email(config, ms)) or center_enabled():
             try:
                 _send_club_email(
                     subject=f"Новый участник в клубе «{club.name}»",
@@ -459,6 +477,8 @@ def send_new_member_notification(
                         "dashboard_url": dashboard_url,
                     },
                     recipient_email=admin_member.user.email,
+                    event_key="club.new_member",
+                    email_allowed=bool(_should_send_email(config, ms)),
                 )
             except Exception:
                 logger.exception(
@@ -504,7 +524,7 @@ def send_join_request_notification(
         admin_name = admin_user.get_full_name() or admin_user.email
         ms = _get_member_settings(admin_user, club)
 
-        if _should_send_email(config, ms) and admin_user.email:
+        if (_should_send_email(config, ms) and admin_user.email) or center_enabled():
             try:
                 _send_club_email(
                     subject=f"Новая заявка в клуб «{club.name}»",
@@ -518,6 +538,10 @@ def send_join_request_notification(
                         "invites_url": invites_url,
                     },
                     recipient_email=admin_user.email,
+                    event_key="club.join_requested",
+                    email_allowed=bool(
+                        _should_send_email(config, ms) and admin_user.email
+                    ),
                 )
             except Exception:
                 logger.exception(
@@ -564,7 +588,7 @@ def send_debtors_summary(
         admin_name = admin_member.user.get_full_name() or admin_member.user.email
         ms = _get_member_settings(admin_member.user, club)
 
-        if _should_send_email(config, ms):
+        if (_should_send_email(config, ms)) or center_enabled():
             try:
                 _send_club_email(
                     subject=f"Сводка должников — «{club.name}» ({period_label})",
@@ -578,6 +602,8 @@ def send_debtors_summary(
                         "fees_url": fees_url,
                     },
                     recipient_email=admin_member.user.email,
+                    event_key="club.debtors",
+                    email_allowed=bool(_should_send_email(config, ms)),
                 )
             except Exception:
                 logger.exception(
@@ -628,7 +654,7 @@ def send_tournament_reminder(
     ms = _get_member_settings(member.user, club)
     player_name = member.user.get_full_name() or member.user.email
 
-    if _should_send_email(config, ms):
+    if (_should_send_email(config, ms)) or center_enabled():
         try:
             _send_club_email(
                 subject=f"Напоминание: турнир «{tournament_name}» {start_info}",
@@ -642,6 +668,8 @@ def send_tournament_reminder(
                     "tournament_url": tournament_url,
                 },
                 recipient_email=member.user.email,
+                event_key="club.tournament_reminder",
+                email_allowed=bool(_should_send_email(config, ms)),
             )
         except Exception:
             logger.exception(
@@ -735,7 +763,7 @@ def send_tournament_min_fill_to_club(tournament) -> None:
         admin_name = member.user.get_full_name() or member.user.email
         ms = _get_member_settings(member.user, club)
 
-        if _should_send_email(config, ms) and member.user.email:
+        if (_should_send_email(config, ms) and member.user.email) or center_enabled():
             try:
                 _send_club_email(
                     subject=(
@@ -754,6 +782,10 @@ def send_tournament_min_fill_to_club(tournament) -> None:
                         "manage_url": manage_url,
                     },
                     recipient_email=member.user.email,
+                    event_key="club.tournament_min_fill",
+                    email_allowed=bool(
+                        _should_send_email(config, ms) and member.user.email
+                    ),
                 )
             except Exception:
                 logger.exception(
@@ -814,7 +846,7 @@ def send_tournament_insufficient_to_club(tournament) -> None:
         admin_name = member.user.get_full_name() or member.user.email
         ms = _get_member_settings(member.user, club)
 
-        if _should_send_email(config, ms) and member.user.email:
+        if (_should_send_email(config, ms) and member.user.email) or center_enabled():
             try:
                 _send_club_email(
                     subject=(
@@ -833,6 +865,10 @@ def send_tournament_insufficient_to_club(tournament) -> None:
                         "manage_url": manage_url,
                     },
                     recipient_email=member.user.email,
+                    event_key="club.tournament_insufficient",
+                    email_allowed=bool(
+                        _should_send_email(config, ms) and member.user.email
+                    ),
                 )
             except Exception:
                 logger.exception(
@@ -890,7 +926,7 @@ def send_tournament_auto_cancelled_to_club(tournament) -> None:
         admin_name = member.user.get_full_name() or member.user.email
         ms = _get_member_settings(member.user, club)
 
-        if _should_send_email(config, ms) and member.user.email:
+        if (_should_send_email(config, ms) and member.user.email) or center_enabled():
             try:
                 _send_club_email(
                     subject=f"Турнир «{tournament_name}» отменён из‑за недобора",
@@ -905,6 +941,10 @@ def send_tournament_auto_cancelled_to_club(tournament) -> None:
                         "manage_url": manage_url,
                     },
                     recipient_email=member.user.email,
+                    event_key="club.tournament_cancelled",
+                    email_allowed=bool(
+                        _should_send_email(config, ms) and member.user.email
+                    ),
                 )
             except Exception:
                 logger.exception(

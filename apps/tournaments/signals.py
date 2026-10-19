@@ -5,6 +5,8 @@ from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 
+from apps.notifications.services import create_notification
+
 from .fan import (
     _is_fan,
     advance_winner_and_award_loser,
@@ -182,7 +184,6 @@ def notify_telegram_match_created(sender, instance, created, **kwargs):
             get_match_participants,
             get_opponents_contacts_short,
         )
-        from apps.users.models import Notification
 
         deadline_str = (
             instance.deadline.strftime("%d.%m.%Y %H:%M")
@@ -208,7 +209,9 @@ def notify_telegram_match_created(sender, instance, created, **kwargs):
             if len(msg) > 255:
                 msg = msg[:252] + "..."
             try:
-                Notification.objects.create(user=player.user, message=msg, url=url)
+                create_notification(
+                    user=player.user, message=msg, url=url, event_key="match.created"
+                )
             except Exception as e:
                 logger.warning(
                     "notify_match_created LK for user %s: %s",

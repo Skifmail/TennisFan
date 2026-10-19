@@ -48,9 +48,10 @@ from apps.core.metrika import (
     tournament_goal_params,
 )
 from apps.core.text_search import filter_field_contains_ci
+from apps.notifications.services import create_notification
 from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
 from apps.subscriptions.models import FancoinTransaction
-from apps.users.models import Notification, Player, SkillLevel
+from apps.users.models import Player, SkillLevel
 
 from .cancel import (
     TournamentLifecycleError,
@@ -2632,10 +2633,11 @@ def tournament_manage_send_payment_notification(request, slug):
             f"Администратор приглашает вас оплатить участие в турнире «{tournament.name}». "
             "После оплаты вы будете добавлены в турнир автоматически."
         )
-    Notification.objects.create(
+    create_notification(
         user=player.user,
         message=msg,
         url=payment_url,
+        event_key="tournament.payment_requested",
     )
     if tournament.is_doubles():
         messages.success(
@@ -2694,7 +2696,12 @@ def _notify_removed_participant_refund(
         "Для возврата средств обратитесь к администратору через форму обратной связи."
     )
     try:
-        Notification.objects.create(user=user, message=msg_lk, url=ref_url)
+        create_notification(
+            user=user,
+            message=msg_lk,
+            url=ref_url,
+            event_key="tournament.removed_refund",
+        )
     except Exception as e:
         logger.exception(
             "Notification create failed for removed participant refund (user=%s): %s",
@@ -2716,7 +2723,9 @@ def _notify_removed_participant_no_refund(request, user, tournament):
     )
     msg_lk = f"Вы сняты с турнира «{tournament.name}»."
     try:
-        Notification.objects.create(user=user, message=msg_lk, url=tour_url)
+        create_notification(
+            user=user, message=msg_lk, url=tour_url, event_key="tournament.removed"
+        )
     except Exception as e:
         logger.exception(
             "Notification create failed for removed participant (user=%s): %s",
@@ -3958,10 +3967,11 @@ def propose_result(request, pk):
         else:
             match_context = "матча"
 
-        Notification.objects.create(
+        create_notification(
             user=opponent_user,
             message=f"{player} внёс результат {match_context}. Матч завершён.",
             url=reverse("match_detail", args=[match.pk]),
+            event_key="match.result_proposed",
         )
 
     try:
@@ -4053,10 +4063,11 @@ def confirm_proposal(request, pk):
         except Exception:
             pass  # запись в ленту не должна мешать основному сценарию
         proposal.delete()
-        Notification.objects.create(
+        create_notification(
             user=proposal.proposer.user,
             message=f"{player} отклонил результат матча. Введите свой результат.",
             url=reverse("my_matches"),
+            event_key="match.proposal_updated",
         )
         messages.info(request, "Результат отклонён. Введите свой результат матча.")
 
@@ -4849,10 +4860,11 @@ def _do_join_team(request, tournament, player, team):
         paid_ids = [i for i in paid_ids if i != tournament.id]
         request.session["tournament_entry_paid"] = paid_ids
         request.session.modified = True
-    Notification.objects.create(
+    create_notification(
         user=team.player1.user,
         message=f"{player} присоединился к вашей команде в турнире {tournament.name}.",
         url=reverse("tournament_detail", args=[tournament.slug]),
+        event_key="tournament.team_joined",
     )
     try:
         from apps.core.telegram_notify import notify_tournament_registration
@@ -5015,10 +5027,11 @@ def _do_add_partner(request, tournament, player, partner_id):
         paid_ids = [i for i in paid_ids if i != tournament.id]
         request.session["tournament_entry_paid"] = paid_ids
         request.session.modified = True
-    Notification.objects.create(
+    create_notification(
         user=partner.user,
         message=f"{player} добавил вас в команду на турнир {tournament.name}.",
         url=reverse("tournament_detail", args=[tournament.slug]),
+        event_key="tournament.partner_added",
     )
     try:
         from apps.core.telegram_notify import notify_tournament_registration

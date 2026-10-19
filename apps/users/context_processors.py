@@ -27,6 +27,7 @@ def unread_notifications(request):
             lambda: Notification.objects.filter(
                 user=request.user,
                 is_read=False,
+                is_visible=True,
             ).count(),
             timeout=30,
         )

@@ -1,4 +1,4 @@
-/** Управление анонимной подпиской OneSignal без автоматического запроса разрешения. */
+/** Подписка устройства и проверенная идентичность без автоматического запроса разрешения. */
 (function () {
     'use strict';
 
@@ -52,6 +52,48 @@
 
             const subscription = OneSignal.User.PushSubscription;
             let busy = false;
+            let accountPushEnabled = true;
+            let boundExternalId = null;
+
+            async function api(url, data) {
+                const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+                const cookie = document.cookie.split('; ').find(value => value.startsWith('csrftoken='));
+                const response = await fetch(url, {
+                    method: 'POST', credentials: 'same-origin', cache: 'no-store',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrf ? csrf.value : (cookie ? decodeURIComponent(cookie.split('=')[1]) : ''),
+                    },
+                    body: JSON.stringify(data),
+                });
+                if (!response.ok || response.redirected) throw new Error('notification binding failed');
+                return response.json();
+            }
+
+            async function syncDevice(enableAccount) {
+                if (config.notificationCenter && config.authenticated) {
+                    const state = await api(config.deviceUrl, {
+                        externalId: boundExternalId,
+                        active: Boolean(subscription.optedIn && subscription.id && Notification.permission !== 'denied'),
+                        enableAccount: enableAccount === true,
+                    });
+                    accountPushEnabled = state.accountPushEnabled !== false;
+                }
+            }
+
+            if (config.notificationCenter) {
+                if (!config.authenticated) {
+                    await OneSignal.logout();
+                    button.disabled = true;
+                    status.textContent = 'Войдите в аккаунт, чтобы подключить персональные уведомления.';
+                    return;
+                }
+                const identity = await api(config.identityUrl, {});
+                boundExternalId = identity.externalId;
+                accountPushEnabled = identity.pushEnabled !== false;
+                await OneSignal.login(identity.externalId, identity.jwt);
+                await syncDevice(false);
+            }
 
             function update() {
                 button.disabled = busy;
@@ -59,6 +101,8 @@
                 if (window.Notification && Notification.permission === 'denied') {
                     status.textContent = 'Уведомления запрещены. Разрешите их в настройках браузера или устройства.';
                     button.disabled = true;
+                } else if (!accountPushEnabled) {
+                    status.textContent = 'Push отключены в настройках аккаунта. Можно включить их этой кнопкой.';
                 } else if (subscription.optedIn && subscription.id) {
                     status.textContent = 'Уведомления включены.';
                     button.textContent = 'Отключить уведомления';
@@ -71,13 +115,16 @@
             }
 
             OneSignal.Notifications.addEventListener('permissionChange', update);
-            subscription.addEventListener('change', update);
+            subscription.addEventListener('change', function () {
+                update();
+                syncDevice(false).catch(unavailable);
+            });
             button.addEventListener('click', async function () {
                 if (busy) return;
                 busy = true;
                 button.disabled = true;
                 try {
-                    if (subscription.optedIn && subscription.id) {
+                    if (subscription.optedIn && subscription.id && accountPushEnabled) {
                         await subscription.optOut();
                     } else {
                         // Вызов до первого await сохраняет прямое действие пользователя для iOS.
@@ -86,6 +133,7 @@
                         }
                         if (OneSignal.Notifications.permission) await subscription.optIn();
                     }
+                    await syncDevice(true);
                     busy = false;
                     update();
                 } catch (_error) {

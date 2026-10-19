@@ -53,6 +53,15 @@ ONESIGNAL_SITE_ORIGIN: Final = (
     os.environ.get("ONESIGNAL_SITE_ORIGIN", "https://tennisfan.ru").strip().rstrip("/")
 )
 
+# Включать после миграций и настройки проверенной идентичности OneSignal.
+NOTIFICATION_CENTER_ENABLED: Final = (
+    os.environ.get("NOTIFICATION_CENTER_ENABLED", "False").lower() == "true"
+)
+ONESIGNAL_REST_API_KEY: Final = os.environ.get("ONESIGNAL_REST_API_KEY", "")
+ONESIGNAL_IDENTITY_PRIVATE_KEY: Final = os.environ.get(
+    "ONESIGNAL_IDENTITY_PRIVATE_KEY", ""
+).replace("\\n", "\n")
+
 _csrf = os.environ.get(
     "CSRF_TRUSTED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"
 )
@@ -125,6 +134,7 @@ INSTALLED_APPS = [
     # Local apps
     "apps.core",
     "apps.users",
+    "apps.notifications",
     "apps.tournaments",
     "apps.clubs",
     "apps.courts",
@@ -505,6 +515,7 @@ CRONTAB_COMMAND_PREFIX = f"{sys.executable} {BASE_DIR / 'cron-run-wrapper.py'}"
 CRONTAB_COMMAND_SUFFIX = ">> /proc/1/fd/1 2>> /proc/1/fd/2"
 
 CRONJOBS = [
+    ("* * * * *", "django.core.management.call_command", ["process_notifications"]),
     ("* * * * *", "django.core.management.call_command", ["process_chat_invitations"]),
     (
         "*/10 * * * *",

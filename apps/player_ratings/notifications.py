@@ -7,8 +7,8 @@ from typing import cast
 
 from django.urls import reverse
 
+from apps.notifications.services import create_notification
 from apps.tournaments.utils import get_match_participant_users
-from apps.users.models import Notification
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,11 @@ def notify_players_to_rate_match(match) -> None:
     rate_absolute = get_rate_match_absolute_url(match.pk)
     for user in users:
         try:
-            Notification.objects.create(
+            create_notification(
                 user=user,
                 message="Оцените соперника",
                 url=rate_path,
+                event_key="match.rate_players",
             )
         except Exception as e:
             logger.warning(
@@ -66,7 +67,12 @@ def notify_players_to_rate_match(match) -> None:
         }
         for user in users:
             try:
-                send_to_user_by_user(user, text, reply_markup=reply_markup)
+                send_to_user_by_user(
+                    user,
+                    text,
+                    reply_markup=reply_markup,
+                    event_key="match.rate_players",
+                )
             except Exception as e:
                 logger.warning(
                     "notify_players_to_rate_match: telegram for user %s: %s",

@@ -19,10 +19,11 @@ from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.notifications.services import create_notification
 from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
 from apps.subscriptions.models import FancoinTransaction
 from apps.telegram_bot.notifications import send_to_user_by_user
-from apps.users.models import Notification, Player
+from apps.users.models import Player
 
 from .models import (
     Match,
@@ -548,9 +549,13 @@ def _notify_withdrawn_user(
         f"Вы сняты с турнира «{tournament.name}». "
         f"Несыгранные матчи закрыты без игры.{refund_part_lk}"
     )
-    Notification.objects.create(user=user, message=message_lk, url=url)
+    create_notification(
+        user=user, message=message_lk, url=url, event_key="tournament.withdrawn"
+    )
     try:
-        send_to_user_by_user(user, message, skip_email=True)
+        send_to_user_by_user(
+            user, message, skip_email=True, event_key="tournament.withdrawn"
+        )
     except Exception as e:
         logger.warning("TG notify withdrawal failed for user %s: %s", user.pk, e)
     try:
@@ -609,11 +614,16 @@ def _notify_opponents(
             withdrawn_team=withdrawn_team,
         )
         for user in opponent_users:
-            Notification.objects.create(
-                user=user, message=message_lk, url=match_path or tournament_path
+            create_notification(
+                user=user,
+                message=message_lk,
+                url=match_path or tournament_path,
+                event_key="match.opponent_withdrawn",
             )
             try:
-                send_to_user_by_user(user, message, skip_email=True)
+                send_to_user_by_user(
+                    user, message, skip_email=True, event_key="match.opponent_withdrawn"
+                )
             except Exception as e:
                 logger.warning(
                     "TG notify opponent on withdrawal failed user=%s: %s",

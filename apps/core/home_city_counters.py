@@ -13,10 +13,10 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from datetime import timezone as dt_timezone
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 from urllib.parse import urlencode
 
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Count, Model, Q, QuerySet
 from django.http import HttpResponse
 from django.urls import reverse
 from django.utils import timezone
@@ -31,6 +31,8 @@ from apps.sparring.models import (
     SparringRequest,
 )
 from apps.tournaments.models import Tournament, TournamentStatus
+
+_ModelT = TypeVar("_ModelT", bound=Model)
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +60,6 @@ ACTIVE_DOUBLES_STATUSES: tuple[str, ...] = cast(
 SPARRING_TYPE_SINGLES = "singles"
 SPARRING_TYPE_DOUBLES = "doubles"
 SPARRING_TYPE_TEAM = "team"
-_SPARRING_TYPES_ORDER: tuple[str, ...] = (
-    SPARRING_TYPE_SINGLES,
-    SPARRING_TYPE_DOUBLES,
-    SPARRING_TYPE_TEAM,
-)
 
 
 @dataclass(frozen=True)
@@ -166,7 +163,9 @@ def new_items_threshold(seen_at: datetime | None, *, now: datetime) -> datetime:
     return min(seen_at, now)
 
 
-def _filter_city(qs: QuerySet, city: str, annotation: str) -> QuerySet:
+def _filter_city(
+    qs: QuerySet[_ModelT], city: str, annotation: str
+) -> QuerySet[_ModelT]:
     """Отфильтровать по городу той же логикой, что и страницы списков.
 
     Args:
@@ -275,25 +274,6 @@ def _count_sparrings_by_type(
     }
 
 
-def pick_sparring_tab(by_type: dict[str, tuple[int, int]]) -> str:
-    """Выбрать вкладку списка спаррингов, куда вести со счётчика.
-
-    Сначала вкладка с новыми заявками, затем с любыми активными. Если пусто
-    везде, ведём на одиночные — вкладку по умолчанию.
-
-    Args:
-        by_type: ``{тип вкладки: (всего, новых)}``.
-
-    Returns:
-        str: ``singles``, ``doubles`` или ``team``.
-    """
-    for index in (1, 0):
-        for sparring_type in _SPARRING_TYPES_ORDER:
-            if by_type.get(sparring_type, (0, 0))[index] > 0:
-                return sparring_type
-    return SPARRING_TYPE_SINGLES
-
-
 def build_home_city_counters(
     *,
     city: str,
@@ -324,7 +304,6 @@ def build_home_city_counters(
         since=new_items_threshold(sparrings_seen_at, now=current),
         exclude_player_id=exclude_player_id,
     )
-    sparring_tab = pick_sparring_tab(by_type)
     return HomeCityCounters(
         city=city,
         tournaments=CityCounter(
@@ -335,15 +314,7 @@ def build_home_city_counters(
         sparrings=CityCounter(
             total=sum(total for total, _ in by_type.values()),
             new=sum(new for _, new in by_type.values()),
-            url=_list_url(
-                "sparring_list",
-                {
-                    "type": (
-                        "" if sparring_tab == SPARRING_TYPE_SINGLES else sparring_tab
-                    ),
-                    "city": city,
-                },
-            ),
+            url=reverse("sparring_list"),
         ),
     )
 

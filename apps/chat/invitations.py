@@ -15,8 +15,14 @@ from django.utils import timezone
 from loguru import logger
 
 from apps.core.localities import primary_locality_name
+from apps.notifications.services import (
+    center_enabled,
+    create_notification,
+    event_policy,
+    preferences,
+)
 from apps.users.context_processors import invalidate_unread_notifications_cache
-from apps.users.models import Notification, User
+from apps.users.models import User
 
 from .domain import MAX_DATABASE_ID, ChatAccessError, ChatError, ChatValidationError
 from .invitation_email import send_invitation_email
@@ -327,12 +333,13 @@ def _expand_campaign(batch_size: int) -> int:
         )
         if not created:
             continue
-        notification = Notification.objects.create(
+        notification = create_notification(
             user=recipient,
             message=f"Вас приглашают в городской чат «{campaign.room.display_name}»"[
                 :255
             ],
             url=reverse("chat:invitation", args=[invitation.pk]),
+            event_key="chat.invited",
         )
         invitation.notification = notification
         invitation.save(update_fields=["notification"])
@@ -371,6 +378,11 @@ def _claim_email() -> ChatInvitation | None:
     ).exists():
         reason = "already_joined"
         invitation.status = "accepted"
+    elif center_enabled() and (
+        not event_policy("chat.invited").email_enabled
+        or not preferences(invitation.recipient_id)[1]
+    ):
+        reason = "notification_email_disabled"
     elif not invitation.recipient.email_verified:
         reason = "email_unverified"
     elif ChatInvitationEmailBlock.objects.filter(user=invitation.recipient).exists():

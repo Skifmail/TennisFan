@@ -7,10 +7,12 @@ import threading
 from typing import cast
 
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives, get_connection
+from django.core.mail import get_connection
 from django.db import connection
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
+
+from apps.notifications.infrastructure.email import EventEmail as EmailMultiAlternatives
 
 from .models import SupportMessage
 
@@ -100,6 +102,7 @@ def send_admin_support_notification(message: SupportMessage) -> bool:
         body=text_content,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru"),
         to=[admin_email],
+        event_key="support.admin_message",
     )
     msg.attach_alternative(html_content, "text/html")
     msg.outbound_category = "support"
@@ -142,6 +145,7 @@ def send_user_support_reply(message: SupportMessage) -> bool:
         body=text_content,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru"),
         to=[user_email],
+        event_key="support.reply",
     )
     msg.attach_alternative(html_content, "text/html")
     msg.outbound_category = "support"

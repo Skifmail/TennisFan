@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.notifications.services import create_notification
 from apps.subscriptions.sparring_billing import charge_fancoin_for_completed_match
-from apps.users.models import Notification
 
 from .models import Match, MatchResultProposal
 
@@ -443,7 +443,9 @@ def notify_participants_match_result_confirmed(
                 msg = base
             if len(msg) > 255:
                 msg = msg[:252] + "..."
-            Notification.objects.create(user=p.user, message=msg, url=url)
+            create_notification(
+                user=p.user, message=msg, url=url, event_key="match.result_confirmed"
+            )
         except Exception as e:
             logger.warning(
                 "notify_participants_match_result_confirmed for player %s: %s",

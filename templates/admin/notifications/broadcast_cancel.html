@@ -1,0 +1,6 @@
+{% extends 'admin/base_site.html' %}
+{% block content %}
+<h1>Остановка рассылки «{{ campaign.title }}»</h1>
+<p>Ещё не отправленные задания будут пропущены. Уже принятые провайдером или выполняемые сообщения могут быть доставлены. Записи ЛК и история не удаляются.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="confirm" value="yes"><button type="submit">Остановить очередь этой рассылки</button></form>
+{% endblock %}

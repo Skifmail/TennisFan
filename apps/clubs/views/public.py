@@ -13,8 +13,8 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from apps.core.consent_utils import record_platform_consent
 from apps.legal.utils import get_legal_document_version
+from apps.notifications.services import create_notification
 from apps.tournaments.models import Match, Tournament, TournamentStatus
-from apps.users.models import Notification
 
 from ..forms import (
     ClubMemberPlanSelectForm,
@@ -699,10 +699,11 @@ def join_request_create(request: HttpRequest, slug: str) -> HttpResponse:
         role=ClubMemberRole.ADMIN,
         status=ClubMemberStatus.ACTIVE,
     ).select_related("user"):
-        Notification.objects.create(
+        create_notification(
             user=admin_member.user,
             message=f"Новая заявка на вступление в клуб «{club.name}» от {request.user}.",
             url=reverse("clubs:invites_list", kwargs={"slug": club.slug}),
+            event_key="club.join_requested",
         )
 
     send_join_request_notification(

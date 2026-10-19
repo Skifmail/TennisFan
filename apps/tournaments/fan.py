@@ -11,7 +11,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.sports import Sport
-from apps.users.models import Notification, Player
+from apps.notifications.services import create_notification
+from apps.users.models import Player
 
 from .models import (
     Match,
@@ -906,15 +907,17 @@ def apply_overdue_walkover(match: Match, winner: Player) -> None:
         status=Match.ProposalStatus.REJECTED
     )
     url = reverse("match_detail", args=[match.pk])
-    Notification.objects.create(
+    create_notification(
         user=winner.user,
         message="Дедлайн матча истёк. Вам присуждена тех. победа.",
         url=url,
+        event_key="match.overdue_result",
     )
-    Notification.objects.create(
+    create_notification(
         user=loser.user,
         message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
         url=url,
+        event_key="match.overdue_result",
     )
     logger.info("Overdue walkover: match %s → winner %s", match.pk, winner)
 

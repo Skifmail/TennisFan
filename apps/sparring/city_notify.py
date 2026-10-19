@@ -12,12 +12,13 @@ from django.urls import reverse
 
 from apps.core.db_context import background_connection
 from apps.core.localities import locality_tokens
+from apps.notifications.services import create_notification
 from apps.sparring.models import (
     DoublesMatchRequest,
     DoublesMatchRequestStatus,
     SparringRequest,
 )
-from apps.users.models import Notification, Player
+from apps.users.models import Player
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,9 @@ def notify_published_sparring(*, kind: str, pk: int) -> tuple[int, int]:
     for player in same_city_players(city, exclude_player_id=author_id):
         user = player.user
         try:
-            Notification.objects.create(user=user, message=message, url=url)
+            create_notification(
+                user=user, message=message, url=url, event_key="sparring.published"
+            )
             lk_count += 1
         except Exception:
             logger.exception(

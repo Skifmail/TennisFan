@@ -14,7 +14,8 @@ from django.utils import timezone
 from loguru import logger
 
 from apps.core.models import City
-from apps.users.models import Notification, User
+from apps.notifications.services import create_notification
+from apps.users.models import User
 
 from .archive import ensure_message_snapshot, record_message_change
 from .consent import ensure_chat_consent
@@ -425,12 +426,13 @@ def send_message(
             notifications_enabled=True,
         ).exists()
     ):
-        Notification.objects.create(
+        create_notification(
             user_id=reply.author_id,
             message=f"Вам ответили в городском чате «{message.room.display_name}»"[
                 :255
             ],
             url=reverse("chat:room", args=[room_id]),
+            event_key="chat.reply",
         )
     logger.info(
         "Сообщение городского чата создано",

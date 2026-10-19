@@ -9,11 +9,11 @@ from typing import cast
 import requests
 from django.conf import settings
 from django.core.cache import cache
-from django.core.mail import send_mail
 from django.utils.html import strip_tags
 
 from apps.core.contact_utils import get_max_display_contact
 from apps.courts.surfaces import format_surface_labels
+from apps.notifications.infrastructure.email import send_event_mail as send_mail
 from apps.telegram_bot.telegram_http import (
     is_telegram_api_enabled,
     telegram_requests_proxies,
@@ -154,6 +154,7 @@ def _send_admin_email(text: str, parse_mode: str = "HTML") -> bool:
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru"),
             recipient_list=[recipient],
             fail_silently=False,
+            event_key="platform.admin_message",
         )
         return True
     except Exception as exc:

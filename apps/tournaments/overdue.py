@@ -10,7 +10,8 @@ from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.users.models import Notification, Player, User
+from apps.notifications.services import create_notification
+from apps.users.models import Player, User
 
 from .models import Match, SeasonPoints, Tournament, TournamentStatus, TournamentTeam
 from .rating import WALKOVER_NO_SHOW_PENALTY
@@ -207,7 +208,12 @@ def _notify_players_deadline_auto_rt(
         if player is None or getattr(player, "is_bye", False):
             continue
         try:
-            Notification.objects.create(user=player.user, message=message, url=url)
+            create_notification(
+                user=player.user,
+                message=message,
+                url=url,
+                event_key="match.overdue_result",
+            )
         except Exception:
             logger.exception(
                 "deadline auto RT notify player %s match %s failed",
@@ -364,7 +370,9 @@ def notify_admins_match_deadline_overdue(match: Match) -> tuple[bool, str]:
     from apps.core.email_service import send_match_deadline_overdue_admin_email
 
     for user in recipients:
-        Notification.objects.create(user=user, message=message, url=url)
+        create_notification(
+            user=user, message=message, url=url, event_key="match.overdue_admin"
+        )
         if send_match_deadline_overdue_admin_email(user, match, manage_url=url):
             emailed += 1
 

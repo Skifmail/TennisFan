@@ -1,0 +1,57 @@
+{% load skill_tags %}
+        <div class="card sparring-card" id="sparring-{{ entry.sparring_type }}-{{ req.pk }}">
+            <div class="card-body sparring-card__inner">
+                <div class="sparring-card__flags">
+                    <span class="sparring-flag sparring-flag--type">{% if entry.sparring_type == 'team' %}Командный спарринг{% else %}Парный 2×2{% endif %}</span>
+                    <span class="sparring-flag sparring-flag--gender">{{ req.get_status_display }}</span>
+                    {% if req.is_friendly %}
+                    <span class="sparring-flag sparring-flag--friendly">Дружеский</span>
+                    {% endif %}
+                </div>
+                <div class="sparring-card__layout sparring-card__layout--roster">
+                    <div class="sparring-card__col sparring-card__col--main">
+                        {% include 'includes/sparring_doubles_roster.html' with req=req %}
+                        <div class="sparring-card__chips">
+                            {% if not entry.is_local and entry.distance_km != None %}
+                            <span class="sparring-card__distance">≈ {{ entry.distance_km|floatformat:0 }} км от вас</span>
+                            {% endif %}
+                            {% if req.desired_level %}
+                            <span class="sparring-desired-category">Партнёры: {{ req.get_desired_level_display }}</span>
+                            {% endif %}
+                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city|default:"Населённый пункт не указан" }}</span>
+                        </div>
+                        {% if req.description %}
+                        <p class="sparring-card__desc text-secondary">{{ req.description|truncatewords:20 }}</p>
+                        {% endif %}
+                        <div class="sparring-card__details">
+                            {% if req.preferred_days or req.preferred_time %}
+                            <span class="sparring-card__detail-line">
+                                {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
+                                {% if req.preferred_time %} · {{ req.preferred_time }}{% endif %}
+                            </span>
+                            {% endif %}
+                            {% if req.preferred_location %}
+                            <span class="sparring-card__detail-line">📍 {{ req.preferred_location }}</span>
+                            {% endif %}
+                            {% if req.desired_age_min or req.desired_age_max %}
+                            <span class="sparring-card__detail-line">
+                                Возраст партнёров:
+                                {% if req.desired_age_min and req.desired_age_max %}
+                                    {{ req.desired_age_min }}–{{ req.desired_age_max }} {{ req.desired_age_max|years_suffix }}
+                                {% elif req.desired_age_min %}
+                                    от {{ req.desired_age_min }} {{ req.desired_age_min|years_suffix }}
+                                {% elif req.desired_age_max %}
+                                    до {{ req.desired_age_max }} {{ req.desired_age_max|years_suffix }}
+                                {% endif %}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="sparring-card__col sparring-card__col--cta">
+                        <div class="sparring-card__actions">
+                            <a href="{% url 'doubles_detail' pk=req.pk %}" class="btn btn-primary btn-sm sparring-card__btn">Подробнее</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>

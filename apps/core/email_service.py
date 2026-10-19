@@ -13,11 +13,13 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives, get_connection
+from django.core.mail import get_connection
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import strip_tags
+
+from apps.notifications.infrastructure.email import EventEmail as EmailMultiAlternatives
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -63,6 +65,7 @@ def _resolve_user_email(user: User) -> str:
 
 def _send_html_email(
     *,
+    event_key: str = "platform.user_message",
     subject: str,
     template_name: str,
     context: dict[str, Any],
@@ -73,6 +76,7 @@ def _send_html_email(
     """Отправить HTML-письмо с текстовой fallback-версией.
 
     Args:
+        event_key: Явный код события из реестра центра.
         subject (str): Тема письма.
         template_name (str): Путь к HTML-шаблону.
         context (dict[str, Any]): Контекст шаблона.
@@ -98,14 +102,14 @@ def _send_html_email(
             body=text_content,
             from_email=from_email,
             to=[recipient],
+            event_key=event_key,
         )
         if timeout_seconds is not None:
             msg.connection = get_connection(timeout=timeout_seconds)
         msg.attach_alternative(html_content, "text/html")
         if category:
             msg.outbound_category = category
-        msg.send(fail_silently=False)
-        return True
+        return bool(msg.send(fail_silently=False))
     except Exception as exc:
         logger.exception("_send_html_email: send failed to %s: %s", recipient, exc)
         return False
@@ -164,6 +168,7 @@ def send_welcome_email(user: User) -> bool:
             body=text_content,
             from_email=from_email,
             to=[email],
+            event_key="account.welcome",
         )
         msg.attach_alternative(html_content, "text/html")
         msg.outbound_category = "registration"
@@ -222,6 +227,7 @@ def send_subscription_pre_debit_notification(
             body=body,
             from_email=from_email,
             to=[email],
+            event_key="subscription.pre_debit",
         )
         msg.outbound_category = "subscription"
         msg.send(fail_silently=False)
@@ -274,6 +280,7 @@ def send_tournament_cancelled_email(
         },
         recipient=email,
         category="tournament",
+        event_key="tournament.cancelled",
     )
 
 
@@ -315,6 +322,7 @@ def send_tournament_participant_withdrawn_email(
         },
         recipient=email,
         category="tournament",
+        event_key="tournament.withdrawn",
     )
 
 
@@ -356,6 +364,7 @@ def send_tournament_opponent_match_closed_email(
         },
         recipient=email,
         category="tournament",
+        event_key="match.opponent_withdrawn",
     )
 
 
@@ -400,6 +409,7 @@ def send_match_deadline_changed_email(
         },
         recipient=email,
         category="tournament",
+        event_key="match.deadline_changed",
     )
 
 
@@ -457,6 +467,7 @@ def send_match_deadline_reminder_email(
         },
         recipient=email,
         category="tournament",
+        event_key="match.deadline_reminder",
     )
 
 
@@ -505,6 +516,7 @@ def send_match_deadline_overdue_admin_email(
         },
         recipient=email,
         category="tournament",
+        event_key="match.overdue_admin",
     )
 
 
@@ -544,6 +556,7 @@ def send_tournament_postpayment_opened_email(
         },
         recipient=email,
         category="tournament",
+        event_key="tournament.payment_opened",
     )
 
 
@@ -580,6 +593,7 @@ def send_tournament_postpayment_1h_reminder_email(
         },
         recipient=email,
         category="tournament",
+        event_key="tournament.payment_reminder",
     )
 
 
@@ -619,6 +633,7 @@ def send_tournament_postpayment_resend_email(
         },
         recipient=email,
         category="tournament",
+        event_key="tournament.payment_link",
     )
 
 
@@ -671,6 +686,7 @@ def send_tournament_entry_fancoin_confirmed_email(
         },
         recipient=email,
         category="tournament",
+        event_key="tournament.fancoin_paid",
     )
 
 
@@ -708,6 +724,7 @@ def send_tournament_entry_receipt_email(
         },
         recipient=email,
         category="tournament",
+        event_key="tournament.receipt",
     )
 
 
@@ -753,6 +770,7 @@ def send_club_plan_receipt_email(
         },
         recipient=email,
         category="subscription",
+        event_key="club.plan_receipt",
     )
 
 
@@ -784,6 +802,7 @@ def send_coach_application_decision_email(
         },
         recipient=recipient,
         category="other",
+        event_key="training.coach_decision",
     )
 
 
@@ -864,6 +883,7 @@ def send_training_enrollment_email(enrollment: TrainingEnrollment) -> bool:
         },
         recipient=recipient,
         category="other",
+        event_key="training.enrollment",
     )
 
 
@@ -893,6 +913,7 @@ def send_court_application_decision_email(
         },
         recipient=recipient,
         category="other",
+        event_key="court.application_decision",
     )
 
 
@@ -919,6 +940,7 @@ def send_donation_thanks_email(user: User, amount: str | None) -> bool:
         },
         recipient=email,
         category="subscription",
+        event_key="payment.donation",
     )
 
 
@@ -955,6 +977,7 @@ def send_subscription_autorenew_failed_email(
         },
         recipient=email,
         category="subscription",
+        event_key="subscription.renewal_failed",
     )
 
 
@@ -983,6 +1006,7 @@ def send_password_changed_email(user: User, request: HttpRequest | None = None) 
         context={"user": user, "event_at": timezone.now(), "ip_address": ip_address},
         recipient=email,
         category="security",
+        event_key="account.password_changed",
     )
 
 
@@ -1011,6 +1035,7 @@ def send_phone_changed_email(user: User, old_phone: str, new_phone: str) -> bool
         },
         recipient=email,
         category="security",
+        event_key="account.phone_changed",
     )
 
 
@@ -1048,6 +1073,7 @@ def send_email_verification(user: User) -> bool:
         context={"user": user, "verify_url": verify_url, "expires_at": expires_at},
         recipient=email,
         category="registration",
+        event_key="account.email_verification",
     )
 
 
@@ -1099,6 +1125,7 @@ def send_new_tournament_email(user: User, tournament: Tournament) -> bool:
         },
         recipient=email,
         category="new_tournament",
+        event_key="tournament.created",
     )
 
 
@@ -1129,6 +1156,7 @@ def send_tournament_completed_email(
         context=context,
         recipient=email,
         category="tournament",
+        event_key="tournament.completed",
     )
 
 
@@ -1181,4 +1209,5 @@ def send_city_sparring_email(
         },
         recipient=email,
         category="other",
+        event_key="sparring.published",
     )

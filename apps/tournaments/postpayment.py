@@ -14,10 +14,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.telegram_notify import notify_tournament_postpayment_window_opened
+from apps.notifications.services import create_notification
 from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
 from apps.subscriptions.models import FancoinTransaction
 from apps.telegram_bot.notifications import send_to_user_by_user
-from apps.users.models import Notification
 
 from .cancel import cancel_tournament
 from .models import (
@@ -369,14 +369,17 @@ def _send_fancoin_settled_notification(
         f"Остаток FT: {balance}\n\n"
         f"Страница турнира: {tournament_url}"
     )
-    send_to_user_by_user(user, text, skip_email=True)
-    Notification.objects.create(
+    send_to_user_by_user(
+        user, text, skip_email=True, event_key="tournament.fancoin_paid"
+    )
+    create_notification(
         user=user,
         message=(
             f"Участие в «{tournament.name}» подтверждено: списано "
             f"{TOURNAMENT_REGISTRATION_COST} FT. Оплата в рублях не требуется."
         ),
         url=tournament_url,
+        event_key="tournament.fancoin_paid",
     )
     try:
         from apps.core.email_service import (
@@ -752,11 +755,14 @@ def _send_postpayment_opened_notification(
         f"Оплатить до: {due_local}\n\n"
         f"Ссылка на оплату: {payment_url}"
     )
-    send_to_user_by_user(invoice.user, text, skip_email=True)
-    Notification.objects.create(
+    send_to_user_by_user(
+        invoice.user, text, skip_email=True, event_key="tournament.payment_opened"
+    )
+    create_notification(
         user=invoice.user,
         message=(f"Оплатите участие в турнире «{tournament.name}» до {due_local}."),
         url=payment_url,
+        event_key="tournament.payment_opened",
     )
     try:
         from apps.core.email_service import send_tournament_postpayment_opened_email
@@ -810,14 +816,17 @@ def resend_postpayment_payment_link(
         f"Оплатить до: {due_local}\n\n"
         f"Ссылка на оплату: {payment_url}"
     )
-    send_to_user_by_user(invoice.user, text, skip_email=True)
-    Notification.objects.create(
+    send_to_user_by_user(
+        invoice.user, text, skip_email=True, event_key="tournament.payment_link"
+    )
+    create_notification(
         user=invoice.user,
         message=(
             f"Напоминание: оплатите участие в турнире «{tournament.name}» "
             f"до {due_local}."
         ),
         url=payment_url,
+        event_key="tournament.payment_link",
     )
     email_ok = False
     try:
@@ -1119,14 +1128,17 @@ def send_1h_reminders() -> int:
             f"До конца срока оплаты турнира «{invoice.tournament.name}» остался 1 час.\n"
             f"Ссылка: {payment_url}"
         )
-        send_to_user_by_user(invoice.user, text, skip_email=True)
-        Notification.objects.create(
+        send_to_user_by_user(
+            invoice.user, text, skip_email=True, event_key="tournament.payment_reminder"
+        )
+        create_notification(
             user=invoice.user,
             message=(
                 f"Напоминание: до оплаты турнира «{invoice.tournament.name}» "
                 f"остался 1 час (до {due_local})."
             ),
             url=payment_url,
+            event_key="tournament.payment_reminder",
         )
         try:
             from apps.core.email_service import (
@@ -1185,6 +1197,7 @@ def _remove_unpaid_players(tournament: Tournament) -> int:
         send_to_user_by_user(
             user,
             f"⚠️ Вы удалены из турнира «{tournament.name}» из-за неоплаты вступительного взноса в установленный срок.",
+            event_key="tournament.unpaid_removed",
         )
     return len(removed_user_ids)
 

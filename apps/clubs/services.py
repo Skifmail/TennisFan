@@ -15,11 +15,11 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.text_search import filter_field_contains_ci
+from apps.notifications.services import create_notification
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
 
-from apps.users.models import Notification
 
 from .models import (
     Club,
@@ -455,10 +455,11 @@ def approve_club_join_request(
         )
 
     if not already_active:
-        Notification.objects.create(
+        create_notification(
             user=locked.user,
             message=f"Ваша заявка на вступление в клуб «{club.name}» одобрена.",
             url=reverse("clubs:club_public_detail", kwargs={"slug": club.slug}),
+            event_key="club.join_approved",
         )
         try:
             send_new_member_notification(club, member, dashboard_url=dashboard_url)
@@ -505,10 +506,11 @@ def reject_club_join_request(
             update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"]
         )
 
-    Notification.objects.create(
+    create_notification(
         user=locked.user,
         message=f"Ваша заявка на вступление в клуб «{locked.club.name}» отклонена.",
         url=reverse("clubs:club_public_detail", kwargs={"slug": locked.club.slug}),
+        event_key="club.join_rejected",
     )
     join_request.status = locked.status
     join_request.reviewed_by = locked.reviewed_by

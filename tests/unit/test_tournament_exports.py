@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from typing import cast
 
 from django.conf import settings
+from django.core.exceptions import DisallowedHost
 from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
@@ -39,12 +40,12 @@ from apps.tournaments.models import Match, Tournament, TournamentFormat
 from tests.support.factories import make_club, make_player, make_tournament, make_user
 
 
-def _titles(tournament) -> list[str]:
+def _titles(tournament: Tournament) -> list[str]:
     """Заголовки разделов положения."""
     return [section.title for section in build_regulation_context(tournament).sections]
 
 
-def _row_map(tournament, title: str) -> dict[str, str]:
+def _row_map(tournament: Tournament, title: str) -> dict[str, str]:
     """Строки одного раздела положения."""
     for section in build_regulation_context(tournament).sections:
         if section.title == title:
@@ -541,8 +542,22 @@ def _club_tournament(logo: object) -> Tournament:
     )
 
 
+@override_settings(ALLOWED_HOSTS=["tennisfan.ru", "tennistop.ru", "testserver"])
 class DocumentLogoTestCase(SimpleTestCase):
     """В шапке документа — знак платформы или логотип клуба."""
+
+    def test_request_when_brand_host_is_used_should_accept_explicit_host(self) -> None:
+        """Проверяет разрешение обоих доменов в изолированной настройке класса."""
+        for host in ("tennisfan.ru", "tennistop.ru"):
+            with self.subTest(host=host):
+                request = RequestFactory().get("/", HTTP_HOST=host)
+                self.assertEqual(request.get_host(), host)
+
+    def test_request_when_host_is_unrelated_should_raise_disallowed_host(self) -> None:
+        """Проверяет отказ постороннему домену без отключения проверки Host."""
+        request = RequestFactory().get("/", HTTP_HOST="untrusted.invalid")
+        with self.assertRaises(DisallowedHost):
+            request.get_host()
 
     def test_platform_tournament_uses_site_logo(self) -> None:
         tournament = cast(
@@ -554,7 +569,6 @@ class DocumentLogoTestCase(SimpleTestCase):
         self.assertTrue(logos[0].content.startswith(b"\x89PNG"))
         self.assertTrue(logos[0].data_uri.startswith("data:image/png;base64,"))
 
-    @override_settings(ALLOWED_HOSTS=["tennisfan.ru", "tennistop.ru", "testserver"])
     def test_platform_logo_follows_download_host(self) -> None:
         """Знак платформы в шапке — TennisFan или TennisTop, по домену запроса."""
         tournament = cast(

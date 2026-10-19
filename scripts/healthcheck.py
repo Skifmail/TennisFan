@@ -18,7 +18,7 @@ def check_health(port: int) -> bool:
     """Проверяет готовность локального HTTP-процесса и его зависимостей.
 
     Args:
-        port: Внутренний порт Gunicorn либо Daphne.
+        port: Внутренний порт Gunicorn либо ASGI-сервера Uvicorn.
 
     Returns:
         Истина, только если процесс вернул успешный результат readiness.

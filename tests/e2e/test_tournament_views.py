@@ -10,6 +10,8 @@ from django.utils import timezone
 from apps.clubs.models import (
     Club,
 )
+from apps.core.geo import GeoRegion
+from apps.core.models import GeoArea
 from apps.tournaments.models import (
     Match,
     Tournament,
@@ -253,6 +255,15 @@ class TournamentListCardStateTestCase(TestCase):
         self.assertContains(response, 'class="tournaments-filters__count"')
 
     def test_tournament_list_shows_area_filter_after_region(self) -> None:
+        """Выбранный регион показывает район из явно подготовленного справочника."""
+        GeoArea.objects.update_or_create(
+            slug="sever",
+            defaults={
+                "region": GeoRegion.MOSCOW,
+                "name": "Север",
+                "is_active": True,
+            },
+        )
         response = self.client.get(
             reverse("tournament_list"),
             {"region": "moscow"},

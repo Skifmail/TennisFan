@@ -9,6 +9,7 @@ from apps.chat.consent import accept_chat_consent, build_consent_form
 from apps.chat.domain import ChatConsentVersionError, ChatValidationError
 from apps.chat.invitations import preview_invitation
 from apps.chat.models import ChatArchive, ChatMembership, ChatRoom
+from apps.core.localities import SettlementType
 from apps.core.models import City, LegalAcceptanceLog
 from tests.support.factories import make_user
 
@@ -132,7 +133,9 @@ def test_custom_room_when_no_city_or_title_should_fail_validation() -> None:
     """Модель запрещает безымянные комнаты и переименование городского сообщества."""
     with pytest.raises(ValidationError):
         ChatRoom().full_clean()
-    city = City.objects.create(name="Москва")
+    city, _ = City.objects.get_or_create(
+        name="Москва", region="", settlement_type=SettlementType.CITY
+    )
     with pytest.raises(ValidationError):
         ChatRoom(city=city, title="Не Москва").full_clean()
 

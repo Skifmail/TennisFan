@@ -94,7 +94,8 @@ services:
       timeout: 10s
       start_period: 60s
       retries: 3
-    entrypoint: ["daphne", "-b", "0.0.0.0", "-p", "8001", "--proxy-headers", "--ping-interval", "20", "--ping-timeout", "30", "config.asgi:application"]
+    # Заголовкам доверяем только за закрытым Docker-прокси: порт не публикуется.
+    entrypoint: ["uvicorn", "config.asgi:application", "--host", "0.0.0.0", "--port", "8001", "--proxy-headers", "--forwarded-allow-ips", "*", "--ws", "websockets-sansio", "--ws-ping-interval", "20", "--ws-ping-timeout", "30", "--lifespan", "off", "--timeout-graceful-shutdown", "30"]
     environment:
       <<: *app-env
       CONN_MAX_AGE: "0"

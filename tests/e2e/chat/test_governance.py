@@ -4,6 +4,7 @@ import json
 from os import environ
 from pathlib import Path
 from time import sleep
+from typing import Final
 
 import pytest
 
@@ -13,11 +14,24 @@ pytestmark = pytest.mark.skipif(
     not environ.get("CHAT_E2E_URL"), reason="Нужен изолированный стенд"
 )
 
+INITIAL_HISTORY_DELAY_MS: Final = 1500
 
-def test_governance_when_city_created_and_transferred_should_update_permissions() -> (
-    None
-):
-    """Игрок создаёт чат, назначает помощника и передаёт управление без прав платформы."""
+
+@pytest.mark.parametrize(
+    "history_delay_ms",
+    [
+        pytest.param(0, id="normal-history"),
+        pytest.param(INITIAL_HISTORY_DELAY_MS, id="delayed-history"),
+    ],
+)
+def test_governance_when_city_created_and_transferred_should_update_permissions(
+    history_delay_ms: int,
+) -> None:
+    """Проверяет управление сообществом, в том числе при медленной загрузке истории.
+
+    Args:
+        history_delay_ms: Задержка первого ответа истории только в браузере участника.
+    """
     from playwright.sync_api import expect, sync_playwright
 
     sessions = json.loads(Path(environ["CHAT_E2E_SESSION_FILE"]).read_text())
@@ -40,6 +54,26 @@ def test_governance_when_city_created_and_transferred_should_update_permissions(
                 ]
             )
         creator, participant = (context.new_page() for context in contexts)
+        history_delay_script = """
+            (() => {
+                const delay = DELAY_MS;
+                if (!delay) return;
+                const nativeFetch = window.fetch.bind(window);
+                let firstHistory = true;
+                window.fetch = async (...args) => {
+                    const response = await nativeFetch(...args);
+                    const path = new URL(response.url, location.href).pathname;
+                    if (firstHistory && path.startsWith('/chats/api/rooms/') && path.endsWith('/history/')) {
+                        firstHistory = false;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                    return response;
+                };
+            })();
+        """
+        participant.add_init_script(
+            history_delay_script.replace("DELAY_MS", str(history_delay_ms))
+        )
         try:
             creator.goto(base + "/chats/?q=" + sessions["creation_city_name"])
             creator.get_by_role("link", name="Создать чат", exact=True).click()
@@ -56,6 +90,7 @@ def test_governance_when_city_created_and_transferred_should_update_permissions(
             # Те же игроки используются другими сценариями: соблюдаем общий антиспам.
             sleep(MESSAGE_INTERVAL_SECONDS + 1)
             creator.locator("#chat-text").fill("Добро пожаловать в наше сообщество!")
+            expect(creator.locator("#chat-send")).to_be_enabled()
             creator.locator("#chat-text").press("Enter")
             owner_badge = creator.locator(
                 '.city-chat-message[data-own="true"] .chat-moderator-badge'
@@ -76,8 +111,21 @@ def test_governance_when_city_created_and_transferred_should_update_permissions(
                 participant.locator(f'input[name="{name}"]').check()
             participant.get_by_role("button", name="Подтвердить и вступить").click()
             participant.wait_for_url(room_url)
-            participant.locator("#chat-text").fill("Помогу следить за порядком")
+            expect(participant.locator("#chat-status")).to_have_text("На связи")
+            participant_message = "Помогу следить за порядком"
+            participant.locator("#chat-text").fill(participant_message)
+            expect(participant.locator("#chat-send")).to_be_enabled()
             participant.locator("#chat-text").press("Enter")
+            expect(
+                participant.locator(
+                    '.city-chat-message[data-own="true"] .city-chat-message-text'
+                ).last
+            ).to_have_text(participant_message)
+            expect(
+                creator.locator(".city-chat-message-text").filter(
+                    has_text=participant_message
+                )
+            ).to_have_count(1)
             creator.locator("#chat-info").click()
             creator.get_by_role("link", name="Управление участниками").click()
             creator.get_by_role(

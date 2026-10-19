@@ -7,9 +7,8 @@ from uuid import uuid4
 
 import pytest
 from django.db import IntegrityError
-from django.test import Client
+from django.test import Client, override_settings
 from django.urls import reverse
-from pytest_django.fixtures import SettingsWrapper
 from pytest_mock import MockerFixture
 
 from apps.chat import services
@@ -875,36 +874,36 @@ def test_settings_when_unchecked_post_not_confirmed_should_not_silently_revoke(
 
 
 def test_photo_when_profile_file_uploaded_should_reach_chat_history_unchanged(
-    client: Client, tmp_path: Path, settings: "SettingsWrapper"
+    client: Client, tmp_path: Path
 ) -> None:
     """История отдаёт URL настоящего файла аватара из профиля, а не иной источник.
 
     Args:
         client: Авторизованный клиент игрока.
         tmp_path: Изолированное хранилище файлов теста.
-        settings: Временные настройки локального файлового хранилища.
     """
     from django.core.files.base import ContentFile
 
-    settings.MEDIA_ROOT = tmp_path
-    user = make_user(email="chat-real-avatar@test.local")
-    player = Player.objects.create(user=user)
-    fixture = (
-        Path(__file__).resolve().parents[3] / "static/images/chat/moderator-badge.png"
-    )
-    player.avatar.save(
-        "chat-profile-fixture.png", ContentFile(fixture.read_bytes()), save=True
-    )
-    assert Path(player.avatar.path).is_file()
-    city = City.objects.create(name="Город файла профиля")
-    member = _accept(user, city, _submission(user, city, show_avatar="on"))
-    services.send_message(
-        user=user, room_id=member.room_id, text="Фото из профиля", client_id=uuid4()
-    )
-    client.force_login(user)
-    response = client.get(reverse("chat:history", args=[member.room_id]))
-    assert response.status_code == 200
-    assert response.json()["messages"][-1]["avatar"] == player.avatar.url
+    with override_settings(MEDIA_ROOT=tmp_path):
+        user = make_user(email="chat-real-avatar@test.local")
+        player = Player.objects.create(user=user)
+        fixture = (
+            Path(__file__).resolve().parents[3]
+            / "static/images/chat/moderator-badge.png"
+        )
+        player.avatar.save(
+            "chat-profile-fixture.png", ContentFile(fixture.read_bytes()), save=True
+        )
+        assert Path(player.avatar.path).is_file()
+        city = City.objects.create(name="Город файла профиля")
+        member = _accept(user, city, _submission(user, city, show_avatar="on"))
+        services.send_message(
+            user=user, room_id=member.room_id, text="Фото из профиля", client_id=uuid4()
+        )
+        client.force_login(user)
+        response = client.get(reverse("chat:history", args=[member.room_id]))
+        assert response.status_code == 200
+        assert response.json()["messages"][-1]["avatar"] == player.avatar.url
 
 
 def test_settings_when_saved_state_submitted_should_reference_previous_confirmation(

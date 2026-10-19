@@ -15,6 +15,7 @@ from apps.chat.models import (
     ChatMembership,
     ChatRoom,
 )
+from apps.core.localities import SettlementType
 from apps.core.models import City
 from apps.users.models import Notification, Player, User
 from tests.support.chat_legal import join_city_with_consent
@@ -24,13 +25,46 @@ pytestmark = pytest.mark.django_db
 
 
 def _community() -> tuple[User, ChatRoom]:
+    """Создаёт сообщество на основе точной записи города из справочника.
+
+    Returns:
+        Владелец и комната, не изменяющие существующие координаты города.
+    """
     owner = make_user(email="invite-owner@test.local", first_name="Администратор")
-    room = join_city_with_consent(
-        user=owner, city_id=City.objects.create(name="Казань").pk
+    city, _ = City.objects.get_or_create(
+        name="Казань", region="", settlement_type=SettlementType.CITY
     )
+    room = join_city_with_consent(user=owner, city_id=city.pk)
     room.administrator = owner
     room.save(update_fields=["administrator"])
     return owner, room
+
+
+@pytest.mark.parametrize("has_namesake", [False, True])
+def test_community_when_seed_city_exists_should_reuse_without_mutating_coordinates(
+    has_namesake: bool,
+) -> None:
+    """Заготовка сохраняет город с нужным регионом и типом, даже при тёзке.
+
+    Args:
+        has_namesake: Добавить одноимённый населённый пункт в другом регионе.
+    """
+    city, _ = City.objects.get_or_create(
+        name="Казань", region="", settlement_type=SettlementType.CITY
+    )
+    if has_namesake:
+        City.objects.create(
+            name="Казань", region="Другой регион", settlement_type=SettlementType.CITY
+        )
+    original_coordinates = (city.lat, city.lng)
+    original_count = City.objects.count()
+
+    _, room = _community()
+
+    city.refresh_from_db()
+    assert room.city_id == city.pk
+    assert City.objects.count() == original_count
+    assert (city.lat, city.lng) == original_coordinates
 
 
 def _queue(

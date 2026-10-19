@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import models, transaction
-from django.db.models import Count, Min, Prefetch, Q
+from django.db.models import Count, Min, Prefetch, Q, prefetch_related_objects
 from django.db.models.functions import Lower
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
@@ -51,6 +51,7 @@ from apps.core.text_search import filter_field_contains_ci
 from apps.notifications.services import create_notification
 from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
 from apps.subscriptions.models import FancoinTransaction
+from apps.tournaments.local_feed import rank_tournaments_near_player
 from apps.users.models import Player, SkillLevel
 
 from .cancel import (
@@ -463,10 +464,30 @@ def tournament_list(
         tournaments = tournaments.filter(club__slug=club_filter)
 
     tournaments = order_tournaments_active_first(tournaments)
-    paginator = Paginator(tournaments, 20)
+    viewer = (
+        getattr(request.user, "player", None) if request.user.is_authenticated else None
+    )
+    viewer_city = (getattr(viewer, "city", "") or "").strip()
+    group_by_proximity = bool(viewer_city) and not archive
+    ordered_tournaments = (
+        rank_tournaments_near_player(
+            tournaments.prefetch_related(None), viewer_city=viewer_city
+        )
+        if group_by_proximity
+        else tournaments
+    )
+    paginator = Paginator(ordered_tournaments, 20)
     page_number = request.GET.get("page")
     tournaments_page = paginator.get_page(page_number)
     tournaments_page_list = list(tournaments_page.object_list)
+    if group_by_proximity:
+        prefetch_related_objects(
+            tournaments_page_list,
+            "participants__user",
+            "allowed_categories",
+            "teams__player1__user",
+            "teams__player2__user",
+        )
 
     current_player = None
     pending_join_club_ids: set[int] = set()
@@ -650,6 +671,8 @@ def tournament_list(
     context = {
         "tournaments": tournaments_page_list,
         "tournaments_page": tournaments_page,
+        "group_by_proximity": group_by_proximity,
+        "viewer_city": viewer_city,
         "current_city": city,
         "current_category": category,
         "current_status": status,

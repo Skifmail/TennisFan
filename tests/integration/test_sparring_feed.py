@@ -1,6 +1,5 @@
 """Общая лента спаррингов: свой город, расстояние и выбор формата."""
 
-from collections.abc import Iterator
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -17,32 +16,9 @@ from apps.sparring.models import (
     SparringRequest,
 )
 from apps.users.models import Player
-from tests.support.factories import make_player
 
 pytestmark = pytest.mark.django_db
-
-
-@pytest.fixture
-def viewer(client: Client) -> Iterator[Player]:
-    """Создаёт зрителя и города с известным порядком расстояний.
-
-    Args:
-        client: Тестовый HTTP-клиент.
-
-    Yields:
-        Игрок, авторизованный в клиенте.
-    """
-    for name, lat, lng in [
-        ("Точка старта", 55.5, 38.2),
-        ("Ближний город", 55.6, 38.3),
-        ("Дальний город", 43.5, 39.7),
-    ]:
-        City.objects.create(name=name, lat=lat, lng=lng)
-    player = make_player(email_suffix="feed-viewer")
-    Player.objects.filter(pk=player.pk).update(city="Точка старта")
-    player.refresh_from_db()
-    client.force_login(player.user)
-    yield player
+pytest_plugins = ("tests.support.sparring_feed_fixtures",)
 
 
 def _single(player: Player, city: str, description: str = "Заявка") -> SparringRequest:
@@ -334,4 +310,4 @@ def test_feed_when_switching_to_all_should_keep_strength_filter(
         secure=True,
     )
     assert response.context["selected_level"] == "experienced"
-    assert "&amp;level=experienced" in response.content.decode()
+    assert 'name="level" value="experienced"' in response.content.decode()

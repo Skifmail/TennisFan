@@ -69,6 +69,10 @@
 
             <p class="tournament-card__line tournament-card__line--meta tournament-card__meta-line">
                 <span>{{ tournament.city }}</span>
+                {% if group_by_proximity and not tournament.is_local and tournament.distance_km != None %}
+                <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
+                <span>≈ {{ tournament.distance_km|floatformat:0 }} км от вас</span>
+                {% endif %}
                 {% if tournament.court %}
                 <span class="tournament-card__meta-sep" aria-hidden="true">•</span>
                 <a href="{% url 'court_detail' slug=tournament.court.slug %}" class="tournament-card__meta-link" title="{{ tournament.court.address }}">{{ tournament.court.name }}</a>

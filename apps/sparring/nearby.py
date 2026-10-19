@@ -4,11 +4,11 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 from django.db.models import Q, QuerySet
 
+from apps.core.distances import haversine_km as haversine_km
 from apps.core.localities import locality_tokens, strip_settlement_prefix
 from apps.core.models import City
 from apps.users.models import Player
@@ -25,19 +25,6 @@ class NearbyPlace:
     lat: float
     lng: float
     distance_km: float
-
-
-def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-    """Расстояние между двумя точками по поверхности Земли, в километрах."""
-    radius = 6371.0
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    d_phi = math.radians(lat2 - lat1)
-    d_lng = math.radians(lng2 - lng1)
-    a = (
-        math.sin(d_phi / 2) ** 2
-        + math.cos(phi1) * math.cos(phi2) * math.sin(d_lng / 2) ** 2
-    )
-    return radius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 def coordinates_for_locality(name: str) -> tuple[float, float] | None:

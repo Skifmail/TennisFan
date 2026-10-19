@@ -128,6 +128,26 @@
             </div>
         </form>
 
+        {% if group_by_proximity %}
+            {% if tournaments_page.number == 1 and not tournaments.0.is_local %}
+            <section class="tournaments-local-section">
+                <header class="tournaments-local-section__heading"><h2>Рядом с вами</h2><span>{{ viewer_city }}</span></header>
+                <p class="text-secondary">В вашем населённом пункте подходящих турниров пока нет.</p>
+            </section>
+            {% endif %}
+            {% regroup tournaments by is_local as tournament_sections %}
+            {% for section in tournament_sections %}
+            <section class="tournaments-local-section{% if not section.grouper %} tournaments-local-section--other{% endif %}" aria-labelledby="tournaments-local-title-{{ forloop.counter }}">
+                <header class="tournaments-local-section__heading"><h2 id="tournaments-local-title-{{ forloop.counter }}">{% if section.grouper %}Рядом с вами{% else %}В других городах{% endif %}</h2>{% if section.grouper %}<span>{{ viewer_city }}</span>{% endif %}</header>
+                <div class="tournament-list">
+                    {% for tournament in section.list %}
+                        {% include 'includes/tournament_card.html' with tournament=tournament %}
+                    {% endfor %}
+                </div>
+            </section>
+            {% endfor %}
+            {% if not tournaments %}<p class="text-secondary">Турниры не найдены.</p>{% endif %}
+        {% else %}
         <div class="tournament-list">
             {% for tournament in tournaments %}
                 {% include 'includes/tournament_card.html' with tournament=tournament %}
@@ -135,6 +155,7 @@
             <p class="text-secondary">{% if is_archive %}Завершённые турниры не найдены.{% else %}Турниры не найдены.{% endif %}</p>
             {% endfor %}
         </div>
+        {% endif %}
         {% if tournaments_page and tournaments_page.paginator.num_pages > 1 %}
         <div class="pagination pagination--center">
             <ul class="pagination__list">
@@ -143,7 +164,7 @@
                     <li class="pagination__item pagination__item--active"><span>{{ page_num }}</span></li>
                     {% else %}
                     <li class="pagination__item">
-                        <a href="?page={{ page_num }}{% if current_region %}&region={{ current_region }}{% endif %}{% if current_area %}&area={{ current_area }}{% endif %}{% if current_variant %}&variant={{ current_variant }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_sport %}&sport={{ current_sport }}{% endif %}{% if current_status and not is_archive %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
+                        <a href="?page={{ page_num }}{% if current_region %}&region={{ current_region }}{% endif %}{% if current_area %}&area={{ current_area }}{% endif %}{% if current_variant %}&variant={{ current_variant }}{% endif %}{% if current_city %}&city={{ current_city|urlencode }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_sport %}&sport={{ current_sport }}{% endif %}{% if current_status and not is_archive %}&status={{ current_status }}{% endif %}{% if list_club_filter %}&club={{ list_club_filter }}{% endif %}">{{ page_num }}</a>
                     </li>
                     {% endif %}
                 {% endfor %}

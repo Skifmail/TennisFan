@@ -84,106 +84,6 @@
 }
 
 /* Первая строка — вид спорта и формат, вторая — поля и действия. */
-.sparring-toolbar__panel:has(.sparring-toolbar__filters) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.55rem;
-    padding: 0.55rem 0.7rem 0.65rem;
-    margin-bottom: var(--spacing-lg);
-}
-
-.sparring-toolbar__modes {
-    display: flex;
-    align-items: stretch;
-    gap: 0.4rem;
-    width: 100%;
-}
-
-.sparring-toolbar__modes .sparring-tabs {
-    display: flex;
-    align-items: stretch;
-    gap: 0.35rem;
-    margin: 0;
-    padding: 0;
-    background: transparent;
-    width: auto;
-}
-
-.sparring-toolbar__modes .sparring-tabs:first-child {
-    flex: 2 1 0;
-}
-
-.sparring-toolbar__modes .sparring-tabs:last-child {
-    flex: 3 1 0;
-}
-
-.sparring-toolbar__modes .sparring-tab {
-    flex: 1 1 0;
-    justify-content: center;
-    min-height: 2.15rem;
-    padding: 0.2rem 0.65rem;
-    border: 1px solid rgb(166 130 74 / 45%);
-    border-radius: 999px;
-    box-shadow: none;
-    text-align: center;
-    white-space: nowrap;
-}
-
-.sparring-toolbar__modes .sparring-tab--active,
-.sparring-toolbar__modes .sparring-tab--active:hover {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    box-shadow: none;
-    color: var(--color-bg, #012b1c);
-}
-
-.sparring-toolbar__row {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.45rem;
-    width: 100%;
-}
-
-.sparring-toolbar__panel .sparring-toolbar__filters.filter-bar {
-    flex: 1 1 auto;
-    width: auto;
-    max-width: none;
-    min-width: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-    align-items: center;
-    margin-bottom: 0;
-    padding: 0;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    gap: 0.45rem;
-}
-
-.sparring-toolbar__panel .sparring-toolbar__filters.filter-bar .form-control {
-    flex: none;
-    min-width: 0;
-    width: 100%;
-    height: 2.15rem;
-    min-height: 2.15rem;
-    max-height: 2.15rem;
-    padding: 0 0.85rem;
-    border-radius: 999px;
-    font-size: 0.875rem;
-    line-height: 1.2;
-    box-sizing: border-box;
-}
-
-.sparring-toolbar__panel .sparring-toolbar__filters.filter-bar select.form-control {
-    padding-right: 2.25rem;
-}
-
-.sparring-filters {
-    flex: 1;
-    margin-bottom: 0;
-    min-width: 0;
-}
 
 .sparring-toolbar__actions {
     display: flex;
@@ -193,33 +93,6 @@
     gap: 0.45rem;
     flex: 1 1 auto;
     width: 100%;
-}
-
-.sparring-toolbar__panel:has(.sparring-toolbar__filters) .sparring-toolbar__actions {
-    width: 100%;
-    flex: 1 1 auto;
-    margin-left: 0;
-    padding-top: 0;
-    border-top: none;
-    gap: 0.45rem;
-}
-
-.sparring-toolbar__action-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.45rem;
-    width: 100%;
-}
-
-.sparring-toolbar__panel .sparring-toolbar__action-grid .sparring-toolbar__btn {
-    width: 100%;
-    max-width: none;
-    height: auto;
-    min-height: 2.15rem;
-    max-height: none;
-    white-space: normal;
-    text-align: center;
-    padding: 0.35rem 0.55rem;
 }
 
 .sparring-toolbar__panel .sparring-toolbar__btn {
@@ -634,23 +507,6 @@ img.player-avatar.sparring-card__avatar {
 }
 
 @media (width <= 1200px) {
-    .sparring-toolbar__row {
-        flex-wrap: wrap;
-    }
-
-    .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar {
-        flex: 1 1 100%;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-    }
-
-    .sparring-toolbar__panel:has(.sparring-toolbar__filters) .sparring-toolbar__actions {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        width: 100%;
-        justify-content: flex-start;
-    }
-
     .sparring-toolbar__actions .sparring-toolbar__btn {
         width: auto;
         flex: 0 0 auto;
@@ -672,56 +528,6 @@ img.player-avatar.sparring-card__avatar {
     .sparring-toolbar__panel {
         flex-direction: column;
         align-items: stretch;
-    }
-
-    .sparring-toolbar__modes {
-        display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-    }
-
-    .sparring-toolbar__modes .sparring-tabs {
-        display: contents;
-    }
-
-    .sparring-toolbar__modes .sparring-tabs:first-child .sparring-tab {
-        grid-column: span 3;
-    }
-
-    .sparring-toolbar__modes .sparring-tabs:last-child .sparring-tab {
-        grid-column: span 3;
-    }
-
-    .sparring-toolbar__modes .sparring-tab {
-        min-width: 0;
-        padding: 0.28rem 0.35rem;
-        font-size: 0.72rem;
-        white-space: normal;
-    }
-
-    .sparring-toolbar__row {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.4rem;
-    }
-
-    .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar {
-        width: 100%;
-        max-width: none;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .sparring-toolbar__panel .sparring-toolbar__filters.filter-bar .sparring-location-filter {
-        grid-column: 1 / -1;
-    }
-
-    .sparring-toolbar__panel:has(.sparring-toolbar__filters) .sparring-toolbar__actions {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        width: 100%;
-        margin-left: 0;
-        justify-content: flex-start;
     }
 
     .sparring-toolbar__actions .sparring-toolbar__btn {
@@ -1312,57 +1118,6 @@ img.player-avatar.sparring-card__avatar {
     font-variant-numeric: tabular-nums;
 }
 
-/* Необязательный радиус не занимает отдельную строку панели. */
-.sparring-location-filter {
-    position: relative;
-    min-width: 0;
-}
-
-.sparring-toolbar__panel .sparring-location-filter input.form-control {
-    padding-right: 6rem;
-}
-
-.sparring-radius {
-    position: absolute;
-    inset: 0 0 auto auto;
-    z-index: 5;
-}
-
-.sparring-radius summary {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.3rem;
-    min-width: 5.5rem;
-    height: 2.15rem;
-    padding-inline: 0.65rem;
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    color: var(--color-text);
-    background: var(--color-bg);
-    font-size: 0.8rem;
-    font-variant-numeric: tabular-nums;
-    cursor: pointer;
-    list-style: none;
-}
-
-.sparring-radius summary::-webkit-details-marker {
-    display: none;
-}
-
-.sparring-radius summary::after {
-    content: "⌄";
-}
-
-.sparring-radius[open] summary::after {
-    transform: rotate(180deg);
-}
-
-.sparring-radius--active summary {
-    color: var(--color-bg);
-    background: var(--color-primary);
-}
-
 .sparring-radius__menu {
     position: absolute;
     top: calc(100% + 0.4rem);
@@ -1403,8 +1158,178 @@ img.player-avatar.sparring-card__avatar {
     background: var(--color-primary);
 }
 
-.sparring-radius summary:focus-visible,
 .sparring-radius__menu a:focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
+}
+
+/* Компактная панель: спорт и форматы в одном ряду, дополнительные действия скрыты. */
+.sparring-compact {
+    position: relative;
+    z-index: 6;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding: 0.65rem;
+    margin-bottom: var(--spacing-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+}
+
+.sparring-compact__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.35fr;
+    gap: 0.4rem;
+    flex: 1 1 20rem;
+    min-width: 0;
+}
+
+.sparring-compact__actions {
+    display: grid;
+    grid-template-columns: 1fr 0.75fr 1.5fr;
+    gap: 0.4rem;
+    flex: 0 1 24rem;
+    min-width: 0;
+}
+
+.sparring-compact__control,
+.sparring-compact__primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    width: 100%;
+    min-width: 0;
+    min-height: 2.25rem;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid rgb(166 130 74 / 60%);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-text);
+    font-size: 0.82rem;
+    line-height: 1.2;
+    list-style: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.sparring-compact__control::-webkit-details-marker {
+    display: none;
+}
+
+summary.sparring-compact__control::after {
+    content: "⌄";
+}
+
+.sparring-compact__control.is-active,
+.sparring-compact__primary,
+.sparring-compact__apply {
+    background: var(--color-primary);
+    color: var(--color-bg);
+}
+
+.sparring-compact__popover {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    z-index: 25;
+    display: grid;
+    gap: 0.75rem;
+    width: min(26rem, 100%);
+    margin: 0;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+    box-shadow: 0 0.6rem 1.5rem rgb(0 20 12 / 40%);
+}
+
+.sparring-compact__check {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.5rem;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.sparring-compact__check input {
+    width: 1.15rem;
+    height: 1.15rem;
+    accent-color: var(--color-primary);
+}
+
+.sparring-compact__filter-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sparring-compact__filter-form label {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 0;
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+}
+
+.sparring-compact__filter-form .form-control {
+    width: 100%;
+    min-width: 0;
+    font-size: 0.9rem;
+}
+
+.sparring-compact__wide,
+.sparring-compact__apply {
+    grid-column: 1 / -1;
+}
+
+.sparring-compact__apply {
+    min-height: 2.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.sparring-compact__personal a {
+    padding-block: 0.5rem;
+    border-bottom: 1px solid rgb(166 130 74 / 25%);
+}
+
+.sparring-compact__hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+}
+
+.sparring-compact__badge {
+    min-width: 1.2rem;
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: var(--color-bg);
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+.sparring-compact a:focus-visible,
+.sparring-compact summary:focus-visible,
+.sparring-compact button:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+
+.sparring-compact__control:hover {
+    border-color: var(--color-text);
+}
+
+@media (width <= 640px) {
+    .sparring-compact__row,
+    .sparring-compact__actions {
+        flex-basis: 100%;
+    }
+}
+
+.sparring-compact details:not([open]) > .sparring-compact__popover {
+    display: none;
 }

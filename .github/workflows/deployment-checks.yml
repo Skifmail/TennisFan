@@ -111,7 +111,7 @@ jobs:
               raise SystemExit('ASGI readiness timed out')
           PY
           done
-          CHAT_E2E_URL=http://127.0.0.1:18765 CHAT_E2E_SECOND_URL=http://127.0.0.1:18766 CHAT_E2E_SESSION_FILE=/tmp/chat-ci-sessions.json venv/bin/pytest tests/e2e/chat tests/e2e/test_sparring_toolbar_browser.py tests/e2e/test_sparring_feed_browser.py --no-cov -q
+          CHAT_E2E_URL=http://127.0.0.1:18765 CHAT_E2E_SECOND_URL=http://127.0.0.1:18766 CHAT_E2E_SESSION_FILE=/tmp/chat-ci-sessions.json venv/bin/pytest tests/e2e/chat tests/e2e/test_sparring_toolbar_browser.py tests/e2e/test_sparring_feed_browser.py tests/e2e/test_tournament_local_feed_browser.py --no-cov -q
       - name: OneSignal subscription browser tests without external requests
         env:
           WEB_PUSH_BROWSER_TESTS: '1'

@@ -78,7 +78,7 @@ class NearbySparringTests(TestCase):
         self.assertNotContains(response, "Анна Море")
         self.assertNotContains(response, "Далеко")
         self.assertNotContains(response, "Олег Два")
-        invite_url = f"{reverse('sparring_invite')}?invitee={self.near_player.pk}"
+        invite_url = f"{reverse('sparring_invite')}?invitee={self.near_player.pk}\""
         self.assertNotContains(response, invite_url)
         self.assertContains(response, "Радиус")
         self.assertContains(response, "25 км")
@@ -119,7 +119,7 @@ class NearbySparringTests(TestCase):
         self.assertContains(first_page, "players_page=2")
         self.assertNotContains(
             first_page,
-            f"{reverse('sparring_invite')}?invitee={self.near_player.pk}",
+            f"{reverse('sparring_invite')}?invitee={self.near_player.pk}\"",
         )
 
         second_page = self.client.get(
@@ -172,10 +172,12 @@ class NearbySparringTests(TestCase):
     ) -> None:
         """Радиусы доступны в свёрнутом меню рядом с полем города."""
         response = self.client.get(reverse("sparring_list"), secure=True)
-        self.assertContains(response, '<details class="sparring-radius">')
-        self.assertContains(response, 'aria-label="Радиус поиска"')
-        self.assertContains(response, "nearby=10")
-        self.assertContains(response, "nearby=100")
+        self.assertContains(
+            response, '<details class="sparring-compact__filters" name="sparring-menu">'
+        )
+        self.assertContains(response, "Радиус от города профиля")
+        self.assertContains(response, 'value="10"')
+        self.assertContains(response, 'value="100"')
         self.assertContains(response, "Без ограничения")
         self.assertNotContains(response, "sparring-nearby-capsule")
         self.assertNotContains(response, 'sparring-radius" open')
@@ -191,14 +193,10 @@ class NearbySparringTests(TestCase):
             },
             secure=True,
         )
-        self.assertContains(
-            response, '<details class="sparring-radius sparring-radius--active">'
-        )
-        self.assertContains(response, "25 км</summary>")
-        self.assertContains(response, 'aria-current="true"')
-        self.assertContains(
-            response, '?sport=tennis&amp;type=team&amp;preferred_gender=male"'
-        )
+        self.assertContains(response, 'aria-label="Активных фильтров: 2"')
+        self.assertContains(response, 'value="25" selected')
+        self.assertContains(response, 'name="preferred_gender"')
+        self.assertContains(response, 'name="type" value="team"')
 
     def test_invite_page_opens_selected_nearby_player(self) -> None:
         """Клик по игроку открывает форму приглашения именно ему."""

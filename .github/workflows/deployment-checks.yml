@@ -16,7 +16,8 @@ concurrency:
 jobs:
   checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Полный PostgreSQL-прогон + оба браузерных набора должны успевать завершиться.
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:16-alpine

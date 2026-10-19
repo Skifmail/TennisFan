@@ -80,7 +80,7 @@ class NearbySparringTests(TestCase):
         self.assertNotContains(response, "Олег Два")
         invite_url = f"{reverse('sparring_invite')}?invitee={self.near_player.pk}"
         self.assertNotContains(response, invite_url)
-        self.assertContains(response, "Искать рядом")
+        self.assertContains(response, "Радиус")
         self.assertContains(response, "25 км")
         self.assertContains(response, "10 км")
         self.assertNotContains(response, "Любое расстояние")
@@ -167,18 +167,38 @@ class NearbySparringTests(TestCase):
             "",
         )
 
-    def test_nearby_button_hides_radius_until_clicked(self) -> None:
-        """Расстояния видны сразу, но не нажимаются, пока «Искать рядом» выключено."""
+    def test_radius_when_default_should_use_collapsed_menu_instead_of_full_row(
+        self,
+    ) -> None:
+        """Радиусы доступны в свёрнутом меню рядом с полем города."""
         response = self.client.get(reverse("sparring_list"), secure=True)
+        self.assertContains(response, '<details class="sparring-radius">')
+        self.assertContains(response, 'aria-label="Радиус поиска"')
+        self.assertContains(response, "nearby=10")
+        self.assertContains(response, "nearby=100")
+        self.assertContains(response, "Без ограничения")
+        self.assertNotContains(response, "sparring-nearby-capsule")
+        self.assertNotContains(response, 'sparring-radius" open')
 
-        self.assertContains(response, "Искать рядом")
-        self.assertContains(response, "nearby=25")
-        self.assertContains(response, "10 км")
-        self.assertContains(response, "sparring-nearby__radius--idle")
-        self.assertContains(response, 'aria-pressed="false"')
-        self.assertNotContains(response, "nearby=10")
-        self.assertNotContains(response, "Любое расстояние")
-        self.assertNotContains(response, "Игроки рядом")
+    def test_radius_when_active_should_show_value_and_keep_reset_link(self) -> None:
+        """Выбранный радиус заметен и снимается без потери остальных фильтров."""
+        response = self.client.get(
+            reverse("sparring_list"),
+            {
+                "nearby": "25",
+                "type": "team",
+                "preferred_gender": "male",
+            },
+            secure=True,
+        )
+        self.assertContains(
+            response, '<details class="sparring-radius sparring-radius--active">'
+        )
+        self.assertContains(response, "25 км</summary>")
+        self.assertContains(response, 'aria-current="true"')
+        self.assertContains(
+            response, '?sport=tennis&amp;type=team&amp;preferred_gender=male"'
+        )
 
     def test_invite_page_opens_selected_nearby_player(self) -> None:
         """Клик по игроку открывает форму приглашения именно ему."""

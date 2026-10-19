@@ -10,7 +10,8 @@ from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.users.models import Notification, Player
+from apps.notifications.services import create_notification
+from apps.users.models import Player
 
 from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam
 from .utils import tournament_deadline_schedule_start
@@ -1027,17 +1028,19 @@ def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
         loser_team = match.team2 if winner_team == match.team1 else match.team1
         for player in (winner_team.player1, winner_team.player2):
             if player and not getattr(player, "is_bye", False):
-                Notification.objects.create(
+                create_notification(
                     user=player.user,
                     message="Дедлайн матча истёк. Вам присуждена тех. победа.",
                     url=url,
+                    event_key="match.overdue_result",
                 )
         for player in (loser_team.player1, loser_team.player2):
             if player and not getattr(player, "is_bye", False):
-                Notification.objects.create(
+                create_notification(
                     user=player.user,
                     message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
                     url=url,
+                    event_key="match.overdue_result",
                 )
     else:
         winner_user = winner.user
@@ -1046,15 +1049,17 @@ def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
             return
         loser_user = loser.user
 
-        Notification.objects.create(
+        create_notification(
             user=winner_user,
             message="Дедлайн матча истёк. Вам присуждена тех. победа.",
             url=url,
+            event_key="match.overdue_result",
         )
-        Notification.objects.create(
+        create_notification(
             user=loser_user,
             message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
             url=url,
+            event_key="match.overdue_result",
         )
     logger.info("Round-robin overdue walkover: match %s → winner %s", match.pk, winner)
 

@@ -38,4 +38,5 @@ def send_invitation_email(invitation: ChatInvitation) -> bool:
         recipient=invitation.recipient.email,
         category="other",
         timeout_seconds=SMTP_TIMEOUT_SECONDS,
+        event_key="chat.invited",
     )

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, cast
 from django.db import transaction
 from django.utils import timezone
 
+from apps.notifications.services import create_notification
 from apps.tournaments.models import Match
 
 from .models import (
@@ -616,8 +617,6 @@ def _notify_team_sparring_ready(req: DoublesMatchRequest) -> None:
     """Уведомить автора командного спарринга о готовности команд (4 участника)."""
     from django.urls import reverse
 
-    from apps.users.models import Notification
-
     try:
         author_user = req.created_by.user
     except Exception:
@@ -630,7 +629,12 @@ def _notify_team_sparring_ready(req: DoublesMatchRequest) -> None:
                 "Командный спарринг: все заявки одобрены, команды сформированы. "
                 "Нажмите «Сформировать матчи», чтобы создать одиночные и парный матчи."
             )
-            Notification.objects.create(user=author_user, message=message, url=url)
+            create_notification(
+                user=author_user,
+                message=message,
+                url=url,
+                event_key="sparring.team_ready",
+            )
         except Exception as exc:  # pragma: no cover - защитное логирование
             logger.warning(
                 "Failed to create Notification for team sparring ready "

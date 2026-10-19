@@ -13,7 +13,12 @@ from django.contrib.auth.decorators import (
 from django.core.paginator import Paginator
 
 # pyright: ignore[reportMissingImports]
-from django.http import Http404, JsonResponse  # pyright: ignore[reportMissingImports]
+from django.http import (  # pyright: ignore[reportMissingImports]
+    Http404,
+    HttpRequest,
+    HttpResponse,
+    JsonResponse,
+)
 from django.shortcuts import (
     get_object_or_404,
     redirect,
@@ -39,7 +44,9 @@ from apps.core.decorators import require_filled_profile, require_verified_player
 from apps.core.home_city_counters import SPARRINGS_SEEN_COOKIE, mark_list_seen
 from apps.core.sports import sport_code
 from apps.core.text_search import filter_field_contains_ci
-from apps.users.models import Notification, Player
+from apps.notifications.services import create_notification
+from apps.sparring.feed import FEED_PAGE_SIZE, rank_sparring_feed
+from apps.users.models import Player
 
 from .city_notify import schedule_published_sparring_notify
 from .court_suggest import suggest_sparring_courts
@@ -76,7 +83,6 @@ from .models import (
     TeamSide,
 )
 from .nearby import (
-    NEARBY_DEFAULT_RADIUS,
     NEARBY_PLAYERS_PAGE_SIZE,
     NEARBY_RADIUS_CHOICES,
     coordinates_for_locality,
@@ -209,22 +215,28 @@ def _get_contact_url(player: Player, method: str) -> str | None:
     return None
 
 
-def sparring_list(request):
-    """Объединённый список заявок на спарринг: одиночный (1×1) и парный (2×2).
+def sparring_list(request: HttpRequest) -> HttpResponse:
+    """Показывает все форматы спаррингов с приоритетом города зрителя.
 
-    Доступен всем пользователям. Неавторизованные могут только просматривать информацию.
+    Args:
+        request: Запрос с необязательными фильтрами и номером страницы.
+
+    Returns:
+        Общая лента по десять заявок, либо выбранный формат спарринга.
     """
     from apps.core.sports import Sport, parse_sport_filter
 
     sport_filter = parse_sport_filter(request.GET.get("sport"))
-    default_type = "doubles" if sport_filter == Sport.PADEL else "singles"
-    sparring_type = request.GET.get("type", default_type)
-    if sparring_type not in ("singles", "doubles", "team"):
-        sparring_type = default_type
+    sparring_type = request.GET.get("type", "all")
+    if sparring_type not in ("all", "singles", "doubles", "team"):
+        sparring_type = "all"
 
     city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
     level = request.GET.get("level", "")
+    selected_level = category or level
+    category = selected_level
+    level = selected_level
     preferred_gender = request.GET.get("preferred_gender", "")
     has_access = user_has_sparring_access(request.user)
     nearby_radius = _nearby_radius(request.GET.get("nearby"))
@@ -260,12 +272,12 @@ def sparring_list(request):
         "current_city": city,
         "current_category": category,
         "current_level": level,
+        "selected_level": selected_level,
         "current_preferred_gender": preferred_gender,
         "has_sparring_access": has_access,
         "current_sport": sport_filter,
         "sport_choices": Sport.choices,
         "nearby_radius_choices": NEARBY_RADIUS_CHOICES,
-        "nearby_default": NEARBY_DEFAULT_RADIUS,
         "current_nearby": nearby_radius or "",
         "nearby_list": nearby_list,
         "nearby_error": nearby_error,
@@ -280,75 +292,64 @@ def sparring_list(request):
         ),
     }
 
+    singles = (
+        SparringRequest.objects.filter(
+            status=SparringRequest.Status.ACTIVE, match_type="singles"
+        )
+        .select_related("player__user__subscription__tier")
+        .prefetch_related("responses")
+    )
+    doubles = (
+        DoublesMatchRequest.objects.filter(
+            status__in=(
+                DoublesMatchRequestStatus.OPEN,
+                DoublesMatchRequestStatus.FORMING,
+                DoublesMatchRequestStatus.READY,
+            )
+        )
+        .select_related("created_by__user__subscription__tier")
+        .prefetch_related("teams__members__player__user")
+    )
+    if sparring_type not in ("all", "singles"):
+        singles = singles.none()
     if sparring_type == "singles":
-        requests_qs = (
-            SparringRequest.objects.filter(
-                status=SparringRequest.Status.ACTIVE,
-                match_type="singles",
-            )
-            .select_related(
-                "player__user",
-                "player__user__subscription",
-                "player__user__subscription__tier",
-            )
-            .prefetch_related("responses")
+        doubles = doubles.none()
+    elif sparring_type == "doubles":
+        doubles = doubles.filter(kind=DoublesMatchKind.CLASSIC)
+    elif sparring_type == "team":
+        doubles = doubles.filter(kind=DoublesMatchKind.TEAM)
+    if nearby_resolved:
+        names = [place.name for place in nearby_places]
+        singles = filter_by_locality_names(singles, names)
+        doubles = filter_by_locality_names(doubles, names)
+    elif city:
+        singles = filter_field_contains_ci(
+            singles, "city", city, annotation="_spr_req_city_l"
         )
-        if nearby_resolved:
-            requests_qs = filter_by_locality_names(
-                requests_qs, [place.name for place in nearby_places]
-            )
-        elif city:
-            requests_qs = filter_field_contains_ci(
-                requests_qs, "city", city, annotation="_spr_req_city_l"
-            )
-        if category:
-            requests_qs = requests_qs.filter(desired_category=category)
-        if preferred_gender:
-            requests_qs = requests_qs.filter(preferred_gender=preferred_gender)
-        if sport_filter != "all":
-            requests_qs = requests_qs.filter(sport=sport_filter)
-        context["sparring_requests"] = Paginator(
-            requests_qs.order_by("-created_at"),
-            20,
-        ).get_page(request.GET.get("page"))
-    else:
-        doubles_qs = (
-            DoublesMatchRequest.objects.filter(
-                status__in=(
-                    DoublesMatchRequestStatus.OPEN,
-                    DoublesMatchRequestStatus.FORMING,
-                    DoublesMatchRequestStatus.READY,
-                )
-            )
-            .select_related(
-                "created_by__user",
-                "created_by__user__subscription",
-                "created_by__user__subscription__tier",
-            )
-            .prefetch_related("teams__members__player__user")
-            .order_by("-created_at")
+        doubles = filter_field_contains_ci(
+            doubles, "city", city, annotation="_spr_dbl_city_l"
         )
-        if sparring_type == "doubles":
-            doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.CLASSIC)
-        else:
-            doubles_qs = doubles_qs.filter(kind=DoublesMatchKind.TEAM)
-        if nearby_resolved:
-            doubles_qs = filter_by_locality_names(
-                doubles_qs, [place.name for place in nearby_places]
-            )
-        elif city:
-            doubles_qs = filter_field_contains_ci(
-                doubles_qs, "city", city, annotation="_spr_dbl_city_l"
-            )
-        if level:
-            doubles_qs = doubles_qs.filter(desired_level=level)
-        if preferred_gender:
-            doubles_qs = doubles_qs.filter(preferred_gender=preferred_gender)
-        if sport_filter != "all":
-            doubles_qs = doubles_qs.filter(sport=sport_filter)
-        context["doubles_requests"] = Paginator(doubles_qs, 20).get_page(
-            request.GET.get("page")
-        )
+    if selected_level:
+        singles = singles.filter(desired_category=selected_level)
+        doubles = doubles.filter(desired_level=selected_level)
+    if preferred_gender:
+        singles = singles.filter(preferred_gender=preferred_gender)
+        doubles = doubles.filter(preferred_gender=preferred_gender)
+    if sport_filter != "all":
+        singles = singles.filter(sport=sport_filter)
+        doubles = doubles.filter(sport=sport_filter)
+    feed = rank_sparring_feed(
+        singles=singles,
+        doubles=doubles,
+        viewer_city=viewer.city if viewer is not None else "",
+    )
+    context["feed_page"] = Paginator(feed, FEED_PAGE_SIZE).get_page(
+        request.GET.get("page")
+    )
+    context["viewer_city"] = viewer.city if viewer is not None else ""
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
+    context["feed_pagination_query"] = pagination_params.urlencode()
 
     if nearby_list == "players" and nearby_places and viewer is not None:
         origin = coordinates_for_locality(viewer.city)
@@ -651,10 +652,11 @@ def sparring_confirm_response(request, response_id):
                 if match.deadline
                 else "Не установлен"
             )
-            Notification.objects.create(
+            create_notification(
                 user=response.respondent.user,
                 message=f"Ваш отклик на заявку на спарринг принят! Матч создан. Дедлайн: {deadline_str}.",
                 url=reverse("match_detail", args=[match.pk]),
+                event_key="sparring.accepted",
             )
         except Exception as e:
             logger.warning(
@@ -833,10 +835,11 @@ def sparring_respond(request, pk):
     if created:
         # Создаем уведомление в личном кабинете для автора заявки
         try:
-            Notification.objects.create(
+            create_notification(
                 user=sparring.player.user,
                 message=f"{respondent} откликнулся на вашу заявку на спарринг.",
                 url=reverse("sparring_my_requests"),
+                event_key="sparring.response",
             )
         except Exception as e:
             logger.warning("Failed to create notification for sparring response: %s", e)
@@ -1048,10 +1051,11 @@ def doubles_accept_join(request, pk, join_request_id):
         for m in jr.members.all():
             if m.player and getattr(m.player, "user_id", None):
                 try:
-                    Notification.objects.create(
+                    create_notification(
                         user=m.player.user,
                         message=msg,
                         url=detail_url,
+                        event_key="sparring.doubles_joined",
                     )
                 except Exception as e:
                     logger.warning(

@@ -22,11 +22,12 @@ from django.views.decorators.http import require_http_methods
 
 from apps.core import telegram_notify as admin_notify
 from apps.core.models import TelegramTransferConsentLog, UserTelegramLink
+from apps.notifications.services import create_notification
 from apps.subscriptions.models import SubscriptionTier
 from apps.tournaments.models import DeadlineExtensionRequest, Match, MatchResultProposal
 from apps.tournaments.proposal_service import ProposalValidationError, apply_proposal
 from apps.tournaments.utils import get_match_opponent_users, get_match_participants
-from apps.users.models import Notification, Player
+from apps.users.models import Player
 
 from . import notifications as tg_notify
 from . import services as bot
@@ -394,10 +395,11 @@ def _handle_proposal_callback(callback_query: dict, base_url: str) -> bool:
 
         # 2. Создаём уведомление на сайте для инициатора
         try:
-            Notification.objects.create(
+            create_notification(
                 user=proposal.proposer.user,
                 message=f"{player} отклонил результат матча. Введите свой результат.",
                 url=reverse("my_matches"),
+                event_key="match.proposal_updated",
             )
         except Exception as e:
             logger.exception("create rejection notification failed: %s", e)
@@ -732,10 +734,11 @@ def _handle_result_type_callback(callback_query: dict) -> bool:
             return True
         tour_name = match.tournament.name if match.tournament else "спарринг"
         for opp_user in get_match_opponent_users(match, player):
-            Notification.objects.create(
+            create_notification(
                 user=opp_user,
                 message=f"{player} внёс результат матча в турнире {tour_name}. Матч завершён.",
                 url=reverse("match_detail", args=[match.pk]),
+                event_key="match.result_proposed",
             )
         try:
             tg_notify.notify_result_proposal(proposal)
@@ -1330,14 +1333,16 @@ def _handle_sparring_callback(callback_query: dict, base_url: str = "") -> bool:
                     f"Автор заявки подтвердил игру.\n"
                     f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
                     f"Дедлайн: {deadline_str}",
+                    event_key="sparring.accepted",
                 )
 
                 # Создаем уведомление в личном кабинете для откликнувшегося игрока
                 try:
-                    Notification.objects.create(
+                    create_notification(
                         user=response.respondent.user,
                         message=f"Ваш отклик на заявку на спарринг принят! Матч создан. Дедлайн: {deadline_str}.",
                         url=reverse("match_detail", args=[match.pk]),
+                        event_key="sparring.accepted",
                     )
                 except Exception as e:
                     logger.warning(
@@ -2319,10 +2324,11 @@ def user_bot_webhook(request):
                     return JsonResponse({"ok": True})
                 tour_name = match.tournament.name if match.tournament else "спарринг"
                 for opp_user in get_match_opponent_users(match, player):
-                    Notification.objects.create(
+                    create_notification(
                         user=opp_user,
                         message=f"{player} внёс результат матча в турнире {tour_name}. Матч завершён.",
                         url=reverse("match_detail", args=[match.pk]),
+                        event_key="match.result_proposed",
                     )
                 try:
                     tg_notify.notify_result_proposal(proposal)

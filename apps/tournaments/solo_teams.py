@@ -6,9 +6,9 @@ import logging
 
 from django.urls import reverse
 
+from apps.notifications.services import create_notification
 from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
 from apps.subscriptions.models import FancoinTransaction
-from apps.users.models import Notification
 
 from .models import Tournament
 
@@ -47,7 +47,7 @@ def remove_solo_teams_from_doubles_tournament(tournament: Tournament) -> int:
         except Exception:
             pass
 
-        Notification.objects.create(
+        create_notification(
             user=player.user,
             message=(
                 f"Вы были удалены из турнира «{tournament.name}»: "
@@ -55,6 +55,7 @@ def remove_solo_teams_from_doubles_tournament(tournament: Tournament) -> int:
                 f"Баланс FT восстановлен (+{TOURNAMENT_REGISTRATION_COST})."
             ),
             url=url,
+            event_key="tournament.solo_removed",
         )
 
         team.delete()

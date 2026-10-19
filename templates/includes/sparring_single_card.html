@@ -1,0 +1,77 @@
+{% load skill_tags %}
+        <div class="card sparring-card" id="sparring-{{ req.pk }}">
+            <div class="card-body sparring-card__inner">
+                <div class="sparring-card__flags">
+                    <span class="sparring-flag sparring-flag--type">Одиночный 1×1</span>
+                    <span class="sparring-flag sparring-flag--recruiting">Идёт набор</span>
+                    <span class="sparring-flag sparring-flag--gender">{{ req.get_preferred_gender_display }}</span>
+                    {% if req.is_friendly %}
+                    <span class="sparring-flag sparring-flag--friendly" title="Результат не влияет на рейтинг">Дружеский</span>
+                    {% endif %}
+                    {% if req.has_responses %}
+                    <span class="sparring-flag sparring-flag--responses">Есть отклики</span>
+                    {% endif %}
+                </div>
+                <div class="sparring-card__layout">
+                    <div class="sparring-card__col sparring-card__col--avatar">
+                        {% include 'includes/avatar.html' with avatar=req.player.avatar class="player-avatar sparring-card__avatar" %}
+                    </div>
+                    <div class="sparring-card__col sparring-card__col--main">
+                        <div class="sparring-card__headline player-name-block">
+                            <a href="{% url 'profile' pk=req.player.pk %}" class="player-name">{{ req.player }}</a>
+                            {% include 'includes/subscription_badge.html' with tier=req.player.paid_subscription_tier %}
+                        </div>
+                        <div class="sparring-card__chips">
+                            {% if not entry.is_local and entry.distance_km != None %}
+                            <span class="sparring-card__distance">≈ {{ entry.distance_km|floatformat:0 }} км от вас</span>
+                            {% endif %}
+                            <span class="player-category sparring-card__chip">{{ req.player.get_skill_level_display }}</span>
+                            <span class="player-category sparring-card__chip sparring-card__chip--muted" title="Уровень силы (NTRP)">Сила {{ req.player.ntrp_level|floatformat:2 }}</span>
+                            <span class="player-category sparring-card__chip sparring-card__chip--muted" title="Рейтинг FAN">Рейтинг {{ req.player.total_points|floatformat:0 }}</span>
+                            {% if req.desired_category %}
+                            <span class="sparring-desired-category">Партнёр: {{ req.get_desired_category_display }}</span>
+                            {% endif %}
+                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city }}</span>
+                        </div>
+                        <p class="sparring-card__desc text-secondary">{{ req.description }}</p>
+                        <div class="sparring-card__details">
+                            {% if req.preferred_days or req.preferred_time %}
+                            <span class="sparring-card__detail-line">
+                                {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
+                                {% if req.preferred_time %} · {{ req.preferred_time }}{% endif %}
+                            </span>
+                            {% endif %}
+                            {% if req.preferred_location %}
+                            <span class="sparring-card__detail-line">📍 {{ req.preferred_location }}</span>
+                            {% endif %}
+                            {% if req.desired_partner_age_min or req.desired_partner_age_max %}
+                            <span class="sparring-card__detail-line">
+                                Возраст партнёра:
+                                {% if req.desired_partner_age_min and req.desired_partner_age_max %}
+                                    {{ req.desired_partner_age_min }}–{{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
+                                {% elif req.desired_partner_age_min %}
+                                    от {{ req.desired_partner_age_min }} {{ req.desired_partner_age_min|years_suffix }}
+                                {% elif req.desired_partner_age_max %}
+                                    до {{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
+                                {% endif %}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="sparring-card__col sparring-card__col--cta">
+                        <div class="sparring-card__actions">
+                            {% if user.is_authenticated and user.player.pk == req.player_id %}
+                            <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline btn-sm sparring-card__btn">Редактировать</a>
+                            <a href="{% url 'sparring_my_requests' %}" class="btn btn-outline btn-sm sparring-card__btn">Мои заявки</a>
+                            {% elif has_sparring_access %}
+                            <button type="button" class="btn btn-primary btn-sm sparring-card__btn sparring-respond-btn" data-id="{{ req.pk }}">
+                                Откликнуться
+                            </button>
+                            {% else %}
+                            <a href="{% url 'pricing' %}" class="btn btn-outline btn-sm sparring-card__btn sparring-btn--locked" title="Оформите подписку, чтобы откликаться на заявки">Нужна подписка</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>

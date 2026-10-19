@@ -488,6 +488,8 @@ class Notification(models.Model):
     url = models.CharField("Ссылка", max_length=255, blank=True)
     is_read = models.BooleanField("Прочитано", default=False)
     created_at = models.DateTimeField("Создано", auto_now_add=True)
+    event_key = models.CharField("Код события", max_length=100, blank=True)
+    is_visible = models.BooleanField("Показывать в ЛК", default=True)
 
     class Meta:
         verbose_name = "Уведомление"

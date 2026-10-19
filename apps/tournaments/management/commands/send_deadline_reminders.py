@@ -27,11 +27,11 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.email_service import send_match_deadline_reminder_email
+from apps.notifications.services import create_notification
 from apps.telegram_bot import notifications as tg
 from apps.telegram_bot import services as bot_services
 from apps.tournaments.models import Match
 from apps.tournaments.utils import get_match_participant_users
-from apps.users.models import Notification
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,9 @@ def _notify_match_participants(match: Match, days_left: int) -> None:
     match_url = f"{base_url}{reverse('match_detail', args=[match.pk])}"
     for user in get_match_participant_users(match):
         try:
-            Notification.objects.create(user=user, message=msg, url=url)
+            create_notification(
+                user=user, message=msg, url=url, event_key="match.deadline_reminder"
+            )
         except Exception as exc:
             logger.warning(
                 "Notification deadline %sd user %s: %s",

@@ -7,6 +7,7 @@
         <div class="inbox__intro">
             <h1 id="inbox-title" class="inbox__title">Уведомления</h1>
             <p class="inbox__lead">Турниры, спарринги, матчи и клубы в одной ленте.</p>
+            {% if notification_center_enabled %}<a href="{% url 'notification_settings' %}">Настройки push и email</a>{% endif %}
         </div>
         <dl class="inbox-summary">
             <div class="inbox-summary__item">

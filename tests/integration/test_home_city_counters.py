@@ -13,7 +13,6 @@ from apps.core.home_city_counters import (
     TOURNAMENTS_SEEN_COOKIE,
     build_home_city_counters,
     parse_seen_at,
-    pick_sparring_tab,
 )
 from apps.core.localities import primary_locality_name
 from apps.sparring.models import (
@@ -61,26 +60,6 @@ class SeenCookieParsingTests(SimpleTestCase):
         for raw in (None, "", "abc", "0", "-5", "9" * 40):
             with self.subTest(raw=raw):
                 self.assertIsNone(parse_seen_at(raw))
-
-
-class PickSparringTabTests(SimpleTestCase):
-    """Счётчик спаррингов ведёт на вкладку, где есть что посмотреть."""
-
-    def test_prefers_tab_with_new_requests(self) -> None:
-        """Вкладка с новыми заявками важнее вкладки с одними старыми."""
-        tab = pick_sparring_tab({"singles": (3, 0), "doubles": (1, 0), "team": (2, 1)})
-        self.assertEqual(tab, "team")
-
-    def test_falls_back_to_any_active_then_singles(self) -> None:
-        """Без новых — первая непустая вкладка, иначе одиночные."""
-        self.assertEqual(
-            pick_sparring_tab({"singles": (0, 0), "doubles": (2, 0), "team": (0, 0)}),
-            "doubles",
-        )
-        self.assertEqual(
-            pick_sparring_tab({"singles": (0, 0), "doubles": (0, 0), "team": (0, 0)}),
-            "singles",
-        )
 
 
 class HomeCityCountersTests(TestCase):
@@ -161,7 +140,7 @@ class HomeCityCountersTests(TestCase):
         )
         self.assertEqual(
             counters.sparrings.url,
-            f"{reverse('sparring_list')}?type=doubles&{RAMENSKOE_QUERY}",
+            reverse("sparring_list"),
         )
 
     def test_seen_cookie_resets_new_count(self) -> None:

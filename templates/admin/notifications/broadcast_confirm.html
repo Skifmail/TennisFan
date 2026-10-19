@@ -1,0 +1,16 @@
+{% extends 'admin/base_site.html' %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p><strong>Заголовок:</strong> {{ campaign.title }}</p>
+<p><strong>Текст:</strong> {{ campaign.body }}</p>
+<p><strong>Переход:</strong> {{ campaign.url|default:'Личный кабинет' }}</p>
+<p>Оценка аудитории на сейчас (согласия повторно проверяются перед отправкой):</p>
+<ul>{% for channel,count in counts.items %}<li>{{ channel }}: {{ count }} пользователей</li>{% endfor %}</ul>
+<p>Push может прийти на несколько включённых устройств одного пользователя. ЛК не зависит от пользовательских переключателей.</p>
+<p>Точный объём видимого текста зависит от устройства. После подтверждения текст и каналы изменить нельзя.</p>
+{% if campaign.status == 'draft' and enabled %}
+<form method="post" action="{% url 'admin:notifications_broadcast_test' campaign.pk %}">{% csrf_token %}<button type="submit">Тест только мне</button></form>
+<hr>
+<form method="post">{% csrf_token %}<input type="hidden" name="snapshot" value="{{ snapshot }}"><label><input type="checkbox" name="confirm" value="yes" required>Подтверждаю отправку указанной аудитории</label><p><button type="submit">Поставить массовую рассылку в очередь</button></p></form>
+{% else %}<p>Отправка недоступна: центр выключен или рассылка уже подтверждена.</p>{% endif %}
+{% endblock %}

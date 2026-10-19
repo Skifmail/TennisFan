@@ -5,6 +5,7 @@ from typing import Final
 from django.conf import settings
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.urls import reverse
 from django.views.decorators.http import require_safe
 
 WORKER_SCRIPT: Final = (
@@ -24,10 +25,25 @@ def web_push_context(request: HttpRequest) -> dict[str, object]:
     app_id = settings.ONESIGNAL_APP_ID
     origin = f"{request.scheme}://{request.get_host()}"
     enabled = bool(app_id) and origin == settings.ONESIGNAL_SITE_ORIGIN
-    return {
+    config: dict[str, object] = {"appId": app_id} if enabled else {}
+    if enabled and settings.NOTIFICATION_CENTER_ENABLED:
+        config.update(
+            {
+                "notificationCenter": True,
+                "authenticated": bool(
+                    getattr(getattr(request, "user", None), "is_authenticated", False)
+                ),
+                "identityUrl": reverse("notification_identity"),
+                "deviceUrl": reverse("notification_device"),
+            }
+        )
+    context: dict[str, object] = {
         "web_push_enabled": enabled,
-        "web_push_config": {"appId": app_id} if enabled else {},
+        "web_push_config": config,
     }
+    if settings.NOTIFICATION_CENTER_ENABLED:
+        context["notification_center_enabled"] = True
+    return context
 
 
 @require_safe

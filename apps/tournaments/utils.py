@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, cast
 
+from apps.notifications.services import create_notification
+
 if TYPE_CHECKING:
     from apps.clubs.models import Club
     from apps.users.models import Player
@@ -656,7 +658,6 @@ def notify_participants_match_deadline_changed(
     from django.urls import reverse
 
     from apps.core.email_service import send_match_deadline_changed_email
-    from apps.users.models import Notification
 
     tournament = match.tournament
     if tournament is None:
@@ -686,7 +687,12 @@ def notify_participants_match_deadline_changed(
     emailed = 0
     for user in dict.fromkeys(get_match_participant_users(match)):
         try:
-            Notification.objects.create(user=user, message=msg_lk, url=match_path)
+            create_notification(
+                user=user,
+                message=msg_lk,
+                url=match_path,
+                event_key="match.deadline_changed",
+            )
             notified += 1
         except Exception:
             logger.exception(

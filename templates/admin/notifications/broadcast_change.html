@@ -1,0 +1,10 @@
+{% extends 'admin/change_form.html' %}
+{% block object-tools-items %}
+{{ block.super }}
+{% if original and original.status == 'draft' and perms.notifications.send_broadcast %}
+<li><a href="{% url 'admin:notifications_broadcast_send' original.pk %}">Предпросмотр и подтверждение</a></li>
+{% endif %}
+{% if original and original.status != 'draft' and original.status != 'cancelled' and perms.notifications.send_broadcast %}
+<li><a href="{% url 'admin:notifications_broadcast_cancel' original.pk %}">Остановить очередь рассылки</a></li>
+{% endif %}
+{% endblock %}

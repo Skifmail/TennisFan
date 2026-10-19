@@ -23,6 +23,7 @@ urlpatterns = [
     path("", include("apps.core.urls")),
     path("chats/", include("apps.chat.urls")),
     path("users/", include("apps.users.urls")),
+    path("notification-center/", include("apps.notifications.urls")),
     path("ratings/", include("apps.player_ratings.urls")),
     path("tournaments/", include("apps.tournaments.urls")),
     path("courts/", include("apps.courts.urls")),

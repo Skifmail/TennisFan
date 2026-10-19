@@ -5,10 +5,10 @@
 import logging
 
 from apps.core.email_service import send_tournament_cancelled_email
+from apps.notifications.services import create_notification
 from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
 from apps.subscriptions.models import FancoinTransaction
 from apps.telegram_bot.notifications import send_to_user_by_user
-from apps.users.models import Notification
 
 from .models import (
     Tournament,
@@ -162,11 +162,11 @@ def _notify_cancelled(
         refunded_ft=refunded_ft,
         reason=message,
     )
-    send_to_user_by_user(user, message, skip_email=True)
-    Notification.objects.create(
-        user=user,
-        message=message,
-        url=url or "",
+    send_to_user_by_user(
+        user, message, skip_email=True, event_key="tournament.cancelled"
+    )
+    create_notification(
+        user=user, message=message, url=url or "", event_key="tournament.cancelled"
     )
 
 
@@ -539,11 +539,12 @@ def _notify_tournament_reopened(tournament: Tournament) -> None:
 
     for user in users:
         try:
-            Notification.objects.create(
+            create_notification(
                 user=user,
                 title="Набор на турнир возобновлён",
                 message=message,
                 url=url or "",
+                event_key="tournament.reopened",
             )
         except Exception as exc:
             logger.warning(
@@ -552,7 +553,7 @@ def _notify_tournament_reopened(tournament: Tournament) -> None:
                 exc,
             )
         try:
-            send_to_user_by_user(user, message)
+            send_to_user_by_user(user, message, event_key="tournament.reopened")
         except Exception as exc:
             logger.warning(
                 "Failed telegram reopen notify for user %s: %s",

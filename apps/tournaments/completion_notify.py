@@ -15,7 +15,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.db_context import background_connection
-from apps.users.models import Notification, Player, User
+from apps.notifications.services import create_notification
+from apps.users.models import Player, User
 
 from .models import (
     SeasonPoints,
@@ -243,10 +244,11 @@ def _deliver_completion_notifications(tournament: Tournament) -> int:
             )
 
         try:
-            Notification.objects.create(
+            create_notification(
                 user=user,
                 message=_lk_message(tournament.name, place, fan_points),
                 url=url_path,
+                event_key="tournament.completed",
             )
         except Exception:
             logger.exception(
@@ -271,6 +273,7 @@ def _deliver_completion_notifications(tournament: Tournament) -> int:
                     ],
                 },
                 skip_email=True,
+                event_key="tournament.completed",
             )
         except Exception:
             logger.exception(

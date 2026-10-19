@@ -17,9 +17,9 @@ from django.core.management.base import BaseCommand
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.notifications.services import create_notification
 from apps.tournaments.models import Match, MatchResultProposal
 from apps.tournaments.proposal_service import apply_proposal
-from apps.users.models import Notification
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +85,11 @@ class Command(BaseCommand):
                     )
                     for p in (opponent_team.player1, opponent_team.player2):
                         if p and not getattr(p, "is_bye", False):
-                            Notification.objects.create(
-                                user=p.user, message=msg, url=url
+                            create_notification(
+                                user=p.user,
+                                message=msg,
+                                url=url,
+                                event_key="match.auto_accepted",
                             )
                 else:
                     opponent = (
@@ -95,8 +98,11 @@ class Command(BaseCommand):
                         else match.player1
                     )
                     if opponent and not getattr(opponent, "is_bye", False):
-                        Notification.objects.create(
-                            user=opponent.user, message=msg, url=url
+                        create_notification(
+                            user=opponent.user,
+                            message=msg,
+                            url=url,
+                            event_key="match.auto_accepted",
                         )
                 self.stdout.write(
                     self.style.SUCCESS(

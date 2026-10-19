@@ -8,6 +8,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth import views as auth_views
@@ -1035,7 +1036,11 @@ def notifications(request):
     Непрочитанные помечаются прочитанными при открытии. В этой отрисовке
     они ещё показаны как новые, чтобы было видно, что пришло с прошлого визита.
     """
-    notes = list(Notification.objects.filter(user=request.user).order_by("-created_at"))
+    notes = list(
+        Notification.objects.filter(user=request.user, is_visible=True).order_by(
+            "-created_at"
+        )
+    )
     unread_ids = {note.pk for note in notes if not note.is_read}
     if unread_ids:
         Notification.objects.filter(pk__in=unread_ids).update(is_read=True)
@@ -1043,7 +1048,10 @@ def notifications(request):
     return render(
         request,
         "users/notifications.html",
-        build_inbox_context(notes, unread_ids=unread_ids),
+        {
+            **build_inbox_context(notes, unread_ids=unread_ids),
+            "notification_center_enabled": settings.NOTIFICATION_CENTER_ENABLED,
+        },
     )
 
 

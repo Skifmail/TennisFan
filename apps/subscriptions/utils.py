@@ -4,8 +4,9 @@ from decimal import Decimal
 from typing import Any, cast
 
 from django.conf import settings
-from django.core.mail import send_mail
 from django.utils import timezone
+
+from apps.notifications.infrastructure.email import send_event_mail as send_mail
 
 from .models import RegionalTierPrice, UserSubscription
 
@@ -213,6 +214,7 @@ def send_subscription_purchase_email(
             from_email=from_email,
             recipient_list=[str(email)],
             fail_silently=True,
+            event_key="subscription.purchased",
         )
     except Exception:
         # Ошибки отправки письма не должны ломать пользовательский флоу оплаты.

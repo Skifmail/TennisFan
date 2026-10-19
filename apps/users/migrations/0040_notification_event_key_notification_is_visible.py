@@ -4,6 +4,11 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """Добавляет код события и видимость, сохраняя прежние записи ЛК.
+
+    Attributes:
+        operations: Аддитивные поля с сохранением видимости старой истории.
+    """
 
     dependencies = [
         ("users", "0039_alter_playersportprofile_entry_level_set"),

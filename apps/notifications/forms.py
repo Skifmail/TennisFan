@@ -6,6 +6,8 @@ from django import forms
 from django.conf import settings
 
 from .domain.rules import (
+    BODY_LIMIT,
+    TITLE_LIMIT,
     NotificationValidationError,
     validate_content,
     validate_destination,
@@ -42,9 +44,15 @@ class BroadcastForm(_BroadcastForm):
         model = Broadcast
         fields = ["title", "body", "url", "send_push", "send_email", "send_inbox"]
         widgets = {
-            "title": forms.TextInput(attrs={"maxlength": 40, "data-counter": "40"}),
+            "title": forms.TextInput(
+                attrs={"maxlength": TITLE_LIMIT, "data-counter": str(TITLE_LIMIT)}
+            ),
             "body": forms.Textarea(
-                attrs={"maxlength": 120, "data-counter": "120", "rows": 3}
+                attrs={
+                    "maxlength": BODY_LIMIT,
+                    "data-counter": str(BODY_LIMIT),
+                    "rows": 3,
+                }
             ),
         }
 

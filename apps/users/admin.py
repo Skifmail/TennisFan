@@ -722,8 +722,58 @@ class PlayerAdmin(admin.ModelAdmin):
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    """Admin for notifications."""
+    """Сохраняет старую историю ЛК без обхода нового центра уведомлений.
 
-    list_display = ("user", "message", "is_read", "created_at")
-    list_filter = ("is_read",)
+    Attributes:
+        list_display: История, прочтение, видимость и код события.
+    """
+
+    list_display = (
+        "user",
+        "message",
+        "is_read",
+        "is_visible",
+        "event_key",
+        "created_at",
+    )
+    list_filter = ("is_read", "is_visible", "event_key")
     search_fields = ("message", "user__email")
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Направляет ручную отправку в центр с проверкой каналов и аудитории.
+
+        Args:
+            request: Запрос администратора.
+
+        Returns:
+            False: отправка выполняется через ручные рассылки.
+        """
+        return False
+
+    def has_change_permission(
+        self, request: HttpRequest, obj: Notification | None = None
+    ) -> bool:
+        """Не позволяет подменить получателя или содержимое истории.
+
+        Args:
+            request: Запрос администратора.
+            obj: Запись ЛК.
+
+        Returns:
+            False: доступна штатная страница просмотра Django Admin.
+        """
+        return False
+
+    def has_delete_permission(
+        self, request: HttpRequest, obj: Notification | None = None
+    ) -> bool:
+        """Сохраняет историю независимо от настроек доставки.
+
+        Args:
+            request: Запрос администратора.
+            obj: Запись ЛК.
+
+        Returns:
+            False: записи не удаляются через старый интерфейс.
+        """
+        return False

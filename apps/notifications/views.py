@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -26,6 +27,7 @@ COOKIE_NAME: Final = "notification_device"
 COOKIE_SALT: Final = "notification-device"
 COOKIE_AGE_SECONDS: Final = 1209600
 JWT_LIFETIME: Final = timedelta(minutes=5)
+DEVICE_TOKEN_BYTES: Final = 32
 
 
 @login_required
@@ -72,7 +74,7 @@ def notification_identity(request: HttpRequest) -> HttpResponse:
         return JsonResponse({"error": "identity_not_configured"}, status=503)
     token = request.get_signed_cookie(
         COOKIE_NAME, default="", salt=COOKIE_SALT
-    ) or secrets.token_urlsafe(32)
+    ) or secrets.token_urlsafe(DEVICE_TOKEN_BYTES)
     digest = hashlib.sha256(token.encode()).hexdigest()
     device, _ = PushDevice.objects.select_for_update().get_or_create(
         device_hash=digest,
@@ -87,8 +89,6 @@ def notification_identity(request: HttpRequest) -> HttpResponse:
         device.active = False
     device.expires_at = request.session.get_expiry_date()
     device.save()
-    from django.utils import timezone
-
     payload = {
         "iss": settings.ONESIGNAL_APP_ID,
         "exp": int((timezone.now() + JWT_LIFETIME).timestamp()),
@@ -122,42 +122,48 @@ def notification_identity(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_POST
 @never_cache
+@transaction.atomic
 def notification_device(request: HttpRequest) -> HttpResponse:
     """Подтверждает или отзывает только собственное текущее устройство.
 
     Args:
-        request: JSON с булевыми active и, при явном клике, enableAccount.
+        request: JSON с серверным externalId, булевым active и опциональным enableAccount.
 
     Returns:
         Подтверждение без ID устройства и без возможности чужой привязки.
     """
     if not center_enabled():
         return JsonResponse({"error": "disabled"}, status=503)
-    token = request.get_signed_cookie(COOKIE_NAME, default="", salt=COOKIE_SALT)
+    token = request.get_signed_cookie(COOKIE_NAME, default="", salt=COOKIE_SALT) or ""
     try:
         data = json.loads(request.body)
     except (ValueError, UnicodeDecodeError):
         return JsonResponse({"error": "invalid_json"}, status=400)
     if not isinstance(data, dict) or not isinstance(data.get("active"), bool):
         return JsonResponse({"error": "invalid_active"}, status=400)
-    device = (
-        PushDevice.objects.filter(
-            device_hash=hashlib.sha256(token.encode()).hexdigest(), user=request.user
-        ).first()
-        if token
-        else None
-    )
-    if device is None or data.get("externalId") != str(device.external_id):
+    try:
+        alias = uuid.UUID(str(data.get("externalId", "")))
+    except ValueError:
         return JsonResponse({"error": "no_identity"}, status=409)
-    device.active = data["active"]
-    device.save(update_fields=["active", "updated_at"])
-    if device.active and data.get("enableAccount") is True:
+    # Условный UPDATE повторно проверяет владельца после ожидания блокировки:
+    # старая вкладка не может активировать уже перепривязанную строку.
+    if not token:
+        return JsonResponse({"error": "no_identity"}, status=409)
+    updated = PushDevice.objects.filter(
+        device_hash=hashlib.sha256(token.encode()).hexdigest(),
+        user=request.user,
+        external_id=alias,
+        expires_at__gt=timezone.now(),
+    ).update(active=data["active"], updated_at=timezone.now())
+    if not updated:
+        return JsonResponse({"error": "no_identity"}, status=409)
+    if data["active"] and data.get("enableAccount") is True:
         NotificationPreference.objects.update_or_create(
             user=request.user, defaults={"push_enabled": True}
         )
     return JsonResponse(
         {
-            "active": device.active,
+            "active": data["active"],
             "accountPushEnabled": preferences(cast(User, request.user).pk)[0],
         }
     )

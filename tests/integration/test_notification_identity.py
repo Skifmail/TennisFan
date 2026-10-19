@@ -181,3 +181,81 @@ def test_device_when_old_tab_acknowledges_should_not_activate_new_account(
     )
     assert response.status_code == 409
     assert not PushDevice.objects.get().active
+
+
+def test_logout_when_old_tab_acknowledges_should_reject_revoked_alias(
+    client: Client,
+) -> None:
+    """Отложенный запрос предыдущей сессии не оживляет отозванную привязку."""
+    user = User.objects.create_user(email="logout-race@example.test")
+    client.force_login(user)
+    old_alias = client.post(reverse("notification_identity")).json()["externalId"]
+    client.post(reverse("logout"))
+    client.force_login(user)
+    response = client.post(
+        reverse("notification_device"),
+        data=json.dumps({"active": True, "externalId": old_alias}),
+        content_type="application/json",
+    )
+    assert response.status_code == 409
+    assert not PushDevice.objects.get().active
+
+
+@pytest.mark.django_db(transaction=True)
+def test_device_when_identity_rotates_concurrently_should_not_activate_new_owner(
+    client: Client,
+) -> None:
+    """Проверка владельца и активация не разделены небезопасным окном гонки."""
+    import uuid
+    from collections.abc import Callable
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from typing import Any
+
+    from django.db import connection, connections, transaction
+
+    if connection.vendor != "postgresql":
+        pytest.skip("Проверка настоящей блокировки строки требует PostgreSQL")
+    first = User.objects.create_user(email="concurrent-old@example.test")
+    second = User.objects.create_user(email="concurrent-new@example.test")
+    client.force_login(first)
+    old_alias = client.post(reverse("notification_identity")).json()["externalId"]
+    reached_write_or_lock = Event()
+
+    def _execute(
+        execute: Callable[..., Any],
+        sql: str,
+        params: Any,
+        many: bool,
+        context: dict[str, Any],
+    ) -> Any:
+        if "notifications_pushdevice" in sql and (
+            sql.lstrip().startswith("UPDATE") or "FOR UPDATE" in sql
+        ):
+            reached_write_or_lock.set()
+        return execute(sql, params, many, context)
+
+    def _acknowledge() -> int:
+        try:
+            with connection.execute_wrapper(_execute):
+                return client.post(
+                    reverse("notification_device"),
+                    data=json.dumps({"active": True, "externalId": old_alias}),
+                    content_type="application/json",
+                ).status_code
+        finally:
+            connections.close_all()
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with transaction.atomic():
+            device = PushDevice.objects.select_for_update().get()
+            device.user = second
+            device.external_id = uuid.uuid4()
+            device.active = False
+            device.save()
+            result = executor.submit(_acknowledge)
+            assert reached_write_or_lock.wait(timeout=10), "Запрос не дошёл до привязки"
+        assert result.result(timeout=10) == 409
+    device.refresh_from_db()
+    assert device.user_id == second.pk
+    assert not device.active

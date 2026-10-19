@@ -521,3 +521,14 @@ def test_audit_admin_when_staff_posts_should_not_allow_technical_edits(
         {"active": "on", "push_enabled": "on", "status": "queued"},
     )
     assert response.status_code == 403
+
+
+def test_legacy_inbox_admin_when_adding_should_not_bypass_channel_policy(
+    client: Client,
+) -> None:
+    """Старый раздел ЛК не создаёт второй неконтролируемый путь ручной рассылки."""
+    admin = User.objects.create_superuser(
+        email="legacy-admin@example.test", password="test-only"
+    )
+    client.force_login(admin)
+    assert client.get(reverse("admin:users_notification_add")).status_code == 403

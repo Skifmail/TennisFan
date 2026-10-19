@@ -5,7 +5,6 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 TITLE_LIMIT: Final = 40
 BODY_LIMIT: Final = 120
-CHANNELS: Final = ("push", "email", "inbox")
 FORBIDDEN_PATHS: Final = ("password-reset", "verify-email", "token", "unsubscribe")
 
 

@@ -1,5 +1,6 @@
 """Публичная конфигурация и файлы браузерных уведомлений OneSignal."""
 
+import json
 from typing import Final
 
 from django.conf import settings
@@ -56,7 +57,11 @@ def onesignal_worker(request: HttpRequest) -> HttpResponse:
     Returns:
         JavaScript с запретом использования устаревшей версии без проверки.
     """
-    response = HttpResponse(WORKER_SCRIPT, content_type="application/javascript")
+    helper = json.dumps(staticfiles_storage.url("js/push_worker_navigation.js"))
+    response = HttpResponse(
+        f"importScripts({helper});\n" + WORKER_SCRIPT,
+        content_type="application/javascript",
+    )
     response["Cache-Control"] = "no-cache"
     response["Service-Worker-Allowed"] = "/"
     return response

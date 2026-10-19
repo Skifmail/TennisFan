@@ -52,7 +52,9 @@ def test_confirmation_when_https_browser_submits_should_pass_real_csrf(
 
     def application(route: Route) -> None:
         if urlsplit(route.request.url).path != CONFIRM_PATH:
-            route.fulfill(content_type="text/javascript", body=SCRIPT.read_text())
+            script = SCRIPT.parent / urlsplit(route.request.url).path.rsplit("/", 1)[-1]
+            assert script.name in {"push_confirm.js", "push_navigation.js"}
+            route.fulfill(content_type="text/javascript", body=script.read_text())
             return
         headers = route.request.all_headers()
         method = route.request.method

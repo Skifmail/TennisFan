@@ -39,7 +39,9 @@ def test_worker_when_anonymous_get_should_return_root_javascript(
     )
     assert response.status_code == 200
     assert response["Content-Type"].startswith("application/javascript")
-    assert response.content.decode() == (
+    body = response.content.decode()
+    assert body.startswith('importScripts("/static/js/push_worker_navigation.js");\n')
+    assert body.endswith(
         'importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");\n'
     )
     assert "no-cache" in response["Cache-Control"]

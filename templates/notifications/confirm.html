@@ -10,4 +10,4 @@
 {% else %}
 <h1>Подтверждение недействительно</h1><p>Код истёк, уже использован или открыт в другом браузере либо аккаунте. Откройте настройки в исходном браузере и запросите новое подтверждение.</p><a href="{% url 'notification_settings' %}">Настройки уведомлений</a>
 {% endif %}
-</main>{% if valid and not complete %}<script src="{% static 'js/push_confirm.js' %}" defer></script>{% endif %}</body></html>
+</main><script src="{% static 'js/push_navigation.js' %}" defer></script>{% if valid and not complete %}<script src="{% static 'js/push_confirm.js' %}" defer></script>{% endif %}</body></html>

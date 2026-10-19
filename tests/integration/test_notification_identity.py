@@ -100,7 +100,7 @@ def test_confirmation_when_delivered_should_activate_only_after_post(
     _, code = _start(client, mocker)
     response = client.get(reverse("notification_confirm"))
     assert response.status_code == 200
-    assert response["Referrer-Policy"] == "no-referrer"
+    assert response["Referrer-Policy"] == "same-origin"
     assert "no-store" in response["Cache-Control"]
     assert not PushDevice.objects.get().active
     assert _confirm(client, code).status_code == 200
@@ -288,6 +288,34 @@ def test_confirmation_when_csrf_valid_should_accept(
     )
     assert response.status_code == 200
     assert PushDevice.objects.get().active
+
+
+@pytest.mark.parametrize("origin", ["null", "https://untrusted.example"])
+def test_confirmation_when_https_origin_untrusted_should_reject(
+    client: Client, mocker: MockerFixture, origin: str
+) -> None:
+    """Правильный код и CSRF-токен не обходят проверку источника HTTPS-запроса.
+
+    Args:
+        client: Исходный браузер с неподтверждённой подпиской.
+        mocker: Изолированный транспорт подтверждения.
+        origin: Непрозрачный или посторонний источник запроса.
+    """
+    _, code = _start(client, mocker)
+    protected = Client(enforce_csrf_checks=True)
+    protected.cookies.update(client.cookies)
+    assert (
+        protected.get(reverse("notification_confirm"), secure=True).status_code == 200
+    )
+    response = protected.post(
+        reverse("notification_confirm"),
+        {"confirm": "yes", "code": code},
+        secure=True,
+        HTTP_ORIGIN=origin,
+        HTTP_X_CSRFTOKEN=protected.cookies["csrftoken"].value,
+    )
+    assert response.status_code == 403
+    assert not PushDevice.objects.get().active
 
 
 def test_worker_when_legacy_unverified_device_active_should_skip(

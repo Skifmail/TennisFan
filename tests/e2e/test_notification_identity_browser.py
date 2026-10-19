@@ -97,6 +97,10 @@ def test_binding_when_state_changes_should_require_confirmation_without_login(
         page.evaluate(
             "async () => {await window.OneSignalDeferred[0](window.mockOneSignal);}"
         )
+        # Открытая PWA должна перейти по ссылке, а не только получить фокус.
+        options = page.evaluate("window.pushCalls.init[0]")
+        assert options["notificationClickHandlerMatch"] == "origin"
+        assert options["notificationClickHandlerAction"] == "navigate"
         assert page.evaluate("window.identityCalls") == []
         if state == "anonymous":
             expect(page.locator("#web-push-status")).to_contain_text("Войдите")
@@ -117,8 +121,15 @@ def test_binding_when_state_changes_should_require_confirmation_without_login(
         browser.close()
 
 
-def test_confirmation_when_opened_from_push_should_keep_secret_out_of_get() -> None:
-    """Фрагмент удаляется из адресной строки и попадает только в подтверждающий POST."""
+@pytest.mark.parametrize("already_open", [False, True])
+def test_confirmation_when_opened_from_push_should_keep_secret_out_of_get(
+    already_open: bool,
+) -> None:
+    """Фрагмент удаляется из адресной строки и попадает только в подтверждающий POST.
+
+    Args:
+        already_open: Доставить код в уже открытую страницу без перезагрузки.
+    """
     with sync_playwright() as driver:
         browser = driver.chromium.launch(
             executable_path=environ.get("CHAT_BROWSER_EXECUTABLE"), headless=True
@@ -135,12 +146,15 @@ def test_confirmation_when_opened_from_push_should_keep_secret_out_of_get() -> N
             )
 
         page.route("**/*", document_route)
-        page.goto(SITE_ORIGIN + "/notification-center/confirm/#code=delivered-secret")
+        target = SITE_ORIGIN + "/notification-center/confirm/"
+        page.goto(target if already_open else target + "#code=delivered-secret")
         page.add_script_tag(
             content=(
                 Path(__file__).resolve().parents[2] / "static/js/push_confirm.js"
             ).read_text()
         )
+        if already_open:
+            page.evaluate("window.location.hash = 'code=delivered-secret'")
         expect(page.locator('input[name="code"]')).to_have_value("delivered-secret")
         assert "delivered-secret" not in page.url
         assert all("delivered-secret" not in url for url in urls)

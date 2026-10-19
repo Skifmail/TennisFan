@@ -4,21 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Final, Literal
 
-from django.conf import settings
-from loguru import logger
-
-from apps.core.city_map_coordinates import (
-    AmbiguousLocalityError,
-    LocalityCoordinates,
-    load_reference_localities,
-    resolve_locality,
-)
-from apps.core.models import City
+from apps.core.locality_proximity import LocalityProximityIndex
 from apps.sparring.models import DoublesMatchRequest, SparringRequest
-from apps.sparring.nearby import haversine_km
 
 FEED_PAGE_SIZE: Final = 10
 SparringFormat = Literal["singles", "doubles", "team"]
@@ -61,52 +50,16 @@ def rank_sparring_feed(
     Returns:
         Общая упорядоченная лента для последующей пагинации.
     """
-    stored = [
-        LocalityCoordinates(
-            row.name,
-            row.region,
-            row.settlement_type,
-            (
-                (float(row.lat), float(row.lng))
-                if row.lat is not None and row.lng is not None
-                else None
-            ),
-        )
-        for row in City.objects.all()
-    ]
-    reference = load_reference_localities(
-        Path(settings.BASE_DIR) / "static" / "documents" / "city.csv"
-    )
-    resolved: dict[str, LocalityCoordinates | None] = {}
-
-    def resolve(name: str) -> LocalityCoordinates | None:
-        if name not in resolved:
-            try:
-                resolved[name] = resolve_locality(name, stored, reference)
-            except AmbiguousLocalityError:
-                logger.warning(
-                    "Неоднозначный населённый пункт ленты спаррингов", city=name
-                )
-                resolved[name] = None
-        return resolved[name]
-
-    origin = resolve(viewer_city) if viewer_city.strip() else None
+    index = LocalityProximityIndex(viewer_city)
     entries: list[SparringFeedEntry] = []
 
     def append(
         item: SparringRequest | DoublesMatchRequest, kind: SparringFormat
     ) -> None:
-        destination = resolve(item.city)
-        is_local = bool(
-            origin is not None
-            and destination is not None
-            and origin.identity == destination.identity
+        proximity = index.get(item.city)
+        entries.append(
+            SparringFeedEntry(item, kind, proximity.is_local, proximity.distance_km)
         )
-        distance: float | None = None
-        if origin is not None and destination is not None:
-            if origin.coordinates is not None and destination.coordinates is not None:
-                distance = haversine_km(*origin.coordinates, *destination.coordinates)
-        entries.append(SparringFeedEntry(item, kind, is_local, distance))
 
     for single in singles:
         append(single, "singles")

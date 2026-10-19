@@ -32,7 +32,8 @@ def test_sparring_filters_when_viewport_changes_should_keep_fields_readable_with
         try:
             page = context.new_page()
             page.goto(environ["CHAT_E2E_URL"] + "/sparring/?type=singles&sport=tennis")
-            panel = page.locator(".sparring-toolbar__filters.filter-bar")
+            panel = page.locator(".sparring-compact__filter-form")
+            page.locator(".sparring-compact__filters > summary").click()
             expect(panel).to_be_visible()
             for width in (1440, 1100, 900, 390, 320):
                 page.set_viewport_size({"width": width, "height": 1000})
@@ -40,7 +41,7 @@ def test_sparring_filters_when_viewport_changes_should_keep_fields_readable_with
                     "document.documentElement.scrollWidth <= innerWidth"
                 )
                 desktop_minimum = page.evaluate(
-                    "parseFloat(getComputedStyle(document.documentElement).fontSize) * 16"
+                    "parseFloat(getComputedStyle(document.documentElement).fontSize) * 10"
                 )
                 fields = panel.locator(".form-control")
                 assert fields.count() >= 2

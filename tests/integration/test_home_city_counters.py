@@ -24,8 +24,6 @@ from apps.sparring.models import (
 from apps.tournaments.models import Tournament, TournamentStatus
 from tests.support.factories import make_player, make_tournament
 
-RAMENSKOE_QUERY = "city=%D0%A0%D0%B0%D0%BC%D0%B5%D0%BD%D1%81%D0%BA%D0%BE%D0%B5"
-
 
 class PrimaryLocalityNameTests(SimpleTestCase):
     """Город для фильтра берётся из профиля без типа поселения и региона."""
@@ -135,9 +133,7 @@ class HomeCityCountersTests(TestCase):
         self.assertEqual(counters.tournaments.new, 1)
         self.assertEqual(counters.sparrings.total, 3)
         self.assertEqual(counters.sparrings.new, 1)
-        self.assertEqual(
-            counters.tournaments.url, f"{reverse('tournament_list')}?{RAMENSKOE_QUERY}"
-        )
+        self.assertEqual(counters.tournaments.url, reverse("tournament_list"))
         self.assertEqual(
             counters.sparrings.url,
             reverse("sparring_list"),
@@ -180,7 +176,7 @@ class HomeCityCountersTests(TestCase):
         self.assertIn("активных спарринга", content)
         self.assertIn('aria-label="1 новый турнир"', content)
         self.assertIn('aria-label="1 новый спарринг"', content)
-        self.assertIn(RAMENSKOE_QUERY, content)
+        self.assertIn(f'href="{reverse("tournament_list")}"', content)
 
     def test_list_pages_set_seen_cookies_and_hide_badges(self) -> None:
         """Открытие списков ставит cookie, и бейджи на главной гаснут."""

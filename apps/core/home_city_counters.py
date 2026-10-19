@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from datetime import timezone as dt_timezone
 from typing import Any, TypeVar, cast
-from urllib.parse import urlencode
 
 from django.db.models import Count, Model, Q, QuerySet
 from django.http import HttpResponse
@@ -179,21 +178,6 @@ def _filter_city(
     return filter_field_contains_ci(qs, "city", city, annotation=annotation)
 
 
-def _list_url(route: str, params: dict[str, str]) -> str:
-    """Собрать ссылку на список с непустыми query-параметрами.
-
-    Args:
-        route: Имя маршрута Django.
-        params: Параметры фильтра.
-
-    Returns:
-        str: Относительная ссылка.
-    """
-    query = urlencode({key: value for key, value in params.items() if value})
-    base = cast(str, reverse(route))
-    return f"{base}?{query}" if query else base
-
-
 def _count_tournaments(*, city: str, since: datetime) -> tuple[int, int]:
     """Посчитать активные и новые турниры в городе.
 
@@ -309,7 +293,7 @@ def build_home_city_counters(
         tournaments=CityCounter(
             total=tournaments_total,
             new=tournaments_new,
-            url=_list_url("tournament_list", {"city": city}),
+            url=reverse("tournament_list"),
         ),
         sparrings=CityCounter(
             total=sum(total for total, _ in by_type.values()),

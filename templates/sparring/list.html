@@ -10,111 +10,77 @@
 </div>
 
 <div class="container">
-    {% if sparring_type == 'singles' %}
-    <p class="text-secondary mb-3" style="font-size: var(--font-size-sm);">
-        Одиночный спарринг 1×1: вы публикуете заявку, другие игроки откликаются, а вы выбираете соперника и по подтверждённому отклику создаётся один матч 1×1 (при желании — дружеский, без влияния на рейтинг).
-    </p>
-    {% elif sparring_type == 'doubles' %}
-    <p class="text-secondary mb-3" style="font-size: var(--font-size-sm);">
-        Парный спарринг 2×2: автор создаёт заявку и свою команду (можно добавить партнёра), остальные игроки откликаются в команду автора или соперников, автор одобряет отклики и при двух полных командах подтверждает один парный матч 2×2.
-    </p>
-    {% elif sparring_type == 'team' %}
-    <p class="text-secondary mb-3" style="font-size: var(--font-size-sm);">
-        Командный спарринг: формируются две команды по 2 человека. После того как автор одобрит отклики и наберётся 4 участника, бот и ЛК предложат сформировать серию матчей — каждый играет с каждым из противоположной команды 1×1, а затем создаётся один парный матч между командами.
-    </p>
-    {% endif %}
-    <div class="sparring-toolbar sparring-toolbar__panel">
-        <div class="sparring-toolbar__modes">
-            <div class="sparring-tabs" role="tablist" aria-label="Вид спорта">
-                {% for value, label in sport_choices %}
-                <a href="?sport={{ value }}&type={{ sparring_type }}{% if current_city %}&city={{ current_city|urlencode }}{% endif %}{% if current_nearby %}&nearby={{ current_nearby }}{% endif %}{% if nearby_list == 'players' %}&nearby_list=players{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}{% if sparring_type == 'singles' and current_category %}&category={{ current_category }}{% elif current_level %}&level={{ current_level }}{% endif %}" class="sparring-tab {% if current_sport == value %}sparring-tab--active{% endif %}">{{ label }}</a>
-                {% endfor %}
-            </div>
-            <div class="sparring-tabs" role="tablist" aria-label="Формат спарринга">
-                <a href="?sport={{ current_sport }}&amp;type=all{% if current_city %}&amp;city={{ current_city|urlencode }}{% endif %}{% if current_nearby %}&amp;nearby={{ current_nearby }}{% endif %}{% if nearby_list == 'players' %}&amp;nearby_list=players{% endif %}{% if selected_level %}&amp;level={{ selected_level }}{% endif %}{% if current_preferred_gender %}&amp;preferred_gender={{ current_preferred_gender }}{% endif %}"
-                   class="sparring-tab {% if sparring_type == 'all' %}sparring-tab--active{% endif %}">Все форматы</a>
-                <a href="?sport={{ current_sport }}&type=singles{% if current_city %}&city={{ current_city|urlencode }}{% endif %}{% if current_nearby %}&nearby={{ current_nearby }}{% endif %}{% if nearby_list == 'players' %}&nearby_list=players{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
-                   class="sparring-tab {% if sparring_type == 'singles' %}sparring-tab--active{% endif %}">
-                    Одиночный 1×1
-                </a>
-                <a href="?sport={{ current_sport }}&type=doubles{% if current_city %}&city={{ current_city|urlencode }}{% endif %}{% if current_nearby %}&nearby={{ current_nearby }}{% endif %}{% if nearby_list == 'players' %}&nearby_list=players{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
-                   class="sparring-tab {% if sparring_type == 'doubles' %}sparring-tab--active{% endif %}">
-                    Парный 2×2
-                </a>
-                <a href="?sport={{ current_sport }}&type=team{% if current_city %}&city={{ current_city|urlencode }}{% endif %}{% if current_nearby %}&nearby={{ current_nearby }}{% endif %}{% if nearby_list == 'players' %}&nearby_list=players{% endif %}{% if current_level %}&level={{ current_level }}{% endif %}{% if current_preferred_gender %}&preferred_gender={{ current_preferred_gender }}{% endif %}"
-                   class="sparring-tab {% if sparring_type == 'team' %}sparring-tab--active{% endif %}">
-                    Командный спарринг
-                </a>
-            </div>
-        </div>
-        <div class="sparring-toolbar__row">
-        <form method="get" class="filter-bar sparring-filters sparring-toolbar__filters">
-            <input type="hidden" name="sport" value="{{ current_sport }}">
-            <input type="hidden" name="type" value="{{ sparring_type }}">
-            <div class="sparring-location-filter">
-                <input name="city" class="form-control" placeholder="Населённый пункт" value="{{ current_city }}" onchange="this.form.submit()" aria-label="Населённый пункт">
-                <details class="sparring-radius{% if current_nearby %} sparring-radius--active{% endif %}">
-                    <summary aria-label="Радиус поиска{% if current_nearby %}: {{ current_nearby }} км{% endif %}">{% if current_nearby %}{{ current_nearby }} км{% else %}Радиус{% endif %}</summary>
-                    <div class="sparring-radius__menu" role="group" aria-label="Расстояние">
-                        <span class="sparring-radius__caption">Искать рядом</span>
-                        <a href="?{{ sparring_filter_query }}" class="sparring-radius__reset"{% if not current_nearby %} aria-current="true"{% endif %}>Без ограничения</a>
-                        {% for radius in nearby_radius_choices %}
-                        <a href="?{{ sparring_filter_query }}&amp;nearby={{ radius }}{% if nearby_list == 'players' %}&amp;nearby_list=players{% endif %}"{% if current_nearby == radius %} aria-current="true"{% endif %}>{{ radius }} км</a>
-                        {% endfor %}
-                    </div>
-                </details>
-            </div>
-            {% if sparring_type == 'singles' %}
-            <select name="category" class="form-control" onchange="this.form.submit()">
-                <option value="">Все уровни силы</option>
-                <option value="novice" {% if current_category == 'novice' %}selected{% endif %}>Новичок</option>
-                <option value="amateur" {% if current_category == 'amateur' %}selected{% endif %}>Любитель</option>
-                <option value="experienced" {% if current_category == 'experienced' %}selected{% endif %}>Опытный</option>
-                <option value="advanced" {% if current_category == 'advanced' %}selected{% endif %}>Мастер</option>
-                <option value="professional" {% if current_category == 'professional' %}selected{% endif %}>Профессионал</option>
-            </select>
-            {% else %}
-            <select name="level" class="form-control" onchange="this.form.submit()">
-                <option value="">Все уровни силы</option>
-                <option value="novice" {% if current_level == 'novice' %}selected{% endif %}>Новичок</option>
-                <option value="amateur" {% if current_level == 'amateur' %}selected{% endif %}>Любитель</option>
-                <option value="experienced" {% if current_level == 'experienced' %}selected{% endif %}>Опытный</option>
-                <option value="advanced" {% if current_level == 'advanced' %}selected{% endif %}>Мастер</option>
-                <option value="professional" {% if current_level == 'professional' %}selected{% endif %}>Профессионал</option>
-            </select>
-            {% endif %}
-            <select name="preferred_gender" class="form-control" onchange="this.form.submit()">
-                <option value="">Любой пол</option>
-                <option value="male" {% if current_preferred_gender == 'male' %}selected{% endif %}>Мужчины</option>
-                <option value="female" {% if current_preferred_gender == 'female' %}selected{% endif %}>Женщины</option>
-                <option value="mixed" {% if current_preferred_gender == 'mixed' %}selected{% endif %}>Микст</option>
-            </select>
-            {% if current_nearby %}
-            <input type="hidden" name="nearby" value="{{ current_nearby }}">
-            {% endif %}
-            {% if nearby_list == 'players' %}
-            <input type="hidden" name="nearby_list" value="players">
-            {% endif %}
-        </form>
-        <div class="sparring-toolbar__actions" role="toolbar" aria-label="Действия спарринга">
-            <div class="sparring-toolbar__action-grid">
-            <a href="{% url 'sparring_my_requests' %}{% if sparring_type != 'all' %}?type={{ sparring_type }}{% endif %}" class="btn btn-outline sparring-toolbar__btn">Мои заявки</a>
+    <section class="sparring-compact" aria-label="Поиск и действия спарринга">
+        <nav class="sparring-compact__row" aria-label="Вид спорта и форматы">
+            {% for option in sport_navigation %}
+            <a href="{{ option.url }}" class="sparring-compact__control{% if current_sport == option.value %} is-active{% endif %}"{% if current_sport == option.value %} aria-current="page"{% endif %}>{{ option.label }}</a>
+            {% endfor %}
+            <details class="sparring-compact__formats" name="sparring-menu">
+                <summary class="sparring-compact__control" aria-label="Выбрать форматы">{{ format_summary }}</summary>
+                <form method="get" class="sparring-compact__popover sparring-compact__format-form" aria-label="Форматы спарринга">
+                    <input type="hidden" name="sport" value="{{ current_sport }}">
+                    {% if current_city %}<input type="hidden" name="city" value="{{ current_city }}">{% endif %}
+                    {% if selected_level %}<input type="hidden" name="level" value="{{ selected_level }}">{% endif %}
+                    {% if current_preferred_gender %}<input type="hidden" name="preferred_gender" value="{{ current_preferred_gender }}">{% endif %}
+                    {% if current_nearby %}<input type="hidden" name="nearby" value="{{ current_nearby }}">{% endif %}
+                    {% if nearby_list == 'players' %}<input type="hidden" name="nearby_list" value="players">{% endif %}
+                    <p class="sparring-compact__hint">Можно выбрать несколько форматов</p>
+                    {% for option in format_options %}
+                    <label class="sparring-compact__check"><input type="checkbox" name="type" value="{{ option.value }}"{% if option.selected %} checked{% endif %}> {{ option.label }}</label>
+                    {% endfor %}
+                    <button type="submit" class="sparring-compact__apply">Показать</button>
+                </form>
+            </details>
+        </nav>
+        <div class="sparring-compact__actions">
+            <details class="sparring-compact__filters" name="sparring-menu">
+                <summary class="sparring-compact__control">Фильтры{% if active_filter_count %}<span class="sparring-compact__badge" aria-label="Активных фильтров: {{ active_filter_count }}">{{ active_filter_count }}</span>{% endif %}</summary>
+                <form method="get" class="sparring-compact__popover sparring-compact__filter-form" aria-label="Фильтры спарринга">
+                    <input type="hidden" name="sport" value="{{ current_sport }}">
+                    {% for code in selected_formats %}<input type="hidden" name="type" value="{{ code }}">{% empty %}<input type="hidden" name="type" value="all">{% endfor %}
+                    {% if nearby_list == 'players' %}<input type="hidden" name="nearby_list" value="players">{% endif %}
+                    <label class="sparring-compact__wide">Населённый пункт<input name="city" class="form-control" placeholder="Любой населённый пункт" value="{{ current_city }}"></label>
+                    <label>Уровень силы<select name="level" class="form-control">
+                        <option value="">Все уровни</option>
+                        <option value="novice"{% if selected_level == 'novice' %} selected{% endif %}>Новичок</option>
+                        <option value="amateur"{% if selected_level == 'amateur' %} selected{% endif %}>Любитель</option>
+                        <option value="experienced"{% if selected_level == 'experienced' %} selected{% endif %}>Опытный</option>
+                        <option value="advanced"{% if selected_level == 'advanced' %} selected{% endif %}>Мастер</option>
+                        <option value="professional"{% if selected_level == 'professional' %} selected{% endif %}>Профессионал</option>
+                    </select></label>
+                    <label>Пол<select name="preferred_gender" class="form-control">
+                        <option value="">Любой пол</option>
+                        <option value="male"{% if current_preferred_gender == 'male' %} selected{% endif %}>Мужчины</option>
+                        <option value="female"{% if current_preferred_gender == 'female' %} selected{% endif %}>Женщины</option>
+                        <option value="mixed"{% if current_preferred_gender == 'mixed' %} selected{% endif %}>Микст</option>
+                    </select></label>
+                    <label class="sparring-compact__wide">Радиус от города профиля<select name="nearby" class="form-control">
+                        <option value="">Без ограничения</option>
+                        {% for radius in nearby_radius_choices %}<option value="{{ radius }}"{% if current_nearby == radius %} selected{% endif %}>{{ radius }} км</option>{% endfor %}
+                    </select></label>
+                    <button type="submit" class="sparring-compact__apply">Применить</button>
+                </form>
+            </details>
             {% if user.is_authenticated %}
-            <a href="{% url 'sparring_my_invitations' %}" class="btn btn-outline sparring-toolbar__btn">Мои приглашения</a>
+            <details class="sparring-compact__mine" name="sparring-menu">
+                <summary class="sparring-compact__control">Мои</summary>
+                <nav class="sparring-compact__popover sparring-compact__personal" aria-label="Личные действия">
+                    <a href="{% url 'sparring_my_requests' %}">Мои заявки</a>
+                    <a href="{% url 'sparring_my_invitations' %}">Мои приглашения</a>
+                    {% if has_sparring_access %}<a href="{% url 'sparring_invite' %}">Пригласить на спарринг</a>{% endif %}
+                    {% if not has_sparring_access %}<p class="sparring-compact__hint">Подписка открывает создание заявок и отклики.</p>{% endif %}
+                </nav>
+            </details>
+            {% else %}
+            <a class="sparring-compact__control" href="{% url 'login' %}?next={% url 'sparring_list' %}">Войти</a>
             {% endif %}
             {% if has_sparring_access %}
-            <a href="{% url 'sparring_invite' %}" class="btn btn-outline sparring-toolbar__btn">Пригласить на спарринг</a>
-            <a href="{% url 'sparring_create' %}?sport={{ current_sport }}{% if sparring_type != 'all' %}&amp;type={{ sparring_type }}{% endif %}" class="btn btn-outline sparring-toolbar__btn sparring-toolbar__btn--cta">Создать заявку</a>
+            <a class="sparring-compact__primary" href="{% url 'sparring_create' %}?sport={{ current_sport }}{% if selected_formats|length == 1 %}&amp;type={{ sparring_type }}{% endif %}">Создать заявку</a>
             {% else %}
-            <a href="{% url 'pricing' %}" class="btn btn-outline sparring-toolbar__btn sparring-toolbar__btn--cta">Оформить подписку</a>
+            <a class="sparring-compact__primary" href="{% url 'pricing' %}" title="Оформить подписку для создания заявок и откликов">Подписка</a>
             {% endif %}
-            </div>
         </div>
-        </div>
-    </div>
-    {% if not has_sparring_access %}
-    <p class="text-muted mb-3" style="font-size: var(--font-size-sm);">Чтобы создавать заявки и откликаться на заявки других игроков — оформите подписку.</p>
-    {% endif %}
+    </section>
     {% if nearby_error %}
     <p class="text-muted mb-3" style="font-size: var(--font-size-sm);">{{ nearby_error }}</p>
     {% endif %}
@@ -250,6 +216,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/sparring-menu.js' %}" defer></script>
 <script>
 (function() {
     const modal = document.getElementById('sparring-respond-modal');

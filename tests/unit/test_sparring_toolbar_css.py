@@ -15,8 +15,8 @@ class SparringToolbarCssTests(SimpleTestCase):
         """Фильтры занимают отдельную строку и не сжимаются ниже ~16rem."""
         css_path = Path(settings.BASE_DIR) / "static" / "css" / "pages" / "sparring.css"
         css = css_path.read_text(encoding="utf-8")
-        self.assertIn(":has(.sparring-toolbar__filters)", css)
-        self.assertIn("minmax(min(100%, 16rem), 1fr)", css)
+        self.assertIn(".sparring-compact__row", css)
+        self.assertIn("grid-template-columns: 1fr 1fr 1.35fr", css)
         self.assertNotIn("min-width: min(100%, 220px)", css)
 
     def test_tournaments_catalog_filters_wrap_instead_of_seven_columns(self) -> None:

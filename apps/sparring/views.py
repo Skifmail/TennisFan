@@ -46,6 +46,7 @@ from apps.core.sports import sport_code
 from apps.core.text_search import filter_field_contains_ci
 from apps.notifications.services import create_notification
 from apps.sparring.feed import FEED_PAGE_SIZE, rank_sparring_feed
+from apps.sparring.formats import SPARRING_FORMAT_OPTIONS, parse_sparring_formats
 from apps.users.models import Player
 
 from .city_notify import schedule_published_sparring_notify
@@ -122,6 +123,7 @@ def _sparring_filter_query(
     category: str,
     level: str,
     preferred_gender: str,
+    selected_formats: tuple[str, ...] = (),
 ) -> str:
     """Собрать query string фильтров списка без радиуса «рядом».
 
@@ -132,14 +134,15 @@ def _sparring_filter_query(
         category: Уровень силы для одиночного спарринга.
         level: Уровень силы для парного и командного спарринга.
         preferred_gender: Предпочитаемый пол соперника.
+        selected_formats: Выбранные форматы; пустой набор означает все.
 
     Returns:
         str: Параметры запроса без ``nearby``.
     """
     params: list[tuple[str, str]] = [
         ("sport", sport),
-        ("type", sparring_type),
     ]
+    params.extend(("type", code) for code in (selected_formats or (sparring_type,)))
     if city:
         params.append(("city", city))
     if sparring_type == "singles" and category:
@@ -227,9 +230,8 @@ def sparring_list(request: HttpRequest) -> HttpResponse:
     from apps.core.sports import Sport, parse_sport_filter
 
     sport_filter = parse_sport_filter(request.GET.get("sport"))
-    sparring_type = request.GET.get("type", "all")
-    if sparring_type not in ("all", "singles", "doubles", "team"):
-        sparring_type = "all"
+    selected_formats = parse_sparring_formats(request.GET.getlist("type"))
+    sparring_type = selected_formats[0] if len(selected_formats) == 1 else "all"
 
     city = (request.GET.get("city") or "").strip()
     category = request.GET.get("category", "")
@@ -289,8 +291,41 @@ def sparring_list(request: HttpRequest) -> HttpResponse:
             category=category,
             level=level,
             preferred_gender=preferred_gender,
+            selected_formats=selected_formats,
         ),
     }
+    query = request.GET.copy()
+    query.pop("page", None)
+    query.setlist("type", list(selected_formats) or ["all"])
+    sport_navigation = []
+    for code, label in Sport.choices:
+        query["sport"] = code
+        sport_navigation.append(
+            {"value": code, "label": label, "url": "?" + query.urlencode()}
+        )
+    context.update(
+        {
+            "selected_formats": selected_formats,
+            "sport_navigation": sport_navigation,
+            "format_options": [
+                {
+                    "value": code,
+                    "label": label,
+                    "selected": not selected_formats or code in selected_formats,
+                }
+                for code, label in SPARRING_FORMAT_OPTIONS
+            ],
+            "format_summary": (
+                f"Форматы · {len(selected_formats)}"
+                if selected_formats
+                else "Все форматы"
+            ),
+            "active_filter_count": sum(
+                bool(value)
+                for value in (city, selected_level, preferred_gender, nearby_radius)
+            ),
+        }
+    )
 
     singles = (
         SparringRequest.objects.filter(
@@ -310,14 +345,15 @@ def sparring_list(request: HttpRequest) -> HttpResponse:
         .select_related("created_by__user__subscription__tier")
         .prefetch_related("teams__members__player__user")
     )
-    if sparring_type not in ("all", "singles"):
+    if selected_formats and "singles" not in selected_formats:
         singles = singles.none()
-    if sparring_type == "singles":
-        doubles = doubles.none()
-    elif sparring_type == "doubles":
-        doubles = doubles.filter(kind=DoublesMatchKind.CLASSIC)
-    elif sparring_type == "team":
-        doubles = doubles.filter(kind=DoublesMatchKind.TEAM)
+    if selected_formats:
+        kinds = [
+            "classic" if code == "doubles" else "team"
+            for code in selected_formats
+            if code != "singles"
+        ]
+        doubles = doubles.filter(kind__in=kinds)
     if nearby_resolved:
         names = [place.name for place in nearby_places]
         singles = filter_by_locality_names(singles, names)

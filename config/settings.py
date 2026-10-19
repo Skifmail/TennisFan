@@ -58,9 +58,6 @@ NOTIFICATION_CENTER_ENABLED: Final = (
     os.environ.get("NOTIFICATION_CENTER_ENABLED", "False").lower() == "true"
 )
 ONESIGNAL_REST_API_KEY: Final = os.environ.get("ONESIGNAL_REST_API_KEY", "")
-ONESIGNAL_IDENTITY_PRIVATE_KEY: Final = os.environ.get(
-    "ONESIGNAL_IDENTITY_PRIVATE_KEY", ""
-).replace("\\n", "\n")
 
 _csrf = os.environ.get(
     "CSRF_TRUSTED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"

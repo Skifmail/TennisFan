@@ -52,6 +52,7 @@ def _counts(campaign: Broadcast) -> dict[str, int]:
             users.filter(
                 notificationpreference__push_enabled=True,
                 pushdevice__active=True,
+                pushdevice__subscription_id__isnull=False,
                 pushdevice__expires_at__gt=timezone.now(),
             )
             .distinct()

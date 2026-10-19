@@ -98,17 +98,20 @@ def process_deliveries(*, limit: int = 100) -> int:
             continue
         try:
             if item.channel == "push":
-                aliases = [
+                subscription_ids = [
                     str(value)
                     for value in PushDevice.objects.filter(
-                        user_id=item.user_id, active=True, expires_at__gt=timezone.now()
-                    ).values_list("external_id", flat=True)
+                        user_id=item.user_id,
+                        active=True,
+                        expires_at__gt=timezone.now(),
+                        subscription_id__isnull=False,
+                    ).values_list("subscription_id", flat=True)
                 ]
-                if not aliases:
+                if not subscription_ids:
                     _finish(item, "skipped", "no_active_device")
                     continue
                 provider_id = send_push(
-                    aliases=aliases,
+                    subscription_ids=subscription_ids,
                     title=item.title,
                     body=item.body,
                     url=item.url,

@@ -89,7 +89,7 @@ class PushDevice(models.Model):
         external_id: Случайный псевдоним для JWT-проверки OneSignal.
         user: Текущий владелец привязки.
         active: SDK подтвердил привязку и локальную подписку.
-        expires_at: Не позднее окончания пользовательской сессии.
+        expires_at: Конечный срок привязки, вычисленный из настроек текущей сессии.
     """
 
     device_hash: models.CharField[str, str] = models.CharField(

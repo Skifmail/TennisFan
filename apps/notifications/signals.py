@@ -1,6 +1,7 @@
 """Отзыв серверной привязки устройства при выходе пользователя."""
 
 import hashlib
+import uuid
 from typing import Any
 
 from django.contrib.auth.signals import user_logged_in, user_logged_out
@@ -16,7 +17,7 @@ from .services import center_enabled
 def revoke_device_on_logout(
     sender: object, request: HttpRequest | None, **kwargs: Any
 ) -> None:
-    """Немедленно исключает устройство из персональных отправок после выхода.
+    """Отзывает адрес при входе и выходе, включая отложенные запросы старых вкладок.
 
     Args:
         sender: Отправитель сигнала Django.
@@ -30,4 +31,4 @@ def revoke_device_on_logout(
         if token:
             PushDevice.objects.filter(
                 device_hash=hashlib.sha256(token.encode()).hexdigest()
-            ).update(active=False)
+            ).update(active=False, external_id=uuid.uuid4())

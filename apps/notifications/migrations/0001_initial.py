@@ -9,6 +9,11 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """Добавляет настройки, очередь и журнал без изменения существующей истории.
+
+    Attributes:
+        operations: Создание таблиц центра уведомлений и индексов.
+    """
 
     initial = True
 

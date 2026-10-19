@@ -123,9 +123,9 @@ jobs:
           venv/bin/ruff check --no-fix apps/core/web_push.py tests/unit/test_web_push.py tests/integration/test_web_push.py tests/e2e/test_web_push_browser.py
       - name: Notification center typing and formatting
         run: |
-          venv/bin/mypy --strict --follow-imports=silent apps/notifications
-          venv/bin/black --check apps/notifications tests/unit/test_notification_rules.py tests/unit/test_notification_inventory.py tests/integration/test_notification_center.py tests/integration/test_notification_identity.py tests/e2e/test_notification_identity_browser.py
-          venv/bin/ruff check --no-fix apps/notifications tests/unit/test_notification_rules.py tests/unit/test_notification_inventory.py tests/integration/test_notification_center.py tests/integration/test_notification_identity.py tests/e2e/test_notification_identity_browser.py
+          venv/bin/mypy --strict --follow-imports=silent apps/notifications tests/unit/test_notification_configuration.py tests/unit/test_notification_rules.py tests/unit/test_notification_inventory.py tests/integration/test_notification_center.py tests/integration/test_notification_identity.py tests/e2e/test_notification_identity_browser.py
+          venv/bin/black --check apps/notifications tests/unit/test_notification_configuration.py tests/unit/test_notification_rules.py tests/unit/test_notification_inventory.py tests/integration/test_notification_center.py tests/integration/test_notification_identity.py tests/e2e/test_notification_identity_browser.py
+          venv/bin/ruff check --no-fix apps/notifications tests/unit/test_notification_configuration.py tests/unit/test_notification_rules.py tests/unit/test_notification_inventory.py tests/integration/test_notification_center.py tests/integration/test_notification_identity.py tests/e2e/test_notification_identity_browser.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

@@ -78,14 +78,25 @@ def test_send_when_concurrent_different_cities_should_limit_account() -> None:
     assert sorted(result) == ["limited", "sent"]
 
 
+@pytest.mark.parametrize("center_enabled", [False, True])
 def test_send_when_cross_replies_concurrent_should_not_deadlock(
     mocker: MockerFixture,
+    center_enabled: bool,
 ) -> None:
     """Уведомления двум авторам не образуют взаимную блокировку FK пользователей."""
     from typing import Any
 
+    from django.test import override_settings
+
     from apps.chat.models import ChatMessage
+    from apps.notifications.models import EventPolicy
+    from apps.notifications.services import create_notification as emit_notification
     from apps.users.models import Notification
+
+    if center_enabled:
+        EventPolicy.objects.update_or_create(
+            key="chat.reply", defaults={"title": "Ответ в чате", "group": "Чаты"}
+        )
 
     authors = [make_user(email=f"cross-reply-{index}@test.local") for index in range(2)]
     rooms = [
@@ -110,15 +121,12 @@ def test_send_when_cross_replies_concurrent_should_not_deadlock(
         created_at=timezone.now() - timedelta(seconds=10)
     )
     barrier = Barrier(2)
-    create_notification = Notification.objects.create
 
     def notification(**kwargs: Any) -> Notification:
         barrier.wait(timeout=10)
-        return create_notification(**kwargs)
+        return emit_notification(**kwargs)
 
-    mocker.patch(
-        "apps.chat.services.Notification.objects.create", side_effect=notification
-    )
+    mocker.patch("apps.chat.services.create_notification", side_effect=notification)
 
     def submit(index: int) -> int:
         close_old_connections()
@@ -135,7 +143,10 @@ def test_send_when_cross_replies_concurrent_should_not_deadlock(
         finally:
             close_old_connections()
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    with (
+        override_settings(NOTIFICATION_CENTER_ENABLED=center_enabled),
+        ThreadPoolExecutor(max_workers=2) as pool,
+    ):
         assert len(list(pool.map(submit, range(2)))) == 2
     assert Notification.objects.count() == 2
 

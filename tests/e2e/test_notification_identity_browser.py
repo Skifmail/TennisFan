@@ -69,13 +69,12 @@ def test_binding_when_session_changes_should_login_only_verified_alias(
         )
         page.goto(SITE_ORIGIN)
         page.evaluate(SDK_MOCK)
-        page.evaluate(
-            """() => {
+        identity_mock = """() => {
             window.identityCalls = [];
             window.mockOneSignal.login = async (id, token) => {window.identityCalls.push(['login', id, token]);};
             window.mockOneSignal.logout = async () => {window.identityCalls.push(['logout']);};
         }"""
-        )
+        page.evaluate(identity_mock)
         script = (
             Path(__file__).resolve().parents[2] / "static/js/web_push.js"
         ).read_text()

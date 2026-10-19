@@ -16,10 +16,17 @@ pytestmark = pytest.mark.skipif(
 )
 
 APP_ID: Final = "c6e46e19-f9f8-4df3-b53d-44f49da24af2"
+SITE_ORIGIN: Final = "https://tennisfan.ru"
 SDK_MOCK: Final = """
 () => {
     const calls = window.pushCalls = {init: [], permission: 0, optIn: 0, optOut: 0};
     const listeners = {};
+    window.nativeNotificationPermissionDescriptor = Object.getOwnPropertyDescriptor(Notification, 'permission');
+    window.mockNotificationPermission = 'default';
+    Object.defineProperty(Notification, 'permission', {
+        configurable: true,
+        get: () => window.mockNotificationPermission,
+    });
     window.failPush = false;
     window.mockSubscription = {
         id: null,
@@ -50,9 +57,10 @@ SDK_MOCK: Final = """
             requestPermission: async () => {
                 calls.permission++;
                 if (window.denyPush) {
-                    Object.defineProperty(Notification, 'permission', {value: 'denied'});
+                    window.mockNotificationPermission = 'denied';
                     return;
                 }
+                window.mockNotificationPermission = 'granted';
                 window.mockOneSignal.Notifications.permission = true;
             },
         },
@@ -62,9 +70,25 @@ SDK_MOCK: Final = """
 """
 
 
+@pytest.fixture(params=["granted", "denied"])
+def native_notification_permission(request: pytest.FixtureRequest) -> str:
+    """Возвращает заданное браузерное разрешение для воспроизводимой проверки.
+
+    Args:
+        request: Параметризованный запрос pytest.
+
+    Returns:
+        Явное исходное разрешение Chromium.
+    """
+    return str(request.param)
+
+
 @pytest.fixture
-def push_page() -> Iterator[Page]:
+def push_page(native_notification_permission: str) -> Iterator[Page]:
     """Открывает изолированный HTTPS-документ с настоящим блоком подписки.
+
+    Args:
+        native_notification_permission: Разрешение настоящего браузерного контекста.
 
     Yields:
         Страница Chromium без разрешённых внешних запросов.
@@ -74,11 +98,16 @@ def push_page() -> Iterator[Page]:
         browser = driver.chromium.launch(
             executable_path=environ.get("CHAT_BROWSER_EXECUTABLE"), headless=True
         )
-        page = browser.new_page()
+        context = browser.new_context()
+        context.grant_permissions(
+            ["notifications"] if native_notification_permission == "granted" else [],
+            origin=SITE_ORIGIN,
+        )
+        page = context.new_page()
         page.route(
             "**/*",
             lambda route: route.fulfill(
-                content_type="text/html",
+                content_type="text/html; charset=utf-8",
                 body=(
                     '<script id="web-push-config" type="application/json">'
                     f'{{"appId": "{APP_ID}"}}</script>'
@@ -86,12 +115,42 @@ def push_page() -> Iterator[Page]:
                 ),
             ),
         )
-        page.goto("https://tennisfan.ru/")
+        page.goto(SITE_ORIGIN)
         page.evaluate(SDK_MOCK)
         try:
             yield page
         finally:
             browser.close()
+
+
+def test_notification_mock_when_native_permission_differs_should_start_unrequested(
+    push_page: Page, native_notification_permission: str
+) -> None:
+    """Проверяет независимость модельного разрешения SDK от фонового Chromium.
+
+    Args:
+        push_page: Страница с подменённым SDK.
+        native_notification_permission: Явно настроенное разрешение Chromium.
+    """
+    native_permission = push_page.evaluate(
+        "async () => (await navigator.permissions.query({name: 'notifications'})).state"
+    )
+    assert native_permission == native_notification_permission
+    assert push_page.evaluate("Notification.permission") == "default"
+    assert push_page.evaluate("window.mockOneSignal.Notifications.permission") is False
+    assert push_page.evaluate("window.pushCalls.permission") == 0
+
+
+def test_page_when_russian_controls_rendered_should_use_utf8(push_page: Page) -> None:
+    """Проверяет корректную кодировку исходного HTML, а не только текста из JS.
+
+    Args:
+        push_page: HTTPS-документ с настоящим шаблоном блока подписки.
+    """
+    assert push_page.evaluate("document.characterSet") == "UTF-8"
+    expect(
+        push_page.get_by_role("heading", name="Уведомления на устройстве", exact=True)
+    ).to_be_visible()
 
 
 def _load_integration(page: Page) -> None:
@@ -115,8 +174,10 @@ def test_subscription_when_user_clicks_should_subscribe_and_allow_opt_out(
     assert config["promptOptions"]["slidedown"]["prompts"][0]["autoPrompt"] is False
     push_page.get_by_role("button", name="Включить уведомления", exact=True).click()
     expect(push_page.locator("#web-push-status")).to_have_text("Уведомления включены.")
+    assert push_page.evaluate("Notification.permission") == "granted"
     push_page.get_by_role("button", name="Отключить уведомления", exact=True).click()
     expect(push_page.locator("#web-push-status")).to_have_text("Уведомления выключены.")
+    assert push_page.evaluate("Notification.permission") == "granted"
     assert push_page.evaluate("window.pushCalls.optOut") == 1
 
 
@@ -130,6 +191,51 @@ def test_subscription_when_denied_should_explain_browser_settings(
     expect(push_page.locator("#web-push-status")).to_contain_text("настройках браузера")
     expect(push_page.locator("#web-push-toggle")).to_be_disabled()
     assert push_page.evaluate("window.pushCalls.optIn") == 0
+
+
+def test_subscription_when_permission_already_denied_should_not_prompt(
+    push_page: Page,
+) -> None:
+    """Сохранённый запрет блокирует подписку без нового системного запроса.
+
+    Args:
+        push_page: Страница с явно управляемым состоянием разрешения.
+    """
+    push_page.evaluate("window.mockNotificationPermission = 'denied'")
+    _load_integration(push_page)
+    expect(push_page.locator("#web-push-status")).to_contain_text("настройках браузера")
+    expect(push_page.locator("#web-push-toggle")).to_be_disabled()
+    assert push_page.evaluate("window.pushCalls.permission") == 0
+    assert push_page.evaluate("window.pushCalls.optIn") == 0
+
+
+def test_subscription_when_native_permission_restored_should_respect_browser_policy(
+    push_page: Page, native_notification_permission: str
+) -> None:
+    """Проверяет защиту подписки с настоящим разрешением браузера вместо mock.
+
+    Args:
+        push_page: Страница с изолированным SDK.
+        native_notification_permission: Разрешённое либо запрещённое состояние Chromium.
+    """
+    push_page.evaluate(
+        "() => { Object.defineProperty(Notification, 'permission', "
+        "window.nativeNotificationPermissionDescriptor); }"
+    )
+    # Headless Shell может запрещать Notification даже при granted в Permissions API.
+    native_permission: str = push_page.evaluate("Notification.permission")
+    assert native_permission in {"default", "granted", "denied"}
+    if native_notification_permission == "denied":
+        assert native_permission == "denied"
+    _load_integration(push_page)
+    if native_permission == "denied":
+        expect(push_page.locator("#web-push-toggle")).to_be_disabled()
+        expect(push_page.locator("#web-push-status")).to_contain_text(
+            "настройках браузера"
+        )
+    else:
+        expect(push_page.locator("#web-push-toggle")).to_be_enabled()
+    assert push_page.evaluate("window.pushCalls.permission") == 0
 
 
 def test_subscription_when_network_error_should_offer_retry(push_page: Page) -> None:
@@ -201,6 +307,7 @@ def test_subscription_when_already_subscribed_should_show_opt_out(
 ) -> None:
     """Повторное открытие страницы не создаёт новую подписку."""
     script = """() => {
+            window.mockNotificationPermission = 'granted';
             window.mockOneSignal.Notifications.permission = true;
             window.mockSubscription.optedIn = true;
             window.mockSubscription.id = 'existing-subscription';
@@ -217,7 +324,11 @@ def test_subscription_when_registration_pending_should_wait_for_subscription_id(
     push_page: Page,
 ) -> None:
     """Разрешение без идентификатора подписки не считается успешной подпиской."""
-    push_page.evaluate("window.mockSubscription.optedIn = true")
+    push_page.evaluate(
+        "window.mockNotificationPermission = 'granted'; "
+        "window.mockOneSignal.Notifications.permission = true; "
+        "window.mockSubscription.optedIn = true"
+    )
     _load_integration(push_page)
     expect(push_page.locator("#web-push-status")).to_contain_text("подключается")
     expect(push_page.locator("#web-push-toggle")).to_be_disabled()
@@ -227,7 +338,10 @@ def test_subscription_when_opted_out_with_permission_should_reenable_without_pro
     push_page: Page,
 ) -> None:
     """Повторная подписка использует ранее выданное разрешение браузера."""
-    push_page.evaluate("window.mockOneSignal.Notifications.permission = true")
+    push_page.evaluate(
+        "window.mockNotificationPermission = 'granted'; "
+        "window.mockOneSignal.Notifications.permission = true"
+    )
     _load_integration(push_page)
     push_page.locator("#web-push-toggle").click()
     expect(push_page.locator("#web-push-status")).to_have_text("Уведомления включены.")

@@ -2,24 +2,57 @@
 
 import hashlib
 import json
-from typing import TYPE_CHECKING, Any, cast
+import uuid
+from typing import TYPE_CHECKING, Any, Final, cast
 
 from django.contrib import admin, messages
 from django.core import signing
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Model, Q
-from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
+from django.db.models import Count, Model, Q, QuerySet
+from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import URLPattern, path, reverse
 from django.utils import timezone
 
 from apps.users.models import User
 
+from .broadcast_progress import broadcast_progress, broadcast_stage
 from .domain.rules import NotificationValidationError
 from .forms import BroadcastForm
 from .models import Broadcast, Delivery, EventPolicy, NotificationPreference, PushDevice
 from .services import center_enabled, event_policy, queue_broadcast
+
+FORM_TOKEN_AGE: Final = 3600
+FORM_TOKEN_SALT: Final = "notification-broadcast-form"
+CONTENT_FIELDS: Final = (
+    "title",
+    "body",
+    "url",
+    "send_push",
+    "send_email",
+    "send_inbox",
+)
+
+
+def _submission(request: HttpRequest) -> uuid.UUID:
+    try:
+        data = signing.loads(
+            request.POST.get("_broadcast_submission", ""),
+            salt=FORM_TOKEN_SALT,
+            max_age=FORM_TOKEN_AGE,
+        )
+        if not isinstance(data, dict) or data.get("user") != request.user.pk:
+            raise PermissionDenied
+        return uuid.UUID(data["nonce"])
+    except (signing.BadSignature, ValueError, KeyError, TypeError):
+        raise PermissionDenied("Форма устарела. Откройте её заново.") from None
+
+
+def _same_content(left: Broadcast, right: Broadcast) -> bool:
+    return all(
+        getattr(left, field) == getattr(right, field) for field in CONTENT_FIELDS
+    )
 
 
 def _fingerprint(campaign: Broadcast) -> str:
@@ -126,7 +159,7 @@ class BroadcastAdmin(_BroadcastAdmin):
     change_form_template = "admin/notifications/broadcast_change.html"
     list_display = [
         "title",
-        "status",
+        "processing_status",
         "is_test",
         "created_by",
         "confirmed_by",
@@ -143,14 +176,13 @@ class BroadcastAdmin(_BroadcastAdmin):
         "target_user",
         "created_at",
     ]
-    fields = [
-        "title",
-        "body",
-        "url",
-        "send_push",
-        "send_email",
-        "send_inbox",
-        *readonly_fields,
+    fieldsets = [
+        ("Сообщение", {"fields": ["title", "body", "url"]}),
+        ("Каналы отправки", {"fields": ["send_push", "send_email", "send_inbox"]}),
+        (
+            "Служебные сведения",
+            {"fields": tuple(readonly_fields), "classes": ["collapse"]},
+        ),
     ]
     actions = None
 
@@ -158,10 +190,12 @@ class BroadcastAdmin(_BroadcastAdmin):
         """Подключает счётчики символов без внешних библиотек.
 
         Attributes:
-            js: Локальный скрипт счётчиков.
+            js: Локальный скрипт счётчиков, действий и живой сводки.
+            css: Стили действий и таблицы, совместимые с темой админки.
         """
 
         js = ["js/notification_admin.js"]
+        css = {"all": ["css/pages/notification-admin.css"]}
 
     def get_urls(self) -> list[URLPattern]:
         """Регистрирует подтверждение и личный тест под защитой admin_view.
@@ -170,6 +204,11 @@ class BroadcastAdmin(_BroadcastAdmin):
             URL предпросмотра и теста, затем штатные маршруты модели.
         """
         return [
+            path(
+                "<int:pk>/progress/",
+                self.admin_site.admin_view(self.progress_view),
+                name="notifications_broadcast_progress",
+            ),
             path(
                 "<int:pk>/send/",
                 self.admin_site.admin_view(self.send_view),
@@ -201,7 +240,7 @@ class BroadcastAdmin(_BroadcastAdmin):
             Все поля при выходе из состояния черновика.
         """
         return (
-            [str(field) for field in self.fields]
+            list(CONTENT_FIELDS) + list(self.readonly_fields)
             if obj and obj.status != "draft"
             else [str(field) for field in self.readonly_fields]
         )
@@ -241,9 +280,198 @@ class BroadcastAdmin(_BroadcastAdmin):
                 != "draft"
             ):
                 raise PermissionDenied
+            direct = "_send_now" in request.POST or "_test_now" in request.POST
+            if direct:
+                self._authorize(request)
+            if direct or request.POST.get("_broadcast_submission"):
+                submission = _submission(request)
+            else:
+                submission = None
+            if not change and submission is not None:
+                existing, _ = Broadcast.objects.get_or_create(
+                    submission_id=submission,
+                    defaults={
+                        **{field: getattr(obj, field) for field in CONTENT_FIELDS},
+                        "created_by": request.user,
+                    },
+                )
+                if (
+                    not _same_content(obj, existing)
+                    or existing.created_by_id != request.user.pk
+                ):
+                    raise PermissionDenied(
+                        "Эта форма уже использована с другим содержимым."
+                    )
+                for field in obj._meta.concrete_fields:
+                    setattr(obj, field.attname, getattr(existing, field.attname))
+                obj._state.adding = False
+                obj._state.db = existing._state.db
+                return
             if not change:
                 obj.created_by = cast(User, request.user)
             super().save_model(request, obj, form, change)
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Broadcast]:
+        """Добавляет счётчики этапа для списка без запроса на каждую строку.
+
+        Args:
+            request: Запрос администратора.
+
+        Returns:
+            Рассылки с агрегированными состояниями заданий.
+        """
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(
+                waiting_jobs=Count(
+                    "delivery", filter=Q(delivery__status__in=["queued", "processing"])
+                ),
+                failed_jobs=Count("delivery", filter=Q(delivery__status="failed")),
+                uncertain_jobs=Count(
+                    "delivery", filter=Q(delivery__status="uncertain")
+                ),
+            )
+        )
+
+    @admin.display(description="Ход отправки")
+    def processing_status(self, obj: Broadcast) -> str:
+        """Показывает фактический этап вместо технического состояния формирования.
+
+        Args:
+            obj: Рассылка с аннотированными счётчиками.
+
+        Returns:
+            Понятный этап обработки.
+        """
+        return broadcast_stage(
+            obj,
+            waiting=getattr(obj, "waiting_jobs", 0),
+            failed=getattr(obj, "failed_jobs", 0),
+            uncertain=getattr(obj, "uncertain_jobs", 0),
+        )
+
+    def render_change_form(
+        self,
+        request: HttpRequest,
+        context: dict[str, Any],
+        add: bool = False,
+        change: bool = False,
+        form_url: str = "",
+        obj: Broadcast | None = None,
+    ) -> HttpResponse:
+        """Добавляет подписанный ключ формы и панель текущего прогресса.
+
+        Args:
+            request: Запрос администратора.
+            context: Контекст штатной формы.
+            add: Создание черновика.
+            change: Изменение существующего объекта.
+            form_url: Адрес формы.
+            obj: Текущая рассылка.
+
+        Returns:
+            Штатная форма с понятными действиями и наблюдаемым результатом.
+        """
+        context.update(
+            {
+                "broadcast_submission": request.POST.get("_broadcast_submission")
+                or signing.dumps(
+                    {"nonce": str(uuid.uuid4()), "user": request.user.pk},
+                    salt=FORM_TOKEN_SALT,
+                ),
+                "show_broadcast_actions": (obj is None or obj.status == "draft")
+                and (
+                    self.has_add_permission(request)
+                    if obj is None
+                    else self.has_change_permission(request, obj)
+                ),
+                "broadcast_enabled": center_enabled(),
+            }
+        )
+        if obj is not None and obj.status != "draft":
+            context["broadcast_progress"] = broadcast_progress(obj)
+            context["broadcast_progress_url"] = reverse(
+                "admin:notifications_broadcast_progress", args=[obj.pk]
+            )
+            context["broadcast_journal_url"] = (
+                reverse("admin:notifications_delivery_changelist")
+                + f"?broadcast__id__exact={obj.pk}"
+            )
+        draft_id = request.GET.get("draft", "")
+        if (
+            obj is not None
+            and obj.is_test
+            and draft_id.isascii()
+            and draft_id.isdecimal()
+        ):
+            draft = Broadcast.objects.filter(
+                pk=int(draft_id), status="draft", is_test=False
+            ).first()
+            if draft is not None and self.has_change_permission(request, draft):
+                context["broadcast_draft_url"] = reverse(
+                    "admin:notifications_broadcast_change", args=[draft.pk]
+                )
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def response_add(
+        self, request: HttpRequest, obj: Broadcast, post_url_continue: str | None = None
+    ) -> HttpResponse:
+        """Направляет заполненную новую форму сразу к выбранному действию.
+
+        Args:
+            request: Проверенный POST формы.
+            obj: Сохранённый черновик.
+            post_url_continue: Штатный адрес продолжения.
+
+        Returns:
+            Подтверждение аудитории, прогресс личного теста или штатный ответ.
+        """
+        return self._direct_response(request, obj) or super().response_add(
+            request, obj, post_url_continue
+        )
+
+    def response_change(self, request: HttpRequest, obj: Broadcast) -> HttpResponse:
+        """Использует тот же сценарий для редактируемого черновика.
+
+        Args:
+            request: Проверенный POST формы.
+            obj: Сохранённая рассылка.
+
+        Returns:
+            Выбранное действие либо штатный ответ Django Admin.
+        """
+        return self._direct_response(request, obj) or super().response_change(
+            request, obj
+        )
+
+    def _direct_response(
+        self, request: HttpRequest, obj: Broadcast
+    ) -> HttpResponse | None:
+        if "_send_now" in request.POST:
+            return redirect("admin:notifications_broadcast_send", obj.pk)
+        if "_test_now" in request.POST:
+            return self._personal_test(
+                request, obj, uuid.uuid5(_submission(request), "personal-test")
+            )
+        return None
+
+    def progress_view(self, request: HttpRequest, pk: int) -> HttpResponse:
+        """Возвращает только сводку текущих состояний под защитой прав админки.
+
+        Args:
+            request: GET без изменения рассылки.
+            pk: Идентификатор рассылки.
+
+        Returns:
+            JSON с этапом и счётчиками либо отказ доступа.
+        """
+        if request.method != "GET":
+            return HttpResponse(status=405)
+        campaign = get_object_or_404(Broadcast, pk=pk)
+        if not self.has_view_or_change_permission(request, campaign):
+            raise PermissionDenied
+        return JsonResponse(broadcast_progress(campaign))
 
     def _authorize(self, request: HttpRequest) -> None:
         if not cast(User, request.user).has_perm("notifications.send_broadcast"):
@@ -284,13 +512,17 @@ class BroadcastAdmin(_BroadcastAdmin):
             self.log_change(request, campaign, "Подтверждена массовая рассылка")
             self.message_user(
                 request,
-                "Рассылка поставлена в очередь. Accepted означает принятие транспортом, а не прочтение.",
+                "Отправка запущена. Ход обработки и результаты показаны ниже.",
                 messages.SUCCESS,
             )
             return redirect("admin:notifications_broadcast_change", pk)
         context: dict[str, Any] = {
             **self.admin_site.each_context(request),
             "title": "Подтверждение рассылки",
+            "broadcast_submission": signing.dumps(
+                {"nonce": str(uuid.uuid4()), "user": request.user.pk},
+                salt=FORM_TOKEN_SALT,
+            ),
             "campaign": campaign,
             "counts": _counts(campaign),
             "snapshot": signing.dumps(
@@ -315,28 +547,51 @@ class BroadcastAdmin(_BroadcastAdmin):
         if request.method != "POST":
             return HttpResponse(status=405)
         source = get_object_or_404(Broadcast, pk=pk, status="draft")
-        test = Broadcast.objects.create(
-            title=source.title,
-            body=source.body,
-            url=source.url,
-            send_push=source.send_push,
-            send_email=source.send_email,
-            send_inbox=source.send_inbox,
-            is_test=True,
-            target_user=request.user,
-            created_by=request.user,
+        return self._personal_test(
+            request,
+            source,
+            (
+                uuid.uuid5(_submission(request), "personal-test")
+                if request.POST.get("_broadcast_submission")
+                else uuid.uuid4()
+            ),
         )
-        try:
-            queue_broadcast(test.pk, actor=cast(User, request.user))
-        except NotificationValidationError as exc:
-            return HttpResponseBadRequest(str(exc))
+
+    def _personal_test(
+        self, request: HttpRequest, source: Broadcast, submission: uuid.UUID
+    ) -> HttpResponse:
+        with transaction.atomic():
+            test, _ = Broadcast.objects.get_or_create(
+                submission_id=submission,
+                defaults={
+                    **{field: getattr(source, field) for field in CONTENT_FIELDS},
+                    "is_test": True,
+                    "target_user": request.user,
+                    "created_by": request.user,
+                },
+            )
+            if (
+                not test.is_test
+                or test.target_user_id != request.user.pk
+                or not _same_content(source, test)
+            ):
+                raise PermissionDenied(
+                    "Эта форма уже использована с другим содержимым."
+                )
+            try:
+                queue_broadcast(test.pk, actor=cast(User, request.user))
+            except NotificationValidationError as exc:
+                return HttpResponseBadRequest(str(exc))
         self.log_change(request, source, f"Личный тест: рассылка #{test.pk}")
         self.message_user(
             request,
-            "Личный тест поставлен только вам; ваши согласия и разрешения устройств учитываются.",
+            "Тест отправляется только вам. Ниже — ход его обработки; исходный черновик сохранён.",
             messages.SUCCESS,
         )
-        return redirect(reverse("admin:notifications_broadcast_change", args=[pk]))
+        return redirect(
+            reverse("admin:notifications_broadcast_change", args=[test.pk])
+            + f"?draft={source.pk}"
+        )
 
     def cancel_view(self, request: HttpRequest, pk: int) -> HttpResponse:
         """Останавливает только будущие задания после явного подтверждения.

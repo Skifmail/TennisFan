@@ -260,8 +260,13 @@ def expand_broadcast(broadcast_id: int, *, batch_size: int = BATCH_SIZE) -> int:
                         "expires_at": now + DELIVERY_LIFETIME,
                     },
                 )
+        campaign.processed_users += 1
+        if note is not None:
+            campaign.inbox_created += 1
         campaign.cursor_user_id = user.pk
     if len(rows) < batch_size:
         campaign.status = "expanded"
-    campaign.save(update_fields=["cursor_user_id", "status"])
+    campaign.save(
+        update_fields=["cursor_user_id", "status", "processed_users", "inbox_created"]
+    )
     return len(rows)

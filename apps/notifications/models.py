@@ -157,6 +157,9 @@ class Broadcast(models.Model):
         cursor_user_id: Курсор пакетного обхода пользователей.
         upper_user_id: Верхняя граница аудитории на момент подтверждения.
         target_user: При тесте единственный адресат — сам администратор.
+        submission_id: Уникальный ключ формы для защиты от повторного POST.
+        processed_users: Число обработанных получателей при формировании.
+        inbox_created: Число реально созданных уведомлений ЛК.
     """
 
     title: models.CharField[str, str] = models.CharField(
@@ -213,6 +216,15 @@ class Broadcast(models.Model):
         related_name="test_notification_broadcasts",
     )
     is_test: models.BooleanField[bool, bool] = models.BooleanField(default=False)
+    submission_id: models.UUIDField[uuid.UUID | None, uuid.UUID | None] = (
+        models.UUIDField(null=True, unique=True, editable=False)
+    )
+    processed_users: models.PositiveIntegerField[int, int] = (
+        models.PositiveIntegerField(default=0, editable=False)
+    )
+    inbox_created: models.PositiveIntegerField[int, int] = models.PositiveIntegerField(
+        default=0, editable=False
+    )
     cursor_user_id: models.BigIntegerField[int, int] = models.BigIntegerField(default=0)
     upper_user_id: models.BigIntegerField[int, int] = models.BigIntegerField(default=0)
     created_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(

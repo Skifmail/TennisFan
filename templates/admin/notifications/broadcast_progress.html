@@ -1,0 +1,16 @@
+<section id="broadcast-progress" class="broadcast-progress" data-progress-url="{{ broadcast_progress_url }}" data-terminal="{{ broadcast_progress.terminal|yesno:'true,false' }}" aria-labelledby="broadcast-progress-title">
+    <h2 id="broadcast-progress-title">{% if original.is_test %}Тест только вам{% else %}Ход отправки{% endif %}</h2>
+    <p class="broadcast-progress__stage" data-progress-stage aria-live="polite">{{ broadcast_progress.stage }}</p>
+    <p>Обработано получателей: <strong data-progress-users>{% if broadcast_progress.counters_complete %}{{ broadcast_progress.processed_users }}{% else %}—{% endif %}</strong>. Сохранено уведомлений в ЛК: <strong data-progress-inbox>{% if broadcast_progress.counters_complete %}{{ broadcast_progress.inbox_created }}{% else %}—{% endif %}</strong>.</p>
+    <div class="broadcast-progress__table"><table><caption>Задания внешних каналов</caption><thead><tr><th>Канал</th><th>Ожидают</th><th>Обрабатываются</th><th>Принято транспортом</th><th>Пропущено</th><th>Ошибки</th><th>Нужно проверить</th></tr></thead><tbody>
+    {% for channel, counts in broadcast_progress.channels.items %}
+    <tr><th>{% if channel == 'push' %}Push{% else %}Email{% endif %}</th><td data-channel="{{ channel }}" data-state="queued">{{ counts.queued }}</td><td data-channel="{{ channel }}" data-state="processing">{{ counts.processing }}</td><td data-channel="{{ channel }}" data-state="accepted">{{ counts.accepted }}</td><td data-channel="{{ channel }}" data-state="skipped">{{ counts.skipped }}</td><td data-channel="{{ channel }}" data-state="failed">{{ counts.failed }}</td><td data-channel="{{ channel }}" data-state="uncertain">{{ counts.uncertain }}</td></tr>
+    {% endfor %}
+    </tbody></table></div>
+    {% if not broadcast_progress.terminal %}<p class="help">Обработчик проверяет очередь раз в минуту; запуск не всегда мгновенный. Очередью управляет система — дополнительных действий не требуется.</p>{% endif %}
+    <p class="help">«Принято транспортом» для Push означает принятие OneSignal, для Email — почтовым сервером, а не прочтение. Одно Push-задание может охватывать несколько устройств. Пользователи без нужного согласия могут не входить в задания. Пока формируются получатели, количество заданий растёт.</p>
+    {% if not broadcast_progress.counters_complete %}<p class="help">Для старых рассылок точные счётчики получателей и ЛК не сохранялись. Результаты внешних каналов доступны в таблице.</p>{% endif %}
+    {% if broadcast_draft_url %}<p><a href="{{ broadcast_draft_url }}">Вернуться к сохранённому черновику</a></p>{% endif %}
+    <p><button type="button" id="broadcast-progress-refresh">Обновить статус</button> <a href="{{ broadcast_journal_url }}">Открыть журнал этой рассылки</a></p>
+    <p data-progress-refresh role="status">{% if broadcast_progress.terminal %}Обработка завершена.{% else %}Статус обновляется автоматически каждые 5 секунд. Обработчик проверяет очередь раз в минуту; запуск не всегда мгновенный. Дополнительных действий не требуется.{% endif %}</p>
+</section>

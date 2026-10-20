@@ -9,8 +9,9 @@
 <p>Push может прийти на несколько включённых устройств одного пользователя. ЛК не зависит от пользовательских переключателей.</p>
 <p>Точный объём видимого текста зависит от устройства. После подтверждения текст и каналы изменить нельзя.</p>
 {% if campaign.status == 'draft' and enabled %}
-<form method="post" action="{% url 'admin:notifications_broadcast_test' campaign.pk %}">{% csrf_token %}<button type="submit">Тест только мне</button></form>
+<form method="post" action="{% url 'admin:notifications_broadcast_test' campaign.pk %}">{% csrf_token %}<input type="hidden" name="_broadcast_submission" value="{{ broadcast_submission }}"><button type="submit">Отправить тест себе</button></form>
 <hr>
-<form method="post">{% csrf_token %}<input type="hidden" name="snapshot" value="{{ snapshot }}"><label><input type="checkbox" name="confirm" value="yes" required>Подтверждаю отправку указанной аудитории</label><p><button type="submit">Поставить массовую рассылку в очередь</button></p></form>
+<p>После подтверждения откроется страница с ходом отправки. Очередью управляет система автоматически.</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="snapshot" value="{{ snapshot }}"><label><input type="checkbox" name="confirm" value="yes" required>Подтверждаю отправку указанной аудитории</label><p><button type="submit">Подтвердить и отправить</button></p></form>
 {% else %}<p>Отправка недоступна: центр выключен или рассылка уже подтверждена.</p>{% endif %}
 {% endblock %}

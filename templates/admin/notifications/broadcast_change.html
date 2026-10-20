@@ -1,10 +1,25 @@
 {% extends 'admin/change_form.html' %}
+{% block form_top %}
+{{ block.super }}
+<input type="hidden" name="_broadcast_submission" value="{{ broadcast_submission }}">
+{% if broadcast_progress %}{% include 'admin/notifications/broadcast_progress.html' %}{% endif %}
+{% if show_broadcast_actions %}<p class="help">Заполните сообщение и выберите каналы. Можно сохранить черновик, отправить тест только себе или перейти к подтверждению массовой отправки.</p>{% endif %}
+{% endblock %}
+{% block submit_buttons_bottom %}
+{% if show_broadcast_actions %}
+<div class="submit-row broadcast-actions">
+    <input type="submit" name="_save" value="Сохранить черновик">
+    {% if perms.notifications.send_broadcast and broadcast_enabled %}
+    <button type="submit" name="_test_now" value="1">Отправить тест себе</button>
+    <button type="submit" name="_send_now" value="1" class="default">Отправить рассылку</button>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
 {% block object-tools-items %}
 {{ block.super }}
-{% if original and original.status == 'draft' and perms.notifications.send_broadcast %}
-<li><a href="{% url 'admin:notifications_broadcast_send' original.pk %}">Предпросмотр и подтверждение</a></li>
+{% if original and original.status != 'draft' and original.status != 'cancelled' and not broadcast_progress.terminal and perms.notifications.send_broadcast %}
+<li><a href="{% url 'admin:notifications_broadcast_cancel' original.pk %}">Остановить отправку</a></li>
 {% endif %}
-{% if original and original.status != 'draft' and original.status != 'cancelled' and perms.notifications.send_broadcast %}
-<li><a href="{% url 'admin:notifications_broadcast_cancel' original.pk %}">Остановить очередь рассылки</a></li>
-{% endif %}
+<li><a href="{% url 'admin:notifications_broadcast_changelist' %}">Все рассылки</a></li>
 {% endblock %}

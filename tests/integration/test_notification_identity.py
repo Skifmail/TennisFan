@@ -358,3 +358,33 @@ def test_confirmation_when_transport_unavailable_should_explain_retry_delay(
     assert response["Retry-After"] == "60"
     assert not PushDevice.objects.get().active
     assert _device(client, identity, enableAccount=True).status_code == 429
+
+
+def test_confirmation_when_transport_fails_should_log_safe_code_in_message(
+    client: Client, mocker: MockerFixture
+) -> None:
+    """Сохраняет безопасную причину отказа даже в журнале без дополнительных полей.
+
+    Args:
+        client: Авторизованный браузер.
+        mocker: Транспорт без настоящей отправки.
+    """
+    from loguru import logger
+
+    from apps.notifications.infrastructure.push import PushRejectedError
+
+    identity = _bind(client)
+    mocker.patch(
+        "apps.notifications.views.send_push",
+        side_effect=PushRejectedError("push_no_reachable_subscriptions"),
+    )
+    messages: list[str] = []
+    sink = logger.add(messages.append, format="{message}", catch=False)
+    try:
+        response = _device(client, identity, enableAccount=True)
+    finally:
+        logger.remove(sink)
+    assert response.status_code == 503
+    assert any("push_no_reachable_subscriptions" in message for message in messages)
+    assert all(SUBSCRIPTION not in message for message in messages)
+    assert all("test-not-a-key" not in message for message in messages)

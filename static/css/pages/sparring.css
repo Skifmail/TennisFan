@@ -502,6 +502,11 @@ img.player-avatar.sparring-card__avatar {
         flex: 1 1 auto;
         min-width: 8rem;
     }
+
+    .sparring-card__actions .direct-message-action {
+        flex: 1 1 auto;
+        min-width: 8rem;
+    }
 }
 
 @media (width <= 1200px) {

@@ -2163,6 +2163,17 @@ button {
     }
 }
 
+/* Обёртка кнопки «Написать» в личный чат: форма не должна ломать flex-ряды действий */
+.direct-message-action {
+    display: flex;
+    margin: 0;
+    min-width: 0;
+}
+
+.direct-message-action .btn {
+    width: 100%;
+}
+
 /* END buttons.css */
 
 /* BEGIN forms.css */
@@ -9020,6 +9031,35 @@ body.has-fullscreen-loader {
 
 .profile-info__messengers {
     margin-top: var(--spacing-md);
+}
+
+/* Контакты игрока: «Написать» и мессенджеры в одном выровненном ряду */
+.profile-info__contacts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+}
+
+.profile-info__contacts .profile-info__messengers {
+    margin-top: 0;
+}
+
+.profile-info__contacts .direct-message-action {
+    display: flex;
+}
+
+.profile-info__contacts .direct-message-action .btn {
+    white-space: nowrap;
+}
+
+@media (width <= 768px) {
+    .profile-info__contacts .direct-message-action .btn {
+        font-size: var(--font-size-sm);
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
 }
 
 .profile-info__subscription,
@@ -21810,10 +21850,8 @@ img.player-avatar.sparring-card__avatar {
     margin: 0 0 var(--spacing-sm);
     font-size: var(--font-size-sm);
     line-height: 1.45;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
 }
 
 .sparring-card__details {
@@ -21928,6 +21966,11 @@ img.player-avatar.sparring-card__avatar {
     }
 
     .sparring-card__actions .sparring-card__btn {
+        flex: 1 1 auto;
+        min-width: 8rem;
+    }
+
+    .sparring-card__actions .direct-message-action {
         flex: 1 1 auto;
         min-width: 8rem;
     }

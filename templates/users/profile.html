@@ -580,13 +580,17 @@
                 <p class="profile-info__bio text-secondary">{{ player.bio }}</p>
                 {% endif %}
 
-                {% if request.user.is_authenticated and request.user.is_active and request.user != player.user and player.user.is_active and not player.is_bye %}
-                {% include 'includes/direct_message_button.html' with target_player=player %}
-                {% endif %}
                 {% if request.user != player.user %}
-                    {% if player.telegram_url or player.whatsapp_url or player.max_contact_display %}
-                    <div class="profile-info__messengers">
-                        {% include 'includes/messenger_links.html' with obj=player %}
+                    {% if request.user.is_authenticated and request.user.is_active and player.user.is_active and not player.is_bye or player.telegram_url or player.whatsapp_url or player.max_contact_display %}
+                    <div class="profile-info__contacts">
+                        {% if request.user.is_authenticated and request.user.is_active and player.user.is_active and not player.is_bye %}
+                        {% include 'includes/direct_message_button.html' with target_player=player %}
+                        {% endif %}
+                        {% if player.telegram_url or player.whatsapp_url or player.max_contact_display %}
+                        <div class="profile-info__messengers">
+                            {% include 'includes/messenger_links.html' with obj=player %}
+                        </div>
+                        {% endif %}
                     </div>
                     {% endif %}
                 {% endif %}

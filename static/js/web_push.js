@@ -65,6 +65,12 @@
             let failureMessage = '';
             let retryUntil = 0;
             let retryTimer = null;
+            const manualCode = Boolean(config.codeRequestUrl && config.codeVerifyUrl);
+            const codeForm = document.getElementById('web-push-code-form');
+            const codeInput = document.getElementById('web-push-code');
+            const codeSubmit = document.getElementById('web-push-code-submit');
+            const codeStatus = document.getElementById('web-push-code-status');
+            let codeRetryUntil = 0;
 
             class BindingError extends Error {
                 constructor(code, httpStatus, retryAfter) {
@@ -104,8 +110,8 @@
                     // Отзываем только в явном обработчике отключения ниже.
                     if (!active) return;
                     // Push может прийти раньше HTTP-ответа (или при его потере).
-                    if (enableAccount === true) window.tennisFanPushHandoff?.beginWaiting();
-                    const state = await api(config.deviceUrl, {
+                    if (enableAccount === true && !manualCode) window.tennisFanPushHandoff?.beginWaiting();
+                    const state = await api(manualCode && enableAccount === true ? config.codeRequestUrl : config.deviceUrl, {
                         externalId: boundExternalId,
                         subscriptionId: subscription.id,
                         active: active,
@@ -116,7 +122,9 @@
                     if (state.active) window.tennisFanPushHandoff?.stopWaiting();
                     if (state.pending) {
                         confirmationPending = true;
-                        window.tennisFanPushHandoff?.beginWaiting();
+                        if (manualCode && codeInput) codeInput.value = '';
+                        if (manualCode && codeStatus) codeStatus.textContent = 'Новый код отправлен. Используйте последнее уведомление.';
+                        if (!manualCode) window.tennisFanPushHandoff?.beginWaiting();
                     }
                 }
             }
@@ -129,6 +137,7 @@
                 }
                 const identity = await api(config.identityUrl, {});
                 boundExternalId = identity.externalId;
+                confirmationPending = manualCode && identity.pendingCode === true;
                 accountPushEnabled = identity.pushEnabled !== false;
                 verifiedSubscriptionId = identity.verifiedSubscriptionId;
                 await syncDevice(false);
@@ -136,20 +145,24 @@
 
             function update() {
                 button.disabled = busy;
+                if (codeForm) codeForm.hidden = !manualCode || !confirmationPending;
+                if (codeSubmit) codeSubmit.disabled = busy || Date.now() < codeRetryUntil;
                 button.textContent = 'Включить уведомления';
                 if (window.Notification && Notification.permission === 'denied') {
                     status.textContent = 'Уведомления запрещены. Разрешите их в настройках браузера или устройства.';
                     button.disabled = true;
                 } else if (config.notificationCenter && confirmationPending) {
-                    status.textContent = 'Разрешение на устройстве включено. Откройте полученный push и подтвердите подключение TennisFan. Если он не пришёл, повторите через минуту.';
-                    button.textContent = 'Отправить подтверждение повторно';
+                    status.textContent = manualCode
+                        ? 'Введите шестизначный код из полученного push. Нажимать уведомление не нужно. Код действует 5 минут.'
+                        : 'Разрешение на устройстве включено. Откройте полученный push и подтвердите подключение TennisFan. Если он не пришёл, повторите через минуту.';
+                    button.textContent = manualCode ? 'Отправить новый код' : 'Отправить подтверждение повторно';
                 } else if (verifiedSubscriptionId && !subscription.id) {
                     status.textContent = 'Загружаем состояние подключённого устройства…';
                 } else if (!accountPushEnabled) {
                     status.textContent = 'Push отключены в настройках аккаунта. Можно включить их этой кнопкой.';
                 } else if (config.notificationCenter && subscription.optedIn && verifiedSubscriptionId !== subscription.id) {
                     status.textContent = 'Push на устройстве разрешены. Подтвердите подключение к TennisFan для персональных уведомлений.';
-                    button.textContent = 'Подтвердить подключение';
+                    button.textContent = manualCode ? 'Получить код подключения' : 'Подтвердить подключение';
                 } else if (subscription.optedIn && subscription.id) {
                     status.textContent = 'Уведомления включены.';
                     button.textContent = 'Отключить уведомления';
@@ -173,7 +186,7 @@
 
             function reportError(error) {
                 if (error instanceof BindingError && error.httpStatus === 429) {
-                    failureMessage = 'Подождите перед повторной отправкой подтверждения.';
+                    failureMessage = manualCode ? 'Подождите перед повторной отправкой кода.' : 'Подождите перед повторной отправкой подтверждения.';
                 } else if (error instanceof BindingError && error.code === 'confirmation_unavailable') {
                     failureMessage = 'Не удалось отправить подтверждение. Разрешение устройства сохранено, но подключение TennisFan ещё не подтверждено.';
                 } else if (error instanceof BindingError && error.httpStatus === 409) {
@@ -186,6 +199,50 @@
                     if (retryTimer === null) retryTimer = window.setInterval(update, SECOND_MS);
                 }
                 update();
+            }
+
+            if (manualCode && codeForm && codeInput && codeSubmit && codeStatus) {
+                codeForm.addEventListener('submit', async event => {
+                    event.preventDefault();
+                    if (busy || Date.now() < codeRetryUntil) return;
+                    busy = true;
+                    failureMessage = '';
+                    codeStatus.textContent = 'Проверяем код…';
+                    update();
+                    try {
+                        const result = await api(config.codeVerifyUrl, {
+                            externalId: boundExternalId, code: codeInput.value.trim(),
+                        });
+                        if (result.active !== true || typeof result.verifiedSubscriptionId !== 'string' || !result.verifiedSubscriptionId) {
+                            throw new BindingError('invalid_response', 400, null);
+                        }
+                        accountPushEnabled = true;
+                        verifiedSubscriptionId = result.verifiedSubscriptionId;
+                        confirmationPending = false;
+                        codeInput.value = '';
+                        codeStatus.textContent = '';
+                        window.tennisFanPushHandoff?.stopWaiting();
+                        const preference = document.getElementById('id_push_enabled');
+                        if (preference) preference.checked = true;
+                        const preferences = document.querySelector('[data-notification-preferences]');
+                        if (preferences) preferences.dataset.pushEnabled = 'true';
+                    } catch (error) {
+                        if (error instanceof BindingError && error.code === 'confirmation_attempts_exhausted') {
+                            codeRetryUntil = Date.now() + error.retrySeconds * SECOND_MS;
+                            codeStatus.textContent = 'Слишком много неверных попыток. Повторите через ' + error.retrySeconds + ' с.';
+                            window.setTimeout(update, error.retrySeconds * SECOND_MS);
+                        } else if (error instanceof BindingError && error.code === 'confirmation_invalid') {
+                            codeStatus.textContent = 'Неверный код. Проверьте шесть цифр в последнем push.';
+                        } else if (error instanceof BindingError && error.code === 'confirmation_expired') {
+                            codeStatus.textContent = 'Код истёк или уже использован. Запросите новый код кнопкой выше.';
+                        } else {
+                            codeStatus.textContent = 'Не удалось проверить код. Попробуйте ещё раз.';
+                        }
+                    } finally {
+                        busy = false;
+                        update();
+                    }
+                });
             }
 
             OneSignal.Notifications.addEventListener('permissionChange', update);

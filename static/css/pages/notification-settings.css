@@ -270,3 +270,42 @@
     flex-basis: 100%;
 }
 }
+
+
+.notification-code {
+    margin-top: 1.5rem;
+}
+
+.notification-code[hidden] {
+    display: none;
+}
+
+.notification-code label {
+    display: block;
+    font-weight: 600;
+}
+
+.notification-code__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.notification-code input {
+    width: 10rem;
+    max-width: 100%;
+    min-height: 3rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #c5a057;
+    border-radius: 0.5rem;
+    background: #002b20;
+    color: #fff;
+    font-size: 1.25rem;
+    letter-spacing: 0.25em;
+}
+
+.notification-code input:focus-visible {
+    outline: 2px solid #e0c27b;
+    outline-offset: 3px;
+}

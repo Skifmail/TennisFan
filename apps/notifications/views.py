@@ -27,10 +27,11 @@ from .device_binding import (
     DeviceBindingError,
     confirm_device,
     request_confirmation,
+    verify_device_code,
 )
 from .forms import PreferenceForm
 from .infrastructure.push import PushRejectedError, PushTransportError, send_push
-from .models import NotificationPreference, PushDevice
+from .models import NotificationPreference, PushConfirmation, PushDevice
 from .services import center_enabled, preferences
 
 COOKIE_AGE_SECONDS: Final = 1209600
@@ -111,6 +112,12 @@ def notification_identity(request: HttpRequest) -> HttpResponse:
                 else None
             ),
             "pushEnabled": preferences(cast(User, request.user).pk)[0],
+            "pendingCode": PushConfirmation.objects.filter(
+                device=device,
+                generation=device.external_id,
+                manual_code=True,
+                expires_at__gt=timezone.now(),
+            ).exists(),
         }
     )
     response.set_signed_cookie(
@@ -128,11 +135,14 @@ def notification_identity(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_POST
 @never_cache
-def notification_device(request: HttpRequest) -> HttpResponse:
+def notification_device(
+    request: HttpRequest, manual_code: bool = False
+) -> HttpResponse:
     """Отзывает устройство либо отправляет код только после явного действия.
 
     Args:
         request: JSON с поколением привязки, ID подписки и булевым active.
+        manual_code: Серверный маршрут запроса короткого кода.
 
     Returns:
         Состояние либо безопасный код отказа; секрет отсутствует в JSON.
@@ -154,6 +164,7 @@ def notification_device(request: HttpRequest) -> HttpResponse:
             active=data["active"],
             subscription_id=str(data.get("subscriptionId", "")),
             enable_account=data.get("enableAccount") is True,
+            manual_code=manual_code,
         )
     except ConfirmationThrottled:
         response = JsonResponse({"error": "confirmation_rate_limited"}, status=429)
@@ -170,11 +181,25 @@ def notification_device(request: HttpRequest) -> HttpResponse:
             + "#code="
             + state.code
         )
+        if manual_code:
+            url = (
+                settings.ONESIGNAL_SITE_ORIGIN.rstrip("/")
+                + reverse("notifications")
+                + "?settings=1#notification-settings"
+            )
         try:
             send_push(
                 subscription_ids=[state.subscription_id],
-                title="Подтвердите уведомления",
-                body="Нажмите, чтобы подключить уведомления TennisFan на этом устройстве.",
+                title=(
+                    "Код подключения TennisFan"
+                    if manual_code
+                    else "Подтвердите уведомления"
+                ),
+                body=(
+                    f"Код подключения: {state.code}. Введите его в настройках уведомлений TennisFan. Код действует 5 минут. Никому не сообщайте его."
+                    if manual_code
+                    else "Нажмите, чтобы подключить уведомления TennisFan на этом устройстве."
+                ),
                 url=url,
                 key=str(uuid.uuid4()),
                 ttl_seconds=int(CONFIRMATION_LIFETIME.total_seconds()),
@@ -236,4 +261,52 @@ def notification_confirm(request: HttpRequest) -> HttpResponse:
     response["Content-Security-Policy"] = (
         "default-src 'none'; script-src 'self'; style-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
     )
+    return response
+
+
+@login_required
+@require_POST
+@never_cache
+def notification_code_verify(request: HttpRequest) -> HttpResponse:
+    """Принимает короткий код только из CSRF-защищённого тела запроса.
+
+    Args:
+        request: JSON с кодом и текущим поколением исходного устройства.
+
+    Returns:
+        Состояние подключения либо безопасный отказ с ограничением подбора.
+    """
+    if not center_enabled():
+        return JsonResponse({"error": "disabled"}, status=503)
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict) or not isinstance(data.get("code"), str):
+            return JsonResponse({"error": "invalid_json"}, status=400)
+        generation = uuid.UUID(str(data.get("externalId", "")))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"error": "invalid_identity_or_json"}, status=400)
+    result = verify_device_code(
+        user=cast(User, request.user),
+        device_hash=device_hash(request),
+        generation=generation,
+        code=data["code"],
+    )
+    if result.active:
+        return JsonResponse(
+            {
+                "active": True,
+                "accountPushEnabled": True,
+                "verifiedSubscriptionId": result.subscription_id,
+            }
+        )
+    response = JsonResponse(
+        {"error": result.error},
+        status=(
+            429
+            if result.retry_after
+            else (409 if result.error == "confirmation_expired" else 400)
+        ),
+    )
+    if result.retry_after:
+        response["Retry-After"] = str(result.retry_after)
     return response

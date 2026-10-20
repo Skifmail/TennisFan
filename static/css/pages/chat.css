@@ -1328,6 +1328,39 @@
     line-height: 1.65;
 }
 
+.chat-discover-actions {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 35px;
+}
+
+.chat-discover-actions .chat-city-search {
+    flex: 1;
+    min-width: 0;
+}
+
+.chat-discover-create {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 17px;
+    border: 1px solid var(--chat-border);
+    border-radius: 14px;
+    background: var(--chat-field);
+    color: var(--chat-secondary-strong);
+    font-size: 0.8125rem;
+    font-weight: 550;
+    white-space: nowrap;
+    transition: background-color 120ms ease;
+}
+
+.chat-discover-create .chat-icon {
+    width: 16px;
+    height: 16px;
+}
+
 .chat-city-search {
     display: flex;
     align-items: center;
@@ -1336,7 +1369,7 @@
     border-radius: 14px;
     padding: 7px 7px 7px 15px;
     background: var(--chat-field);
-    margin-bottom: 35px;
+    margin-bottom: 0;
 }
 
 .chat-city-search > .chat-icon {
@@ -1548,6 +1581,10 @@
         background: var(--chat-hover);
     }
 
+    .chat-discover-create:hover {
+        background: var(--chat-hover);
+    }
+
     .chat-platform-link:hover {
         color: var(--chat-accent) !important;
     }
@@ -1588,6 +1625,17 @@
 
     .chat-city-grid {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (width <= 900px) {
+    .chat-discover-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .chat-discover-create {
+        min-height: 57px;
     }
 }
 
@@ -1779,18 +1827,20 @@
         display: none;
     }
 
-    .chat-discover-admin {
-        margin: -4px 0 16px;
+    .chat-discover-actions {
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 20px;
     }
 
-    .chat-discover-admin .chat-button {
-        min-height: 34px;
-        padding: 6px 12px;
+    .chat-discover-create {
+        min-height: 58px;
+        padding: 9px 14px;
         font-size: 0.75rem;
     }
 
     .chat-city-search {
-        margin-bottom: 20px;
+        margin-bottom: 0;
         padding-left: 11px;
         gap: 7px;
     }

@@ -336,3 +336,25 @@ def test_worker_when_legacy_unverified_device_active_should_skip(
     send = mocker.patch("apps.notifications.worker.send_push")
     process_deliveries(limit=10)
     send.assert_not_called()
+
+
+def test_confirmation_when_transport_unavailable_should_explain_retry_delay(
+    client: Client, mocker: MockerFixture
+) -> None:
+    """Отказ отправки оставляет безопасный лимит и сообщает срок следующей попытки.
+
+    Args:
+        client: Авторизованный браузер.
+        mocker: Изолированный транспорт без настоящей отправки.
+    """
+    from apps.notifications.infrastructure.push import PushTransportError
+
+    identity = _bind(client)
+    mocker.patch(
+        "apps.notifications.views.send_push", side_effect=PushTransportError("offline")
+    )
+    response = _device(client, identity, enableAccount=True)
+    assert response.status_code == 503
+    assert response["Retry-After"] == "60"
+    assert not PushDevice.objects.get().active
+    assert _device(client, identity, enableAccount=True).status_code == 429

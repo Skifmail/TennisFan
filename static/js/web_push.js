@@ -8,6 +8,9 @@
     const iosHelp = document.getElementById('web-push-ios-help');
     const sdkScript = document.getElementById('onesignal-sdk');
     const SDK_TIMEOUT_MS = 15000;
+    const DEFAULT_RETRY_SECONDS = 60;
+    const MAX_RETRY_SECONDS = 300;
+    const SECOND_MS = 1000;
 
     if (!configElement || !button || !status || window.tennisFanWebPushStarted) return;
     window.tennisFanWebPushStarted = true;
@@ -59,6 +62,20 @@
             let boundExternalId = null;
             let verifiedSubscriptionId = null;
             let confirmationPending = false;
+            let failureMessage = '';
+            let retryUntil = 0;
+            let retryTimer = null;
+
+            class BindingError extends Error {
+                constructor(code, httpStatus, retryAfter) {
+                    super('notification binding failed');
+                    this.code = code;
+                    this.httpStatus = httpStatus;
+                    const seconds = Number(retryAfter);
+                    this.retrySeconds = Number.isFinite(seconds) && seconds > 0
+                        ? Math.min(Math.ceil(seconds), MAX_RETRY_SECONDS) : DEFAULT_RETRY_SECONDS;
+                }
+            }
 
             async function api(url, data) {
                 const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
@@ -71,16 +88,25 @@
                     },
                     body: JSON.stringify(data),
                 });
-                if (!response.ok || response.redirected) throw new Error('notification binding failed');
-                return response.json();
+                let payload;
+                try { payload = await response.json(); }
+                catch (_error) { throw new BindingError('invalid_response', response.status, null); }
+                if (!response.ok || response.redirected) {
+                    throw new BindingError(payload.error, response.status, response.headers.get('Retry-After'));
+                }
+                return payload;
             }
 
             async function syncDevice(enableAccount) {
                 if (config.notificationCenter && config.authenticated) {
+                    const active = Boolean(subscription.optedIn && subscription.id && Notification.permission !== 'denied');
+                    // Неизвестное/ещё загружающееся состояние SDK — не команда отзыва.
+                    // Отзываем только в явном обработчике отключения ниже.
+                    if (!active) return;
                     const state = await api(config.deviceUrl, {
                         externalId: boundExternalId,
                         subscriptionId: subscription.id,
-                        active: Boolean(subscription.optedIn && subscription.id && Notification.permission !== 'denied'),
+                        active: active,
                         enableAccount: enableAccount === true,
                     });
                     accountPushEnabled = state.accountPushEnabled !== false;
@@ -111,6 +137,8 @@
                 } else if (config.notificationCenter && confirmationPending) {
                     status.textContent = 'Откройте полученный push и подтвердите подключение. Если он не пришёл, повторите через минуту.';
                     button.textContent = 'Отправить подтверждение повторно';
+                } else if (verifiedSubscriptionId && !subscription.id) {
+                    status.textContent = 'Загружаем состояние подключённого устройства…';
                 } else if (!accountPushEnabled) {
                     status.textContent = 'Push отключены в настройках аккаунта. Можно включить их этой кнопкой.';
                 } else if (config.notificationCenter && subscription.optedIn && verifiedSubscriptionId !== subscription.id) {
@@ -124,12 +152,41 @@
                 } else {
                     status.textContent = 'Уведомления выключены.';
                 }
+                if (failureMessage) status.textContent = failureMessage;
+                const remaining = Math.ceil((retryUntil - Date.now()) / SECOND_MS);
+                if (remaining > 0) {
+                    button.disabled = true;
+                    button.textContent = 'Повторить через ' + remaining + ' с';
+                    status.textContent += ' Повторите через ' + remaining + ' с.';
+                } else if (retryTimer !== null) {
+                    window.clearInterval(retryTimer);
+                    retryTimer = null;
+                }
+            }
+
+            function reportError(error) {
+                if (error instanceof BindingError && error.httpStatus === 429) {
+                    failureMessage = 'Подождите перед повторной отправкой подтверждения.';
+                } else if (error instanceof BindingError && error.code === 'confirmation_unavailable') {
+                    failureMessage = 'Не удалось отправить подтверждение. Разрешение устройства сохранено, но подключение TennisFan ещё не подтверждено.';
+                } else if (error instanceof BindingError && error.httpStatus === 409) {
+                    failureMessage = 'Состояние подключения изменилось. Обновите страницу и повторите подключение.';
+                } else {
+                    failureMessage = 'Не удалось проверить подключение. Проверьте интернет. Попробуйте ещё раз.';
+                }
+                if (error instanceof BindingError && (error.httpStatus === 429 || error.code === 'confirmation_unavailable')) {
+                    retryUntil = Date.now() + error.retrySeconds * SECOND_MS;
+                    if (retryTimer === null) retryTimer = window.setInterval(update, SECOND_MS);
+                }
+                update();
             }
 
             OneSignal.Notifications.addEventListener('permissionChange', update);
             subscription.addEventListener('change', function () {
                 update();
-                if (!busy) syncDevice(false).catch(unavailable);
+                if (!busy) syncDevice(false).then(update).catch(error => {
+                    if (!busy) reportError(error);
+                });
             });
             button.addEventListener('click', async function () {
                 if (busy) return;
@@ -139,6 +196,7 @@
                     if (!window.tennisFanConfirmPushDisable ||
                         !await window.tennisFanConfirmPushDisable('device')) return;
                 }
+                failureMessage = '';
                 busy = true;
                 button.disabled = true;
                 try {
@@ -155,15 +213,16 @@
                         if (!OneSignal.Notifications.permission) {
                             await OneSignal.Notifications.requestPermission();
                         }
-                        if (OneSignal.Notifications.permission) await subscription.optIn();
+                        if (OneSignal.Notifications.permission && !(subscription.optedIn && subscription.id)) {
+                            await subscription.optIn();
+                        }
                     }
                     await syncDevice(true);
                     busy = false;
                     update();
-                } catch (_error) {
+                } catch (error) {
                     busy = false;
-                    update();
-                    status.textContent = 'Не удалось изменить подписку. Попробуйте ещё раз.';
+                    reportError(error);
                 }
             });
             update();

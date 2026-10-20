@@ -149,6 +149,61 @@
     display: none;
 }
 
+.web-push-help {
+    margin: 1rem 0 0;
+    border: 1px solid rgb(198 161 90 / 35%);
+    border-radius: 12px;
+    background: rgb(255 255 255 / 3%);
+}
+
+.web-push-help__summary {
+    padding: 0.75rem 1rem;
+    color: var(--notification-gold, #c6a15a);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+}
+
+.web-push-help__summary::-webkit-details-marker {
+    display: none;
+}
+
+.web-push-help[open] .web-push-help__summary {
+    border-bottom: 1px solid rgb(198 161 90 / 25%);
+}
+
+.web-push-help__body {
+    padding: 0.85rem 1rem 1rem;
+    font-size: 0.92rem;
+}
+
+.web-push-help__body p {
+    margin: 0.35rem 0 0.5rem;
+}
+
+.web-push-help__body ol {
+    margin: 0.35rem 0 0.75rem;
+    padding-left: 1.35rem;
+    list-style: decimal;
+}
+
+.web-push-help__body li {
+    margin: 0.3rem 0;
+}
+
+.web-push-help__body strong {
+    color: var(--notification-text, inherit);
+}
+
+.web-push-help__note {
+    color: var(--notification-muted, inherit);
+    font-size: 0.85rem;
+}
+
+.web-push-help[hidden] {
+    display: none;
+}
+
 .notification-device #web-push-status[data-state="connected"] {
     color: var(--notification-success);
     font-weight: 600;

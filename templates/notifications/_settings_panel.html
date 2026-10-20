@@ -14,6 +14,7 @@
             <h3 id="web-push-title">Подключение push <span id="web-push-badge" class="notification-device__badge" aria-hidden="true" hidden>✓ Подключено</span></h3>
             <p id="web-push-status" role="status" aria-live="polite">Проверяем подключение устройства…</p>
             <button id="web-push-toggle" type="button" class="btn btn-outline" aria-describedby="web-push-status" disabled>Загрузка…</button>
+            {% include "includes/web_push_android_help.html" %}
             <form id="web-push-code-form" class="notification-code" hidden>
                 <label for="web-push-code">Код из push-уведомления</label>
                 <p id="web-push-code-hint">Введите 6 цифр из последнего уведомления. Код действует 5 минут. Никому его не сообщайте.</p>

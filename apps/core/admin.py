@@ -32,6 +32,28 @@ from .models import (
 )
 
 
+def _with_blank_link_target(html: str) -> str:
+    """Открывать все ссылки превью в новой вкладке.
+
+    Старые письма хранят кнопки без ``target``, из-за чего переход внутри
+    sandbox-iframe админки блокируется или подменяется страницей входа.
+
+    Args:
+        html (str): HTML-тело письма.
+
+    Returns:
+        str: HTML с ``<base target="_blank">`` в начале ``<head>``.
+    """
+    base_tag = '<base target="_blank">'
+    head_start = html.lower().find("<head")
+    if head_start == -1:
+        return base_tag + html
+    head_end = html.find(">", head_start)
+    if head_end == -1:
+        return base_tag + html
+    return f"{html[: head_end + 1]}{base_tag}{html[head_end + 1 :]}"
+
+
 @admin.register(OutboundEmail)
 class OutboundEmailAdmin(admin.ModelAdmin):
     """Журнал всех исходящих писем: просмотр HTML и текста."""
@@ -134,7 +156,8 @@ class OutboundEmailAdmin(admin.ModelAdmin):
         obj = get_object_or_404(self.model, pk=object_id)
         if obj.body_html:
             response = HttpResponse(
-                obj.body_html, content_type="text/html; charset=utf-8"
+                _with_blank_link_target(obj.body_html),
+                content_type="text/html; charset=utf-8",
             )
         else:
             text = escape(obj.body_text or "")

@@ -7,6 +7,7 @@
     const status = document.getElementById('web-push-status');
     const badge = document.getElementById('web-push-badge');
     const iosHelp = document.getElementById('web-push-ios-help');
+    const androidHelp = document.getElementById('web-push-android-help');
     const sdkScript = document.getElementById('onesignal-sdk');
     const SDK_TIMEOUT_MS = 15000;
     const DEFAULT_RETRY_SECONDS = 60;
@@ -20,7 +21,6 @@
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
         navigator.standalone === true;
-    const isYandex = /YaBrowser\//.test(navigator.userAgent);
     let fallbackMode = null;
 
     function setFallback(mode, message, label) {
@@ -50,16 +50,20 @@
     }
 
     function deniedInstructions() {
-        const browserHint = isYandex
-            ? 'В Яндекс Браузере откройте ⋮ → Настройки → Сайты → Уведомления и разрешите их для ' + location.host + '. На Android также включите уведомления для Яндекс Браузера в настройках телефона.'
-            : 'Разрешите уведомления для этого сайта в настройках браузера, а на Android — ещё и в настройках телефона.';
-        return 'Уведомления заблокированы. ' + browserHint + ' Затем нажмите «Проверить снова».';
+        return isIOS
+            ? 'Уведомления заблокированы. Разрешите их в настройках iPhone и нажмите «Проверить снова».'
+            : 'Уведомления заблокированы. Разрешите их по инструкции ниже и нажмите «Проверить снова».';
+    }
+
+    function openAndroidHelp() {
+        if (androidHelp && !isIOS) androidHelp.open = true;
     }
 
     button.addEventListener('click', function () {
         if (fallbackMode === 'help') {
             if (iosHelp) {
                 iosHelp.hidden = false;
+                iosHelp.open = true;
                 iosHelp.scrollIntoView({block: 'nearest'});
             }
             return;
@@ -67,8 +71,16 @@
         if (fallbackMode === 'reload') window.location.reload();
     });
 
+    if (isIOS && androidHelp) {
+        androidHelp.hidden = true;
+        androidHelp.classList.add('hidden');
+    }
+
     if (isIOS && !isStandalone) {
-        if (iosHelp) iosHelp.hidden = false;
+        if (iosHelp) {
+            iosHelp.hidden = false;
+            iosHelp.open = true;
+        }
         hideControls('На iPhone и iPad push работают только из приложения, добавленного на экран «Домой».');
         return;
     }
@@ -211,6 +223,7 @@
                 button.textContent = 'Включить уведомления';
                 if (window.Notification && Notification.permission === 'denied') {
                     setFallback('reload', deniedInstructions(), 'Проверить снова');
+                    openAndroidHelp();
                     state = 'error';
                 } else if (config.notificationCenter && confirmationPending) {
                     status.textContent = manualCode

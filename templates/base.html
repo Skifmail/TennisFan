@@ -44,6 +44,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
     <link rel="stylesheet" href="{% static 'css/style.min.css' %}">
+    {% if web_push_enabled and not notification_center_enabled %}
+    <link rel="stylesheet" href="{% static 'css/pages/notification-settings.css' %}">
+    {% endif %}
     {% block extra_css %}{% endblock %}
     {% block extra_head %}{% endblock %}
 

@@ -53,3 +53,31 @@ class OutboundEmailLogTestCase(TestCase):
         self.assertIn("iframe", str(preview))
         self.assertIn(preview_url, str(preview))
         self.assertNotIn("srcdoc", str(preview))
+
+    def test_admin_preview_opens_links_in_new_tab(self) -> None:
+        """Ссылки в превью письма открываются в новой вкладке, а не в iframe."""
+        from django.urls import reverse
+
+        staff = User.objects.create_superuser(
+            email="preview-staff@test.local",
+            password="x",
+        )
+        row = OutboundEmail.objects.create(
+            to_email="outbound@test.local",
+            subject="Кнопка",
+            body_html=(
+                "<html><head><style>a{color:#fff}</style></head>"
+                '<body><a href="https://example.com/club/dashboard/">Клуб</a>'
+                "</body></html>"
+            ),
+        )
+        self.client.force_login(staff)
+        response = self.client.get(
+            reverse("admin:core_outboundemail_html_preview", args=[row.pk]),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            '<head><base target="_blank">',
+            response.content.decode("utf-8"),
+        )

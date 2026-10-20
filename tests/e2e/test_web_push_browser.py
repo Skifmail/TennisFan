@@ -125,6 +125,18 @@ def push_page(native_notification_permission: str) -> Iterator[Page]:
             browser.close()
 
 
+def test_help_when_controls_rendered_should_describe_yandex_and_chrome(
+    push_page: Page,
+) -> None:
+    """Инструкция доступна сразу и содержит шаги для Яндекс Браузера и Chrome."""
+    help_block = push_page.locator("#web-push-android-help")
+    expect(help_block).to_be_visible()
+    expect(help_block).to_contain_text("Яндекс Браузер")
+    expect(help_block).to_contain_text("«Сайты» → «Уведомления»")
+    expect(help_block).to_contain_text("Google Chrome")
+    expect(help_block).to_contain_text("«Разрешения» → «Уведомления»")
+
+
 def test_notification_mock_when_native_permission_differs_should_start_unrequested(
     push_page: Page, native_notification_permission: str
 ) -> None:
@@ -199,6 +211,11 @@ def test_subscription_when_denied_should_explain_browser_settings(
     expect(push_page.locator("#web-push-status")).to_contain_text("заблокированы")
     expect(push_page.locator("#web-push-toggle")).to_be_enabled()
     expect(push_page.locator("#web-push-toggle")).to_have_text("Проверить снова")
+    assert push_page.evaluate("document.getElementById('web-push-android-help').open")
+    expect(push_page.locator("#web-push-android-help")).to_contain_text(
+        "Яндекс Браузер"
+    )
+    expect(push_page.locator("#web-push-android-help")).to_contain_text("Google Chrome")
     assert push_page.evaluate("window.pushCalls.optIn") == 0
 
 
@@ -296,8 +313,19 @@ def test_ios_when_home_screen_state_changes_should_explain_install_or_enable_pus
     _load_integration(push_page)
     if standalone:
         expect(push_page.locator("#web-push-toggle")).to_be_enabled()
+        expect(push_page.locator("#web-push-android-help")).to_be_hidden()
+        expect(push_page.locator("#web-push-ios-help")).to_be_hidden()
     else:
         expect(push_page.locator("#web-push-ios-help")).to_be_visible()
+        expect(push_page.locator("#web-push-ios-help")).to_contain_text(
+            "Откройте сайт в Safari"
+        )
+        expect(push_page.locator("#web-push-ios-help")).to_contain_text(
+            "Открыть как веб-приложение"
+        )
+        expect(push_page.locator("#web-push-ios-help img")).to_have_count(4)
+        assert push_page.evaluate("document.getElementById('web-push-ios-help').open")
+        expect(push_page.locator("#web-push-android-help")).to_be_hidden()
         expect(push_page.locator("#web-push-toggle")).to_be_hidden()
         assert push_page.evaluate("window.pushCalls.init.length") == 0
 

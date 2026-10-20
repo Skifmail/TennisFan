@@ -44,6 +44,16 @@ def web_push_context(request: HttpRequest) -> dict[str, object]:
     }
     if settings.NOTIFICATION_CENTER_ENABLED:
         context["notification_center_enabled"] = True
+    if (
+        enabled
+        and settings.NOTIFICATION_CENTER_ENABLED
+        and settings.NOTIFICATION_PROMPT_ENABLED
+        and getattr(getattr(request, "user", None), "is_authenticated", False)
+        and getattr(request.resolver_match, "url_name", None) == "home"
+    ):
+        from apps.notifications.presentation import should_invite
+
+        context["show_notification_invitation"] = should_invite(request)
     return context
 
 

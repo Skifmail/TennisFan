@@ -1,0 +1,272 @@
+/* Единое управление уведомлениями и изолированный экран подтверждения TennisFan. */
+.notification-settings,
+.notification-dialog,
+.notification-confirmation {
+    --notification-gold: #c6a15a;
+    --notification-text: #e4e4e4;
+    --notification-muted: #b8c7bf;
+    --notification-surface: #001f14;
+
+    box-sizing: border-box;
+    color: var(--notification-text);
+    font-family: var(--font-family, system-ui, sans-serif);
+    line-height: 1.55;
+}
+
+.notification-settings {
+    margin: 0 0 1.5rem;
+    border: 1px solid rgb(198 161 90 / 45%);
+    border-radius: 16px;
+    background: var(--notification-surface);
+    overflow: hidden;
+}
+
+.notification-settings__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 52px;
+    padding: 0.9rem 1.25rem;
+    color: var(--notification-gold);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+}
+
+.notification-settings__summary::-webkit-details-marker {
+    display: none;
+}
+
+.notification-settings[open] > summary {
+    border-bottom: 1px solid rgb(198 161 90 / 25%);
+}
+
+.notification-settings[open] > summary span {
+    transform: rotate(45deg);
+}
+
+.notification-settings__body {
+    padding: clamp(1rem, 3vw, 1.75rem);
+}
+
+.notification-settings__intro {
+    margin-bottom: 1.25rem;
+}
+
+.notification-settings__eyebrow {
+    color: var(--notification-gold);
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+}
+
+.notification-settings h2,
+.notification-settings h3,
+.notification-dialog h2,
+.notification-confirmation h1 {
+    margin: 0.4rem 0 0.7rem;
+    color: var(--notification-text);
+    line-height: 1.2;
+    text-wrap: balance;
+}
+
+.notification-settings h2 {
+    font-size: clamp(1.4rem, 3vw, 1.8rem);
+}
+
+.notification-settings h3 {
+    font-size: 1.2rem;
+}
+
+.notification-settings p,
+.notification-dialog p,
+.notification-confirmation p {
+    color: var(--notification-muted);
+    margin: 0.6rem 0 1rem;
+}
+
+.notification-channel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid rgb(198 161 90 / 20%);
+    cursor: pointer;
+}
+
+.notification-channel strong {
+    display: block;
+    font-weight: 600;
+}
+
+.notification-channel small {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--notification-muted);
+    font-size: 0.9rem;
+}
+
+.notification-channel input {
+    flex: 0 0 auto;
+    width: 1.4rem;
+    height: 1.4rem;
+    margin: 0;
+    accent-color: var(--notification-gold);
+    cursor: pointer;
+}
+
+.notification-settings__note {
+    font-size: 0.85rem;
+}
+
+.notification-device {
+    margin-top: 1.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgb(198 161 90 / 30%);
+}
+
+.notification-settings p.notification-settings__notice {
+    margin: 1.5rem 0 0;
+    padding-left: 1rem;
+    border-left: 2px solid var(--notification-gold);
+    color: var(--notification-text);
+    font-size: 0.9rem;
+}
+
+.notification-settings .btn,
+.notification-dialog .btn,
+.notification-confirmation .btn {
+    display: inline-flex;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    max-width: 100%;
+    padding: 0.75rem 1.15rem;
+    border: 1px solid var(--notification-gold);
+    border-radius: 10px;
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    text-decoration: none;
+    white-space: normal;
+    cursor: pointer;
+    transition: background-color 180ms ease, color 180ms ease;
+}
+
+.notification-settings .btn-primary,
+.notification-dialog .btn-primary,
+.notification-confirmation .btn-primary {
+    background: var(--notification-gold);
+    color: #10291c;
+}
+
+.notification-settings .btn-outline,
+.notification-dialog .btn-outline,
+.notification-confirmation .btn-outline {
+    background: transparent;
+    color: var(--notification-gold);
+}
+
+.notification-settings .btn:hover,
+.notification-dialog .btn:hover,
+.notification-confirmation .btn:hover {
+    background: #dfbf80;
+    color: #10291c;
+}
+
+.notification-settings .btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.notification-settings :focus-visible,
+.notification-dialog :focus-visible,
+.notification-confirmation :focus-visible {
+    outline: 3px solid #edcf91;
+    outline-offset: 4px;
+}
+
+.notification-dialog {
+    width: min(32rem, calc(100% - 2rem));
+    max-height: 85dvh;
+    margin: auto;
+    padding: clamp(1.25rem, 4vw, 2rem);
+    border: 1px solid rgb(198 161 90 / 60%);
+    border-radius: 18px;
+    background: var(--notification-surface);
+    overflow: auto;
+}
+
+.notification-dialog::backdrop {
+    background: rgb(0 12 8 / 78%);
+}
+
+.notification-dialog h2 {
+    font-size: clamp(1.4rem, 4vw, 1.8rem);
+}
+
+.notification-dialog__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.notification-dialog__actions .btn {
+    flex: 1 1 10rem;
+}
+
+.notification-dialog [hidden] {
+    display: none;
+}
+
+.notification-confirmation-page {
+    min-height: 100dvh;
+    margin: 0;
+    padding: clamp(1rem, 5vw, 3rem);
+    display: grid;
+    place-items: center;
+    background: #012b1c;
+}
+
+.notification-confirmation {
+    width: min(100%, 35rem);
+    padding: clamp(1.5rem, 5vw, 2.75rem);
+    background: var(--notification-surface);
+    border: 1px solid rgb(198 161 90 / 55%);
+    border-radius: 18px;
+}
+
+.notification-confirmation__brand {
+    display: inline-block;
+    margin-bottom: 1.75rem;
+    color: var(--notification-gold);
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.notification-confirmation h1 {
+    font-size: clamp(1.7rem, 5vw, 2.2rem);
+}
+
+.notification-confirmation .btn {
+    margin-top: 0.75rem;
+}
+
+.notification-confirmation__hint {
+    font-size: 0.85rem;
+}
+
+@media (width <= 480px) {
+    .notification-settings .btn {
+    width: 100%;
+}
+
+    .notification-dialog__actions .btn {
+    flex-basis: 100%;
+}
+}

@@ -8,6 +8,7 @@ import yaml
 
 ROOT: Final = Path(__file__).resolve().parents[2]
 EXPECTED_ENVIRONMENT: Final = {
+    "NOTIFICATION_PROMPT_ENABLED": "${NOTIFICATION_PROMPT_ENABLED:-False}",
     "NOTIFICATION_CENTER_ENABLED": "${NOTIFICATION_CENTER_ENABLED:-False}",
     "ONESIGNAL_APP_ID": "${ONESIGNAL_APP_ID:-c6e46e19-f9f8-4df3-b53d-44f49da24af2}",
     "ONESIGNAL_SITE_ORIGIN": "${ONESIGNAL_SITE_ORIGIN:-https://tennisfan.ru}",

@@ -18,6 +18,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.users.models import User
 
+from .browser_identity import COOKIE_NAME, COOKIE_SALT, device_hash
 from .device_binding import (
     CONFIRMATION_COOLDOWN,
     CONFIRMATION_LIFETIME,
@@ -31,8 +32,6 @@ from .infrastructure.push import PushRejectedError, PushTransportError, send_pus
 from .models import NotificationPreference, PushDevice
 from .services import center_enabled, preferences
 
-COOKIE_NAME: Final = "notification_device"
-COOKIE_SALT: Final = "notification-device"
 COOKIE_AGE_SECONDS: Final = 1209600
 DEVICE_TOKEN_BYTES: Final = 32
 
@@ -41,16 +40,19 @@ DEVICE_TOKEN_BYTES: Final = 32
 @require_http_methods(["GET", "POST"])
 @never_cache
 def notification_settings(request: HttpRequest) -> HttpResponse:
-    """Отдаёт и сохраняет два переключателя только текущего пользователя.
+    """Сохраняет переключатели пользователя и направляет в единую панель.
 
     Args:
         request: Авторизованный запрос без принимаемого user_id.
 
     Returns:
-        Форма либо редирект после сохранения.
+        Редирект в ленту с раскрытыми настройками либо ответ об ошибке.
     """
     if not center_enabled():
         return HttpResponse("Центр уведомлений ещё не активирован.", status=503)
+    target = reverse("notifications") + "?settings=1#notification-settings"
+    if request.method == "GET":
+        return redirect(target)
     push, email = preferences(cast(User, request.user).pk)
     form = PreferenceForm(
         request.POST if request.method == "POST" else None,
@@ -60,8 +62,10 @@ def notification_settings(request: HttpRequest) -> HttpResponse:
         NotificationPreference.objects.update_or_create(
             user=request.user, defaults=form.cleaned_data
         )
-        return redirect("notification_settings")
-    return render(request, "notifications/settings.html", {"form": form})
+        return redirect(target)
+    return HttpResponse(
+        "Не удалось сохранить настройки. Обновите страницу уведомлений.", status=400
+    )
 
 
 @login_required
@@ -120,11 +124,6 @@ def notification_identity(request: HttpRequest) -> HttpResponse:
     return response
 
 
-def _device_hash(request: HttpRequest) -> str:
-    token = request.get_signed_cookie(COOKIE_NAME, default="", salt=COOKIE_SALT) or ""
-    return hashlib.sha256(token.encode()).hexdigest() if token else ""
-
-
 @login_required
 @require_POST
 @never_cache
@@ -149,7 +148,7 @@ def notification_device(request: HttpRequest) -> HttpResponse:
     try:
         state = request_confirmation(
             user=cast(User, request.user),
-            device_hash=_device_hash(request),
+            device_hash=device_hash(request),
             generation=uuid.UUID(str(data["externalId"])),
             active=data["active"],
             subscription_id=str(data.get("subscriptionId", "")),
@@ -209,7 +208,7 @@ def notification_confirm(request: HttpRequest) -> HttpResponse:
     complete = request.method == "POST" and request.POST.get("confirm") == "yes"
     valid = confirm_device(
         user=cast(User, request.user),
-        device_hash=_device_hash(request),
+        device_hash=device_hash(request),
         code=code if request.method == "POST" else None,
         consume=complete,
     )
@@ -228,6 +227,6 @@ def notification_confirm(request: HttpRequest) -> HttpResponse:
     # Секрет остаётся во фрагменте и POST, сторонних ресурсов на странице нет.
     response["Referrer-Policy"] = "same-origin"
     response["Content-Security-Policy"] = (
-        "default-src 'none'; script-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+        "default-src 'none'; script-src 'self'; style-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
     )
     return response

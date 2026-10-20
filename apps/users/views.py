@@ -15,7 +15,7 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -28,6 +28,7 @@ from apps.core.models import LegalAcceptanceLog, UserConsent, UserTelegramLink
 from apps.core.redirects import append_next, get_safe_next_url
 from apps.core.sports import Sport
 from apps.legal.utils import get_legal_document_version
+from apps.notifications.presentation import settings_context
 
 from .context_processors import invalidate_unread_notifications_cache
 from .forms import EmailAuthenticationForm, PlayerProfileForm, UserRegistrationForm
@@ -1030,11 +1031,17 @@ def profile_edit(request):
 
 
 @login_required
-def notifications(request):
+def notifications(request: HttpRequest) -> HttpResponse:
     """Лента уведомлений пользователя.
 
     Непрочитанные помечаются прочитанными при открытии. В этой отрисовке
     они ещё показаны как новые, чтобы было видно, что пришло с прошлого визита.
+
+    Args:
+        request: Авторизованный запрос владельца ленты.
+
+    Returns:
+        Лента и постоянно доступная панель настроек уведомлений.
     """
     notes = list(
         Notification.objects.filter(user=request.user, is_visible=True).order_by(
@@ -1050,6 +1057,11 @@ def notifications(request):
         "users/notifications.html",
         {
             **build_inbox_context(notes, unread_ids=unread_ids),
+            **(
+                settings_context(request)
+                if settings.NOTIFICATION_CENTER_ENABLED
+                else {}
+            ),
             "notification_center_enabled": settings.NOTIFICATION_CENTER_ENABLED,
         },
     )

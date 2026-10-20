@@ -57,6 +57,10 @@ ONESIGNAL_SITE_ORIGIN: Final = (
 NOTIFICATION_CENTER_ENABLED: Final = (
     os.environ.get("NOTIFICATION_CENTER_ENABLED", "False").lower() == "true"
 )
+# Приглашение запускается отдельно после проверки подключения на устройствах.
+NOTIFICATION_PROMPT_ENABLED: Final = (
+    os.environ.get("NOTIFICATION_PROMPT_ENABLED", "False").lower() == "true"
+)
 ONESIGNAL_REST_API_KEY: Final = os.environ.get("ONESIGNAL_REST_API_KEY", "")
 
 _csrf = os.environ.get(

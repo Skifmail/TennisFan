@@ -1,13 +1,13 @@
 {% load static %}
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="same-origin"><title>Подтверждение уведомлений — TennisFan</title></head>
-<body><main>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="same-origin"><title>Подтверждение уведомлений — TennisFan</title><link rel="stylesheet" href="{% static 'css/pages/notification-settings.css' %}"></head>
+<body class="notification-confirmation-page"><main class="notification-confirmation"><a class="notification-confirmation__brand" href="{% url 'home' %}">ТеннисФан · TennisFan</a>
 {% if complete %}
-<h1>Уведомления подключены</h1><p>Это устройство подтверждено для вашего аккаунта.</p><a href="{% url 'notification_settings' %}">Перейти к настройкам</a>
+<h1>Уведомления подключены</h1><p>Это устройство подтверждено для вашего аккаунта.</p><a class="btn btn-primary" href="{% url 'notifications' %}?settings=1#notification-settings">Открыть уведомления</a>
 {% elif valid %}
 <h1>Подключить уведомления?</h1><p>Подтвердите подключение этого устройства к вашему аккаунту TennisFan.</p>
-<form method="post" action="{% url 'notification_confirm' %}">{% csrf_token %}<input type="hidden" name="code" value="{{ code }}"><button name="confirm" value="yes" type="submit">Подтвердить подключение</button></form>
+<form method="post" action="{% url 'notification_confirm' %}">{% csrf_token %}<input type="hidden" name="code" value="{{ code }}"><button class="btn btn-primary" name="confirm" value="yes" type="submit">Подтвердить подключение</button></form>
 {% else %}
-<h1>Подтверждение недействительно</h1><p>Код истёк, уже использован или открыт в другом браузере либо аккаунте. Откройте настройки в исходном браузере и запросите новое подтверждение.</p><a href="{% url 'notification_settings' %}">Настройки уведомлений</a>
+<h1>Подтверждение недействительно</h1><p>Код истёк, уже использован или открыт в другом браузере либо аккаунте. Откройте настройки в исходном браузере и запросите новое подтверждение.</p><a class="btn btn-primary" href="{% url 'notifications' %}?settings=1#notification-settings">Настроить уведомления</a>
 {% endif %}
-</main><script src="{% static 'js/push_navigation.js' %}" defer></script>{% if valid and not complete %}<script src="{% static 'js/push_confirm.js' %}" defer></script>{% endif %}</body></html>
+<p class="notification-confirmation__hint">Уведомления в личном кабинете сохраняются независимо от подключения устройства.</p></main><script src="{% static 'js/push_navigation.js' %}" defer></script>{% if valid and not complete %}<script src="{% static 'js/push_confirm.js' %}" defer></script>{% endif %}</body></html>

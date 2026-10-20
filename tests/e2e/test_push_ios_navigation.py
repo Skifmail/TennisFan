@@ -46,7 +46,9 @@ self.addEventListener('notificationclick', () => {self.sdkClicks++;});
         elif self.path.startswith("/static/js/"):
             return super().do_GET()
         else:
-            text = '<h1>Test page</h1><script src="/static/js/push_navigation.js"></script>'
+            text = "<h1>Test page</h1>"
+            if not self.path.startswith("/no-bridge"):
+                text += '<script src="/static/js/push_navigation.js"></script>'
             mime = "text/html; charset=utf-8"
         self.send_response(200)
         self.send_header("Content-Type", mime)
@@ -75,14 +77,16 @@ def navigation_origin() -> Iterator[str]:
 
 
 @pytest.mark.parametrize("native_failure", ["reject", "no_navigation"])
+@pytest.mark.parametrize("opaque_origin", [False, True])
 def test_ios_click_when_native_navigation_fails_should_navigate_through_page(
-    navigation_origin: str, native_failure: str
+    navigation_origin: str, native_failure: str, opaque_origin: bool
 ) -> None:
     """Настоящие worker и страница переходят через postMessage при отказе iOS API.
 
     Args:
         navigation_origin: Изолированный тестовый сервер.
         native_failure: Исключение API либо успешный ответ без смены страницы.
+        opaque_origin: Эмулировать пустой origin сообщения при доверенном worker.
     """
     with sync_playwright() as driver:
         browser = driver.chromium.launch(
@@ -90,6 +94,15 @@ def test_ios_click_when_native_navigation_fails_should_navigate_through_page(
         )
         try:
             page = browser.new_page()
+            if opaque_origin:
+                page.add_init_script(
+                    """
+                    const add = navigator.serviceWorker.addEventListener.bind(navigator.serviceWorker);
+                    navigator.serviceWorker.addEventListener = (name, handler, options) => add(name,
+                        name === 'message' ? event => handler({origin: '', source: event.source,
+                            data: event.data, ports: event.ports}) : handler, options);
+                """
+                )
             page.goto(navigation_origin)
             with page.context.expect_event("serviceworker") as found:
                 page.evaluate(
@@ -117,5 +130,52 @@ def test_ios_click_when_native_navigation_fails_should_navigate_through_page(
             )
             expect(page).to_have_url(navigation_origin + TARGET)
             assert result == {"sdkClicks": 0}
+        finally:
+            browser.close()
+
+
+@pytest.mark.parametrize("failure", ["reject", "no_navigation"])
+def test_ios_click_when_page_does_not_acknowledge_should_try_exact_window(
+    navigation_origin: str, failure: str
+) -> None:
+    """Непринятое сообщение не может молча поглотить нажатие на push.
+
+    Args:
+        navigation_origin: Локальный стенд без SDK и отправок.
+        failure: Отказ или ложный успех нативной навигации.
+    """
+    with sync_playwright() as driver:
+        browser = driver.chromium.launch(
+            executable_path=environ.get("CHAT_BROWSER_EXECUTABLE"), headless=True
+        )
+        try:
+            page = browser.new_page()
+            page.goto(navigation_origin + "/no-bridge")
+            with page.context.expect_event("serviceworker") as found:
+                page.evaluate(
+                    "navigator.serviceWorker.register('/OneSignalSDKWorker.js')"
+                )
+            worker = found.value
+            page.evaluate("navigator.serviceWorker.ready")
+            result = worker.evaluate(
+                """async ({target, failure}) => {
+                    WindowClient.prototype.focus = async function () {return this;};
+                    WindowClient.prototype.navigate = async function () {
+                        if (failure === 'reject') throw new TypeError('iOS navigation failed');
+                        return this;
+                    };
+                    const opened = [];
+                    self.clients.openWindow = async url => {opened.push(url); return null;};
+                    const event = new Event('notificationclick');
+                    const promises = [];
+                    event.notification = {data: {launchURL: target}, close() {}};
+                    event.waitUntil = promise => promises.push(promise);
+                    self.dispatchEvent(event);
+                    await Promise.all(promises);
+                    return {opened};
+                }""",
+                {"target": navigation_origin + TARGET, "failure": failure},
+            )
+            assert result == {"opened": [navigation_origin + TARGET]}
         finally:
             browser.close()

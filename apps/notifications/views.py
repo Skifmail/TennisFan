@@ -181,7 +181,8 @@ def notification_device(request: HttpRequest) -> HttpResponse:
             )
         except (PushRejectedError, PushTransportError) as exc:
             logger.warning(
-                "Не удалось отправить подтверждение push", error_code=str(exc)
+                "Не удалось отправить подтверждение push: {error_code}",
+                error_code=str(exc),
             )
             response = JsonResponse({"error": "confirmation_unavailable"}, status=503)
             response["Retry-After"] = str(int(CONFIRMATION_COOLDOWN.total_seconds()))

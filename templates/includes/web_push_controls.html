@@ -4,8 +4,8 @@
         <p>Подпишитесь на push-уведомления платформы. Настройка действует только в этом браузере на этом устройстве.</p>
         {% if request.user.is_authenticated and notification_center_enabled %}<p><a href="{% url 'notification_settings' %}">Настройки push и email аккаунта</a></p>{% endif %}
         <p id="web-push-status" role="status" aria-live="polite">Загрузка сервиса уведомлений…</p>
-        <button id="web-push-toggle" type="button" class="btn btn-outline" aria-describedby="web-push-status" disabled>Включить уведомления</button>
-        <p id="web-push-ios-help" hidden>На iPhone и iPad нужна iOS 16.4 или новее. Откройте сайт в Safari, нажмите «Поделиться» → «На экран Домой», затем откройте сайт через созданную иконку и включите уведомления.</p>
+        <button id="web-push-toggle" type="button" class="btn btn-outline" aria-describedby="web-push-status" disabled>Загрузка…</button>
+        <p id="web-push-ios-help" hidden>На iPhone и iPad нужна iOS 16.4 или новее. Откройте сайт в Safari, нажмите «Поделиться» → «На экран Домой», затем откройте сайт через созданную иконку и включите уведомления. Если сайт открыт в Яндекс Браузере, добавьте его на экран «Домой» или используйте Safari.</p>
         <noscript><p>Чтобы управлять уведомлениями, включите JavaScript в браузере.</p></noscript>
     </div>
 </section>

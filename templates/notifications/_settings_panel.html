@@ -11,9 +11,9 @@
         </form>
         <section class="notification-device" aria-labelledby="web-push-title">
             <span class="notification-settings__eyebrow">Это устройство</span>
-            <h3 id="web-push-title">Подключение push</h3>
+            <h3 id="web-push-title">Подключение push <span id="web-push-badge" class="notification-device__badge" aria-hidden="true" hidden>✓ Подключено</span></h3>
             <p id="web-push-status" role="status" aria-live="polite">Проверяем подключение устройства…</p>
-            <button id="web-push-toggle" type="button" class="btn btn-outline" aria-describedby="web-push-status" disabled>Включить уведомления</button>
+            <button id="web-push-toggle" type="button" class="btn btn-outline" aria-describedby="web-push-status" disabled>Загрузка…</button>
             <form id="web-push-code-form" class="notification-code" hidden>
                 <label for="web-push-code">Код из push-уведомления</label>
                 <p id="web-push-code-hint">Введите 6 цифр из последнего уведомления. Код действует 5 минут. Никому его не сообщайте.</p>
@@ -23,7 +23,7 @@
                 </div>
                 <p id="web-push-code-status" role="status" aria-live="polite"></p>
             </form>
-            <p id="web-push-ios-help" hidden>На iPhone и iPad нужна iOS 16.4 или новее. В Safari нажмите «Поделиться» → «На экран Домой». Затем откройте TennisFan с созданной иконки.</p>
+            <p id="web-push-ios-help" hidden>На iPhone и iPad нужна iOS 16.4 или новее. В Safari нажмите «Поделиться» → «На экран Домой», затем откройте TennisFan с созданной иконки. Если вы открыли сайт в Яндекс Браузере, добавьте его на экран «Домой» или используйте Safari.</p>
             <noscript><p>Для подключения устройства включите JavaScript.</p></noscript>
         </section>
         <p class="notification-settings__notice">Даже если отключить push и email, уведомления в личном кабинете продолжат приходить.</p>

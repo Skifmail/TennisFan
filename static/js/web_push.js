@@ -5,6 +5,7 @@
     const configElement = document.getElementById('web-push-config');
     const button = document.getElementById('web-push-toggle');
     const status = document.getElementById('web-push-status');
+    const badge = document.getElementById('web-push-badge');
     const iosHelp = document.getElementById('web-push-ios-help');
     const sdkScript = document.getElementById('onesignal-sdk');
     const SDK_TIMEOUT_MS = 15000;
@@ -19,16 +20,57 @@
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
         navigator.standalone === true;
+    const isYandex = /YaBrowser\//.test(navigator.userAgent);
+    let fallbackMode = null;
 
-    if (isIOS && !isStandalone) {
-        if (iosHelp) iosHelp.hidden = false;
-        status.textContent = 'Для уведомлений сначала добавьте сайт на экран «Домой».';
-        return;
+    function setFallback(mode, message, label) {
+        fallbackMode = mode;
+        button.hidden = false;
+        button.classList.remove('hidden');
+        button.disabled = false;
+        button.textContent = label;
+        status.textContent = message;
+        status.dataset.state = 'error';
+    }
+
+    function hideControls(message) {
+        fallbackMode = null;
+        button.hidden = true;
+        button.classList.add('hidden');
+        status.textContent = message;
+        status.dataset.state = 'error';
     }
 
     function unavailable() {
-        button.disabled = true;
-        status.textContent = 'Сервис уведомлений временно недоступен. Обновите страницу позже.';
+        setFallback(
+            'reload',
+            'Сервис уведомлений временно недоступен. Проверьте соединение и попробуйте ещё раз.',
+            'Повторить'
+        );
+    }
+
+    function deniedInstructions() {
+        const browserHint = isYandex
+            ? 'В Яндекс Браузере откройте ⋮ → Настройки → Сайты → Уведомления и разрешите их для ' + location.host + '. На Android также включите уведомления для Яндекс Браузера в настройках телефона.'
+            : 'Разрешите уведомления для этого сайта в настройках браузера, а на Android — ещё и в настройках телефона.';
+        return 'Уведомления заблокированы. ' + browserHint + ' Затем нажмите «Проверить снова».';
+    }
+
+    button.addEventListener('click', function () {
+        if (fallbackMode === 'help') {
+            if (iosHelp) {
+                iosHelp.hidden = false;
+                iosHelp.scrollIntoView({block: 'nearest'});
+            }
+            return;
+        }
+        if (fallbackMode === 'reload') window.location.reload();
+    });
+
+    if (isIOS && !isStandalone) {
+        if (iosHelp) iosHelp.hidden = false;
+        hideControls('На iPhone и iPad push работают только из приложения, добавленного на экран «Домой».');
+        return;
     }
 
     const loadingTimeout = window.setTimeout(unavailable, SDK_TIMEOUT_MS);
@@ -37,9 +79,12 @@
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function (OneSignal) {
         try {
-            if (!window.isSecureContext || !OneSignal.Notifications.isPushSupported()) {
-                status.textContent = 'Этот браузер не поддерживает push-уведомления. Попробуйте другой браузер.';
-                button.disabled = true;
+            if (!window.isSecureContext ||
+                !('Notification' in window) ||
+                !('serviceWorker' in navigator) ||
+                !('PushManager' in window) ||
+                !OneSignal.Notifications.isPushSupported()) {
+                hideControls('Этот браузер не поддерживает push-уведомления. Откройте сайт в Chrome или Safari.');
                 return;
             }
 
@@ -156,35 +201,53 @@
             }
 
             function update() {
+                let state = 'off';
+                fallbackMode = null;
+                button.hidden = false;
+                button.classList.remove('hidden');
                 button.disabled = busy;
                 if (codeForm) codeForm.hidden = !manualCode || !confirmationPending;
                 if (codeSubmit) codeSubmit.disabled = busy || Date.now() < codeRetryUntil;
                 button.textContent = 'Включить уведомления';
                 if (window.Notification && Notification.permission === 'denied') {
-                    status.textContent = 'Уведомления запрещены. Разрешите их в настройках браузера или устройства.';
-                    button.disabled = true;
+                    setFallback('reload', deniedInstructions(), 'Проверить снова');
+                    state = 'error';
                 } else if (config.notificationCenter && confirmationPending) {
                     status.textContent = manualCode
                         ? 'Введите шестизначный код из полученного push. Нажимать уведомление не нужно. Код действует 5 минут.'
                         : 'Разрешение на устройстве включено. Откройте полученный push и подтвердите подключение TennisFan. Если он не пришёл, повторите через минуту.';
                     button.textContent = manualCode ? 'Отправить новый код' : 'Отправить подтверждение повторно';
+                    state = 'pending';
                 } else if (verifiedSubscriptionId && !subscription.id) {
                     status.textContent = 'Загружаем состояние подключённого устройства…';
+                    button.textContent = 'Проверить снова';
+                    fallbackMode = 'reload';
+                    state = 'loading';
                 } else if (!accountPushEnabled) {
                     status.textContent = 'Push отключены в настройках аккаунта. Можно включить их этой кнопкой.';
+                    state = 'off';
                 } else if (config.notificationCenter && subscription.optedIn && verifiedSubscriptionId !== subscription.id) {
                     status.textContent = 'Push на устройстве разрешены. Подтвердите подключение к TennisFan для персональных уведомлений.';
                     button.textContent = manualCode ? 'Получить код подключения' : 'Подтвердить подключение';
+                    state = 'pending';
                 } else if (subscription.optedIn && subscription.id) {
                     status.textContent = 'Уведомления включены.';
                     button.textContent = 'Отключить уведомления';
+                    state = 'connected';
                 } else if (subscription.optedIn) {
-                    status.textContent = 'Подписка подключается. Дождитесь подтверждения.';
-                    button.disabled = true;
+                    status.textContent = 'Подписка подключается. Если это длится долго, проверьте разрешение и повторите.';
+                    button.textContent = 'Проверить снова';
+                    fallbackMode = 'reload';
+                    state = 'pending';
                 } else {
                     status.textContent = 'Уведомления выключены.';
                 }
-                if (failureMessage) status.textContent = failureMessage;
+                if (failureMessage) {
+                    status.textContent = failureMessage;
+                    state = 'error';
+                }
+                status.dataset.state = state;
+                if (badge) badge.hidden = state !== 'connected';
                 const remaining = Math.ceil((retryUntil - Date.now()) / SECOND_MS);
                 if (remaining > 0) {
                     button.disabled = true;
@@ -265,7 +328,7 @@
                 });
             });
             button.addEventListener('click', async function () {
-                if (busy) return;
+                if (busy || fallbackMode) return;
                 const disabling = subscription.optedIn && subscription.id && accountPushEnabled &&
                     (!config.notificationCenter || verifiedSubscriptionId === subscription.id);
                 if (disabling && document.getElementById('notification-disable-dialog')) {

@@ -6,6 +6,7 @@
     --notification-text: #e4e4e4;
     --notification-muted: #b8c7bf;
     --notification-surface: #001f14;
+    --notification-success: #4ade80;
 
     box-sizing: border-box;
     color: var(--notification-text);
@@ -124,6 +125,33 @@
     margin-top: 1.75rem;
     padding-top: 1.5rem;
     border-top: 1px solid rgb(198 161 90 / 30%);
+}
+
+.notification-device__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.45rem;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid rgb(74 222 128 / 45%);
+    border-radius: 999px;
+    background: rgb(74 222 128 / 12%);
+    color: var(--notification-success);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.notification-device__badge[hidden] {
+    display: none;
+}
+
+.notification-device #web-push-status[data-state="connected"] {
+    color: var(--notification-success);
+    font-weight: 600;
 }
 
 .notification-settings p.notification-settings__notice {

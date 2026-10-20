@@ -8,7 +8,11 @@ from django.template.loader import render_to_string
 from django.test import Client, RequestFactory, override_settings
 from pytest_mock import MockerFixture
 
-from apps.core.web_push import web_push_context
+from apps.core.web_push import (
+    ONESIGNAL_DIRECT_SDK_URL,
+    ONESIGNAL_PAGE_SDK_URL,
+    web_push_context,
+)
 
 APP_ID: Final = "c6e46e19-f9f8-4df3-b53d-44f49da24af2"
 SDK_URL: Final = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
@@ -96,6 +100,45 @@ def test_base_when_enabled_changes_should_conditionally_load_sdk(enabled: bool) 
         assert 'aria-live="polite"' in html
         assert "iOS 16.4" in html
         assert html.index("js/web_push.js") < html.index(SDK_URL)
+
+
+@pytest.mark.parametrize(
+    ("user_agent", "expected_url"),
+    [
+        (
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/126.0.0.0 YaBrowser/26.8.0.0 "
+            "Mobile Safari/537.36",
+            ONESIGNAL_DIRECT_SDK_URL,
+        ),
+        (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) YaBrowser/26.8.0.0 "
+            "Mobile/15E148 Safari/604.1",
+            ONESIGNAL_PAGE_SDK_URL,
+        ),
+        (
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+            ONESIGNAL_PAGE_SDK_URL,
+        ),
+    ],
+)
+def test_base_when_yandex_android_should_load_sdk_without_loader(
+    user_agent: str, expected_url: str
+) -> None:
+    """Шаблон подключает прямой SDK для Yandex на Android и десктопе.
+
+    Args:
+        user_agent: Браузер, который открыл страницу.
+        expected_url: Ожидаемый адрес скрипта OneSignal.
+    """
+    request = RequestFactory().get(
+        "/", secure=True, HTTP_HOST="tennisfan.ru", HTTP_USER_AGENT=user_agent
+    )
+    html = render_to_string("base.html", web_push_context(request))
+    assert f'src="{expected_url}"' in html
+    assert html.count('id="onesignal-sdk"') == 1
 
 
 def test_context_when_registered_should_be_available_to_all_pages() -> None:

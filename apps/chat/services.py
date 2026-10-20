@@ -106,6 +106,9 @@ def require_member(
     )
     if member is None:
         raise ChatAccessError("Сначала вступите в чат.")
+    from .direct import require_direct_participant
+
+    require_direct_participant(user=user, room=member.room)
     ensure_chat_consent(member)
     if writing and member.banned_until and member.banned_until > timezone.now():
         raise ChatAccessError("Отправка сообщений временно ограничена модератором.")
@@ -114,7 +117,12 @@ def require_member(
 
 def _moderator(user: User, member: ChatMembership) -> bool:
     return bool(
-        user.is_staff or member.is_moderator or member.room.administrator_id == user.pk
+        not member.room.is_direct
+        and (
+            user.is_staff
+            or member.is_moderator
+            or member.room.administrator_id == user.pk
+        )
     )
 
 
@@ -147,6 +155,7 @@ def _moderator_ids(room_id: int) -> frozenset[int]:
             consented_at__isnull=False,
             consent_withdrawn_at__isnull=True,
             room_id=room_id,
+            room__direct_user_low__isnull=True,
             room__is_active=True,
             is_active=True,
             user__is_active=True,
@@ -317,6 +326,9 @@ def join_room(*, user: User, room_id: int) -> ChatRoom:
     """
     require_active_user(user)
     room = _room(room_id, lock=True)
+    from .direct import require_direct_participant
+
+    require_direct_participant(user=user, room=room)
     member, created = ChatMembership.objects.get_or_create(
         room=room,
         user=user,
@@ -349,6 +361,9 @@ def leave_room(*, user: User, room_id: int) -> None:
     require_active_user(user)
     with transaction.atomic():
         room = _room(room_id, lock=True)
+        from .direct import require_direct_participant
+
+        require_direct_participant(user=user, room=room)
         if room.administrator_id == user.pk:
             raise ChatAccessError(
                 "Сначала передайте управление другому участнику. Отзыв согласий доступен без передачи."
@@ -388,7 +403,7 @@ def send_message(
         ChatRateLimitError: Слишком частая отправка.
     """
     require_active_user(user)
-    _room(room_id, lock=True)
+    selected_room = _room(room_id, lock=True)
     require_member(user=user, room_id=room_id, writing=True)
     # NO KEY UPDATE сохраняет сериализацию автора, не блокируя FK уведомлений.
     User.objects.select_for_update(no_key=True).get(pk=user.pk)
@@ -415,7 +430,11 @@ def send_message(
     record_message_change(
         message=message, actor=user, action="created", text=message.text
     )
-    if (
+    if selected_room.is_direct:
+        from .direct import notify_direct_message
+
+        notify_direct_message(message)
+    elif (
         reply
         and reply.author_id is not None
         and reply.author_id != user.pk
@@ -746,7 +765,12 @@ def my_memberships(
     )
     return (
         ChatMembership.objects.filter(user=user, is_active=True, room__is_active=True)
-        .select_related("room__city")
+        .filter(
+            Q(room__direct_user_low__isnull=True)
+            | Q(room__direct_user_low=user)
+            | Q(room__direct_user_high=user)
+        )
+        .select_related("room__city", "room__direct_user_low", "room__direct_user_high")
         .annotate(
             member_count=Coalesce(
                 Subquery(member_counts, output_field=IntegerField()), 0

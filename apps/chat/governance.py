@@ -26,7 +26,8 @@ def can_manage(*, user: User, room: ChatRoom) -> bool:
         Есть ли право менять управляющих именно в этой комнате.
     """
     return bool(
-        user.is_active
+        not room.is_direct
+        and user.is_active
         and user.is_authenticated
         and (room.administrator_id == user.pk or _platform_manager(user))
     )

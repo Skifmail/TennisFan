@@ -2,10 +2,11 @@
 
 from django.urls import path
 
-from . import custom_rooms, invitation_views, views
+from . import custom_rooms, direct, invitation_views, views
 
 app_name = "chat"
 urlpatterns = [
+    path("direct/<int:player_id>/start/", direct.start, name="direct_start"),
     path("create/", custom_rooms.create, name="create"),
     path(
         "invitations/<uuid:invitation_id>/",

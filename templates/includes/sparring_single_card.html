@@ -14,7 +14,9 @@
                 </div>
                 <div class="sparring-card__layout">
                     <div class="sparring-card__col sparring-card__col--avatar">
-                        {% include 'includes/avatar.html' with avatar=req.player.avatar class="player-avatar sparring-card__avatar" %}
+                        <a href="{% url 'profile' pk=req.player.pk %}" aria-label="Профиль игрока {{ req.player }}">
+                            {% include 'includes/avatar.html' with avatar=req.player.avatar class="player-avatar sparring-card__avatar" %}
+                        </a>
                     </div>
                     <div class="sparring-card__col sparring-card__col--main">
                         <div class="sparring-card__headline player-name-block">
@@ -60,6 +62,10 @@
                     </div>
                     <div class="sparring-card__col sparring-card__col--cta">
                         <div class="sparring-card__actions">
+                            <a href="{% url 'profile' pk=req.player.pk %}" class="btn btn-outline btn-sm sparring-card__btn" title="Посмотреть матчи и статистику игрока">Профиль игрока</a>
+                            {% if user.is_authenticated and user.is_active and user.pk != req.player.user_id and req.player.user.is_active %}
+                            {% include 'includes/direct_message_button.html' with target_player=req.player compact=True %}
+                            {% endif %}
                             {% if user.is_authenticated and user.player.pk == req.player_id %}
                             <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline btn-sm sparring-card__btn">Редактировать</a>
                             <a href="{% url 'sparring_my_requests' %}" class="btn btn-outline btn-sm sparring-card__btn">Мои заявки</a>

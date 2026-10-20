@@ -74,7 +74,7 @@
                             <span class="sparring-desired-category">{{ req.get_desired_category_display }}</span>
                             {% endif %}
                         </div>
-                        <p class="sparring-card__desc text-secondary">{{ req.description|truncatewords:30 }}</p>
+                        <p class="sparring-card__desc text-secondary">{{ req.description }}</p>
                         <div class="sparring-card__details">
                             {% if req.preferred_days or req.preferred_time %}
                             <span class="sparring-card__detail-line">
@@ -194,7 +194,7 @@
                             <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city|default:"Населённый пункт не указан" }}</span>
                         </div>
                         {% if req.description %}
-                        <p class="sparring-card__desc text-secondary">{{ req.description|truncatewords:15 }}</p>
+                        <p class="sparring-card__desc text-secondary">{{ req.description }}</p>
                         {% endif %}
                         <div class="sparring-card__details">
                             <span class="sparring-card__detail-line">

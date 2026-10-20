@@ -15,6 +15,8 @@ class ChatRoom(models.Model):
     Attributes:
         city: Однозначная ссылка на населённый пункт либо пустое значение.
         title: Название отдельного чата без привязки к городу.
+        direct_user_low: Собеседник с меньшим идентификатором личной переписки.
+        direct_user_high: Собеседник с большим идентификатором личной переписки.
         is_active: Разрешён ли доступ к комнате.
         rules: Закреплённые правила общения.
         is_created: Создано ли сообщество, а не только техническая заготовка.
@@ -30,6 +32,22 @@ class ChatRoom(models.Model):
     )
     title = models.CharField(
         "Название отдельного чата", max_length=MAX_CHAT_TITLE_LENGTH, blank=True
+    )
+    direct_user_low = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="direct_rooms_low",
+        verbose_name="Первый собеседник",
+    )
+    direct_user_high = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="direct_rooms_high",
+        verbose_name="Второй собеседник",
     )
     is_active = models.BooleanField("Открыта", default=True)
     is_created = models.BooleanField("Сообщество создано", default=True)
@@ -51,10 +69,29 @@ class ChatRoom(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    models.Q(city__isnull=False, title="")
-                    | (models.Q(city__isnull=True) & ~models.Q(title=""))
+                    models.Q(
+                        direct_user_low__isnull=True, direct_user_high__isnull=True
+                    )
+                    & (
+                        models.Q(city__isnull=False, title="")
+                        | (models.Q(city__isnull=True) & ~models.Q(title=""))
+                    )
+                )
+                | (
+                    models.Q(
+                        city__isnull=True,
+                        title="",
+                        administrator__isnull=True,
+                        direct_user_low__isnull=False,
+                        direct_user_high__isnull=False,
+                    )
+                    & models.Q(direct_user_low__lt=models.F("direct_user_high"))
                 ),
-                name="chat_room_city_or_title",
+                name="chat_room_kind_valid",
+            ),
+            models.UniqueConstraint(
+                fields=["direct_user_low", "direct_user_high"],
+                name="chat_direct_pair_unique",
             ),
         ]
         verbose_name = "городской чат"
@@ -67,17 +104,30 @@ class ChatRoom(models.Model):
     @property
     def display_name(self) -> str:
         """Возвращает краткое имя городского или отдельного сообщества."""
-        return self.city.name if self.city is not None else self.title
+        return (
+            "Личная переписка"
+            if self.is_direct
+            else (self.city.name if self.city is not None else self.title)
+        )
 
     @property
     def display_label(self) -> str:
         """Возвращает имя с регионом для городов и название отдельного чата."""
-        return str(self.city) if self.city_id else self.title
+        return (
+            f"Личная переписка #{self.pk}"
+            if self.is_direct
+            else (str(self.city) if self.city_id else self.title)
+        )
 
     @property
     def join_query(self) -> str:
         """Возвращает однозначный параметр формы личных согласий."""
         return f"city_id={self.city_id}" if self.city_id else f"room_id={self.pk}"
+
+    @property
+    def is_direct(self) -> bool:
+        """Возвращает признак переписки строго двух фиксированных аккаунтов."""
+        return self.direct_user_low_id is not None
 
     def clean(self) -> None:
         """Проверяет взаимоисключающие способы именования комнаты.
@@ -87,6 +137,19 @@ class ChatRoom(models.Model):
         """
         super().clean()
         self.title = self.title.strip()
+        if self.direct_user_low_id is not None or self.direct_user_high_id is not None:
+            if (
+                self.city_id
+                or self.title
+                or self.administrator_id
+                or self.direct_user_low_id is None
+                or self.direct_user_high_id is None
+                or self.direct_user_low_id >= self.direct_user_high_id
+            ):
+                raise ValidationError(
+                    "Личный чат требует двух разных упорядоченных собеседников без города и администратора."
+                )
+            return
         if bool(self.city_id) == bool(self.title):
             raise ValidationError(
                 "Выберите город ИЛИ укажите название отдельного чата."
@@ -146,6 +209,22 @@ class ChatMembership(models.Model):
         default=False,
         help_text="Не заменяет согласие игрока. Отметьте только после проверки возможности выполнить все его условия.",
     )
+
+    @property
+    def display_name(self) -> str:
+        """Возвращает название сообщества либо имя собственного собеседника."""
+        if not self.room.is_direct:
+            return self.room.display_name
+        peer = (
+            self.room.direct_user_high
+            if self.user_id == self.room.direct_user_low_id
+            else self.room.direct_user_low
+        )
+        return (
+            (peer.get_full_name().strip() or f"Игрок #{peer.pk}")
+            if peer
+            else "Недоступный игрок"
+        )
 
     class Meta:
         constraints = [

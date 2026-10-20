@@ -791,8 +791,13 @@ class StringerApplication(models.Model):
         APPROVED = "approved", "Одобрена"
         REJECTED = "rejected", "Отклонена"
 
-    applicant: models.ForeignKey[User, User] = models.ForeignKey(
-        "users.User", on_delete=models.PROTECT, verbose_name="Заявитель"
+    applicant: models.ForeignKey[User | None, User | None] = models.ForeignKey(
+        "users.User",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name="Заявитель",
+        help_text="Не указан, если заявка подана без авторизации.",
     )
     name: models.CharField[str, str] = models.CharField(
         "Название компании", max_length=200

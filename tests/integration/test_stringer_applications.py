@@ -87,11 +87,13 @@ def application_data() -> dict[str, str]:
     }
 
 
+@pytest.mark.parametrize("authenticated", [True, False])
 def test_submission_queues_admin_channels_and_hides_until_approved(
-    client: Client, applicant: User, moderator: User
+    client: Client, applicant: User, moderator: User, authenticated: bool
 ) -> None:
     """Заявка не публикуется до одобрения; ЛК, email и push ведут на модерацию."""
-    client.force_login(applicant)
+    if authenticated:
+        client.force_login(applicant)
     stream = BytesIO()
     Image.new("RGB", (20, 20), "red").save(stream, format="PNG")
     data = application_data()
@@ -110,7 +112,7 @@ def test_submission_queues_admin_channels_and_hides_until_approved(
     assert response.status_code == 302
     application = StringerApplication.objects.get()
     assert application.status == "pending"
-    assert application.applicant == applicant
+    assert application.applicant == (applicant if authenticated else None)
     assert not StringerCompany.objects.exists()
     assert application.photos.count() == 1
     note = Notification.objects.get(
@@ -135,12 +137,9 @@ def test_submission_queues_admin_channels_and_hides_until_approved(
     assert application.reviewed_at is not None
 
 
-def test_submission_requires_login_and_valid_form(
-    client: Client, applicant: User
-) -> None:
-    """Гость входит в аккаунт, невалидная форма не создаёт заявку."""
-    assert client.get(reverse("stringer_application")).status_code == 302
-    client.force_login(applicant)
+def test_submission_requires_valid_form(client: Client) -> None:
+    """Гость открывает форму без входа, невалидная форма не создаёт заявку."""
+    assert client.get(reverse("stringer_application")).status_code == 200
     data = application_data()
     data["phone"] = "invalid"
     data["name"] = ""
@@ -257,4 +256,37 @@ def test_disabled_page_blocks_application(client: Client, applicant: User) -> No
     assert (
         client.post(reverse("stringer_application"), application_data()).status_code
         == 404
+    )
+
+
+def test_guest_applications_are_not_exposed_or_claimed_by_email(
+    client: Client, applicant: User
+) -> None:
+    """Гостевые заявки не видны другим гостям и не привязываются по чужому email."""
+    data = application_data()
+    data["email"] = applicant.email
+    assert client.post(reverse("stringer_application"), data).status_code == 302
+    application = StringerApplication.objects.get()
+    assert application.applicant is None
+    response = client.get(reverse("stringer_application"))
+    assert not response.context["applications"].exists()
+    assert "Струны тест" not in response.content.decode()
+    other_guest = Client()
+    assert (
+        not other_guest.get(reverse("stringer_application"))
+        .context["applications"]
+        .exists()
+    )
+    client.force_login(applicant)
+    assert (
+        not client.get(reverse("stringer_application")).context["applications"].exists()
+    )
+
+
+def test_guest_submission_requires_csrf() -> None:
+    """Публичная форма сохраняет защиту от межсайтовой отправки."""
+    client = Client(enforce_csrf_checks=True)
+    assert (
+        client.post(reverse("stringer_application"), application_data()).status_code
+        == 403
     )

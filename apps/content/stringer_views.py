@@ -3,7 +3,6 @@
 from typing import cast
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -16,19 +15,23 @@ from .stringer_forms import StringerApplicationForm, StringerPhotoFormSet
 from .stringer_services import notify_stringer_application
 
 
-@login_required
 @require_http_methods(["GET", "POST"])
 def stringer_application(request: HttpRequest) -> HttpResponse:
     """Принимает заявку и показывает историю только её владельцу."""
     if not StringerPage.get_singleton().is_enabled:
         raise Http404("Страница отключена")
-    applications = StringerApplication.objects.filter(
-        applicant=request.user
-    ).select_related("company")
+    applicant = cast(User, request.user) if request.user.is_authenticated else None
+    applications = (
+        StringerApplication.objects.filter(applicant=applicant).select_related(
+            "company"
+        )
+        if applicant is not None
+        else StringerApplication.objects.none()
+    )
     pending = applications.filter(status=StringerApplication.Status.PENDING).exists()
     form = StringerApplicationForm(
         request.POST if request.method == "POST" else None,
-        initial={"email": cast(User, request.user).email},
+        initial={"email": applicant.email if applicant is not None else ""},
     )
     photos = StringerPhotoFormSet(
         request.POST if request.method == "POST" else None,
@@ -45,15 +48,18 @@ def stringer_application(request: HttpRequest) -> HttpResponse:
             try:
                 with transaction.atomic():
                     application = form.save(commit=False)
-                    application.applicant = cast(User, request.user)
+                    application.applicant = applicant
                     application.save()
                     photos.instance = application
                     photos.save()
                     notify_stringer_application(application)
             except IntegrityError:
-                if not StringerApplication.objects.filter(
-                    applicant=request.user, status=StringerApplication.Status.PENDING
-                ).exists():
+                if (
+                    applicant is None
+                    or not StringerApplication.objects.filter(
+                        applicant=applicant, status=StringerApplication.Status.PENDING
+                    ).exists()
+                ):
                     raise
                 messages.info(request, "Ваша заявка уже находится на рассмотрении.")
             else:

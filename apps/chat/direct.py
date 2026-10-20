@@ -50,10 +50,13 @@ def peer_for(*, user: User, room: ChatRoom) -> User | None:
     require_direct_participant(user=user, room=room)
     if not room.is_direct:
         return None
-    return (
-        room.direct_user_high
-        if room.direct_user_low_id == user.pk
-        else room.direct_user_low
+    return cast(
+        User,
+        (
+            room.direct_user_high
+            if room.direct_user_low_id == user.pk
+            else room.direct_user_low
+        ),
     )
 
 
@@ -94,7 +97,7 @@ def open_direct(*, user: User, recipient_id: int) -> ChatRoom:
             member.save(update_fields=["is_active"])
     if created:
         logger.info("Личный диалог создан", room_id=room.pk, actor_id=user.pk)
-    return room
+    return cast(ChatRoom, room)
 
 
 def notify_direct_message(message: ChatMessage) -> None:

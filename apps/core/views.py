@@ -118,7 +118,7 @@ from .support_service import (
     mark_thread_read_by_user,
     update_support_message_text,
 )
-from .text_search import filter_field_contains_ci
+from .text_search import build_contains_all_words_q, filter_field_contains_ci
 
 logger = logging.getLogger(__name__)
 
@@ -2392,7 +2392,7 @@ def rating(request):
     city = request.GET.get("city", "")
     rating_sport = parse_sport_filter(request.GET.get("sport"))
     skill_level = request.GET.get("skill_level", "") or request.GET.get("category", "")
-    search = request.GET.get("q", "")
+    search = " ".join(request.GET.get("q", "").split())
 
     current_season = get_current_season()
 
@@ -2421,7 +2421,7 @@ def rating(request):
         players = players.filter(sport_profiles__sport=Sport.PADEL)
     if search:
         players = players.filter(
-            Q(user__first_name__icontains=search) | Q(user__last_name__icontains=search)
+            build_contains_all_words_q(search, ("user__first_name", "user__last_name"))
         )
 
     from apps.tournaments.season_utils import annotate_season_pts

@@ -8,6 +8,68 @@
     margin-bottom: var(--spacing-lg);
 }
 
+/* Компактные фильтры рейтинга: на мобильных — сетка из трёх строк вместо пяти */
+@media (width <= 768px) {
+    .rating-filters {
+        display: grid;
+        grid-template-areas:
+            "sport level"
+            "city city"
+            "query submit";
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 10px;
+        border-radius: 14px;
+        margin-bottom: var(--spacing-md);
+    }
+
+    .rating-filters .form-control {
+        width: 100%;
+        min-width: 0;
+        height: 42px;
+        padding: 0 10px;
+        border-radius: 10px;
+        font-size: 16px;
+    }
+
+    .rating-filter--sport {
+        grid-area: sport;
+    }
+
+    .rating-filter--level {
+        grid-area: level;
+    }
+
+    .rating-filter--city {
+        grid-area: city;
+    }
+
+    .rating-filter--query {
+        grid-area: query;
+    }
+
+    .rating-filter--submit {
+        grid-area: submit;
+        width: 100%;
+        height: 42px;
+        min-height: 42px;
+        padding: 0 10px;
+        border-radius: 10px;
+        font-size: var(--font-size-sm);
+    }
+
+    .rating-toggle {
+        margin-bottom: var(--spacing-md);
+    }
+
+    .rating-toggle .btn {
+        min-height: 36px;
+        padding: 6px 12px;
+        border-radius: 10px;
+        font-size: 0.8125rem;
+    }
+}
+
 @media (width <= 480px) {
     .rating-toggle {
         justify-content: center;

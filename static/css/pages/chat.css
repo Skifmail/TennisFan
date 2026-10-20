@@ -1544,6 +1544,10 @@
         background: var(--chat-hover);
     }
 
+    .chat-mobile-room:hover {
+        background: var(--chat-hover);
+    }
+
     .chat-platform-link:hover {
         color: var(--chat-accent) !important;
     }
@@ -1749,33 +1753,44 @@
     }
 
     .chat-discover-inner {
-        padding: 32px 20px 28px;
+        padding: 20px 16px 24px;
     }
 
-    .chat-discover-icon {
-        width: 44px;
-        height: 44px;
-        margin-bottom: 19px;
+    .chat-discover-icon,
+    .chat-discover-heading .chat-eyebrow {
+        display: none;
     }
 
     .chat-discover-heading {
-        margin-bottom: 22px;
+        margin-bottom: 16px;
     }
 
     .chat-discover-heading h1 {
-        font-size: 1.875rem;
+        font-size: 1.5rem;
+        margin-bottom: 6px;
     }
 
     .chat-discover-heading > p:last-child {
-        font-size: 0.8125rem;
+        font-size: 0.75rem;
+        line-height: 1.5;
     }
 
     .chat-desktop-break {
         display: none;
     }
 
+    .chat-discover-admin {
+        margin: -4px 0 16px;
+    }
+
+    .chat-discover-admin .chat-button {
+        min-height: 34px;
+        padding: 6px 12px;
+        font-size: 0.75rem;
+    }
+
     .chat-city-search {
-        margin-bottom: 26px;
+        margin-bottom: 20px;
         padding-left: 11px;
         gap: 7px;
     }
@@ -1790,7 +1805,7 @@
 
     .chat-mobile-memberships {
         display: block;
-        margin-bottom: 28px;
+        margin-bottom: 22px;
     }
 
     .chat-mobile-memberships h2 {
@@ -1800,30 +1815,63 @@
         margin-bottom: 10px;
     }
 
-    .chat-mobile-memberships > div {
+    .chat-mobile-rooms {
         display: flex;
-        gap: 8px;
-        overflow: auto;
-        padding: 2px;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--chat-sidebar);
+        border: 1px solid var(--chat-line);
+        border-radius: 14px;
     }
 
-    .chat-mobile-memberships a {
-        display: inline-flex;
+    .chat-mobile-room {
+        display: flex;
         align-items: center;
-        gap: 7px;
-        min-height: 37px;
-        border-radius: 20px;
-        background: var(--chat-accent-soft);
-        color: var(--chat-accent);
-        font-size: 0.75rem;
-        padding: 8px 14px;
-        white-space: nowrap;
+        gap: 10px;
+        min-height: 58px;
+        padding: 9px 12px;
+        color: var(--chat-ink);
+    }
+
+    .chat-mobile-room + .chat-mobile-room {
+        border-top: 1px solid var(--chat-line);
+    }
+
+    .chat-mobile-room .chat-room-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 11px;
+        font-size: 0.8125rem;
     }
 
     .chat-mobile-room-copy {
         display: flex;
+        flex: 1;
         flex-direction: column;
         gap: 2px;
+        min-width: 0;
+    }
+
+    .chat-mobile-room-copy strong {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .chat-mobile-room-copy small {
+        color: var(--chat-secondary);
+        font-size: 0.625rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .chat-mobile-room-copy .chat-participant-count {
+        display: inline;
+        font-size: inherit;
+        line-height: inherit;
     }
 
     .chat-city-card {

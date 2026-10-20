@@ -63,6 +63,7 @@
         if (fallbackMode === 'help') {
             if (iosHelp) {
                 iosHelp.hidden = false;
+                iosHelp.open = true;
                 iosHelp.scrollIntoView({block: 'nearest'});
             }
             return;
@@ -76,7 +77,10 @@
     }
 
     if (isIOS && !isStandalone) {
-        if (iosHelp) iosHelp.hidden = false;
+        if (iosHelp) {
+            iosHelp.hidden = false;
+            iosHelp.open = true;
+        }
         hideControls('На iPhone и iPad push работают только из приложения, добавленного на экран «Домой».');
         return;
     }

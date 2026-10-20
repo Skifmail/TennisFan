@@ -1,9 +1,11 @@
 """Проверки публичных файлов и подключения OneSignal в шаблонах."""
 
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Final
 
 import pytest
+from django.conf import settings
 from django.template.loader import render_to_string
 from django.test import Client, RequestFactory, override_settings
 from pytest_mock import MockerFixture
@@ -139,6 +141,24 @@ def test_base_when_yandex_android_should_load_sdk_without_loader(
     html = render_to_string("base.html", web_push_context(request))
     assert f'src="{expected_url}"' in html
     assert html.count('id="onesignal-sdk"') == 1
+
+
+def test_ios_help_when_rendered_should_reference_existing_step_images() -> None:
+    """Пошаговая инструкция для iPhone показывает существующие картинки."""
+    html = render_to_string("includes/web_push_controls.html")
+    assets = (
+        "ios-push-1-safari.webp",
+        "ios-push-2-more.webp",
+        "ios-push-3-home-screen.webp",
+        "ios-push-4-web-app.webp",
+    )
+    for asset in assets:
+        assert f"images/push/ios/{asset}" in html
+        path = Path(settings.BASE_DIR) / "static/images/push/ios" / asset
+        assert path.is_file()
+        assert path.stat().st_size > 20_000
+    assert "Показать больше" in html
+    assert "Открыть как веб-приложение" in html
 
 
 def test_context_when_registered_should_be_available_to_all_pages() -> None:

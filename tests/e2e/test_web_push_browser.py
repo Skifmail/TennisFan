@@ -314,8 +314,17 @@ def test_ios_when_home_screen_state_changes_should_explain_install_or_enable_pus
     if standalone:
         expect(push_page.locator("#web-push-toggle")).to_be_enabled()
         expect(push_page.locator("#web-push-android-help")).to_be_hidden()
+        expect(push_page.locator("#web-push-ios-help")).to_be_hidden()
     else:
         expect(push_page.locator("#web-push-ios-help")).to_be_visible()
+        expect(push_page.locator("#web-push-ios-help")).to_contain_text(
+            "Откройте сайт в Safari"
+        )
+        expect(push_page.locator("#web-push-ios-help")).to_contain_text(
+            "Открыть как веб-приложение"
+        )
+        expect(push_page.locator("#web-push-ios-help img")).to_have_count(4)
+        assert push_page.evaluate("document.getElementById('web-push-ios-help').open")
         expect(push_page.locator("#web-push-android-help")).to_be_hidden()
         expect(push_page.locator("#web-push-toggle")).to_be_hidden()
         assert push_page.evaluate("window.pushCalls.init.length") == 0

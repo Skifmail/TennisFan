@@ -1,5 +1,6 @@
 """Оркестрация событий, согласий и пакетной подготовки рассылок."""
 
+import uuid
 from datetime import timedelta
 from typing import Final
 
@@ -195,6 +196,8 @@ def queue_broadcast(broadcast_id: int, *, actor: User) -> Broadcast:
     campaign.url = validate_destination(campaign.url, settings.ONESIGNAL_SITE_ORIGIN)
     if not any((campaign.send_push, campaign.send_email, campaign.send_inbox)):
         raise NotificationValidationError("Выберите хотя бы один канал.")
+    if campaign.submission_id is None:
+        campaign.submission_id = uuid.uuid4()
     campaign.upper_user_id = User.objects.aggregate(value=Max("pk"))["value"] or 0
     campaign.status = "queued"
     campaign.confirmed_by = actor

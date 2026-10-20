@@ -1,0 +1,41 @@
+.broadcast-progress {
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid var(--hairline-color, #ddd);
+    border-radius: 8px;
+    background: var(--darkened-bg, #f8f8f8);
+}
+.broadcast-progress__stage { font-size: 1.25rem; font-weight: 600; }
+.broadcast-progress__table { overflow-x: auto; }
+.broadcast-progress table { width: 100%; margin-bottom: 12px; }
+.broadcast-progress caption { text-align: left; padding: 8px 0; font-weight: 600; }
+.broadcast-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.broadcast-actions button { padding: 10px 15px; }
+.broadcast-progress a { margin-left: 12px; }
+.broadcast-actions button,
+#broadcast-progress-refresh {
+    border: 0;
+    border-radius: 4px;
+    background: var(--button-bg, #417690);
+    color: var(--button-fg, #fff);
+    padding: 10px 15px;
+    font: inherit;
+    cursor: pointer;
+}
+.broadcast-actions button.default {
+    background: var(--default-button-bg, #205067);
+    font-weight: 600;
+}
+.broadcast-actions input[name="_save"] {
+    background: var(--close-button-bg, #747474);
+}
+.broadcast-actions button:disabled,
+#broadcast-progress-refresh:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+.broadcast-actions button:focus-visible,
+#broadcast-progress-refresh:focus-visible {
+    outline: 2px solid var(--link-fg, #417690);
+    outline-offset: 3px;
+}

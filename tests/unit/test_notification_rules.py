@@ -77,3 +77,45 @@ def test_destination_when_local_should_build_canonical_url() -> None:
         validate_destination("/tournaments/", "https://tennisfan.ru")
         == "https://tennisfan.ru/tournaments/"
     )
+
+
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        (
+            "/tournaments/?type=cup&id=5",
+            "https://tennisfan.ru/tournaments/?type=cup&id=5",
+        ),
+        (
+            "https://tennisfan.ru/payments/?type=tournament&id=42",
+            "https://tennisfan.ru/payments/?type=tournament&id=42",
+        ),
+        ("/matches/?page=2", "https://tennisfan.ru/matches/?page=2"),
+        ("/tournaments/?author=42", "https://tennisfan.ru/tournaments/?author=42"),
+    ],
+)
+def test_destination_when_query_is_safe_should_keep_deep_link(
+    url: str, expected: str
+) -> None:
+    """Обычные параметры нужны для перехода к турниру, оплате и странице."""
+    assert validate_destination(url, "https://tennisfan.ru") == expected
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "/users/?token=secret",
+        "/users/?access-token=secret",
+        "/users/?api_key=secret",
+        "/users/?email=player@example.test",
+        "/users/?e-mail=player@example.test",
+        "/users/?code=123456",
+        "/users/?key=secret",
+        "/users/?next=/users/#fragment",
+        "/" + "a" * 250,
+    ],
+)
+def test_destination_when_query_contains_secret_should_reject(url: str) -> None:
+    """Токены, адреса, коды и слишком длинные ссылки не уходят провайдеру."""
+    with pytest.raises(NotificationValidationError):
+        validate_destination(url, "https://tennisfan.ru")

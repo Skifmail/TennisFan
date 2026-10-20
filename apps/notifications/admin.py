@@ -692,13 +692,32 @@ class DeliveryAdmin(NotificationAuditAdmin):
         "event_key",
         "user",
         "channel",
-        "status",
+        "status_label",
         "attempts",
         "provider_id",
         "error_code",
     ]
     list_filter = ["channel", "status", "event_key"]
     search_fields = ["user__email", "provider_id", "event_key"]
+
+    @admin.display(description="Статус", ordering="status")
+    def status_label(self, obj: Delivery) -> str:
+        """Поясняет, что ``accepted`` означает только приём провайдером.
+
+        Args:
+            obj: Задание доставки.
+
+        Returns:
+            Понятная администратору подпись статуса.
+        """
+        return {
+            "queued": "В очереди",
+            "processing": "Обрабатывается",
+            "accepted": "Принято провайдером",
+            "skipped": "Пропущено",
+            "failed": "Ошибка",
+            "uncertain": "Неопределённо",
+        }.get(obj.status, obj.status)
 
 
 @admin.register(PushDevice)

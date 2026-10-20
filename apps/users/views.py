@@ -2,6 +2,7 @@
 Users views.
 """
 
+import hashlib
 import json
 import logging
 from datetime import date
@@ -13,6 +14,7 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordResetForm
 from django.core.cache import cache
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -44,6 +46,31 @@ from .sport_rating import (
 from .verification import try_auto_verify
 
 logger = logging.getLogger(__name__)
+
+PASSWORD_RESET_LIMIT = 5
+PASSWORD_RESET_WINDOW_SECONDS = 15 * 60
+
+
+class PasswordResetRateLimitedView(auth_views.PasswordResetView):
+    """Ограничивает публичные запросы восстановления по IP и адресу.
+
+    Ответ всегда совпадает с успешным, чтобы лимит не раскрывал наличие аккаунта.
+    """
+
+    def form_valid(self, form: PasswordResetForm) -> HttpResponse:
+        """Пропускает письмо только в пределах общего окна частоты.
+
+        Args:
+            form: Валидная форма с адресом восстановления.
+
+        Returns:
+            HttpResponse: Редирект на страницу «письмо отправлено».
+        """
+        email = str(form.cleaned_data.get("email", ""))
+        if not _password_reset_allowed(self.request, email):
+            logger.warning("Password reset throttled")
+            return redirect(self.get_success_url())
+        return super().form_valid(form)
 
 
 class PasswordChangeNotifyView(auth_views.PasswordChangeView):
@@ -100,6 +127,52 @@ def _get_request_ip(request) -> str | None:
         return forwarded_for.split(",")[0].strip() or None
     remote_addr = request.META.get("REMOTE_ADDR", "").strip()
     return remote_addr or None
+
+
+def _password_reset_bucket(kind: str, value: str) -> str:
+    """Строит не содержащий PII ключ окна частоты.
+
+    Args:
+        kind: ``ip`` или ``email``.
+        value: Значение, которое нельзя хранить в кэше открытым.
+
+    Returns:
+        Короткий хэш значения.
+    """
+    digest = hashlib.sha256(value.strip().lower().encode()).hexdigest()[:32]
+    return f"password-reset:{kind}:{digest}"
+
+
+def _password_reset_allowed(request: HttpRequest, email: str) -> bool:
+    """Проверяет и увеличивает лимиты восстановления для IP и адреса.
+
+    Args:
+        request: Запрос с IP-адресом.
+        email: Введённый адрес.
+
+    Returns:
+        Можно ли отправить очередное письмо.
+    """
+    ip = _get_request_ip(request) or "unknown"
+    keys = (
+        _password_reset_bucket("ip", ip),
+        _password_reset_bucket("email", email),
+    )
+    try:
+        if any(int(cache.get(key) or 0) >= PASSWORD_RESET_LIMIT for key in keys):
+            return False
+        for key in keys:
+            if cache.add(key, 1, timeout=PASSWORD_RESET_WINDOW_SECONDS):
+                continue
+            try:
+                cache.incr(key)
+            except ValueError:
+                cache.set(key, 1, timeout=PASSWORD_RESET_WINDOW_SECONDS)
+        return True
+    except Exception:
+        # Недоступный кэш не должен блокировать восстановление доступа.
+        logger.warning("Password reset rate limit unavailable", exc_info=True)
+        return True
 
 
 def _log_registration_legal_acceptances(request, user) -> None:

@@ -88,8 +88,17 @@ def send_push(
         raise PushRejectedError(f"push_http_{response.status_code}")
     try:
         payload = response.json()
-    except requests.exceptions.JSONDecodeError as exc:
+    except ValueError as exc:
+        # requests и simplejson могут поднимать разные подклассы ошибки разбора.
         raise PushTransportError("push_invalid_json") from exc
     if not isinstance(payload, dict) or not payload.get("id"):
         raise PushRejectedError("push_no_reachable_subscriptions")
+    recipients = payload.get("recipients")
+    if isinstance(recipients, str) and recipients.strip().isdigit():
+        recipients = int(recipients.strip())
+    if isinstance(recipients, bool) or not isinstance(recipients, (int, float)):
+        # Часть ответов OneSignal не содержит счётчик; id уже подтверждает приём.
+        return str(payload["id"])
+    if recipients <= 0:
+        raise PushRejectedError("push_no_recipients")
     return str(payload["id"])

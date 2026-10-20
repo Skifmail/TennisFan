@@ -126,6 +126,7 @@ def notify_direct_message(message: ChatMessage) -> None:
             user_id=recipient_id,
             message="У вас новое сообщение в личном чате.",
             url=reverse("chat:room", args=[room.pk]),
+            chat_room_id=room.pk,
         )
 
 

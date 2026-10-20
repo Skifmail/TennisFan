@@ -90,7 +90,10 @@ def request_confirmation(
         DeviceBindingError: Устройство отозвано или адрес подписки некорректен.
         ConfirmationThrottled: Повторный запрос раньше установленного лимита.
     """
-    User.objects.select_for_update().get(pk=user.pk)
+    # Фоновая синхронизация и отзыв не должны блокировать строку пользователя:
+    # для явного включения важно сериализовать лимит подтверждений по аккаунту.
+    if enable_account:
+        User.objects.select_for_update().get(pk=user.pk)
     device = (
         PushDevice.objects.select_for_update()
         .filter(

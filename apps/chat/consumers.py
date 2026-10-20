@@ -9,6 +9,7 @@ from typing import Any, Final
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import JsonWebsocketConsumer
 
+from apps.notifications.presence import enter_chat, leave_chat, touch_chat
 from apps.users.models import User
 
 from .domain import MAX_FRAME_LENGTH, ChatError
@@ -31,6 +32,7 @@ class CityChatConsumer(JsonWebsocketConsumer):  # type: ignore[misc]
     room_id: int
     group_name: str = ""
     last_ping: float = 0.0
+    user_id: int | None = None
 
     def _allowed(self) -> bool:
         principal = self.scope.get("user")
@@ -43,6 +45,7 @@ class CityChatConsumer(JsonWebsocketConsumer):  # type: ignore[misc]
             require_member(user=user, room_id=self.room_id)
         except ChatError:
             return False
+        self.user_id = user.pk
         return True
 
     def connect(self) -> None:
@@ -54,6 +57,8 @@ class CityChatConsumer(JsonWebsocketConsumer):  # type: ignore[misc]
         self.group_name = f"city_chat_{self.room_id}"
         async_to_sync(self.channel_layer.group_add)(self.group_name, self.channel_name)
         self.accept()
+        if self.user_id is not None:
+            enter_chat(user_id=self.user_id, room_id=self.room_id)
         self.send_json({"type": "ready"})
 
     def disconnect(self, code: int) -> None:
@@ -66,6 +71,8 @@ class CityChatConsumer(JsonWebsocketConsumer):  # type: ignore[misc]
             async_to_sync(self.channel_layer.group_discard)(
                 self.group_name, self.channel_name
             )
+        if self.user_id is not None:
+            leave_chat(user_id=self.user_id, room_id=self.room_id)
 
     def receive(
         self,
@@ -104,6 +111,8 @@ class CityChatConsumer(JsonWebsocketConsumer):  # type: ignore[misc]
             self.close(code=POLICY_CLOSE)
             return
         async_to_sync(self.channel_layer.group_add)(self.group_name, self.channel_name)
+        if self.user_id is not None:
+            touch_chat(user_id=self.user_id, room_id=self.room_id)
         self.send_json({"type": "pong"})
 
     def chat_changed(self, event: dict[str, Any]) -> None:
@@ -115,4 +124,6 @@ class CityChatConsumer(JsonWebsocketConsumer):  # type: ignore[misc]
         if not self._allowed():
             self.close(code=POLICY_CLOSE)
             return
+        if self.user_id is not None:
+            touch_chat(user_id=self.user_id, room_id=self.room_id)
         self.send_json({"type": "refresh"})

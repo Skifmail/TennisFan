@@ -173,6 +173,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.notifications.middleware.PushDeviceLifetimeMiddleware",
     "apps.subscriptions.middleware.FreeSubscriptionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -517,6 +518,11 @@ CRONTAB_COMMAND_SUFFIX = ">> /proc/1/fd/1 2>> /proc/1/fd/2"
 
 CRONJOBS = [
     ("* * * * *", "django.core.management.call_command", ["process_notifications"]),
+    (
+        "*/5 * * * *",
+        "django.core.management.call_command",
+        ["notification_queue_status"],
+    ),
     ("* * * * *", "django.core.management.call_command", ["process_chat_invitations"]),
     (
         "*/10 * * * *",
@@ -605,6 +611,11 @@ CRONJOBS = [
         "0 3 * * *",
         "django.core.management.call_command",
         ["cleanup_suspended_clubs"],
+    ),
+    (
+        "40 3 * * *",
+        "django.core.management.call_command",
+        ["cleanup_notification_history"],
     ),
 ]
 

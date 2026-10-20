@@ -21,6 +21,7 @@ from .domain.rules import (
     validate_destination,
 )
 from .models import Broadcast, Delivery, EventPolicy, NotificationPreference
+from .presence import is_in_chat
 
 DELIVERY_LIFETIME: Final = timedelta(days=1)
 BATCH_SIZE: Final = 100
@@ -77,21 +78,41 @@ def _safe_url(url: str) -> str:
         return validate_destination("", settings.ONESIGNAL_SITE_ORIGIN)
 
 
-def _queue_push(note: Notification, title: str) -> None:
-    push, _ = preferences(note.user.pk)
-    if push and event_policy(note.event_key).push_enabled:
-        now = timezone.now()
-        Delivery.objects.create(
-            event_key=note.event_key,
-            user_id=note.user.pk,
-            channel="push",
-            notification=note,
-            title=title[:TITLE_LIMIT],
-            body=note.message[:BODY_LIMIT],
-            url=_safe_url(note.url),
-            available_at=now,
-            expires_at=now + DELIVERY_LIFETIME,
-        )
+def _queue_push(
+    note: Notification,
+    title: str,
+    recipient_id: int,
+    chat_room_id: int | None = None,
+) -> None:
+    """Ставит одно push-задание сразу после события.
+
+    Если получатель уже открыл комнату чата, push не создаётся: уведомление
+    остаётся в ЛК, а worker дополнительно перепроверит присутствие перед отправкой.
+
+    Args:
+        note: Запись ЛК, к которой относится push.
+        title: Заголовок события.
+        recipient_id: Получатель без дополнительного запроса пользователя.
+        chat_room_id: Комната чата для подавления push, если она открыта.
+    """
+    push, _ = preferences(recipient_id)
+    if not (push and event_policy(note.event_key).push_enabled):
+        return
+    if chat_room_id is not None and is_in_chat(recipient_id, chat_room_id):
+        return
+    now = timezone.now()
+    Delivery.objects.create(
+        event_key=note.event_key,
+        user_id=recipient_id,
+        channel="push",
+        notification=note,
+        title=title[:TITLE_LIMIT],
+        body=note.message[:BODY_LIMIT],
+        url=_safe_url(note.url),
+        chat_room_id=chat_room_id,
+        available_at=now,
+        expires_at=now + DELIVERY_LIFETIME,
+    )
 
 
 @transaction.atomic
@@ -102,6 +123,7 @@ def create_notification(
     user: User | None = None,
     user_id: int | None = None,
     url: str = "",
+    chat_room_id: int | None = None,
 ) -> Notification:
     """Сохраняет запись ЛК и атомарно создаёт единственное push-задание.
 
@@ -111,6 +133,7 @@ def create_notification(
         user: Получатель либо ``None`` при передаче user_id.
         user_id: ID получателя вместо объекта.
         url: Ссылка на соответствующий объект платформы.
+        chat_room_id: Комната чата, открытость которой подавляет push.
 
     Returns:
         Запись с PK даже при отключённой видимости ЛК для сохранения связей.
@@ -130,7 +153,7 @@ def create_notification(
         is_visible=visible,
     )
     if center_enabled() and EVENTS[event_key].source == "inbox":
-        _queue_push(note, EVENTS[event_key].title)
+        _queue_push(note, EVENTS[event_key].title, recipient_id, chat_room_id)
         if (
             event_key in INBOX_ONLY_EVENTS
             and event_policy(event_key).email_enabled
@@ -170,7 +193,7 @@ def capture_email_event(event_key: str, user: User) -> None:
         message=f"{definition.title}. Подробности доступны в личном кабинете.",
         url="/users/notifications/",
     )
-    _queue_push(note, definition.title)
+    _queue_push(note, definition.title, user.pk)
 
 
 @transaction.atomic

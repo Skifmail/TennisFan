@@ -70,8 +70,13 @@ def test_catalog_when_critical_credentials_should_keep_required_email() -> None:
 
 
 def test_catalog_when_seed_migration_loaded_should_cover_all_current_events() -> None:
-    """Первичная миграция и явный каталог имеют одинаковый состав событий."""
+    """Миграции политик в совокупности покрывают текущий каталог событий."""
     from importlib import import_module
 
     migration = import_module("apps.notifications.migrations.0002_seed_event_policies")
-    assert {row["key"] for row in migration.ROWS} == set(EVENTS)
+    stringer_migration = import_module(
+        "apps.notifications.migrations.0004_stringer_application_event"
+    )
+    assert {row["key"] for row in [*migration.ROWS, *stringer_migration.ROWS]} == set(
+        EVENTS
+    )

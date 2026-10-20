@@ -17,6 +17,11 @@
     </div>
     {% endif %}
 
+    <div class="card" style="margin-bottom: var(--spacing-xl);"><div class="card-body">
+        <p>Оказываете услуги по натяжке струн? Расскажите о своей компании.</p>
+        <a href="{% url 'stringer_application' %}" class="btn btn-primary">Подать заявку на добавление</a>
+    </div></div>
+
     {% if companies %}
     <div class="stringers-grid">
         {% for company in companies %}
@@ -107,7 +112,7 @@
     {% else %}
     <div class="card">
         <div class="card-body" style="text-align: center; padding: var(--spacing-3xl);">
-            <p class="text-secondary">Компании стрингеров пока нет. Добавьте их через админ-панель.</p>
+            <p class="text-secondary">Компании стрингеров пока не добавлены. Вы можете подать заявку на публикацию.</p>
         </div>
     </div>
     {% endif %}

@@ -220,10 +220,10 @@ class Broadcast(models.Model):
         models.UUIDField(null=True, unique=True, editable=False)
     )
     processed_users: models.PositiveIntegerField[int, int] = (
-        models.PositiveIntegerField(default=0, editable=False)
+        models.PositiveIntegerField(default=0, db_default=0, editable=False)
     )
     inbox_created: models.PositiveIntegerField[int, int] = models.PositiveIntegerField(
-        default=0, editable=False
+        default=0, db_default=0, editable=False
     )
     cursor_user_id: models.BigIntegerField[int, int] = models.BigIntegerField(default=0)
     upper_user_id: models.BigIntegerField[int, int] = models.BigIntegerField(default=0)

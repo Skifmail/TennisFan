@@ -271,3 +271,54 @@ def test_broadcast_progress_when_opening_journal_should_filter_campaign(
         {"broadcast__id__exact": campaign.pk},
     )
     assert response.status_code == 200
+
+
+def test_broadcast_when_old_draft_is_queued_now_should_track_new_progress(
+    client: Client,
+) -> None:
+    """Старый неотправленный черновик получает точные счётчики нового запуска.
+
+    Args:
+        client: Изолированная HTTP-сессия теста.
+    """
+    actor = _admin(client)
+    draft = Broadcast.objects.create(title="Старый черновик", body="Текст")
+    assert draft.submission_id is None
+    queue_broadcast(draft.pk, actor=actor)
+    response = client.get(
+        reverse("admin:notifications_broadcast_progress", args=[draft.pk])
+    )
+    assert response.json()["counters_complete"] is True
+
+
+def test_broadcast_when_older_writer_omits_new_counters_should_use_database_defaults() -> (
+    None
+):
+    """Добавленные счётчики совместимы с INSERT предыдущей версии приложения."""
+    from django.db import connection
+    from django.utils import timezone
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "INSERT INTO notifications_broadcast "
+            "(title, body, url, send_push, send_email, send_inbox, status, is_test, "
+            "cursor_user_id, upper_user_id, created_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            [
+                "Старая версия",
+                "Текст",
+                "",
+                False,
+                False,
+                True,
+                "draft",
+                False,
+                0,
+                0,
+                timezone.now(),
+            ],
+        )
+        row = cursor.fetchone()
+    assert row is not None
+    draft = Broadcast.objects.get(pk=row[0])
+    assert draft.processed_users == draft.inbox_created == 0

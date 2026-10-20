@@ -424,3 +424,6 @@ class StringerCompanyRatingAdmin(admin.ModelAdmin):
         return obj.comment[:80] + "…" if len(obj.comment) > 80 else obj.comment
 
     comment_preview.short_description = "Комментарий"
+
+
+from . import stringer_admin  # noqa: F401, E402

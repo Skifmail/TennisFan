@@ -25,6 +25,9 @@ class EventDefinition:
 
 
 EVENTS: Final[dict[str, EventDefinition]] = {
+    "stringer.application_submitted": EventDefinition(
+        "Новая заявка стрингера", "Стрингеры", "inbox"
+    ),
     "platform.user_message": EventDefinition(
         "Служебное сообщение пользователю", "Платформа", "email"
     ),
@@ -232,6 +235,7 @@ EVENTS: Final[dict[str, EventDefinition]] = {
 }
 
 PRODUCER_EVENTS: Final[dict[str, str]] = {
+    "apps.content.stringer_services:notify_stringer_application": "stringer.application_submitted",
     "apps.notifications.auth_forms:send_mail": "account.password_reset",
     "apps.chat.invitation_email:send_invitation_email": "chat.invited",
     "apps.chat.invitations:_expand_campaign": "chat.invited",
@@ -344,6 +348,7 @@ PRODUCER_EVENTS: Final[dict[str, str]] = {
 # В этих событиях до центра не существовало почтового производителя.
 INBOX_ONLY_EVENTS: Final = frozenset(
     [
+        "stringer.application_submitted",
         "chat.reply",
         "club.join_approved",
         "club.join_rejected",

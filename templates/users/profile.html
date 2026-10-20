@@ -17,6 +17,9 @@
         </form>
     </div>
     {% endif %}
+    {% if request.user == player.user %}
+    <p><a href="{% url 'stringer_application' %}">Мои заявки стрингера</a></p>
+    {% endif %}
     <!-- Profile Card: full width, left info + right charts -->
     <div class="card profile-card profile-card--wide">
         <div class="card-body">

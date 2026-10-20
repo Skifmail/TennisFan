@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Заявка на добавление стрингера{% endblock %}
+{% block content %}
+<div class="container" style="max-width: 850px;">
+    <h1 class="page-title">Добавить компанию стрингера</h1>
+    <p><a href="{% url 'stringers' %}">← Стрингеры</a></p>
+    <p>Заполните сведения о компании. После проверки администратором они появятся в каталоге. Контактное лицо и email доступны только администрации.</p>
+    {% if applications %}
+    <div class="card"><div class="card-body">
+        <h2>Мои заявки</h2>
+        {% for application in applications %}
+        <p><strong>{{ application.name }}</strong> — {{ application.get_status_display }} · {{ application.created_at|date:"d.m.Y H:i" }}</p>
+        {% if application.moderation_comment %}<p>{{ application.moderation_comment|linebreaksbr }}</p>{% endif %}
+        {% if application.company and application.company.is_active %}<p><a href="{% url 'stringer_detail' application.company.pk %}">Открыть компанию</a></p>{% endif %}
+        {% endfor %}
+    </div></div>
+    {% endif %}
+    {% if pending %}
+    <p>Ваша заявка находится на рассмотрении. Её статус появится на этой странице.</p>
+    {% else %}
+    <form method="post" enctype="multipart/form-data" class="card">
+        <div class="card-body">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <h2>Фотографии компании</h2>
+            <p>Можно приложить до трёх фотографий, не более 10 МБ каждая.</p>
+            {{ photos.management_form }}
+            {{ photos.non_form_errors }}
+            {% for photo in photos %}{{ photo.as_p }}{% endfor %}
+            <p>Нажимая «Отправить», вы подтверждаете право представлять компанию и согласие на публикацию её сведений, контактов и фотографий.</p>
+            <button type="submit" class="btn btn-primary">Отправить на утверждение</button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

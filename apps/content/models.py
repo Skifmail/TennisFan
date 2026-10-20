@@ -2,7 +2,15 @@
 Content models: News, Gallery, Pages.
 """
 
-from typing import cast
+from __future__ import annotations
+
+from datetime import datetime
+from typing import TYPE_CHECKING, ClassVar, cast
+
+if TYPE_CHECKING:
+    from django.db.models.manager import RelatedManager
+
+    from apps.users.models import User
 
 from django.db import models
 
@@ -180,7 +188,7 @@ class AboutUs(CompressImageFieldsMixin, models.Model):
         return "О нас"
 
     @classmethod
-    def get_singleton(cls) -> "AboutUs":
+    def get_singleton(cls) -> AboutUs:
         """Return the single AboutUs instance, creating if needed."""
         obj = cls.objects.first()
         if obj is None:
@@ -209,7 +217,7 @@ class ContactPage(models.Model):
         return "Контакты"
 
     @classmethod
-    def get_singleton(cls) -> "ContactPage":
+    def get_singleton(cls) -> ContactPage:
         """Return the single ContactPage instance, creating if needed."""
         obj = cls.objects.first()
         if obj is None:
@@ -391,7 +399,7 @@ class VideoPage(models.Model):
         return "Страница «Видео»"
 
     @classmethod
-    def get_singleton(cls) -> "VideoPage":
+    def get_singleton(cls) -> VideoPage:
         """Return the single VideoPage instance, creating if needed."""
         obj = cls.objects.first()
         if obj is None:
@@ -584,7 +592,7 @@ class StringerPage(models.Model):
         super().save(*args, **kwargs)
 
     @classmethod
-    def get_singleton(cls) -> "StringerPage":
+    def get_singleton(cls) -> StringerPage:
         """Получить или создать единственный экземпляр."""
         obj, _ = cls.objects.get_or_create(
             pk=1,
@@ -768,3 +776,114 @@ class StringerCompanyRating(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user} → {self.company}: {self.score}/5"
+
+
+class StringerApplication(models.Model):
+    """Заявка на публикацию компании, изолированная от публичного каталога."""
+
+    if TYPE_CHECKING:
+        photos: RelatedManager[StringerApplicationPhoto]
+
+    class Status(models.TextChoices):
+        """Состояния модерации заявки."""
+
+        PENDING = "pending", "На рассмотрении"
+        APPROVED = "approved", "Одобрена"
+        REJECTED = "rejected", "Отклонена"
+
+    applicant: models.ForeignKey[User, User] = models.ForeignKey(
+        "users.User", on_delete=models.PROTECT, verbose_name="Заявитель"
+    )
+    name: models.CharField[str, str] = models.CharField(
+        "Название компании", max_length=200
+    )
+    address: models.CharField[str, str] = models.CharField(
+        "Город и адрес", max_length=300
+    )
+    price: models.CharField[str, str] = models.CharField(
+        "Стоимость услуг", max_length=200
+    )
+    description: models.TextField[str, str] = models.TextField(
+        "Описание услуг", max_length=5000
+    )
+    contact_name: models.CharField[str, str] = models.CharField(
+        "Контактное лицо", max_length=200
+    )
+    email: models.EmailField[str, str] = models.EmailField("Email для связи")
+    phone: models.CharField[str, str] = models.CharField("Телефон", max_length=100)
+    telegram: models.CharField[str, str] = models.CharField(
+        "Telegram", max_length=300, blank=True
+    )
+    whatsapp: models.CharField[str, str] = models.CharField(
+        "WhatsApp", max_length=300, blank=True
+    )
+    max_contact: models.CharField[str, str] = models.CharField(
+        "MAX", max_length=300, blank=True
+    )
+    status: models.CharField[str, str] = models.CharField(
+        "Статус", max_length=20, choices=Status.choices, default=Status.PENDING
+    )
+    moderation_comment: models.TextField[str, str] = models.TextField(
+        "Комментарий администратора", blank=True
+    )
+    company: models.OneToOneField[StringerCompany | None, StringerCompany | None] = (
+        models.OneToOneField(
+            StringerCompany,
+            on_delete=models.SET_NULL,
+            null=True,
+            blank=True,
+            verbose_name="Опубликованная компания",
+        )
+    )
+    reviewed_by: models.ForeignKey[User | None, User | None] = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_stringer_applications",
+        verbose_name="Рассмотрел",
+    )
+    reviewed_at: models.DateTimeField[datetime | None, datetime | None] = (
+        models.DateTimeField("Дата решения", null=True, blank=True)
+    )
+    created_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
+        "Дата заявки", auto_now_add=True
+    )
+
+    class Meta:
+        verbose_name = "Заявка стрингера"
+        verbose_name_plural = "Заявки стрингеров"
+        ordering: ClassVar = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["applicant"],
+                condition=models.Q(status="pending"),
+                name="one_pending_stringer_application",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return str(self.name)
+
+
+class StringerApplicationPhoto(CompressImageFieldsMixin, models.Model):
+    """Фотография компании, ожидающая проверки вместе с заявкой."""
+
+    application: models.ForeignKey[StringerApplication, StringerApplication] = (
+        models.ForeignKey(
+            StringerApplication,
+            on_delete=models.CASCADE,
+            related_name="photos",
+            verbose_name="Заявка",
+        )
+    )
+    image: models.ImageField[str, str] = models.ImageField(
+        "Фото", upload_to="stringers/applications/", validators=[validate_image_max_2mb]
+    )
+    caption: models.CharField[str, str] = models.CharField(
+        "Подпись", max_length=200, blank=True
+    )
+
+    class Meta:
+        verbose_name = "Фото заявки"
+        verbose_name_plural = "Фото заявки"

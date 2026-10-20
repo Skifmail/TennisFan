@@ -111,7 +111,9 @@ def push_page(native_notification_permission: str) -> Iterator[Page]:
                 body=(
                     '<script id="web-push-config" type="application/json">'
                     f'{{"appId": "{APP_ID}"}}</script>'
-                    '<script id="onesignal-sdk"></script>' + controls
+                    '<script id="onesignal-sdk"></script>'
+                    + controls
+                    + '<span id="web-push-badge" hidden>✓ Подключено</span>'
                 ),
             ),
         )
@@ -174,9 +176,15 @@ def test_subscription_when_user_clicks_should_subscribe_and_allow_opt_out(
     assert config["promptOptions"]["slidedown"]["prompts"][0]["autoPrompt"] is False
     push_page.get_by_role("button", name="Включить уведомления", exact=True).click()
     expect(push_page.locator("#web-push-status")).to_have_text("Уведомления включены.")
+    expect(push_page.locator("#web-push-status")).to_have_attribute(
+        "data-state", "connected"
+    )
+    expect(push_page.locator("#web-push-badge")).to_be_visible()
     assert push_page.evaluate("Notification.permission") == "granted"
     push_page.get_by_role("button", name="Отключить уведомления", exact=True).click()
     expect(push_page.locator("#web-push-status")).to_have_text("Уведомления выключены.")
+    expect(push_page.locator("#web-push-status")).to_have_attribute("data-state", "off")
+    expect(push_page.locator("#web-push-badge")).to_be_hidden()
     assert push_page.evaluate("Notification.permission") == "granted"
     assert push_page.evaluate("window.pushCalls.optOut") == 1
 

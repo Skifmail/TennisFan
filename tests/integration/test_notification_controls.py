@@ -50,6 +50,8 @@ def test_inbox_when_push_state_differs_should_always_offer_settings(
     assert html.count('id="web-push-toggle"') == 1
     assert 'name="push_enabled"' in html and 'name="email_enabled"' in html
     assert 'id="notification-disable-dialog"' in html
+    assert 'id="web-push-badge"' in html
+    assert "Подключено" in html
     assert "уведомления в личном кабинете" in html.lower()
 
 

@@ -5,6 +5,7 @@
     const configElement = document.getElementById('web-push-config');
     const button = document.getElementById('web-push-toggle');
     const status = document.getElementById('web-push-status');
+    const badge = document.getElementById('web-push-badge');
     const iosHelp = document.getElementById('web-push-ios-help');
     const sdkScript = document.getElementById('onesignal-sdk');
     const SDK_TIMEOUT_MS = 15000;
@@ -156,6 +157,7 @@
             }
 
             function update() {
+                let state = 'off';
                 button.disabled = busy;
                 if (codeForm) codeForm.hidden = !manualCode || !confirmationPending;
                 if (codeSubmit) codeSubmit.disabled = busy || Date.now() < codeRetryUntil;
@@ -163,28 +165,40 @@
                 if (window.Notification && Notification.permission === 'denied') {
                     status.textContent = 'Уведомления запрещены. Разрешите их в настройках браузера или устройства.';
                     button.disabled = true;
+                    state = 'error';
                 } else if (config.notificationCenter && confirmationPending) {
                     status.textContent = manualCode
                         ? 'Введите шестизначный код из полученного push. Нажимать уведомление не нужно. Код действует 5 минут.'
                         : 'Разрешение на устройстве включено. Откройте полученный push и подтвердите подключение TennisFan. Если он не пришёл, повторите через минуту.';
                     button.textContent = manualCode ? 'Отправить новый код' : 'Отправить подтверждение повторно';
+                    state = 'pending';
                 } else if (verifiedSubscriptionId && !subscription.id) {
                     status.textContent = 'Загружаем состояние подключённого устройства…';
+                    state = 'loading';
                 } else if (!accountPushEnabled) {
                     status.textContent = 'Push отключены в настройках аккаунта. Можно включить их этой кнопкой.';
+                    state = 'off';
                 } else if (config.notificationCenter && subscription.optedIn && verifiedSubscriptionId !== subscription.id) {
                     status.textContent = 'Push на устройстве разрешены. Подтвердите подключение к TennisFan для персональных уведомлений.';
                     button.textContent = manualCode ? 'Получить код подключения' : 'Подтвердить подключение';
+                    state = 'pending';
                 } else if (subscription.optedIn && subscription.id) {
                     status.textContent = 'Уведомления включены.';
                     button.textContent = 'Отключить уведомления';
+                    state = 'connected';
                 } else if (subscription.optedIn) {
                     status.textContent = 'Подписка подключается. Дождитесь подтверждения.';
                     button.disabled = true;
+                    state = 'pending';
                 } else {
                     status.textContent = 'Уведомления выключены.';
                 }
-                if (failureMessage) status.textContent = failureMessage;
+                if (failureMessage) {
+                    status.textContent = failureMessage;
+                    state = 'error';
+                }
+                status.dataset.state = state;
+                if (badge) badge.hidden = state !== 'connected';
                 const remaining = Math.ceil((retryUntil - Date.now()) / SECOND_MS);
                 if (remaining > 0) {
                     button.disabled = true;

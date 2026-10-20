@@ -10,4 +10,4 @@
 {% else %}
 <h1>Подтверждение недействительно</h1><p>Код истёк, уже использован или открыт в другом браузере либо аккаунте. Откройте настройки в исходном браузере и запросите новое подтверждение.</p><a class="btn btn-primary" href="{% url 'notifications' %}?settings=1#notification-settings">Настроить уведомления</a>
 {% endif %}
-<p class="notification-confirmation__hint">Уведомления в личном кабинете сохраняются независимо от подключения устройства.</p></main><script src="{% static 'js/push_navigation.js' %}" defer></script>{% if valid and not complete %}<script src="{% static 'js/push_confirm.js' %}" defer></script>{% endif %}</body></html>
+<p class="notification-confirmation__hint">Уведомления в личном кабинете сохраняются независимо от подключения устройства.</p></main><script src="{% static 'js/push_confirmation_handoff.js' %}" defer></script><script src="{% static 'js/push_navigation.js' %}" defer></script>{% if valid and not complete %}<script src="{% static 'js/push_confirm.js' %}" defer></script>{% endif %}</body></html>

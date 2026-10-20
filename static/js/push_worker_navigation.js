@@ -5,6 +5,15 @@
     const MESSAGE_TYPE = 'tennisfan:push-confirmation';
     const CONFIRM_PATH = '/notification-center/confirm/';
     const ACK_TIMEOUT_MS = 2000;
+    const NATIVE_TIMEOUT_MS = 1000;
+
+    function bounded(operation, fallback) {
+        return new Promise(resolve => {
+            const timer = setTimeout(() => resolve(fallback), NATIVE_TIMEOUT_MS);
+            Promise.resolve().then(operation).then(value => {clearTimeout(timer); resolve(value);},
+                () => {clearTimeout(timer); resolve(fallback);});
+        });
+    }
     const CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
     self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
@@ -23,7 +32,9 @@
         event.stopImmediatePropagation();
         event.notification.close();
         event.waitUntil((async () => {
-            const windows = await self.clients.matchAll({type: 'window', includeUncontrolled: true});
+            // Записываем только после notificationclick, а не при получении push.
+            if (self.tennisFanPushHandoff) await self.tennisFanPushHandoff.remember(target.href);
+            const windows = await bounded(() => self.clients.matchAll({type: 'window', includeUncontrolled: true}), []);
             const local = windows.filter(client =>
                 typeof client.url === 'string' && client.url.startsWith(target.origin + '/'));
             local.sort((left, right) => Number(right.focused) - Number(left.focused));
@@ -41,18 +52,17 @@
                 let delivered = true;
                 try { client.postMessage({type: MESSAGE_TYPE, url: target.href}, [channel.port2]); }
                 catch (_error) { delivered = false; }
-                try { await client.focus(); } catch (_error) { /* Продолжаем другими способами. */ }
+                // Зависший focus не должен блокировать уже отправленное сообщение.
+                void bounded(() => client.focus(), null);
                 const acknowledged = delivered && await accepted;
                 channel.port1.close();
                 if (acknowledged) return;
-                try {
-                    const moved = await client.navigate(target.href);
-                    if (moved && moved.url === target.href) return;
-                } catch (_error) { /* Холодное открытие остаётся запасным путём. */ }
+                const moved = await bounded(() => client.navigate(target.href), null);
+                if (moved && moved.url === target.href) return;
                 break;
             }
             // При закрытой PWA остаётся стандартное открытие окна по точному URL.
-            await self.clients.openWindow(target.href);
+            await bounded(() => self.clients.openWindow(target.href), null);
         })());
     });
 })();

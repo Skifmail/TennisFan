@@ -67,9 +67,10 @@ def onesignal_worker(request: HttpRequest) -> HttpResponse:
     Returns:
         JavaScript с запретом использования устаревшей версии без проверки.
     """
+    handoff = json.dumps(staticfiles_storage.url("js/push_confirmation_handoff.js"))
     helper = json.dumps(staticfiles_storage.url("js/push_worker_navigation.js"))
     response = HttpResponse(
-        f"importScripts({helper});\n" + WORKER_SCRIPT,
+        f"importScripts({handoff}, {helper});\n" + WORKER_SCRIPT,
         content_type="application/javascript",
     )
     response["Cache-Control"] = "no-cache"

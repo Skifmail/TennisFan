@@ -56,6 +56,7 @@ def test_confirmation_when_https_browser_submits_should_pass_real_csrf(
             assert relative in {
                 "js/push_confirm.js",
                 "js/push_navigation.js",
+                "js/push_confirmation_handoff.js",
                 "css/pages/notification-settings.css",
             }
             asset = SCRIPT.parent.parent / relative

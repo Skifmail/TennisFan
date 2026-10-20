@@ -11,26 +11,26 @@
 
 <div class="container">
     <!-- Filters -->
-    <form method="get" class="filter-bar">
-        <select name="sport" class="form-control" onchange="this.form.submit()" aria-label="Вид спорта">
+    <form method="get" class="filter-bar rating-filters">
+        <select name="sport" class="form-control rating-filter--sport" onchange="this.form.submit()" aria-label="Вид спорта">
             {% for value, label in sport_choices %}
             <option value="{{ value }}" {% if current_sport == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
-        <select name="city" class="form-control">
+        <select name="city" class="form-control rating-filter--city" aria-label="Населённый пункт">
             <option value="">Любой населённый пункт России</option>
             {% for city in city_options %}
             <option value="{{ city }}" {% if current_city == city %}selected{% endif %}>{{ city }}</option>
             {% endfor %}
         </select>
-        <select name="skill_level" class="form-control" onchange="this.form.submit()">
+        <select name="skill_level" class="form-control rating-filter--level" onchange="this.form.submit()" aria-label="Уровень игрока">
             <option value="">Все уровни</option>
             {% for value, label in skill_level_choices %}
             <option value="{{ value }}" {% if current_skill_level == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
-        <input type="text" name="q" value="{{ search_query }}" placeholder="Поиск по имени..." class="form-control">
-        <button type="submit" class="btn btn-primary">Поиск</button>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Поиск по имени..." class="form-control rating-filter--query" aria-label="Поиск по имени">
+        <button type="submit" class="btn btn-primary rating-filter--submit">Поиск</button>
     </form>
 
     <div class="rating-toggle">

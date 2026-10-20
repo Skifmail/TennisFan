@@ -15,7 +15,7 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.mark.parametrize(
-    "scenario", ["hydration", "changed", "rate_limit", "transport"]
+    "scenario", ["hydration", "changed", "rate_limit", "transport", "delayed_response"]
 )
 def test_binding_when_sdk_or_server_recovers_should_keep_consistent_state(
     scenario: str,
@@ -62,6 +62,7 @@ def test_binding_when_sdk_or_server_recovers_should_keep_consistent_state(
             calls: list[dict[str, object]] = []
             verified = scenario == "hydration"
             rejected = False
+            held: list[Route] = []
 
             def device(route: Route) -> None:
                 """Имитирует существующую серверную привязку и один безопасный отказ.
@@ -73,6 +74,9 @@ def test_binding_when_sdk_or_server_recovers_should_keep_consistent_state(
                 data = route.request.post_data_json
                 assert isinstance(data, dict)
                 calls.append(data)
+                if data.get("enableAccount") and scenario == "delayed_response":
+                    held.append(route)
+                    return
                 if data.get("active") is False:
                     verified = False
                 if (
@@ -107,11 +111,13 @@ def test_binding_when_sdk_or_server_recovers_should_keep_consistent_state(
             page.evaluate(SDK_MOCK)
             page.evaluate(
                 """() => {
+                window.handoffArmed = 0;
+                window.tennisFanPushHandoff = {beginWaiting: () => {window.handoffArmed++;}, stopWaiting: () => {}};
                 window.mockSubscription.addEventListener = (_name, callback) => {window.bindingChanged = callback;};
                 window.mockNotificationPermission='granted'; window.mockOneSignal.Notifications.permission=true;
             }"""
             )
-            if scenario in ("rate_limit", "transport"):
+            if scenario in ("rate_limit", "transport", "delayed_response"):
                 page.evaluate(
                     "() => {window.mockSubscription.id='test-subscription'; window.mockSubscription.optedIn=true;}"
                 )
@@ -132,6 +138,15 @@ def test_binding_when_sdk_or_server_recovers_should_keep_consistent_state(
                     "Отключить уведомления"
                 )
                 assert verified or scenario == "changed"
+            elif scenario == "delayed_response":
+                page.click("#web-push-toggle")
+                assert page.evaluate("window.handoffArmed") > 0
+                assert len(held) == 1
+                held[0].fulfill(
+                    status=202,
+                    json={"active": False, "pending": True, "accountPushEnabled": True},
+                )
+                expect(page.locator("#web-push-status")).to_contain_text("подтвердите")
             else:
                 expect(page.locator("#web-push-toggle")).to_have_text(
                     "Подтвердить подключение"

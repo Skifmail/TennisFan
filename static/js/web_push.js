@@ -103,6 +103,8 @@
                     // Неизвестное/ещё загружающееся состояние SDK — не команда отзыва.
                     // Отзываем только в явном обработчике отключения ниже.
                     if (!active) return;
+                    // Push может прийти раньше HTTP-ответа (или при его потере).
+                    if (enableAccount === true) window.tennisFanPushHandoff?.beginWaiting();
                     const state = await api(config.deviceUrl, {
                         externalId: boundExternalId,
                         subscriptionId: subscription.id,
@@ -111,6 +113,7 @@
                     });
                     accountPushEnabled = state.accountPushEnabled !== false;
                     verifiedSubscriptionId = state.active ? subscription.id : null;
+                    if (state.active) window.tennisFanPushHandoff?.stopWaiting();
                     if (state.pending) {
                         confirmationPending = true;
                         window.tennisFanPushHandoff?.beginWaiting();

@@ -111,7 +111,10 @@
                     });
                     accountPushEnabled = state.accountPushEnabled !== false;
                     verifiedSubscriptionId = state.active ? subscription.id : null;
-                    if (state.pending) confirmationPending = true;
+                    if (state.pending) {
+                        confirmationPending = true;
+                        window.tennisFanPushHandoff?.beginWaiting();
+                    }
                 }
             }
 
@@ -135,14 +138,15 @@
                     status.textContent = 'Уведомления запрещены. Разрешите их в настройках браузера или устройства.';
                     button.disabled = true;
                 } else if (config.notificationCenter && confirmationPending) {
-                    status.textContent = 'Откройте полученный push и подтвердите подключение. Если он не пришёл, повторите через минуту.';
+                    status.textContent = 'Разрешение на устройстве включено. Откройте полученный push и подтвердите подключение TennisFan. Если он не пришёл, повторите через минуту.';
                     button.textContent = 'Отправить подтверждение повторно';
                 } else if (verifiedSubscriptionId && !subscription.id) {
                     status.textContent = 'Загружаем состояние подключённого устройства…';
                 } else if (!accountPushEnabled) {
                     status.textContent = 'Push отключены в настройках аккаунта. Можно включить их этой кнопкой.';
                 } else if (config.notificationCenter && subscription.optedIn && verifiedSubscriptionId !== subscription.id) {
-                    status.textContent = 'Подтвердите это устройство, чтобы получать персональные уведомления.';
+                    status.textContent = 'Push на устройстве разрешены. Подтвердите подключение к TennisFan для персональных уведомлений.';
+                    button.textContent = 'Подтвердить подключение';
                 } else if (subscription.optedIn && subscription.id) {
                     status.textContent = 'Уведомления включены.';
                     button.textContent = 'Отключить уведомления';
@@ -206,6 +210,7 @@
                             await api(config.deviceUrl, {externalId: boundExternalId, active: false});
                             verifiedSubscriptionId = null;
                             confirmationPending = false;
+                            window.tennisFanPushHandoff?.stopWaiting();
                         }
                         await subscription.optOut();
                     } else {

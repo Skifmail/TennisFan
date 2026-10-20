@@ -43,7 +43,7 @@ const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 const listeners = {};
 let intercepted = false;
 vm.runInNewContext(fs.readFileSync(input.file, 'utf8'), {
-    navigator: {userAgent: input.agent}, URL, URLSearchParams,
+    navigator: {userAgent: input.agent}, URL, URLSearchParams, setTimeout, clearTimeout,
     self: {location: {origin: 'https://tennisfan.ru'},
         addEventListener: (name, callback) => {listeners[name] = callback;}}
 });
@@ -83,7 +83,7 @@ const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 let listener, navigated = false;
 class ServiceWorker {constructor(){this.scriptURL = 'https://tennisfan.ru/OneSignalSDKWorker.js';}}
 vm.runInNewContext(fs.readFileSync(input.file, 'utf8'), {
-    ServiceWorker, URL, URLSearchParams,
+    ServiceWorker, URL, URLSearchParams, window: {},
     navigator: {userAgent: 'Chrome', serviceWorker: {addEventListener: (_name, callback) => {listener = callback;}}},
     location: {origin: 'https://tennisfan.ru', href: 'https://tennisfan.ru/', assign() {navigated = true;}}
 });
@@ -116,7 +116,7 @@ const listeners = {};
 const opened = [];
 const target = 'https://tennisfan.ru/notification-center/confirm/#code=' + 'a'.repeat(43);
 vm.runInNewContext(fs.readFileSync(input.file, 'utf8'), {
-    navigator: {userAgent: 'iPhone'}, URL, URLSearchParams,
+    navigator: {userAgent: 'iPhone'}, URL, URLSearchParams, setTimeout, clearTimeout,
     self: {location: {origin: 'https://tennisfan.ru'},
         addEventListener: (name, callback) => {listeners[name] = callback;},
         clients: {matchAll: async () => [], openWindow: async url => {opened.push(url);}}}

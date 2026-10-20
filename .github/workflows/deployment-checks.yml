@@ -141,6 +141,7 @@ jobs:
           node --check static/js/notification_admin.js
           node --check static/js/push_navigation.js
           node --check static/js/push_worker_navigation.js
+          node --check static/js/push_confirmation_handoff.js
           node --check static/js/notification_settings.js
           node --check static/js/notification_invitation.js
 

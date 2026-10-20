@@ -133,6 +133,9 @@ def test_binding_when_sdk_or_server_recovers_should_keep_consistent_state(
                 )
                 assert verified or scenario == "changed"
             else:
+                expect(page.locator("#web-push-toggle")).to_have_text(
+                    "Подтвердить подключение"
+                )
                 page.click("#web-push-toggle")
                 expect(page.locator("#web-push-status")).to_contain_text(
                     "Подождите"

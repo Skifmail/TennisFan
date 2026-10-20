@@ -207,6 +207,50 @@ def test_push_transport_when_called_should_target_subscription_only(
     assert "included_segments" not in payload
 
 
+def test_push_transport_when_zero_recipients_should_reject(
+    mocker: MockerFixture,
+) -> None:
+    """Принятый запрос без получателей не считается успешной доставкой."""
+    from apps.notifications.infrastructure.push import PushRejectedError, send_push
+
+    response = mocker.Mock(status_code=200)
+    response.json.return_value = {"id": "accepted-id", "recipients": 0}
+    mocker.patch(
+        "apps.notifications.infrastructure.push.requests.post", return_value=response
+    )
+    with pytest.raises(PushRejectedError, match="push_no_recipients"):
+        send_push(
+            subscription_ids=[SUBSCRIPTION],
+            title="Тема",
+            body="Текст",
+            url="https://tennisfan.ru/",
+            key=SUBSCRIPTION,
+        )
+
+
+def test_push_transport_when_recipients_absent_should_accept_id(
+    mocker: MockerFixture,
+) -> None:
+    """Обратная совместимость: не все ответы API содержат счётчик."""
+    from apps.notifications.infrastructure.push import send_push
+
+    response = mocker.Mock(status_code=200)
+    response.json.return_value = {"id": "accepted-id"}
+    mocker.patch(
+        "apps.notifications.infrastructure.push.requests.post", return_value=response
+    )
+    assert (
+        send_push(
+            subscription_ids=[SUBSCRIPTION],
+            title="Тема",
+            body="Текст",
+            url="https://tennisfan.ru/",
+            key=SUBSCRIPTION,
+        )
+        == "accepted-id"
+    )
+
+
 def test_confirmation_when_opted_out_should_keep_rate_limit(
     client: Client, mocker: MockerFixture
 ) -> None:

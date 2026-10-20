@@ -17,7 +17,7 @@ urlpatterns = [
     # Восстановление пароля
     path(
         "password-reset/",
-        auth_views.PasswordResetView.as_view(
+        views.PasswordResetRateLimitedView.as_view(
             form_class=NotificationPasswordResetForm,
             template_name="users/password_reset.html",
             email_template_name="users/password_reset_email.html",

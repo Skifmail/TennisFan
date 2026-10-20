@@ -105,10 +105,22 @@
 
             async function syncDevice(enableAccount) {
                 if (config.notificationCenter && config.authenticated) {
-                    const active = Boolean(subscription.optedIn && subscription.id && Notification.permission !== 'denied');
+                    const denied = Boolean(window.Notification && Notification.permission === 'denied');
+                    const active = Boolean(subscription.optedIn && subscription.id && !denied);
                     // Неизвестное/ещё загружающееся состояние SDK — не команда отзыва.
-                    // Отзываем только в явном обработчике отключения ниже.
-                    if (!active) return;
+                    // Явный запрет в ОС отзывает серверную привязку, чтобы не копить мёртвые адреса.
+                    if (!active) {
+                        if (denied && verifiedSubscriptionId && boundExternalId) {
+                            try {
+                                await api(config.deviceUrl, {externalId: boundExternalId, active: false});
+                                verifiedSubscriptionId = null;
+                                confirmationPending = false;
+                            } catch (_error) {
+                                // Следующая авторизованная синхронизация повторит отзыв.
+                            }
+                        }
+                        return;
+                    }
                     // Push может прийти раньше HTTP-ответа (или при его потере).
                     if (enableAccount === true && !manualCode) window.tennisFanPushHandoff?.beginWaiting();
                     const state = await api(manualCode && enableAccount === true ? config.codeRequestUrl : config.deviceUrl, {

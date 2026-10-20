@@ -452,6 +452,7 @@ def send_message(
             ],
             url=reverse("chat:room", args=[room_id]),
             event_key="chat.reply",
+            chat_room_id=room_id,
         )
     logger.info(
         "Сообщение городского чата создано",

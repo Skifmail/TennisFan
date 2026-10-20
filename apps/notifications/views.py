@@ -85,24 +85,38 @@ def notification_identity(request: HttpRequest) -> HttpResponse:
     """
     if not center_enabled() or not settings.ONESIGNAL_REST_API_KEY:
         return JsonResponse({"error": "push_not_configured"}, status=503)
-    User.objects.select_for_update().get(pk=request.user.pk)
     token = request.get_signed_cookie(
         COOKIE_NAME, default="", salt=COOKIE_SALT
     ) or secrets.token_urlsafe(DEVICE_TOKEN_BYTES)
+    deadline = request.session.get_expiry_date()
     device, _ = PushDevice.objects.select_for_update().get_or_create(
         device_hash=hashlib.sha256(token.encode()).hexdigest(),
         defaults={
             "user": request.user,
-            "expires_at": request.session.get_expiry_date(),
+            "expires_at": deadline,
         },
     )
-    if device.user_id != request.user.pk or device.expires_at <= timezone.now():
+    update_fields: list[str] = []
+    if device.user_id != request.user.pk:
         device.user = cast(User, request.user)
         device.external_id = uuid.uuid4()
         device.active = False
         device.subscription_id = None
-    device.expires_at = request.session.get_expiry_date()
-    device.save()
+        device.expires_at = deadline
+        update_fields = [
+            "user",
+            "external_id",
+            "active",
+            "subscription_id",
+            "expires_at",
+        ]
+    elif device.expires_at <= timezone.now():
+        # Обычно срок продлевает middleware на каждом авторизованном запросе;
+        # здесь остаётся безопасный запасной путь без записи на каждый просмотр.
+        device.expires_at = deadline
+        update_fields = ["expires_at"]
+    if update_fields:
+        device.save(update_fields=update_fields)
     response = JsonResponse(
         {
             "externalId": str(device.external_id),

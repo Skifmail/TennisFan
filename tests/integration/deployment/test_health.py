@@ -1,9 +1,14 @@
 """Проверки HTTP-готовности без побочных эффектов и утечки ошибок."""
 
+import pytest
 from django.db import OperationalError
 from django.test import Client, override_settings
+from django.utils import timezone
 from pytest_mock import MockerFixture
 from redis.exceptions import ConnectionError as RedisConnectionError
+
+from apps.notifications.models import Delivery
+from apps.users.models import User
 
 
 @override_settings(ALLOWED_HOSTS=["testserver"], SECURE_SSL_REDIRECT=True)
@@ -85,3 +90,43 @@ def test_web_readiness_when_chat_transport_offline_should_keep_http_available(
     redis = mocker.patch("apps.core.health.Redis.from_url")
     assert Client().get("/health/ready/").status_code == 200
     redis.assert_not_called()
+
+
+@override_settings(
+    ALLOWED_HOSTS=["testserver"],
+    SECURE_SSL_REDIRECT=True,
+    NOTIFICATION_CENTER_ENABLED=False,
+)
+def test_notification_probe_when_center_disabled_should_not_alarm() -> None:
+    """До включения центра отсутствие worker не считается отказом сайта."""
+    response = Client().get("/health/notifications/")
+    assert response.status_code == 200
+    assert response.json() == {"status": "disabled"}
+    assert response["Cache-Control"] == "no-store"
+
+
+@override_settings(
+    ALLOWED_HOSTS=["testserver"],
+    SECURE_SSL_REDIRECT=True,
+    NOTIFICATION_CENTER_ENABLED=True,
+)
+@pytest.mark.django_db
+def test_notification_probe_when_queue_is_old_should_return_503() -> None:
+    """Внешний монитор видит остановленный cron без раскрытия данных заданий."""
+    user = User.objects.create_user(email="health-queue@example.test")
+    Delivery.objects.create(
+        event_key="match.created",
+        channel="push",
+        user=user,
+        title="Тема",
+        body="Текст",
+        url="https://tennisfan.ru/",
+        available_at=timezone.now() - timezone.timedelta(hours=1),
+        expires_at=timezone.now() + timezone.timedelta(days=1),
+    )
+    response = Client().get("/health/notifications/")
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["status"] == "degraded"
+    assert payload["queued_due"] == 1
+    assert "health-queue" not in response.content.decode()

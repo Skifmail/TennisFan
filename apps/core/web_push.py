@@ -56,6 +56,11 @@ def web_push_context(request: HttpRequest) -> dict[str, object]:
         from apps.notifications.presentation import should_invite
 
         context["show_notification_invitation"] = should_invite(request)
+    if enabled:
+        context["web_push_needed"] = (
+            not settings.NOTIFICATION_CENTER_ENABLED
+            or getattr(request.resolver_match, "url_name", None) == "notifications"
+        )
     return context
 
 

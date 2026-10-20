@@ -255,6 +255,7 @@ class Delivery(models.Model):
         status: Очередь, принято провайдером, пропущено, ошибка или неопределённо.
         attempts: Число попыток.
         provider_id: ID принятого сообщения; не подтверждение прочтения.
+        chat_room_id: Комната чата для подавления push, пока она открыта.
     """
 
     key: models.UUIDField[uuid.UUID, uuid.UUID] = models.UUIDField(
@@ -291,6 +292,9 @@ class Delivery(models.Model):
         max_length=100, blank=True
     )
     error_code: models.CharField[str, str] = models.CharField(max_length=80, blank=True)
+    chat_room_id: models.PositiveBigIntegerField[int | None, int | None] = (
+        models.PositiveBigIntegerField(null=True, blank=True)
+    )
     created_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
         auto_now_add=True
     )
@@ -305,9 +309,16 @@ class Delivery(models.Model):
             models.UniqueConstraint(
                 fields=["broadcast", "user", "channel"],
                 name="unique_broadcast_user_channel",
-            )
+            ),
         ]
-        indexes: ClassVar = [models.Index(fields=["status", "available_at"])]
+        indexes: ClassVar = [
+            models.Index(fields=["status", "available_at"]),
+            models.Index(
+                fields=["user", "chat_room_id"],
+                condition=models.Q(channel="push", status="queued"),
+                name="queued_chat_push_idx",
+            ),
+        ]
 
 
 class PushCodeLimit(models.Model):

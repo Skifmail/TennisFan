@@ -5,7 +5,7 @@
 <p>Подписка клуба <b>{{ club_name }}</b> (тариф <b>{{ plan_name }}</b>) истекает <b>{{ ends_at }}</b>.</p>
 <p>До окончания осталось <b>{{ days_left }} дн.</b></p>
 {% if renew_url %}
-<p><a href="{{ renew_url }}" class="btn">Продлить подписку</a></p>
+<p><a href="{{ renew_url }}" class="btn" target="_blank" rel="noopener">Продлить подписку</a></p>
 {% endif %}
 <p>При просрочке функционал клуба будет ограничен.</p>
 {% endblock %}

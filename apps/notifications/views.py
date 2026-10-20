@@ -15,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
+from loguru import logger
 
 from apps.users.models import User
 
@@ -178,8 +179,13 @@ def notification_device(request: HttpRequest) -> HttpResponse:
                 key=str(uuid.uuid4()),
                 ttl_seconds=int(CONFIRMATION_LIFETIME.total_seconds()),
             )
-        except (PushRejectedError, PushTransportError):
-            return JsonResponse({"error": "confirmation_unavailable"}, status=503)
+        except (PushRejectedError, PushTransportError) as exc:
+            logger.warning(
+                "Не удалось отправить подтверждение push", error_code=str(exc)
+            )
+            response = JsonResponse({"error": "confirmation_unavailable"}, status=503)
+            response["Retry-After"] = str(int(CONFIRMATION_COOLDOWN.total_seconds()))
+            return response
     return JsonResponse(
         {
             "active": state.active,

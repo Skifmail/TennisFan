@@ -843,9 +843,26 @@
 }
 
 @media (width <= 768px) {
+    .profile-info__contacts {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .profile-info__contacts .profile-info__messengers {
+        display: flex;
+        justify-content: center;
+    }
+
+    .profile-info__contacts .direct-message-action {
+        width: 100%;
+        max-width: 24rem;
+    }
+
     .profile-info__contacts .direct-message-action .btn {
+        width: 100%;
+        min-height: 44px;
+        padding: var(--spacing-sm) var(--spacing-md);
         font-size: var(--font-size-sm);
-        padding: var(--spacing-xs) var(--spacing-sm);
     }
 }
 

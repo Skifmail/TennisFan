@@ -14,7 +14,8 @@ from apps.chat.models import (
     ChatRoom,
 )
 from apps.core.models import City
-from apps.users.models import User
+from apps.sparring.models import SparringRequest
+from apps.users.models import Player, User
 from tests.support.chat_legal import join_city_with_consent as join_city
 
 
@@ -68,6 +69,7 @@ def create_smoke_sessions(path: Path) -> None:
         if created:
             user.set_unusable_password()
             user.save(update_fields=["password"])
+        Player.objects.get_or_create(user=user, defaults={"city": "Казань"})
         room = join_city(user=user, city_id=city.pk)
         ChatInvitationEmailBlock.objects.filter(user=user).delete()
         client = Client()
@@ -78,6 +80,17 @@ def create_smoke_sessions(path: Path) -> None:
                 for key, cookie in client.cookies.items()
             ]
         )
+    first_user = User.objects.get(email="city-chat-browser-0@test.local")
+    second_user = User.objects.get(email="city-chat-browser-1@test.local")
+    ChatRoom.objects.filter(
+        direct_user_low_id=min(first_user.pk, second_user.pk),
+        direct_user_high_id=max(first_user.pk, second_user.pk),
+    ).delete()
+    sparring, _ = SparringRequest.objects.get_or_create(
+        player=second_user.player,
+        description="Браузерная проверка личных сообщений",
+        defaults={"city": "Казань", "match_type": "singles"},
+    )
     ChatMessage.objects.filter(room=room).delete()
     admin_user, _ = User.objects.update_or_create(
         email="city-chat-admin-browser@test.local",
@@ -98,6 +111,8 @@ def create_smoke_sessions(path: Path) -> None:
         json.dumps(
             {
                 "cookies": cookies,
+                "direct_target_player_id": second_user.player.pk,
+                "direct_sparring_id": sparring.pk,
                 "room_path": f"/chats/{room.pk}/",
                 "archive_city_id": archive_city.pk,
                 "archive_city_name": archive_city.name,

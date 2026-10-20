@@ -383,10 +383,8 @@ img.player-avatar.sparring-card__avatar {
     margin: 0 0 var(--spacing-sm);
     font-size: var(--font-size-sm);
     line-height: 1.45;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
 }
 
 .sparring-card__details {

@@ -26,13 +26,23 @@
         <a href="{% url 'chat:index' %}?q=" class="chat-sidebar-search{% if not room %} is-selected{% endif %}" {% if not room %}aria-current="page"{% endif %}><svg class="chat-icon"><use href="#chat-icon-search"/></svg>Найти город<span>↗</span></a>
         <p class="chat-sidebar-label">МОИ ЧАТЫ</p>
         <nav class="chat-room-list" aria-label="Мои городские чаты">
-        {% for member in memberships %}
+        {% for member in memberships %}{% if not member.room.is_direct %}
             <a class="chat-room-link{% if room.pk == member.room_id %} is-selected{% endif %}" href="{% url 'chat:room' member.room_id %}" {% if room.pk == member.room_id %}aria-current="page"{% endif %}>
-                <span class="chat-room-avatar" aria-hidden="true">{{ member.room.display_name|slice:':1' }}</span>
-                <span class="chat-room-copy"><strong>{{ member.room.display_name }}</strong><small>{{ member.room.city.region|default:'Сообщество TennisFan' }}</small>{% include 'chat/_participant_count.html' with count=member.member_count only %}</span>
+                <span class="chat-room-avatar" aria-hidden="true">{{ member.display_name|slice:':1' }}</span>
+                <span class="chat-room-copy"><strong>{{ member.display_name }}</strong><small>{{ member.room.city.region|default:'Сообщество TennisFan' }}</small>{% include 'chat/_participant_count.html' with count=member.member_count only %}</span>
                 {% if member.unread %}<span class="chat-unread" {% if room.pk == member.room_id %}id="chat-room-unread"{% endif %} aria-label="Непрочитанных: {{ member.unread }}">{{ member.unread }}</span>{% endif %}
             </a>
-        {% empty %}<div class="chat-sidebar-empty"><p>Ваши города появятся здесь</p><span>Найдите сообщество и начните общение.</span></div>{% endfor %}
+        {% endif %}{% endfor %}
+        </nav>
+        <p class="chat-sidebar-label">Личные чаты</p>
+        <nav class="chat-room-list" aria-label="Личные чаты">
+        {% for member in memberships %}{% if member.room.is_direct %}
+            <a class="chat-room-link{% if room.pk == member.room_id %} is-selected{% endif %}" href="{% url 'chat:room' member.room_id %}">
+                <span class="chat-room-avatar" aria-hidden="true">{{ member.display_name|slice:':1' }}</span>
+                <span class="chat-room-copy"><strong>{{ member.display_name }}</strong><small>Личная переписка</small></span>
+                {% if member.unread %}<span class="chat-unread" {% if room.pk == member.room_id %}id="chat-room-unread"{% endif %}>{{ member.unread }}</span>{% endif %}
+            </a>
+        {% endif %}{% endfor %}
         </nav>
         {% if request.user.is_active and request.user.is_staff and request.user.is_superuser %}<a class="chat-sidebar-settings" href="{% url 'chat:create' %}">Создать отдельный чат</a>{% endif %}
             {% block sidebar_settings %}{% if room %}<button type="button" id="chat-sidebar-settings" class="chat-sidebar-settings" data-open-chat-settings aria-haspopup="dialog" aria-controls="chat-settings"><svg class="chat-icon" aria-hidden="true"><use href="#chat-icon-settings"/></svg>Настройки чата</button>{% endif %}{% endblock %}

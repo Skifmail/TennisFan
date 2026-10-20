@@ -208,6 +208,9 @@ EVENTS: Final[dict[str, EventDefinition]] = {
     "club.tournament_cancelled": EventDefinition(
         "Клубный турнир отменён", "Клубы", "email", False
     ),
+    "chat.direct_message": EventDefinition(
+        "Новое личное сообщение", "Личные чаты", "inbox"
+    ),
     "chat.reply": EventDefinition("Ответ в чате", "Чаты", "inbox", False),
     "chat.invited": EventDefinition("Приглашение в чат", "Чаты", "inbox", False),
     "support.reply": EventDefinition("Ответ поддержки", "Поддержка", "email", False),
@@ -235,6 +238,7 @@ EVENTS: Final[dict[str, EventDefinition]] = {
 }
 
 PRODUCER_EVENTS: Final[dict[str, str]] = {
+    "apps.chat.direct:notify_direct_message": "chat.direct_message",
     "apps.content.stringer_services:notify_stringer_application": "stringer.application_submitted",
     "apps.notifications.auth_forms:send_mail": "account.password_reset",
     "apps.chat.invitation_email:send_invitation_email": "chat.invited",

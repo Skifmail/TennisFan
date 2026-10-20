@@ -29,6 +29,7 @@ from .consent import (
     consent_request_ip,
     withdraw_chat_consent,
 )
+from .direct import peer_for, require_direct_participant
 from .domain import (
     MAX_DATABASE_ID,
     MAX_HTTP_BODY_BYTES,
@@ -194,7 +195,7 @@ def index(request: HttpRequest) -> HttpResponse:
         cities_query = cities_query.order_by("name", "region")
     cities_list = list(cities_query[:CITY_SEARCH_LIMIT])
     custom_query = ChatRoom.objects.filter(
-        city__isnull=True, is_active=True, is_created=True
+        city__isnull=True, direct_user_low__isnull=True, is_active=True, is_created=True
     ).annotate(
         member_count=Count(
             "memberships",
@@ -262,6 +263,7 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
         return redirect("chat:index")
     except ChatError:
         return redirect("chat:index")
+    peer = peer_for(user=cast(User, request.user), room=member.room)
     profile = getattr(request.user, "player", None)
     return render(
         request,
@@ -276,6 +278,8 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
             ),
             "profile_has_photo": bool(profile and profile.avatar),
             "room": member.room,
+            "room_name": member.display_name,
+            "direct_peer": peer,
             "memberships": list(services.my_memberships(user=cast(User, request.user))),
             "member_count": member.room.memberships.filter(
                 is_active=True, user__is_active=True
@@ -291,9 +295,12 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
                 "moderatorBadgeUrl": static("images/chat/moderator-badge.png"),
                 "administratorBadgeUrl": static("images/chat/administrator-badge.webp"),
                 "canModerate": bool(
-                    request.user.is_staff
-                    or member.is_moderator
-                    or member.room.administrator_id == request.user.pk
+                    not member.room.is_direct
+                    and (
+                        request.user.is_staff
+                        or member.is_moderator
+                        or member.room.administrator_id == request.user.pk
+                    )
                 ),
             },
         },
@@ -322,6 +329,8 @@ def join(request: HttpRequest) -> HttpResponse:
             is_created=True,
             is_active=True,
         )
+        assert isinstance(city, ChatRoom)
+        require_direct_participant(user=cast(User, request.user), room=city)
         current_filter: dict[str, Any] = {"room": city}
     else:
         city = get_object_or_404(City, pk=_id(params.get("city_id")))
@@ -384,9 +393,19 @@ def join(request: HttpRequest) -> HttpResponse:
             "city": city,
             "custom_room": city if isinstance(city, ChatRoom) else None,
             "target_name": (
-                city.display_name if isinstance(city, ChatRoom) else city.name
+                (
+                    current.display_name
+                    if current and current.room.is_direct
+                    else city.display_name
+                )
+                if isinstance(city, ChatRoom)
+                else city.name
             ),
-            "target_label": str(city),
+            "target_label": (
+                f"Личный чат: {current.display_name}"
+                if current and current.room.is_direct
+                else str(city)
+            ),
             "consent_form": consent_form,
             "has_saved_consents": bool(consent_form.initial.get("personal_data")),
             "consent_error": error,
@@ -414,6 +433,12 @@ def data_conditions(request: HttpRequest, room_id: int) -> HttpResponse:
         Публичный перечень условий по техническим обозначениям участников.
     """
     selected = get_object_or_404(ChatRoom.objects.select_related("city"), pk=room_id)
+    if selected.is_direct:
+        if not request.user.is_authenticated or request.user.pk not in {
+            selected.direct_user_low_id,
+            selected.direct_user_high_id,
+        }:
+            return HttpResponse("Переписка недоступна.", status=404)
     members = (
         ChatMembership.objects.filter(room=selected, consented_at__isnull=False)
         .only(

@@ -300,6 +300,10 @@ def accept_chat_consent(
     from .services import join_room, require_active_user
 
     require_active_user(user)
+    if isinstance(city, ChatRoom):
+        from .direct import require_direct_participant
+
+        require_direct_participant(user=user, room=city)
     form = ChatConsentForm(data=data)
     if not form.is_valid():
         raise ChatValidationError(
@@ -343,6 +347,9 @@ def accept_chat_consent(
         )
         if selected_room is None:
             raise ChatNotFoundError("Чат недоступен.")
+        from .direct import require_direct_participant
+
+        require_direct_participant(user=user, room=selected_room)
         room = selected_room
     else:
         City.objects.select_for_update().get(pk=city.pk)
@@ -423,6 +430,7 @@ def accept_chat_consent(
                 "acceptance_id": str(nonce),
                 "bundle_version": version,
                 "room_id": room.pk,
+                "room_kind": "direct" if room.is_direct else "community",
                 "city_id": room.city_id,
                 "city_label": str(room),
                 "room_label": str(room),
@@ -492,6 +500,9 @@ def withdraw_chat_consent(
         ChatConsentRequiredError: Участие отсутствует.
     """
     room = ChatRoom.objects.select_for_update().get(pk=room_id)
+    from .direct import require_direct_participant
+
+    require_direct_participant(user=user, room=room)
     User.objects.select_for_update(no_key=True).get(pk=user.pk)
     member = (
         ChatMembership.objects.select_for_update()

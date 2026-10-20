@@ -1,0 +1,1 @@
+<form method="post" action="{% url 'chat:direct_start' target_player.pk %}" class="direct-message-action">{% csrf_token %}<button type="submit" class="btn btn-outline btn-sm{% if compact %} sparring-card__btn{% endif %}" aria-label="Написать игроку {{ target_player }}">Написать</button></form>

@@ -187,7 +187,7 @@ class ChatRoomAdmin(_ModelAdmin):
     """
 
     form = ChatRoomForm
-    readonly_fields = ("is_created",)
+    readonly_fields = ("is_created", "direct_user_low", "direct_user_high")
     list_display = (
         "display_label",
         "city",
@@ -217,6 +217,8 @@ class ChatRoomAdmin(_ModelAdmin):
         Returns:
             Поля, недоступные для редактирования текущему сотруднику.
         """
+        if obj and obj.is_direct:
+            return (*self.readonly_fields, "title", "city", "administrator")
         if not request.user.is_superuser:
             return (*self.readonly_fields, "title")
         return self.readonly_fields

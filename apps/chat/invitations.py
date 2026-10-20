@@ -78,6 +78,8 @@ class InvitationCandidate:
 
 def _require_inviter(user: User, room_id: int) -> ChatMembership:
     member = require_member(user=user, room_id=room_id, writing=True)
+    if member.room.is_direct:
+        raise ChatAccessError("В личный чат нельзя приглашать третьих участников.")
     if not (
         member.room.administrator_id == user.pk
         or member.is_moderator

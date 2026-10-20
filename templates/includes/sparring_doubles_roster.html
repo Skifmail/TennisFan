@@ -13,6 +13,9 @@
                         {% include 'includes/avatar.html' with avatar=tm.player.avatar class="player-avatar sparring-card__member-avatar" %}
                         <span class="sparring-card__member-name">{{ tm.player }}</span>
                     </a>
+                    {% if user.is_authenticated and user.is_active and user.pk != tm.player.user_id and tm.player.user.is_active %}
+                    {% include 'includes/direct_message_button.html' with target_player=tm.player compact=True %}
+                    {% endif %}
                 </li>
                 {% empty %}
                 <li class="sparring-card__member sparring-card__member--empty">Пока никого</li>
@@ -33,6 +36,9 @@
                         {% include 'includes/avatar.html' with avatar=tm.player.avatar class="player-avatar sparring-card__member-avatar" %}
                         <span class="sparring-card__member-name">{{ tm.player }}</span>
                     </a>
+                    {% if user.is_authenticated and user.is_active and user.pk != tm.player.user_id and tm.player.user.is_active %}
+                    {% include 'includes/direct_message_button.html' with target_player=tm.player compact=True %}
+                    {% endif %}
                 </li>
                 {% empty %}
                 <li class="sparring-card__member sparring-card__member--empty">Пока никого</li>

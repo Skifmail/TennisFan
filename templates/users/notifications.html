@@ -7,7 +7,6 @@
         <div class="inbox__intro">
             <h1 id="inbox-title" class="inbox__title">Уведомления</h1>
             <p class="inbox__lead">Турниры, спарринги, матчи и клубы в одной ленте.</p>
-            {% if notification_center_enabled %}<a href="{% url 'notification_settings' %}">Настройки push и email</a>{% endif %}
         </div>
         <dl class="inbox-summary">
             <div class="inbox-summary__item">
@@ -26,6 +25,8 @@
             </div>
         </dl>
     </header>
+
+    {% if notification_center_enabled %}{% include "notifications/_settings_panel.html" %}{% endif %}
 
     {% if inbox_groups %}
     <div class="inbox-filters" role="toolbar" aria-label="Группы уведомлений">
@@ -74,6 +75,10 @@
     {% endif %}
 </section>
 {% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/notification-settings.css' %}">
+{% endblock %}
 {% block extra_js %}
+{% if notification_center_enabled %}<script defer src="{% static 'js/notification_settings.js' %}"></script>{% endif %}
 <script defer src="{% static 'js/notifications_inbox.js' %}"></script>
 {% endblock %}

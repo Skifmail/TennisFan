@@ -1,0 +1,5 @@
+<dialog id="notification-invitation" class="notification-dialog" aria-labelledby="notification-invitation-title">
+    <span class="notification-settings__eyebrow">Важное — вовремя</span>
+    <div data-invitation-initial><h2 id="notification-invitation-title">Не пропускайте события TennisFan</h2><p>Подключите push-уведомления на устройстве — узнавайте о матчах, турнирах и важных новостях платформы вовремя.</p><div class="notification-dialog__actions"><a class="btn btn-primary" href="{% url 'notifications' %}?settings=1#notification-settings">Подключить</a><button class="btn btn-outline" type="button" data-invitation-later>Позже</button></div></div>
+    <div data-invitation-later-message hidden><h2>Настройки всегда под рукой</h2><p>Настроить уведомления можно в любой момент: нажмите на своё имя в верхнем меню и выберите «Уведомления».</p><form method="dialog"><button class="btn btn-primary" value="close">Понятно</button></form></div>
+</dialog>

@@ -1,0 +1,25 @@
+<details id="notification-settings" class="notification-settings"{% if notification_settings_open %} open{% endif %}>
+    <summary class="notification-settings__summary">Настроить уведомления <span aria-hidden="true">＋</span></summary>
+    <div class="notification-settings__body">
+        <div class="notification-settings__intro"><span class="notification-settings__eyebrow">Ваши предпочтения</span><h2>Оставайтесь в курсе</h2><p>Выберите удобные каналы. Все события и история сохраняются в личном кабинете.</p></div>
+        <form method="post" action="{% url 'notification_settings' %}" data-notification-preferences data-push-enabled="{{ notification_push_enabled|yesno:'true,false' }}">
+            {% csrf_token %}
+            <label class="notification-channel" for="id_push_enabled"><span><strong>Push-уведомления</strong><small>Матчи, турниры и важные события на подключённых устройствах.</small></span>{{ notification_form.push_enabled }}</label>
+            <label class="notification-channel" for="id_email_enabled"><span><strong>Письма на email</strong><small>Уведомления платформы на вашу электронную почту.</small></span>{{ notification_form.email_enabled }}</label>
+            <p class="notification-settings__note">Письма подтверждения адреса и восстановления доступа отправляются независимо от этих переключателей.</p>
+            <button class="btn btn-primary" type="submit">Сохранить выбор</button>
+        </form>
+        <section class="notification-device" aria-labelledby="web-push-title">
+            <span class="notification-settings__eyebrow">Это устройство</span>
+            <h3 id="web-push-title">Подключение push</h3>
+            <p id="web-push-status" role="status" aria-live="polite">Проверяем подключение устройства…</p>
+            <button id="web-push-toggle" type="button" class="btn btn-outline" aria-describedby="web-push-status" disabled>Включить уведомления</button>
+            <p id="web-push-ios-help" hidden>На iPhone и iPad нужна iOS 16.4 или новее. В Safari нажмите «Поделиться» → «На экран Домой». Затем откройте TennisFan с созданной иконки.</p>
+            <noscript><p>Для подключения устройства включите JavaScript.</p></noscript>
+        </section>
+        <p class="notification-settings__notice">Даже если отключить push и email, уведомления в личном кабинете продолжат приходить.</p>
+    </div>
+</details>
+<dialog id="notification-disable-dialog" class="notification-dialog" aria-labelledby="notification-disable-title" aria-describedby="notification-disable-description">
+    <form method="dialog"><span class="notification-settings__eyebrow">Управление push</span><h2 id="notification-disable-title">Отключить push-уведомления?</h2><p id="notification-disable-description">Вы перестанете получать push. Уведомления в личном кабинете всё равно будут приходить, а история сохранится. Настройка email не изменится.</p><div class="notification-dialog__actions"><button class="btn btn-outline" value="cancel" autofocus>Оставить включёнными</button><button class="btn btn-primary" value="disable">Отключить push</button></div></form>
+</dialog>

@@ -276,8 +276,14 @@
         {% block content %}{% endblock %}
     </main>
 
-    {% if web_push_enabled %}
+    {% if web_push_enabled and not notification_center_enabled %}
     {% include "includes/web_push_controls.html" %}
+    {% endif %}
+
+    {% if show_notification_invitation %}
+    {% include "notifications/_invitation.html" %}
+    <link rel="stylesheet" href="{% static 'css/pages/notification-settings.css' %}">
+    <script defer src="{% static 'js/notification_invitation.js' %}"></script>
     {% endif %}
 
     <!-- Footer -->

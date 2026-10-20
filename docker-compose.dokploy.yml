@@ -14,6 +14,7 @@ x-app-env: &app-env
   SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in Dokploy Environment}
   # Новый центр включается отдельно, после миграций и проверки подтверждения подписки.
   NOTIFICATION_CENTER_ENABLED: ${NOTIFICATION_CENTER_ENABLED:-False}
+  NOTIFICATION_PROMPT_ENABLED: ${NOTIFICATION_PROMPT_ENABLED:-False}
   ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID:-c6e46e19-f9f8-4df3-b53d-44f49da24af2}
   ONESIGNAL_SITE_ORIGIN: ${ONESIGNAL_SITE_ORIGIN:-https://tennisfan.ru}
   ONESIGNAL_REST_API_KEY: ${ONESIGNAL_REST_API_KEY:-}

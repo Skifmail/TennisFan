@@ -104,3 +104,35 @@ process.stdout.write(JSON.stringify({navigated}));
         check=True,
     )
     assert json.loads(result.stdout) == {"navigated": False}
+
+
+def test_worker_click_when_ios_app_closed_should_open_exact_confirmation() -> None:
+    """Холодное открытие сохраняет одноразовый фрагмент и не требует страницы."""
+    harness = r"""
+const vm = require('node:vm');
+const fs = require('node:fs');
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+const listeners = {};
+const opened = [];
+const target = 'https://tennisfan.ru/notification-center/confirm/#code=' + 'a'.repeat(43);
+vm.runInNewContext(fs.readFileSync(input.file, 'utf8'), {
+    navigator: {userAgent: 'iPhone'}, URL, URLSearchParams,
+    self: {location: {origin: 'https://tennisfan.ru'},
+        addEventListener: (name, callback) => {listeners[name] = callback;},
+        clients: {matchAll: async () => [], openWindow: async url => {opened.push(url);}}}
+});
+let done;
+listeners.notificationclick({notification: {data: {launchURL: target}, close() {}},
+    stopImmediatePropagation() {}, waitUntil(promise) {done = promise;}});
+done.then(() => process.stdout.write(JSON.stringify({opened})));
+"""
+    result = subprocess.run(
+        ["node", "-e", harness],
+        input=json.dumps({"file": str(ROOT / "static/js/push_worker_navigation.js")}),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert json.loads(result.stdout) == {
+        "opened": ["https://tennisfan.ru/notification-center/confirm/#code=" + "a" * 43]
+    }

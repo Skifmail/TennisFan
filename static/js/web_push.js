@@ -113,7 +113,7 @@
                     button.textContent = 'Отправить подтверждение повторно';
                 } else if (!accountPushEnabled) {
                     status.textContent = 'Push отключены в настройках аккаунта. Можно включить их этой кнопкой.';
-                } else if (config.notificationCenter && verifiedSubscriptionId !== subscription.id) {
+                } else if (config.notificationCenter && subscription.optedIn && verifiedSubscriptionId !== subscription.id) {
                     status.textContent = 'Подтвердите это устройство, чтобы получать персональные уведомления.';
                 } else if (subscription.optedIn && subscription.id) {
                     status.textContent = 'Уведомления включены.';
@@ -133,6 +133,12 @@
             });
             button.addEventListener('click', async function () {
                 if (busy) return;
+                const disabling = subscription.optedIn && subscription.id && accountPushEnabled &&
+                    (!config.notificationCenter || verifiedSubscriptionId === subscription.id);
+                if (disabling && document.getElementById('notification-disable-dialog')) {
+                    if (!window.tennisFanConfirmPushDisable ||
+                        !await window.tennisFanConfirmPushDisable('device')) return;
+                }
                 busy = true;
                 button.disabled = true;
                 try {

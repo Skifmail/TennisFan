@@ -76,7 +76,9 @@ def test_numeric_code_when_delivered_should_activate_once_without_click(
     """Доставленный код подключает исходное устройство однократно без ссылки."""
     identity, code = _start(client, mocker)
     assert not PushDevice.objects.get().active
-    assert _verify(client, identity, code).status_code == 200
+    verified = _verify(client, identity, code)
+    assert verified.status_code == 200
+    assert json.loads(verified.content)["verifiedSubscriptionId"] == SUBSCRIPTION
     assert PushDevice.objects.get().active
     assert _verify(client, identity, code).status_code == 409
 

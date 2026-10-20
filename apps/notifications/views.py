@@ -292,7 +292,13 @@ def notification_code_verify(request: HttpRequest) -> HttpResponse:
         code=data["code"],
     )
     if result.active:
-        return JsonResponse({"active": True, "accountPushEnabled": True})
+        return JsonResponse(
+            {
+                "active": True,
+                "accountPushEnabled": True,
+                "verifiedSubscriptionId": result.subscription_id,
+            }
+        )
     response = JsonResponse(
         {"error": result.error},
         status=(

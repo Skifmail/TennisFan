@@ -230,11 +230,13 @@ class CodeVerification:
         active: Устройство подключено.
         error: Безопасный код отказа.
         retry_after: Пауза при исчерпанном общем лимите.
+        subscription_id: Адрес, фактически подтверждённый сервером.
     """
 
     active: bool = False
     error: str = "confirmation_invalid"
     retry_after: int = 0
+    subscription_id: str = ""
 
 
 @transaction.atomic
@@ -302,7 +304,9 @@ def verify_device_code(
             retry_after=retry_after if limit.failures >= CODE_ATTEMPTS else 0,
         )
     _activate_device(device, confirmation)
-    return CodeVerification(active=True, error="")
+    return CodeVerification(
+        active=True, error="", subscription_id=str(device.subscription_id)
+    )
 
 
 def _activate_device(device: PushDevice, confirmation: PushConfirmation) -> None:

@@ -213,9 +213,11 @@
                         const result = await api(config.codeVerifyUrl, {
                             externalId: boundExternalId, code: codeInput.value.trim(),
                         });
-                        if (result.active !== true) throw new BindingError('invalid_response', 400, null);
+                        if (result.active !== true || typeof result.verifiedSubscriptionId !== 'string' || !result.verifiedSubscriptionId) {
+                            throw new BindingError('invalid_response', 400, null);
+                        }
                         accountPushEnabled = true;
-                        verifiedSubscriptionId = subscription.id;
+                        verifiedSubscriptionId = result.verifiedSubscriptionId;
                         confirmationPending = false;
                         codeInput.value = '';
                         codeStatus.textContent = '';

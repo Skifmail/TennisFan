@@ -90,7 +90,11 @@ def test_numeric_code_when_open_app_should_verify_without_navigation(
                 route.fulfill(
                     status=200 if data["code"] == "123456" else 400,
                     json=(
-                        {"active": True, "accountPushEnabled": True}
+                        {
+                            "active": True,
+                            "accountPushEnabled": True,
+                            "verifiedSubscriptionId": "test-subscription",
+                        }
                         if data["code"] == "123456"
                         else {"error": "confirmation_invalid"}
                     ),

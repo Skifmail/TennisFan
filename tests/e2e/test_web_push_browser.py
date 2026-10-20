@@ -196,8 +196,9 @@ def test_subscription_when_denied_should_explain_browser_settings(
     push_page.evaluate("window.denyPush = true")
     _load_integration(push_page)
     push_page.get_by_role("button", name="Включить уведомления", exact=True).click()
-    expect(push_page.locator("#web-push-status")).to_contain_text("настройках браузера")
-    expect(push_page.locator("#web-push-toggle")).to_be_disabled()
+    expect(push_page.locator("#web-push-status")).to_contain_text("заблокированы")
+    expect(push_page.locator("#web-push-toggle")).to_be_enabled()
+    expect(push_page.locator("#web-push-toggle")).to_have_text("Проверить снова")
     assert push_page.evaluate("window.pushCalls.optIn") == 0
 
 
@@ -211,8 +212,9 @@ def test_subscription_when_permission_already_denied_should_not_prompt(
     """
     push_page.evaluate("window.mockNotificationPermission = 'denied'")
     _load_integration(push_page)
-    expect(push_page.locator("#web-push-status")).to_contain_text("настройках браузера")
-    expect(push_page.locator("#web-push-toggle")).to_be_disabled()
+    expect(push_page.locator("#web-push-status")).to_contain_text("заблокированы")
+    expect(push_page.locator("#web-push-toggle")).to_be_enabled()
+    expect(push_page.locator("#web-push-toggle")).to_have_text("Проверить снова")
     assert push_page.evaluate("window.pushCalls.permission") == 0
     assert push_page.evaluate("window.pushCalls.optIn") == 0
 
@@ -237,10 +239,9 @@ def test_subscription_when_native_permission_restored_should_respect_browser_pol
         assert native_permission == "denied"
     _load_integration(push_page)
     if native_permission == "denied":
-        expect(push_page.locator("#web-push-toggle")).to_be_disabled()
-        expect(push_page.locator("#web-push-status")).to_contain_text(
-            "настройках браузера"
-        )
+        expect(push_page.locator("#web-push-toggle")).to_be_enabled()
+        expect(push_page.locator("#web-push-toggle")).to_have_text("Проверить снова")
+        expect(push_page.locator("#web-push-status")).to_contain_text("заблокированы")
     else:
         expect(push_page.locator("#web-push-toggle")).to_be_enabled()
     assert push_page.evaluate("window.pushCalls.permission") == 0
@@ -263,7 +264,8 @@ def test_sdk_when_init_fails_should_show_unavailable_status(push_page: Page) -> 
     push_page.evaluate("window.failPush = true")
     _load_integration(push_page)
     expect(push_page.locator("#web-push-status")).to_contain_text("недоступен")
-    expect(push_page.locator("#web-push-toggle")).to_be_disabled()
+    expect(push_page.locator("#web-push-toggle")).to_be_enabled()
+    expect(push_page.locator("#web-push-toggle")).to_have_text("Повторить")
 
 
 def test_sdk_when_download_fails_should_show_unavailable_status(
@@ -274,6 +276,8 @@ def test_sdk_when_download_fails_should_show_unavailable_status(
     push_page.add_script_tag(content=script.read_text(encoding="utf-8"))
     push_page.locator("#onesignal-sdk").dispatch_event("error")
     expect(push_page.locator("#web-push-status")).to_contain_text("недоступен")
+    expect(push_page.locator("#web-push-toggle")).to_be_enabled()
+    expect(push_page.locator("#web-push-toggle")).to_have_text("Повторить")
 
 
 @pytest.mark.parametrize("standalone", [False, True])
@@ -294,7 +298,7 @@ def test_ios_when_home_screen_state_changes_should_explain_install_or_enable_pus
         expect(push_page.locator("#web-push-toggle")).to_be_enabled()
     else:
         expect(push_page.locator("#web-push-ios-help")).to_be_visible()
-        expect(push_page.locator("#web-push-toggle")).to_be_disabled()
+        expect(push_page.locator("#web-push-toggle")).to_be_hidden()
         assert push_page.evaluate("window.pushCalls.init.length") == 0
 
 
@@ -307,7 +311,7 @@ def test_sdk_when_browser_unsupported_should_explain_limitation(
     )
     _load_integration(push_page)
     expect(push_page.locator("#web-push-status")).to_contain_text("не поддерживает")
-    expect(push_page.locator("#web-push-toggle")).to_be_disabled()
+    expect(push_page.locator("#web-push-toggle")).to_be_hidden()
 
 
 def test_subscription_when_already_subscribed_should_show_opt_out(
@@ -339,7 +343,8 @@ def test_subscription_when_registration_pending_should_wait_for_subscription_id(
     )
     _load_integration(push_page)
     expect(push_page.locator("#web-push-status")).to_contain_text("подключается")
-    expect(push_page.locator("#web-push-toggle")).to_be_disabled()
+    expect(push_page.locator("#web-push-toggle")).to_be_enabled()
+    expect(push_page.locator("#web-push-toggle")).to_have_text("Проверить снова")
 
 
 def test_subscription_when_opted_out_with_permission_should_reenable_without_prompt(
@@ -367,6 +372,8 @@ def test_sdk_when_download_stalls_should_stop_loading_indicator(
     push_page.add_script_tag(content=script.read_text(encoding="utf-8"))
     push_page.evaluate("window.pushTimeout()")
     expect(push_page.locator("#web-push-status")).to_contain_text("недоступен")
+    expect(push_page.locator("#web-push-toggle")).to_be_enabled()
+    expect(push_page.locator("#web-push-toggle")).to_have_text("Повторить")
 
 
 def test_ipad_when_desktop_user_agent_should_still_explain_install(

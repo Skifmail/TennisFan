@@ -116,6 +116,56 @@ def test_invitation_when_rollout_flag_changes_should_be_home_only(flag: bool) ->
             )
 
 
+@pytest.mark.parametrize(
+    ("user_agent", "direct"),
+    [
+        (
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/126.0.0.0 YaBrowser/26.8.0.0 "
+            "Mobile Safari/537.36",
+            True,
+        ),
+        (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) YaBrowser/26.8.0.0 "
+            "Mobile/15E148 Safari/604.1",
+            False,
+        ),
+        (
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+            False,
+        ),
+    ],
+)
+def test_sdk_url_when_yandex_mobile_should_bypass_loader(
+    user_agent: str, direct: bool
+) -> None:
+    """Yandex на Android получает SDK напрямую, iOS остаётся на загрузчике.
+
+    Args:
+        user_agent: Браузер, который открыл страницу.
+        direct: Ожидается ли прямая ссылка на SDK без проверки загрузчика.
+    """
+    from django.test import RequestFactory
+    from django.urls import resolve
+
+    from apps.core.web_push import (
+        ONESIGNAL_DIRECT_SDK_URL,
+        ONESIGNAL_PAGE_SDK_URL,
+        web_push_context,
+    )
+
+    request = RequestFactory().get(
+        "/", secure=True, HTTP_HOST="tennisfan.ru", HTTP_USER_AGENT=user_agent
+    )
+    request.resolver_match = resolve("/")
+    context = web_push_context(request)
+    assert context["web_push_sdk_url"] == (
+        ONESIGNAL_DIRECT_SDK_URL if direct else ONESIGNAL_PAGE_SDK_URL
+    )
+
+
 def test_invitation_when_user_explicitly_disabled_push_should_not_nag() -> None:
     """Явный отказ в настройках не переопределяется приглашением.
 

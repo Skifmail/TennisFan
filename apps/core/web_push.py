@@ -9,9 +9,41 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.urls import reverse
 from django.views.decorators.http import require_safe
 
+ONESIGNAL_SDK_VERSION: Final = "160610"
+ONESIGNAL_PAGE_SDK_URL: Final = (
+    "https://cdn.onesignal.com/sdks/web/v16/"
+    f"OneSignalSDK.page.js?v={ONESIGNAL_SDK_VERSION}"
+)
+ONESIGNAL_DIRECT_SDK_URL: Final = (
+    "https://cdn.onesignal.com/sdks/web/v16/"
+    f"OneSignalSDK.page.es6.js?v={ONESIGNAL_SDK_VERSION}"
+)
+YANDEX_BROWSER_MARKER: Final = "YaBrowser/"
+IOS_MARKERS: Final = ("iPhone", "iPad", "iPod")
+
 WORKER_SCRIPT: Final = (
     'importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");\n'
 )
+
+
+def _needs_direct_sdk(request: HttpRequest) -> bool:
+    """Проверяет, нужен ли обход проверки загрузчика OneSignal для Yandex.
+
+    Загрузчик OneSignal отказывается подключать SDK, если в браузере нет
+    собственного свойства ``PushSubscriptionOptions.applicationServerKey``.
+    В мобильном Яндекс Браузере это свойство может быть унаследованным, хотя
+    Push API работает. Для таких браузеров загружаем сам SDK напрямую.
+
+    Args:
+        request: Текущий запрос с User-Agent браузера.
+
+    Returns:
+        True для Яндекс Браузера на Android и десктопе.
+    """
+    user_agent = request.META.get("HTTP_USER_AGENT", "")
+    return YANDEX_BROWSER_MARKER in user_agent and not any(
+        marker in user_agent for marker in IOS_MARKERS
+    )
 
 
 def web_push_context(request: HttpRequest) -> dict[str, object]:
@@ -60,6 +92,11 @@ def web_push_context(request: HttpRequest) -> dict[str, object]:
         context["web_push_needed"] = (
             not settings.NOTIFICATION_CENTER_ENABLED
             or getattr(request.resolver_match, "url_name", None) == "notifications"
+        )
+        context["web_push_sdk_url"] = (
+            ONESIGNAL_DIRECT_SDK_URL
+            if _needs_direct_sdk(request)
+            else ONESIGNAL_PAGE_SDK_URL
         )
     return context
 

@@ -1,12 +1,14 @@
 """Сценарии одноразового подтверждения подписки без зависимости от HTTP и SDK."""
 
 import hashlib
+import hmac
 import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Final
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -14,13 +16,16 @@ from django.utils import timezone
 from apps.users.models import User
 
 from .domain.rules import NotificationError
-from .models import NotificationPreference, PushConfirmation, PushDevice
+from .models import NotificationPreference, PushCodeLimit, PushConfirmation, PushDevice
 from .services import preferences
 
 CONFIRMATION_LIFETIME: Final = timedelta(minutes=5)
 CONFIRMATION_COOLDOWN: Final = timedelta(minutes=1)
 CONFIRMATIONS_PER_MINUTE: Final = 5
 TOKEN_BYTES: Final = 32
+CODE_DIGITS: Final = 6
+CODE_ATTEMPTS: Final = 5
+CODE_ATTEMPT_WINDOW: Final = timedelta(minutes=5)
 
 
 class DeviceBindingError(NotificationError):
@@ -65,6 +70,7 @@ def request_confirmation(
     active: bool,
     subscription_id: str,
     enable_account: bool,
+    manual_code: bool = False,
 ) -> DeviceState:
     """Отзывает адрес либо резервирует ограниченную отправку кода подтверждения.
 
@@ -75,6 +81,7 @@ def request_confirmation(
         active: Разрешена ли локальная подписка браузера.
         subscription_id: Непроверенный ID SDK; не активируется без доставленного кода.
         enable_account: Явное нажатие пользователя, не фоновая синхронизация.
+        manual_code: Использовать короткий код вместо ссылки.
 
     Returns:
         Состояние и, только для нового запроса, секрет для транспорта.
@@ -135,12 +142,21 @@ def request_confirmation(
     PushConfirmation.objects.filter(
         Q(device=device) | Q(subscription_id=address)
     ).delete()
-    code = secrets.token_urlsafe(TOKEN_BYTES)
+    code = (
+        str(secrets.randbelow(10**CODE_DIGITS)).zfill(CODE_DIGITS)
+        if manual_code
+        else secrets.token_urlsafe(TOKEN_BYTES)
+    )
     PushConfirmation.objects.create(
         device=device,
         subscription_id=address,
         generation=device.external_id,
-        token_hash=hashlib.sha256(code.encode()).hexdigest(),
+        token_hash=(
+            _code_digest(code, device.external_id)
+            if manual_code
+            else hashlib.sha256(code.encode()).hexdigest()
+        ),
+        manual_code=manual_code,
         expires_at=now + CONFIRMATION_LIFETIME,
         requested_at=now,
     )
@@ -181,6 +197,7 @@ def confirm_device(
     confirmations = PushConfirmation.objects.select_for_update().filter(
         device=device,
         generation=device.external_id,
+        manual_code=False,
         expires_at__gt=timezone.now(),
     )
     if code is not None:
@@ -193,14 +210,109 @@ def confirm_device(
     if confirmation is None or (consume and code is None):
         return False
     if consume:
-        PushDevice.objects.filter(subscription_id=confirmation.subscription_id).exclude(
-            pk=device.pk
-        ).update(active=False, subscription_id=None)
-        device.subscription_id = confirmation.subscription_id
-        device.active = True
-        device.save(update_fields=["subscription_id", "active", "updated_at"])
-        confirmation.delete()
-        NotificationPreference.objects.update_or_create(
-            user=user, defaults={"push_enabled": True}
-        )
+        _activate_device(device, confirmation)
     return True
+
+
+def _code_digest(code: str, generation: uuid.UUID) -> str:
+    return hmac.new(
+        settings.SECRET_KEY.encode(),
+        f"tennisfan:push-code:{generation}:{code}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+@dataclass(frozen=True)
+class CodeVerification:
+    """Возвращает итог ввода без секрета и без отката счётчика ошибок.
+
+    Attributes:
+        active: Устройство подключено.
+        error: Безопасный код отказа.
+        retry_after: Пауза при исчерпанном общем лимите.
+    """
+
+    active: bool = False
+    error: str = "confirmation_invalid"
+    retry_after: int = 0
+
+
+@transaction.atomic
+def verify_device_code(
+    *, user: User, device_hash: str, generation: uuid.UUID, code: str
+) -> CodeVerification:
+    """Подтверждает короткий код с общим для аккаунта лимитом подбора.
+
+    Args:
+        user: Авторизованный владелец.
+        device_hash: Хэш подписанного cookie исходного браузера.
+        generation: Текущее поколение привязки.
+        code: Код из тела защищённого POST-запроса.
+
+    Returns:
+        Результат без секрета; ошибочные вводы сохраняются при отказе.
+    """
+    User.objects.select_for_update().get(pk=user.pk)
+    now = timezone.now()
+    device = (
+        PushDevice.objects.select_for_update()
+        .filter(
+            user=user,
+            device_hash=device_hash,
+            external_id=generation,
+            expires_at__gt=now,
+        )
+        .first()
+    )
+    if device is None:
+        return CodeVerification(error="confirmation_expired")
+    confirmation = (
+        PushConfirmation.objects.select_for_update()
+        .filter(
+            device=device, generation=generation, manual_code=True, expires_at__gt=now
+        )
+        .first()
+    )
+    if confirmation is None:
+        return CodeVerification(error="confirmation_expired")
+    limit, _ = PushCodeLimit.objects.get_or_create(
+        user=user, defaults={"resets_at": now + CODE_ATTEMPT_WINDOW}
+    )
+    if limit.resets_at <= now:
+        limit.failures = 0
+        limit.resets_at = now + CODE_ATTEMPT_WINDOW
+        limit.save(update_fields=["failures", "resets_at"])
+    retry_after = max(1, int((limit.resets_at - now).total_seconds()) + 1)
+    if limit.failures >= CODE_ATTEMPTS:
+        return CodeVerification(
+            error="confirmation_attempts_exhausted", retry_after=retry_after
+        )
+    valid = len(code) == CODE_DIGITS and code.isascii() and code.isdecimal()
+    if not valid or not hmac.compare_digest(
+        confirmation.token_hash, _code_digest(code, generation)
+    ):
+        limit.failures += 1
+        limit.save(update_fields=["failures"])
+        return CodeVerification(
+            error=(
+                "confirmation_attempts_exhausted"
+                if limit.failures >= CODE_ATTEMPTS
+                else "confirmation_invalid"
+            ),
+            retry_after=retry_after if limit.failures >= CODE_ATTEMPTS else 0,
+        )
+    _activate_device(device, confirmation)
+    return CodeVerification(active=True, error="")
+
+
+def _activate_device(device: PushDevice, confirmation: PushConfirmation) -> None:
+    PushDevice.objects.filter(subscription_id=confirmation.subscription_id).exclude(
+        pk=device.pk
+    ).update(active=False, subscription_id=None)
+    device.subscription_id = confirmation.subscription_id
+    device.active = True
+    device.save(update_fields=["subscription_id", "active", "updated_at"])
+    confirmation.delete()
+    NotificationPreference.objects.update_or_create(
+        user=device.user, defaults={"push_enabled": True}
+    )

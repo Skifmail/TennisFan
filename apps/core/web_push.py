@@ -36,6 +36,8 @@ def web_push_context(request: HttpRequest) -> dict[str, object]:
                 ),
                 "identityUrl": reverse("notification_identity"),
                 "deviceUrl": reverse("notification_device"),
+                "codeRequestUrl": reverse("notification_code_request"),
+                "codeVerifyUrl": reverse("notification_code_verify"),
             }
         )
     context: dict[str, object] = {

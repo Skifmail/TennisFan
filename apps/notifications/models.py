@@ -127,6 +127,7 @@ class PushConfirmation(models.Model):
         token_hash: SHA-256 секрета; открытый код не хранится в базе.
         expires_at: Предельный срок использования кода.
         requested_at: Время запроса для ограничения повторных отправок.
+        manual_code: Признак короткого кода с отдельным лимитом ввода.
     """
 
     device: models.OneToOneField[PushDevice, PushDevice] = models.OneToOneField(
@@ -141,6 +142,7 @@ class PushConfirmation(models.Model):
     )
     expires_at: models.DateTimeField[datetime, datetime] = models.DateTimeField()
     requested_at: models.DateTimeField[datetime, datetime] = models.DateTimeField()
+    manual_code: models.BooleanField[bool, bool] = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Подтверждение push-подписки"
@@ -294,3 +296,21 @@ class Delivery(models.Model):
             )
         ]
         indexes: ClassVar = [models.Index(fields=["status", "available_at"])]
+
+
+class PushCodeLimit(models.Model):
+    """Ограничивает подбор коротких push-кодов для всего аккаунта.
+
+    Attributes:
+        user: Владелец общего лимита всех браузеров.
+        failures: Количество неверных вводов в текущем окне.
+        resets_at: Момент сброса ограничения.
+    """
+
+    user: models.OneToOneField[User, User] = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE
+    )
+    failures: models.PositiveSmallIntegerField[int, int] = (
+        models.PositiveSmallIntegerField(default=0)
+    )
+    resets_at: models.DateTimeField[datetime, datetime] = models.DateTimeField()

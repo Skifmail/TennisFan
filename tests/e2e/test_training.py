@@ -201,3 +201,19 @@ class MyTrainingsAnonymousEnrollmentTests(TestCase):
         self.assertIn("height: 40px", css)
         self.assertIn("white-space: nowrap", css)
         self.assertIn("grid-template-columns: minmax(0, 1fr) auto", css)
+
+    def test_my_trainings_cards_do_not_overlap_next_section(self) -> None:
+        """Карточки страницы появляются без сдвига и не перекрывают заголовок ниже."""
+        from pathlib import Path
+
+        css_path = (
+            Path(__file__).resolve().parents[2]
+            / "static"
+            / "css"
+            / "pages"
+            / "training.css"
+        )
+        css = css_path.read_text(encoding="utf-8")
+        self.assertIn(".main .my-trainings .card {", css)
+        self.assertIn("opacity: 1;", css)
+        self.assertIn("transform: none;", css)

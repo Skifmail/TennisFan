@@ -74,6 +74,13 @@ x-app-env: &app-env
   DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-}
   DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
 
+# Логи Docker ограничены по размеру, чтобы диск сервера не заполнился.
+x-app-logging: &app-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:16-alpine
@@ -113,13 +120,32 @@ services:
       timeout: 5s
       retries: 10
 
+  # Одноразовая подготовка БД: ожидание postgres, миграции, первый админ.
+  # Пока она выполняется, старый web продолжает обслуживать запросы — деплой не
+  # превращается в несколько минут страницы техработ. Ниже web ждёт её успешного
+  # завершения и запускает gunicorn сразу (SKIP_DEPLOYMENT_PREPARE=1).
+  release:
+    build: .
+    logging: *app-logging
+    user: "10001:10001"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    restart: "no"
+    entrypoint: ["python", "manage.py", "prepare_deployment"]
+    environment:
+      <<: *app-env
+    volumes:
+      # Логи вне контейнера: переживают пересоздание и деплой.
+      - /var/lib/tennison/logs/web:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   web:
     build: .
-    logging: &app-logging
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *app-logging
     user: "10001:10001"
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
@@ -134,6 +160,11 @@ services:
       retries: 3
     environment:
       <<: *app-env
+      # Миграции уже применил release: web не ждёт подготовку БД при старте.
+      SKIP_DEPLOYMENT_PREPARE: "1"
+    volumes:
+      # Логи вне контейнера: переживают пересоздание и деплой.
+      - /var/lib/tennison/logs/web:/app/logs
     expose:
       - "8000"
     labels:
@@ -163,6 +194,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      release:
+        condition: service_completed_successfully
     deploy:
       restart_policy:
         condition: on-failure
@@ -198,6 +231,8 @@ services:
       <<: *app-env
       CONN_MAX_AGE: "0"
       HEALTHCHECK_CHAT_REDIS: "True"
+    volumes:
+      - /var/lib/tennison/logs/chat:/app/logs
     expose:
       - "8001"
     restart: unless-stopped
@@ -223,6 +258,8 @@ services:
     entrypoint: ["/cron-entrypoint.sh"]
     environment:
       <<: *app-env
+    volumes:
+      - /var/lib/tennison/logs/cron:/app/logs
     depends_on:
       web:
         condition: service_healthy

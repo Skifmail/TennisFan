@@ -337,6 +337,9 @@ def primary_locality_name(value: str) -> str:
 def several_catalog_cities_message(value: str) -> str:
     """Сообщение, если в одной строке указаны два города из справочника.
 
+    Сравнение выполняется в Python: SQLite не умеет регистронезависимый
+    ``iexact`` для кириллицы, поэтому «Раменское» и «раменское» там не совпадали.
+
     Args:
         value: Населённый пункт из профиля или регистрации.
 
@@ -345,13 +348,18 @@ def several_catalog_cities_message(value: str) -> str:
     """
     from apps.core.models import City
 
+    tokens = locality_tokens(value)
+    if not tokens:
+        return ""
+    catalog = {
+        strip_settlement_prefix(name): name
+        for name in City.objects.values_list("name", flat=True)
+    }
     found: list[str] = []
-    for token in locality_tokens(value):
-        city = (
-            City.objects.filter(name__iexact=token).order_by("pk").only("name").first()
-        )
-        if city is not None and city.name not in found:
-            found.append(city.name)
+    for token in tokens:
+        name = catalog.get(strip_settlement_prefix(token))
+        if name and name not in found:
+            found.append(name)
     if len(found) < 2:
         return ""
     if len(found) == 2:

@@ -31,6 +31,8 @@
     --color-warning: #013220;
     --color-error: #a00000;
     --color-info: #A6824A;
+    /* Зелёный для подтверждающих подсказок (пароль соответствует, пароли совпадают). */
+    --color-valid: #22c55e;
 
     /* Typography */
     --font-family: 'Open Sans', -apple-system, blinkmacsystemfont, 'Segoe UI', sans-serif;

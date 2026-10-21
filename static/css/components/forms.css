@@ -641,6 +641,28 @@ select.form-control option:hover {
     color: var(--color-error);
 }
 
+/* Живая подсказка под паролем: зелёный цвет, когда требование выполнено. */
+.register-form-layout .field-error.is-ok {
+    color: var(--color-valid);
+}
+
+/* Поле с ошибкой: красная рамка и мягкое свечение, чтобы было видно всё поле. */
+.form-control.is-invalid,
+.js-phone-input.is-invalid {
+    border-color: var(--color-error) !important;
+    box-shadow: 0 0 0 3px rgb(160 0 0 / 22%);
+}
+
+.form-control.is-invalid:focus,
+.js-phone-input.is-invalid:focus {
+    border-color: var(--color-error) !important;
+    box-shadow: 0 0 0 3px rgb(160 0 0 / 32%);
+}
+
+.form-group.has-error .consent-text {
+    color: var(--color-error);
+}
+
 /* Форма входа: обычный размер */
 .auth-form-container.auth-form--login {
     max-width: 420px;

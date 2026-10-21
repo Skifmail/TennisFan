@@ -109,6 +109,11 @@ AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = timedelta(minutes=5)  # время блокировки после превышения попыток
 AXES_LOCKOUT_TEMPLATE = "axes/lockout.html"
 AXES_LOCKOUT_URL = None
+# Блокируем пару «IP + аккаунт», а не весь IP: иначе пять чужих ошибок
+# в общем офисе или мобильном NAT закрывают вход всем пользователям.
+AXES_LOCKOUT_PARAMETERS = ["ip_address", "username"]
+# Успешный вход сбрасывает счётчик неудач, чтобы они не копились месяцами.
+AXES_RESET_ON_SUCCESS = True
 
 # Опционально: свой путь к админке (в .env задать, напр. ADMIN_URL=manage-secret-xyz)
 ADMIN_URL = os.environ.get("ADMIN_URL", "admin").strip("/") or "admin"
@@ -402,6 +407,9 @@ EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"
 EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False") == "True"
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+# Ограничение ожидания SMTP: без него регистрация могла висеть десятки секунд,
+# а пользователь успевал отправить форму повторно.
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru")
 USER_NOTIFICATIONS_EMAIL_ENABLED = (
     os.environ.get("USER_NOTIFICATIONS_EMAIL_ENABLED", "True") == "True"
@@ -697,6 +705,18 @@ LOGGING = {
             "formatter": "verbose",
             "encoding": "utf-8",
         },
+        # Отдельный журнал входа и регистрации: на сервере удобно смотреть
+        # `tail -f /app/logs/django_auth.log`, не листая общий info-лог.
+        "file_auth": {
+            "level": "INFO",
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "filename": BASE_DIR / "logs" / "django_auth.log",
+            "when": "midnight",
+            "interval": 1,
+            "backupCount": 30,
+            "formatter": "verbose",
+            "encoding": "utf-8",
+        },
         "console": {
             "level": "DEBUG" if DEBUG else "INFO",
             "class": "logging.StreamHandler",
@@ -732,6 +752,13 @@ LOGGING = {
             "handlers": _APPS_HANDLERS,
             "level": "INFO",
             "propagate": False,
+        },
+        # Вход/регистрация идут и в общие файлы (через propagate), и в свой
+        # django_auth.log, чтобы на сервере их можно было читать отдельно.
+        "apps.users.views": {
+            "handlers": ["file_auth"],
+            "level": "INFO",
+            "propagate": True,
         },
         "apps.sparring": {
             "handlers": _APPS_HANDLERS,

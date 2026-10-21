@@ -15,7 +15,9 @@ from django.contrib.auth import login
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordResetForm
+from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -33,9 +35,15 @@ from apps.legal.utils import get_legal_document_version
 from apps.notifications.presentation import settings_context
 
 from .context_processors import invalidate_unread_notifications_cache
-from .forms import EmailAuthenticationForm, PlayerProfileForm, UserRegistrationForm
-from .models import EmailVerificationToken, Notification, NtrpTestResult, Player
+from .forms import (
+    DUPLICATE_EMAIL_MESSAGE,
+    EmailAuthenticationForm,
+    PlayerProfileForm,
+    UserRegistrationForm,
+)
+from .models import EmailVerificationToken, Notification, NtrpTestResult, Player, User
 from .notification_inbox import build_inbox_context
+from .rating_utils import get_starting_points
 from .sport_rating import (
     PADEL_LEVEL_CHOICES,
     PadelStrengthAlreadySet,
@@ -49,6 +57,8 @@ logger = logging.getLogger(__name__)
 
 PASSWORD_RESET_LIMIT = 5
 PASSWORD_RESET_WINDOW_SECONDS = 15 * 60
+REGISTRATION_LIMIT = 30
+REGISTRATION_WINDOW_SECONDS = 60 * 60
 
 
 class PasswordResetRateLimitedView(auth_views.PasswordResetView):
@@ -173,6 +183,111 @@ def _password_reset_allowed(request: HttpRequest, email: str) -> bool:
         # Недоступный кэш не должен блокировать восстановление доступа.
         logger.warning("Password reset rate limit unavailable", exc_info=True)
         return True
+
+
+def _hash_for_log(value: str) -> str:
+    """Вернуть короткий необратимый хэш значения для логов.
+
+    Args:
+        value: Email, IP или другой идентификатор.
+
+    Returns:
+        str: Первые 16 символов SHA-256.
+    """
+    return hashlib.sha256((value or "").strip().lower().encode()).hexdigest()[:16]
+
+
+def _is_registration_submission(request: HttpRequest) -> bool:
+    """Определить, что POST пришёл из формы регистрации.
+
+    Args:
+        request: HTTP-запрос.
+
+    Returns:
+        bool: True для формы регистрации.
+    """
+    form_type = (request.POST.get("form_type") or "").strip()
+    if form_type:
+        return form_type == "register"
+    return "email" in request.POST and "city" in request.POST
+
+
+def _registration_allowed(request: HttpRequest) -> bool:
+    """Проверить и увеличить лимит попыток регистрации с одного IP.
+
+    Args:
+        request: Запрос с IP-адресом.
+
+    Returns:
+        bool: Можно ли обрабатывать очередную попытку.
+    """
+    ip = _get_request_ip(request) or "unknown"
+    key = f"registration:{_hash_for_log(ip)}"
+    try:
+        if int(cache.get(key) or 0) >= REGISTRATION_LIMIT:
+            return False
+        if cache.add(key, 1, timeout=REGISTRATION_WINDOW_SECONDS):
+            return True
+        try:
+            cache.incr(key)
+        except ValueError:
+            cache.set(key, 1, timeout=REGISTRATION_WINDOW_SECONDS)
+        return True
+    except Exception:
+        # Недоступный кэш не должен блокировать регистрацию.
+        logger.warning("auth: registration rate limit unavailable", exc_info=True)
+        return True
+
+
+def _send_registration_notifications(user, player) -> bool:
+    """Отправить уведомления о регистрации, не ломая основной сценарий.
+
+    Args:
+        user: Созданный пользователь.
+        player: Созданный профиль игрока.
+
+    Returns:
+        bool: Удалось ли отправить письмо с подтверждением email.
+    """
+    try:
+        from apps.core.telegram_notify import notify_new_registration
+
+        notify_new_registration(user, player)
+    except Exception:
+        logger.exception("auth: registration telegram notify failed | user=%s", user.pk)
+    try:
+        from apps.core.email_service import send_welcome_email
+
+        send_welcome_email(user)
+    except Exception:
+        logger.exception("auth: registration welcome email failed | user=%s", user.pk)
+    try:
+        from apps.core.email_service import send_email_verification
+
+        return bool(send_email_verification(user))
+    except Exception:
+        logger.exception(
+            "auth: registration verification email failed | user=%s",
+            user.pk,
+        )
+        return False
+
+
+def _log_registration_rejected(
+    request: HttpRequest, form: UserRegistrationForm
+) -> None:
+    """Записать отказ регистрации без персональных данных.
+
+    Args:
+        request: HTTP-запрос.
+        form: Невалидная форма регистрации.
+    """
+    logger.warning(
+        "auth: registration rejected | ip=%s email_hash=%s fields=%s",
+        _get_request_ip(request),
+        _hash_for_log(str(form.data.get("email") or "")),
+        ",".join(sorted(form.errors)),
+    )
 
 
 def _log_registration_legal_acceptances(request, user) -> None:
@@ -496,78 +611,119 @@ def auth(request):
     show_register_step2 = False
 
     if request.method == "POST":
-        # Проверяем какая форма была отправлена по наличию полей
-        if "email" in request.POST and "city" in request.POST:
+        if _is_registration_submission(request):
             # Форма регистрации
             active_mode = "register"
             register_form = UserRegistrationForm(request.POST)
-            if register_form.is_valid():
-                from .rating_utils import get_starting_points
-
-                user = register_form.save()
-                level_decimal = register_form.cleaned_data["ntrp_level"]
-                if not isinstance(level_decimal, Decimal):
-                    level_decimal = Decimal(str(level_decimal))
-                skill = _map_ntrp_to_skill_level(level_decimal)
-                starting_pts = get_starting_points(level_decimal)
-                player = Player.objects.create(
-                    user=user,
-                    # birth_date заполняется позже в профиле
-                    city=register_form.cleaned_data["city"].strip(),
-                    ntrp_level=level_decimal,
-                    skill_level=skill,
-                    total_points=starting_pts,
-                    hidden_rating=float(starting_pts),
-                    is_verified=False,  # В рейтинг попадает после модерации или загрузки аватара
+            if not _registration_allowed(request):
+                logger.warning(
+                    "auth: registration throttled | ip=%s", _get_request_ip(request)
                 )
-
-                quiz_raw = register_form.cleaned_data.get("ntrp_quiz_payload") or ""
-                if quiz_raw:
-                    try:
-                        quiz_data = json.loads(quiz_raw)
-                    except (TypeError, ValueError, json.JSONDecodeError):
-                        quiz_data = None
-                    if isinstance(quiz_data, dict):
-                        NtrpTestResult.objects.create(
-                            player=player,
-                            source=NtrpTestResult.Source.REGISTRATION,
-                            total_score=quiz_data.get("total_score") or None,
-                            level=level_decimal,
-                            starting_points=float(starting_pts),
-                            applied_to_rating=True,
-                            answers=quiz_data.get("answers") or [],
+                register_form.is_valid()
+                register_form.add_error(
+                    None,
+                    "Слишком много попыток регистрации. Подождите несколько минут "
+                    "и попробуйте снова.",
+                )
+            elif register_form.is_valid():
+                try:
+                    with transaction.atomic():
+                        user = register_form.save()
+                        level_decimal = register_form.cleaned_data["ntrp_level"]
+                        if not isinstance(level_decimal, Decimal):
+                            level_decimal = Decimal(str(level_decimal))
+                        skill = _map_ntrp_to_skill_level(level_decimal)
+                        starting_pts = get_starting_points(level_decimal)
+                        player = Player.objects.create(
+                            user=user,
+                            # birth_date заполняется позже в профиле
+                            city=register_form.cleaned_data["city"].strip(),
+                            ntrp_level=level_decimal,
+                            skill_level=skill,
+                            total_points=starting_pts,
+                            hidden_rating=float(starting_pts),
+                            is_verified=False,  # В рейтинг попадает после модерации или загрузки аватара
                         )
 
-                from apps.core.telegram_notify import notify_new_registration
+                        quiz_raw = (
+                            register_form.cleaned_data.get("ntrp_quiz_payload") or ""
+                        )
+                        if quiz_raw:
+                            try:
+                                quiz_data = json.loads(quiz_raw)
+                            except (TypeError, ValueError, json.JSONDecodeError):
+                                quiz_data = None
+                            if isinstance(quiz_data, dict):
+                                NtrpTestResult.objects.create(
+                                    player=player,
+                                    source=NtrpTestResult.Source.REGISTRATION,
+                                    total_score=quiz_data.get("total_score") or None,
+                                    level=level_decimal,
+                                    starting_points=float(starting_pts),
+                                    applied_to_rating=True,
+                                    answers=quiz_data.get("answers") or [],
+                                )
 
-                notify_new_registration(user, player)
-
-                from apps.core.email_service import send_welcome_email
-
-                send_welcome_email(user)
-                from apps.core.email_service import send_email_verification
-
-                send_email_verification(user)
-                _log_registration_legal_acceptances(request, user)
-
-                login(
-                    request,
-                    user,
-                    backend="django.contrib.auth.backends.ModelBackend",
-                )
-                record_platform_consent(
-                    request,
-                    UserConsent.ConsentType.PLATFORM_OFFER,
-                    get_legal_document_version("offer"),
-                )
-                record_platform_consent(
-                    request,
-                    UserConsent.ConsentType.PRIVACY_POLICY,
-                    get_legal_document_version("privacy"),
-                )
-                messages.success(request, "Регистрация успешна! Добро пожаловать.")
-                return redirect(next_url or "home")
+                        _log_registration_legal_acceptances(request, user)
+                        # record_platform_consent ожидает request.user,
+                        # поэтому выставляем его явно до входа в сессию.
+                        request.user = user
+                        record_platform_consent(
+                            request,
+                            UserConsent.ConsentType.PLATFORM_OFFER,
+                            get_legal_document_version("offer"),
+                        )
+                        record_platform_consent(
+                            request,
+                            UserConsent.ConsentType.PRIVACY_POLICY,
+                            get_legal_document_version("privacy"),
+                        )
+                except IntegrityError:
+                    # Гонка двух одновременных отправок: пользователь уже создан.
+                    request.user = AnonymousUser()
+                    email = register_form.cleaned_data.get("email") or ""
+                    if User.objects.filter(email__iexact=email).exists():
+                        logger.warning(
+                            "auth: registration rejected: duplicate email race | ip=%s email_hash=%s",
+                            _get_request_ip(request),
+                            _hash_for_log(email),
+                        )
+                        register_form.add_error("email", DUPLICATE_EMAIL_MESSAGE)
+                        show_register_step2 = False
+                    else:
+                        logger.exception("auth: registration integrity error")
+                        raise
+                else:
+                    login(
+                        request,
+                        user,
+                        backend="django.contrib.auth.backends.ModelBackend",
+                    )
+                    logger.info(
+                        "auth: registration created | user=%s player=%s ip=%s",
+                        user.pk,
+                        player.pk,
+                        _get_request_ip(request),
+                    )
+                    # Уведомления не должны мешать входу и редиректу:
+                    # каждое обёрнуто в try/except внутри помощника.
+                    email_sent = _send_registration_notifications(user, player)
+                    messages.success(request, "Регистрация успешна! Добро пожаловать.")
+                    if email_sent:
+                        messages.info(
+                            request,
+                            "Мы отправили письмо для подтверждения email. "
+                            "После подтверждения и заполнения профиля аккаунт "
+                            "активируется автоматически.",
+                        )
+                    else:
+                        logger.warning(
+                            "auth: registration confirmation email not sent | user=%s",
+                            user.pk,
+                        )
+                    return redirect(next_url or "home")
             else:
+                _log_registration_rejected(request, register_form)
                 # Если ошибка только в поле уровня силы (шаг 2),
                 # а все поля шага 1 валидны, то оставляем пользователя на шаге 2.
                 step1_fields = (
@@ -585,17 +741,30 @@ def auth(request):
                 )
                 has_ntrp_errors = "ntrp_level" in register_form.errors
                 show_register_step2 = bool(has_ntrp_errors and not has_step1_errors)
-        elif "username" in request.POST and "password" in request.POST:
+        elif request.POST.get("form_type") == "login" or (
+            "username" in request.POST and "password" in request.POST
+        ):
             # Форма входа
             active_mode = "login"
             login_form = EmailAuthenticationForm(request, data=request.POST)
             if login_form.is_valid():
                 user = login_form.get_user()
                 login(request, user)
+                logger.info(
+                    "auth: login success | user=%s ip=%s",
+                    user.pk,
+                    _get_request_ip(request),
+                )
                 messages.success(
                     request, f"Добро пожаловать, {user.get_full_name() or user.email}!"
                 )
                 return redirect(next_url or "home")
+            logger.warning(
+                "auth: login rejected | ip=%s user_hash=%s errors=%s",
+                _get_request_ip(request),
+                _hash_for_log(str(request.POST.get("username") or "")),
+                ",".join(sorted(login_form.errors)),
+            )
 
     # Инициализируем формы если они не были созданы выше
     if register_form is None:
@@ -603,11 +772,26 @@ def auth(request):
     if login_form is None:
         login_form = EmailAuthenticationForm(request)
 
+    # Сводка ошибок собирается здесь, чтобы шаблон не показывал пустой блок
+    # при ошибке уровня формы (например, при срабатывании лимита попыток).
+    register_error_summary: list[dict[str, str]] = []
+    if register_form.is_bound:
+        for field in register_form:
+            for error in field.errors:
+                register_error_summary.append(
+                    {
+                        "anchor": f"field-{field.name}",
+                        "label": str(field.label) or "Согласие",
+                        "message": str(error),
+                    }
+                )
+
     return render(
         request,
         "users/auth.html",
         {
             "register_form": register_form,
+            "register_error_summary": register_error_summary,
             "login_form": login_form,
             "active_mode": active_mode,
             "show_register_step2": show_register_step2,

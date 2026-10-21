@@ -24330,6 +24330,26 @@ summary.sparring-compact__control::after {
     margin-bottom: var(--spacing-md);
 }
 
+.club-discover-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-md);
+    max-width: 640px;
+    margin: var(--spacing-lg) auto 0;
+}
+
+.club-discover-cta__text {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+}
+
+.club-discover-cta__button {
+    min-width: 240px;
+}
+
 .club-discover-section {
     padding-top: var(--spacing-lg);
 }
@@ -24520,6 +24540,21 @@ summary.sparring-compact__control::after {
 }
 
 @media (max-width: 640px) {
+    .club-discover-cta {
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-md);
+    }
+
+    .club-discover-cta__text {
+        font-size: var(--font-size-sm);
+    }
+
+    .club-discover-cta__button {
+        width: 100%;
+        max-width: 320px;
+        min-width: 0;
+    }
+
     .club-discover-filters {
         margin-bottom: var(--spacing-md);
     }

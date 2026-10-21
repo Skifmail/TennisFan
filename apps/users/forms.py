@@ -3,11 +3,13 @@ User forms.
 """
 
 import logging
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 
 from apps.core.contact_utils import normalize_max_contact
 
@@ -16,6 +18,13 @@ from .models import Player
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
+NTRP_MIN = Decimal("1.50")
+NTRP_MAX = Decimal("7.00")
+DUPLICATE_EMAIL_MESSAGE = (
+    "Пользователь с таким email уже зарегистрирован. "
+    "Войдите в аккаунт или воспользуйтесь восстановлением пароля."
+)
+
 
 class EmailAuthenticationForm(AuthenticationForm):
     """Форма входа с нормализацией email без учета регистра."""
@@ -23,6 +32,24 @@ class EmailAuthenticationForm(AuthenticationForm):
     def clean_username(self) -> str:
         username = (self.cleaned_data.get("username") or "").strip().lower()
         return username
+
+
+class NtrpDecimalField(forms.DecimalField):
+    """Поле NTRP, принимающее и точку, и запятую в качестве разделителя."""
+
+    def to_python(self, value: object) -> Decimal | None:
+        """Привести ввод к Decimal, заменив запятую на точку.
+
+        Args:
+            value: Сырое значение из формы.
+
+        Returns:
+            Decimal | None: Разобранное число или None для пустого значения.
+        """
+        if isinstance(value, str):
+            value = value.strip().replace(",", ".")
+        result: Decimal | None = super().to_python(value)
+        return result
 
 
 class UserRegistrationForm(forms.ModelForm):
@@ -51,15 +78,23 @@ class UserRegistrationForm(forms.ModelForm):
         widget=forms.TextInput(
             attrs={
                 "class": "form-control js-phone-input",
-                "placeholder": "+7",
+                "placeholder": "+7 999 123-45-67",
                 "autocomplete": "tel",
+                "inputmode": "tel",
             }
         ),
-        help_text="Укажите номер в формате +7XXXXXXXXXX.",
+        help_text="10 цифр после кода +7. Например: +7 999 123-45-67.",
     )
     email = forms.EmailField(
         label="Email *",
-        widget=forms.EmailInput(attrs={"class": "form-control"}),
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-control",
+                "autocomplete": "email",
+                "placeholder": "you@example.com",
+            }
+        ),
+        help_text="На этот адрес придёт письмо для подтверждения аккаунта.",
     )
     city = forms.CharField(
         label="Населённый пункт *",
@@ -71,13 +106,11 @@ class UserRegistrationForm(forms.ModelForm):
                 "placeholder": "Один населённый пункт, например Раменское",
             }
         ),
+        help_text="Укажите один населённый пункт — по нему подбираются турниры рядом.",
     )
-    ntrp_level = forms.DecimalField(
+    ntrp_level = NtrpDecimalField(
         label="Уровень силы (NTRP)",
-        required=True,
-        min_value=Decimal("1.5"),
-        max_value=Decimal("7.0"),
-        decimal_places=2,
+        required=False,
         widget=forms.NumberInput(
             attrs={
                 "id": "id_ntrp_level",
@@ -85,20 +118,40 @@ class UserRegistrationForm(forms.ModelForm):
                 "min": "1.5",
                 "max": "7",
                 "step": "0.01",
+                "inputmode": "decimal",
                 "placeholder": "например 3.75",
             }
         ),
-        help_text="Число от 1.50 до 7.00, два знака после запятой.",
+        help_text=(
+            "Число от 1.50 до 7.00. Можно с точкой или запятой: 3.75 или 3,75. "
+            "Ориентир: 1.5–2.5 — новичок, 3.0–3.5 — уверенный любитель, "
+            "4.0–4.5 — сильный любитель, 5.0 и выше — соревновательный уровень."
+        ),
     )
     password = forms.CharField(
         label="Пароль *",
-        widget=forms.PasswordInput(attrs={"class": "form-control", "minlength": 10}),
-        min_length=10,
-        help_text="Минимум 10 символов, не только цифры.",
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control",
+                "minlength": 10,
+                "autocomplete": "new-password",
+                "placeholder": "Минимум 10 символов",
+            }
+        ),
+        help_text="Минимум 10 символов. Не используйте только цифры и простые пароли вроде 1234567890.",
     )
     password_confirm = forms.CharField(
         label="Подтвердите пароль *",
-        widget=forms.PasswordInput(attrs={"class": "form-control"}),
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control",
+                "minlength": 10,
+                "autocomplete": "new-password",
+                "placeholder": "Повторите пароль",
+            }
+        ),
     )
     ntrp_quiz_payload = forms.CharField(
         label="",
@@ -120,18 +173,15 @@ class UserRegistrationForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def clean_email(self):
+    def clean_email(self) -> str:
         email = (self.cleaned_data.get("email") or "").strip().lower()
         if not email:
             raise forms.ValidationError("Укажите email.")
         if User.objects.filter(email__iexact=email).exists():
-            raise forms.ValidationError(
-                "Пользователь с таким email уже зарегистрирован. "
-                "Войдите в аккаунт или воспользуйтесь восстановлением пароля."
-            )
+            raise forms.ValidationError(DUPLICATE_EMAIL_MESSAGE)
         return email
 
-    def clean_city(self):
+    def clean_city(self) -> str:
         city = (self.cleaned_data.get("city") or "").strip()
         if not city:
             raise forms.ValidationError("Укажите населённый пункт.")
@@ -142,22 +192,21 @@ class UserRegistrationForm(forms.ModelForm):
             raise forms.ValidationError(message)
         return city
 
-    def clean_phone(self):
+    def clean_phone(self) -> str:
         phone_raw = (self.cleaned_data.get("phone") or "").strip()
         if not phone_raw:
             raise forms.ValidationError("Укажите телефон.")
 
         digits = "".join(ch for ch in phone_raw if ch.isdigit())
-        # Допускаем ввод с 8 или 7 или +7, нормализуем к 11 цифрам
-        if digits.startswith("8") and len(digits) == 11:
+        # Допускаем ввод с 8 или 7 или +7, нормализуем к 11 цифрам.
+        if len(digits) == 11 and digits[0] in ("7", "8"):
             digits = "7" + digits[1:]
-        elif digits.startswith("7") and len(digits) == 11:
-            pass
         elif len(digits) == 10:
             digits = "7" + digits
-        if len(digits) != 11 or not digits.isdigit():
+        if len(digits) != 11 or not digits.startswith("7"):
             raise forms.ValidationError(
-                "Введите телефон в формате +7XXXXXXXXXX (11 цифр)."
+                "Введите номер полностью: код +7 и 10 цифр. "
+                "Например: +7 999 123-45-67."
             )
         normalized = f"+{digits}"
 
@@ -169,27 +218,40 @@ class UserRegistrationForm(forms.ModelForm):
 
         return normalized
 
-    def clean_ntrp_level(self):
-        from decimal import InvalidOperation
-
+    def clean_ntrp_level(self) -> Decimal:
+        """Принять уровень силы с точкой или запятой и округлить до сотых."""
         val = self.cleaned_data.get("ntrp_level")
-        if val is None or val == "":
+        if val in (None, ""):
             raise forms.ValidationError(
-                "Укажите уровень силы от 1.50 до 7.00 (например 3.75) или пройдите калькулятор ниже."
+                "Укажите уровень силы от 1.50 до 7.00 (например 3.75) "
+                "или пройдите калькулятор ниже."
             )
-        try:
-            v = Decimal(str(val))
-            if v < Decimal("1.5") or v > Decimal("7.0"):
-                raise forms.ValidationError("Уровень должен быть от 1.50 до 7.00.")
-            return v
-        except (TypeError, ValueError, InvalidOperation) as err:
+        level = Decimal(str(val)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if level < NTRP_MIN or level > NTRP_MAX:
             raise forms.ValidationError(
-                "Укажите уровень силы от 1.50 до 7.00 (например 3.75)."
-            ) from err
+                "Уровень силы должен быть от 1.50 до 7.00. Например, 3.75."
+            )
+        return level
 
-    def clean_password_confirm(self):
+    def clean_password(self) -> str:
+        """Проверить пароль стандартными валидаторами Django."""
+        password = self.cleaned_data.get("password") or ""
+        if not password:
+            return password
+        candidate = User(
+            email=self.cleaned_data.get("email", ""),
+            first_name=self.cleaned_data.get("first_name", ""),
+            last_name=self.cleaned_data.get("last_name", ""),
+        )
+        try:
+            validate_password(password, user=candidate)
+        except ValidationError as exc:
+            raise forms.ValidationError(exc.messages) from exc
+        return password
+
+    def clean_password_confirm(self) -> str:
         password = self.cleaned_data.get("password")
-        password_confirm = self.cleaned_data.get("password_confirm")
+        password_confirm = self.cleaned_data.get("password_confirm") or ""
         if password and password_confirm and password != password_confirm:
             raise forms.ValidationError("Пароли не совпадают")
         return password_confirm

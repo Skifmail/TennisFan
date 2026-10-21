@@ -6,7 +6,7 @@
 
     var ACTIVE_BUTTONS = new WeakSet();
     var BUTTON_LOADING_TIMEOUTS = new WeakMap();
-    var BUTTON_LOADING_SAFETY_MS = 12000;
+    var BUTTON_LOADING_SAFETY_MS = 60000;
     var PAGE_LOADER_ID = "global-fullscreen-loader";
     var PAGE_SPINNER_ID = "page-transition-spinner";
 
@@ -150,6 +150,8 @@
         ACTIVE_BUTTONS.add(button);
 
         // Если навигация зависла/оборвалась — вернуть кнопку, чтобы можно было повторить.
+        // Таймаут с запасом: регистрация отправляет письма, и 12 секунд не хватало —
+        // пользователь успевал отправить форму повторно.
         clearButtonLoadingTimeout(button);
         var safetyTimer = window.setTimeout(function () {
             resetButtonLoading(button);

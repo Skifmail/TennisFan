@@ -31,6 +31,7 @@
                 Результат теста носит информационный характер и не влияет на ваш рейтинг. Рейтинг формируется только по результатам матчей.
             </p>
             <a id="ntrp-result-link" href="{% url 'tournament_list' %}" class="btn btn-primary">Записаться на турнир</a>
+            <button type="button" id="ntrp-restart" class="btn btn-outline" style="margin-left: 0.5rem;">Пройти заново</button>
         </div>
     </div>
 </div>
@@ -382,6 +383,54 @@
             saveNtrpIfAllowed(result.level, payload);
         }
     });
+
+    const restartBtn = document.getElementById('ntrp-restart');
+    if (restartBtn) {
+        restartBtn.addEventListener('click', () => {
+            answers.fill(null);
+            currentIndex = 0;
+            resultEl.classList.add('hidden');
+            quizEl.classList.remove('hidden');
+            if (infoMsgEl) infoMsgEl.classList.add('hidden');
+            if (formAdjustNoteEl) formAdjustNoteEl.textContent = '';
+            if (formTarget) {
+                const input = document.getElementById(formTarget);
+                if (input) {
+                    input.value = '';
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    const form = input.form;
+                    const hidden = form ? form.querySelector('input[name="ntrp_quiz_payload"]') : null;
+                    if (hidden) hidden.value = '';
+                }
+                if (resultLink) resultLink.classList.remove('hidden');
+            }
+            renderQuestion();
+        });
+    }
+
+    // Восстанавливаем ответы калькулятора, если форма вернулась с ошибкой:
+    // иначе пользователю пришлось бы проходить все 8 вопросов заново.
+    (function restoreAnswers() {
+        const input = formTarget ? document.getElementById(formTarget) : null;
+        const form = input ? input.form : null;
+        const hidden = form ? form.querySelector('input[name="ntrp_quiz_payload"]') : null;
+        if (!hidden || !hidden.value) return;
+        try {
+            const payload = JSON.parse(hidden.value);
+            const items = payload && payload.answers;
+            if (!Array.isArray(items)) return;
+            items.forEach((item, index) => {
+                if (index >= answers.length || !item) return;
+                const optionIndex = item.option_index;
+                const options = ntrpQuestions[index].options;
+                if (typeof optionIndex === 'number' && options[optionIndex]) {
+                    answers[index] = options[optionIndex].score;
+                }
+            });
+        } catch (error) {
+            // Битый payload не должен ломать калькулятор.
+        }
+    })();
 
     renderQuestion();
 </script>

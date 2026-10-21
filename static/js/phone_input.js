@@ -1,76 +1,81 @@
 /**
  * Поля телефона с фиксированным префиксом +7.
  * Класс .js-phone-input: префикс +7 не удаляется, ввод только цифр после него.
+ *
+ * Внутри хранится «национальная» часть номера — 10 цифр без кода страны.
+ * Если пользователь вставляет номер с кодом 7 или 8, код отбрасывается,
+ * поэтому номер не превращается молча в +7899…
  */
 (function () {
     var PREFIX = '+7';
+    var NATIONAL_LENGTH = 10;
 
-    function getDigitsOnly(str) {
-        return (str || '').replace(/\D/g, '');
+    function digitsOf(value) {
+        return (value || '').replace(/\D/g, '');
     }
 
-    function normalizePhoneDigits(digits) {
-        if (digits.length === 0) return '';
-        if (digits.charAt(0) === '8' && digits.length === 11) {
-            digits = '7' + digits.slice(1);
-        } else if (digits.length === 10 && digits.charAt(0) !== '7') {
-            digits = '7' + digits;
-        } else if (digits.charAt(0) === '7' && digits.length > 11) {
-            digits = digits.slice(0, 11);
-        } else if (digits.charAt(0) !== '7' && digits.length <= 10) {
-            digits = '7' + digits.slice(0, 10);
-        } else if (digits.length > 11) {
-            digits = digits.slice(0, 11);
+    /**
+     * Выделить 10 цифр номера без кода страны.
+     * @param {string} raw значение поля или вставленный текст
+     * @returns {string}
+     */
+    function nationalDigits(raw) {
+        var value = (raw || '').trim();
+        var digits = digitsOf(value);
+        if (!digits) return '';
+
+        // Первая 7 — код страны из самого префикса.
+        if (value.indexOf(PREFIX) === 0) {
+            digits = digits.slice(1);
+        }
+        // Вставили полный номер: 8XXXXXXXXXX или 7XXXXXXXXXX.
+        if (digits.length >= 11 && (digits.charAt(0) === '7' || digits.charAt(0) === '8')) {
+            digits = digits.slice(1);
+        }
+        // Одинокая 8 после префикса — это забытый код страны, а не номер.
+        if (digits === '8') {
+            return '';
+        }
+        if (digits.length > NATIONAL_LENGTH) {
+            digits = digits.slice(-NATIONAL_LENGTH);
         }
         return digits;
     }
 
-    function toDisplayValue(digits) {
-        if (!digits || digits.length <= 1) return PREFIX + (digits.length ? ' ' + digits.slice(1) : ' ');
-        var after7 = digits.slice(1);
-        if (after7.length <= 3) return PREFIX + ' ' + after7;
-        if (after7.length <= 6) return PREFIX + ' ' + after7.slice(0, 3) + ' ' + after7.slice(3);
-        if (after7.length <= 8) return PREFIX + ' ' + after7.slice(0, 3) + ' ' + after7.slice(3, 6) + ' ' + after7.slice(6);
-        after7 = after7.slice(0, 10);
-        return PREFIX + ' ' + after7.slice(0, 3) + ' ' + after7.slice(3, 6) + ' ' + after7.slice(6, 8) + ' ' + after7.slice(8);
+    /**
+     * Отформатировать национальные цифры как +7 999 123 45 67.
+     * @param {string} national
+     * @returns {string}
+     */
+    function formatPhone(national) {
+        var n = (national || '').slice(0, NATIONAL_LENGTH);
+        if (!n) return PREFIX + ' ';
+        var groups = [];
+        if (n.length > 0) groups.push(n.slice(0, 3));
+        if (n.length > 3) groups.push(n.slice(3, 6));
+        if (n.length > 6) groups.push(n.slice(6, 8));
+        if (n.length > 8) groups.push(n.slice(8, 10));
+        return PREFIX + ' ' + groups.join(' ');
     }
 
     function applyToInput(input) {
         if (!input || input.type === 'hidden') return;
 
-        function setValue(digits) {
-            var normalized = normalizePhoneDigits(digits);
-            var display = toDisplayValue(normalized);
-            if (input.value !== display) {
-                input.value = display;
+        function render(national) {
+            var formatted = formatPhone(national);
+            if (input.value !== formatted) {
+                input.value = formatted;
             }
-            return normalized;
         }
 
-        function getValueDigits() {
-            return getDigitsOnly(input.value);
-        }
-
-        // Инициализация при загрузке: если пусто — "+7 ", иначе нормализовать
         (function init() {
-            var val = (input.value || '').trim();
-            if (val.length === 0) {
-                input.value = PREFIX + ' ';
-                return;
-            }
-            var digits = getDigitsOnly(val);
-            if (digits.length === 0) {
-                input.value = PREFIX + ' ';
-                return;
-            }
-            setValue(digits);
+            render(nationalDigits(input.value));
         })();
 
         input.addEventListener('focus', function () {
-            var val = (this.value || '').trim();
-            if (val.length === 0 || val.indexOf(PREFIX) !== 0) {
-                this.value = PREFIX + ' ';
-            }
+            // Не стираем вставленный номер без префикса — просто приводим к маске.
+            render(nationalDigits(this.value));
+            this.setSelectionRange(this.value.length, this.value.length);
         });
 
         input.addEventListener('keydown', function (e) {
@@ -85,19 +90,12 @@
         });
 
         input.addEventListener('input', function () {
-            var digits = getValueDigits();
-            setValue(digits);
+            render(nationalDigits(this.value));
             this.setSelectionRange(this.value.length, this.value.length);
         });
 
         input.addEventListener('blur', function () {
-            var digits = getValueDigits();
-            var normalized = normalizePhoneDigits(digits);
-            if (normalized.length <= 1) {
-                this.value = PREFIX + ' ';
-                return;
-            }
-            this.value = toDisplayValue(normalized);
+            render(nationalDigits(this.value));
         });
     }
 

@@ -19,6 +19,7 @@ from apps.core.localities import (
     map_kladr_type,
     parse_kladr_row,
     parse_yandex_locality,
+    several_catalog_cities_message,
     split_typed_name,
     strip_settlement_prefix,
     upsert_locality,
@@ -411,3 +412,21 @@ class RegistrationAndCourtLocalityLabelsTestCase(TestCase):
         self.assertEqual(
             Player._meta.get_field("city").verbose_name, "Населённый пункт"
         )
+
+
+class SeveralCatalogCitiesTestCase(TestCase):
+    """Два города в одной строке ловятся независимо от регистра и СУБД."""
+
+    def setUp(self) -> None:
+        City.objects.create(name="Раменское", region="Московская область")
+        City.objects.create(name="Жуковский", region="Московская область")
+
+    def test_two_cities_in_lowercase_are_detected(self) -> None:
+        message = several_catalog_cities_message("раменское, жуковский")
+
+        self.assertIn("разные города", message)
+        self.assertIn("Раменское", message)
+        self.assertIn("Жуковский", message)
+
+    def test_single_city_is_allowed(self) -> None:
+        self.assertEqual(several_catalog_cities_message("Раменское"), "")

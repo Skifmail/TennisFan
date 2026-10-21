@@ -108,6 +108,8 @@
     --color-warning: #013220;
     --color-error: #a00000;
     --color-info: #A6824A;
+    /* Зелёный для подтверждающих подсказок (пароль соответствует, пароли совпадают). */
+    --color-valid: #22c55e;
 
     /* Typography */
     --font-family: 'Open Sans', -apple-system, blinkmacsystemfont, 'Segoe UI', sans-serif;
@@ -2818,6 +2820,28 @@ select.form-control option:hover {
 .register-form-layout .field-error {
     margin-top: var(--spacing-xs);
     font-size: var(--font-size-sm);
+    color: var(--color-error);
+}
+
+/* Живая подсказка под паролем: зелёный цвет, когда требование выполнено. */
+.register-form-layout .field-error.is-ok {
+    color: var(--color-valid);
+}
+
+/* Поле с ошибкой: красная рамка и мягкое свечение, чтобы было видно всё поле. */
+.form-control.is-invalid,
+.js-phone-input.is-invalid {
+    border-color: var(--color-error) !important;
+    box-shadow: 0 0 0 3px rgb(160 0 0 / 22%);
+}
+
+.form-control.is-invalid:focus,
+.js-phone-input.is-invalid:focus {
+    border-color: var(--color-error) !important;
+    box-shadow: 0 0 0 3px rgb(160 0 0 / 32%);
+}
+
+.form-group.has-error .consent-text {
     color: var(--color-error);
 }
 

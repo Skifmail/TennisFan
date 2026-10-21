@@ -26,7 +26,7 @@
 
             <!-- Форма регистрации (справа), два этапа -->
             <div class="auth-form register {% if active_mode == 'register' %}active{% endif %}">
-                <form method="post" id="register-form" class="register-form-layout register-form-steps" novalidate data-loader-overlay>
+                <form method="post" id="register-form" class="register-form-layout register-form-steps" novalidate data-loader-overlay autocomplete="on">
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="register">
                     {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
@@ -34,18 +34,33 @@
 
                     <!-- Общие ошибки формы (non-field errors) -->
                     {% if register_form.non_field_errors %}
-                        <div class="alert alert-error mb-3">
+                        <div class="alert alert-error mb-3" role="alert">
                             {% for error in register_form.non_field_errors %}
                                 <p style="margin: 0;">{{ error }}</p>
                             {% endfor %}
                         </div>
                     {% endif %}
 
+                    <!-- Сводка ошибок: помогает заметить поле, до которого не доскроллили -->
+                    {% if register_error_summary %}
+                        <div class="alert alert-error mb-3" role="alert" id="register-error-summary">
+                            <p style="margin: 0 0 var(--spacing-xs); font-weight: 700;">Проверьте поля формы:</p>
+                            <ul style="margin: 0; padding-left: 1.2rem;">
+                                {% for item in register_error_summary %}
+                                    <li>
+                                        <a href="#{{ item.anchor }}" style="color: inherit; text-decoration: underline;">{{ item.label }}:</a>
+                                        {{ item.message }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
                     <!-- Этап 1: персональные данные -->
                     <div class="register-step register-step-1 {% if show_register_step2 %}hidden{% endif %}" id="register-step-1">
-                        <h3 class="register-step-title">Шаг 1. Персональные данные</h3>
+                        <h3 class="register-step-title">Шаг 1 из 2. Персональные данные</h3>
                         <div class="register-step-fields">
-                            <div class="form-group">
+                            <div class="form-group" id="field-first_name">
                                 <label class="form-label" for="id_first_name">{{ register_form.first_name.label }}</label>
                                 {{ register_form.first_name }}
                                 <div class="field-error" id="first_name-error"></div>
@@ -53,7 +68,7 @@
                                     <p class="text-error form-error">{{ error }}</p>
                                 {% endfor %}
                             </div>
-                            <div class="form-group">
+                            <div class="form-group" id="field-last_name">
                                 <label class="form-label" for="id_last_name">{{ register_form.last_name.label }}</label>
                                 {{ register_form.last_name }}
                                 <div class="field-error" id="last_name-error"></div>
@@ -61,25 +76,31 @@
                                     <p class="text-error form-error">{{ error }}</p>
                                 {% endfor %}
                             </div>
-                            <div class="form-group">
+                            <div class="form-group" id="field-email">
                                 <label class="form-label" for="id_email">{{ register_form.email.label }}</label>
                                 {{ register_form.email }}
                                 <div class="field-error" id="email-error"></div>
+                                {% if register_form.email.help_text %}
+                                    <p class="form-help text-secondary">{{ register_form.email.help_text }}</p>
+                                {% endif %}
                                 {% if register_form.email.errors %}
                                     {% for error in register_form.email.errors %}
                                         <p class="text-error form-error">{{ error }}</p>
                                     {% endfor %}
                                 {% endif %}
                             </div>
-                            <div class="form-group">
+                            <div class="form-group" id="field-city">
                                 <label class="form-label" for="id_city">{{ register_form.city.label }}</label>
                                 {{ register_form.city }}
                                 <div class="field-error" id="city-error"></div>
+                                {% if register_form.city.help_text %}
+                                    <p class="form-help text-secondary">{{ register_form.city.help_text }}</p>
+                                {% endif %}
                                 {% for error in register_form.city.errors %}
                                     <p class="text-error form-error">{{ error }}</p>
                                 {% endfor %}
                             </div>
-                            <div class="form-group">
+                            <div class="form-group" id="field-phone">
                                 <label class="form-label" for="id_phone">{{ register_form.phone.label }}</label>
                                 {{ register_form.phone }}
                                 <div class="field-error" id="phone-error"></div>
@@ -90,7 +111,7 @@
                                     <p class="text-error form-error">{{ error }}</p>
                                 {% endfor %}
                             </div>
-                            <div class="form-group">
+                            <div class="form-group" id="field-password">
                                 <label class="form-label" for="id_password">{{ register_form.password.label }}</label>
                                 <div class="password-field-wrapper">
                                     {{ register_form.password }}
@@ -102,14 +123,17 @@
                                         </svg>
                                     </button>
                                 </div>
-                                <div class="field-error" id="password-error"></div>
+                                <div class="field-error" id="password-error" aria-live="polite"></div>
+                                {% if register_form.password.help_text %}
+                                    <p class="form-help text-secondary">{{ register_form.password.help_text }}</p>
+                                {% endif %}
                                 {% if register_form.password.errors %}
                                     {% for error in register_form.password.errors %}
                                         <p class="text-error form-error">{{ error }}</p>
                                     {% endfor %}
                                 {% endif %}
                             </div>
-                            <div class="form-group">
+                            <div class="form-group" id="field-password_confirm">
                                 <label class="form-label" for="id_password_confirm">{{ register_form.password_confirm.label }}</label>
                                 <div class="password-field-wrapper">
                                     {{ register_form.password_confirm }}
@@ -121,15 +145,16 @@
                                         </svg>
                                     </button>
                                 </div>
-                                <div class="field-error" id="password_confirm-error"></div>
+                                <div class="field-error" id="password_confirm-error" aria-live="polite"></div>
                                 {% for error in register_form.password_confirm.errors %}
                                     <p class="text-error form-error">{{ error }}</p>
                                 {% endfor %}
                             </div>
-                            <div class="form-group form-group-consent">
+                            <div class="form-group form-group-consent" id="field-agree_legal">
                                 <label class="consent-label">
                                     {{ register_form.agree_legal }}
-                                    <span class="consent-text">Я согласен на <a href="{% url 'legal_personal_data' %}"
+                                    <span class="consent-text">Я принимаю <a href="{% url 'legal_offer' %}"
+                                            target="_blank" rel="noopener">оферту</a>, согласен на <a href="{% url 'legal_personal_data' %}"
                                             target="_blank" rel="noopener">обработку персональных данных</a> и <a
                                             href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политику
                                             конфиденциальности</a></span>
@@ -146,9 +171,9 @@
 
                     <!-- Этап 2: Уровень силы (ручной ввод или калькулятор) -->
                     <div class="register-step register-step-2 {% if not show_register_step2 %}hidden{% endif %}" id="register-step-2">
-                        <h3 class="register-step-title">Шаг 2. Уровень силы</h3>
+                        <h3 class="register-step-title">Шаг 2 из 2. Уровень силы</h3>
                         <p class="text-secondary register-form-ntrp-note">Укажите свой уровень или пройдите калькулятор, если не уверены.</p>
-                        <div class="form-group">
+                        <div class="form-group" id="field-ntrp_level">
                             <label class="form-label" for="id_ntrp_level">Как вы оцениваете свой уровень силы (NTRP):</label>
                             {{ register_form.ntrp_level }}
                             {% if register_form.ntrp_level.help_text %}
@@ -173,18 +198,37 @@
                         <div class="field-error" id="ntrp-error"></div>
                     </div>
                 </form>
+
+                <noscript>
+                    <style>
+                        /* Без JS шаг 2 показываем сразу, иначе кнопка «Далее» мертва. */
+                        #register-step-2 { display: block !important; }
+                        #register-btn-next { display: none !important; }
+                    </style>
+                </noscript>
             </div>
 
             <!-- Форма входа (слева) -->
             <div class="auth-form login {% if active_mode == 'login' %}active{% endif %}">
-                <form method="post" class="auth-login-form" data-loader-overlay>
+                <form method="post" class="auth-login-form" data-loader-overlay autocomplete="on">
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="login">
                     {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
 
                     {% if login_form.errors %}
-                    <div class="alert alert-error mb-3">
-                        Неверный email или пароль
+                    <div class="alert alert-error mb-3" role="alert">
+                        {% if login_form.non_field_errors %}
+                            {% for error in login_form.non_field_errors %}
+                                <p style="margin: 0;">{{ error }}</p>
+                            {% endfor %}
+                        {% else %}
+                            <p style="margin: 0;">Не удалось войти. Проверьте email и пароль.</p>
+                        {% endif %}
+                        {% for field in login_form %}
+                            {% for error in field.errors %}
+                                <p style="margin: 0;">{{ field.label }}: {{ error }}</p>
+                            {% endfor %}
+                        {% endfor %}
                     </div>
                     {% endif %}
 
@@ -202,13 +246,15 @@
 
                     <div class="form-group">
                         <label class="form-label" for="id_username">Email</label>
-                        <input type="email" name="username" id="id_username" class="form-control" required autofocus>
+                        <input type="email" name="username" id="id_username" class="form-control" required
+                            autocomplete="username" value="{{ login_form.username.value|default_if_none:'' }}" autofocus>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label" for="id_password">Пароль</label>
+                        <label class="form-label" for="id_login_password">Пароль</label>
                         <div class="password-field-wrapper">
-                            <input type="password" name="password" id="id_password" class="form-control" required>
+                            <input type="password" name="password" id="id_login_password" class="form-control" required
+                                autocomplete="current-password">
                             <button type="button" class="password-toggle-btn" aria-label="Показать пароль"
                                 onclick="togglePasswordVisibility(this)">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -307,6 +353,9 @@
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '');
         }
 
+        var PASSWORD_MIN_LENGTH = 10;
+        var consentField = form.querySelector('input[name="agree_legal"]');
+
         function showError(el, msg) {
             if (!el) return;
             el.textContent = msg;
@@ -317,81 +366,260 @@
             el.style.display = 'none';
         }
 
-        [firstNameField, lastNameField, emailField, passwordField, passwordConfirmField, cityField, phoneField].forEach(function (f) {
-            if (!f) return;
-            f.addEventListener('input', function () {
-                var g = this.closest('.form-group');
-                if (g) g.querySelectorAll('.text-error').forEach(function (e) { e.remove(); });
-                hideError(document.getElementById(this.id.replace('id_', '') + '-error'));
-            });
-        });
+        /**
+         * Русская форма множественного числа: 1 символ, 2 символа, 5 символов.
+         * @param {number} count
+         * @param {string[]} forms [один, два, много]
+         * @returns {string}
+         */
+        function pluralForm(count, forms) {
+            var n = Math.abs(count) % 100;
+            var n1 = n % 10;
+            if (n > 10 && n < 20) return forms[2];
+            if (n1 > 1 && n1 < 5) return forms[1];
+            if (n1 === 1) return forms[0];
+            return forms[2];
+        }
 
-        if (emailField) {
-            emailField.addEventListener('blur', function () {
-                var v = this.value.trim();
-                if (!v) showError(emailError, 'Email обязателен.');
-                else if (!validateEmail(v)) showError(emailError, 'Введите корректный email.');
-                else hideError(emailError);
+        /**
+         * Показать/скрыть подсказку под полем и переключить её цвет.
+         * @param {HTMLElement|null} el
+         * @param {string} text
+         * @param {boolean} ok
+         */
+        function setFieldHint(el, text, ok) {
+            if (!el) return;
+            el.textContent = text || '';
+            el.classList.toggle('is-ok', !!ok && !!text);
+            el.style.display = text ? 'block' : 'none';
+        }
+
+        /**
+         * Подсветить поле красным, если с ним что-то не так.
+         * @param {HTMLElement|null} input
+         * @param {boolean} invalid
+         */
+        function setFieldState(input, invalid) {
+            if (!input) return;
+            input.classList.toggle('is-invalid', !!invalid);
+            input.setAttribute('aria-invalid', invalid ? 'true' : 'false');
+            var group = input.closest('.form-group');
+            if (group) group.classList.toggle('has-error', !!invalid);
+        }
+
+        /**
+         * Убрать серверные ошибки конкретного поля, когда пользователь начал его править.
+         * @param {HTMLElement|null} input
+         */
+        function clearServerFieldErrors(input) {
+            var group = input ? input.closest('.form-group') : null;
+            if (!group) return;
+            group.querySelectorAll('.text-error.form-error').forEach(function (el) {
+                el.remove();
             });
         }
-        if (cityField) {
-            cityField.addEventListener('blur', function () {
-                if (!this.value.trim()) showError(cityError, 'Укажите населённый пункт.');
-                else hideError(cityError);
-            });
+
+        /**
+         * Что не так с паролем: пустая строка, если требования выполнены.
+         * @param {string} value
+         * @returns {string}
+         */
+        function passwordProblem(value) {
+            if (value.length < PASSWORD_MIN_LENGTH) {
+                var left = PASSWORD_MIN_LENGTH - value.length;
+                return 'Пароль не соответствует требованиям: введите ещё ' + left + ' ' +
+                    pluralForm(left, ['символ', 'символа', 'символов']) + '.';
+            }
+            if (/^\d+$/.test(value)) {
+                return 'Пароль не соответствует требованиям: добавьте хотя бы одну букву.';
+            }
+            return '';
         }
 
         function validatePhone(phone) {
-            const digits = (phone || '').replace(/\D/g, '');
-            // На клиенте допускаем любую маску, если цифр как минимум 10.
-            // Строгая проверка и нормализация выполняются на сервере.
-            return digits.length >= 10;
+            var digits = (phone || '').replace(/\D/g, '');
+            if (digits.length === 11) {
+                return digits.charAt(0) === '7' || digits.charAt(0) === '8';
+            }
+            // Ровно 10 цифр сервер дополнит кодом +7.
+            return digits.length === 10;
         }
 
-        function validateStep1() {
-            var has = false;
-            if (!firstNameField || !firstNameField.value.trim()) { showError(firstNameError, 'Укажите имя.'); has = true; }
-            else hideError(firstNameError);
-            if (!lastNameField || !lastNameField.value.trim()) { showError(lastNameError, 'Укажите фамилию.'); has = true; }
-            else hideError(lastNameError);
-            if (!emailField || !emailField.value.trim()) { showError(emailError, 'Email обязателен.'); has = true; }
-            else if (!validateEmail(emailField.value.trim())) { showError(emailError, 'Введите корректный email.'); has = true; }
-            else hideError(emailError);
-            if (!passwordField || !passwordField.value || passwordField.value.length < 8) { showError(passwordError, 'Пароль не менее 8 символов.'); has = true; }
-            else hideError(passwordError);
-            if (passwordConfirmField && (!passwordConfirmField.value || passwordConfirmField.value !== passwordField.value)) { showError(passwordConfirmError, 'Пароли не совпадают.'); has = true; }
-            else hideError(passwordConfirmError);
-            if (!cityField || !cityField.value.trim()) { showError(cityError, 'Укажите населённый пункт.'); has = true; }
-            else hideError(cityError);
-            if (!phoneField || !phoneField.value.trim()) { showError(phoneError, 'Укажите телефон.'); has = true; }
-            else if (!validatePhone(phoneField.value.trim())) { showError(phoneError, 'Введите корректный номер телефона.'); has = true; }
-            else hideError(phoneError);
-            var consent = form.querySelector('input[name="agree_legal"]');
-            if (consent && !consent.checked) {
-                showError(consentError, 'Необходимо дать согласие на обработку персональных данных.');
-                has = true;
-            } else {
-                hideError(consentError);
+        /**
+         * Проверить одно поле, показать подсказку и красную рамку.
+         * @param {object} rule
+         * @param {boolean} force показывать ошибку даже для нетронутого пустого поля
+         * @returns {boolean}
+         */
+        function validateRule(rule, force) {
+            var input = rule.input;
+            var isCheckbox = rule.type === 'checkbox';
+            var value = input ? input.value : '';
+            var isEmpty = isCheckbox ? !(input && input.checked) : !value.trim();
+
+            // Пустое поле не краснеет, пока пользователь его не трогал и не нажал «Далее».
+            if (isEmpty && !force && !rule.touched) {
+                setFieldHint(rule.hint, '', false);
+                setFieldState(input, false);
+                return false;
             }
-            return !has;
+
+            var problem = isEmpty ? rule.empty : rule.check(value, input);
+            setFieldHint(
+                rule.hint,
+                problem || rule.success || '',
+                !problem && !!rule.success
+            );
+            setFieldState(input, !!problem);
+            return !problem;
         }
+
+        /**
+         * Правила полей шага 1. Проверяются и при вводе, и по кнопке «Далее».
+         */
+        var step1Rules = [
+            {
+                input: firstNameField,
+                hint: firstNameError,
+                empty: 'Укажите имя.',
+                check: function () { return ''; }
+            },
+            {
+                input: lastNameField,
+                hint: lastNameError,
+                empty: 'Укажите фамилию.',
+                check: function () { return ''; }
+            },
+            {
+                input: emailField,
+                hint: emailError,
+                empty: 'Email обязателен.',
+                check: function (value) {
+                    return validateEmail(value.trim()) ? '' : 'Введите корректный email.';
+                }
+            },
+            {
+                input: cityField,
+                hint: cityError,
+                empty: 'Укажите населённый пункт.',
+                check: function () { return ''; }
+            },
+            {
+                input: phoneField,
+                hint: phoneError,
+                empty: 'Укажите телефон.',
+                check: function (value) {
+                    return validatePhone(value.trim()) ? '' : 'Введите корректный номер телефона.';
+                }
+            },
+            {
+                input: passwordField,
+                hint: passwordError,
+                empty: 'Введите пароль, минимум ' + PASSWORD_MIN_LENGTH + ' символов.',
+                success: '✓ Пароль соответствует требованиям.',
+                check: function (value) { return passwordProblem(value); }
+            },
+            {
+                input: passwordConfirmField,
+                hint: passwordConfirmError,
+                empty: 'Повторите пароль.',
+                success: '✓ Пароли совпадают.',
+                check: function (value) {
+                    return passwordField && value === passwordField.value
+                        ? ''
+                        : 'Пароли не совпадают.';
+                }
+            },
+            {
+                input: consentField,
+                hint: consentError,
+                type: 'checkbox',
+                empty: 'Необходимо дать согласие на обработку персональных данных.',
+                check: function () { return ''; }
+            }
+        ];
+
+        var confirmRule = null;
+        step1Rules.forEach(function (rule) {
+            if (!rule.input) return;
+            if (rule.input === passwordConfirmField) confirmRule = rule;
+
+            var eventName = rule.type === 'checkbox' ? 'change' : 'input';
+            rule.input.addEventListener(eventName, function () {
+                rule.touched = true;
+                clearServerFieldErrors(rule.input);
+                validateRule(rule, false);
+                // Пароль изменился — сразу перепроверяем подтверждение.
+                if (rule.input === passwordField && confirmRule && passwordConfirmField.value) {
+                    validateRule(confirmRule, false);
+                }
+            });
+            rule.input.addEventListener('blur', function () {
+                rule.touched = true;
+                validateRule(rule, false);
+            });
+        });
+
+        /**
+         * Проверить все поля шага 1 и подсветить проблемные.
+         * @returns {boolean}
+         */
+        function validateStep1() {
+            var hasErrors = false;
+            step1Rules.forEach(function (rule) {
+                rule.touched = true;
+                if (!validateRule(rule, true)) hasErrors = true;
+            });
+            return !hasErrors;
+        }
+
+        // Сервер мог вернуть ошибки — подсвечиваем соответствующие поля.
+        form.querySelectorAll('.form-group').forEach(function (group) {
+            if (!group.querySelector('.text-error.form-error')) return;
+            group.classList.add('has-error');
+            var control = group.querySelector('.form-control, input[type="checkbox"]');
+            if (control) {
+                control.classList.add('is-invalid');
+                control.setAttribute('aria-invalid', 'true');
+            }
+        });
 
         var step1 = document.getElementById('register-step-1');
         var step2 = document.getElementById('register-step-2');
         var btnNext = document.getElementById('register-btn-next');
         var btnBack = document.getElementById('register-btn-back');
 
+        function scrollToFirstInvalid() {
+            var firstInvalid = step1 ? step1.querySelector('.is-invalid') : null;
+            if (!firstInvalid) return;
+            firstInvalid.focus({ preventScroll: true });
+            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function showStep2() {
+            if (!step1 || !step2) return;
+            step1.classList.add('hidden');
+            step2.classList.remove('hidden');
+            if (ntrpField) {
+                ntrpField.focus({ preventScroll: true });
+                ntrpField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
         if (btnNext && step1 && step2) {
             btnNext.addEventListener('click', function () {
-                if (!validateStep1()) return;
-                step1.classList.add('hidden');
-                step2.classList.remove('hidden');
+                if (!validateStep1()) {
+                    scrollToFirstInvalid();
+                    return;
+                }
+                showStep2();
             });
         }
         if (btnBack && step1 && step2) {
             btnBack.addEventListener('click', function () {
                 step2.classList.add('hidden');
                 step1.classList.remove('hidden');
+                step1.scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
         }
 
@@ -409,16 +637,34 @@
 
         if (form) {
             form.addEventListener('submit', function (e) {
-                if (!step2 || !step2.classList.contains('hidden')) {
-                    hideError(ntrpError);
-                    var nv = (ntrpField && ntrpField.value) ? ntrpField.value.trim() : '';
-                    var num = parseFloat(nv.replace(',', '.'));
-                    if (!nv || isNaN(num) || num < 1.5 || num > 7) {
-                        showError(ntrpError, 'Укажите уровень силы от 1.5 до 7.0 (например 3.7).');
-                        e.preventDefault();
-                    }
+                // Enter на шаге 1 не должен отправлять форму целиком:
+                // сначала проверяем поля и переводим на шаг 2.
+                if (step2 && step2.classList.contains('hidden')) {
+                    e.preventDefault();
+                    if (validateStep1()) showStep2();
+                    else scrollToFirstInvalid();
+                    return;
+                }
+                hideError(ntrpError);
+                var nv = (ntrpField && ntrpField.value) ? ntrpField.value.trim() : '';
+                var num = parseFloat(nv.replace(',', '.'));
+                if (!nv || isNaN(num) || num < 1.5 || num > 7) {
+                    showError(ntrpError, 'Укажите уровень силы от 1.5 до 7.0 (например 3.7).');
+                    e.preventDefault();
                 }
             });
+        }
+
+        // После ответа сервера показываем, где именно ошибка, и не оставляем
+        // пользователя внизу страницы без объяснений.
+        var summary = document.getElementById('register-error-summary');
+        if (summary) {
+            summary.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else if (step2 && !step2.classList.contains('hidden')) {
+            var ntrpServerErrors = step2.querySelectorAll('.text-error');
+            if (ntrpServerErrors.length && ntrpField) {
+                ntrpField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         }
     });
 </script>

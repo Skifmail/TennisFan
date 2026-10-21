@@ -278,7 +278,8 @@
 
   <script>
     // ── Timer + progress bar (synced to time) ──
-    const TOTAL = 3 * 60; // 3 minutes
+    // Деплой занимает десятки секунд, поэтому обновляемся каждую минуту:
+    const TOTAL = 60; // 1 минута
     let remaining = TOTAL;
 
     const mmEl  = document.getElementById('mm');
@@ -292,7 +293,15 @@
 
     const tick = setInterval(() => {
       remaining--;
-      if (remaining <= 0) { clearInterval(tick); location.reload(); return; }
+      if (remaining <= 0) {
+        clearInterval(tick);
+        // Перезагружаемся в обход кэша: иначе браузер может снова взять
+        // страницу техработ из своего кэша и остаться на ней навсегда.
+        const url = new URL(location.href);
+        url.searchParams.set('_r', String(Date.now()));
+        location.replace(url.toString());
+        return;
+      }
 
       mmEl.textContent = pad(Math.floor(remaining / 60));
       ssEl.textContent = pad(remaining % 60);

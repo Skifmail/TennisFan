@@ -8,6 +8,7 @@ from apps.core.email_service import send_training_enrollment_email
 from apps.core.models import OutboundEmail
 from apps.courts.models import Court
 from apps.training.models import Coach, Training, TrainingEnrollment
+from apps.users.models import Notification
 from tests.support.factories import make_user
 
 
@@ -111,6 +112,28 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
         html = mail.outbox[0].alternatives[0][0]
         self.assertIn("Пётр Игрок", html)
         self.assertIn("+79990001122", html)
+
+    @override_settings(NOTIFICATION_CENTER_ENABLED=True)
+    def test_enroll_notification_links_to_coach_trainings(self) -> None:
+        """Уведомление в ЛК ведёт к заявкам тренера, а не на саму ленту."""
+        url = reverse("training_enroll", kwargs={"slug": self.training.slug})
+        response = self.client.post(
+            url,
+            {
+                "full_name": "Анна Игрок",
+                "contact_method": "telegram",
+                "contact_value": "@anna_player",
+                "agree_legal": "on",
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        note = Notification.objects.get(
+            user=self.coach_user,
+            event_key="training.enrollment",
+        )
+        self.assertEqual(note.url, reverse("my_trainings"))
 
     def test_enroll_sends_email_when_contact_is_email(self) -> None:
         """Email из заявки попадает в письмо тренеру."""

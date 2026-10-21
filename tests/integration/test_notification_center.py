@@ -131,6 +131,22 @@ def test_email_when_disabled_should_still_capture_email_only_event(
     assert "Секретные" not in delivery.body
 
 
+def test_email_event_when_notification_url_set_should_link_there(
+    recipient: User,
+) -> None:
+    """Почтовое событие ведёт в раздел с подробностями, а не на саму ленту."""
+    EventEmail(
+        subject="Новая заявка",
+        body="Текст",
+        to=[recipient.email],
+        event_key="training.enrollment",
+        notification_url=reverse("my_trainings"),
+    ).send()
+
+    note = Notification.objects.get(user=recipient, event_key="training.enrollment")
+    assert note.url == reverse("my_trainings")
+
+
 def test_push_when_transaction_rolls_back_should_not_escape(recipient: User) -> None:
     """Задание доставки откатывается вместе с бизнес-действием."""
     NotificationPreference.objects.create(user=recipient, push_enabled=True)

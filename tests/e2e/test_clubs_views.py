@@ -234,6 +234,18 @@ class MyClubsViewTestCase(TestCase):
         self.assertContains(response, reverse("clubs:my_clubs"))
         self.assertContains(response, "Мои клубы")
 
+    def test_club_discover_page_shows_club_registration_cta(self) -> None:
+        response = self.client.get(reverse("clubs:club_discover"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Являетесь представителем клуба - зарегистрируйте клуб на платформе "
+            "и проводите свои турниры.",
+        )
+        self.assertContains(response, "Зарегистрировать клуб")
+        self.assertContains(response, reverse("clubs:register_step1"))
+
     def test_club_my_home_redirects_to_my_clubs_page(self) -> None:
         response = self.client.get(reverse("clubs:club_my_home"), secure=True)
 

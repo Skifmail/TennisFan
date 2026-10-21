@@ -18,6 +18,7 @@ class EventEmail(EmailMultiAlternatives):
     Attributes:
         event_key: Явный код события, не тема или текст письма.
         capture_event: Создавать ли ЛК/push для почтового источника.
+        notification_url: Относительный адрес раздела с подробностями для ЛК и push.
     """
 
     outbound_category: str = ""
@@ -28,6 +29,7 @@ class EventEmail(EmailMultiAlternatives):
         event_key: str,
         capture_event: bool = True,
         delivery_allowed: bool = True,
+        notification_url: str = "",
         **kwargs: Any,
     ) -> None:
         """Создаёт письмо с прежними аргументами Django.
@@ -37,6 +39,7 @@ class EventEmail(EmailMultiAlternatives):
             event_key: Ключ реестра.
             capture_event: Выключено у уже сформированной ручной рассылки.
             delivery_allowed: Дополнительное прежнее ограничение почтового канала.
+            notification_url: Относительный адрес раздела с подробностями для ЛК и push.
             **kwargs: Прежние именованные параметры письма.
 
         Raises:
@@ -47,6 +50,7 @@ class EventEmail(EmailMultiAlternatives):
         self.event_key = event_key
         self.capture_event = capture_event
         self.delivery_allowed = delivery_allowed
+        self.notification_url = notification_url
         super().__init__(*args, **kwargs)
 
     def send(self, fail_silently: bool = False) -> int:
@@ -67,7 +71,11 @@ class EventEmail(EmailMultiAlternatives):
             if user is not None and not user.is_active:
                 continue
             if user and self.capture_event:
-                capture_email_event(self.event_key, user)
+                capture_email_event(
+                    self.event_key,
+                    user,
+                    url=self.notification_url,
+                )
             consent = preferences(user.pk)[1] if user else True
             if (
                 not self.delivery_allowed

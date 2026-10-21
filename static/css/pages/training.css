@@ -531,6 +531,13 @@
     line-height: 1.5;
 }
 
+/* Высокие карточки заявок показываем сразу и без вертикального сдвига:
+   иначе низ карточки перекрывает заголовок следующей секции. */
+.main .my-trainings .card {
+    opacity: 1;
+    transform: none;
+}
+
 .my-trainings-offer {
     margin-bottom: var(--spacing-lg);
 }

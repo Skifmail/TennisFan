@@ -175,7 +175,7 @@ def create_notification(
 
 
 @transaction.atomic
-def capture_email_event(event_key: str, user: User) -> None:
+def capture_email_event(event_key: str, user: User, *, url: str = "") -> None:
     """Создаёт нейтральное уведомление для события с почтовым источником.
 
     Секреты и содержимое письма намеренно не передаются в ЛК и на экран устройства.
@@ -183,6 +183,7 @@ def capture_email_event(event_key: str, user: User) -> None:
     Args:
         event_key: Событие почтового адаптера.
         user: Получатель письма в платформе.
+        url: Необязательный относительный адрес раздела с подробностями.
     """
     definition = EVENTS[event_key]
     if definition.source != "email":
@@ -191,7 +192,7 @@ def capture_email_event(event_key: str, user: User) -> None:
         event_key=event_key,
         user=user,
         message=f"{definition.title}. Подробности доступны в личном кабинете.",
-        url="/users/notifications/",
+        url=url or "/users/notifications/",
     )
     _queue_push(note, definition.title, user.pk)
 

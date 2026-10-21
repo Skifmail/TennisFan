@@ -72,6 +72,7 @@ def _send_html_email(
     recipient: str,
     category: str = "",
     timeout_seconds: float | None = None,
+    notification_url: str = "",
 ) -> bool:
     """Отправить HTML-письмо с текстовой fallback-версией.
 
@@ -83,6 +84,7 @@ def _send_html_email(
         recipient (str): Email получателя.
         category (str): Раздел письма для журнала ``OutboundEmail``.
         timeout_seconds: Ограничение ожидания почтового транспорта для фоновых задач.
+        notification_url: Относительный адрес раздела с подробностями для ЛК и push.
 
     Returns:
         bool: ``True`` при успешной отправке, иначе ``False``.
@@ -103,6 +105,7 @@ def _send_html_email(
             from_email=from_email,
             to=[recipient],
             event_key=event_key,
+            notification_url=notification_url,
         )
         if timeout_seconds is not None:
             msg.connection = get_connection(timeout=timeout_seconds)
@@ -884,6 +887,7 @@ def send_training_enrollment_email(enrollment: TrainingEnrollment) -> bool:
         recipient=recipient,
         category="other",
         event_key="training.enrollment",
+        notification_url=reverse("my_trainings"),
     )
 
 

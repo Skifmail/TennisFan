@@ -672,6 +672,11 @@ class FooterSocialLink(models.Model):
         blank=True,
         help_text="Если иконка не загружена: путь относительно static, например images/VK.svg.",
     )
+    requires_disclaimer = models.BooleanField(
+        "Требует сноски *",
+        default=False,
+        help_text="Показать звёздочку у иконки и общий дисклеймер под соцсетями.",
+    )
     order = models.PositiveSmallIntegerField("Порядок", default=0)
 
     class Meta:

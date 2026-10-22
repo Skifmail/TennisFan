@@ -385,9 +385,17 @@
                             {% else %}
                             <span>{{ link.name }}</span>
                             {% endif %}
+                            {% if link.requires_disclaimer %}
+                            <span class="social-link__mark" aria-hidden="true">*</span>
+                            {% endif %}
                         </a>
                         {% endfor %}
                     </div>
+                    {% if footer_social_has_disclaimer %}
+                    <p class="footer-social__disclaimer">
+                        * Meta Platforms Inc. признана экстремистской организацией, её деятельность запрещена на территории Российской Федерации. Instagram принадлежит Meta. Ссылка размещена в информационных целях и не является рекламой социальной сети.
+                    </p>
+                    {% endif %}
                 </div>
             </div>
             <div class="footer-bottom">

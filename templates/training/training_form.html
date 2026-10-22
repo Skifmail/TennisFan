@@ -112,6 +112,9 @@
                 <div class="form-group">
                     <label class="form-label" for="id_image">{{ form.image.label }}</label>
                     {{ form.image }}
+                    <p class="form-hint text-muted" style="font-size: var(--font-size-xs);">
+                        Лучше загружать горизонтальное фото в пропорции 3:2 или 4:3 — так оно аккуратно поместится в карточку и на страницу тренировки.
+                    </p>
                     {% for err in form.image.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
                 </div>
                 <div class="form-group">

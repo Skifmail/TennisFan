@@ -491,7 +491,6 @@ class AdminTrainingForm(VenueSportCheckboxesMixin, forms.ModelForm):
             "schedule",
             "image",
             "is_active",
-            "is_featured",
         )
 
     def __init__(self, *args, **kwargs):

@@ -501,7 +501,6 @@ M2M: турнир ↔ игроки (участники).
 | schedule | text |
 | image | varchar(100) |
 | is_active | bool |
-| is_featured | bool |
 | created_at, updated_at | datetime |
 
 ### training_trainingenrollment

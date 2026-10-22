@@ -11,8 +11,15 @@
     <div class="grid training-detail-grid">
         <div class="training-detail-main">
             {% if training.image %}
-            <img src="{{ training.image.url }}" alt=""
-                style="width: 100%; border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl);">
+            <div class="training-detail__media">
+                <img
+                    src="{{ training.image.url }}"
+                    alt=""
+                    class="training-detail__image"
+                    decoding="async"
+                    fetchpriority="high"
+                >
+            </div>
             {% endif %}
 
             <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">

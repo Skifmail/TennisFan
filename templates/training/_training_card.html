@@ -1,9 +1,22 @@
 <a href="{% url 'training_detail' slug=training.slug %}" class="card training-card">
-    {% if training.image %}
-    <img src="{{ training.image.url }}" alt="" class="card-image">
-    {% else %}
-    <div class="card-image" style="background: linear-gradient(135deg, var(--color-primary-transparent), var(--color-bg-elevated));"></div>
-    {% endif %}
+    <div class="training-card__media">
+        {% if training.image %}
+        <img
+            src="{{ training.image.url }}"
+            alt=""
+            class="training-card__image"
+            loading="lazy"
+            decoding="async"
+        >
+        {% else %}
+        <div class="training-card__placeholder" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="24" cy="24" r="15"></circle>
+                <path d="M10.5 17.5c8 4 19 4 27 0M10.5 30.5c8-4 19-4 27 0"></path>
+            </svg>
+        </div>
+        {% endif %}
+    </div>
     <div class="card-body">
         <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">
             {% for sport_label in training.sports_display %}

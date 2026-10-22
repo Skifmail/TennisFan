@@ -1,0 +1,13 @@
+{% load static %}
+{% if profile_completion_reminder %}
+{{ profile_completion_reminder|json_script:"profile-completion-data" }}
+<dialog id="profile-completion-dialog" aria-labelledby="profile-completion-title" style="max-width:480px; width:calc(100% - 2rem); border:1px solid var(--color-border); border-radius:16px; padding:1.5rem; color:var(--color-text); background:var(--color-bg-secondary, #fff);">
+    <h2 id="profile-completion-title">Завершите заполнение профиля</h2>
+    <p>Можно продолжать смотреть сайт. Для участия в турнирах и спаррингах нужно заполнить обязательные данные, подтвердить почту и указать уровень силы.</p>
+    <p>Осталось заполнить:</p>
+    <ul>{% for field in profile_completion_reminder.fields %}<li>{{ field }}</li>{% endfor %}</ul>
+    <a href="{% url 'profile_edit' %}" class="btn btn-primary">Заполнить профиль</a>
+    <button type="button" class="btn btn-ghost" id="profile-completion-later">Напомнить позже</button>
+</dialog>
+<script defer src="{% static 'js/profile_completion.js' %}"></script>
+{% endif %}

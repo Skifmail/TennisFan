@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from apps.notifications.services import create_notification
 from apps.tournaments.models import Match
+from apps.users.onboarding import ensure_tennis_participants
 
 from .models import (
     DoublesJoinRequest,
@@ -64,6 +65,9 @@ def create_doubles_request(
     sport: str = "tennis",
 ) -> DoublesMatchRequest:
     """Создать заявку на парный матч 2×2. Автор — капитан своей команды, опционально с партнёром."""
+    ensure_tennis_participants(
+        (created_by, partner) if partner else (created_by,), sport or "tennis"
+    )
     with transaction.atomic():
         req = DoublesMatchRequest.objects.create(
             status=DoublesMatchRequestStatus.OPEN,
@@ -137,6 +141,7 @@ def create_join_request(
         if current_in_team + len(players) > 2:
             raise ValueError("В команде не может быть больше 2 человек")
 
+        ensure_tennis_participants(tuple(players), req.sport)
         for p in players:
             if p.id == req.created_by_id and target_side == TeamSide.AUTHOR:
                 raise ValueError("Автор уже в команде")
@@ -210,6 +215,11 @@ def accept_join_request(
         if current_count + len(members_to_add) > 2:
             raise ValueError("В команде не может быть больше 2 человек")
 
+        from apps.users.models import Player
+
+        ensure_tennis_participants(
+            tuple(Player.objects.filter(pk__in=members_to_add)), req.sport
+        )
         for player_id in members_to_add:
             DoublesTeamMember.objects.get_or_create(
                 team=team,
@@ -300,6 +310,9 @@ def add_partner_to_author_team(
         ).exists():
             raise ValueError("Этот игрок уже в одной из команд")
 
+        from apps.users.models import Player
+
+        ensure_tennis_participants((Player.objects.get(pk=player_id),), req.sport)
         DoublesTeamMember.objects.create(
             team=author_team,
             player_id=player_id,
@@ -473,6 +486,10 @@ def _create_doubles_match_from_teams(
     p1_partner = Player.objects.get(pk=a_members[1])
     p2 = Player.objects.get(pk=o_members[0])
     p2_partner = Player.objects.get(pk=o_members[1])
+    ensure_tennis_participants(
+        (p1, p1_partner, p2, p2_partner),
+        team_request.sport if team_request else "tennis",
+    )
 
     rating_status = (
         Match.RatingCalcStatus.NOT_APPLICABLE
@@ -525,6 +542,7 @@ def _create_team_sparring_singles(
         )
 
     players = {p.id: p for p in Player.objects.filter(id__in=[*a_ids, *o_ids])}
+    ensure_tennis_participants(tuple(players.values()), team_request.sport)
     if len(players) != 4:
         raise ValueError("Не удалось загрузить всех игроков для командного спарринга")
 

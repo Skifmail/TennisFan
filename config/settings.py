@@ -214,6 +214,8 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.users.context_processors.unread_notifications",
+                "apps.users.social_context.social_auth",
+                "apps.users.social_context.profile_completion",
                 "apps.users.context_processors.user_is_coach",
                 "apps.navigation.context_processors.nav_menu_items",
                 "apps.core.context_processors.telegram_community_url",
@@ -795,4 +797,21 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {"hosts": [CHAT_REDIS_URL], "prefix": "tennison_chat"},
     }
+}
+
+# Социальный вход включается отдельно для каждого сервиса после регистрации приложения.
+# Callback должен точно совпадать с URI в кабинете Яндекс ID / VK ID.
+SOCIAL_AUTH_PROVIDERS = {
+    key: {
+        "enabled": os.environ.get(f"SOCIAL_{key.upper()}_ENABLED", "False").lower()
+        == "true",
+        "client_id": os.environ.get(f"SOCIAL_{key.upper()}_CLIENT_ID", "").strip(),
+        "client_secret": os.environ.get(
+            f"SOCIAL_{key.upper()}_CLIENT_SECRET", ""
+        ).strip(),
+        "redirect_uri": os.environ.get(
+            f"SOCIAL_{key.upper()}_REDIRECT_URI", ""
+        ).strip(),
+    }
+    for key in ("yandex", "vk")
 }

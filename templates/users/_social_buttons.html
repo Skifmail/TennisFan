@@ -1,0 +1,12 @@
+{% if social_auth_providers %}
+<p class="text-secondary" style="font-size:0.8rem;">Продолжая вход через соцсеть, вы принимаете <a href="{% url 'legal_offer' %}">оферту</a>, <a href="{% url 'legal_privacy' %}">политику конфиденциальности</a> и соглашаетесь на <a href="{% url 'legal_personal_data' %}">обработку персональных данных</a>.</p>
+<div class="social-auth-buttons" aria-label="Вход через соцсети" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
+    {% for provider in social_auth_providers %}
+    <form method="post" action="{% url 'social_start' provider=provider.key %}">
+        {% csrf_token %}
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+        <button type="submit" class="btn btn-outline">Войти через {{ provider.label }}</button>
+    </form>
+    {% endfor %}
+</div>
+{% endif %}

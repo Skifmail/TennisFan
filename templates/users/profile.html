@@ -60,7 +60,7 @@
                                 {% if current_sport == 'padel' and not has_padel_profile %}
                                 <span class="player-category">Уровень не задан</span>
                                 {% else %}
-                                <span class="player-category">{{ player.get_skill_level_display }}</span>
+                                <span class="player-category">{% if player.tennis_entry_level_set or player.matches_played or profile_sport == "padel" %}{{ player.get_skill_level_display }}{% else %}Не указан{% endif %}</span>
                                 {% include 'includes/rating_badge.html' with player=player %}
                                 {% endif %}
                             </div>
@@ -124,7 +124,7 @@
                 <div class="profile-stats-table profile-metrics">
                     <div class="profile-metric">
                         <span class="profile-metric__label">Уровень</span>
-                        <span class="profile-metric__value">{{ player.get_skill_level_display }}</span>
+                        <span class="profile-metric__value">{% if player.tennis_entry_level_set or player.matches_played or profile_sport == "padel" %}{{ player.get_skill_level_display }}{% else %}Не указан{% endif %}</span>
                     </div>
                     {% with rating_changes=player.get_rating_changes %}
                     <div class="profile-metric">
@@ -135,7 +135,7 @@
                             {% elif rating_changes.ntrp.direction == 'down' %}
                                 <span class="rating-badge__arrow rating-badge__arrow--down">↓</span>
                             {% endif %}
-                            <strong class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}" title="После последнего матча{% if rating_changes.ntrp.direction != 'none' %}: {% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta|floatformat:2 }}{% endif %}">{{ player.ntrp_level|floatformat:2 }}</strong>
+                            <strong class="rating-badge__value rating-badge__value--{{ rating_changes.ntrp.direction }}" title="После последнего матча{% if rating_changes.ntrp.direction != 'none' %}: {% if rating_changes.ntrp.direction == 'up' %}+{% endif %}{{ rating_changes.ntrp.delta|floatformat:2 }}{% endif %}">{% if player.tennis_entry_level_set or player.matches_played or profile_sport == "padel" %}{{ player.ntrp_level|floatformat:2 }}{% else %}Не указан{% endif %}</strong>
                         </span>
                     </div>
                     <div class="profile-metric">
@@ -598,7 +598,11 @@
                 {% if request.user == player.user %}
                 <a href="{% url 'profile_edit' %}" class="btn btn-primary mt-3 profile-info__btn-edit profile-info__btn-fullwidth">Редактировать</a>
                 {% if current_sport != 'padel' %}
+                {% if not player.tennis_entry_level_set and not player.matches_played %}
+                <a href="{% url 'profile_edit' %}#initial-strength" class="btn btn-primary mt-2">Указать уровень силы</a>
+                {% else %}
                 <a href="{% url 'ntrp_test' %}" class="btn btn-outline mt-2 profile-info__btn-ntrp profile-info__btn-fullwidth" title="Тест носит информационный характер и не влияет на ваш рейтинг">Проверить уровень силы (информационно)</a>
+                {% endif %}
                 {% endif %}
                 {% endif %}
             </div>

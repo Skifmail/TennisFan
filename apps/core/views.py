@@ -2188,7 +2188,9 @@ def home(request):
     # Получаем топ игроков по сезонным очкам
     from apps.tournaments.season_utils import annotate_season_pts
 
-    rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
+    rating_visibility_filter = (Q(is_verified=True) | ~Q(avatar="")) & (
+        Q(tennis_entry_level_set=True) | Q(matches_played__gt=0)
+    )
     if home_sport == Sport.PADEL:
         from apps.tournaments.models import SportSeasonPoints
         from apps.users.models import PlayerSportProfile
@@ -2397,7 +2399,9 @@ def rating(request):
     current_season = get_current_season()
 
     # Получаем игроков с сезонными очками (исключаем служебного игрока "Свободный круг")
-    rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
+    rating_visibility_filter = (Q(is_verified=True) | ~Q(avatar="")) & (
+        Q(tennis_entry_level_set=True) | Q(matches_played__gt=0)
+    )
     players = (
         Player.objects.filter(is_bye=False)
         .filter(rating_visibility_filter)

@@ -41,6 +41,9 @@ def create_match_from_invitation(invitation: SparringInvitation) -> Match:
     Raises:
         ValueError: Если участники совпадают или данные некорректны.
     """
+    from apps.users.onboarding import ensure_tennis_participants
+
+    ensure_tennis_participants((invitation.inviter, invitation.invitee))
     inviter = invitation.inviter
     invitee = invitation.invitee
     if inviter.id == invitee.id:
@@ -165,6 +168,11 @@ def create_match_from_response(sparring_response) -> Match:
         ValueError: Если данные некорректны
     """
     request = sparring_response.sparring_request
+    from apps.users.onboarding import ensure_tennis_participants
+
+    ensure_tennis_participants(
+        (request.player, sparring_response.respondent), request.sport
+    )
     author = request.player
     respondent = sparring_response.respondent
 

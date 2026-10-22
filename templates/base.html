@@ -239,11 +239,15 @@
     <div class="messages-container">
         <div class="container">
             <div class="alert alert-warning">
+                {% if not user.email %}
+                Укажите email в <a href="{% url 'profile_edit' %}">профиле</a>, чтобы получать уведомления и подтвердить аккаунт.
+                {% else %}
                 Подтвердите email: он нужен для уведомлений платформы и обязателен для участия в турнирах.
                 <form action="{% url 'verify_email_resend' %}" method="post" style="display:inline-block; margin-left: 8px;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-ghost" style="padding: 4px 10px;">Отправить письмо повторно</button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -256,7 +260,7 @@
             <div class="unverified-banner__inner">
                 <span class="unverified-banner__icon" aria-hidden="true">⏳</span>
                 <span class="unverified-banner__text">
-                    Ваш аккаунт ещё не активирован. Заполните профиль (дата рождения) и подтвердите email —
+                    Ваш аккаунт ещё не активирован. Заполните обязательные данные в <a href="{% url 'profile_edit' %}">профиле</a> и подтвердите email —
                     после этого доступ к турнирам, спаррингам и другим активностям откроется автоматически,
                     без ожидания ручной проверки.
                     Также подтверждение приходит автоматически при <a href="{% url 'pricing' %}" style="color: inherit; text-decoration: underline;">оформлении любой подписки</a>.
@@ -484,6 +488,7 @@
         </div>
     </div>
 
+    {% include "users/_completion_reminder.html" %}
     {% block extra_js %}{% endblock %}
 </body>
 

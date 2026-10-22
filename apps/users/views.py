@@ -7,7 +7,7 @@ import json
 import logging
 from datetime import date
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from django.contrib import messages
@@ -255,6 +255,8 @@ def _send_registration_notifications(user, player) -> bool:
         notify_new_registration(user, player)
     except Exception:
         logger.exception("auth: registration telegram notify failed | user=%s", user.pk)
+    if not user.email:
+        return False
     try:
         from apps.core.email_service import send_welcome_email
 
@@ -591,6 +593,65 @@ def _get_profile_progress_data(
     return result
 
 
+def create_registration_profile(
+    request: HttpRequest, user: User, form: UserRegistrationForm
+) -> Player:
+    """Создать профиль, стартовый рейтинг и согласия для любого способа регистрации."""
+    level_decimal = form.cleaned_data["ntrp_level"]
+    if not isinstance(level_decimal, Decimal):
+        level_decimal = Decimal(str(level_decimal))
+    skill = _map_ntrp_to_skill_level(level_decimal)
+    starting_pts = get_starting_points(level_decimal)
+    player = Player.objects.create(
+        user=user,
+        birth_date=form.cleaned_data.get("birth_date"),
+        gender=form.cleaned_data.get("gender") or "",
+        city=form.cleaned_data["city"].strip(),
+        ntrp_level=level_decimal,
+        skill_level=skill,
+        total_points=starting_pts,
+        hidden_rating=float(starting_pts),
+        is_verified=False,  # В рейтинг попадает после модерации или загрузки аватара
+    )
+
+    quiz_raw = form.cleaned_data.get("ntrp_quiz_payload") or ""
+    if quiz_raw:
+        try:
+            quiz_data = json.loads(quiz_raw)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            quiz_data = None
+        if isinstance(quiz_data, dict):
+            NtrpTestResult.objects.create(
+                player=player,
+                source=NtrpTestResult.Source.REGISTRATION,
+                total_score=quiz_data.get("total_score") or None,
+                level=level_decimal,
+                starting_points=float(starting_pts),
+                applied_to_rating=True,
+                answers=quiz_data.get("answers") or [],
+            )
+
+    _log_registration_legal_acceptances(request, user)
+    # record_platform_consent ожидает request.user,
+    # поэтому выставляем его явно до входа в сессию.
+    previous_user = request.user
+    request.user = user
+    try:
+        record_platform_consent(
+            request,
+            str(UserConsent.ConsentType.PLATFORM_OFFER),
+            get_legal_document_version("offer"),
+        )
+        record_platform_consent(
+            request,
+            str(UserConsent.ConsentType.PRIVACY_POLICY),
+            get_legal_document_version("privacy"),
+        )
+    finally:
+        request.user = previous_user
+    return cast(Player, player)
+
+
 @never_cache
 def auth(request):
     """Объединённая страница регистрации и входа с анимацией переключения.
@@ -629,54 +690,8 @@ def auth(request):
                 try:
                     with transaction.atomic():
                         user = register_form.save()
-                        level_decimal = register_form.cleaned_data["ntrp_level"]
-                        if not isinstance(level_decimal, Decimal):
-                            level_decimal = Decimal(str(level_decimal))
-                        skill = _map_ntrp_to_skill_level(level_decimal)
-                        starting_pts = get_starting_points(level_decimal)
-                        player = Player.objects.create(
-                            user=user,
-                            # birth_date заполняется позже в профиле
-                            city=register_form.cleaned_data["city"].strip(),
-                            ntrp_level=level_decimal,
-                            skill_level=skill,
-                            total_points=starting_pts,
-                            hidden_rating=float(starting_pts),
-                            is_verified=False,  # В рейтинг попадает после модерации или загрузки аватара
-                        )
-
-                        quiz_raw = (
-                            register_form.cleaned_data.get("ntrp_quiz_payload") or ""
-                        )
-                        if quiz_raw:
-                            try:
-                                quiz_data = json.loads(quiz_raw)
-                            except (TypeError, ValueError, json.JSONDecodeError):
-                                quiz_data = None
-                            if isinstance(quiz_data, dict):
-                                NtrpTestResult.objects.create(
-                                    player=player,
-                                    source=NtrpTestResult.Source.REGISTRATION,
-                                    total_score=quiz_data.get("total_score") or None,
-                                    level=level_decimal,
-                                    starting_points=float(starting_pts),
-                                    applied_to_rating=True,
-                                    answers=quiz_data.get("answers") or [],
-                                )
-
-                        _log_registration_legal_acceptances(request, user)
-                        # record_platform_consent ожидает request.user,
-                        # поэтому выставляем его явно до входа в сессию.
-                        request.user = user
-                        record_platform_consent(
-                            request,
-                            UserConsent.ConsentType.PLATFORM_OFFER,
-                            get_legal_document_version("offer"),
-                        )
-                        record_platform_consent(
-                            request,
-                            UserConsent.ConsentType.PRIVACY_POLICY,
-                            get_legal_document_version("privacy"),
+                        player = create_registration_profile(
+                            request, user, register_form
                         )
                 except IntegrityError:
                     # Гонка двух одновременных отправок: пользователь уже создан.
@@ -1243,6 +1258,7 @@ def _get_telegram_bot_connection_context(user) -> dict[str, str | bool]:
 
 
 @login_required
+@transaction.atomic
 def profile_edit(request):
     """Отобразить и сохранить настройки профиля пользователя.
 
@@ -1262,11 +1278,17 @@ def profile_edit(request):
     next_url = get_safe_next_url(request)
 
     if request.method == "POST":
+        player = Player.objects.select_for_update().get(pk=player.pk)
         form = PlayerProfileForm(
             request.POST, request.FILES, instance=player, user=request.user
         )
         if form.is_valid():
             form.save()
+            level = form.cleaned_data.get("ntrp_level")
+            if level is not None:
+                from .onboarding import set_initial_strength
+
+                set_initial_strength(player.pk, level)
             player.refresh_from_db()
             try_auto_verify(player)
             messages.success(request, "Профиль обновлён.")
@@ -1372,6 +1394,9 @@ def verify_email_resend(request):
     Returns:
         HttpResponse: Редирект обратно в профиль пользователя.
     """
+    if not request.user.email:
+        messages.info(request, "Сначала укажите email в профиле.")
+        return redirect("profile_edit")
     cache_key = f"verify_email_resend:{request.user.pk}"
     if cache.get(cache_key):
         messages.warning(
@@ -1467,60 +1492,29 @@ def padel_strength(request):
 
 @login_required
 @require_POST
-def save_ntrp(request):
-    """Save strength level ONLY during registration.
-
-    After registration, strength test results cannot be saved.
-    Rating is determined solely by match results.
-    """
-    try:
-        payload = json.loads(request.body.decode("utf-8"))
-    except json.JSONDecodeError:
-        return JsonResponse({"ok": False, "error": "invalid_json"}, status=400)
-
-    raw_level = payload.get("ntrp_level")
-    logger.info("save_ntrp: payload raw_level=%s", raw_level)
-    if raw_level is None:
-        logger.warning("save_ntrp: missing_level")
-        return JsonResponse({"ok": False, "error": "missing_level"}, status=400)
+def save_ntrp(request: HttpRequest) -> JsonResponse:
+    """Однократно сохранить стартовый уровень тенниса после регистрации."""
+    from .onboarding import StrengthAlreadySet, set_initial_strength
 
     try:
-        level = Decimal(str(raw_level))
-    except (InvalidOperation, ValueError) as e:
-        logger.warning("save_ntrp: invalid_level raw=%s err=%s", raw_level, e)
+        payload = json.loads(request.body)
+        if not isinstance(payload, dict):
+            raise ValueError
+        level = Decimal(str(payload.get("ntrp_level", "")).replace(",", "."))
+        player = Player.objects.get(user=request.user)
+    except (ValueError, InvalidOperation, UnicodeDecodeError):
         return JsonResponse({"ok": False, "error": "invalid_level"}, status=400)
-
-    if level < Decimal("1.5") or level > Decimal("7.0"):
-        logger.warning("save_ntrp: out_of_range level=%s", level)
-        return JsonResponse({"ok": False, "error": "out_of_range"}, status=400)
-
-    try:
-        player = request.user.player
     except Player.DoesNotExist:
         return JsonResponse({"ok": False, "error": "player_not_found"}, status=404)
-
-    # CRITICAL: Do not allow saving test results after registration
-    # Rating is determined only by match results after initial registration
-    if player.matches_played > 0:
+    try:
+        set_initial_strength(player.pk, level)
+    except StrengthAlreadySet as exc:
         return JsonResponse(
-            {
-                "ok": False,
-                "error": "test_already_saved",
-                "message": "Тест силы можно пройти только один раз при регистрации. Рейтинг формируется только по результатам матчей.",
-            },
+            {"ok": False, "error": "test_already_saved", "message": str(exc)},
             status=403,
         )
-
-    from .rating_utils import get_starting_points
-
-    player.ntrp_level = level
-    player.skill_level = _map_ntrp_to_skill_level(level)
-    starting_pts = get_starting_points(level)
-    player.total_points = starting_pts
-    player.hidden_rating = float(starting_pts)
-
-    player.save(
-        update_fields=["ntrp_level", "skill_level", "total_points", "hidden_rating"]
-    )
-    logger.info("save_ntrp: ok level=%s", level)
+    except ValueError as exc:
+        return JsonResponse(
+            {"ok": False, "error": "invalid_level", "message": str(exc)}, status=400
+        )
     return JsonResponse({"ok": True, "ntrp_level": f"{level:.2f}"})

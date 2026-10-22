@@ -22,7 +22,7 @@ from .models import FooterSocialLink
 
 PLATFORM_ACTIVITY_UNSEEN_CACHE_PREFIX = "platform_activity_unseen"
 
-FOOTER_SOCIAL_LINKS_CACHE_KEY = "footer_social_links:v1"
+FOOTER_SOCIAL_LINKS_CACHE_KEY = "footer_social_links:v2"
 
 
 def telegram_community_url(request):
@@ -41,7 +41,12 @@ def footer_social_links(request):
         lambda: list(FooterSocialLink.objects.all()),
         timeout=300,
     )
-    return {"footer_social_links": links}
+    return {
+        "footer_social_links": links,
+        "footer_social_has_disclaimer": any(
+            getattr(link, "requires_disclaimer", False) for link in links
+        ),
+    }
 
 
 def search_engine_verification(request):

@@ -6847,7 +6847,7 @@ body.has-fullscreen-loader {
  * Компоненты: .footer, .footer-grid, .footer-club-cta__*, .footer-section__*, .social-link, .footer-bottom
  * Используется на: глобально в базовом шаблоне (подвал сайта)
  * 
- * Последнее обновление: 2026-03 (компактная высота футера)
+ * Последнее обновление: 2026-10 (Instagram и правовая сноска)
  */
 
 /* ==========================================================================
@@ -7413,6 +7413,7 @@ body.has-fullscreen-loader {
 }
 
 .social-link {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -7428,6 +7429,29 @@ body.has-fullscreen-loader {
 .social-link:hover {
     background: var(--color-primary);
     color: var(--color-bg);
+}
+
+.social-link__mark {
+    position: absolute;
+    top: -1px;
+    right: 3px;
+    color: var(--color-primary);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    transition: color var(--transition-fast);
+}
+
+.social-link:hover .social-link__mark {
+    color: var(--color-bg);
+}
+
+.footer-social__disclaimer {
+    max-width: 240px;
+    margin: var(--spacing-sm) 0 0;
+    color: var(--color-text-muted);
+    font-size: 10px;
+    line-height: 1.45;
 }
 
 .social-link svg,
@@ -19102,6 +19126,22 @@ a.home-activity__actor:hover {
     color: var(--color-text-secondary);
 }
 
+/* Компактный вариант для карточек в общем списке. */
+.training-meta--card {
+    gap: var(--spacing-xs) var(--spacing-sm);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.training-meta--card .training-meta__term {
+    align-self: start;
+    padding-top: 0.2rem;
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+}
+
 .training-list-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -19646,6 +19686,19 @@ a.home-activity__actor:hover {
 
     .training-meta__value {
         margin-top: var(--spacing-xs);
+    }
+
+    .training-meta--card {
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .training-meta--card .training-meta__term {
+        margin-top: 0;
+    }
+
+    .training-meta--card .training-meta__value {
+        margin-top: 0;
     }
 }
 

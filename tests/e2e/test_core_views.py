@@ -6,6 +6,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from django.core import mail
+from django.core.cache import cache
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -18,7 +19,7 @@ from apps.clubs.models import (
     ClubMemberRole,
     ClubMemberStatus,
 )
-from apps.core.models import SupportThread
+from apps.core.models import FooterSocialLink, SupportThread
 from apps.tournaments.models import Match, Tournament, TournamentStatus
 from apps.users.models import Player, User
 
@@ -604,3 +605,32 @@ class SupportDialogsFlowTestCase(TestCase):
         self.assertEqual(thread.admin_unread_count, 0)
         self.assertEqual(thread.user_unread_count, 1)
         self.assertEqual(len(mail.outbox), 2)
+
+
+class FooterSocialLinksTestCase(TestCase):
+    """Футер: ссылка на Instagram со сноской и правовым дисклеймером."""
+
+    def setUp(self) -> None:
+        self.client = Client()
+        cache.delete("footer_social_links:v2")
+
+    def test_instagram_link_has_asterisk_and_disclaimer(self) -> None:
+        response = self.client.get(reverse("home"), secure=True)
+
+        self.assertContains(response, "https://www.instagram.com/tennisfan.ru/")
+        self.assertContains(response, "static/images/Instagram.png")
+        self.assertContains(response, "social-link__mark")
+        self.assertContains(response, "признана экстремистской организацией")
+        self.assertContains(
+            response,
+            "Ссылка размещена в информационных целях и не является рекламой социальной сети.",
+        )
+
+    def test_disclaimer_is_hidden_without_flagged_links(self) -> None:
+        FooterSocialLink.objects.update(requires_disclaimer=False)
+        cache.delete("footer_social_links:v2")
+
+        response = self.client.get(reverse("home"), secure=True)
+
+        self.assertNotContains(response, "social-link__mark")
+        self.assertNotContains(response, "признана экстремистской организацией")

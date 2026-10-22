@@ -520,8 +520,8 @@ class UserConsentAdmin(admin.ModelAdmin):
 class FooterSocialLinkAdmin(admin.ModelAdmin):
     """Редактирование ссылок на соцсети в футере: URL и иконка (SVG)."""
 
-    list_display = ("name", "url", "order", "icon", "icon_path")
-    list_editable = ("order",)
+    list_display = ("name", "url", "order", "requires_disclaimer", "icon", "icon_path")
+    list_editable = ("order", "requires_disclaimer")
     list_display_links = ("name", "url")
     search_fields = ("name", "url")
 

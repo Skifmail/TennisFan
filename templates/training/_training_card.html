@@ -18,20 +18,41 @@
         {% endif %}
     </div>
     <div class="card-body">
-        <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">
-            {% for sport_label in training.sports_display %}
-            <span class="player-category">{{ sport_label }}</span>
-            {% endfor %}
-            {% for tt in training.training_types_display %}
-            <span class="player-category">{{ tt }}</span>
-            {% endfor %}
-            {% for sl in training.skill_levels_display %}
-            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ sl }}</span>
-            {% endfor %}
-            {% if training.city %}
-            <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ training.city }}</span>
+        <dl class="training-meta training-meta--card">
+            {% if training.sports_display %}
+            <dt class="training-meta__term">Вид спорта</dt>
+            <dd class="training-meta__value">
+                {% for sport_label in training.sports_display %}
+                <span class="player-category">{{ sport_label }}</span>
+                {% endfor %}
+            </dd>
             {% endif %}
-        </div>
+
+            {% if training.training_types_display %}
+            <dt class="training-meta__term">Тип тренировки</dt>
+            <dd class="training-meta__value">
+                {% for tt in training.training_types_display %}
+                <span class="player-category">{{ tt }}</span>
+                {% endfor %}
+            </dd>
+            {% endif %}
+
+            {% if training.skill_levels_display %}
+            <dt class="training-meta__term">Уровень</dt>
+            <dd class="training-meta__value">
+                {% for sl in training.skill_levels_display %}
+                <span class="player-category player-category--muted">{{ sl }}</span>
+                {% endfor %}
+            </dd>
+            {% endif %}
+
+            {% if training.city %}
+            <dt class="training-meta__term">Город</dt>
+            <dd class="training-meta__value">
+                <span class="player-category player-category--muted">{{ training.city }}</span>
+            </dd>
+            {% endif %}
+        </dl>
         <h3 class="card-title">{{ training.title }}</h3>
         <p class="card-text">{{ training.short_description|default:training.description|truncatewords:15 }}</p>
         {% if training.coach %}

@@ -71,6 +71,22 @@
     color: var(--color-text-secondary);
 }
 
+/* Компактный вариант для карточек в общем списке. */
+.training-meta--card {
+    gap: var(--spacing-xs) var(--spacing-sm);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.training-meta--card .training-meta__term {
+    align-self: start;
+    padding-top: 0.2rem;
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+}
+
 .training-list-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -615,6 +631,19 @@
 
     .training-meta__value {
         margin-top: var(--spacing-xs);
+    }
+
+    .training-meta--card {
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .training-meta--card .training-meta__term {
+        margin-top: 0;
+    }
+
+    .training-meta--card .training-meta__value {
+        margin-top: 0;
     }
 }
 

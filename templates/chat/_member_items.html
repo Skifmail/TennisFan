@@ -1,0 +1,13 @@
+{% for participant in participants %}
+<li class="chat-member">
+    <span class="chat-member-avatar" aria-hidden="true">
+        {% if participant.avatar_url %}<img src="{{ participant.avatar_url }}" alt="" width="42" height="42" loading="lazy">{% elif participant.emoji %}<span class="chat-member-emoji">{{ participant.emoji }}</span>{% else %}{{ participant.initial }}{% endif %}
+    </span>
+    <span class="chat-member-copy">
+        <strong>{{ participant.label }}</strong>
+        <small>{% if participant.is_you %}Вы · {% endif %}{{ participant.role }}</small>
+    </span>
+</li>
+{% empty %}
+<li class="chat-members-empty">В чате пока нет участников.</li>
+{% endfor %}

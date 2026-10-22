@@ -22,6 +22,7 @@ from apps.training.geo import (
     group_training_courts,
     is_moscow_city,
     oblast_area_for_city,
+    order_trainings_by_proximity,
     public_training_cities,
     public_training_cities_label,
     resolve_training_list_geo,
@@ -514,3 +515,51 @@ class MultiCityTrainingFilterTestCase(TestCase):
 
     def test_combined_catalog_cities_are_not_extra(self) -> None:
         self.assertEqual(extra_training_cities(), [])
+
+
+class OrderTrainingsByProximityTestCase(TestCase):
+    """Лента тренировок повторяет порядок спаррингов."""
+
+    def test_local_and_multi_city_training_goes_first(self) -> None:
+        far = Training.objects.create(
+            title="Дальняя тренировка",
+            slug="proximity-far",
+            description="Описание",
+            city="Ростов-на-Дону",
+            type_prices={"individual": 3000},
+        )
+        multi = Training.objects.create(
+            title="Тренировка в Москве и Раменском",
+            slug="proximity-multi",
+            description="Описание",
+            city="Москва, Раменское",
+            type_prices={"individual": 3000},
+        )
+
+        entries = order_trainings_by_proximity(Training.objects.all(), "Раменское")
+
+        self.assertEqual(entries[0], multi)
+        self.assertTrue(entries[0].is_local)
+        self.assertEqual(entries[-1], far)
+        self.assertFalse(entries[-1].is_local)
+
+    def test_guest_order_is_newest_first(self) -> None:
+        old = Training.objects.create(
+            title="Старая тренировка",
+            slug="proximity-old",
+            description="Описание",
+            city="Москва",
+            type_prices={"individual": 3000},
+        )
+        new = Training.objects.create(
+            title="Новая тренировка",
+            slug="proximity-new",
+            description="Описание",
+            city="Ростов-на-Дону",
+            type_prices={"individual": 3000},
+        )
+
+        entries = order_trainings_by_proximity(Training.objects.all(), "")
+
+        self.assertEqual([entry for entry in entries], [new, old])
+        self.assertFalse(any(entry.is_local for entry in entries))

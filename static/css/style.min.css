@@ -19053,6 +19053,35 @@ a.home-activity__actor:hover {
     align-items: stretch;
 }
 
+/* Общая лента: свой город, затем ближайшие города. */
+.training-feed__section {
+    margin-block: var(--spacing-lg);
+}
+
+.training-feed__section--other {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--spacing-lg);
+}
+
+.training-feed__heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.training-feed__heading h2 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    color: var(--color-text-primary);
+}
+
+.training-feed__heading > span {
+    color: var(--color-text-secondary);
+}
+
 .training-list-grid .training-card,
 .training-list-grid .training-card .card-body {
     min-width: 0;

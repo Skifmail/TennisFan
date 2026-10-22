@@ -7,14 +7,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, cast
 
 from django.db.models import QuerySet
 from django.utils.text import slugify
 
 from apps.core.geo import GeoRegion, canonical_area_slug, normalize_geo_text
+from apps.core.locality_proximity import LocalityProximityIndex
 from apps.core.models import GeoArea
 from apps.courts.models import Court
+
+if TYPE_CHECKING:
+    from apps.training.models import Training
 
 MOSCOW_CITY = "Москва"
 OTHER_CITIES_LABEL = "Другие города"
@@ -357,6 +363,60 @@ def filter_trainings_by_city(queryset: QuerySet, city: str) -> QuerySet:
     if not matched_pks:
         return queryset.none()
     return queryset.filter(pk__in=matched_pks)
+
+
+def order_trainings_by_proximity(
+    trainings: Iterable[Training],
+    viewer_city: str,
+) -> list[Training]:
+    """Упорядочить тренировки как ленту спаррингов.
+
+    Сначала идут тренировки в населённом пункте зрителя, затем ближайшие
+    города по координатам и только потом города без координат. Внутри
+    группы новые тренировки выше: тренировка сразу видна после публикации.
+
+    Поле ``city`` может содержать несколько населённых пунктов через запятую,
+    поэтому для него берётся минимальное расстояние и признак совпадения
+    хотя бы с одним городом.
+
+    Args:
+        trainings: Активные тренировки, уже прошедшие фильтры.
+        viewer_city: Населённый пункт зрителя; пустая строка для гостя.
+
+    Returns:
+        list[Training]: Тренировки в порядке показа. У каждой карточки
+        выставлены ``is_local`` и ``distance_km`` для шаблона.
+    """
+    index = LocalityProximityIndex(viewer_city)
+    ranked: list[tuple[tuple[bool, float, float, int], Training]] = []
+
+    for training in trainings:
+        is_local = False
+        distances: list[float] = []
+        for token in training_city_tokens(training.city):
+            proximity = index.get(token)
+            if proximity.is_local:
+                is_local = True
+            if proximity.distance_km is not None:
+                distances.append(proximity.distance_km)
+        distance = min(distances) if distances else None
+        annotated = cast(Any, training)
+        annotated.is_local = is_local
+        annotated.distance_km = distance
+        ranked.append(
+            (
+                (
+                    not is_local,
+                    distance if distance is not None else float("inf"),
+                    -training.created_at.timestamp(),
+                    training.pk,
+                ),
+                training,
+            )
+        )
+
+    ranked.sort(key=lambda row: row[0])
+    return [training for _, training in ranked]
 
 
 def advertised_training_areas() -> list[GeoArea]:

@@ -348,7 +348,6 @@ class Training(CompressImageFieldsMixin, models.Model):
     )
 
     is_active = models.BooleanField("Активно", default=True)
-    is_featured = models.BooleanField("На главной", default=False)
 
     created_at = models.DateTimeField("Создано", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
@@ -356,7 +355,7 @@ class Training(CompressImageFieldsMixin, models.Model):
     class Meta:
         verbose_name = "Тренировка"
         verbose_name_plural = "Тренировки"
-        ordering = ["-is_featured", "-created_at"]
+        ordering = ["-created_at"]
 
     def __str__(self) -> str:
         return str(self.title)

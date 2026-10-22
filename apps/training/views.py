@@ -42,6 +42,7 @@ from .geo import (
     courts_for_training_area,
     courts_for_training_city,
     filter_trainings_by_city,
+    order_trainings_by_proximity,
     public_training_cities_label,
     resolve_training_list_geo,
 )
@@ -75,21 +76,52 @@ def _visible_coaches():
     ).distinct()
 
 
+def _training_viewer_city(request: HttpRequest) -> str:
+    """Вернуть город текущего пользователя для сортировки тренировок.
+
+    Сначала берётся населённый пункт профиля игрока, затем город профиля
+    тренера: тренер тоже смотрит общую ленту.
+
+    Args:
+        request: Текущий запрос.
+
+    Returns:
+        str: Населённый пункт или пустая строка для гостя.
+    """
+    if not request.user.is_authenticated:
+        return ""
+    player = getattr(request.user, "player", None)
+    city = (getattr(player, "city", "") or "").strip()
+    if city:
+        return city
+    coach = getattr(request.user, "coach", None)
+    return (getattr(coach, "city", "") or "").strip()
+
+
 def training_list(request):
-    """Список тренировок. Доступен всем пользователям."""
+    """Список тренировок. Доступен всем пользователям.
+
+    Без фильтра показывает все опубликованные тренировки: сначала в городе
+    пользователя, затем в ближайших городах. Выбранный город или район
+    по-прежнему сужает список.
+    """
     from apps.core.sports import Sport, parse_sport_filter, venue_sport_catalog_values
 
     skill_level = request.GET.get("level", "")
     training_type = request.GET.get("type", "")
     sport_filter = parse_sport_filter(request.GET.get("sport"))
+    city_param = (request.GET.get("city") or "").strip()
+    area_param = (request.GET.get("area") or "").strip()
+    has_geo_filter = bool(city_param or area_param)
     areas = advertised_training_areas()
     geo = resolve_training_list_geo(
-        city=(request.GET.get("city") or "").strip(),
-        area_slug=(request.GET.get("area") or "").strip(),
+        city=city_param,
+        area_slug=area_param,
         areas=areas,
     )
     district = geo.moscow_district
     district_slug = district.slug if district is not None else ""
+    viewer_city = _training_viewer_city(request)
 
     trainings = Training.objects.filter(is_active=True).select_related("coach")
     sport_values = venue_sport_catalog_values(sport_filter)
@@ -101,17 +133,20 @@ def training_list(request):
     if training_type:
         # type_prices — словарь {type: price}, фильтруем по наличию ключа
         trainings = trainings.filter(type_prices__has_key=training_type)
-    trainings = filter_trainings_by_city(trainings, geo.city)
 
     selected_place = None
     selected_courts = ()
-    if geo.show_moscow_zones:
-        if district is not None:
-            selected_place = district
-            selected_courts = courts_for_training_area(district.slug, areas)
+    if has_geo_filter:
+        trainings = filter_trainings_by_city(trainings, geo.city)
+        if geo.show_moscow_zones:
+            if district is not None:
+                selected_place = district
+                selected_courts = courts_for_training_area(district.slug, areas)
+        else:
+            selected_place = TrainingPlace(slug=geo.city, name=geo.city)
+            selected_courts = courts_for_training_city(geo.city, areas)
     else:
-        selected_place = TrainingPlace(slug=geo.city, name=geo.city)
-        selected_courts = courts_for_training_city(geo.city, areas)
+        trainings = order_trainings_by_proximity(trainings, viewer_city)
 
     moscow_zones: list[dict[str, str | bool]] = []
     if geo.show_moscow_zones:
@@ -140,13 +175,15 @@ def training_list(request):
         "current_type": training_type,
         "current_sport": sport_filter,
         "sport_choices": Sport.choices,
-        "current_city": geo.city,
+        "current_city": geo.city if has_geo_filter else "",
         "current_area": district_slug,
         "show_moscow_zones": geo.show_moscow_zones,
         "selected_area": selected_place,
         "selected_courts": selected_courts,
         "training_cities_label": public_training_cities_label(areas),
         "moscow_zones": moscow_zones,
+        "viewer_city": viewer_city,
+        "show_feed_sections": not has_geo_filter,
     }
     return render(request, "training/list.html", context)
 

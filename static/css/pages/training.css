@@ -35,6 +35,42 @@
     object-position: center;
 }
 
+/* Расшифровка тегов под фото: вид спорта, формат, уровни. */
+.training-meta {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--spacing-sm) var(--spacing-lg);
+    margin: 0 0 var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+}
+
+.training-meta__term {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+}
+
+.training-meta__value {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    min-width: 0;
+    margin: 0;
+}
+
+.training-meta .player-category--muted {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-secondary);
+}
+
+.training-meta .player-category--target {
+    background: rgb(92 184 92 / 0.15);
+    color: var(--color-text-secondary);
+}
+
 .training-list-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -561,6 +597,24 @@
     .training-detail__media {
         aspect-ratio: 4 / 3;
         max-height: none;
+    }
+
+    .training-meta {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+        padding: var(--spacing-md);
+    }
+
+    .training-meta__term {
+        margin-top: var(--spacing-sm);
+    }
+
+    .training-meta__term:first-child {
+        margin-top: 0;
+    }
+
+    .training-meta__value {
+        margin-top: var(--spacing-xs);
     }
 }
 

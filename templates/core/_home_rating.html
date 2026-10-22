@@ -9,7 +9,7 @@
         <div class="grid">
             {% for player in top_players %}
             <a href="{% url 'profile' pk=player.pk %}" class="player-card">
-                <span class="player-rank">{{ forloop.counter }}</span>
+                <span class="player-rank" title="Рейтинговый балл: {{ player.rank_score|floatformat:0 }}">{{ forloop.counter }}</span>
                 {% include 'includes/avatar.html' with avatar=player.avatar %}
                 <div class="player-info">
                     <div class="player-info__text">

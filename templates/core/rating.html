@@ -6,7 +6,7 @@
 {% block content %}
 <div class="page-header">
     <h1 class="page-title">Рейтинг игроков</h1>
-    <p class="page-subtitle">Топ игроков по количеству очков за текущий сезон</p>
+    <p class="page-subtitle">Рейтинг по победам, сыгранным матчам и стажу на платформе</p>
 </div>
 
 <div class="container">
@@ -33,6 +33,10 @@
         <button type="submit" class="btn btn-primary rating-filter--submit">Поиск</button>
     </form>
 
+    <p class="text-secondary">
+        Балл = 100 × победы + 1 × матчи + 1 × % побед. При равенстве балла выше тот, кто раньше зарегистрировался на платформе.
+    </p>
+
     <div class="rating-toggle">
         <button type="button" class="btn btn-outline" id="rating-toggle-btn">Показать в виде диаграммы</button>
     </div>
@@ -43,7 +47,7 @@
         <div class="grid">
         {% for player in players %}
         <a href="{% url 'profile' pk=player.pk %}" class="player-card">
-            <span class="player-rank">{{ forloop.counter }}</span>
+            <span class="player-rank" title="Рейтинговый балл: {{ player.rank_score|floatformat:0 }}">{{ forloop.counter }}</span>
             {% include 'includes/avatar.html' with avatar=player.avatar %}
             <div class="player-info">
                 <div class="player-info__text">

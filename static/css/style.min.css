@@ -20368,6 +20368,63 @@ a.home-activity__actor:hover {
 
 /* END shop.css */
 
+/* BEGIN gallery.css */
+
+/*
+ * Страница фотогалереи: карточки с полными превью без обрезки.
+ *
+ * Фотографии приходят с произвольными пропорциями, поэтому изображение
+ * вписывается целиком (`object-fit: contain`) в медиа-блок фиксированной
+ * пропорции, а карточки в ряду выравниваются по высоте.
+ */
+
+.gallery-grid {
+    align-items: stretch;
+}
+
+.gallery-grid > .card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-width: 0;
+}
+
+.gallery-grid .card-image {
+    display: block;
+    flex-shrink: 0;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: contain;
+    object-position: center;
+    background: var(--color-bg-elevated);
+}
+
+.gallery-grid .card-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    min-width: 0;
+}
+
+.gallery-grid .card-title {
+    margin: 0;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.gallery-grid .card-text {
+    margin: 0;
+}
+
+.gallery-grid .gallery-card__date {
+    margin-top: auto;
+    padding-top: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+}
+
+/* END gallery.css */
+
 /* BEGIN rules.css */
 
 /*

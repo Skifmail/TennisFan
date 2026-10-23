@@ -500,6 +500,18 @@ GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip(
 YANDEX_VERIFICATION = os.environ.get("YANDEX_VERIFICATION", "").strip()
 
 # ------------------------------------------------------------------------------
+# АНАЛИТИКА: Яндекс.Метрика
+# ------------------------------------------------------------------------------
+# ID счётчика. Пусто или 0 — счётчик не подключается (local/dev/staging).
+# В base.html счётчик грузится только после согласия пользователя на cookie.
+_yandex_metrika_raw = os.environ.get("YANDEX_METRIKA_ID", "").strip()
+YANDEX_METRIKA_ID: Final = (
+    int(_yandex_metrika_raw)
+    if _yandex_metrika_raw.isdigit() and int(_yandex_metrika_raw) > 0
+    else 0
+)
+
+# ------------------------------------------------------------------------------
 # YANDEX MAPS / GEOCODER
 # ------------------------------------------------------------------------------
 

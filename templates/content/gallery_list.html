@@ -9,36 +9,34 @@
 </div>
 
 <div class="container">
-    <div class="grid grid-3">
+    <div class="grid grid-3 gallery-grid">
         {% for tournament in tournament_galleries %}
         <a href="{% url 'tournament_gallery_detail' slug=tournament.slug %}" class="card">
             {% if tournament.photos.first %}
-            <img src="{{ tournament.photos.first.image.url }}" alt="" class="card-image">
+            <img src="{{ tournament.photos.first.image.url }}" alt="" class="card-image" loading="lazy" decoding="async">
             {% else %}
             <div class="card-image" style="background: var(--color-bg-elevated);"></div>
             {% endif %}
             <div class="card-body">
                 <h3 class="card-title">{{ tournament.name }}</h3>
                 <p class="card-text">{{ tournament.photos.count }} фото</p>
-                <p class="text-muted mt-2" style="font-size: var(--font-size-xs);">{{ tournament.start_date|date:"d.m.Y" }}
-                </p>
+                <p class="text-muted gallery-card__date">{{ tournament.start_date|date:"d.m.Y" }}</p>
             </div>
         </a>
         {% endfor %}
         {% for gallery in galleries %}
         <a href="{% url 'gallery_detail' slug=gallery.slug %}" class="card">
             {% if gallery.cover_image %}
-            <img src="{{ gallery.cover_image.url }}" alt="" class="card-image">
+            <img src="{{ gallery.cover_image.url }}" alt="" class="card-image" loading="lazy" decoding="async">
             {% elif gallery.photos.first %}
-            <img src="{{ gallery.photos.first.image.url }}" alt="" class="card-image">
+            <img src="{{ gallery.photos.first.image.url }}" alt="" class="card-image" loading="lazy" decoding="async">
             {% else %}
             <div class="card-image" style="background: var(--color-bg-elevated);"></div>
             {% endif %}
             <div class="card-body">
                 <h3 class="card-title">{{ gallery.title }}</h3>
                 <p class="card-text">{{ gallery.photos_count }} фото</p>
-                <p class="text-muted mt-2" style="font-size: var(--font-size-xs);">{{ gallery.created_at|date:"d.m.Y" }}
-                </p>
+                <p class="text-muted gallery-card__date">{{ gallery.created_at|date:"d.m.Y" }}</p>
             </div>
         </a>
         {% endfor %}

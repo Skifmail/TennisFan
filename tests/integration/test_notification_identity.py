@@ -228,6 +228,27 @@ def test_push_transport_when_zero_recipients_should_reject(
         )
 
 
+def test_push_transport_when_id_empty_should_reject_as_no_recipients(
+    mocker: MockerFixture,
+) -> None:
+    """Пустой id означает отсутствие живых подписок и разрешает их отключить."""
+    from apps.notifications.infrastructure.push import PushRejectedError, send_push
+
+    response = mocker.Mock(status_code=200)
+    response.json.return_value = {"id": ""}
+    mocker.patch(
+        "apps.notifications.infrastructure.push.requests.post", return_value=response
+    )
+    with pytest.raises(PushRejectedError, match="push_no_recipients"):
+        send_push(
+            subscription_ids=[SUBSCRIPTION],
+            title="Тема",
+            body="Текст",
+            url="https://tennisfan.ru/",
+            key=SUBSCRIPTION,
+        )
+
+
 def test_push_transport_when_recipients_absent_should_accept_id(
     mocker: MockerFixture,
 ) -> None:

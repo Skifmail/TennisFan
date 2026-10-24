@@ -170,6 +170,9 @@ if PROFILING and DEBUG:
 
 MIDDLEWARE = [
     "apps.core.health.HealthMiddleware",
+    # Один origin OneSignal: www-адреса уводятся на канонический домен.
+    # До SecurityMiddleware, чтобы www-хост не зависел от ALLOWED_HOSTS.
+    "apps.core.middleware.CanonicalHostMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     # После WhiteNoise: статика уже сжата, HTML динамических страниц — нет.

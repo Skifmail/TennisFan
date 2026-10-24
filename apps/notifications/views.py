@@ -8,6 +8,7 @@ from typing import Final, cast
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -36,6 +37,10 @@ from .services import center_enabled, preferences
 
 COOKIE_AGE_SECONDS: Final = 1209600
 DEVICE_TOKEN_BYTES: Final = 32
+TEST_PUSH_COOLDOWN_SECONDS: Final = 30
+TEST_PUSH_CACHE_PREFIX: Final = "notifications:test-push:"
+TEST_PUSH_TTL_SECONDS: Final = 600
+TEST_PUSH_RETRY_SECONDS: Final = 15
 
 
 @login_required
@@ -234,6 +239,82 @@ def notification_device(
         },
         status=202 if state.subscription_id else 200,
     )
+
+
+@login_required
+@require_POST
+@never_cache
+def notification_test_push(request: HttpRequest) -> HttpResponse:
+    """Отправляет тестовый push только на подтверждённое устройство пользователя.
+
+    Args:
+        request: JSON с ID подписки, уже подтверждённой коротким кодом.
+
+    Returns:
+        202 при приёме сообщения провайдером, безопасный код отказа иначе.
+    """
+    if not center_enabled() or not settings.ONESIGNAL_REST_API_KEY:
+        return JsonResponse({"error": "disabled"}, status=503)
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict) or not isinstance(
+            data.get("subscriptionId"), str
+        ):
+            raise ValueError
+        subscription_id = uuid.UUID(data["subscriptionId"])
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"error": "invalid_subscription"}, status=400)
+    device = PushDevice.objects.filter(
+        user=request.user,
+        active=True,
+        expires_at__gt=timezone.now(),
+        subscription_id=subscription_id,
+    ).first()
+    if device is None:
+        return JsonResponse({"error": "device_not_found"}, status=409)
+    limit_key = f"{TEST_PUSH_CACHE_PREFIX}{request.user.pk}"
+    if not cache.add(limit_key, 1, timeout=TEST_PUSH_COOLDOWN_SECONDS):
+        response = JsonResponse({"error": "test_rate_limited"}, status=429)
+        response["Retry-After"] = str(TEST_PUSH_COOLDOWN_SECONDS)
+        return response
+    try:
+        send_push(
+            subscription_ids=[str(subscription_id)],
+            title="Проверка уведомлений TennisFan",
+            body=(
+                "Тестовое уведомление. Если вы его видите, push на этом "
+                "устройстве работают."
+            ),
+            url=(
+                settings.ONESIGNAL_SITE_ORIGIN.rstrip("/")
+                + reverse("notifications")
+                + "?settings=1#notification-settings"
+            ),
+            key=str(uuid.uuid4()),
+            ttl_seconds=TEST_PUSH_TTL_SECONDS,
+        )
+    except PushTransportError:
+        logger.warning(
+            "Тестовая push-доставка временно недоступна",
+            user_id=request.user.pk,
+        )
+        response = JsonResponse({"error": "test_unavailable"}, status=503)
+        response["Retry-After"] = str(TEST_PUSH_RETRY_SECONDS)
+        return response
+    except PushRejectedError as exc:
+        if str(exc) == "push_no_recipients":
+            # Устройство больше не принимает push: не оставляем мёртвую привязку.
+            PushDevice.objects.filter(pk=device.pk).update(active=False)
+            logger.warning(
+                "Тестовое устройство отключено после отказа провайдера",
+                user_id=request.user.pk,
+            )
+            return JsonResponse({"error": "device_unreachable"}, status=409)
+        logger.warning(
+            "Тестовая push-доставка отклонена: {error_code}", error_code=str(exc)
+        )
+        return JsonResponse({"error": "test_unavailable"}, status=503)
+    return JsonResponse({"status": "accepted"}, status=202)
 
 
 @login_required

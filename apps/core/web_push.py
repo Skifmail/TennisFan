@@ -18,8 +18,8 @@ ONESIGNAL_DIRECT_SDK_URL: Final = (
     "https://cdn.onesignal.com/sdks/web/v16/"
     f"OneSignalSDK.page.es6.js?v={ONESIGNAL_SDK_VERSION}"
 )
-YANDEX_BROWSER_MARKER: Final = "YaBrowser/"
-IOS_MARKERS: Final = ("iPhone", "iPad", "iPod")
+YANDEX_BROWSER_MARKERS: Final = ("yabrowser", "yandexbrowser")
+IOS_MARKERS: Final = ("iphone", "ipad", "ipod")
 
 WORKER_SCRIPT: Final = (
     'importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");\n'
@@ -40,10 +40,10 @@ def _needs_direct_sdk(request: HttpRequest) -> bool:
     Returns:
         True для Яндекс Браузера на Android и десктопе.
     """
-    user_agent = request.META.get("HTTP_USER_AGENT", "")
-    return YANDEX_BROWSER_MARKER in user_agent and not any(
-        marker in user_agent for marker in IOS_MARKERS
-    )
+    user_agent = request.META.get("HTTP_USER_AGENT", "").lower()
+    if any(marker in user_agent for marker in IOS_MARKERS):
+        return False
+    return any(marker in user_agent for marker in YANDEX_BROWSER_MARKERS)
 
 
 def web_push_context(request: HttpRequest) -> dict[str, object]:
@@ -70,6 +70,7 @@ def web_push_context(request: HttpRequest) -> dict[str, object]:
                 "deviceUrl": reverse("notification_device"),
                 "codeRequestUrl": reverse("notification_code_request"),
                 "codeVerifyUrl": reverse("notification_code_verify"),
+                "testUrl": reverse("notification_test_push"),
             }
         )
     context: dict[str, object] = {

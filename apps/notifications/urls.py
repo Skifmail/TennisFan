@@ -18,4 +18,5 @@ urlpatterns = [
     path("settings/", views.notification_settings, name="notification_settings"),
     path("identity/", views.notification_identity, name="notification_identity"),
     path("device/", views.notification_device, name="notification_device"),
+    path("test/", views.notification_test_push, name="notification_test_push"),
 ]

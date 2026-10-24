@@ -55,6 +55,23 @@ def test_inbox_when_push_state_differs_should_always_offer_settings(
     assert "уведомления в личном кабинете" in html.lower()
 
 
+def test_settings_when_center_enabled_should_offer_test_delivery(
+    client: Client,
+) -> None:
+    """Подключённое устройство можно проверить тестовым push из настроек.
+
+    Args:
+        client: Авторизованный клиент.
+    """
+    client.force_login(User.objects.create_user(email="test-push@example.test"))
+    html = client.get(
+        reverse("notifications"), HTTP_HOST="tennisfan.ru", secure=True
+    ).content.decode()
+    assert 'id="web-push-test"' in html
+    assert "Проверить доставку" in html
+    assert reverse("notification_test_push") in html
+
+
 def test_settings_when_old_link_opened_should_redirect_to_inbox(client: Client) -> None:
     """Старые ссылки ведут в раскрытые настройки единой страницы уведомлений.
 

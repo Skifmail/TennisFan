@@ -92,7 +92,9 @@ def send_push(
         # requests и simplejson могут поднимать разные подклассы ошибки разбора.
         raise PushTransportError("push_invalid_json") from exc
     if not isinstance(payload, dict) or not payload.get("id"):
-        raise PushRejectedError("push_no_reachable_subscriptions")
+        # Пустой id означает, что провайдер не нашёл ни одной живой подписки.
+        # Код совпадает с нулевым recipients, чтобы worker отключил мёртвые адреса.
+        raise PushRejectedError("push_no_recipients")
     recipients = payload.get("recipients")
     if isinstance(recipients, str) and recipients.strip().isdigit():
         recipients = int(recipients.strip())

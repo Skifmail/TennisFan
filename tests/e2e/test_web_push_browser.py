@@ -132,7 +132,7 @@ def test_help_when_controls_rendered_should_describe_yandex_and_chrome(
     help_block = push_page.locator("#web-push-android-help")
     expect(help_block).to_be_visible()
     expect(help_block).to_contain_text("Яндекс Браузер")
-    expect(help_block).to_contain_text("«Сайты» → «Уведомления»")
+    expect(help_block).to_contain_text("«Уведомления от сайтов»")
     expect(help_block).to_contain_text("Google Chrome")
     expect(help_block).to_contain_text("«Разрешения» → «Уведомления»")
 
@@ -184,6 +184,8 @@ def test_subscription_when_user_clicks_should_subscribe_and_allow_opt_out(
     assert push_page.evaluate("window.pushCalls.permission") == 0
     config = push_page.evaluate("window.pushCalls.init[0]")
     assert config["appId"] == APP_ID
+    assert config["serviceWorkerPath"] == "OneSignalSDKWorker.js"
+    assert config["serviceWorkerParam"] == {"scope": "/"}
     assert config["welcomeNotification"]["disable"] is True
     assert config["promptOptions"]["slidedown"]["prompts"][0]["autoPrompt"] is False
     push_page.get_by_role("button", name="Включить уведомления", exact=True).click()

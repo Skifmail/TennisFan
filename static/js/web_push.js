@@ -9,6 +9,8 @@
     const iosHelp = document.getElementById('web-push-ios-help');
     const androidHelp = document.getElementById('web-push-android-help');
     const sdkScript = document.getElementById('onesignal-sdk');
+    const testButton = document.getElementById('web-push-test');
+    const testStatus = document.getElementById('web-push-test-status');
     const SDK_TIMEOUT_MS = 15000;
     const DEFAULT_RETRY_SECONDS = 60;
     const MAX_RETRY_SECONDS = 300;
@@ -103,6 +105,8 @@
             const config = JSON.parse(configElement.textContent);
             await OneSignal.init({
                 appId: config.appId,
+                serviceWorkerPath: 'OneSignalSDKWorker.js',
+                serviceWorkerParam: {scope: '/'},
                 notifyButton: { enable: false },
                 welcomeNotification: { disable: true },
                 // На iOS используем уже открытое окно PWA с переходом по ссылке.
@@ -128,6 +132,9 @@
             const codeSubmit = document.getElementById('web-push-code-submit');
             const codeStatus = document.getElementById('web-push-code-status');
             let codeRetryUntil = 0;
+            let testBusy = false;
+            let testRetryUntil = 0;
+            let testTimer = null;
 
             class BindingError extends Error {
                 constructor(code, httpStatus, retryAfter) {
@@ -261,6 +268,16 @@
                 }
                 status.dataset.state = state;
                 if (badge) badge.hidden = state !== 'connected';
+                if (testButton) {
+                    const canTest = state === 'connected' && Boolean(config.testUrl);
+                    testButton.hidden = !canTest;
+                    testButton.classList.toggle('hidden', !canTest);
+                    testButton.disabled = busy || testBusy || Date.now() < testRetryUntil;
+                    if (testStatus && !canTest && testStatus.dataset.state !== 'error') {
+                        testStatus.textContent = '';
+                        delete testStatus.dataset.state;
+                    }
+                }
                 const remaining = Math.ceil((retryUntil - Date.now()) / SECOND_MS);
                 if (remaining > 0) {
                     button.disabled = true;
@@ -328,6 +345,47 @@
                         }
                     } finally {
                         busy = false;
+                        update();
+                    }
+                });
+            }
+
+            if (testButton && testStatus) {
+                testButton.addEventListener('click', async function () {
+                    if (!config.testUrl || !verifiedSubscriptionId || testBusy) return;
+                    testBusy = true;
+                    testStatus.dataset.state = 'loading';
+                    testStatus.textContent = 'Отправляем тестовое уведомление…';
+                    update();
+                    try {
+                        await api(config.testUrl, {subscriptionId: verifiedSubscriptionId});
+                        testStatus.dataset.state = 'success';
+                        testStatus.textContent = 'Уведомление отправлено. Если оно не появилось в течение минуты, проверьте разрешения и ограничения батареи по инструкции выше.';
+                    } catch (error) {
+                        const retry = error instanceof BindingError ? error.retrySeconds : DEFAULT_RETRY_SECONDS;
+                        if (error instanceof BindingError && error.httpStatus === 429) {
+                            testRetryUntil = Date.now() + retry * SECOND_MS;
+                            testStatus.textContent = 'Не отправляйте тесты слишком часто. Повторите через ' + retry + ' с.';
+                            if (testTimer === null) {
+                                testTimer = window.setInterval(function () {
+                                    if (Date.now() >= testRetryUntil) {
+                                        window.clearInterval(testTimer);
+                                        testTimer = null;
+                                    }
+                                    update();
+                                }, SECOND_MS);
+                            }
+                        } else if (error instanceof BindingError && error.code === 'device_not_found') {
+                            testStatus.textContent = 'Это устройство не найдено среди подтверждённых. Подключите push заново.';
+                        } else if (error instanceof BindingError && error.code === 'device_unreachable') {
+                            testStatus.textContent = 'Устройство больше не принимает push. Подключите его заново.';
+                            verifiedSubscriptionId = null;
+                        } else {
+                            testStatus.textContent = 'Не удалось отправить тестовое уведомление. Проверьте интернет и попробуйте ещё раз.';
+                        }
+                        testStatus.dataset.state = 'error';
+                    } finally {
+                        testBusy = false;
                         update();
                     }
                 });

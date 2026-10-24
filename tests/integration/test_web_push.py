@@ -124,6 +124,18 @@ def test_base_when_enabled_changes_should_conditionally_load_sdk(enabled: bool) 
             "(KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
             ONESIGNAL_PAGE_SDK_URL,
         ),
+        (
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/126.0.0.0 yabrowser/26.8.0.0 "
+            "Mobile Safari/537.36",
+            ONESIGNAL_DIRECT_SDK_URL,
+        ),
+        (
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) YandexBrowser/25.12.0.0 "
+            "Mobile Safari/537.36",
+            ONESIGNAL_DIRECT_SDK_URL,
+        ),
     ],
 )
 def test_base_when_yandex_android_should_load_sdk_without_loader(

@@ -16,10 +16,16 @@ from django.core.paginator import Paginator
 from django.db import models, transaction
 from django.db.models import Count, Min, Prefetch, Q, prefetch_related_objects
 from django.db.models.functions import Lower
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 from loguru import logger as log
 
 from apps.clubs.models import (
@@ -74,6 +80,7 @@ from .landing import (
 from .models import (
     Match,
     MatchResultProposal,
+    SparringDeadlineExtension,
     Tournament,
     TournamentEntryPayment,
     TournamentEntryRefundRequest,
@@ -3636,6 +3643,8 @@ def match_detail(request, pk):
             status=Match.ProposalStatus.PENDING
         ).select_related("proposer")
     )
+    from .sparring_deadlines import can_extend_sparring_deadline
+
     can_view_match_actions = bool(player and player in _match_participants(match))
     result_order_blocker = (
         find_blocking_earlier_tournament_match(match, player)
@@ -3671,6 +3680,14 @@ def match_detail(request, pk):
             "pending_proposals": pending_proposals,
             "can_view_match_actions": can_view_match_actions,
             "can_submit_result": can_submit_result,
+            "can_extend_deadline": can_extend_sparring_deadline(match, player),
+            "deadline_extension_used": bool(
+                player
+                and match.is_sparring()
+                and SparringDeadlineExtension.objects.filter(
+                    match=match, player=player
+                ).exists()
+            ),
             "result_order_block_message": result_order_block_message,
             "next_url": next_url,
             "is_fan": _is_fan(match.tournament),
@@ -3686,6 +3703,24 @@ def match_detail(request, pk):
             ),
         },
     )
+
+
+@login_required
+@require_POST
+def extend_sparring_match_deadline(request: HttpRequest, pk: int) -> HttpResponse:
+    """Продлить спарринговый матч на неделю от имени участника."""
+    from django.core.exceptions import ValidationError
+
+    from .sparring_deadlines import extend_sparring_deadline
+
+    get_object_or_404(Match, pk=pk, match_type=Match.MatchType.SPARRING)
+    try:
+        extend_sparring_deadline(pk, getattr(request.user, "player", None))
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0])
+    else:
+        messages.success(request, "Дедлайн матча продлён на одну неделю.")
+    return redirect("match_detail", pk=pk)
 
 
 @login_required

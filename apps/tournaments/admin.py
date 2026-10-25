@@ -29,6 +29,7 @@ from .models import (
     SeasonArchive,
     SeasonPoints,
     SeasonRating,
+    SparringDeadlineExtension,
     Tournament,
     TournamentAllowedCategory,
     TournamentEntryRefundRequest,
@@ -1874,6 +1875,70 @@ class MatchAdminForm(forms.ModelForm):
         return instance
 
 
+class SparringMatchAdminForm(forms.ModelForm):
+    """Полное управление датами, участниками, статусом и результатом спарринга."""
+
+    class Meta:
+        model = Match
+        fields = "__all__"
+
+    def clean(self) -> dict[str, Any]:
+        """Проверить победителя и исключить турнирный контекст спарринга."""
+        cleaned = cast(dict[str, Any], super().clean())
+        if cleaned.get("tournament"):
+            raise ValidationError("Спарринговый матч не должен относиться к турниру.")
+        winner = cleaned.get("winner")
+        participants = [
+            cleaned.get(name) for name in ("player1", "player2", "partner1", "partner2")
+        ]
+        players = [player for player in participants if player is not None]
+        if len(set(players)) != len(players):
+            raise ValidationError(
+                "Один игрок не может занимать несколько мест в матче."
+            )
+        if winner and winner not in players:
+            raise ValidationError("Победителем должен быть участник матча.")
+        if cleaned.get("status") == Match.MatchStatus.COMPLETED:
+            if not winner:
+                raise ValidationError("Для завершённого матча выберите победителя.")
+            if (
+                cleaned.get("player1_set1") is None
+                or cleaned.get("player2_set1") is None
+            ):
+                raise ValidationError(
+                    "Для завершённого матча укажите счёт первого сета."
+                )
+            for index in (1, 2, 3):
+                if (cleaned.get(f"player1_set{index}") is None) != (
+                    cleaned.get(f"player2_set{index}") is None
+                ):
+                    raise ValidationError("Укажите геймы обеих сторон в каждом сете.")
+            sets1, sets2 = _count_sets_won(cleaned)
+            winner_on_side1 = winner in (
+                cleaned.get("player1"),
+                cleaned.get("partner1"),
+            )
+            if sets1 == sets2 or winner_on_side1 != (sets1 > sets2):
+                raise ValidationError("Счёт не соответствует выбранному победителю.")
+        return cleaned
+
+
+class SparringDeadlineExtensionInline(admin.TabularInline):
+    """Неизменяемая история продлений, использованных участниками."""
+
+    model = SparringDeadlineExtension
+    extra = 0
+    fields = ("player", "old_deadline", "new_deadline", "created_at")
+    readonly_fields = fields
+    can_delete = False
+
+    def has_add_permission(
+        self, request: HttpRequest, obj: Match | None = None
+    ) -> bool:
+        """Запретить ручное добавление использованных продлений."""
+        return False
+
+
 @admin.register(Match)
 class MatchAdmin(admin.ModelAdmin):
     """Admin for Match model."""
@@ -1881,6 +1946,7 @@ class MatchAdmin(admin.ModelAdmin):
     form = MatchAdminForm
     change_form_template = "admin/tournaments/match/change_form.html"
     list_display = (
+        "match_type",
         "tournament",
         "round_name",
         "round_index",
@@ -1895,7 +1961,13 @@ class MatchAdmin(admin.ModelAdmin):
         "status",
         "deadline",
     )
-    list_filter = ("status", "is_consolation", "tournament__city", "tournament")
+    list_filter = (
+        "match_type",
+        "status",
+        "is_consolation",
+        "tournament__city",
+        "tournament",
+    )
     search_fields = (
         "player1__user__first_name",
         "player1__user__last_name",
@@ -1905,6 +1977,11 @@ class MatchAdmin(admin.ModelAdmin):
     raw_id_fields = (
         "player1",
         "player2",
+        "partner1",
+        "partner2",
+        "winner",
+        "sparring_response",
+        "sparring_team_request",
         "team1",
         "team2",
         "court",
@@ -1984,6 +2061,45 @@ class MatchAdmin(admin.ModelAdmin):
         _ADVANCED_FIELDSET,
     )
 
+    def get_form(
+        self,
+        request: HttpRequest,
+        obj: Match | None = None,
+        change: bool = False,
+        **kwargs: Any,
+    ) -> type[forms.ModelForm]:
+        """Выбрать полную форму только для спаррингового матча."""
+        if obj is not None and obj.is_sparring():
+            kwargs["form"] = SparringMatchAdminForm
+        return cast(
+            type[forms.ModelForm],
+            super().get_form(request, obj, change=change, **kwargs),
+        )
+
+    def get_inlines(
+        self, request: HttpRequest, obj: Match | None = None
+    ) -> tuple[type[admin.TabularInline], ...]:
+        """Показать историю продлений только у спаррингов."""
+        return (
+            (SparringDeadlineExtensionInline,)
+            if obj is not None and obj.is_sparring()
+            else ()
+        )
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: Match,
+        form: forms.ModelForm,
+        change: bool,
+    ) -> None:
+        """Сбросить уведомление при переносе и пересчитать изменённый спарринг."""
+        if change and obj.is_sparring():
+            from .sparring_deadlines import prepare_admin_sparring_save
+
+            prepare_admin_sparring_save(obj, set(form.changed_data))
+        super().save_model(request, obj, form, change)
+
     def get_fieldsets(
         self,
         request: Any,
@@ -1998,6 +2114,57 @@ class MatchAdmin(admin.ModelAdmin):
         Returns:
             Кортеж fieldsets Django admin.
         """
+        if obj is not None and obj.is_sparring():
+            return (
+                (
+                    "Спарринговый матч",
+                    {
+                        "fields": (
+                            "match_type",
+                            "sport",
+                            "court",
+                            "round_name",
+                            "deadline",
+                            "scheduled_datetime",
+                            "status",
+                            "completed_datetime",
+                        )
+                    },
+                ),
+                (
+                    "Участники",
+                    {"fields": ("player1", "partner1", "player2", "partner2")},
+                ),
+                (
+                    "Результат",
+                    {
+                        "fields": (
+                            "winner",
+                            ("player1_set1", "player2_set1"),
+                            ("player1_set2", "player2_set2"),
+                            ("player1_set3", "player2_set3"),
+                            "walkover_no_show_side1",
+                            "walkover_no_show_side2",
+                        )
+                    },
+                ),
+                (
+                    "Служебные поля",
+                    {
+                        "classes": ("collapse",),
+                        "fields": (
+                            "sparring_response",
+                            "sparring_team_request",
+                            "deadline_overdue_notified_at",
+                            "rating_status",
+                            "rating_delta_player1",
+                            "rating_delta_player2",
+                            "points_player1",
+                            "points_player2",
+                        ),
+                    },
+                ),
+            )
         if obj is None:
             return self._ADD_FIELDSETS
 
@@ -2034,6 +2201,15 @@ class MatchAdmin(admin.ModelAdmin):
         Returns:
             Имена полей только для чтения.
         """
+        if obj is not None and obj.is_sparring():
+            return (
+                "match_type",
+                "rating_status",
+                "rating_delta_player1",
+                "rating_delta_player2",
+                "points_player1",
+                "points_player2",
+            )
         if obj is None:
             return ()
         readonly: list[str] = [

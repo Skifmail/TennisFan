@@ -1792,6 +1792,35 @@ class MatchResultProposal(models.Model):
         )
 
 
+class SparringDeadlineExtension(models.Model):
+    """Однократное продление дедлайна спарринга конкретным участником."""
+
+    match = models.ForeignKey(
+        Match,
+        on_delete=models.CASCADE,
+        related_name="sparring_deadline_extensions",
+        verbose_name="Матч",
+    )
+    player = models.ForeignKey(
+        Player,
+        on_delete=models.PROTECT,
+        verbose_name="Игрок",
+    )
+    old_deadline = models.DateTimeField("Прежний дедлайн")
+    new_deadline = models.DateTimeField("Новый дедлайн")
+    created_at = models.DateTimeField("Продлено", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Продление спарринга"
+        verbose_name_plural = "Продления спарринга"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["match", "player"],
+                name="unique_sparring_extension_player",
+            ),
+        ]
+
+
 class DeadlineExtensionRequest(models.Model):
     """Запрос участника матча на продление дедлайна (кнопка в Telegram-боте)."""
 

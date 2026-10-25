@@ -436,6 +436,8 @@ def send_match_deadline_reminder_email(
     Returns:
         True, если письмо отправлено.
     """
+    from apps.tournaments.sparring_deadlines import can_extend_sparring_deadline
+
     email = _resolve_user_email(user)
     if not email:
         return False
@@ -455,6 +457,9 @@ def send_match_deadline_reminder_email(
             "tournament": tournament,
             "match": match,
             "days_left": days_left,
+            "can_extend_deadline": can_extend_sparring_deadline(
+                match, getattr(user, "player", None)
+            ),
             "days_label": days_label,
             "deadline_str": deadline_str,
             "player1": match.get_player1_display(),

@@ -31,6 +31,7 @@ from apps.notifications.services import create_notification
 from apps.telegram_bot import notifications as tg
 from apps.telegram_bot import services as bot_services
 from apps.tournaments.models import Match
+from apps.tournaments.sparring_deadlines import can_extend_sparring_deadline
 from apps.tournaments.utils import get_match_participant_users
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,8 @@ def build_deadline_reminder_lk_message(
     tournament_name: str,
     days_left: int,
     deadline_str: str,
+    is_sparring: bool = False,
+    can_extend: bool = False,
 ) -> str:
     """Текст напоминания в личный кабинет (лимит 255 символов).
 
@@ -70,11 +73,22 @@ def build_deadline_reminder_lk_message(
         tournament_name: Название турнира.
         days_left: Осталось дней (1 или 2).
         deadline_str: Дедлайн для отображения.
+        is_sparring: Напоминание о спарринговом матче.
+        can_extend: Доступно ли получателю однократное продление.
 
     Returns:
         Сообщение не длиннее ``LK_MESSAGE_MAX_LEN``.
     """
     left = "1 день" if days_left == 1 else f"{days_left} дня"
+    if is_sparring:
+        extension_hint = (
+            "Продлите на 7 дней один раз в карточке матча. Кнопка «Продлить дедлайн на неделю»."
+            if can_extend
+            else "Для изменения дедлайна обратитесь к администратору."
+        )
+        return (
+            f"Спарринг: до дедлайна осталось {left} ({deadline_str}). {extension_hint}"
+        )
     msg = (
         f"Если матч не сыграют до дедлайна — RT 0:0, дальше проходит кто сильнее по рейтингу (рейтинг не меняется). "
         f"«{tournament_name}»: осталось {left} ({deadline_str}). "
@@ -88,14 +102,13 @@ def build_deadline_reminder_lk_message(
 def _notify_match_participants(match: Match, days_left: int) -> None:
     """Отправить Telegram, ЛК и email участникам одного матча."""
     tg.notify_match_deadline_reminder(match, days_left=days_left)
-    deadline_str = match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else ""
-    tournament_name = match.tournament.name if match.tournament_id else "матч"
-    msg = build_deadline_reminder_lk_message(
-        tournament_name=tournament_name,
-        days_left=days_left,
-        deadline_str=deadline_str,
+    deadline_str = (
+        timezone.localtime(match.deadline).strftime("%d.%m.%Y %H:%M")
+        if match.deadline
+        else ""
     )
-    url = reverse("my_matches")
+    tournament_name = match.tournament.name if match.tournament_id else "матч"
+    url = reverse("match_detail", args=[match.pk])
     base_url = ""
     try:
         from apps.core.email_service import _get_site_base_url
@@ -105,6 +118,15 @@ def _notify_match_participants(match: Match, days_left: int) -> None:
         logger.exception("deadline reminder: base url")
     match_url = f"{base_url}{reverse('match_detail', args=[match.pk])}"
     for user in get_match_participant_users(match):
+        msg = build_deadline_reminder_lk_message(
+            tournament_name=tournament_name,
+            days_left=days_left,
+            deadline_str=deadline_str,
+            is_sparring=match.is_sparring(),
+            can_extend=can_extend_sparring_deadline(
+                match, getattr(user, "player", None)
+            ),
+        )
         try:
             create_notification(
                 user=user, message=msg, url=url, event_key="match.deadline_reminder"

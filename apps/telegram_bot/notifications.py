@@ -614,9 +614,7 @@ def _no_show_penalty_text(match, player) -> str:
             "участника вычтено <b>40 очков</b>."
         )
     if player_no_show:
-        return (
-            "\n\n⚠️ <b>Неявка:</b> из вашего рейтинга силы вычтено " "<b>40 очков</b>."
-        )
+        return "\n\n⚠️ <b>Неявка:</b> из вашего рейтинга силы вычтено <b>40 очков</b>."
     return (
         "\n\nℹ️ Сопернику засчитана неявка: из его рейтинга силы вычтено "
         "<b>40 очков</b>."
@@ -887,9 +885,36 @@ def notify_match_deadline_reminder(match, days_left: int) -> None:
             ],
         ],
     }
+    from django.urls import reverse
+
+    from apps.tournaments.sparring_deadlines import can_extend_sparring_deadline
+
     for user in get_match_participant_users(match):
+        personal_text = text
+        personal_markup = reply_markup
+        if match.is_sparring() and can_extend_sparring_deadline(
+            match, getattr(user, "player", None)
+        ):
+            personal_text += (
+                "\n\nНе успеваете сыграть? Каждый участник может один раз продлить дедлайн "
+                "на 7 дней. Откройте матч на сайте и нажмите «Продлить дедлайн на неделю»."
+            )
+            personal_markup = {
+                "inline_keyboard": [
+                    reply_markup["inline_keyboard"][0],
+                    [
+                        {
+                            "text": "Открыть матч и продлить дедлайн",
+                            "url": f"{_get_site_base_url()}{reverse('match_detail', args=[match.pk])}",
+                        }
+                    ],
+                ],
+            }
         send_to_user_by_user(
-            user, text, reply_markup=reply_markup, event_key="match.deadline_reminder"
+            user,
+            personal_text,
+            reply_markup=personal_markup,
+            event_key="match.deadline_reminder",
         )
 
 

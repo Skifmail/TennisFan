@@ -3,16 +3,25 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
+from typing import Any
+from unittest.mock import patch
+from urllib.parse import urlsplit
 
 from django.core import mail
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
+from apps.notifications.models import Delivery, EventPolicy, NotificationPreference
+from apps.telegram_bot.notifications import notify_match_deadline_reminder
 from apps.tournaments.management.commands.send_deadline_reminders import (
+    _notify_match_participants,
+    build_deadline_reminder_lk_message,
     matches_with_deadline_in_days,
 )
-from apps.tournaments.models import Match, TournamentStatus
+from apps.tournaments.models import Match, SparringDeadlineExtension, TournamentStatus
+from apps.users.models import Notification
 from tests.support.factories import make_player, make_tournament
 
 
@@ -111,3 +120,102 @@ class SparringDeadlineReminderTestCase(TestCase):
         self.assertEqual(recipients, {p1.user.email, p2.user.email})
         body = reminder_mails[0].alternatives[0][0]
         self.assertIn("40", body)
+
+
+@override_settings(
+    NOTIFICATION_CENTER_ENABLED=True,
+    USER_NOTIFICATIONS_EMAIL_ENABLED=True,
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+class SparringExtensionReminderTextTestCase(TestCase):
+    """Почта, ЛК и push объясняют продление только имеющему на него право игроку."""
+
+    def setUp(self) -> None:
+        self.p1 = make_player(email_suffix="hint-p1")
+        self.p2 = make_player(email_suffix="hint-p2")
+        self.match = Match.objects.create(
+            match_type=Match.MatchType.SPARRING,
+            player1=self.p1,
+            player2=self.p2,
+            deadline=_end_of_day_in(1),
+        )
+        EventPolicy.objects.filter(key="match.deadline_reminder").update(
+            push_enabled=True,
+            email_enabled=True,
+            inbox_enabled=True,
+        )
+        for player in (self.p1, self.p2):
+            NotificationPreference.objects.update_or_create(
+                user=player.user,
+                defaults={"push_enabled": True, "email_enabled": True},
+            )
+
+    @patch(
+        "apps.tournaments.management.commands.send_deadline_reminders.tg.notify_match_deadline_reminder"
+    )
+    def test_reminders_include_personal_hint_and_direct_link(
+        self, telegram: Any
+    ) -> None:
+        SparringDeadlineExtension.objects.create(
+            match=self.match,
+            player=self.p1,
+            old_deadline=self.match.deadline - timedelta(days=7),
+            new_deadline=self.match.deadline,
+        )
+        for days in (1, 2):
+            with self.subTest(days=days):
+                mail.outbox.clear()
+                _notify_match_participants(self.match, days)
+                for player, eligible in ((self.p1, False), (self.p2, True)):
+                    note = Notification.objects.filter(
+                        user=player.user, event_key="match.deadline_reminder"
+                    ).latest("pk")
+                    self.assertEqual(
+                        note.url, reverse("match_detail", args=[self.match.pk])
+                    )
+                    self.assertEqual(
+                        "Продлите на 7 дней один раз" in note.message, eligible
+                    )
+                    self.assertLessEqual(len(note.message), 255)
+                    delivery = Delivery.objects.get(notification=note, channel="push")
+                    self.assertEqual(
+                        "Продлите на 7 дней один раз" in delivery.body, eligible
+                    )
+                    self.assertEqual(urlsplit(delivery.url).path, note.url)
+                    email = next(
+                        message
+                        for message in mail.outbox
+                        if player.user.email in message.to
+                    )
+                    self.assertEqual(
+                        "Продлить дедлайн на неделю" in email.body, eligible
+                    )
+                    self.assertIn(note.url, email.alternatives[0][0])
+                    if eligible:
+                        self.assertIn("7 дней", email.body)
+                    else:
+                        self.assertIn("обратитесь к администратору", email.body)
+        self.assertEqual(telegram.call_count, 2)
+
+    def test_tournament_text_does_not_offer_self_extension(self) -> None:
+        message = build_deadline_reminder_lk_message(
+            tournament_name="Турнир",
+            days_left=1,
+            deadline_str="26.10.2026 23:59",
+        )
+        self.assertNotIn("Продлите", message)
+        self.assertIn("RT 0:0", message)
+
+    @patch("apps.telegram_bot.notifications.send_to_user_by_user")
+    @patch("apps.telegram_bot.notifications.bot.is_configured", return_value=True)
+    def test_telegram_reminder_links_to_self_extension(
+        self, configured: Any, send: Any
+    ) -> None:
+        notify_match_deadline_reminder(self.match, days_left=1)
+        self.assertEqual(send.call_count, 2)
+        for call in send.call_args_list:
+            self.assertIn("на 7 дней", call.args[1])
+            rows = call.kwargs["reply_markup"]["inline_keyboard"]
+            self.assertIn(
+                reverse("match_detail", args=[self.match.pk]), rows[1][0]["url"]
+            )

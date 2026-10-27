@@ -1,7 +1,11 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Заявка на добавление стрингера{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/stringer-application.css' %}">
+{% endblock %}
 {% block content %}
-<div class="container" style="max-width: 850px;">
+<div class="container stringer-application">
     <h1 class="page-title">Добавить компанию стрингера</h1>
     <p><a href="{% url 'stringers' %}">← Стрингеры</a></p>
     <p>Заполните сведения о компании. После проверки администратором они появятся в каталоге. Контактное лицо и email доступны только администрации.</p>
@@ -24,14 +28,42 @@
     <form method="post" enctype="multipart/form-data" class="card">
         <div class="card-body">
             {% csrf_token %}
-            {{ form.as_p }}
-            <h2>Фотографии компании</h2>
-            <p>Можно приложить до трёх фотографий, не более 10 МБ каждая.</p>
+            {{ form.non_field_errors }}
+            {% for field in form %}
+            <div class="form-group">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-hidden="true">*</span>{% endif %}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="stringer-application__hint" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+            <section class="stringer-application__photos" aria-labelledby="company-photos-title">
+            <h2 id="company-photos-title">Фотографии компании</h2>
+            <p class="stringer-application__hint">Необязательно. Можно приложить до трёх фотографий, не более 10 МБ каждая.</p>
             {{ photos.management_form }}
             {{ photos.non_form_errors }}
-            {% for photo in photos %}{{ photo.as_p }}{% endfor %}
-            <p>Нажимая «Отправить», вы подтверждаете право представлять компанию и согласие на публикацию её сведений, контактов и фотографий.</p>
-            <button type="submit" class="btn btn-primary">Отправить на утверждение</button>
+            <div class="stringer-application__photo-list">
+                {% for photo in photos %}
+                <fieldset class="stringer-application__photo">
+                    <legend>Фотография {{ forloop.counter }}</legend>
+                    {% for hidden in photo.hidden_fields %}{{ hidden }}{{ hidden.errors }}{% endfor %}
+                    {{ photo.non_field_errors }}
+                    {% for field in photo.visible_fields %}
+                    <div class="form-group">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="stringer-application__hint" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
+                        {{ field.errors }}
+                    </div>
+                    {% endfor %}
+                </fieldset>
+                {% endfor %}
+            </div>
+            </section>
+            <div class="stringer-application__submit">
+                <p class="stringer-application__hint">Нажимая «Отправить на утверждение», вы подтверждаете право представлять компанию и согласие на публикацию её сведений, контактов и фотографий.</p>
+                <button type="submit" class="btn btn-primary">Отправить на утверждение</button>
+            </div>
         </div>
     </form>
     {% endif %}

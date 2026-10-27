@@ -70,6 +70,12 @@ StringerPhotoFormSet: type[
     StringerApplication,
     StringerApplicationPhoto,
     fields=("image", "caption"),
+    widgets={
+        "image": forms.ClearableFileInput(
+            attrs={"class": "form-control", "accept": "image/*"}
+        ),
+        "caption": forms.TextInput(attrs={"class": "form-control"}),
+    },
     extra=3,
     max_num=3,
     validate_max=True,

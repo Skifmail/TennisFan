@@ -1,0 +1,81 @@
+.stringer-application {
+    max-width: 850px;
+}
+
+.stringer-application__hint {
+    margin-top: var(--spacing-sm);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.stringer-application__photos,
+.stringer-application__submit {
+    margin-top: var(--spacing-xl);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+}
+
+.stringer-application__photos h2 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+}
+
+.stringer-application__photo-list {
+    display: grid;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+
+.stringer-application__photo {
+    min-width: 0;
+    margin: 0;
+    padding: var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.stringer-application__photo legend {
+    padding: 0 var(--spacing-sm);
+    font-weight: 600;
+}
+
+.stringer-application__photo .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.stringer-application input[type="file"] {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.stringer-application input[type="file"]::file-selector-button {
+    margin-right: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-card);
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.stringer-application .errorlist {
+    margin: var(--spacing-sm) 0;
+    padding-left: var(--spacing-lg);
+    color: var(--color-text);
+    overflow-wrap: anywhere;
+}
+
+.stringer-application__submit .btn {
+    margin-top: var(--spacing-lg);
+    white-space: normal;
+}
+
+@media (width <= 480px) {
+    .stringer-application__submit .btn {
+        width: 100%;
+    }
+}

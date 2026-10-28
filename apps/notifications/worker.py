@@ -10,6 +10,7 @@ from django.db.models import Q
 from django.utils import timezone
 from loguru import logger
 
+from .device_binding import revoke_devices
 from .domain.catalog import EVENTS
 from .domain.rules import NotificationValidationError, channels_for
 from .infrastructure.email import EventEmail
@@ -192,10 +193,12 @@ def _process(item: Delivery) -> None:
                 # Ни одна из подтверждённых подписок больше не принимает push:
                 # не тратим следующие задания на заведомо мёртвые адреса.
                 try:
-                    PushDevice.objects.filter(
-                        user_id=item.user_id,
-                        subscription_id__in=subscription_ids,
-                    ).update(active=False)
+                    revoked = revoke_devices(
+                        PushDevice.objects.filter(
+                            user_id=item.user_id,
+                            subscription_id__in=subscription_ids,
+                        )
+                    )
                 except Exception:
                     logger.exception(
                         "Не удалось отключить подписки после ответа провайдера",
@@ -205,7 +208,7 @@ def _process(item: Delivery) -> None:
                     logger.warning(
                         "Подписки устройства отключены после ответа провайдера",
                         user_id=item.user_id,
-                        count=len(subscription_ids),
+                        count=revoked,
                     )
             raise
     else:

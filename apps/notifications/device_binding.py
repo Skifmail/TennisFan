@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import secrets
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Final
@@ -16,6 +17,7 @@ from django.utils import timezone
 from apps.users.models import User
 
 from .domain.rules import NotificationError
+from .infrastructure.push import delete_subscription
 from .models import NotificationPreference, PushCodeLimit, PushConfirmation, PushDevice
 from .services import preferences
 
@@ -42,6 +44,30 @@ class ConfirmationThrottled(DeviceBindingError):
     Attributes:
         args: Безопасный код ограничения.
     """
+
+
+def revoke_devices(devices: Iterable[PushDevice]) -> int:
+    """Отключает устройства и удаляет их подписки у провайдера.
+
+    Единая точка отзыва: локальная запись и подписка OneSignal не должны
+    расходиться, иначе удалённое из базы устройство остаётся живым адресом,
+    на который продолжают уходить уведомления.
+
+    Args:
+        devices: Записи, которые больше не должны получать push.
+
+    Returns:
+        Число обработанных записей.
+    """
+    count = 0
+    for device in devices:
+        if device.subscription_id is not None:
+            delete_subscription(str(device.subscription_id))
+        PushDevice.objects.filter(pk=device.pk).update(
+            active=False, subscription_id=None, updated_at=timezone.now()
+        )
+        count += 1
+    return count
 
 
 @dataclass(frozen=True)
@@ -108,9 +134,7 @@ def request_confirmation(
         raise DeviceBindingError("no_identity")
     push_enabled = preferences(user.pk)[0]
     if not active:
-        device.active = False
-        device.subscription_id = None
-        device.save(update_fields=["active", "subscription_id", "updated_at"])
+        revoke_devices([device])
         # Сохраняем requested_at, чтобы отказ не обходил ограничение частоты.
         PushConfirmation.objects.filter(device=device).update(
             token_hash=secrets.token_hex(TOKEN_BYTES), expires_at=timezone.now()
@@ -128,9 +152,7 @@ def request_confirmation(
             push_enabled = True
         return DeviceState(True, push_enabled)
     if device.active:
-        device.active = False
-        device.subscription_id = None
-        device.save(update_fields=["active", "subscription_id", "updated_at"])
+        revoke_devices([device])
     if not enable_account:
         return DeviceState(False, push_enabled)
     now = timezone.now()

@@ -8,7 +8,8 @@ from loguru import logger
 
 from ..domain.rules import NotificationError
 
-API_URL: Final = "https://api.onesignal.com/notifications"
+API_ORIGIN: Final = "https://api.onesignal.com"
+API_URL: Final = f"{API_ORIGIN}/notifications"
 HTTP_TIMEOUT: Final = (3.0, 10.0)
 # Час не переживает ночную паузу телефона: Android-браузер без фонового процесса
 # показывает push только при следующем открытии. 12 часов переживают ночь и при
@@ -163,3 +164,48 @@ def fetch_delivery_stats(provider_id: str) -> dict[str, object]:
     if not isinstance(payload, dict):
         return {"error": "invalid_response"}
     return {key: payload[key] for key in PROVIDER_STAT_KEYS if key in payload}
+
+
+def delete_subscription(subscription_id: str) -> bool:
+    """Удаляет подписку у провайдера, когда устройство отозвано в базе.
+
+    Отзыв только локальной записи оставлял бы в OneSignal живой адрес, на
+    который больше нельзя законно отправлять уведомления. Удаление необратимо,
+    но не мешает браузеру подписаться заново и подтвердить устройство кодом.
+
+    Args:
+        subscription_id: ID подписки, сохранённый при подтверждении устройства.
+
+    Returns:
+        Истина, если подписка удалена или её уже не было у провайдера.
+    """
+    if not settings.ONESIGNAL_REST_API_KEY or not settings.ONESIGNAL_APP_ID:
+        return False
+    try:
+        response = requests.delete(
+            f"{API_ORIGIN}/apps/{settings.ONESIGNAL_APP_ID}"
+            f"/subscriptions/{subscription_id}",
+            headers={"Authorization": f"Key {settings.ONESIGNAL_REST_API_KEY}"},
+            timeout=HTTP_TIMEOUT,
+            allow_redirects=False,
+        )
+    except requests.RequestException:
+        logger.warning(
+            "Не удалось удалить подписку OneSignal: сеть",
+            subscription_id=subscription_id,
+        )
+        return False
+    # 404 означает, что подписки уже нет: цель достигнута без повтора.
+    if response.status_code in (202, 404):
+        logger.info(
+            "Подписка OneSignal удалена",
+            subscription_id=subscription_id,
+            status=response.status_code,
+        )
+        return True
+    logger.warning(
+        "OneSignal отклонил удаление подписки",
+        subscription_id=subscription_id,
+        status=response.status_code,
+    )
+    return False

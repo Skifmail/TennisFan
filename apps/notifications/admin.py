@@ -728,9 +728,10 @@ class PushDeviceAdmin(NotificationAuditAdmin):
         list_display: Владелец, активность и срок привязки.
     """
 
-    list_display = ["user", "active", "expires_at", "updated_at"]
+    list_display = ["user", "active", "subscription_id", "expires_at", "updated_at"]
     list_filter = ["active"]
-    search_fields = ["user__email"]
+    search_fields = ["user__email", "subscription_id"]
+    readonly_fields = ["subscription_id", "external_id"]
     exclude = ["device_hash"]
 
 

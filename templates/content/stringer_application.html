@@ -8,10 +8,14 @@
 <div class="container stringer-application">
     <h1 class="page-title">Добавить компанию стрингера</h1>
     <p><a href="{% url 'stringers' %}">← Стрингеры</a></p>
-    <p>Заполните сведения о компании. После проверки администратором они появятся в каталоге. Контактное лицо и email доступны только администрации.</p>
+    <div class="stringer-application__intro">
+    <h2>Как добавить компанию</h2>
+    <p>Заполните сведения о компании — после проверки они появятся в каталоге. Контактное лицо и email видит только администрация.</p>
     {% if not request.user.is_authenticated %}
     <p>Регистрация не требуется. Укажите email и телефон, чтобы администратор мог связаться с вами.</p>
     {% endif %}
+    <p>Поля со звёздочкой * обязательны. Остальные можно оставить пустыми.</p>
+    </div>
     {% if applications %}
     <div class="card"><div class="card-body">
         <h2>Мои заявки</h2>
@@ -25,12 +29,27 @@
     {% if pending %}
     <p>Ваша заявка находится на рассмотрении. Её статус появится на этой странице.</p>
     {% else %}
-    <form method="post" enctype="multipart/form-data" class="card">
+    <form method="post" enctype="multipart/form-data" class="card" id="stringer-application-form">
         <div class="card-body">
             {% csrf_token %}
+            <div class="stringer-application__errors" id="application-errors" role="alert" tabindex="-1" {% if not form.errors and not photos.errors and not photos.non_form_errors %}hidden{% endif %}>
+                <h2>Заявка не отправлена</h2>
+                <p>Исправьте ошибки в указанных полях и отправьте заявку ещё раз.</p>
+                <ul>
+                    {% for field in form %}{% for error in field.errors %}
+                    <li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ error }}</a></li>
+                    {% endfor %}{% endfor %}
+                    {% for photo in photos %}{% for field in photo.visible_fields %}{% for error in field.errors %}
+                    <li><a href="#{{ field.id_for_label }}">Фотография {{ forloop.parentloop.parentloop.counter }} — {{ field.label }}: {{ error }}</a></li>
+                    {% endfor %}{% endfor %}{% endfor %}
+                </ul>
+                {{ form.non_field_errors }}
+                {{ photos.non_form_errors }}
+                {% if form.errors or photos.errors or photos.non_form_errors %}<p>Текстовые поля сохранены. Если вы выбирали фотографии, выберите их повторно перед отправкой.</p>{% endif %}
+            </div>
             {{ form.non_field_errors }}
             {% for field in form %}
-            <div class="form-group">
+            <div class="form-group{% if field.errors %} has-error{% endif %}">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-hidden="true">*</span>{% endif %}</label>
                 {{ field }}
                 {% if field.help_text %}<div class="stringer-application__hint" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
@@ -48,6 +67,7 @@
                     <legend>Фотография {{ forloop.counter }}</legend>
                     {% for hidden in photo.hidden_fields %}{{ hidden }}{{ hidden.errors }}{% endfor %}
                     {{ photo.non_field_errors }}
+                    <div class="stringer-application__photo-fields">
                     {% for field in photo.visible_fields %}
                     <div class="form-group">
                         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
@@ -56,6 +76,7 @@
                         {{ field.errors }}
                     </div>
                     {% endfor %}
+                    </div>
                 </fieldset>
                 {% endfor %}
             </div>
@@ -68,4 +89,7 @@
     </form>
     {% endif %}
 </div>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'js/stringer-application.js' %}" defer></script>
 {% endblock %}

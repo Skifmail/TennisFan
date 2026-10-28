@@ -4,12 +4,25 @@ from typing import Final
 
 import requests
 from django.conf import settings
+from loguru import logger
 
 from ..domain.rules import NotificationError
 
 API_URL: Final = "https://api.onesignal.com/notifications"
 HTTP_TIMEOUT: Final = (3.0, 10.0)
-PUSH_TTL_SECONDS: Final = 3600
+# Час не переживает ночную паузу телефона: Android-браузер без фонового процесса
+# показывает push только при следующем открытии. 12 часов переживают ночь и при
+# этом не показывают уведомление на следующий день; само задание живёт сутки.
+PUSH_TTL_SECONDS: Final = 43200
+PROVIDER_STAT_KEYS: Final = (
+    "successful",
+    "failed",
+    "errored",
+    "converted",
+    "remaining",
+    "queued_at",
+    "completed_at",
+)
 
 
 class PushTransportError(NotificationError):
@@ -100,7 +113,53 @@ def send_push(
         recipients = int(recipients.strip())
     if isinstance(recipients, bool) or not isinstance(recipients, (int, float)):
         # Часть ответов OneSignal не содержит счётчик; id уже подтверждает приём.
+        logger.info(
+            "OneSignal принял push",
+            provider_id=str(payload["id"]),
+            recipients=None,
+            requested=len(subscription_ids),
+        )
         return str(payload["id"])
     if recipients <= 0:
         raise PushRejectedError("push_no_recipients")
+    logger.info(
+        "OneSignal принял push",
+        provider_id=str(payload["id"]),
+        recipients=int(recipients),
+        requested=len(subscription_ids),
+    )
     return str(payload["id"])
+
+
+def fetch_delivery_stats(provider_id: str) -> dict[str, object]:
+    """Читает у провайдера счётчики доставки уже принятого сообщения.
+
+    Приём сообщения ещё не означает показ на экране: ``successful`` показывает,
+    сколько подписок реально получили push, ``failed`` и ``errored`` — отказы.
+
+    Args:
+        provider_id: ID сообщения из журнала доставки, не ключ идемпотентности.
+
+    Returns:
+        Безопасные счётчики и время обработки либо код ошибки запроса.
+    """
+    if not settings.ONESIGNAL_REST_API_KEY or not settings.ONESIGNAL_APP_ID:
+        return {"error": "not_configured"}
+    try:
+        response = requests.get(
+            f"{API_URL}/{provider_id}",
+            params={"app_id": settings.ONESIGNAL_APP_ID},
+            headers={"Authorization": f"Key {settings.ONESIGNAL_REST_API_KEY}"},
+            timeout=HTTP_TIMEOUT,
+        )
+    except requests.RequestException:
+        return {"error": "unavailable"}
+    if response.status_code != 200:
+        return {"error": f"http_{response.status_code}"}
+    try:
+        payload = response.json()
+    except ValueError:
+        return {"error": "invalid_response"}
+    if not isinstance(payload, dict):
+        return {"error": "invalid_response"}
+    return {key: payload[key] for key in PROVIDER_STAT_KEYS if key in payload}

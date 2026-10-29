@@ -793,7 +793,7 @@ class StringerApplication(models.Model):
 
     applicant: models.ForeignKey[User | None, User | None] = models.ForeignKey(
         "users.User",
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name="Заявитель",

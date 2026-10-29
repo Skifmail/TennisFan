@@ -644,6 +644,10 @@ class SocialAuthFlow(models.Model):
     provider: "models.CharField[str, str]" = models.CharField(
         max_length=20, choices=SocialIdentity.Provider.choices
     )
+    login_only: "models.BooleanField[bool, bool]" = models.BooleanField(default=False)
+    external_provider: "models.CharField[str, str]" = models.CharField(
+        max_length=20, blank=True
+    )
     code_verifier: "models.CharField[str, str]" = models.CharField(max_length=128)
     redirect_uri: "models.URLField[str, str]" = models.URLField(max_length=500)
     next_url: "models.CharField[str, str]" = models.CharField(

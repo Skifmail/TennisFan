@@ -7,7 +7,7 @@ import hashlib
 import re
 import secrets
 from datetime import timedelta
-from typing import cast
+from typing import Any, cast
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -56,7 +56,7 @@ def _flow(request: HttpRequest, *, lock: bool = False) -> SocialAuthFlow:
     flow = queryset.filter(
         state=request.session.get(SESSION_FLOW, ""), expires_at__gt=timezone.now()
     ).first()
-    if flow is None or not flow.legal_acceptance:
+    if flow is None or (not flow.login_only and not flow.legal_acceptance):
         raise SocialAuthError
     return cast(SocialAuthFlow, flow)
 
@@ -69,6 +69,83 @@ def _failure(request: HttpRequest, message: str, next_url: str = "") -> HttpResp
         or get_safe_next_url(request)
         or ("social_connections" if request.user.is_authenticated else "login")
     )
+
+
+def _confirm_consent(
+    request: HttpRequest,
+    provider: str,
+    external_provider: str,
+    *,
+    connect: bool,
+    next_url: str,
+) -> tuple[HttpResponse | None, dict[str, Any]]:
+    """Подтвердить документы только для регистрации или явной привязки."""
+    config = get_provider(provider)
+    try:
+        documents = load_documents()
+    except (OSError, UnicodeError, ValueError):
+        logger.exception("Документы для социального входа недоступны")
+        return _failure(request, "Документы временно недоступны. Попробуйте позже."), {}
+    context = consent_context(
+        request,
+        provider=provider,
+        external_provider=external_provider,
+        connect=connect,
+        next_url=next_url,
+        documents=documents,
+    )
+    submitted = request.method == "POST" and "token" in request.POST
+    form = SocialConsentForm(request.POST) if submitted else build_form(context)
+    if not submitted or not validate_form(form, context):
+        if submitted and form.non_field_errors():
+            errors = list(form.non_field_errors())
+            form = SocialConsentForm({"token": build_form(context)["token"].value()})
+            form.is_valid()
+            for error in errors:
+                form.add_error(None, error)
+        return (
+            render(
+                request,
+                "users/social_consent.html",
+                {
+                    "form": form,
+                    "provider": provider,
+                    "provider_label": {"ok_ru": "Одноклассники", "mail_ru": "Mail"}.get(
+                        external_provider, config.label
+                    ),
+                    "external_provider": external_provider,
+                    "connect": connect,
+                    "register": not connect,
+                    "next_url": next_url,
+                },
+                status=400 if submitted else 200,
+            ),
+            {},
+        )
+    return None, acceptance_snapshot(request, documents, context)
+
+
+@never_cache
+@require_GET
+def registration_consent(request: HttpRequest) -> HttpResponse:
+    """Предложить регистрацию, если проверенный внешний аккаунт ещё не привязан."""
+    if request.user.is_authenticated:
+        return redirect("home")
+    try:
+        flow = _flow(request)
+        if not flow.login_only or not flow.identity.get("subject"):
+            raise SocialAuthError
+    except SocialAuthError:
+        return _failure(request, "Сеанс завершён. Начните вход через соцсеть заново.")
+    response, _ = _confirm_consent(
+        request,
+        flow.provider,
+        flow.external_provider,
+        connect=False,
+        next_url=flow.next_url,
+    )
+    assert response is not None
+    return response
 
 
 @never_cache
@@ -89,43 +166,18 @@ def start(request: HttpRequest, provider: str) -> HttpResponse:
     if not _registration_allowed(request):
         return _failure(request, "Слишком много попыток. Попробуйте позже.")
     next_url = get_safe_next_url(request)[:2000]
-    try:
-        documents = load_documents()
-    except (OSError, UnicodeError, ValueError):
-        logger.exception("Документы для социального входа недоступны")
-        return _failure(request, "Документы временно недоступны. Попробуйте позже.")
-    context = consent_context(
-        request,
-        provider=provider,
-        external_provider=external_provider,
-        connect=connect,
-        next_url=next_url,
-        documents=documents,
+    login_only = (
+        not connect
+        and request.POST.get("process") != "signup"
+        and "token" not in request.POST
     )
-    submitted = "token" in request.POST
-    form = SocialConsentForm(request.POST) if submitted else build_form(context)
-    if not submitted or not validate_form(form, context):
-        if submitted and form.non_field_errors():
-            errors = list(form.non_field_errors())
-            form = SocialConsentForm({"token": build_form(context)["token"].value()})
-            form.is_valid()
-            for error in errors:
-                form.add_error(None, error)
-        return render(
-            request,
-            "users/social_consent.html",
-            {
-                "form": form,
-                "provider": provider,
-                "provider_label": {"ok_ru": "Одноклассники", "mail_ru": "Mail"}.get(
-                    external_provider, config.label
-                ),
-                "external_provider": external_provider,
-                "connect": connect,
-                "next_url": next_url,
-            },
-            status=400 if submitted else 200,
+    snapshot: dict[str, Any] = {}
+    if not login_only:
+        response, snapshot = _confirm_consent(
+            request, provider, external_provider, connect=connect, next_url=next_url
         )
+        if response is not None:
+            return response
     SocialAuthFlow.objects.filter(expires_at__lte=timezone.now()).delete()
     old_state = request.session.pop(SESSION_FLOW, "")
     SocialAuthFlow.objects.filter(state=old_state).delete()
@@ -136,7 +188,9 @@ def start(request: HttpRequest, provider: str) -> HttpResponse:
         code_verifier=verifier,
         redirect_uri=config.redirect_uri,
         next_url=next_url,
-        legal_acceptance=acceptance_snapshot(request, documents, context),
+        legal_acceptance=snapshot,
+        login_only=login_only,
+        external_provider=external_provider,
         connect_user_id=request.user.pk if connect else None,
         expires_at=timezone.now() + timedelta(minutes=15),
     )
@@ -151,7 +205,11 @@ def start(request: HttpRequest, provider: str) -> HttpResponse:
         "response_type": "code",
         "client_id": config.client_id,
         "redirect_uri": config.redirect_uri,
-        "scope": config.scope,
+        "scope": (
+            ("login:info" if provider == "yandex" else "vkid.personal_info")
+            if login_only
+            else config.scope
+        ),
         "state": flow.state,
         "code_challenge": challenge,
         "code_challenge_method": "S256",
@@ -159,9 +217,9 @@ def start(request: HttpRequest, provider: str) -> HttpResponse:
     if external_provider:
         query["provider"] = external_provider
         query["prompt"] = "login"
-    if config.optional_scope:
+    if config.optional_scope and not login_only:
         query["optional_scope"] = config.optional_scope
-    if provider == "yandex":
+    if provider == "yandex" and not login_only:
         query["force_confirm"] = "yes"
     return redirect(f"{config.authorize_url}?{urlencode(query)}")
 
@@ -202,6 +260,7 @@ def callback(request: HttpRequest, provider: str) -> HttpResponse:
                 verifier=flow.code_verifier,
                 state=flow.state,
                 device_id=request.GET.get("device_id", ""),
+                subject_only=flow.login_only,
             )
             linked = (
                 SocialIdentity.objects.select_related("user")
@@ -209,6 +268,8 @@ def callback(request: HttpRequest, provider: str) -> HttpResponse:
                 .first()
             )
             if flow.connect_user_id:
+                if flow.login_only:
+                    raise SocialAuthError
                 user = User.objects.select_for_update().get(pk=flow.connect_user_id)
                 if linked and linked.user_id != user.pk:
                     raise SocialAuthError
@@ -225,7 +286,8 @@ def callback(request: HttpRequest, provider: str) -> HttpResponse:
             if linked:
                 if not linked.user.is_active:
                     raise SocialAuthError
-                record_social_acceptance(flow, linked.user)
+                if not flow.login_only:
+                    record_social_acceptance(flow, linked.user)
                 target = flow.next_url
                 flow.delete()
                 request.session.pop(SESSION_FLOW, None)
@@ -235,6 +297,11 @@ def callback(request: HttpRequest, provider: str) -> HttpResponse:
                     backend="django.contrib.auth.backends.ModelBackend",
                 )
                 return redirect(target or "home")
+            if flow.login_only:
+                # Не сохраняем контакты, фото и остальные поля до отдельного согласия.
+                flow.identity = {"subject": identity["subject"]}
+                flow.save(update_fields=["identity"])
+                return redirect("social_registration_consent")
             identity["email"] = identity.get("email", "").strip().lower()
             if _matching_users(identity):
                 flow.identity = identity
@@ -288,7 +355,7 @@ def signup(request: HttpRequest) -> HttpResponse:
         with transaction.atomic():
             flow = _flow(request, lock=True)
             get_provider(flow.provider)
-            if not flow.identity or flow.connect_user_id:
+            if flow.login_only or not flow.identity or flow.connect_user_id:
                 raise SocialAuthError
             identity = dict(flow.identity)
             matches = _matching_users(identity)
@@ -352,6 +419,8 @@ def _complete_signup(
     request: HttpRequest, flow: SocialAuthFlow, identity: dict[str, str]
 ) -> HttpResponse:
     """Завершить создание аккаунта и погасить сеанс."""
+    if flow.login_only or not flow.legal_acceptance:
+        raise SocialAuthError
     provider = flow.provider
     user, player = register_social_user(request, provider, identity)
     record_social_acceptance(flow, user)

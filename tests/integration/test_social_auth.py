@@ -74,6 +74,7 @@ class SocialAuthTests(TestCase):
 
     def start(self, provider: str = "yandex", **data: str) -> SocialAuthFlow:
         """Начать HTTP-сеанс входа с PKCE."""
+        data.setdefault("process", "signup")
         page = self.client.post(
             reverse("social_start", args=[provider]), data, secure=True
         )
@@ -107,6 +108,128 @@ class SocialAuthTests(TestCase):
                 secure=True,
             )
 
+    def login_flow(self, provider: str = "yandex", **data: str) -> SocialAuthFlow:
+        """Начать обычный вход без регистрационного согласия."""
+        response = self.client.post(
+            reverse("social_start", args=[provider]), data, secure=True
+        )
+        self.assertEqual(response.status_code, 302)
+        query = parse_qs(urlparse(response.url).query)
+        self.assertNotIn("optional_scope", query)
+        self.assertNotIn("force_confirm", query)
+        self.assertEqual(
+            query["scope"],
+            ["login:info" if provider == "yandex" else "vkid.personal_info"],
+        )
+        return SocialAuthFlow.objects.get(state=query["state"][0])
+
+    def test_repeated_login_on_fresh_browsers_never_repeats_consents(self) -> None:
+        self.callback(self.start())
+        user = User.objects.get(email="new@test.local")
+        count = LegalAcceptanceLog.objects.filter(user=user).count()
+        for _ in range(3):
+            self.client = Client()
+            response = self.callback(self.login_flow(next="/tournaments/"))
+            self.assertEqual(response.url, "/tournaments/")
+            self.assertEqual(str(self.client.session["_auth_user_id"]), str(user.pk))
+            self.assertEqual(
+                LegalAcceptanceLog.objects.filter(user=user).count(), count
+            )
+
+    def test_linked_account_login_does_not_depend_on_document_availability(
+        self,
+    ) -> None:
+        user = User.objects.create_user(email="existing-login@test.local")
+        SocialIdentity.objects.create(user=user, provider="yandex", subject="123")
+        with patch(
+            "apps.users.social_views.load_documents", side_effect=OSError
+        ) as documents:
+            response = self.callback(self.login_flow())
+        documents.assert_not_called()
+        self.assertEqual(response.url, reverse("home"))
+        self.assertFalse(LegalAcceptanceLog.objects.filter(user=user).exists())
+
+    def test_vk_ok_and_mail_reuse_existing_identity_without_consents(self) -> None:
+        user = User.objects.create_user(email="vk-login@test.local")
+        SocialIdentity.objects.create(user=user, provider="vk", subject="123")
+        for method in ("", "ok_ru", "mail_ru"):
+            with self.subTest(method=method):
+                self.client = Client()
+                response = self.callback(
+                    self.login_flow("vk", external_provider=method)
+                )
+                self.assertEqual(response.url, reverse("home"))
+                self.assertEqual(
+                    str(self.client.session["_auth_user_id"]), str(user.pk)
+                )
+        self.assertFalse(LegalAcceptanceLog.objects.filter(user=user).exists())
+
+    def test_unknown_login_requests_signup_consent_without_creating_user(self) -> None:
+        flow = self.login_flow("vk", external_provider="mail_ru", next="/tournaments/")
+        response = self.callback(flow)
+        self.assertEqual(response.url, reverse("social_registration_consent"))
+        self.assertEqual(User.objects.count(), self.initial_user_count)
+        self.assertFalse(SocialIdentity.objects.exists())
+        self.assertFalse(LegalAcceptanceLog.objects.exists())
+        flow.refresh_from_db()
+        self.assertEqual(flow.identity, {"subject": "123"})
+        page = self.client.get(response.url, secure=True)
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Регистрация через Mail")
+        self.assertFalse(page.context["form"]["personal_data"].value())
+        self.assertContains(page, 'name="process" value="signup"')
+        self.assertContains(page, 'name="external_provider" value="mail_ru"')
+        self.assertContains(page, 'name="next" value="/tournaments/"')
+        data = {
+            "process": "signup",
+            "external_provider": "mail_ru",
+            "next": "/tournaments/",
+            "token": page.context["form"]["token"].value(),
+            "personal_data": "on",
+            "terms": "on",
+        }
+        response = self.client.post(
+            reverse("social_start", args=["vk"]), data, secure=True
+        )
+        full_flow = SocialAuthFlow.objects.get(
+            state=parse_qs(urlparse(response.url).query)["state"][0]
+        )
+        self.assertFalse(full_flow.login_only)
+        self.assertEqual(self.callback(full_flow).url, "/tournaments/")
+        user = User.objects.get(email="new@test.local")
+        self.assertEqual(LegalAcceptanceLog.objects.filter(user=user).count(), 3)
+
+    def test_login_only_flow_cannot_bypass_registration_consent_through_match_page(
+        self,
+    ) -> None:
+        flow = self.login_flow()
+        self.callback(flow)
+        self.client.post(reverse("social_signup"), {"choice": "no"}, secure=True)
+        self.assertFalse(SocialIdentity.objects.exists())
+        self.assertEqual(User.objects.count(), self.initial_user_count)
+
+    def test_disconnected_account_requires_consent_to_connect_again(self) -> None:
+        user = User.objects.create_user(
+            email="connect-again@test.local", password="StrongPass123!"
+        )
+        SocialIdentity.objects.create(user=user, provider="yandex", subject="123")
+        self.client.force_login(user)
+        self.client.post(reverse("social_disconnect", args=["yandex"]), secure=True)
+        page = self.client.post(
+            reverse("social_start", args=["yandex"]),
+            {"process": "connect"},
+            secure=True,
+        )
+        self.assertEqual(page.status_code, 200)
+        self.assertFalse(page.context["form"]["personal_data"].value())
+
+    def test_registration_consent_requires_the_original_browser_session(self) -> None:
+        flow = self.login_flow()
+        self.callback(flow)
+        response = Client().get(reverse("social_registration_consent"), secure=True)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(User.objects.count(), self.initial_user_count)
+
     def test_registers_and_logs_in_without_form_or_strength(self) -> None:
         flow = self.start(next="/tournaments/")
         response = self.callback(flow)
@@ -134,7 +257,7 @@ class SocialAuthTests(TestCase):
 
     def test_consent_is_required_before_provider_redirect(self) -> None:
         url = reverse("social_start", args=["yandex"])
-        page = self.client.post(url, secure=True)
+        page = self.client.post(url, {"process": "signup"}, secure=True)
         self.assertEqual(page.status_code, 200)
         self.assertFalse(page.context["form"].is_bound)
         self.assertFalse(page.context["form"]["personal_data"].value())
@@ -156,7 +279,7 @@ class SocialAuthTests(TestCase):
         self,
     ) -> None:
         url = reverse("social_start", args=["yandex"])
-        page = self.client.post(url, secure=True)
+        page = self.client.post(url, {"process": "signup"}, secure=True)
         data = {
             "token": page.context["form"]["token"].value(),
             "personal_data": "on",
@@ -174,7 +297,7 @@ class SocialAuthTests(TestCase):
         from apps.users.social_consent import load_documents
 
         url = reverse("social_start", args=["yandex"])
-        page = self.client.post(url, secure=True)
+        page = self.client.post(url, {"process": "signup"}, secure=True)
         data = {
             "token": page.context["form"]["token"].value(),
             "personal_data": "on",
@@ -240,7 +363,7 @@ class SocialAuthTests(TestCase):
 
     def test_used_confirmation_cannot_start_another_flow(self) -> None:
         url = reverse("social_start", args=["yandex"])
-        page = self.client.post(url, secure=True)
+        page = self.client.post(url, {"process": "signup"}, secure=True)
         data = {
             "token": page.context["form"]["token"].value(),
             "personal_data": "on",
@@ -253,7 +376,9 @@ class SocialAuthTests(TestCase):
     def test_documents_unavailable_prevents_authorization(self) -> None:
         with patch("apps.users.social_views.load_documents", side_effect=OSError):
             response = self.client.post(
-                reverse("social_start", args=["yandex"]), secure=True
+                reverse("social_start", args=["yandex"]),
+                {"process": "signup"},
+                secure=True,
             )
         self.assertEqual(response.status_code, 302)
         self.assertFalse(SocialAuthFlow.objects.exists())
@@ -599,6 +724,47 @@ class SocialProviderApiTests(TestCase):
     def response(self, data: object) -> Mock:
         """Подготовить ответ HTTP-клиента."""
         return Mock(json=Mock(return_value=data))
+
+    def test_subject_only_login_does_not_return_profile_fields(self) -> None:
+        for provider, token, profile in (
+            (
+                "yandex",
+                {"access_token": "token"},
+                {
+                    "id": "321",
+                    "default_email": "private@test.local",
+                    "first_name": "Имя",
+                    "birthday": "1990-01-01",
+                },
+            ),
+            (
+                "vk",
+                {"access_token": "token", "state": "state", "user_id": "321"},
+                {
+                    "user": {
+                        "user_id": "321",
+                        "email": "private@test.local",
+                        "phone": "+79991234567",
+                    }
+                },
+            ),
+        ):
+            with (
+                self.subTest(provider=provider),
+                patch(
+                    "apps.users.social_oauth.requests.request",
+                    side_effect=[self.response(token), self.response(profile)],
+                ),
+            ):
+                identity = fetch_identity(
+                    get_provider(provider),
+                    code="code",
+                    verifier="verifier",
+                    state="state",
+                    device_id="device",
+                    subject_only=True,
+                )
+            self.assertEqual(identity, {"subject": "321"})
 
     def test_yandex_fetches_profile_with_server_token(self) -> None:
         with patch(

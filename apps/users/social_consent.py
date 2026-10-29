@@ -128,7 +128,7 @@ def acceptance_snapshot(
         "user_agent": request.META.get("HTTP_USER_AGENT", "")[:2000],
         "provider": context["provider"],
         "external_provider": context["external_provider"],
-        "action": "connect" if context["connect_user_id"] else "login_or_signup",
+        "action": "connect" if context["connect_user_id"] else "signup",
         "personal_data_checked": True,
         "terms_checked": True,
     }

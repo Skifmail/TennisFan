@@ -330,11 +330,11 @@ select.form-control option:hover {
     margin-top: var(--spacing-lg);
 }
 
-/* Ошибка входа — выше логотипа, не перекрывается им */
+/* Ошибка входа — над полями формы */
 .auth-form.login form .alert.alert-error {
     position: relative;
     z-index: 2;
-    margin-bottom: calc(7 * var(--spacing-lg));
+    margin-bottom: var(--spacing-md);
 }
 
 .auth-login-logo {

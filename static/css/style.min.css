@@ -2512,11 +2512,11 @@ select.form-control option:hover {
     margin-top: var(--spacing-lg);
 }
 
-/* Ошибка входа — выше логотипа, не перекрывается им */
+/* Ошибка входа — над полями формы */
 .auth-form.login form .alert.alert-error {
     position: relative;
     z-index: 2;
-    margin-bottom: calc(7 * var(--spacing-lg));
+    margin-bottom: var(--spacing-md);
 }
 
 .auth-login-logo {
@@ -11137,6 +11137,198 @@ a.match-details-value__lead:hover {
     color: var(--color-text);
 }
 
+/* Контент формы входа: логотип, соцсети и форма держатся вместе по центру */
+.auth-login-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin: auto 0;
+}
+
+.auth-login-content > form {
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* ==========================================================================
+   Social auth: брендированные кнопки Яндекс / ВКонтакте / Одноклассники / Mail.ru
+   ========================================================================== */
+.social-auth {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    flex-shrink: 0;
+}
+
+.social-auth__legal {
+    margin: var(--spacing-sm) 0 0;
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+}
+
+.social-auth__legal a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.social-auth__legal a:hover {
+    color: var(--color-text);
+}
+
+.social-auth-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-sm);
+}
+
+.social-auth-buttons form {
+    width: 100%;
+    margin: 0;
+}
+
+/* Общие правила auth-форм добавляют отступ кнопке — здесь он не нужен */
+.auth-form.login .social-auth-buttons form button[type="submit"],
+.auth-form.register .social-auth-buttons form button[type="submit"] {
+    margin-top: 0;
+}
+
+.social-auth-btn {
+    --social-color: #07f;
+    --social-color-dark: #0053c4;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 12px;
+    border: 1px solid rgb(255 255 255 / 18%);
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, var(--social-color) 0%, var(--social-color-dark) 100%);
+    color: #fff;
+    font-family: var(--font-family);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    box-shadow:
+        0 6px 16px rgb(0 0 0 / 28%),
+        inset 0 1px 0 rgb(255 255 255 / 22%);
+    transition:
+        transform var(--transition-fast),
+        box-shadow var(--transition-fast),
+        filter var(--transition-fast);
+}
+
+.social-auth-btn:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+    box-shadow:
+        0 10px 22px rgb(0 0 0 / 34%),
+        inset 0 1px 0 rgb(255 255 255 / 26%);
+}
+
+.social-auth-btn:active {
+    filter: brightness(0.95);
+    transform: translateY(0);
+}
+
+.social-auth-btn:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.social-auth-btn--vk {
+    --social-color: #07f;
+    --social-color-dark: #0053c4;
+}
+
+.social-auth-btn--yandex {
+    --social-color: #fc3f1d;
+    --social-color-dark: #c62c10;
+}
+
+.social-auth-btn--ok {
+    --social-color: #ee8208;
+    --social-color-dark: #c96500;
+}
+
+.social-auth-btn--mail {
+    --social-color: #005ff9;
+    --social-color-dark: #0043b8;
+}
+
+.social-auth-btn__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 25%);
+}
+
+.social-auth-btn__icon svg {
+    width: 13px;
+    height: 13px;
+    fill: var(--social-color);
+}
+
+.social-auth-btn--yandex .social-auth-btn__icon svg {
+    width: 8px;
+    height: 14px;
+}
+
+.social-auth-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    max-width: 400px;
+    margin: var(--spacing-md) auto var(--spacing-sm);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.social-auth-divider::before,
+.social-auth-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgb(166 130 74 / 40%), transparent);
+}
+
+.social-auth-divider > span {
+    white-space: nowrap;
+}
+
+.auth-club-link {
+    margin: var(--spacing-md) 0 0;
+    font-size: var(--font-size-sm);
+    text-align: center;
+}
+
+@media (width <= 380px) {
+    .social-auth-buttons {
+        gap: 6px;
+    }
+
+    .social-auth-btn {
+        gap: 6px;
+        padding: 8px 6px;
+        font-size: var(--font-size-xs);
+    }
+}
+
+
 .auth-wrapper {
     width: 100%;
     max-width: 100%;
@@ -11213,8 +11405,7 @@ a.match-details-value__lead:hover {
 .auth-login-logo {
     display: block;
     text-align: center;
-    margin-bottom: var(--spacing-md);
-    margin-top: calc(-6 * var(--spacing-lg));
+    margin: 0 auto var(--spacing-lg);
     width: 100%;
     perspective: 1000px;
     perspective-origin: center center;
@@ -11223,8 +11414,8 @@ a.match-details-value__lead:hover {
 /* Объемная монета с логотипом */
 .auth-login-logo .coin {
     position: relative;
-    width: 250px;
-    height: 250px;
+    width: 120px;
+    height: 120px;
     margin: 0 auto;
     transform-style: preserve-3d;
     transform-origin: 50% 50% 0;

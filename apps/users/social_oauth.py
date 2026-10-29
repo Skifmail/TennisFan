@@ -90,7 +90,13 @@ def _request_json(method: str, url: str, **kwargs: Any) -> dict[str, Any]:
 
 
 def fetch_identity(
-    provider: Provider, *, code: str, verifier: str, state: str, device_id: str = ""
+    provider: Provider,
+    *,
+    code: str,
+    verifier: str,
+    state: str,
+    device_id: str = "",
+    subject_only: bool = False,
 ) -> dict[str, str]:
     """Обменять одноразовый код с PKCE и запросить профиль по полученному токену."""
     payload = {
@@ -142,6 +148,8 @@ def fetch_identity(
         or len(str(subject)) > 255
     ):
         raise SocialAuthError
+    if subject_only:
+        return {"subject": str(subject)}
     phone = profile.get("phone")
     avatar_url = profile.get("avatar") or profile.get("photo_200") or ""
     if provider.key == "yandex":

@@ -26,7 +26,7 @@
 
             <!-- Форма регистрации (справа), два этапа -->
             <div class="auth-form register {% if active_mode == 'register' %}active{% endif %}">
-                {% include "users/_social_buttons.html" %}
+                {% include "users/_social_buttons.html" with social_process="signup" %}
                 <div class="social-auth-divider"><span>или зарегистрируйтесь по email</span></div>
                 <form method="post" id="register-form" class="register-form-layout register-form-steps" novalidate data-loader-overlay autocomplete="on">
                     {% csrf_token %}

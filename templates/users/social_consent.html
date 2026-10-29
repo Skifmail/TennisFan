@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}{% if connect %}Подключить{% else %}Вход через{% endif %} {{ provider_label }}{% endblock %}
+{% block title %}{% if connect %}Подключить{% elif register %}Регистрация через{% else %}Вход через{% endif %} {{ provider_label }}{% endblock %}
 {% block content %}
 <section class="social-consent" aria-labelledby="social-consent-title">
     <div class="social-consent__card">
@@ -8,7 +8,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 3v6c0 5-8 9-8 9S4 17 4 12V6l8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>
             </span>
             <p class="social-consent__eyebrow">{% if connect %}Новый способ входа{% else %}Вход в TennisFan / TennisTop{% endif %}</p>
-            <h1 id="social-consent-title" class="social-consent__title">{% if connect %}Подключить{% else %}Вход через{% endif %} {{ provider_label }}</h1>
+            <h1 id="social-consent-title" class="social-consent__title">{% if connect %}Подключить{% elif register %}Регистрация через{% else %}Вход через{% endif %} {{ provider_label }}</h1>
             <p class="social-consent__intro">Ознакомьтесь с документами и подтвердите свой выбор перед переходом в сервис.</p>
         </header>
 
@@ -29,6 +29,7 @@
         <form method="post" action="{% url 'social_start' provider=provider %}" class="social-consent__form">
             {% csrf_token %}
             {{ form.token }}
+            {% if register %}<input type="hidden" name="process" value="signup">{% endif %}
             {% if connect %}<input type="hidden" name="process" value="connect">{% endif %}
             {% if external_provider %}<input type="hidden" name="external_provider" value="{{ external_provider }}">{% endif %}
             {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}

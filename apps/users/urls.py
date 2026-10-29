@@ -10,6 +10,11 @@ from apps.notifications.auth_forms import NotificationPasswordResetForm
 from . import social_views, views
 
 urlpatterns = [
+    path(
+        "social/register/consent/",
+        social_views.registration_consent,
+        name="social_registration_consent",
+    ),
     path("password/set/", social_views.set_password, name="social_set_password"),
     path("social/connections/", social_views.connections, name="social_connections"),
     path("social/signup/", social_views.signup, name="social_signup"),

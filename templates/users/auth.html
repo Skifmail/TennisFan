@@ -3,6 +3,13 @@
 
 {% block title %}{% if active_mode == 'login' %}Вход{% else %}Регистрация{% endif %}{% endblock %}
 
+{% block extra_css %}
+<style>
+.social-auth-buttons { width: 100%; flex-shrink: 0; }
+.auth-form .social-auth-buttons form { flex: 1; width: auto; margin: 0; }
+.auth-form .social-auth-buttons button[type="submit"] { width: 100%; margin-top: 0; }
+</style>
+{% endblock %}
 {% block content %}
 <div class="auth-wrapper">
     <div class="auth-page">
@@ -26,6 +33,7 @@
 
             <!-- Форма регистрации (справа), два этапа -->
             <div class="auth-form register {% if active_mode == 'register' %}active{% endif %}">
+                {% include "users/_social_buttons.html" %}
                 <form method="post" id="register-form" class="register-form-layout register-form-steps" novalidate data-loader-overlay autocomplete="on">
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="register">
@@ -210,6 +218,7 @@
 
             <!-- Форма входа (слева) -->
             <div class="auth-form login {% if active_mode == 'login' %}active{% endif %}">
+                {% include "users/_social_buttons.html" %}
                 <form method="post" class="auth-login-form" data-loader-overlay autocomplete="on">
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="login">

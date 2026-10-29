@@ -188,7 +188,21 @@ def _padel_entry_redirect(
     )
 
     if sport_code(sport or Sport.TENNIS) != Sport.PADEL:
-        return None
+        from apps.users.onboarding import STRENGTH_REQUIRED, tennis_strength_set
+
+        if tennis_strength_set(player):
+            return None
+        if as_json:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": STRENGTH_REQUIRED,
+                    "redirect": reverse("profile_edit"),
+                },
+                status=403,
+            )
+        messages.warning(request, STRENGTH_REQUIRED)
+        return redirect("profile_edit")
     if padel_entry_complete(player):
         return None
     if as_json:
@@ -1304,6 +1318,10 @@ def sparring_invite(request):
         messages.error(request, "Заполните профиль игрока.")
         return redirect("profile_edit")
 
+    blocked = _padel_entry_redirect(request, player, "tennis")
+    if blocked is not None:
+        return blocked
+
     search_query = (request.GET.get("q") or request.POST.get("return_q") or "").strip()
     search_results: list[Player] = []
     selected_player = None
@@ -1414,6 +1432,8 @@ def sparring_my_invitations(request):
 
 @require_POST
 @login_required
+@require_filled_profile
+@require_verified_player
 def sparring_invitation_accept(request, pk):
     """Принять приглашение на спарринг (приглашённый игрок)."""
     if not user_has_sparring_access(request.user):

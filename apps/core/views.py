@@ -2190,6 +2190,10 @@ def home(request):
     from apps.users.ranking import order_by_ranking
 
     rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
+    if home_sport != Sport.PADEL:
+        rating_visibility_filter &= Q(tennis_entry_level_set=True) | Q(
+            matches_played__gt=0
+        )
     rating_players = (
         Player.objects.filter(
             is_bye=False,
@@ -2398,6 +2402,10 @@ def rating(request):
 
     # Получаем игроков с сезонными очками (исключаем служебного игрока "Свободный круг")
     rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
+    if rating_sport != Sport.PADEL:
+        rating_visibility_filter &= Q(tennis_entry_level_set=True) | Q(
+            matches_played__gt=0
+        )
     players = (
         Player.objects.filter(is_bye=False)
         .filter(rating_visibility_filter)

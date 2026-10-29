@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Подключённые соцсети{% endblock %}
+{% block content %}
+<div class="container" style="max-width:650px; padding-top:2rem; padding-bottom:2rem;">
+    <h1>Подключённые соцсети</h1>
+    <p class="text-secondary">Подключите соцсеть, чтобы входить в этот аккаунт и сохранять свои матчи, рейтинг и подписку.</p>
+    {% for provider in providers %}
+    <div class="card" style="margin-bottom:1rem;">
+        <div class="card-body">
+            <h2>{% if provider.key == "vk" %}VK ID (VK, Одноклассники и Mail){% else %}{{ provider.label }}{% endif %}</h2>
+            {% if provider.linked %}
+            <p>Подключён{% if not provider.available %}. Вход через этот сервис временно недоступен{% endif %}</p>
+            <form method="post" action="{% url 'social_disconnect' provider=provider.key %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline">Отключить {{ provider.label }}</button>
+            </form>
+            {% else %}
+            <form method="post" action="{% url 'social_start' provider=provider.key %}">
+                {% csrf_token %}
+                <input type="hidden" name="process" value="connect">
+                <button type="submit" class="btn btn-primary">Подключить {{ provider.label }}</button>
+            </form>
+            {% if provider.key == "vk" %}
+            <form method="post" action="{% url 'social_start' provider='vk' %}" style="margin-top:0.5rem;">
+                {% csrf_token %}
+                <input type="hidden" name="process" value="connect">
+                <button name="external_provider" value="ok_ru" class="btn btn-outline">Подключить через Одноклассники</button>
+                <button name="external_provider" value="mail_ru" class="btn btn-outline">Подключить через Mail</button>
+            </form>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <p>Вход через соцсети пока не подключён на платформе.</p>
+    {% endfor %}
+    {% if not social_password_available %}
+    <p>Вы зарегистрировались через соцсеть. <a href="{% url 'social_set_password' %}">Задайте пароль в личном кабинете</a>, чтобы также входить по email.</p>
+    {% if not request.user.email_verified %}
+    <p>Для добавления пароля сначала подтвердите свой email.</p>
+    <form method="post" action="{% url 'verify_email_resend' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline">Отправить письмо подтверждения</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    <a href="{% url 'profile_edit' %}" class="btn btn-ghost">Вернуться в профиль</a>
+</div>
+{% endblock %}

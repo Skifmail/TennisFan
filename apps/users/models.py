@@ -2,6 +2,7 @@
 Custom User model with phone and email authentication.
 """
 
+from datetime import datetime
 from typing import cast
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
@@ -51,7 +52,7 @@ class User(AbstractUser):
     """Custom User model with email as username."""
 
     username = None
-    email = models.EmailField("Email", unique=True)
+    email = models.EmailField("Email", unique=True, null=True, blank=True)
     phone = models.CharField("Телефон", max_length=20, blank=True)
     email_verified = models.BooleanField("Email подтвержден", default=True)
 
@@ -180,6 +181,9 @@ class Player(CompressImageFieldsMixin, models.Model):
     matches_played = models.PositiveIntegerField("Сыграно матчей", default=0)
     matches_won = models.PositiveIntegerField("Побед", default=0)
 
+    tennis_entry_level_set: "models.BooleanField[bool, bool]" = models.BooleanField(
+        "Стартовый уровень тенниса задан", default=True
+    )
     is_verified = models.BooleanField("Подтверждён", default=False)
     is_legend = models.BooleanField("Легенда", default=False)
     is_hidden_on_home = models.BooleanField(
@@ -594,3 +598,63 @@ class PlayerSportProfile(models.Model):
 
     def __str__(self) -> str:
         return f"{self.player} — {self.get_sport_display()} ({self.total_points:.0f})"
+
+
+class SocialIdentity(models.Model):
+    """Привязка подтверждённого аккаунта провайдера к пользователю платформы."""
+
+    class Provider(models.TextChoices):
+        """Поддерживаемые сервисы входа."""
+
+        YANDEX = "yandex", "Яндекс"
+        VK = "vk", "VK"
+
+    user_id: int
+    user: "models.ForeignKey[User, User]" = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="social_identities"
+    )
+    provider: "models.CharField[str, str]" = models.CharField(
+        "Сервис", max_length=20, choices=Provider.choices
+    )
+    subject: "models.CharField[str, str]" = models.CharField(
+        "Идентификатор у провайдера", max_length=255
+    )
+    created_at: "models.DateTimeField[datetime, datetime]" = models.DateTimeField(
+        "Дата подключения", auto_now_add=True
+    )
+
+    class Meta:
+        verbose_name = "Социальный аккаунт"
+        verbose_name_plural = "Социальные аккаунты"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider", "subject"], name="unique_social_subject"
+            ),
+            models.UniqueConstraint(
+                fields=["user", "provider"], name="unique_user_social_provider"
+            ),
+        ]
+
+
+class SocialAuthFlow(models.Model):
+    """Одноразовый серверный сеанс OAuth и завершения регистрации на 15 минут."""
+
+    connect_user_id: int | None
+    state: "models.CharField[str, str]" = models.CharField(max_length=100, unique=True)
+    provider: "models.CharField[str, str]" = models.CharField(
+        max_length=20, choices=SocialIdentity.Provider.choices
+    )
+    code_verifier: "models.CharField[str, str]" = models.CharField(max_length=128)
+    redirect_uri: "models.URLField[str, str]" = models.URLField(max_length=500)
+    next_url: "models.CharField[str, str]" = models.CharField(
+        max_length=2000, blank=True
+    )
+    connect_user: "models.ForeignKey[User | None, User | None]" = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.CASCADE
+    )
+    identity: "models.JSONField[dict[str, str], dict[str, str]]" = models.JSONField(
+        default=dict, blank=True
+    )
+    expires_at: "models.DateTimeField[datetime, datetime]" = models.DateTimeField(
+        db_index=True
+    )

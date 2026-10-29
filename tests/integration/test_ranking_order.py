@@ -120,6 +120,20 @@ class RatingOrderTestCase(TestCase):
         self.assertEqual(names[0], "Чемпион Турниров")
         self.assertEqual(names[-1], "Новый Участник")
 
+    def test_missing_tennis_strength_excludes_only_new_player(self) -> None:
+        """Незаданный уровень скрывает новичка, сохраняя порядок остальных."""
+        Player.objects.filter(pk__in=[self.newbie.pk, self.champion.pk]).update(
+            tennis_entry_level_set=False
+        )
+        for route, key in (("home", "top_players"), ("rating", "players_page")):
+            response = self.client.get(reverse(route), secure=True)
+            players = response.context[key]
+            if key == "players_page":
+                players = players.object_list
+            ids = [player.pk for player in players]
+            self.assertNotIn(self.newbie.pk, ids)
+            self.assertEqual(ids[0], self.champion.pk)
+
 
 class PadelRatingOrderTestCase(TestCase):
     """Для падела балл считается по статистике профиля вида спорта."""
@@ -203,3 +217,13 @@ class PadelRatingOrderTestCase(TestCase):
             names,
             ["Падел Чемпион", "Падел Ветеран", "Падел Новичок"],
         )
+
+    def test_padel_does_not_require_tennis_strength(self) -> None:
+        """Отсутствие уровня тенниса не скрывает игрока в паделе."""
+        Player.objects.filter(pk=self.newbie.pk).update(tennis_entry_level_set=False)
+        for route, key in (("home", "top_players"), ("rating", "players_page")):
+            response = self.client.get(reverse(route), {"sport": "padel"}, secure=True)
+            players = response.context[key]
+            if key == "players_page":
+                players = players.object_list
+            self.assertIn(self.newbie.pk, [player.pk for player in players])

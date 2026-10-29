@@ -4,16 +4,21 @@ User forms.
 
 import logging
 from decimal import ROUND_HALF_UP, Decimal
+from typing import TYPE_CHECKING
 
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from apps.core.contact_utils import normalize_max_contact
 
 from .models import Player
+
+if TYPE_CHECKING:
+    pass
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -205,8 +210,7 @@ class UserRegistrationForm(forms.ModelForm):
             digits = "7" + digits
         if len(digits) != 11 or not digits.startswith("7"):
             raise forms.ValidationError(
-                "Введите номер полностью: код +7 и 10 цифр. "
-                "Например: +7 999 123-45-67."
+                "Введите номер полностью: код +7 и 10 цифр. Например: +7 999 123-45-67."
             )
         normalized = f"+{digits}"
 
@@ -270,6 +274,51 @@ class UserRegistrationForm(forms.ModelForm):
 
 class PlayerProfileForm(forms.ModelForm):
     """Player profile edit form."""
+
+    email = forms.EmailField(
+        label="Email",
+        required=False,
+        widget=forms.EmailInput(attrs={"class": "form-control"}),
+    )
+    ntrp_level = NtrpDecimalField(
+        label="Уровень силы (NTRP)",
+        required=False,
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": "1.50",
+                "max": "7.00",
+                "step": "0.01",
+            }
+        ),
+        help_text="Можно указать только один раз. Затем рейтинг меняется по результатам матчей.",
+    )
+
+    def clean_email(self) -> str:
+        """Проверить новый адрес, сохранив текущий при отсутствии изменения."""
+        email = (
+            (self.cleaned_data.get("email") or getattr(self.user, "email", "") or "")
+            .strip()
+            .lower()
+        )
+        if (
+            email
+            and User.objects.filter(email__iexact=email)
+            .exclude(pk=self.user.pk if self.user else None)
+            .exists()
+        ):
+            raise forms.ValidationError(DUPLICATE_EMAIL_MESSAGE)
+        return str(email)
+
+    def clean_ntrp_level(self) -> Decimal | None:
+        """Проверить первый уровень, разрешив пока оставить его пустым."""
+        value = self.cleaned_data.get("ntrp_level")
+        if value is None:
+            return None
+        level = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if not NTRP_MIN <= level <= NTRP_MAX:
+            raise forms.ValidationError("Уровень силы должен быть от 1.50 до 7.00.")
+        return level
 
     first_name = forms.CharField(
         label="Имя",
@@ -341,7 +390,12 @@ class PlayerProfileForm(forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+        from .onboarding import tennis_strength_set
+
+        if tennis_strength_set(self.instance):
+            self.fields.pop("ntrp_level")
         if user:
+            self.fields["email"].initial = user.email
             self.fields["first_name"].initial = user.first_name
             self.fields["last_name"].initial = user.last_name
             self.fields["phone"].initial = user.phone
@@ -417,12 +471,29 @@ class PlayerProfileForm(forms.ModelForm):
             player.avatar.delete(save=False)
             player.avatar = None
         if self.user:
+            old_email = self.user.email
+            new_email = self.cleaned_data.get("email") or None
+            email_changed = new_email != old_email
+            self.user.email = new_email
+            if email_changed:
+                self.user.email_verified = False
             old_phone = str(getattr(self.user, "phone", "") or "").strip()
             self.user.first_name = self.cleaned_data["first_name"]
             self.user.last_name = self.cleaned_data["last_name"]
             self.user.phone = self.cleaned_data["phone"]
             if commit:
                 self.user.save()
+                if email_changed and new_email:
+                    from django.db import transaction
+
+                    from apps.core.email_service import send_email_verification
+
+                    from .models import EmailVerificationToken
+
+                    EmailVerificationToken.objects.filter(
+                        user=self.user, used_at__isnull=True
+                    ).update(used_at=timezone.now())
+                    transaction.on_commit(lambda: send_email_verification(self.user))
                 new_phone = str(self.user.phone or "").strip()
                 if old_phone != new_phone:
                     try:

@@ -4229,6 +4229,12 @@ def _check_tournament_registration_eligibility(request, tournament, player):
     user = getattr(request, "user", None)
     if user is None:
         return False, "Требуется авторизация."
+    from apps.users.onboarding import STRENGTH_REQUIRED, tennis_strength_set
+
+    if tournament.sport != "padel" and not tennis_strength_set(player):
+        return False, STRENGTH_REQUIRED
+    if not (user.is_staff or user.is_superuser) and not user.email_verified:
+        return False, "Подтвердите email для участия в турнире."
 
     try:
         sub = user.subscription

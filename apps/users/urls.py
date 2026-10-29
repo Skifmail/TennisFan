@@ -7,9 +7,21 @@ from django.urls import path, reverse_lazy
 
 from apps.notifications.auth_forms import NotificationPasswordResetForm
 
-from . import views
+from . import social_views, views
 
 urlpatterns = [
+    path("password/set/", social_views.set_password, name="social_set_password"),
+    path("social/connections/", social_views.connections, name="social_connections"),
+    path("social/signup/", social_views.signup, name="social_signup"),
+    path("social/<str:provider>/start/", social_views.start, name="social_start"),
+    path(
+        "social/<str:provider>/callback/", social_views.callback, name="social_callback"
+    ),
+    path(
+        "social/<str:provider>/disconnect/",
+        social_views.disconnect,
+        name="social_disconnect",
+    ),
     path("auth/", views.auth, name="auth"),
     path("register/", views.register, name="register"),
     path("login/", views.login_view, name="login"),

@@ -113,7 +113,7 @@ def require_verified_player(view_func):
         except Exception:
             player = None
 
-        if not player or not player.is_verified:
+        if not player or not player.is_verified or not user.email_verified:
             if (
                 request.method == "POST"
                 and request.content_type
@@ -122,15 +122,15 @@ def require_verified_player(view_func):
                 return JsonResponse(
                     {
                         "success": False,
-                        "error": "Ваш аккаунт ещё не подтверждён администратором.",
+                        "error": "Аккаунт пока не активирован: заполните обязательные поля профиля и подтвердите email.",
                         "redirect": reverse("profile_edit"),
                     },
                     status=403,
                 )
             messages.warning(
                 request,
-                "Ваш аккаунт ещё не подтверждён администратором. "
-                "Регистрация на турниры и спарринги будет доступна после подтверждения.",
+                "Аккаунт пока не активирован: заполните обязательные поля профиля и подтвердите email. "
+                "После этого активация произойдёт автоматически.",
             )
             # Без next: верификацию пользователь не может пройти сам, и возврат
             # отправил бы его в то же заблокированное действие.

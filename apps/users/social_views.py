@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import re
 import secrets
 from datetime import timedelta
 from typing import cast
@@ -60,6 +61,11 @@ def _failure(request: HttpRequest, message: str) -> HttpResponse:
 def start(request: HttpRequest, provider: str) -> HttpResponse:
     """Начать вход или привязку с защитой CSRF, state и PKCE S256."""
     config = get_provider(provider)
+    external_provider = request.POST.get("external_provider", "")
+    if external_provider and (
+        provider != "vk" or external_provider not in ("ok_ru", "mail_ru")
+    ):
+        raise Http404
     connect = request.POST.get("process") == "connect"
     if connect and not request.user.is_authenticated:
         return redirect("login")
@@ -95,6 +101,9 @@ def start(request: HttpRequest, provider: str) -> HttpResponse:
         "code_challenge": challenge,
         "code_challenge_method": "S256",
     }
+    if external_provider:
+        query["provider"] = external_provider
+        query["prompt"] = "login"
     if config.optional_scope:
         query["optional_scope"] = config.optional_scope
     if provider == "yandex":
@@ -166,29 +175,11 @@ def callback(request: HttpRequest, provider: str) -> HttpResponse:
                 )
                 return redirect(target or "home")
             identity["email"] = identity.get("email", "").strip().lower()
-            if (
-                identity.get("email")
-                and User.objects.filter(email__iexact=identity["email"]).exists()
-            ):
-                raise SocialAuthError
-            user, player = register_social_user(request, provider, identity)
-            target = flow.next_url
-            avatar_url = identity.get("avatar_url", "")
-            flow.delete()
-            request.session.pop(SESSION_FLOW, None)
-            login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-            transaction.on_commit(
-                lambda: _send_registration_notifications(user, player)
-            )
-            if avatar_url:
-                transaction.on_commit(
-                    lambda: import_social_avatar(player.pk, provider, avatar_url)
-                )
-            messages.success(
-                request,
-                "Добро пожаловать! Недостающие данные можно заполнить в профиле.",
-            )
-            return redirect(target or "home")
+            if _matching_users(identity):
+                flow.identity = identity
+                flow.save(update_fields=["identity"])
+                return redirect("social_signup")
+            return _complete_signup(request, flow, identity)
     except (SocialAuthError, IntegrityError):
         # Удаление вне откатившейся транзакции делает отказ и ошибку одноразовыми.
         SocialAuthFlow.objects.filter(
@@ -202,10 +193,97 @@ def callback(request: HttpRequest, provider: str) -> HttpResponse:
     return redirect("social_signup")
 
 
+def _phone_key(value: str) -> str:
+    """Сравнить телефоны без оформления, учитывая российскую восьмёрку."""
+    digits = re.sub(r"[^0-9]", "", value)
+    if len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
+    return digits if len(digits) >= 10 else ""
+
+
+def _matching_users(identity: dict[str, str]) -> list[User]:
+    """Найти совпадения контактов без автоматической привязки."""
+    email = identity.get("email", "").strip().lower()
+    phone = _phone_key(identity.get("phone", ""))
+    matches: dict[int, User] = {}
+    if email:
+        for user in User.objects.filter(email__iexact=email):
+            matches[user.pk] = user
+    if phone:
+        for user in User.objects.exclude(phone="").iterator():
+            if _phone_key(user.phone or "") == phone:
+                matches[user.pk] = user
+    return list(matches.values())
+
+
 @never_cache
+@require_http_methods(["GET", "POST"])
 def signup(request: HttpRequest) -> HttpResponse:
-    """Совместимый адрес: после OAuth анкета больше не требуется."""
-    return redirect("home" if request.user.is_authenticated else "login")
+    """Предложить владельцу найденного профиля войти прежним способом."""
+    if request.user.is_authenticated:
+        return redirect("home")
+    try:
+        with transaction.atomic():
+            flow = _flow(request, lock=True)
+            get_provider(flow.provider)
+            if not flow.identity or flow.connect_user_id:
+                raise SocialAuthError
+            identity = dict(flow.identity)
+            matches = _matching_users(identity)
+            if request.method == "POST":
+                choice = request.POST.get("choice")
+                if choice == "yes":
+                    flow.delete()
+                    request.session.pop(SESSION_FLOW, None)
+                    messages.info(
+                        request,
+                        "Войдите привычным способом. Затем откройте «Редактирование профиля → Подключённые соцсети» и привяжите выбранную соцсеть. После этого через неё можно будет входить.",
+                    )
+                    return redirect("login")
+                if choice == "no":
+                    # Занятые контакты не переносим в новый профиль.
+                    for user in matches:
+                        if (
+                            user.email
+                            and user.email.lower() == identity.get("email", "").lower()
+                        ):
+                            identity["email"] = ""
+                        if _phone_key(user.phone or "") and _phone_key(
+                            user.phone or ""
+                        ) == _phone_key(identity.get("phone", "")):
+                            identity["phone"] = ""
+                    return _complete_signup(request, flow, identity)
+            return render(
+                request, "users/social_account_match.html", {"matches": matches}
+            )
+    except (SocialAuthError, IntegrityError):
+        SocialAuthFlow.objects.filter(
+            state=request.session.pop(SESSION_FLOW, "")
+        ).delete()
+        return _failure(request, "Сеанс завершён. Начните вход через соцсеть заново.")
+
+
+def _complete_signup(
+    request: HttpRequest, flow: SocialAuthFlow, identity: dict[str, str]
+) -> HttpResponse:
+    """Завершить создание аккаунта и погасить сеанс."""
+    provider = flow.provider
+    user, player = register_social_user(request, provider, identity)
+    target = flow.next_url
+    avatar_url = identity.get("avatar_url", "")
+    flow.delete()
+    request.session.pop(SESSION_FLOW, None)
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    transaction.on_commit(lambda: _send_registration_notifications(user, player))
+    if avatar_url:
+        transaction.on_commit(
+            lambda: import_social_avatar(player.pk, provider, avatar_url)
+        )
+    messages.success(
+        request,
+        "Добро пожаловать! Недостающие данные можно заполнить в профиле.",
+    )
+    return redirect(target or "home")
 
 
 @login_required

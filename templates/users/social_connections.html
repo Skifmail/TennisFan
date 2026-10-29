@@ -7,7 +7,7 @@
     {% for provider in providers %}
     <div class="card" style="margin-bottom:1rem;">
         <div class="card-body">
-            <h2>{{ provider.label }}</h2>
+            <h2>{% if provider.key == "vk" %}VK ID (VK, Одноклассники и Mail){% else %}{{ provider.label }}{% endif %}</h2>
             {% if provider.linked %}
             <p>Подключён{% if not provider.available %}. Вход через этот сервис временно недоступен{% endif %}</p>
             <form method="post" action="{% url 'social_disconnect' provider=provider.key %}">
@@ -20,6 +20,14 @@
                 <input type="hidden" name="process" value="connect">
                 <button type="submit" class="btn btn-primary">Подключить {{ provider.label }}</button>
             </form>
+            {% if provider.key == "vk" %}
+            <form method="post" action="{% url 'social_start' provider='vk' %}" style="margin-top:0.5rem;">
+                {% csrf_token %}
+                <input type="hidden" name="process" value="connect">
+                <button name="external_provider" value="ok_ru" class="btn btn-outline">Подключить через Одноклассники</button>
+                <button name="external_provider" value="mail_ru" class="btn btn-outline">Подключить через Mail</button>
+            </form>
+            {% endif %}
             {% endif %}
         </div>
     </div>

@@ -4,6 +4,7 @@
     {% for provider in social_auth_providers %}
     <form method="post" action="{% url 'social_start' provider=provider.key %}">
         {% csrf_token %}
+        {% if provider.external_provider %}<input type="hidden" name="external_provider" value="{{ provider.external_provider }}">{% endif %}
         {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
         <button type="submit" class="btn btn-outline">Войти через {{ provider.label }}</button>
     </form>

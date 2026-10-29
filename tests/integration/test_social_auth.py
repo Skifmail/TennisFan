@@ -152,6 +152,88 @@ class SocialAuthTests(TestCase):
         self.assertFalse(SocialIdentity.objects.exists())
         self.assertEqual(User.objects.get(email__iexact="new@test.local").pk, owner.pk)
 
+    def test_matching_phone_and_email_confirmation(self) -> None:
+        owner = User.objects.create_user(
+            email="new@test.local",
+            password="StrongPass123!",
+            first_name="Иван",
+            last_name="Иванов",
+            phone="8 (999) 123-45-67",
+        )
+        flow = self.start()
+        response = self.callback(flow, {**IDENTITY, "phone": "+79991234567"})
+        self.assertRedirects(
+            response, reverse("social_signup"), fetch_redirect_response=False
+        )
+        page = self.client.get(reverse("social_signup"), secure=True)
+        self.assertContains(page, "Иванов")
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.client.post(reverse("social_signup"), {"choice": "no"}, secure=True)
+        new_user = User.objects.get(pk=self.client.session["_auth_user_id"])
+        self.assertNotEqual(new_user.pk, owner.pk)
+        self.assertIsNone(new_user.email)
+        self.assertEqual(new_user.phone, "")
+        self.assertFalse(SocialAuthFlow.objects.filter(pk=flow.pk).exists())
+        owner.refresh_from_db()
+        self.assertEqual(owner.phone, "8 (999) 123-45-67")
+
+    def test_phone_only_match_yes_requires_old_login(self) -> None:
+        User.objects.create_user(
+            email="owner@test.local", password="StrongPass123!", phone="+79991234567"
+        )
+        flow = self.start("vk")
+        self.callback(flow, {**IDENTITY, "phone": "8 999 123 45 67"})
+        self.client.post(reverse("social_signup"), {"choice": "yes"}, secure=True)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertFalse(SocialIdentity.objects.exists())
+        self.assertFalse(SocialAuthFlow.objects.filter(pk=flow.pk).exists())
+
+    def test_match_choice_requires_session_and_csrf(self) -> None:
+        User.objects.create_user(email="new@test.local", password="StrongPass123!")
+        self.callback(self.start())
+        stranger = Client()
+        stranger.post(reverse("social_signup"), {"choice": "no"}, secure=True)
+        self.assertFalse(SocialIdentity.objects.exists())
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.cookies = self.client.cookies
+        response = csrf_client.post(
+            reverse("social_signup"), {"choice": "no"}, secure=True
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(SocialIdentity.objects.exists())
+
+    def test_external_vk_methods_use_shared_callback_and_identity(self) -> None:
+        for external in ("ok_ru", "mail_ru"):
+            with self.subTest(external=external):
+                self.client = Client()
+                response = self.client.post(
+                    reverse("social_start", args=["vk"]),
+                    {"external_provider": external},
+                    secure=True,
+                )
+                query = parse_qs(urlparse(response.url).query)
+                self.assertEqual(query["provider"], [external])
+                self.assertEqual(query["prompt"], ["login"])
+                self.assertEqual(
+                    query["redirect_uri"], [PROVIDERS["vk"]["redirect_uri"]]
+                )
+                flow = SocialAuthFlow.objects.get(state=query["state"][0])
+                self.callback(flow)
+                self.assertIn("_auth_user_id", self.client.session)
+        self.assertEqual(SocialIdentity.objects.filter(provider="vk").count(), 1)
+
+    def test_external_vk_methods_visible_and_invalid_choice_rejected(self) -> None:
+        response = self.client.get(reverse("login"), secure=True, follow=True)
+        self.assertContains(response, "Войти через Одноклассники")
+        self.assertContains(response, "Войти через Mail")
+        for provider, external in (("vk", "evil"), ("yandex", "ok_ru")):
+            response = self.client.post(
+                reverse("social_start", args=[provider]),
+                {"external_provider": external},
+                secure=True,
+            )
+            self.assertEqual(response.status_code, 404)
+
     def test_repeated_login_keeps_same_profile_and_strength(self) -> None:
         self.callback(self.start())
         user = User.objects.get(email="new@test.local")

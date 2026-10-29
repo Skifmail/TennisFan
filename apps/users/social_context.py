@@ -16,6 +16,17 @@ def social_auth(request: HttpRequest) -> dict[str, list[dict[str, str]]]:
         except Http404:
             continue
         providers.append({"key": key, "label": provider.label})
+        if key == "vk":
+            providers.extend(
+                [
+                    {
+                        "key": "vk",
+                        "label": "Одноклассники",
+                        "external_provider": "ok_ru",
+                    },
+                    {"key": "vk", "label": "Mail", "external_provider": "mail_ru"},
+                ]
+            )
     return {"social_auth_providers": providers}
 
 

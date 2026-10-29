@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Это ваш профиль?{% endblock %}
+{% block content %}
+<div class="container" style="max-width:600px; padding:2rem 1rem;">
+<h1>Это вы?</h1>
+<p>На платформе уже есть профиль с такой почтой или телефоном:</p>
+<ul>{% for account in matches %}<li>{{ account.first_name }} {{ account.last_name }}{% if not account.first_name and not account.last_name %}Пользователь TennisFan{% endif %}</li>{% endfor %}</ul>
+<p>Если это вы, войдите привычным способом и подключите соцсеть в настройках профиля.</p>
+<p>Если это не вы, создадим новый профиль. Совпавшие почту и телефон оставим пустыми — укажите свои контакты позже.</p>
+<form method="post">
+{% csrf_token %}
+<button name="choice" value="yes" class="btn btn-primary">Да, это я — войти</button>
+<button name="choice" value="no" class="btn btn-ghost">Нет, это не я — создать профиль</button>
+</form>
+</div>
+{% endblock %}

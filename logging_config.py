@@ -11,6 +11,7 @@
 """
 
 import os
+import re
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -115,19 +116,29 @@ logger.add(
 
 
 # Функция для очистки старых логов (вызывается при старте приложения)
-def cleanup_old_logs():
-    """Удаляет логи старше 7 дней."""
+def cleanup_old_logs() -> None:
+    """Удалить старые архивы, не затрагивая открытые файлы обработчиков."""
     cutoff_date = datetime.now() - timedelta(days=7)
 
     for log_file in LOGS_DIR.glob("*.log*"):
+        # Только архивы ротации Loguru; активные *.log могут быть давно не изменены.
+        if not re.fullmatch(
+            r"(all|errors|warnings|info)\.\d{4}-\d{2}-\d{2}_"
+            r"\d{2}-\d{2}-\d{2}_\d{6}\.log(?:\.zip)?",
+            log_file.name,
+        ):
+            continue
         try:
             # Проверяем время модификации файла
             mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
             if mtime < cutoff_date:
                 log_file.unlink()
                 logger.info(f"Удален старый лог-файл: {log_file.name}")
-        except Exception as e:
-            logger.error(f"Ошибка при удалении лог-файла {log_file.name}: {e}")
+        except FileNotFoundError:
+            # Другой процесс мог уже удалить архив.
+            continue
+        except OSError as exc:
+            logger.error("Ошибка при удалении лог-файла {}: {}", log_file.name, exc)
 
 
 # Вызываем очистку при импорте модуля

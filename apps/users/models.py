@@ -3,7 +3,7 @@ Custom User model with phone and email authentication.
 """
 
 from datetime import datetime
-from typing import cast
+from typing import Any, cast
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
@@ -654,6 +654,9 @@ class SocialAuthFlow(models.Model):
     )
     identity: "models.JSONField[dict[str, str], dict[str, str]]" = models.JSONField(
         default=dict, blank=True
+    )
+    legal_acceptance: "models.JSONField[dict[str, Any], dict[str, Any]]" = (
+        models.JSONField(default=dict, blank=True)
     )
     expires_at: "models.DateTimeField[datetime, datetime]" = models.DateTimeField(
         db_index=True

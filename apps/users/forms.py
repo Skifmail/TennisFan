@@ -168,6 +168,12 @@ class UserRegistrationForm(forms.ModelForm):
         label="",
         widget=forms.CheckboxInput(attrs={"class": "form-checkbox"}),
     )
+    agree_terms = forms.BooleanField(
+        required=True,
+        label="Пользовательское соглашение",
+        widget=forms.CheckboxInput(attrs={"class": "form-checkbox"}),
+        error_messages={"required": "Примите пользовательское соглашение."},
+    )
 
     class Meta:
         model = User

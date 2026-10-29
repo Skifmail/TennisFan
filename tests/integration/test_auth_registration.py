@@ -11,6 +11,7 @@ from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
+from apps.core.models import LegalAcceptanceLog, UserConsent
 from apps.users.models import Player, User
 
 
@@ -34,6 +35,7 @@ def registration_payload(**overrides: object) -> dict[str, object]:
         "password": "StrongPass123",
         "password_confirm": "StrongPass123",
         "agree_legal": "on",
+        "agree_terms": "on",
     }
     data.update(overrides)
     return data
@@ -87,6 +89,40 @@ class RegistrationFlowTestCase(TestCase):
         self.assertContains(response, "Проверьте поля формы")
         self.assertContains(response, "10")
         self.assertFalse(User.objects.filter(email="new-player@test.local").exists())
+
+    def test_registration_requires_independent_personal_data_and_terms(self) -> None:
+        for field in ("agree_legal", "agree_terms"):
+            with self.subTest(field=field):
+                response = self.client.post(
+                    reverse("auth"), registration_payload(**{field: ""}), secure=True
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(field, response.context["register_form"].errors)
+                self.assertFalse(response.context["show_register_step2"])
+                self.assertFalse(
+                    User.objects.filter(email="new-player@test.local").exists()
+                )
+                self.assertFalse(LegalAcceptanceLog.objects.exists())
+
+    def test_registration_logs_separate_documents_without_paid_offer(self) -> None:
+        self.client.post(reverse("auth"), registration_payload(), secure=True)
+        user = User.objects.get(email="new-player@test.local")
+        entries = LegalAcceptanceLog.objects.filter(user=user)
+        self.assertEqual(
+            set(entries.values_list("document_slug", flat=True)),
+            {"personal-data", "terms", "privacy"},
+        )
+        self.assertTrue(
+            entries.get(document_slug="personal-data").metadata["document_text"]
+        )
+        self.assertEqual(
+            entries.get(document_slug="privacy").metadata["event"], "notice_presented"
+        )
+        self.assertFalse(
+            UserConsent.objects.filter(
+                user=user, consent_type="platform_offer"
+            ).exists()
+        )
 
     def test_comma_in_ntrp_is_accepted(self) -> None:
         response = self.client.post(

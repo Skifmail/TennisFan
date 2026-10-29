@@ -195,6 +195,9 @@ class DeferredOnboardingTests(TestCase):
         request.resolver_match = SimpleNamespace(url_name="home")
         result = profile_completion(request)["profile_completion_reminder"]
         self.assertIn("Уровень силы", result["fields"])
+        self.assertIn("Уровень силы", result["required_fields"])
+        self.assertIn("Фото профиля", result["optional_fields"])
+        self.assertNotIn("Фото профиля", result["required_fields"])
         self.assertEqual(result["interval_ms"], 6 * 60 * 60 * 1000)
         request.resolver_match.url_name = "profile_edit"
         self.assertEqual(profile_completion(request), {})

@@ -4,6 +4,12 @@ from . import views
 
 urlpatterns = [
     path(
+        "social-personal-data/",
+        views.legal_document,
+        {"slug": "social-personal-data"},
+        name="legal_social_personal_data",
+    ),
+    path(
         "chat-rules/",
         views.legal_document,
         {"slug": "chat-rules"},

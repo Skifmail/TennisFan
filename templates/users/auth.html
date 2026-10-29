@@ -155,15 +155,19 @@
                             <div class="form-group form-group-consent" id="field-agree_legal">
                                 <label class="consent-label">
                                     {{ register_form.agree_legal }}
-                                    <span class="consent-text">Я принимаю <a href="{% url 'legal_offer' %}"
-                                            target="_blank" rel="noopener">оферту</a>, согласен на <a href="{% url 'legal_personal_data' %}"
-                                            target="_blank" rel="noopener">обработку персональных данных</a> и <a
-                                            href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политику
-                                            конфиденциальности</a></span>
+                                    <span class="consent-text">Даю отдельное <a href="{% url 'legal_personal_data' %}" target="_blank" rel="noopener">согласие на обработку персональных данных</a>. Порядок обработки описан в <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">политике конфиденциальности</a>.</span>
                                 </label>
                                 <div class="field-error" id="consent-error"></div>
                                 {% for error in register_form.agree_legal.errors %}<p class="text-error form-error">{{
                                     error }}</p>{% endfor %}
+                            </div>
+                            <div class="form-group form-group-consent" id="field-agree_terms">
+                                <label class="consent-label">
+                                    {{ register_form.agree_terms }}
+                                    <span class="consent-text">Принимаю <a href="{% url 'legal_terms' %}" target="_blank" rel="noopener">пользовательское соглашение</a>.</span>
+                                </label>
+                                <div class="field-error" id="terms-error"></div>
+                                {% for error in register_form.agree_terms.errors %}<p class="text-error form-error">{{ error }}</p>{% endfor %}
                             </div>
                         </div>
                         <div class="register-step-actions">
@@ -534,6 +538,13 @@
                         ? ''
                         : 'Пароли не совпадают.';
                 }
+            },
+            {
+                input: form.querySelector('input[name="agree_terms"]'),
+                hint: document.getElementById('terms-error'),
+                type: 'checkbox',
+                empty: 'Примите пользовательское соглашение.',
+                check: function () { return ''; }
             },
             {
                 input: consentField,

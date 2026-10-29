@@ -25,8 +25,18 @@ from loguru import logger
 
 from apps.core.redirects import get_safe_next_url
 
-from .models import SocialAuthFlow, SocialIdentity, User
+from .models import Player, SocialAuthFlow, SocialIdentity, User
 from .social_avatar import import_social_avatar
+from .social_consent import (
+    SESSION_NONCE,
+    SocialConsentForm,
+    acceptance_snapshot,
+    build_form,
+    consent_context,
+    load_documents,
+    record_social_acceptance,
+    validate_form,
+)
 from .social_oauth import SocialAuthError, fetch_identity, get_provider
 from .social_onboarding import register_social_user
 from .views import (
@@ -45,7 +55,7 @@ def _flow(request: HttpRequest, *, lock: bool = False) -> SocialAuthFlow:
     flow = queryset.filter(
         state=request.session.get(SESSION_FLOW, ""), expires_at__gt=timezone.now()
     ).first()
-    if flow is None:
+    if flow is None or not flow.legal_acceptance:
         raise SocialAuthError
     return cast(SocialAuthFlow, flow)
 
@@ -73,6 +83,44 @@ def start(request: HttpRequest, provider: str) -> HttpResponse:
         return redirect("social_connections")
     if not _registration_allowed(request):
         return _failure(request, "Слишком много попыток. Попробуйте позже.")
+    next_url = get_safe_next_url(request)[:2000]
+    try:
+        documents = load_documents()
+    except (OSError, UnicodeError, ValueError):
+        logger.exception("Документы для социального входа недоступны")
+        return _failure(request, "Документы временно недоступны. Попробуйте позже.")
+    context = consent_context(
+        request,
+        provider=provider,
+        external_provider=external_provider,
+        connect=connect,
+        next_url=next_url,
+        documents=documents,
+    )
+    submitted = "token" in request.POST
+    form = SocialConsentForm(request.POST) if submitted else build_form(context)
+    if not submitted or not validate_form(form, context):
+        if submitted and form.non_field_errors():
+            errors = list(form.non_field_errors())
+            form = SocialConsentForm({"token": build_form(context)["token"].value()})
+            form.is_valid()
+            for error in errors:
+                form.add_error(None, error)
+        return render(
+            request,
+            "users/social_consent.html",
+            {
+                "form": form,
+                "provider": provider,
+                "provider_label": {"ok_ru": "Одноклассники", "mail_ru": "Mail"}.get(
+                    external_provider, config.label
+                ),
+                "external_provider": external_provider,
+                "connect": connect,
+                "next_url": next_url,
+            },
+            status=400 if submitted else 200,
+        )
     SocialAuthFlow.objects.filter(expires_at__lte=timezone.now()).delete()
     old_state = request.session.pop(SESSION_FLOW, "")
     SocialAuthFlow.objects.filter(state=old_state).delete()
@@ -82,11 +130,13 @@ def start(request: HttpRequest, provider: str) -> HttpResponse:
         provider=provider,
         code_verifier=verifier,
         redirect_uri=config.redirect_uri,
-        next_url=get_safe_next_url(request)[:2000],
+        next_url=next_url,
+        legal_acceptance=acceptance_snapshot(request, documents, context),
         connect_user_id=request.user.pk if connect else None,
         expires_at=timezone.now() + timedelta(minutes=15),
     )
     request.session[SESSION_FLOW] = flow.state
+    request.session.pop(SESSION_NONCE, None)
     challenge = (
         base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
         .rstrip(b"=")
@@ -158,6 +208,7 @@ def callback(request: HttpRequest, provider: str) -> HttpResponse:
                     SocialIdentity.objects.create(
                         user=user, provider=provider, subject=identity["subject"]
                     )
+                record_social_acceptance(flow, user)
                 flow.delete()
                 request.session.pop(SESSION_FLOW, None)
                 messages.success(request, f"Аккаунт {config.label} подключён.")
@@ -165,6 +216,7 @@ def callback(request: HttpRequest, provider: str) -> HttpResponse:
             if linked:
                 if not linked.user.is_active:
                     raise SocialAuthError
+                record_social_acceptance(flow, linked.user)
                 target = flow.next_url
                 flow.delete()
                 request.session.pop(SESSION_FLOW, None)
@@ -253,8 +305,31 @@ def signup(request: HttpRequest) -> HttpResponse:
                         ) == _phone_key(identity.get("phone", "")):
                             identity["phone"] = ""
                     return _complete_signup(request, flow, identity)
+            players = {
+                player.user_id: player
+                for player in Player.objects.filter(user__in=matches).select_related(
+                    "user"
+                )
+            }
+            profiles: list[dict[str, object]] = []
+            for user in matches:
+                player = players.get(user.pk)
+                display_name = user.get_display_name().strip()
+                if not display_name or display_name == (user.email or ""):
+                    display_name = "Пользователь TennisFan"
+                profiles.append(
+                    {
+                        "display_name": display_name,
+                        "avatar": player.avatar if player else None,
+                        "city": player.city if player else "",
+                        "level": player.get_skill_level_display() if player else "",
+                        "rating": player.total_points if player else 0,
+                    }
+                )
             return render(
-                request, "users/social_account_match.html", {"matches": matches}
+                request,
+                "users/social_account_match.html",
+                {"matches": matches, "profiles": profiles},
             )
     except (SocialAuthError, IntegrityError):
         SocialAuthFlow.objects.filter(
@@ -269,6 +344,7 @@ def _complete_signup(
     """Завершить создание аккаунта и погасить сеанс."""
     provider = flow.provider
     user, player = register_social_user(request, provider, identity)
+    record_social_acceptance(flow, user)
     target = flow.next_url
     avatar_url = identity.get("avatar_url", "")
     flow.delete()

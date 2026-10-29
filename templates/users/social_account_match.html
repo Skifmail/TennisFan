@@ -1,16 +1,76 @@
 {% extends 'base.html' %}
 {% block title %}Это ваш профиль?{% endblock %}
 {% block content %}
-<div class="container" style="max-width:600px; padding:2rem 1rem;">
-<h1>Это вы?</h1>
-<p>На платформе уже есть профиль с такой почтой или телефоном:</p>
-<ul>{% for account in matches %}<li>{{ account.first_name }} {{ account.last_name }}{% if not account.first_name and not account.last_name %}Пользователь TennisFan{% endif %}</li>{% endfor %}</ul>
-<p>Если это вы, войдите привычным способом и подключите соцсеть в настройках профиля.</p>
-<p>Если это не вы, создадим новый профиль. Совпавшие почту и телефон оставим пустыми — укажите свои контакты позже.</p>
-<form method="post">
-{% csrf_token %}
-<button name="choice" value="yes" class="btn btn-primary">Да, это я — войти</button>
-<button name="choice" value="no" class="btn btn-ghost">Нет, это не я — создать профиль</button>
-</form>
+<div class="social-match">
+    <div class="social-match__card">
+        <header class="social-match__head">
+            <span class="social-match__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="m16 11 2 2 4-4"></path>
+                </svg>
+            </span>
+            <h1 class="social-match__title">Это вы?</h1>
+            <p class="social-match__subtitle">На платформе уже есть профиль с такой почтой или телефоном.</p>
+        </header>
+
+        <ul class="social-match__profiles">
+            {% for profile in profiles %}
+            <li class="social-match__profile">
+                <div class="social-match__avatar">
+                    {% if profile.avatar %}
+                    {% include 'includes/avatar.html' with avatar=profile.avatar class='social-match__avatar-img' %}
+                    {% else %}
+                    <span class="social-match__initial" aria-hidden="true">{{ profile.display_name|first }}</span>
+                    {% endif %}
+                </div>
+                <div class="social-match__person">
+                    <p class="social-match__name">{{ profile.display_name }}</p>
+                    <p class="social-match__meta">
+                        {% if profile.city %}<span>{{ profile.city }}</span>{% endif %}
+                        {% if profile.city and profile.level %}<span class="social-match__dot">·</span>{% endif %}
+                        {% if profile.level %}<span>{{ profile.level }}</span>{% endif %}
+                        {% if profile.rating %}
+                        <span class="social-match__rating">Рейтинг FAN {{ profile.rating|floatformat:1 }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <span class="social-match__tag">Найден профиль</span>
+            </li>
+            {% endfor %}
+        </ul>
+
+        <div class="social-match__notes">
+            <div class="social-match__note">
+                <span class="social-match__note-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <path d="m9 11 3 3L22 4"></path>
+                    </svg>
+                </span>
+                <p><strong>Если это вы</strong> — войдите привычным способом и подключите соцсеть в настройках профиля.</p>
+            </div>
+            <div class="social-match__note">
+                <span class="social-match__note-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5.5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <path d="M20 8v6M23 11h-6"></path>
+                    </svg>
+                </span>
+                <p><strong>Если это не вы</strong> — создадим новый профиль. Совпавшие почту и телефон оставим пустыми — укажите свои контакты позже.</p>
+            </div>
+        </div>
+
+        <form method="post" class="social-match__actions">
+            {% csrf_token %}
+            <button name="choice" value="yes" class="btn btn-primary btn-lg">Да, это я — войти</button>
+            <button name="choice" value="no" class="btn btn-outline btn-lg">Нет, это не я — создать профиль</button>
+        </form>
+    </div>
 </div>
 {% endblock %}

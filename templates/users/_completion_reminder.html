@@ -1,13 +1,39 @@
 {% load static %}
 {% if profile_completion_reminder %}
 {{ profile_completion_reminder|json_script:"profile-completion-data" }}
-<dialog id="profile-completion-dialog" aria-labelledby="profile-completion-title" style="max-width:480px; width:calc(100% - 2rem); border:1px solid var(--color-border); border-radius:16px; padding:1.5rem; color:var(--color-text); background:var(--color-bg-secondary, #fff);">
-    <h2 id="profile-completion-title">Завершите заполнение профиля</h2>
-    <p>Можно продолжать смотреть сайт. Для участия в турнирах и спаррингах нужно заполнить обязательные данные, подтвердить почту и указать уровень силы.</p>
-    <p>Осталось заполнить:</p>
-    <ul>{% for field in profile_completion_reminder.fields %}<li>{{ field }}</li>{% endfor %}</ul>
-    <a href="{% url 'profile_edit' %}" class="btn btn-primary">Заполнить профиль</a>
-    <button type="button" class="btn btn-ghost" id="profile-completion-later">Напомнить позже</button>
+<dialog id="profile-completion-dialog" class="profile-completion" aria-labelledby="profile-completion-title" aria-describedby="profile-completion-description">
+    <div class="profile-completion__body">
+        <button type="button" class="profile-completion__close" id="profile-completion-close" aria-label="Закрыть напоминание">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+        <span class="profile-completion__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3.5"/><path d="M2.5 20v-2a5 5 0 0 1 5-5h3a5 5 0 0 1 4 2M16 19l2 2 4-5"/></svg>
+        </span>
+        <p class="profile-completion__eyebrow">Профиль игрока</p>
+        <h2 id="profile-completion-title" class="profile-completion__title" tabindex="-1" autofocus>{% if profile_completion_reminder.required_fields %}Завершите профиль{% else %}Добавьте пару деталей{% endif %}</h2>
+        <p id="profile-completion-description" class="profile-completion__description">{% if profile_completion_reminder.required_fields %}Заполните данные, подтвердите почту и укажите уровень игры, чтобы участвовать в турнирах и спаррингах.{% else %}Основные данные уже заполнены. По желанию добавьте больше информации о себе.{% endif %}</p>
+        {% if profile_completion_reminder.required_fields %}
+        <section class="profile-completion__section" aria-labelledby="profile-completion-required">
+            <h3 id="profile-completion-required" class="profile-completion__label">Для участия в играх</h3>
+            <ul class="profile-completion__fields">
+                {% for field in profile_completion_reminder.required_fields %}<li><span class="profile-completion__field-dot" aria-hidden="true"></span>{{ field }}</li>{% endfor %}
+            </ul>
+        </section>
+        {% endif %}
+        {% if profile_completion_reminder.optional_fields %}
+        <section class="profile-completion__section profile-completion__section--optional" aria-labelledby="profile-completion-optional">
+            <h3 id="profile-completion-optional" class="profile-completion__label">По желанию</h3>
+            <ul class="profile-completion__fields">
+                {% for field in profile_completion_reminder.optional_fields %}<li>{{ field }}</li>{% endfor %}
+            </ul>
+        </section>
+        {% endif %}
+        <div class="profile-completion__actions">
+            <a href="{% url 'profile_edit' %}" class="btn btn-primary">{% if profile_completion_reminder.required_fields %}Заполнить профиль{% else %}Перейти в профиль{% endif %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
+            <button type="button" class="btn btn-ghost" id="profile-completion-later">Напомнить позже</button>
+        </div>
+        <p class="profile-completion__footnote">{% if profile_completion_reminder.required_fields %}Смотреть сайт можно уже сейчас.{% else %}Эти данные не обязательны для участия в играх.{% endif %}</p>
+    </div>
 </dialog>
 <script defer src="{% static 'js/profile_completion.js' %}"></script>
 {% endif %}

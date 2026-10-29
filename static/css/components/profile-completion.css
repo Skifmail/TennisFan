@@ -1,0 +1,233 @@
+/* Напоминание о профиле: нативный диалог в центре экрана. */
+.profile-completion {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: min(540px, calc(100% - 32px));
+    max-width: none;
+    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    color: #ece9df;
+    border: 1px solid rgb(166 130 74 / 40%);
+    border-radius: 24px;
+    background: linear-gradient(155deg, #073d2c, #00271b 60%, #002116);
+    box-shadow: 0 32px 100px rgb(0 0 0 / 48%), inset 0 1px 0 rgb(255 255 255 / 6%);
+}
+
+.profile-completion::backdrop {
+    background: rgb(0 14 9 / 68%);
+    backdrop-filter: blur(6px);
+}
+
+.profile-completion__body {
+    position: relative;
+    padding: 32px;
+}
+
+.profile-completion__close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 12px;
+    border: 1px solid rgb(255 255 255 / 10%);
+    border-radius: 50%;
+    background: rgb(255 255 255 / 3%);
+    color: #c9ccbf;
+    cursor: pointer;
+}
+
+.profile-completion__icon {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    margin-bottom: 22px;
+    padding: 14px;
+    border: 1px solid rgb(213 178 117 / 30%);
+    border-radius: 18px;
+    color: #daba82;
+    background: rgb(166 130 74 / 12%);
+}
+
+.profile-completion svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.profile-completion__eyebrow {
+    margin: 0 0 6px;
+    color: #c9aa73;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.profile-completion__title {
+    margin: 0 0 12px;
+    color: #f2eee5;
+    font-family: var(--font-heading);
+    font-size: clamp(24px, 5vw, 30px);
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+    outline: none;
+}
+
+.profile-completion__description {
+    margin: 0 0 24px;
+    color: #b8c6bb;
+    font-size: 14px;
+    line-height: 1.65;
+    text-wrap: pretty;
+}
+
+.profile-completion__section + .profile-completion__section {
+    margin-top: 18px;
+}
+
+.profile-completion__label {
+    margin: 0 0 10px;
+    color: #e2dfd3;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.profile-completion__fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.profile-completion__fields li {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 100%;
+    padding: 7px 11px;
+    border: 1px solid rgb(201 170 115 / 25%);
+    border-radius: 8px;
+    background: rgb(166 130 74 / 7%);
+    color: #dfd4bb;
+    font-size: 13px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.profile-completion__field-dot {
+    flex: 0 0 4px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #c9aa73;
+}
+
+.profile-completion__section--optional .profile-completion__label {
+    color: #aabbb0;
+}
+
+.profile-completion__section--optional li {
+    border-color: rgb(255 255 255 / 10%);
+    background: rgb(255 255 255 / 3%);
+    color: #b8c6bb;
+}
+
+.profile-completion__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 28px;
+}
+
+.profile-completion__actions .btn {
+    flex: 1 1 auto;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px 16px;
+    font-size: 14px;
+    white-space: normal;
+}
+
+.profile-completion__actions .btn-primary {
+    background: #b59155;
+    color: #09261b;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 15%);
+}
+
+.profile-completion__actions .btn-ghost {
+    color: #c7cfc3;
+}
+
+.profile-completion__actions svg {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.profile-completion__actions .btn,
+.profile-completion__close {
+    transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease;
+}
+
+.profile-completion :is(a, button):active:not(:focus-visible) {
+    transform: scale(0.98);
+}
+
+.profile-completion :is(a, button):focus-visible {
+    outline: 2px solid #e8cb99;
+    outline-offset: 4px;
+}
+
+.profile-completion__footnote {
+    margin: 16px 0 0;
+    color: #9ab0a0;
+    font-size: 12px;
+    text-align: center;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .profile-completion__close:hover,
+    .profile-completion__actions .btn-ghost:hover {
+        background: rgb(255 255 255 / 7%);
+    }
+    .profile-completion__actions .btn-primary:hover {
+        background: #c4a066;
+    }
+}
+
+@media (width <= 480px) {
+    .profile-completion {
+        border-radius: 20px;
+    }
+    .profile-completion__body {
+        padding: 24px;
+    }
+    .profile-completion__actions {
+        flex-direction: column;
+    }
+    .profile-completion__actions .btn {
+        flex: 0 0 auto;
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .profile-completion__actions .btn,
+    .profile-completion__close {
+        transition: none;
+    }
+    .profile-completion :is(a, button):active:not(:focus-visible) {
+        transform: none;
+    }
+}

@@ -74,11 +74,22 @@ class SocialAuthTests(TestCase):
 
     def start(self, provider: str = "yandex", **data: str) -> SocialAuthFlow:
         """Начать HTTP-сеанс входа с PKCE."""
+        page = self.client.post(
+            reverse("social_start", args=[provider]), data, secure=True
+        )
+        self.assertEqual(page.status_code, 200)
+        data = {
+            **data,
+            "token": page.context["form"]["token"].value(),
+            "personal_data": "on",
+            "terms": "on",
+        }
         response = self.client.post(
             reverse("social_start", args=[provider]), data, secure=True
         )
         self.assertEqual(response.status_code, 302)
         query = parse_qs(urlparse(response.url).query)
+        self.last_start_query = query
         self.assertEqual(query["code_challenge_method"], ["S256"])
         return SocialAuthFlow.objects.get(state=query["state"][0])
 
@@ -107,8 +118,8 @@ class SocialAuthTests(TestCase):
         self.assertFalse(user.player.tennis_entry_level_set)
         self.assertFalse(user.player.is_verified)
         self.assertEqual(user.player.total_points, 0)
-        self.assertEqual(LegalAcceptanceLog.objects.filter(user=user).count(), 2)
-        self.assertEqual(UserConsent.objects.filter(user=user).count(), 2)
+        self.assertEqual(LegalAcceptanceLog.objects.filter(user=user).count(), 3)
+        self.assertEqual(UserConsent.objects.filter(user=user).count(), 0)
         self.assertFalse(SocialAuthFlow.objects.filter(pk=flow.pk).exists())
 
     def test_registers_multiple_users_without_email_and_other_data(self) -> None:
@@ -120,6 +131,147 @@ class SocialAuthTests(TestCase):
         self.assertEqual(
             SocialIdentity.objects.filter(subject__in=["one", "two"]).count(), 2
         )
+
+    def test_consent_is_required_before_provider_redirect(self) -> None:
+        url = reverse("social_start", args=["yandex"])
+        page = self.client.post(url, secure=True)
+        self.assertEqual(page.status_code, 200)
+        self.assertFalse(page.context["form"].is_bound)
+        self.assertFalse(page.context["form"]["personal_data"].value())
+        self.assertFalse(page.context["form"]["terms"].value())
+        self.assertFalse(SocialAuthFlow.objects.exists())
+        token = page.context["form"]["token"].value()
+        for changes in (
+            {},
+            {"personal_data": "on"},
+            {"terms": "on"},
+            {"personal_data": "yes", "terms": "on"},
+        ):
+            response = self.client.post(url, {"token": token, **changes}, secure=True)
+            self.assertEqual(response.status_code, 400)
+            self.assertFalse(SocialAuthFlow.objects.exists())
+            self.assertFalse(LegalAcceptanceLog.objects.exists())
+
+    def test_signed_confirmation_cannot_move_between_browsers_or_providers(
+        self,
+    ) -> None:
+        url = reverse("social_start", args=["yandex"])
+        page = self.client.post(url, secure=True)
+        data = {
+            "token": page.context["form"]["token"].value(),
+            "personal_data": "on",
+            "terms": "on",
+        }
+        for client, target in (
+            (Client(), url),
+            (self.client, reverse("social_start", args=["vk"])),
+        ):
+            response = client.post(target, data, secure=True)
+            self.assertEqual(response.status_code, 400)
+            self.assertFalse(SocialAuthFlow.objects.exists())
+
+    def test_document_change_requires_new_confirmation_and_allows_retry(self) -> None:
+        from apps.users.social_consent import load_documents
+
+        url = reverse("social_start", args=["yandex"])
+        page = self.client.post(url, secure=True)
+        data = {
+            "token": page.context["form"]["token"].value(),
+            "personal_data": "on",
+            "terms": "on",
+        }
+        documents = load_documents()
+        documents["terms"]["version"] = "changed"
+        with patch("apps.users.social_views.load_documents", return_value=documents):
+            response = self.client.post(url, data, secure=True)
+            self.assertEqual(response.status_code, 400)
+            self.assertFalse(SocialAuthFlow.objects.exists())
+            self.assertContains(response, "Форма устарела", status_code=400)
+            self.assertFalse(response.context["form"]["personal_data"].value())
+            data["token"] = response.context["form"]["token"].value()
+            self.assertEqual(self.client.post(url, data, secure=True).status_code, 302)
+
+    def test_journal_keeps_confirmed_snapshot_and_does_not_accept_paid_offer(
+        self,
+    ) -> None:
+        from apps.users.social_consent import load_documents
+
+        flow = self.start()
+        original = flow.legal_acceptance
+        with patch("apps.users.social_views.load_documents", side_effect=OSError):
+            self.callback(flow)
+        entries = LegalAcceptanceLog.objects.filter(source="social_auth")
+        self.assertEqual(
+            set(entries.values_list("document_slug", flat=True)),
+            {"social-personal-data", "terms", "privacy"},
+        )
+        for entry in entries:
+            self.assertEqual(entry.metadata["confirmed_at"], original["confirmed_at"])
+            self.assertEqual(
+                entry.metadata["document_text"],
+                original["documents"][entry.document_slug]["document_text"],
+            )
+            self.assertEqual(
+                entry.document_version,
+                original["documents"][entry.document_slug]["version"],
+            )
+        self.assertEqual(
+            entries.get(document_slug="privacy").metadata["event"], "notice_presented"
+        )
+        self.assertFalse(
+            UserConsent.objects.filter(consent_type="platform_offer").exists()
+        )
+        self.assertEqual(
+            load_documents()["terms"]["version"],
+            entries.get(document_slug="terms").document_version,
+        )
+
+    def test_legacy_flow_without_consent_cannot_fetch_profile(self) -> None:
+        flow = self.start()
+        SocialAuthFlow.objects.filter(pk=flow.pk).update(legal_acceptance={})
+        with patch("apps.users.social_views.fetch_identity") as fetch:
+            self.client.get(
+                reverse("social_callback", args=[flow.provider]),
+                {"code": "code", "state": flow.state},
+                secure=True,
+            )
+        fetch.assert_not_called()
+        self.assertFalse(SocialIdentity.objects.exists())
+
+    def test_used_confirmation_cannot_start_another_flow(self) -> None:
+        url = reverse("social_start", args=["yandex"])
+        page = self.client.post(url, secure=True)
+        data = {
+            "token": page.context["form"]["token"].value(),
+            "personal_data": "on",
+            "terms": "on",
+        }
+        self.assertEqual(self.client.post(url, data, secure=True).status_code, 302)
+        self.assertEqual(self.client.post(url, data, secure=True).status_code, 400)
+        self.assertEqual(SocialAuthFlow.objects.count(), 1)
+
+    def test_documents_unavailable_prevents_authorization(self) -> None:
+        with patch("apps.users.social_views.load_documents", side_effect=OSError):
+            response = self.client.post(
+                reverse("social_start", args=["yandex"]), secure=True
+            )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(SocialAuthFlow.objects.exists())
+
+    def test_empty_token_returns_actionable_error_and_fresh_form(self) -> None:
+        url = reverse("social_start", args=["yandex"])
+        response = self.client.post(
+            url, {"token": "", "personal_data": "on", "terms": "on"}, secure=True
+        )
+        self.assertContains(response, "Форма устарела", status_code=400)
+        self.assertTrue(response.context["form"]["token"].value())
+        self.assertFalse(response.context["form"]["personal_data"].value())
+        self.assertFalse(SocialAuthFlow.objects.exists())
+
+    def test_social_consent_is_publicly_available(self) -> None:
+        response = self.client.get(reverse("legal_social_personal_data"), secure=True)
+        self.assertContains(response, "СОГЛАСИЕ НА ОБРАБОТКУ ДАННЫХ")
+        self.assertEqual(response.headers["Cache-Control"], "no-cache")
 
     def test_available_profile_data_and_avatar_are_imported(self) -> None:
         identity = {
@@ -206,18 +358,13 @@ class SocialAuthTests(TestCase):
         for external in ("ok_ru", "mail_ru"):
             with self.subTest(external=external):
                 self.client = Client()
-                response = self.client.post(
-                    reverse("social_start", args=["vk"]),
-                    {"external_provider": external},
-                    secure=True,
-                )
-                query = parse_qs(urlparse(response.url).query)
+                flow = self.start("vk", external_provider=external)
+                query = self.last_start_query
                 self.assertEqual(query["provider"], [external])
                 self.assertEqual(query["prompt"], ["login"])
                 self.assertEqual(
                     query["redirect_uri"], [PROVIDERS["vk"]["redirect_uri"]]
                 )
-                flow = SocialAuthFlow.objects.get(state=query["state"][0])
                 self.callback(flow)
                 self.assertIn("_auth_user_id", self.client.session)
         self.assertEqual(SocialIdentity.objects.filter(provider="vk").count(), 1)

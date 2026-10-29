@@ -27,6 +27,7 @@ from apps.core.redirects import get_safe_next_url
 
 from .models import Player, SocialAuthFlow, SocialIdentity, User
 from .social_avatar import import_social_avatar
+from .social_connections import connection_providers
 from .social_consent import (
     SESSION_NONCE,
     SocialConsentForm,
@@ -60,10 +61,14 @@ def _flow(request: HttpRequest, *, lock: bool = False) -> SocialAuthFlow:
     return cast(SocialAuthFlow, flow)
 
 
-def _failure(request: HttpRequest, message: str) -> HttpResponse:
+def _failure(request: HttpRequest, message: str, next_url: str = "") -> HttpResponse:
     """Показать понятную ошибку без секретов провайдера."""
     messages.error(request, message)
-    return redirect("social_connections" if request.user.is_authenticated else "login")
+    return redirect(
+        next_url
+        or get_safe_next_url(request)
+        or ("social_connections" if request.user.is_authenticated else "login")
+    )
 
 
 @never_cache
@@ -166,9 +171,12 @@ def start(request: HttpRequest, provider: str) -> HttpResponse:
 def callback(request: HttpRequest, provider: str) -> HttpResponse:
     """Проверить ответ сервиса и однократно использовать серверный сеанс."""
     config = get_provider(provider)
+    failure_target = ""
     try:
         with transaction.atomic():
             flow = _flow(request, lock=True)
+            if flow.connect_user_id:
+                failure_target = flow.next_url
             if (
                 flow.provider != provider
                 or flow.redirect_uri != config.redirect_uri
@@ -209,10 +217,11 @@ def callback(request: HttpRequest, provider: str) -> HttpResponse:
                         user=user, provider=provider, subject=identity["subject"]
                     )
                 record_social_acceptance(flow, user)
+                target = flow.next_url
                 flow.delete()
                 request.session.pop(SESSION_FLOW, None)
                 messages.success(request, f"Аккаунт {config.label} подключён.")
-                return redirect("social_connections")
+                return redirect(target or "social_connections")
             if linked:
                 if not linked.user.is_active:
                     raise SocialAuthError
@@ -241,6 +250,7 @@ def callback(request: HttpRequest, provider: str) -> HttpResponse:
         return _failure(
             request,
             "Не удалось подтвердить вход. Попробуйте снова. Если соцсеть уже подключена к другому профилю, используйте его.",
+            next_url=failure_target,
         )
     return redirect("social_signup")
 
@@ -368,37 +378,11 @@ def _complete_signup(
 def connections(request: HttpRequest) -> HttpResponse:
     """Показать подключённые сервисы и доступные способы привязки."""
 
-    linked = {
-        item.provider: item for item in SocialIdentity.objects.filter(user=request.user)
-    }
-    providers: list[dict[str, object]] = []
-    for key in ("yandex", "vk"):
-        try:
-            config = get_provider(key)
-        except Http404:
-            if key in linked:
-                providers.append(
-                    {
-                        "key": key,
-                        "label": SocialIdentity.Provider(key).label,
-                        "linked": True,
-                        "available": False,
-                    }
-                )
-        else:
-            providers.append(
-                {
-                    "key": key,
-                    "label": config.label,
-                    "linked": key in linked,
-                    "available": True,
-                }
-            )
     return render(
         request,
         "users/social_connections.html",
         {
-            "providers": providers,
+            "providers": connection_providers(cast(User, request.user)),
             "social_password_available": cast(User, request.user).has_usable_password(),
         },
     )
@@ -431,7 +415,7 @@ def disconnect(request: HttpRequest, provider: str) -> HttpResponse:
         else:
             SocialIdentity.objects.filter(user=user, provider=provider).delete()
             messages.success(request, "Соцсеть отключена.")
-    return redirect("social_connections")
+    return redirect(get_safe_next_url(request) or "social_connections")
 
 
 @login_required

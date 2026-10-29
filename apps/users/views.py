@@ -1264,6 +1264,8 @@ def profile_edit(request):
     Returns:
         HttpResponse: Страница редактирования профиля или редирект после сохранения.
     """
+    from .social_connections import connection_providers
+
     try:
         player = request.user.player
     except Player.DoesNotExist:
@@ -1300,7 +1302,7 @@ def profile_edit(request):
         {
             "form": form,
             "next_url": next_url,
-            **_get_telegram_bot_connection_context(request.user),
+            "connection_providers": connection_providers(request.user),
         },
     )
 

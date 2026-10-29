@@ -1,225 +1,117 @@
 {% extends 'base.html' %}
 {% load static %}
-
 {% block title %}Редактирование профиля{% endblock %}
-
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">Редактирование профиля</h1>
-</div>
-
-<div class="container" style="max-width: 600px;">
-    <div class="card">
-        <div class="card-body" style="padding: var(--spacing-2xl);">
-            <form method="post" enctype="multipart/form-data">
-                {% csrf_token %}
-                {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
-                {% if form.non_field_errors %}
-                <div class="alert alert-error" style="margin-bottom: var(--spacing-lg);">
-                    {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+<div class="profile-editor">
+    <header class="profile-editor__header">
+        <a href="{% url 'profile' pk=request.user.player.pk %}" class="profile-editor__back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg>Мой профиль</a>
+        <p class="profile-editor__eyebrow">Личный кабинет</p>
+        <h1>Настройки профиля</h1>
+        <p class="profile-editor__subtitle">Расскажите о себе, настройте контакты и способы входа.</p>
+    </header>
+    <form method="post" enctype="multipart/form-data" id="profile-edit-form" class="profile-editor__layout">
+        {% csrf_token %}
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+        <aside class="profile-editor__sidebar" aria-label="Фото и разделы настроек">
+            <div class="profile-editor__identity">
+                <div class="profile-editor__avatar" id="profile-avatar-preview">
+                    {% if form.instance.avatar %}
+                    {% include 'includes/avatar.html' with avatar=form.instance.avatar class='profile-editor__avatar-image' %}
+                    {% else %}
+                    <span class="profile-editor__initial" aria-hidden="true">{{ request.user.first_name|first|default:'Я' }}</span>
+                    {% endif %}
                 </div>
-                {% endif %}
-
-                <h3 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Основная информация</h3>
-                <div class="form-group">
-                    <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
-                    {{ form.email }}
-                    {% for err in form.email.errors %}<p class="text-error">{{ err }}</p>{% endfor %}
+                <p class="profile-editor__name">{% if request.user.first_name %}{{ request.user.first_name }} {{ request.user.last_name }}{% else %}Ваш профиль{% endif %}</p>
+                <p class="profile-editor__identity-caption">Фото поможет другим игрокам узнать вас на корте.</p>
+                <div class="profile-editor__upload">
+                    <label for="{{ form.avatar.id_for_label }}" class="profile-editor__upload-label">Фото профиля <span>по желанию</span></label>
+                    <input type="file" name="{{ form.avatar.html_name }}" id="{{ form.avatar.id_for_label }}" accept="image/*" aria-describedby="profile-avatar-help{% if form.avatar.errors %} id_avatar_error{% endif %}"{% if form.avatar.errors %} aria-invalid="true"{% endif %}>
+                    <p id="profile-avatar-help" class="profile-editor__hint">Выберите изображение на устройстве. Предпросмотр появится сразу.</p>
+                    {% if form.instance.avatar %}
+                    <label class="profile-editor__remove-photo"><input type="checkbox" name="avatar-clear" id="avatar-clear_id"{% if form.avatar.data == False %} checked{% endif %}> Удалить текущее фото</label>
+                    {% endif %}
+                    {% if form.avatar.errors %}<ul id="id_avatar_error" class="profile-editor__errors" role="alert">{% for error in form.avatar.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                    <p class="profile-editor__file-status" id="profile-avatar-status" role="status"></p>
                 </div>
+            </div>
+            <nav class="profile-editor__nav" aria-label="Разделы профиля">
+                <a href="#profile-personal"><span>01</span>Личные данные</a>
+                <a href="#initial-strength"><span>02</span>На корте</a>
+                <a href="#profile-contacts"><span>03</span>Контакты</a>
+                <a href="#profile-connections"><span>04</span>Соцсети</a>
+                <a href="#profile-security"><span>05</span>Безопасность</a>
+            </nav>
+        </aside>
+        <div class="profile-editor__content">
+            {% if form.errors %}
+            <div class="profile-editor__error-summary" role="alert" tabindex="-1">
+                <h2>Проверьте отмеченные поля</h2>
+                {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+                <ul>{% for field in form %}{% for error in field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ error }}</a></li>{% endfor %}{% endfor %}</ul>
+            </div>
+            {% endif %}
+            <section class="profile-editor__section" id="profile-personal" aria-labelledby="profile-personal-title">
+                <header class="profile-editor__section-header"><span class="profile-editor__section-number" aria-hidden="true">01</span><div><h2 id="profile-personal-title">Личные данные</h2><p>Как к вам обращаться и откуда вы.</p></div></header>
+                <div class="profile-editor__grid">
+                    {% include 'users/partials/profile_edit_field.html' with field=form.first_name %}
+                    {% include 'users/partials/profile_edit_field.html' with field=form.last_name %}
+                    {% include 'users/partials/profile_edit_field.html' with field=form.birth_date %}
+                    {% include 'users/partials/profile_edit_field.html' with field=form.gender hint='Необязательное поле.' %}
+                    <div class="profile-editor__wide">{% include 'users/partials/profile_edit_field.html' with field=form.city %}</div>
+                    <div class="profile-editor__wide">{% include 'users/partials/profile_edit_field.html' with field=form.bio hint='Например, когда и где любите играть и какого соперника ищете.' %}</div>
+                </div>
+                <p class="profile-editor__hint profile-editor__required-note"><span aria-hidden="true">*</span> Обязательные поля для сохранения формы.</p>
+            </section>
+            <section class="profile-editor__section" id="initial-strength" aria-labelledby="profile-game-title">
+                <header class="profile-editor__section-header"><span class="profile-editor__section-number" aria-hidden="true">02</span><div><h2 id="profile-game-title">На корте</h2><p>Уровень игры и ваши предпочтения.</p></div></header>
                 {% if form.ntrp_level %}
-                <section id="initial-strength" class="form-group">
-                    <label class="form-label" for="{{ form.ntrp_level.id_for_label }}">Уровень силы (NTRP)</label>
-                    {{ form.ntrp_level }}
-                    <p>{{ form.ntrp_level.help_text }}</p>
-                    {% for err in form.ntrp_level.errors %}<p class="text-error">{{ err }}</p>{% endfor %}
-                    <details><summary>Не знаете уровень? Пройдите калькулятор</summary>
-                    {% include 'users/_ntrp_quiz.html' with can_save=False form_target='id_ntrp_level' %}
-                    </details>
-                </section>
+                <div class="profile-editor__level-note">Укажите стартовый уровень один раз. Затем рейтинг будет меняться по результатам матчей.</div>
+                <div class="profile-editor__grid">
+                    {% include 'users/partials/profile_edit_field.html' with field=form.ntrp_level %}
+                    {% include 'users/partials/profile_edit_field.html' with field=form.forehand %}
+                </div>
+                <details class="profile-editor__calculator"><summary>Не знаете свой уровень? Пройдите калькулятор<span aria-hidden="true">+</span></summary><div>{% include 'users/_ntrp_quiz.html' with can_save=False form_target='id_ntrp_level' %}</div></details>
                 {% else %}
-                <p>Стартовый уровень силы уже задан. Далее рейтинг меняется по результатам матчей.</p>
+                <div class="profile-editor__level-note"><strong>Стартовый уровень силы уже задан.</strong> Далее рейтинг меняется по результатам матчей.</div>
+                <div class="profile-editor__grid">{% include 'users/partials/profile_edit_field.html' with field=form.forehand %}</div>
                 {% endif %}
-
-                <div class="form-group">
-                    <label class="form-label">Аватар</label>
-                    {{ form.avatar }}
-                    {% for err in form.avatar.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
+            </section>
+            <section class="profile-editor__section" id="profile-contacts" aria-labelledby="profile-contacts-title">
+                <header class="profile-editor__section-header"><span class="profile-editor__section-number" aria-hidden="true">03</span><div><h2 id="profile-contacts-title">Контакты</h2><p>Для связи с платформой и другими игроками.</p></div></header>
+                <div class="profile-editor__grid">
+                    {% include 'users/partials/profile_edit_field.html' with field=form.email %}
+                    {% include 'users/partials/profile_edit_field.html' with field=form.phone %}
                 </div>
-
-                <div class="d-flex gap-2">
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label">{{ form.first_name.label }}</label>
-                        {{ form.first_name }}
-                        {% for err in form.first_name.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label">{{ form.last_name.label }}</label>
-                        {{ form.last_name }}
-                        {% for err in form.last_name.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                    </div>
+                <p class="profile-editor__contact-note">{% if request.user.email_verified %}<span class="profile-editor__status">Email подтверждён</span> При смене адреса потребуется подтвердить новую почту.{% else %}Подтвердите email, чтобы получать уведомления и участвовать в играх. При добавлении или смене адреса отправим письмо подтверждения.{% endif %}</p>
+                <h3 class="profile-editor__subheading">Мессенджеры <span>по желанию</span></h3>
+                <div class="profile-editor__grid profile-editor__messengers">
+                    {% include 'users/partials/profile_edit_field.html' with field=form.telegram hint='Имя пользователя в Telegram.' %}
+                    {% include 'users/partials/profile_edit_field.html' with field=form.whatsapp hint='Номер WhatsApp с кодом страны.' %}
+                    <div class="profile-editor__wide">{% include 'users/partials/profile_edit_field.html' with field=form.max_contact %}</div>
                 </div>
-
-                <div class="form-group">
-                    <label class="form-label">{{ form.phone.label }}</label>
-                    {{ form.phone }}
-                    {% for err in form.phone.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">{{ form.birth_date.label }}</label>
-                    {{ form.birth_date }}
-                    {% for err in form.birth_date.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                </div>
-
-                <div class="d-flex gap-2">
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label">{{ form.gender.label }}</label>
-                        {{ form.gender }}
-                        {% for err in form.gender.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                    </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label">{{ form.forehand.label }}</label>
-                        {{ form.forehand }}
-                        {% for err in form.forehand.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                    </div>
-                </div>
-
-                <div class="d-flex gap-2">
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label">{{ form.city.label }}</label>
-                        {{ form.city }}
-                        {% for err in form.city.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                    </div>
-                </div>
-
-                <hr style="margin: var(--spacing-xl) 0; border: none; border-top: 1px solid var(--color-border);">
-
-                <h3 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Дополнительно</h3>
-
-                <div class="form-group">
-                    <label class="form-label">{{ form.bio.label }}</label>
-                    {{ form.bio }}
-                    {% for err in form.bio.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                </div>
-
-                <div class="d-flex gap-2 flex-wrap">
-                    <div class="form-group form-group-messenger">
-                        <label class="form-label form-label-with-logo">
-                            <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="form-label__icon"
-                                width="18" height="18"> {{ form.telegram.label }} (username)
-                        </label>
-                        {{ form.telegram }}
-                        {% for err in form.telegram.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                    </div>
-                    <div class="form-group form-group-messenger">
-                        <label class="form-label form-label-with-logo">
-                            <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="form-label__icon" width="18"
-                                height="18"> {{ form.whatsapp.label }} (номер)
-                        </label>
-                        {{ form.whatsapp }}
-                        {% for err in form.whatsapp.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                    </div>
-                    <div class="form-group form-group-messenger">
-                        <label class="form-label form-label-with-logo">
-                            <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="form-label__icon"
-                                width="18" height="18"> {{ form.max_contact.label }} (ссылка или номер)
-                        </label>
-                        {{ form.max_contact }}
-                        {% for err in form.max_contact.errors %}<p class="text-error" style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm);">{{ err }}</p>{% endfor %}
-                    </div>
-                </div>
-
-                <div class="profile-info__telegram">
-                    <h3 class="profile-info__telegram-title">Telegram-бот</h3>
-                    {% if telegram_api_enabled %}
-                    <p class="text-secondary profile-info__telegram-text">
-                        Уведомления о регистрациях на турниры, матчах и дедлайнах, напоминания за 2 и 1 день,
-                        запросы на подтверждение результата. В боте: «Мои матчи», «Мой профиль», «Моя подписка».
-                    </p>
-                    <p class="text-secondary profile-info__telegram-text">
-                        <strong>Важно:</strong> нажмите кнопку ниже, откройте чат с ботом и нажмите <strong>«Запустить»</strong> (или отправьте /start). Без этого бот не сможет присылать вам сообщения.
-                    </p>
-                    <p class="text-secondary profile-info__telegram-text">
-                        Подключая Telegram-бота, вы соглашаетесь с передачей необходимых данных в сервис Telegram для работы уведомлений.
-                        Подробнее:
-                        <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">Политика конфиденциальности</a>
-                        и
-                        <a href="{% url 'legal_personal_data' %}" target="_blank" rel="noopener">Согласие на обработку персональных данных</a>.
-                    </p>
-                    {% if telegram_user_bot_connected %}
-                    <p class="text-success profile-info__telegram-status">✓ Бот подключён — уведомления будут приходить в Telegram</p>
-                    <div class="profile-info__telegram-actions">
-                        {% if telegram_bot_username %}
-                        <a href="https://t.me/{{ telegram_bot_username }}" target="_blank" rel="noopener" class="btn btn-telegram btn-telegram--outline">
-                            <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="btn-telegram__icon" width="20" height="20"> Открыть бота
-                        </a>
-                        {% endif %}
-                        <button type="submit" form="telegram-disconnect-form" class="btn btn-outline btn-danger-text">Отключить бота</button>
-                    </div>
-                    {% else %}
-                    <div class="profile-info__telegram-consent-form">
-                        <label class="consent-label profile-info__telegram-consent">
-                            <input type="checkbox" name="telegram_transfer_consent" required form="telegram-connect-form">
-                            <span class="consent-text">
-                                Я подтверждаю согласие на передачу необходимых данных в сервис Telegram
-                                для работы уведомлений бота.
-                            </span>
-                        </label>
-                        <button type="submit" form="telegram-connect-form" class="btn btn-telegram">
-                            <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="btn-telegram__icon" width="20" height="20"> Подключить Telegram-бот
-                        </button>
-                    </div>
-                    {% endif %}
-                    {% else %}
-                    <div class="profile-info__telegram-unavailable" role="status">
-                        <p class="profile-info__telegram-unavailable-text">
-                            Telegram-бот сейчас недоступен для подключения.
-                            Уведомления о событиях можно получать по email и во внутренних уведомлениях личного кабинета.
-                        </p>
-                    </div>
-                    {% if telegram_user_bot_connected %}
-                    <p class="text-secondary profile-info__telegram-text">
-                        У вас сохранена привязка к боту, но сообщения с платформы в Telegram сейчас не отправляются.
-                        При желании можно отключить привязку — это не повлияет на остальные способы уведомлений.
-                    </p>
-                    <div class="profile-info__telegram-actions">
-                        <button type="submit" form="telegram-disconnect-form" class="btn btn-outline btn-danger-text">Отключить привязку</button>
-                    </div>
-                    {% endif %}
-                    {% endif %}
-                </div>
-
-                <hr style="margin: var(--spacing-xl) 0; border: none; border-top: 1px solid var(--color-border);">
-
-                <h3 style="margin-bottom: var(--spacing-lg); font-size: var(--font-size-lg);">Безопасность</h3>
-                <p><a href="{% url 'social_connections' %}" class="btn btn-outline">Подключённые соцсети</a></p>
-
-                <div class="form-group">
-                    <label class="form-label">Пароль</label>
-                    <p class="text-secondary" style="margin-bottom: var(--spacing-sm);">
-                        Для изменения пароля перейдите на специальную страницу.
-                    </p>
-                    {% if request.user.has_usable_password %}
-                    <a href="{% url 'password_change' %}" class="btn btn-outline">Сменить пароль</a>
-                    {% else %}
-                    <a href="{% url 'social_set_password' %}" class="btn btn-outline">Задать пароль</a>
-                    {% endif %}
-                </div>
-
-                <div class="d-flex gap-2" style="margin-top: var(--spacing-xl);">
-                    <button type="submit" class="btn btn-primary btn-lg" style="flex: 1;">Сохранить</button>
-                    <a href="{% url 'profile' pk=request.user.player.pk %}" class="btn btn-ghost btn-lg">Отмена</a>
-                </div>
-            </form>
-            <form id="telegram-disconnect-form" method="post" action="{% url 'telegram_disconnect' %}" style="display: none;">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="{% url 'profile_edit' %}">
-            </form>
-            <form id="telegram-connect-form" method="post" action="{% url 'telegram_connect' %}" style="display: none;">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="{% url 'profile_edit' %}">
-            </form>
+            </section>
+            {% include 'users/partials/profile_social_connections.html' %}
+            <section class="profile-editor__section" id="profile-security" aria-labelledby="profile-security-title">
+                <header class="profile-editor__section-header"><span class="profile-editor__section-number" aria-hidden="true">05</span><div><h2 id="profile-security-title">Безопасность</h2><p>Управляйте доступом к вашему аккаунту.</p></div></header>
+                <div class="profile-editor__security-row"><div><h3>Пароль</h3><p>{% if request.user.has_usable_password %}Измените пароль на отдельной странице.{% else %}Добавьте пароль, чтобы входить также по email.{% endif %}</p></div>{% if request.user.has_usable_password %}<a href="{% url 'password_change' %}" class="btn btn-outline">Сменить пароль</a>{% else %}<a href="{% url 'social_set_password' %}" class="btn btn-outline">Задать пароль</a>{% endif %}</div>
+            </section>
+            <div class="profile-editor__save-bar">
+                <p>Личные данные и контакты сохраняются по кнопке.</p>
+                <div><a href="{% url 'profile' pk=request.user.player.pk %}" class="btn btn-ghost">Отмена</a><button type="submit" class="btn btn-primary">Сохранить изменения</button></div>
+            </div>
         </div>
-    </div>
+    </form>
+    {% for provider in connection_providers %}
+    {% if provider.linked %}
+    <form id="profile-social-{{ provider.key }}-disconnect" method="post" action="{% url 'social_disconnect' provider=provider.key %}" hidden>{% csrf_token %}<input type="hidden" name="next" value="{% url 'profile_edit' %}#profile-connections"></form>
+    {% elif provider.available %}
+    <form id="profile-social-{{ provider.key }}-connect" method="post" action="{% url 'social_start' provider=provider.key %}" hidden>{% csrf_token %}<input type="hidden" name="process" value="connect"><input type="hidden" name="next" value="{% url 'profile_edit' %}#profile-connections"></form>
+    {% if provider.key == 'vk' %}
+    <form id="profile-social-vk-ok_ru" method="post" action="{% url 'social_start' provider='vk' %}" hidden>{% csrf_token %}<input type="hidden" name="process" value="connect"><input type="hidden" name="external_provider" value="ok_ru"><input type="hidden" name="next" value="{% url 'profile_edit' %}#profile-connections"></form>
+    <form id="profile-social-vk-mail_ru" method="post" action="{% url 'social_start' provider='vk' %}" hidden>{% csrf_token %}<input type="hidden" name="process" value="connect"><input type="hidden" name="external_provider" value="mail_ru"><input type="hidden" name="next" value="{% url 'profile_edit' %}#profile-connections"></form>
+    {% endif %}
+    {% endif %}
+    {% endfor %}
 </div>
 {% endblock %}
+{% block extra_js %}<script defer src="{% static 'js/profile_edit.js' %}"></script>{% endblock %}

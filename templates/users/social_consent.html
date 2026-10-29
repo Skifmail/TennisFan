@@ -55,7 +55,7 @@
             <p class="social-consent__note">Этот шаг не оформляет подписку, оплату или согласие на рекламу. Внешний сервис отдельно предложит подтвердить доступ к данным.</p>
             <div class="social-consent__actions">
                 <button type="submit" class="btn btn-primary">Продолжить через {{ provider_label }}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
-                <a href="{% if connect %}{% url 'social_connections' %}{% else %}{% url 'login' %}{% endif %}" class="btn btn-ghost">Отмена</a>
+                <a href="{% if connect and next_url %}{{ next_url }}{% elif connect %}{% url 'social_connections' %}{% else %}{% url 'login' %}{% endif %}" class="btn btn-ghost">Отмена</a>
             </div>
         </form>
         <p class="social-consent__alternative">{% if connect %}Подключение добровольное. Текущий способ входа сохранится.{% else %}Другой способ входа — <a href="{% url 'login' %}">по электронной почте</a>.{% endif %}</p>

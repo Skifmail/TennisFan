@@ -1,0 +1,36 @@
+<section class="profile-editor__section" id="profile-connections" aria-labelledby="profile-connections-title">
+    <header class="profile-editor__section-header"><span class="profile-editor__section-number" aria-hidden="true">04</span><div><h2 id="profile-connections-title">Подключённые соцсети</h2><p>Входите удобным способом в тот же профиль.</p></div></header>
+    <div class="profile-social-list">
+        {% for provider in connection_providers %}
+        <div class="profile-social{% if provider.linked %} profile-social--connected{% endif %}">
+            <div class="profile-social__row">
+                <span class="profile-social__brand profile-social__brand--{{ provider.key }}" aria-hidden="true">{% if provider.key == 'yandex' %}Я{% else %}VK{% endif %}</span>
+                <div class="profile-social__info">
+                    <h3>{% if provider.key == 'vk' %}VK ID{% else %}{{ provider.label }}{% endif %}</h3>
+                    {% if provider.linked %}<p class="profile-social__status"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor" fill-opacity=".15"/><path d="m6 10 2.5 2.5L14 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Подключено</p>
+                    {% else %}<p class="profile-social__unlinked">{% if provider.available %}Не подключено{% else %}Временно недоступно{% endif %}</p>{% endif %}
+                    {% if provider.linked and not provider.available %}<p class="profile-social__unlinked">Вход через сервис временно недоступен</p>{% endif %}
+                </div>
+                {% if provider.linked %}<button type="submit" form="profile-social-{{ provider.key }}-disconnect" class="btn btn-ghost profile-social__action" aria-label="Отключить {% if provider.key == 'vk' %}VK ID{% else %}{{ provider.label }}{% endif %}">Отключить</button>
+                {% elif provider.available %}<button type="submit" form="profile-social-{{ provider.key }}-connect" class="btn btn-outline profile-social__action" aria-label="Подключить {% if provider.key == 'vk' %}VK ID{% else %}{{ provider.label }}{% endif %}">Подключить</button>{% endif %}
+            </div>
+            {% if provider.key == 'vk' %}
+            <div class="profile-social__vk-services">
+                <p>VK, Одноклассники и Mail используют общую привязку VK ID.</p>
+                <div class="profile-social__methods">
+                    {% if provider.linked %}
+                    <span class="profile-social__method"><span class="profile-social__mini profile-social__mini--vk" aria-hidden="true">VK</span>VK</span>
+                    <span class="profile-social__method"><span class="profile-social__mini profile-social__mini--ok" aria-hidden="true">OK</span>Одноклассники</span>
+                    <span class="profile-social__method"><span class="profile-social__mini profile-social__mini--mail" aria-hidden="true">@</span>Mail</span>
+                    {% elif provider.available %}
+                    <button type="submit" form="profile-social-vk-ok_ru" class="profile-social__method"><span class="profile-social__mini profile-social__mini--ok" aria-hidden="true">OK</span>Через Одноклассники</button>
+                    <button type="submit" form="profile-social-vk-mail_ru" class="profile-social__method"><span class="profile-social__mini profile-social__mini--mail" aria-hidden="true">@</span>Через Mail</button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}<p class="profile-editor__description">Подключение соцсетей сейчас недоступно. Другие способы входа сохраняются.</p>{% endfor %}
+    </div>
+    <p class="profile-editor__hint profile-social-list__hint">Чтобы отключить последний способ входа, сначала задайте пароль или подключите другой сервис.</p>
+</section>

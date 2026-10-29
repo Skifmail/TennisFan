@@ -19,6 +19,7 @@
 @import url('./components/feedback.css');
 @import url('./components/autocomplete.css');
 @import url('./pages/profile.css');
+@import url('./pages/profile-edit.css');
 @import url('./pages/matches.css');
 @import url('./pages/contacts.css');
 @import url('./pages/auth.css');

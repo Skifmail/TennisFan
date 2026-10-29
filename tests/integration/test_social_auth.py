@@ -491,6 +491,74 @@ class SocialAuthTests(TestCase):
         self.client.post(reverse("social_disconnect", args=["yandex"]), secure=True)
         self.assertFalse(SocialIdentity.objects.filter(user=user).exists())
 
+    def test_profile_edit_shows_inline_connections_without_telegram(self) -> None:
+        user = User.objects.create_user(
+            email="settings@test.local", password="StrongPass123!"
+        )
+        Player.objects.create(user=user)
+        SocialIdentity.objects.create(user=user, provider="yandex", subject="settings")
+        self.client.force_login(user)
+        with patch("apps.users.views._get_telegram_bot_connection_context") as telegram:
+            response = self.client.get(reverse("profile_edit"), secure=True)
+        telegram.assert_not_called()
+        self.assertContains(response, 'id="profile-connections"')
+        self.assertContains(response, "Подключено")
+        self.assertContains(response, 'aria-label="Отключить Яндекс"')
+        self.assertContains(response, 'aria-label="Подключить VK ID"')
+        self.assertContains(response, 'name="external_provider" value="ok_ru"')
+        self.assertContains(response, 'name="external_provider" value="mail_ru"')
+        self.assertNotContains(response, "Telegram-бот")
+        self.assertNotContains(response, 'id="telegram-connect-form"')
+        states = {
+            provider["key"]: provider["linked"]
+            for provider in response.context["connection_providers"]
+        }
+        self.assertEqual(states, {"yandex": True, "vk": False})
+
+    def test_profile_connection_returns_directly_to_profile(self) -> None:
+        user = User.objects.create_user(
+            email="inline@test.local", password="StrongPass123!"
+        )
+        self.client.force_login(user)
+        target = reverse("profile_edit") + "#profile-connections"
+        response = self.callback(self.start(process="connect", next=target))
+        self.assertEqual(response.url, target)
+        response = self.client.post(
+            reverse("social_disconnect", args=["yandex"]), {"next": target}, secure=True
+        )
+        self.assertEqual(response.url, target)
+        self.assertFalse(SocialIdentity.objects.filter(user=user).exists())
+
+    def test_inline_connection_cancellation_returns_to_profile(self) -> None:
+        user = User.objects.create_user(
+            email="inline-cancel@test.local", password="StrongPass123!"
+        )
+        self.client.force_login(user)
+        target = reverse("profile_edit") + "#profile-connections"
+        flow = self.start(process="connect", next=target)
+        response = self.client.get(
+            reverse("social_callback", args=["yandex"]),
+            {"state": flow.state, "error": "access_denied"},
+            secure=True,
+        )
+        self.assertEqual(response.url, target)
+        self.assertFalse(SocialIdentity.objects.filter(user=user).exists())
+
+    def test_disconnect_rejects_external_return_address(self) -> None:
+        user = User.objects.create_user(
+            email="inline-safe@test.local", password="StrongPass123!"
+        )
+        SocialIdentity.objects.create(
+            user=user, provider="yandex", subject="inline-safe"
+        )
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("social_disconnect", args=["yandex"]),
+            {"next": "https://evil.test/"},
+            secure=True,
+        )
+        self.assertEqual(response.url, reverse("social_connections"))
+
     def test_other_users_identity_cannot_be_connected(self) -> None:
         owner = User.objects.create_user(email="owner@test.local")
         other = User.objects.create_user(email="other@test.local")

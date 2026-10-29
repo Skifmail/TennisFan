@@ -3,13 +3,6 @@
 
 {% block title %}{% if active_mode == 'login' %}Вход{% else %}Регистрация{% endif %}{% endblock %}
 
-{% block extra_css %}
-<style>
-.social-auth-buttons { width: 100%; flex-shrink: 0; }
-.auth-form .social-auth-buttons form { flex: 1; width: auto; margin: 0; }
-.auth-form .social-auth-buttons button[type="submit"] { width: 100%; margin-top: 0; }
-</style>
-{% endblock %}
 {% block content %}
 <div class="auth-wrapper">
     <div class="auth-page">
@@ -34,6 +27,7 @@
             <!-- Форма регистрации (справа), два этапа -->
             <div class="auth-form register {% if active_mode == 'register' %}active{% endif %}">
                 {% include "users/_social_buttons.html" %}
+                <div class="social-auth-divider"><span>или зарегистрируйтесь по email</span></div>
                 <form method="post" id="register-form" class="register-form-layout register-form-steps" novalidate data-loader-overlay autocomplete="on">
                     {% csrf_token %}
                     <input type="hidden" name="form_type" value="register">
@@ -218,29 +212,7 @@
 
             <!-- Форма входа (слева) -->
             <div class="auth-form login {% if active_mode == 'login' %}active{% endif %}">
-                {% include "users/_social_buttons.html" %}
-                <form method="post" class="auth-login-form" data-loader-overlay autocomplete="on">
-                    {% csrf_token %}
-                    <input type="hidden" name="form_type" value="login">
-                    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
-
-                    {% if login_form.errors %}
-                    <div class="alert alert-error mb-3" role="alert">
-                        {% if login_form.non_field_errors %}
-                            {% for error in login_form.non_field_errors %}
-                                <p style="margin: 0;">{{ error }}</p>
-                            {% endfor %}
-                        {% else %}
-                            <p style="margin: 0;">Не удалось войти. Проверьте email и пароль.</p>
-                        {% endif %}
-                        {% for field in login_form %}
-                            {% for error in field.errors %}
-                                <p style="margin: 0;">{{ field.label }}: {{ error }}</p>
-                            {% endfor %}
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
+                <div class="auth-login-content">
                     <div class="auth-login-logo">
                         <div class="coin">
                             <div class="coin__face coin__front">
@@ -252,43 +224,67 @@
                             <div class="coin__edge"></div>
                         </div>
                     </div>
+                    <form method="post" class="auth-login-form" data-loader-overlay autocomplete="on">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_type" value="login">
+                        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
 
-                    <div class="form-group">
-                        <label class="form-label" for="id_username">Email</label>
-                        <input type="email" name="username" id="id_username" class="form-control" required
-                            autocomplete="username" value="{{ login_form.username.value|default_if_none:'' }}" autofocus>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="id_login_password">Пароль</label>
-                        <div class="password-field-wrapper">
-                            <input type="password" name="password" id="id_login_password" class="form-control" required
-                                autocomplete="current-password">
-                            <button type="button" class="password-toggle-btn" aria-label="Показать пароль"
-                                onclick="togglePasswordVisibility(this)">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                            </button>
+                        {% if login_form.errors %}
+                        <div class="alert alert-error mb-3" role="alert">
+                            {% if login_form.non_field_errors %}
+                                {% for error in login_form.non_field_errors %}
+                                    <p style="margin: 0;">{{ error }}</p>
+                                {% endfor %}
+                            {% else %}
+                                <p style="margin: 0;">Не удалось войти. Проверьте email и пароль.</p>
+                            {% endif %}
+                            {% for field in login_form %}
+                                {% for error in field.errors %}
+                                    <p style="margin: 0;">{{ field.label }}: {{ error }}</p>
+                                {% endfor %}
+                            {% endfor %}
                         </div>
-                    </div>
+                        {% endif %}
 
-                    <div style="text-align: right; margin-bottom: var(--spacing-sm);">
-                        <a href="{% url 'password_reset' %}" class="text-link"
-                            style="font-size: var(--font-size-sm);">Забыли пароль?</a>
-                    </div>
+                        <div class="form-group">
+                            <label class="form-label" for="id_username">Email</label>
+                            <input type="email" name="username" id="id_username" class="form-control" required
+                                autocomplete="username" value="{{ login_form.username.value|default_if_none:'' }}" autofocus>
+                        </div>
 
-                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;" data-loading-text="Вход...">Войти</button>
-                    <div class="auth-register-link">
-                        <p class="text-secondary" style="margin: 0 0 var(--spacing-sm);">Нет аккаунта?</p>
-                        <button type="button" class="btn btn-outline" style="width: 100%;"
-                            onclick="toggleView()">Зарегистрироваться</button>
-                    </div>
-                    <p class="text-secondary" style="margin-top: var(--spacing-md); font-size: var(--font-size-sm); text-align: center;">
+                        <div class="form-group">
+                            <label class="form-label" for="id_login_password">Пароль</label>
+                            <div class="password-field-wrapper">
+                                <input type="password" name="password" id="id_login_password" class="form-control" required
+                                    autocomplete="current-password">
+                                <button type="button" class="password-toggle-btn" aria-label="Показать пароль"
+                                    onclick="togglePasswordVisibility(this)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="text-align: right; margin-bottom: var(--spacing-sm);">
+                            <a href="{% url 'password_reset' %}" class="text-link"
+                                style="font-size: var(--font-size-sm);">Забыли пароль?</a>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;" data-loading-text="Вход...">Войти</button>
+                        <div class="auth-register-link">
+                            <p class="text-secondary" style="margin: 0 0 var(--spacing-sm);">Нет аккаунта?</p>
+                            <button type="button" class="btn btn-outline" style="width: 100%;"
+                                onclick="toggleView()">Зарегистрироваться</button>
+                        </div>
+                    </form>
+                    <div class="social-auth-divider"><span>или войдите через соцсеть</span></div>
+                    {% include "users/_social_buttons.html" %}
+                    <p class="text-secondary auth-club-link">
                         Представляете клуб? <a href="{% url 'clubs:register_choice' %}">Создать клуб на платформе</a>
                     </p>
-                </form>
+                </div>
             </div>
         </div>
     </div>

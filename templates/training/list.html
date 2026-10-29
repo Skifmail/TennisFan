@@ -54,7 +54,7 @@
                     name="city"
                     class="form-control"
                     value="{{ current_city }}"
-                    placeholder="Москва"
+                    placeholder="Все города"
                     aria-label="Город"
                     autocomplete="off"
                     data-training-city
@@ -118,47 +118,41 @@
         </section>
     </div>
 
+    {% if show_feed_sections %}
+    {% if viewer_city and trainings and not trainings.0.is_local %}
+    <section class="training-feed__section" aria-labelledby="training-feed-local-empty">
+        <div class="training-feed__heading">
+            <h2 id="training-feed-local-empty">Рядом с вами</h2>
+            <span>{{ viewer_city }}</span>
+        </div>
+        <p class="text-secondary">В вашем населённом пункте тренировок пока нет.</p>
+    </section>
+    {% endif %}
+    {% regroup trainings by is_local as training_sections %}
+    {% for section in training_sections %}
+    <section class="training-feed__section{% if not section.grouper and viewer_city %} training-feed__section--other{% endif %}" aria-labelledby="training-feed-title-{{ forloop.counter }}">
+        <div class="training-feed__heading">
+            <h2 id="training-feed-title-{{ forloop.counter }}">{% if section.grouper %}Рядом с вами{% elif viewer_city %}В других городах{% else %}Все тренировки{% endif %}</h2>
+            {% if section.grouper %}<span>{{ viewer_city }}</span>{% endif %}
+        </div>
+        <div class="training-list-grid">
+            {% for training in section.list %}
+            {% include 'training/_training_card.html' with training=training %}
+            {% endfor %}
+        </div>
+    </section>
+    {% empty %}
+    <p class="text-secondary">Тренировки пока не добавлены.</p>
+    {% endfor %}
+    {% else %}
     <div class="training-list-grid">
         {% for training in trainings %}
-        <a href="{% url 'training_detail' slug=training.slug %}" class="card training-card">
-            {% if training.image %}
-            <img src="{{ training.image.url }}" alt="" class="card-image">
-            {% else %}
-            <div class="card-image" style="background: linear-gradient(135deg, var(--color-primary-transparent), var(--color-bg-elevated));"></div>
-            {% endif %}
-            <div class="card-body">
-                <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">
-                    {% for sport_label in training.sports_display %}
-                    <span class="player-category">{{ sport_label }}</span>
-                    {% endfor %}
-                    {% for tt in training.training_types_display %}
-                    <span class="player-category">{{ tt }}</span>
-                    {% endfor %}
-                    {% for sl in training.skill_levels_display %}
-                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ sl }}</span>
-                    {% endfor %}
-                    {% if training.city %}
-                    <span class="player-category" style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ training.city }}</span>
-                    {% endif %}
-                </div>
-                <h3 class="card-title">{{ training.title }}</h3>
-                <p class="card-text">{{ training.short_description|default:training.description|truncatewords:15 }}</p>
-                {% if training.coach %}
-                <p class="text-secondary mt-2" style="font-size: var(--font-size-sm);">Тренер: {{ training.coach.name }}</p>
-                {% endif %}
-                {% if training.price_display %}
-                <p class="text-primary mt-2" style="font-weight: 600;">{{ training.price_display }}
-                    {% if training.court_price_display %}
-                    <span class="text-secondary" style="font-weight: 400; font-size: var(--font-size-sm);">{{ training.court_price_display }}</span>
-                    {% endif %}
-                </p>
-                {% endif %}
-            </div>
-        </a>
+        {% include 'training/_training_card.html' with training=training %}
         {% empty %}
-        <p class="text-secondary">Тренировки пока не добавлены.</p>
+        <p class="text-secondary">В выбранном городе тренировок пока нет.</p>
         {% endfor %}
     </div>
+    {% endif %}
 </div>
 {% endblock %}
 

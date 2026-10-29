@@ -13,7 +13,11 @@
             <span class="notification-settings__eyebrow">Это устройство</span>
             <h3 id="web-push-title">Подключение push <span id="web-push-badge" class="notification-device__badge" aria-hidden="true" hidden>✓ Подключено</span></h3>
             <p id="web-push-status" role="status" aria-live="polite">Проверяем подключение устройства…</p>
-            <button id="web-push-toggle" type="button" class="btn btn-outline" aria-describedby="web-push-status" disabled>Загрузка…</button>
+            <div class="notification-device__actions">
+                <button id="web-push-toggle" type="button" class="btn btn-outline" aria-describedby="web-push-status" disabled>Загрузка…</button>
+                <button id="web-push-test" type="button" class="btn btn-outline hidden" aria-describedby="web-push-test-status" hidden>Проверить доставку</button>
+            </div>
+            <p id="web-push-test-status" class="notification-device__test-status" role="status" aria-live="polite"></p>
             {% include "includes/web_push_android_help.html" %}
             <form id="web-push-code-form" class="notification-code" hidden>
                 <label for="web-push-code">Код из push-уведомления</label>

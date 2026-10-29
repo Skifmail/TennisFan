@@ -48,6 +48,11 @@ urlpatterns = [
     path("champions-league/", views.champions_league, name="champions_league"),
     path("my/", views.my_matches, name="my_matches"),
     path("my/sparring/", views.my_sparring_matches, name="my_sparring_matches"),
+    path(
+        "match/<int:pk>/extend-deadline/",
+        views.extend_sparring_match_deadline,
+        name="extend_sparring_match_deadline",
+    ),
     path("match/<int:pk>/propose/", views.propose_result, name="propose_result"),
     path("proposal/<int:pk>/confirm/", views.confirm_proposal, name="confirm_proposal"),
     path(

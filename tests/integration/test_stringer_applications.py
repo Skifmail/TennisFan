@@ -19,11 +19,68 @@ from apps.content.models import (
     StringerCompanyPhoto,
     StringerPage,
 )
+from apps.content.stringer_forms import StringerApplicationForm
 from apps.content.stringer_services import review_stringer_application
 from apps.notifications.models import Delivery, NotificationPreference
 from apps.users.models import Notification, User
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "error"),
+    [
+        ("name", "   ", "Заполните поле"),
+        ("address", "", "Заполните поле"),
+        ("price", "", "Заполните поле"),
+        ("description", "", "Заполните поле"),
+        ("contact_name", "", "Заполните поле"),
+        ("email", "wrong@", "name@example.ru"),
+        ("name", "x" * 201, "максимум 200"),
+        ("phone", "+", "полный номер РФ"),
+        ("phone", "+79991234567oops", "полный номер РФ"),
+        ("whatsapp", "+", "полный номер РФ"),
+        ("whatsapp", "+799912345678", "полный номер РФ"),
+        ("telegram", "user name", "@username"),
+        ("telegram", "@@username", "@username"),
+        ("max_contact", "https://example.com/profile", "профиль MAX"),
+        ("max_contact", "https://[", "профиль MAX"),
+    ],
+)
+def test_field_errors_are_visible_and_link_to_input(
+    client: Client, field: str, value: str, error: str
+) -> None:
+    """Ошибка объясняет причину отказа и указывает конкретное поле без JavaScript."""
+    data = application_data()
+    data[field] = value
+    response = client.post(reverse("stringer_application"), data)
+    html = response.content.decode()
+    assert response.status_code == 200
+    assert error in response.context["form"].errors[field][0]
+    assert "Заявка не отправлена" in html
+    assert f'href="#id_{field}"' in html
+    assert 'value="Струны тест"' in html or field == "name"
+    assert not StringerApplication.objects.exists()
+
+
+@pytest.mark.parametrize(
+    "number", ["+7 (999) 123-45-67", "8 999 123 45 67", "9991234567"]
+)
+def test_phone_formatting_is_accepted(number: str) -> None:
+    """Плюс и обычные разделители допустимы и приводятся к единому формату."""
+    data = application_data()
+    data.update(phone=number, whatsapp=number, telegram="https://t.me/stringer_test")
+    form = StringerApplicationForm(data)
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data["whatsapp"] == "+79991234567"
+    assert form.cleaned_data["telegram"] == "stringer_test"
+
+
+def test_optional_contacts_can_be_empty() -> None:
+    """Пустые необязательные контакты не блокируют отправку."""
+    data = application_data()
+    data.update(telegram="", whatsapp="", max_contact="")
+    assert StringerApplicationForm(data).is_valid()
 
 
 @pytest.fixture(autouse=True)

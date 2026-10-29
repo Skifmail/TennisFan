@@ -170,6 +170,9 @@ if PROFILING and DEBUG:
 
 MIDDLEWARE = [
     "apps.core.health.HealthMiddleware",
+    # Один origin OneSignal: www-адреса уводятся на канонический домен.
+    # До SecurityMiddleware, чтобы www-хост не зависел от ALLOWED_HOSTS.
+    "apps.core.middleware.CanonicalHostMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     # После WhiteNoise: статика уже сжата, HTML динамических страниц — нет.
@@ -500,6 +503,18 @@ if not SITE_URL:
 # Не заданы — теги не выводятся.
 GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip()
 YANDEX_VERIFICATION = os.environ.get("YANDEX_VERIFICATION", "").strip()
+
+# ------------------------------------------------------------------------------
+# АНАЛИТИКА: Яндекс.Метрика
+# ------------------------------------------------------------------------------
+# ID счётчика. Пусто или 0 — счётчик не подключается (local/dev/staging).
+# В base.html счётчик грузится только после согласия пользователя на cookie.
+_yandex_metrika_raw = os.environ.get("YANDEX_METRIKA_ID", "").strip()
+YANDEX_METRIKA_ID: Final = (
+    int(_yandex_metrika_raw)
+    if _yandex_metrika_raw.isdigit() and int(_yandex_metrika_raw) > 0
+    else 0
+)
 
 # ------------------------------------------------------------------------------
 # YANDEX MAPS / GEOCODER

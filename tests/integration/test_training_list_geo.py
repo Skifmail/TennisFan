@@ -7,7 +7,8 @@ from apps.core.geo import GeoRegion
 from apps.core.models import GeoArea
 from apps.courts.models import Court
 from apps.training.forms import TrainingEnrollmentForm
-from apps.training.models import Training
+from apps.training.models import Coach, Training
+from tests.support.factories import make_player, make_user
 
 
 def _make_court(
@@ -91,7 +92,7 @@ class TrainingListGeographyTestCase(TestCase):
             "Москва, Раменское, Жуковский, Воскресенск и Павловский Посад",
         )
         self.assertContains(response, 'name="city"')
-        self.assertContains(response, 'value="Москва"')
+        self.assertContains(response, 'placeholder="Все города"')
         self.assertContains(response, "Где вам удобно?")
         self.assertContains(response, "Район Москвы.")
         self.assertContains(response, "Юг")
@@ -191,18 +192,17 @@ class TrainingListExtraCitiesTestCase(TestCase):
             type_prices={"individual": 3000},
         )
 
-    def test_default_moscow_hides_other_city_trainings(self) -> None:
+    def test_default_shows_trainings_from_all_cities(self) -> None:
         response = self.client.get(reverse("training_list"), secure=True)
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="city"')
-        self.assertContains(response, 'value="Москва"')
+        self.assertContains(response, 'placeholder="Все города"')
         self.assertContains(response, "Где вам удобно?")
         self.assertContains(response, "Тренировка в Москве")
-        self.assertNotContains(response, "Тренировка в Ростове")
+        self.assertContains(response, "Тренировка в Ростове")
         self.assertNotContains(response, "data-extra-city-filter")
         self.assertNotContains(response, "Другие города")
-        self.assertNotContains(response, "Казань")
         self.assertContains(
             response,
             "Москва, Раменское, Жуковский, Воскресенск, Павловский Посад и Ростов-на-Дону",
@@ -253,11 +253,11 @@ class TrainingListMultiCityTestCase(TestCase):
             type_prices={"individual": 3000},
         )
 
-    def test_default_moscow_shows_multi_city_training(self) -> None:
+    def test_default_shows_multi_city_training(self) -> None:
         response = self.client.get(reverse("training_list"), secure=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="Москва"')
+        self.assertContains(response, 'placeholder="Все города"')
         self.assertContains(
             response,
             "Тренировки по теннису в Москве, Раменском, Жуковском, Воскресенске",
@@ -290,6 +290,92 @@ class TrainingListMultiCityTestCase(TestCase):
             response,
             "Тренировки по теннису в Москве, Раменском, Жуковском, Воскресенске",
         )
+
+
+class TrainingListProximityOrderTestCase(TestCase):
+    """Без фильтра лента идёт от своего города к дальним."""
+
+    def setUp(self) -> None:
+        Training.objects.create(
+            title="Тренировка в Ростове",
+            slug="feed-order-rostov",
+            description="Описание",
+            city="Ростов-на-Дону",
+            type_prices={"individual": 3000},
+        )
+        Training.objects.create(
+            title="Тренировка в Москве",
+            slug="feed-order-moscow",
+            description="Описание",
+            city="Москва",
+            type_prices={"individual": 3000},
+        )
+        Training.objects.create(
+            title="Тренировка в Раменском",
+            slug="feed-order-ramenskoe",
+            description="Описание",
+            city="Раменское",
+            type_prices={"individual": 3000},
+        )
+        self.player = make_player(email_suffix="training-feed-order")
+        self.player.city = "Раменское"
+        self.player.save(update_fields=["city"])
+        self.client.force_login(self.player.user)
+
+    def test_local_training_goes_before_nearby_and_far(self) -> None:
+        response = self.client.get(reverse("training_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Рядом с вами")
+        self.assertContains(response, "В других городах")
+        html = response.content.decode()
+        positions = [
+            html.index(title)
+            for title in (
+                "Тренировка в Раменском",
+                "Тренировка в Москве",
+                "Тренировка в Ростове",
+            )
+        ]
+        self.assertEqual(positions, sorted(positions))
+
+
+class CoachPublishedTrainingVisibilityTestCase(TestCase):
+    """Опубликованная тренером тренировка сразу видна всем без галочек."""
+
+    def setUp(self) -> None:
+        self.coach_user = make_user(email="publish-coach@test.local")
+        self.coach = Coach.objects.create(
+            user=self.coach_user,
+            name="Публикующий тренер",
+            slug="publishing-coach",
+            city="Раменское",
+        )
+        self.client.force_login(self.coach_user)
+
+    def test_new_training_appears_in_public_list(self) -> None:
+        response = self.client.post(
+            reverse("training_add"),
+            {
+                "title": "Новая тренировка тренера",
+                "description": "Описание",
+                "sports": ["tennis"],
+                "skill_levels": ["novice"],
+                "type_prices_checked_group": "on",
+                "type_prices_price_group": "1500",
+                "city": "Раменское",
+                "duration_minutes": "60",
+                "max_participants": "1",
+                "is_active": "on",
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        training = Training.objects.get(title="Новая тренировка тренера")
+        self.assertTrue(training.is_active)
+        listing = self.client.get(reverse("training_list"), secure=True)
+        self.assertContains(listing, "Новая тренировка тренера")
 
 
 class TrainingEnrollCourtChoicesTestCase(TestCase):

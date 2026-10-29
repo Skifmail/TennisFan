@@ -36,7 +36,9 @@
     {% if web_push_enabled %}
     {% include "includes/web_push_head.html" %}
     {% endif %}
+    {% if yandex_metrika_id %}
     <link rel="preconnect" href="https://mc.yandex.ru" crossorigin>
+    {% endif %}
     {% if media_origin %}
     <link rel="preconnect" href="{{ media_origin }}" crossorigin>
     {% endif %}
@@ -50,10 +52,44 @@
     {% block extra_css %}{% endblock %}
     {% block extra_head %}{% endblock %}
 
-    <!-- Yandex.Metrika counter -->
+    {% if yandex_metrika_id %}
+    <!-- Yandex.Metrika counter: загружается только после согласия на cookie -->
     <script type="text/javascript">
-        window.addEventListener("load", function () {
-            window.setTimeout(function () {
+        (function () {
+            "use strict";
+
+            var counterId = {{ yandex_metrika_id }};
+            var pendingGoals = [
+                {% for item in metrika_goals %}
+                {"goal": "{{ item.goal|escapejs }}", "params": {{ item.params_json|default:"null"|safe }}}{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ];
+            var counterLoaded = false;
+
+            function consentGiven() {
+                return ("; " + document.cookie + ";").indexOf("; cookie_consent=true;") !== -1;
+            }
+
+            function sendPendingGoals() {
+                if (!counterLoaded) {
+                    return;
+                }
+                while (pendingGoals.length) {
+                    var goal = pendingGoals.shift();
+                    if (goal.params) {
+                        window.ym(counterId, "reachGoal", goal.goal, goal.params);
+                    } else {
+                        window.ym(counterId, "reachGoal", goal.goal);
+                    }
+                }
+            }
+
+            function loadCounter() {
+                if (counterLoaded || !consentGiven()) {
+                    return;
+                }
+                counterLoaded = true;
+
                 (function(m, e, t, r, i, k, a) {
                     m[i] = m[i] || function() {
                         (m[i].a = m[i].a || []).push(arguments);
@@ -69,9 +105,9 @@
                     k.async = 1;
                     k.src = r;
                     a.parentNode.insertBefore(k, a);
-                })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js?id=107284748", "ym");
+                })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js?id=" + counterId, "ym");
 
-                ym(107284748, "init", {
+                ym(counterId, "init", {
                     ssr: true,
                     webvisor: true,
                     clickmap: true,
@@ -81,27 +117,38 @@
                     accurateTrackBounce: true,
                     trackLinks: true
                 });
-                {% for item in metrika_goals %}
-                ym(107284748, "reachGoal", "{{ item.goal }}"{% if item.params_json %}, {{ item.params_json|safe }}{% endif %});
-                {% endfor %}
-            }, 1500);
-        });
-        document.addEventListener("click", function (event) {
-            var link = event.target && event.target.closest
-                ? event.target.closest("[data-metrika-goal]")
-                : null;
-            if (!link || typeof ym !== "function") {
-                return;
+                sendPendingGoals();
             }
-            ym(107284748, "reachGoal", link.getAttribute("data-metrika-goal"));
-        });
+
+            function scheduleLoad() {
+                window.setTimeout(loadCounter, 1500);
+            }
+
+            if (document.readyState === "complete") {
+                scheduleLoad();
+            } else {
+                window.addEventListener("load", scheduleLoad);
+            }
+            window.addEventListener("cookie_consent_accepted", loadCounter);
+
+            document.addEventListener("click", function (event) {
+                var link = event.target && event.target.closest
+                    ? event.target.closest("[data-metrika-goal]")
+                    : null;
+                if (!link) {
+                    return;
+                }
+                var goalName = link.getAttribute("data-metrika-goal");
+                if (!goalName) {
+                    return;
+                }
+                pendingGoals.push({goal: goalName, params: null});
+                sendPendingGoals();
+            });
+        })();
     </script>
-    <noscript>
-        <div>
-            <img src="https://mc.yandex.ru/watch/107284748" style="position:absolute; left:-9999px;" alt="" />
-        </div>
-    </noscript>
     <!-- /Yandex.Metrika counter -->
+    {% endif %}
 </head>
 
 <body class="{% if is_club_panel and club %}body--club-panel{% endif %}">
@@ -389,9 +436,17 @@
                             {% else %}
                             <span>{{ link.name }}</span>
                             {% endif %}
+                            {% if link.requires_disclaimer %}
+                            <span class="social-link__mark" aria-hidden="true">*</span>
+                            {% endif %}
                         </a>
                         {% endfor %}
                     </div>
+                    {% if footer_social_has_disclaimer %}
+                    <p class="footer-social__disclaimer">
+                        * Meta Platforms Inc. признана экстремистской организацией, её деятельность запрещена на территории Российской Федерации. Instagram принадлежит Meta. Ссылка размещена в информационных целях и не является рекламой социальной сети.
+                    </p>
+                    {% endif %}
                 </div>
             </div>
             <div class="footer-bottom">

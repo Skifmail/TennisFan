@@ -20,7 +20,7 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db import models
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, IntegerField, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
@@ -2185,62 +2185,64 @@ def home(request):
         member_club_ids=member_club_ids,
     )
 
-    # Получаем топ игроков по сезонным очкам
+    # Получаем топ игроков по рейтинговому баллу (победы → матчи → стаж)
     from apps.tournaments.season_utils import annotate_season_pts
+    from apps.users.ranking import order_by_ranking
 
-    rating_visibility_filter = (Q(is_verified=True) | ~Q(avatar="")) & (
-        Q(tennis_entry_level_set=True) | Q(matches_played__gt=0)
+    rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
+    if home_sport != Sport.PADEL:
+        rating_visibility_filter &= Q(tennis_entry_level_set=True) | Q(
+            matches_played__gt=0
+        )
+    rating_players = (
+        Player.objects.filter(
+            is_bye=False,
+            is_hidden_on_home=False,
+        )
+        .filter(rating_visibility_filter)
+        .select_related(
+            "user",
+            "user__subscription",
+            "user__subscription__tier",
+            "season_points",
+        )
     )
+
     if home_sport == Sport.PADEL:
         from apps.tournaments.models import SportSeasonPoints
         from apps.users.models import PlayerSportProfile
         from apps.users.sport_rating import apply_profile_to_player
 
-        profiles = list(
-            PlayerSportProfile.objects.filter(
-                sport=Sport.PADEL,
-                player__is_bye=False,
-                player__is_hidden_on_home=False,
+        padel_season_pts = SportSeasonPoints.objects.filter(
+            player_id=OuterRef("pk"),
+            sport=Sport.PADEL,
+        ).values("current_season_points")[:1]
+        rating_players = rating_players.filter(
+            sport_profiles__sport=Sport.PADEL,
+        ).annotate(
+            season_pts=Coalesce(
+                Subquery(padel_season_pts, output_field=IntegerField()),
+                Value(0),
             )
-            .filter(Q(player__is_verified=True) | ~Q(player__avatar=""))
-            .select_related(
-                "player__user",
-                "player__user__subscription",
-                "player__user__subscription__tier",
-            )
-            .order_by("-total_points")[:10]
         )
-        season_rows = {
-            row.player_id: row.current_season_points
-            for row in SportSeasonPoints.objects.filter(
+        top_players = list(order_by_ranking(rating_players, Sport.PADEL)[:10])
+        padel_profiles = {
+            profile.player_id: profile
+            for profile in PlayerSportProfile.objects.filter(
                 sport=Sport.PADEL,
-                player_id__in=[profile.player_id for profile in profiles],
+                player_id__in=[player.pk for player in top_players],
             )
         }
-        top_players = []
-        for profile in profiles:
-            player = profile.player
-            apply_profile_to_player(player, profile)
-            player.season_pts = season_rows.get(player.pk, 0)
-            top_players.append(player)
-        top_players.sort(
-            key=lambda player: (-int(player.season_pts), -float(player.total_points))
-        )
+        for player in top_players:
+            profile = padel_profiles.get(player.pk)
+            if profile is not None:
+                apply_profile_to_player(player, profile)
     else:
         top_players = list(
-            annotate_season_pts(
-                Player.objects.filter(
-                    is_bye=False,
-                    is_hidden_on_home=False,
-                )
-                .filter(rating_visibility_filter)
-                .select_related(
-                    "user",
-                    "user__subscription",
-                    "user__subscription__tier",
-                    "season_points",
-                )
-            ).order_by("-season_pts", "-total_points")[:10]
+            order_by_ranking(
+                annotate_season_pts(rating_players),
+                Sport.TENNIS,
+            )[:10]
         )
 
     from apps.tournaments.utils import get_players_trophies_map
@@ -2399,9 +2401,11 @@ def rating(request):
     current_season = get_current_season()
 
     # Получаем игроков с сезонными очками (исключаем служебного игрока "Свободный круг")
-    rating_visibility_filter = (Q(is_verified=True) | ~Q(avatar="")) & (
-        Q(tennis_entry_level_set=True) | Q(matches_played__gt=0)
-    )
+    rating_visibility_filter = Q(is_verified=True) | ~Q(avatar="")
+    if rating_sport != Sport.PADEL:
+        rating_visibility_filter &= Q(tennis_entry_level_set=True) | Q(
+            matches_played__gt=0
+        )
     players = (
         Player.objects.filter(is_bye=False)
         .filter(rating_visibility_filter)
@@ -2429,12 +2433,24 @@ def rating(request):
         )
 
     from apps.tournaments.season_utils import annotate_season_pts
-    from apps.users.sport_rating import order_by_sport_rating
+    from apps.users.ranking import order_by_ranking
 
     if rating_sport == Sport.PADEL:
-        players = order_by_sport_rating(players, Sport.PADEL)
+        from apps.tournaments.models import SportSeasonPoints
+
+        padel_season_pts = SportSeasonPoints.objects.filter(
+            player_id=OuterRef("pk"),
+            sport=Sport.PADEL,
+        ).values("current_season_points")[:1]
+        players = players.annotate(
+            season_pts=Coalesce(
+                Subquery(padel_season_pts, output_field=IntegerField()),
+                Value(0),
+            )
+        )
+        players = order_by_ranking(players, Sport.PADEL)
     else:
-        players = annotate_season_pts(players).order_by("-season_pts", "-total_points")
+        players = order_by_ranking(annotate_season_pts(players), Sport.TENNIS)
 
     paginator = Paginator(players, 50)
     page_number = request.GET.get("page")
@@ -2468,16 +2484,14 @@ def rating(request):
         .order_by("city")
     )
 
-    sorted_for_chart = sorted(
-        players_page.object_list,
-        key=lambda p: float(p.total_points or 0),
-        reverse=True,
-    )
-    max_fan_points = (
-        float(sorted_for_chart[0].total_points or 0) if sorted_for_chart else 0.0
+    # Диаграмма идёт в том же порядке, что и список: по рейтинговому баллу.
+    ranked_players = list(players_page.object_list)
+    max_fan_points = max(
+        (float(player.total_points or 0) for player in ranked_players),
+        default=0.0,
     )
     rating_data: list[dict[str, object]] = []
-    for rank, player in enumerate(sorted_for_chart, start=1):
+    for rank, player in enumerate(ranked_players, start=1):
         points = float(player.total_points or 0)
         share = round((points / max_fan_points) * 100, 1) if max_fan_points > 0 else 0.0
         rating_data.append(

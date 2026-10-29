@@ -52,6 +52,8 @@ x-app-env: &app-env
   YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY}
   GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION}
   YANDEX_VERIFICATION: ${YANDEX_VERIFICATION}
+  # ID счётчика Яндекс.Метрики. Пусто/0 — счётчик выключен.
+  YANDEX_METRIKA_ID: ${YANDEX_METRIKA_ID:-}
   SITE_DOMAIN: ${SITE_DOMAIN}
   # Производительность Django/Postgres
   CONN_MAX_AGE: ${CONN_MAX_AGE:-60}

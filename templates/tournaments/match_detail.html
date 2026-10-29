@@ -27,6 +27,15 @@
                     Если матч не сыгран до дедлайна, обоим будет проставлен Walkover (неявка: −40 очков каждому). Администратор сможет изменить стороны и штраф.
                 </p>
                 {% endif %}
+                {% if can_extend_deadline %}
+                <form method="post" action="{% url 'extend_sparring_match_deadline' pk=match.pk %}" class="mt-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline">Продлить дедлайн на неделю</button>
+                    <p class="text-muted mt-1">Каждый участник может продлить дедлайн этого матча один раз на 7 дней.</p>
+                </form>
+                {% elif deadline_extension_used %}
+                <p class="text-muted mt-2">Вы уже использовали продление дедлайна этого матча.</p>
+                {% endif %}
                 {% if match.court %}
                 <p class="text-secondary">{{ match.court.name }}</p>
                 {% endif %}

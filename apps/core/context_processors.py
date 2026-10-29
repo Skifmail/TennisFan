@@ -22,7 +22,7 @@ from .models import FooterSocialLink
 
 PLATFORM_ACTIVITY_UNSEEN_CACHE_PREFIX = "platform_activity_unseen"
 
-FOOTER_SOCIAL_LINKS_CACHE_KEY = "footer_social_links:v1"
+FOOTER_SOCIAL_LINKS_CACHE_KEY = "footer_social_links:v2"
 
 
 def telegram_community_url(request):
@@ -41,7 +41,12 @@ def footer_social_links(request):
         lambda: list(FooterSocialLink.objects.all()),
         timeout=300,
     )
-    return {"footer_social_links": links}
+    return {
+        "footer_social_links": links,
+        "footer_social_has_disclaimer": any(
+            getattr(link, "requires_disclaimer", False) for link in links
+        ),
+    }
 
 
 def search_engine_verification(request):
@@ -94,13 +99,17 @@ def site_meta(request):
 
 
 def metrika_goals(request):
-    """Передать в шаблон цели Метрики из сессии и сразу очистить очередь.
+    """Передать в шаблон ID счётчика Метрики и цели из сессии.
+
+    Цели забираются из сессии и сразу очищаются: повторная загрузка страницы
+    не отправит ``reachGoal`` дважды.
 
     Args:
         request: HTTP-запрос с сессией.
 
     Returns:
-        dict: Ключ ``metrika_goals`` — список целей для ``reachGoal``.
+        dict: ``yandex_metrika_id`` — ID счётчика (0, если отключён);
+        ``metrika_goals`` — список целей для ``reachGoal``.
     """
     import json
 
@@ -113,7 +122,10 @@ def metrika_goals(request):
         if params:
             entry["params_json"] = json.dumps(params, ensure_ascii=False)
         goals.append(entry)
-    return {"metrika_goals": goals}
+    return {
+        "yandex_metrika_id": getattr(settings, "YANDEX_METRIKA_ID", 0) or 0,
+        "metrika_goals": goals,
+    }
 
 
 def _tennistop_host_set() -> frozenset[str]:

@@ -11,30 +11,55 @@
     <div class="grid training-detail-grid">
         <div class="training-detail-main">
             {% if training.image %}
-            <img src="{{ training.image.url }}" alt=""
-                style="width: 100%; border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl);">
+            <div class="training-detail__media">
+                <img
+                    src="{{ training.image.url }}"
+                    alt=""
+                    class="training-detail__image"
+                    decoding="async"
+                    fetchpriority="high"
+                >
+            </div>
             {% endif %}
 
-            <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">
-                {% for sport_label in training.sports_display %}
-                <span class="player-category">{{ sport_label }}</span>
-                {% endfor %}
-                {% for tt in training.training_types_display %}
-                <span class="player-category">{{ tt }}</span>
-                {% endfor %}
-                {% for sl in training.skill_levels_display %}
-                <span class="player-category"
-                    style="background: var(--color-bg-elevated); color: var(--color-text-secondary);">{{ sl }}</span>
-                {% endfor %}
-            </div>
+            {% if training.sports_display or training.training_types_display or training.skill_levels_display or training.target_levels_display %}
+            <dl class="training-meta">
+                {% if training.sports_display %}
+                <dt class="training-meta__term">Вид спорта</dt>
+                <dd class="training-meta__value">
+                    {% for sport_label in training.sports_display %}
+                    <span class="player-category">{{ sport_label }}</span>
+                    {% endfor %}
+                </dd>
+                {% endif %}
 
-            {% if training.target_levels_display %}
-            <div class="d-flex gap-1 mb-2" style="flex-wrap: wrap;">
-                <span class="text-muted" style="font-size: var(--font-size-xs); align-self: center;">Целевой уровень:</span>
-                {% for tl in training.target_levels_display %}
-                <span class="player-category" style="background: var(--color-success-transparent, rgba(92, 184, 92, 0.15)); color: var(--color-text-secondary);">{{ tl }}</span>
-                {% endfor %}
-            </div>
+                {% if training.training_types_display %}
+                <dt class="training-meta__term">Тип тренировки</dt>
+                <dd class="training-meta__value">
+                    {% for tt in training.training_types_display %}
+                    <span class="player-category">{{ tt }}</span>
+                    {% endfor %}
+                </dd>
+                {% endif %}
+
+                {% if training.skill_levels_display %}
+                <dt class="training-meta__term">Уровень игроков</dt>
+                <dd class="training-meta__value">
+                    {% for sl in training.skill_levels_display %}
+                    <span class="player-category player-category--muted">{{ sl }}</span>
+                    {% endfor %}
+                </dd>
+                {% endif %}
+
+                {% if training.target_levels_display %}
+                <dt class="training-meta__term">Целевой уровень</dt>
+                <dd class="training-meta__value">
+                    {% for tl in training.target_levels_display %}
+                    <span class="player-category player-category--target">{{ tl }}</span>
+                    {% endfor %}
+                </dd>
+                {% endif %}
+            </dl>
             {% endif %}
 
             <h1 style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);">{{ training.title }}</h1>

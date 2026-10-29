@@ -9,10 +9,13 @@ import logging
 import sys
 import time
 from collections.abc import Callable
+from typing import Final
 
 from django.conf import settings
 from django.db import connection
 from django.http import HttpRequest, HttpResponse
+
+HEALTH_PATHS: Final = ("/health/live/", "/health/ready/", "/health/notifications/")
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +109,77 @@ class SlowRequestLoggingMiddleware:
                 len(getattr(connection, "queries", [])),
             )
         return response
+
+
+def _brand_hosts() -> set[str]:
+    """Возвращает основные хосты брендов без префикса ``www``.
+
+    Функция повторяет набор из ``site_branding``: TennisFan из ``SITE_DOMAIN``
+    и TennisTop из ``TENNISTOP_EXTRA_HOSTS`` плюс значения по умолчанию.
+
+    Returns:
+        Множество нормализованных хостов без ``www.``.
+    """
+    hosts: set[str] = {"tennistop.ru"}
+    site_domain = str(getattr(settings, "SITE_DOMAIN", "")).strip().lower()
+    extra_hosts = getattr(settings, "TENNISTOP_EXTRA_HOSTS", None)
+    if isinstance(extra_hosts, str):
+        extra_hosts = extra_hosts.split(",")
+    for raw_host in (site_domain, *(extra_hosts or ())):
+        host = str(raw_host).strip().lower().removeprefix("www.")
+        if host:
+            hosts.add(host)
+    return hosts
+
+
+def _canonical_host_redirects() -> dict[str, str]:
+    """Собирает пары «www-хост → основной хост» из настроек.
+
+    Returns:
+        Карта редиректов для www-адресов всех хостов брендов.
+    """
+    return {f"www.{host}": host for host in _brand_hosts()}
+
+
+class CanonicalHostMiddleware:
+    """Уводит www-адреса на канонический хост без потери пути и параметров.
+
+    OneSignal закрепляет подписку за точным origin, поэтому www-копия сайта
+    не может использовать тот же App ID. Код 308 сохраняет метод и query.
+
+    Attributes:
+        get_response: Следующий обработчик запроса.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        """Строит карту редиректов из настроек домена и бренда.
+
+        Args:
+            get_response: Следующий обработчик запроса.
+        """
+        self.get_response = get_response
+        self._redirects = _canonical_host_redirects()
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        """Перенаправляет www-хост, не затрагивая пробы здоровья.
+
+        Args:
+            request: Текущий HTTP-запрос.
+
+        Returns:
+            Постоянный редирект 308 либо обычный ответ приложения.
+        """
+        if request.path not in HEALTH_PATHS:
+            # Сырой Host читаем до проверки ALLOWED_HOSTS: www-копия должна
+            # получить редирект даже если её ещё нет в списке разрешённых.
+            host = request.META.get("HTTP_HOST", "").split(":", 1)[0].strip().lower()
+            target = self._redirects.get(host)
+            if target:
+                return HttpResponse(
+                    status=308,
+                    headers={"Location": f"https://{target}{request.get_full_path()}"},
+                )
+        return self.get_response(request)
 
 
 class AdminNoCacheMiddleware:

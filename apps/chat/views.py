@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.templatetags.static import static
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
@@ -22,6 +23,7 @@ from apps.core.models import City
 from apps.users.models import User
 
 from . import services
+from .anonymous import FALLBACK_EMOJI, anonymous_emoji_map
 from .consent import (
     BASE_DISCLOSURE_CONDITIONS,
     accept_chat_consent,
@@ -42,6 +44,7 @@ from .invitations import can_invite
 from .models import ChatMembership, ChatRoom
 
 CITY_SEARCH_LIMIT: Final = 100
+PARTICIPANTS_PAGE_SIZE: Final = 60
 
 
 def _api(view: Callable[..., HttpResponse]) -> Callable[..., HttpResponse]:
@@ -290,6 +293,7 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
                 "actionUrl": f"/chats/api/rooms/{room_id}/action/",
                 "historyUrl": f"/chats/api/rooms/{room_id}/history/",
                 "syncUrl": f"/chats/api/rooms/{room_id}/sync/",
+                "membersUrl": f"/chats/api/rooms/{room_id}/members/",
                 "socketPath": f"/ws/chats/{room_id}/",
                 "indexUrl": "/chats/",
                 "moderatorBadgeUrl": static("images/chat/moderator-badge.png"),
@@ -304,6 +308,126 @@ def room(request: HttpRequest, room_id: int) -> HttpResponse:
                 ),
             },
         },
+    )
+
+
+def _participant_cards(
+    members: Sequence[ChatMembership],
+    *,
+    room: ChatRoom,
+    viewer: User,
+    emojis: dict[int, str],
+) -> list[dict[str, Any]]:
+    """Готовит безопасные данные участников без скрытых имени и фотографии.
+
+    Args:
+        members: Страница активных участников с профилями.
+        room: Комната для определения администратора.
+        viewer: Текущий участник, чтобы отметить его в списке.
+        emojis: Стабильные анонимные обозначения для участников комнаты.
+
+    Returns:
+        Поля карточек, пригодные для серверного шаблона.
+    """
+    cards: list[dict[str, Any]] = []
+    for member in members:
+        user = member.user
+        publishable = bool(
+            member.consented_at
+            and not member.consent_withdrawn_at
+            and (not member.disclosure_conditions or member.disclosure_reviewed)
+        )
+        full_name = user.get_full_name().strip()
+        show_name = bool(publishable and member.disclosure_name and full_name)
+        player = getattr(user, "player", None)
+        avatar = (
+            player.avatar
+            if publishable and member.disclosure_avatar and player and player.avatar
+            else None
+        )
+        label = full_name if show_name else "Аноним"
+        emoji = ""
+        initial = ""
+        if avatar:
+            avatar_url = avatar.url
+        else:
+            avatar_url = ""
+            if show_name:
+                initial = label[:1].upper()
+            else:
+                emoji = emojis.get(member.user_id, FALLBACK_EMOJI)
+        cards.append(
+            {
+                "id": member.user_id,
+                "label": label,
+                "avatar_url": avatar_url,
+                "emoji": emoji,
+                "initial": initial,
+                "is_you": member.user_id == viewer.pk,
+                "role": (
+                    "Администратор"
+                    if room.administrator_id == member.user_id
+                    else (
+                        "Модератор"
+                        if member.is_moderator or user.is_staff
+                        else "Участник"
+                    )
+                ),
+            }
+        )
+    return cards
+
+
+@require_GET
+@_api
+def members(request: HttpRequest, room_id: int) -> JsonResponse:
+    """Отдаёт постраничный список участников только действующему участнику.
+
+    Args:
+        request: Запрос с необязательным номером страницы.
+        room_id: Комната, список которой открывается из шапки.
+
+    Returns:
+        HTML-фрагмент карточек и признак следующей страницы.
+
+    Raises:
+        ChatAccessError: Пользователь не участвует в комнате.
+    """
+    from django.core.paginator import Paginator
+
+    viewer = cast(User, request.user)
+    current = services.require_member(user=viewer, room_id=room_id)
+    active_ids = ChatMembership.objects.filter(
+        room=current.room, is_active=True, user__is_active=True
+    ).values_list("user_id", flat=True)
+    emojis = anonymous_emoji_map(room_id=current.room_id, user_ids=active_ids)
+    page = Paginator(
+        ChatMembership.objects.select_related("user", "user__player")
+        .filter(
+            room=current.room,
+            is_active=True,
+            user__is_active=True,
+            consent_withdrawn_at__isnull=True,
+        )
+        .order_by("-is_moderator", "joined_at", "pk"),
+        PARTICIPANTS_PAGE_SIZE,
+    ).get_page(request.GET.get("page"))
+    html = render_to_string(
+        "chat/_member_items.html",
+        {
+            "participants": _participant_cards(
+                list(page), room=current.room, viewer=viewer, emojis=emojis
+            )
+        },
+        request=request,
+    )
+    return JsonResponse(
+        {
+            "html": html,
+            "page": page.number,
+            "has_more": page.has_next(),
+            "total": page.paginator.count,
+        }
     )
 
 

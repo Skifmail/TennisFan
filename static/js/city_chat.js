@@ -12,6 +12,10 @@
     const error = byId("chat-error");
     const notice = byId("chat-notice");
     const menu = byId("chat-message-menu");
+    const membersDialog = byId("chat-members");
+    const membersContent = byId("chat-members-content");
+    const membersMore = byId("chat-members-more");
+    const membersError = byId("chat-members-error");
     const settingsDialog = byId("chat-settings");
     const actionDialog = byId("chat-action-dialog");
     const confirmButton = byId("chat-action-confirm");
@@ -54,6 +58,8 @@
     let loadingHistory = false;
     let menuTrigger = null;
     let menuOpen = false;
+    let membersBusy = false;
+    let membersNextPage = 1;
     let currentAction = null;
     let transientError = "";
     let bannedNotice = false;
@@ -216,10 +222,38 @@
     }
 
     function openDialog(dialog, origin) {
+        if (dialog.open) return;
         closeMenu();
         if (settingsDialog.open && dialog !== settingsDialog) settingsDialog.close();
         dialogOrigins.set(dialog, origin || byId("chat-info"));
         dialog.showModal();
+    }
+
+    async function loadMembers(page = 1, append = false) {
+        if (membersBusy) return;
+        membersBusy = true;
+        membersMore.disabled = true;
+        membersError.hidden = true;
+        membersContent.setAttribute("aria-busy", "true");
+        if (!append) {
+            membersContent.replaceChildren(element("li", "chat-members-loading", "Загружаем участников…"));
+            membersMore.hidden = true;
+        }
+        try {
+            const data = await request(`${config.membersUrl}?page=${page}`);
+            if (!append) membersContent.replaceChildren();
+            membersContent.insertAdjacentHTML("beforeend", data.html);
+            membersNextPage = data.has_more ? data.page + 1 : null;
+            membersMore.hidden = !data.has_more;
+        } catch (failure) {
+            if (!append) membersContent.replaceChildren();
+            membersError.textContent = failure.message;
+            membersError.hidden = false;
+        } finally {
+            membersBusy = false;
+            membersMore.disabled = false;
+            membersContent.removeAttribute("aria-busy");
+        }
     }
 
     document.querySelectorAll(".chat-dialog").forEach((dialog) => {
@@ -640,6 +674,15 @@
         }
     });
     byId("chat-cancel").addEventListener("click", () => { clearContext(true); persist(); input.focus({preventScroll: true}); });
+    document.querySelectorAll("[data-open-chat-members]").forEach((button) => {
+        button.addEventListener("click", () => {
+            openDialog(membersDialog, button);
+            loadMembers(1, false);
+        });
+    });
+    membersMore.addEventListener("click", () => {
+        if (membersNextPage) loadMembers(membersNextPage, true);
+    });
     document.querySelectorAll("[data-open-chat-settings]").forEach((button) => {
         button.addEventListener("click", () => openDialog(settingsDialog, button));
     });

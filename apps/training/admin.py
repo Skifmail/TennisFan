@@ -216,11 +216,10 @@ class TrainingAdmin(admin.ModelAdmin):
         "price_range_display",
         "court_price_range_display",
         "is_active",
-        "is_featured",
     )
-    list_filter = ("sport", "city", "is_active", "is_featured")
+    list_filter = ("sport", "city", "is_active")
     search_fields = ("title", "description")
-    list_editable = ("is_active", "is_featured")
+    list_editable = ("is_active",)
     prepopulated_fields = {"slug": ("title",)}
     raw_id_fields = ("coach",)
     filter_horizontal = ("courts",)
@@ -253,7 +252,7 @@ class TrainingAdmin(admin.ModelAdmin):
             "Стоимость корта",
             {"fields": ("court_has_extra_fee", "court_price_min", "court_price_max")},
         ),
-        ("Настройки", {"fields": ("is_active", "is_featured")}),
+        ("Настройки", {"fields": ("is_active",)}),
     )
 
     def types_display(self, obj):

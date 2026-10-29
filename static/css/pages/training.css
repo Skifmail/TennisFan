@@ -6,7 +6,7 @@
  *             .my-trainings, .my-trainings-offer, .my-trainings-enrollment
  * Используется на: страница тренировки, «Мои тренировки»
  *
- * Последнее обновление: 2026-09
+ * Последнее обновление: 2026-10
  */
 
 /* Training detail layout */
@@ -15,11 +15,114 @@
     gap: var(--spacing-xl);
 }
 
+.training-detail__media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: 520px;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-xl);
+    background:
+        linear-gradient(135deg, rgb(196 158 92 / 0.12), rgb(8 28 22 / 0.6));
+}
+
+.training-detail__image {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+}
+
+/* Расшифровка тегов под фото: вид спорта, формат, уровни. */
+.training-meta {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--spacing-sm) var(--spacing-lg);
+    margin: 0 0 var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+}
+
+.training-meta__term {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+}
+
+.training-meta__value {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    min-width: 0;
+    margin: 0;
+}
+
+.training-meta .player-category--muted {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-secondary);
+}
+
+.training-meta .player-category--target {
+    background: rgb(92 184 92 / 0.15);
+    color: var(--color-text-secondary);
+}
+
+/* Компактный вариант для карточек в общем списке. */
+.training-meta--card {
+    gap: var(--spacing-xs) var(--spacing-sm);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.training-meta--card .training-meta__term {
+    align-self: start;
+    padding-top: 0.2rem;
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+}
+
 .training-list-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--spacing-lg);
     align-items: stretch;
+}
+
+/* Общая лента: свой город, затем ближайшие города. */
+.training-feed__section {
+    margin-block: var(--spacing-lg);
+}
+
+.training-feed__section--other {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--spacing-lg);
+}
+
+.training-feed__heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.training-feed__heading h2 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    color: var(--color-text-primary);
+}
+
+.training-feed__heading > span {
+    color: var(--color-text-secondary);
 }
 
 .training-list-grid .training-card,
@@ -33,10 +136,38 @@
     flex-direction: column;
 }
 
-.training-list-grid .training-card .card-image {
+.training-list-grid .training-card .training-card__media {
+    position: relative;
     width: 100%;
     aspect-ratio: 16 / 10;
     flex-shrink: 0;
+    overflow: hidden;
+    background:
+        linear-gradient(135deg, rgb(196 158 92 / 0.12), rgb(8 28 22 / 0.6));
+}
+
+.training-list-grid .training-card .training-card__image {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+}
+
+.training-list-grid .training-card .training-card__placeholder {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    color: rgb(196 158 92 / 0.35);
+}
+
+.training-list-grid .training-card .training-card__placeholder svg {
+    width: 3rem;
+    height: 3rem;
 }
 
 .training-list-grid .training-card .card-body {
@@ -363,6 +494,11 @@
         grid-template-columns: 1fr;
     }
 
+    .training-detail__media {
+        aspect-ratio: 4 / 3;
+        max-height: 460px;
+    }
+
     .training-detail-sidebar-card {
         position: static;
         margin-top: var(--spacing-lg);
@@ -461,8 +597,44 @@
         gap: var(--spacing-md);
     }
 
-    .training-list-grid .training-card .card-image {
-        aspect-ratio: 16 / 10;
+    .training-list-grid .training-card .training-card__media {
+        aspect-ratio: 4 / 3;
+    }
+
+    .training-detail__media {
+        aspect-ratio: 4 / 3;
+        max-height: none;
+    }
+
+    .training-meta {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+        padding: var(--spacing-md);
+    }
+
+    .training-meta__term {
+        margin-top: var(--spacing-sm);
+    }
+
+    .training-meta__term:first-child {
+        margin-top: 0;
+    }
+
+    .training-meta__value {
+        margin-top: var(--spacing-xs);
+    }
+
+    .training-meta--card {
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .training-meta--card .training-meta__term {
+        margin-top: 0;
+    }
+
+    .training-meta--card .training-meta__value {
+        margin-top: 0;
     }
 }
 

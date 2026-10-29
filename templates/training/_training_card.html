@@ -1,0 +1,69 @@
+<a href="{% url 'training_detail' slug=training.slug %}" class="card training-card">
+    <div class="training-card__media">
+        {% if training.image %}
+        <img
+            src="{{ training.image.url }}"
+            alt=""
+            class="training-card__image"
+            loading="lazy"
+            decoding="async"
+        >
+        {% else %}
+        <div class="training-card__placeholder" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="24" cy="24" r="15"></circle>
+                <path d="M10.5 17.5c8 4 19 4 27 0M10.5 30.5c8-4 19-4 27 0"></path>
+            </svg>
+        </div>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <dl class="training-meta training-meta--card">
+            {% if training.sports_display %}
+            <dt class="training-meta__term">Вид спорта</dt>
+            <dd class="training-meta__value">
+                {% for sport_label in training.sports_display %}
+                <span class="player-category">{{ sport_label }}</span>
+                {% endfor %}
+            </dd>
+            {% endif %}
+
+            {% if training.training_types_display %}
+            <dt class="training-meta__term">Тип тренировки</dt>
+            <dd class="training-meta__value">
+                {% for tt in training.training_types_display %}
+                <span class="player-category">{{ tt }}</span>
+                {% endfor %}
+            </dd>
+            {% endif %}
+
+            {% if training.skill_levels_display %}
+            <dt class="training-meta__term">Уровень</dt>
+            <dd class="training-meta__value">
+                {% for sl in training.skill_levels_display %}
+                <span class="player-category player-category--muted">{{ sl }}</span>
+                {% endfor %}
+            </dd>
+            {% endif %}
+
+            {% if training.city %}
+            <dt class="training-meta__term">Город</dt>
+            <dd class="training-meta__value">
+                <span class="player-category player-category--muted">{{ training.city }}</span>
+            </dd>
+            {% endif %}
+        </dl>
+        <h3 class="card-title">{{ training.title }}</h3>
+        <p class="card-text">{{ training.short_description|default:training.description|truncatewords:15 }}</p>
+        {% if training.coach %}
+        <p class="text-secondary mt-2" style="font-size: var(--font-size-sm);">Тренер: {{ training.coach.name }}</p>
+        {% endif %}
+        {% if training.price_display %}
+        <p class="text-primary mt-2" style="font-weight: 600;">{{ training.price_display }}
+            {% if training.court_price_display %}
+            <span class="text-secondary" style="font-weight: 400; font-size: var(--font-size-sm);">{{ training.court_price_display }}</span>
+            {% endif %}
+        </p>
+        {% endif %}
+    </div>
+</a>

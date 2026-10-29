@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.utils import timezone
 from loguru import logger
 
+from apps.notifications.device_binding import revoke_devices
 from apps.notifications.models import (
     Delivery,
     PushCodeLimit,
@@ -76,6 +77,8 @@ class Command(BaseCommand):
         if options["dry_run"]:
             self.stdout.write(f"К удалению: {counts}")
             return
+        # Удаление записи без удаления подписки оставило бы живой адрес у провайдера.
+        counts["revoked"] = revoke_devices(list(devices))
         devices.delete()
         confirmations.delete()
         deliveries.delete()

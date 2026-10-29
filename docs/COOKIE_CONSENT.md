@@ -10,32 +10,25 @@
 
 ## Подключение аналитики только после согласия
 
-Скрипты Google Analytics, Яндекс.Метрики и т.п. **не должны** подключаться в `base.html` до выбора пользователя. Варианты:
+Скрипт Яндекс.Метрики встроен в `templates/base.html`, но **не загружается** до выбора пользователя:
 
-### 1. Проверка при загрузке страницы
+- при `cookie_consent=true` счётчик подключается через 1.5 с после `window.load`;
+- при клике «Принять» на этой же странице счётчик грузится сразу — по событию `cookie_consent_accepted`;
+- при отказе (`cookie_consent=false`) скрипт не загружается, цели не отправляются;
+- проверить выбор можно через `window.cookieConsentAccepted()` / `window.cookieConsentRefused()` из `static/js/cookie_consent.js`.
 
-В шаблоне или в отдельном скрипте (например, в `{% block extra_js %}` на нужных страницах):
+Очередь целей (`reachGoal`) из сессии и клики по ссылкам с `[data-metrika-goal]` накапливаются в памяти и отправляются уже после загрузки счётчика. При отказе очередь просто не отправляется.
 
-```html
-<script>
-(function() {
-  if (window.cookieConsentAccepted && window.cookieConsentAccepted()) {
-    // вставить загрузку счётчика, например:
-    // (function(w,d,s,l,i){...})(window,document,'script','...','GA_ID');
-  }
-})();
-</script>
-```
+`<noscript>`-пиксель Метрики удалён: без JavaScript невозможно получить согласие, поэтому безусловная загрузка пикселя нарушала бы ту же логику.
 
-### 2. Событие после согласия
+## Настройка счётчика
 
-Если пользователь принял cookie на этой вкладке, можно подписаться на событие:
+ID счётчика задаётся переменной окружения `YANDEX_METRIKA_ID` (см. `.env.example`):
 
-```javascript
-window.addEventListener('cookie_consent_accepted', function() {
-  loadYandexMetrika(); // или loadGoogleAnalytics();
-});
-```
+- `YANDEX_METRIKA_ID=107284748` — продакшен;
+- пусто или `0` — счётчик отключён (local/dev/staging).
+
+Другие трекеры (Google Analytics и т.п.) подключайте по тому же принципу — только при `window.cookieConsentAccepted()` или по событию `cookie_consent_accepted`.
 
 Скрипт `cookie_consent.js` подключается в `base.html` после `main.js`. Файлы: `static/js/cookie_consent.js`, стили в `static/css/style.css` (блок «Cookie consent banner»).
 

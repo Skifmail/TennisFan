@@ -1,7 +1,8 @@
 """Users admin configuration."""
 
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 
 from django import forms
 from django.contrib import admin
@@ -87,6 +88,22 @@ def _phone_variants_for_search(token: str) -> list[str]:
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     """Admin configuration for User model."""
+
+    def get_deleted_objects(
+        self, objs: Sequence[User] | QuerySet[User], request: HttpRequest
+    ) -> tuple[list[Any], dict[str, int], set[str], list[Any]]:
+        """Разрешает суперпользователю удалить аккаунт вместе с его историей.
+
+        Запрет ручного удаления уведомлений и журналов не должен блокировать
+        каскадное удаление аккаунта. Список последствий и защищённых объектов
+        сохраняется для штатного экрана подтверждения Django.
+        """
+        deleted, counts, permissions, protected = super().get_deleted_objects(
+            objs, request
+        )
+        if cast(User, request.user).is_superuser:
+            permissions = set()
+        return deleted, counts, permissions, protected
 
     readonly_fields = (
         "last_login",

@@ -1803,7 +1803,7 @@ class SparringDeadlineExtension(models.Model):
     )
     player = models.ForeignKey(
         Player,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         verbose_name="Игрок",
     )
     old_deadline = models.DateTimeField("Прежний дедлайн")

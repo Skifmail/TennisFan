@@ -1,28 +1,64 @@
 {% extends 'base.html' %}
-{% block title %}Вход через {{ provider_label }}{% endblock %}
+{% block title %}{% if connect %}Подключить{% else %}Вход через{% endif %} {{ provider_label }}{% endblock %}
 {% block content %}
-<div class="container" style="max-width:650px; padding-top:2rem; padding-bottom:2rem;">
-    <h1>{% if connect %}Подключить{% else %}Войти через{% endif %} {{ provider_label }}</h1>
-    <p>Сервис передаст доступные данные: идентификатор аккаунта, имя, фамилию, email, телефон, фото, дату рождения и пол. При первом входе будет создан профиль. Пароль от внешнего аккаунта платформа не получает.</p>
-    <p>Данные используем для входа{% if connect %} и привязки аккаунта{% else %}, создания и заполнения профиля{% endif %}. Подробности — в <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">политике конфиденциальности</a>. Соцвход доброволен: можно использовать вход или регистрацию по email.</p>
-    <form method="post" action="{% url 'social_start' provider=provider %}">
-        {% csrf_token %}
-        {{ form.token }}
-        {% if connect %}<input type="hidden" name="process" value="connect">{% endif %}
-        {% if external_provider %}<input type="hidden" name="external_provider" value="{{ external_provider }}">{% endif %}
-        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
-        {% if form.non_field_errors %}<div class="alert alert-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
-        <div class="form-group">
-            <label class="consent-label" for="{{ form.personal_data.id_for_label }}">{{ form.personal_data }} <span class="consent-text">Даю <a href="{% url 'legal_social_personal_data' %}" target="_blank" rel="noopener">отдельное согласие на обработку данных для входа через внешний сервис</a>.</span></label>
-            {% for error in form.personal_data.errors %}<p class="text-error" role="alert">{{ error }}</p>{% endfor %}
+<section class="social-consent" aria-labelledby="social-consent-title">
+    <div class="social-consent__card">
+        <header class="social-consent__header">
+            <span class="social-consent__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 3v6c0 5-8 9-8 9S4 17 4 12V6l8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>
+            </span>
+            <p class="social-consent__eyebrow">{% if connect %}Новый способ входа{% else %}Вход в TennisFan / TennisTop{% endif %}</p>
+            <h1 id="social-consent-title" class="social-consent__title">{% if connect %}Подключить{% else %}Вход через{% endif %} {{ provider_label }}</h1>
+            <p class="social-consent__intro">Ознакомьтесь с документами и подтвердите свой выбор перед переходом в сервис.</p>
+        </header>
+
+        <div class="social-consent__data">
+            <div class="social-consent__assurance">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></svg>
+                <span>Пароль от внешнего аккаунта платформа не получает.</span>
+            </div>
+            <details class="social-consent__details">
+                <summary>Какие данные передаст сервис<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+                <div class="social-consent__details-content">
+                    <p>Идентификатор аккаунта, имя, фамилию, email, телефон, фото, дату рождения и пол — если эти данные доступны и вы разрешите их передачу.</p>
+                    <p>Используем их для входа{% if connect %} и привязки аккаунта{% else %}, создания и первоначального заполнения профиля. При первом входе создадим профиль{% endif %}. Подробнее — в <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">политике конфиденциальности<span class="social-consent__sr-only"> (откроется в новой вкладке)</span></a>.</p>
+                </div>
+            </details>
         </div>
-        <div class="form-group">
-            <label class="consent-label" for="{{ form.terms.id_for_label }}">{{ form.terms }} <span class="consent-text">Принимаю <a href="{% url 'legal_terms' %}" target="_blank" rel="noopener">пользовательское соглашение</a>.</span></label>
-            {% for error in form.terms.errors %}<p class="text-error" role="alert">{{ error }}</p>{% endfor %}
-        </div>
-        <p class="text-secondary">Этот шаг не оформляет подписку, оплату или согласие на рекламу. Внешний сервис отдельно предложит подтвердить доступ к данным.</p>
-        <button type="submit" class="btn btn-primary">Продолжить через {{ provider_label }}</button>
-        <a href="{% if connect %}{% url 'social_connections' %}{% else %}{% url 'login' %}{% endif %}" class="btn btn-ghost">Отмена</a>
-    </form>
-</div>
+
+        <form method="post" action="{% url 'social_start' provider=provider %}" class="social-consent__form">
+            {% csrf_token %}
+            {{ form.token }}
+            {% if connect %}<input type="hidden" name="process" value="connect">{% endif %}
+            {% if external_provider %}<input type="hidden" name="external_provider" value="{{ external_provider }}">{% endif %}
+            {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+            {% if form.non_field_errors %}
+            <div class="social-consent__error-summary" role="alert">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <fieldset class="social-consent__choices">
+                <legend>Два отдельных подтверждения</legend>
+                <div class="social-consent__choice{% if form.personal_data.errors %} social-consent__choice--error{% endif %}">
+                    <label for="{{ form.personal_data.id_for_label }}" class="social-consent__label">
+                        {{ form.personal_data }}
+                        <span><span class="social-consent__choice-title">Обработка данных</span><span class="social-consent__choice-copy">Даю отдельное <a href="{% url 'legal_social_personal_data' %}" target="_blank" rel="noopener">согласие на обработку данных для входа через внешний сервис<span class="social-consent__sr-only"> (откроется в новой вкладке)</span></a>.</span></span>
+                    </label>
+                    {% if form.personal_data.errors %}<ul id="{{ form.personal_data.auto_id }}_error" class="social-consent__field-errors" role="alert">{% for error in form.personal_data.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+                <div class="social-consent__choice{% if form.terms.errors %} social-consent__choice--error{% endif %}">
+                    <label for="{{ form.terms.id_for_label }}" class="social-consent__label">
+                        {{ form.terms }}
+                        <span><span class="social-consent__choice-title">Правила платформы</span><span class="social-consent__choice-copy">Принимаю <a href="{% url 'legal_terms' %}" target="_blank" rel="noopener">пользовательское соглашение<span class="social-consent__sr-only"> (откроется в новой вкладке)</span></a>.</span></span>
+                    </label>
+                    {% if form.terms.errors %}<ul id="{{ form.terms.auto_id }}_error" class="social-consent__field-errors" role="alert">{% for error in form.terms.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+                </div>
+            </fieldset>
+            <p class="social-consent__note">Этот шаг не оформляет подписку, оплату или согласие на рекламу. Внешний сервис отдельно предложит подтвердить доступ к данным.</p>
+            <div class="social-consent__actions">
+                <button type="submit" class="btn btn-primary">Продолжить через {{ provider_label }}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
+                <a href="{% if connect %}{% url 'social_connections' %}{% else %}{% url 'login' %}{% endif %}" class="btn btn-ghost">Отмена</a>
+            </div>
+        </form>
+        <p class="social-consent__alternative">{% if connect %}Подключение добровольное. Текущий способ входа сохранится.{% else %}Другой способ входа — <a href="{% url 'login' %}">по электронной почте</a>.{% endif %}</p>
+    </div>
+</section>
 {% endblock %}

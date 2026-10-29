@@ -72,6 +72,16 @@ x-app-env: &app-env
   GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-60}
   GUNICORN_GRACEFUL_TIMEOUT: ${GUNICORN_GRACEFUL_TIMEOUT:-30}
   GUNICORN_KEEPALIVE: ${GUNICORN_KEEPALIVE:-5}
+  # Социальный вход. Кнопки скрыты, пока сервис не включён и не заполнен.
+  # Значения задаются в Dokploy Environment; compose обязан их пробросить в контейнер.
+  SOCIAL_YANDEX_ENABLED: ${SOCIAL_YANDEX_ENABLED:-False}
+  SOCIAL_YANDEX_CLIENT_ID: ${SOCIAL_YANDEX_CLIENT_ID:-}
+  SOCIAL_YANDEX_CLIENT_SECRET: ${SOCIAL_YANDEX_CLIENT_SECRET:-}
+  SOCIAL_YANDEX_REDIRECT_URI: ${SOCIAL_YANDEX_REDIRECT_URI:-https://tennisfan.ru/users/social/yandex/callback/}
+  SOCIAL_VK_ENABLED: ${SOCIAL_VK_ENABLED:-False}
+  SOCIAL_VK_CLIENT_ID: ${SOCIAL_VK_CLIENT_ID:-}
+  SOCIAL_VK_CLIENT_SECRET: ${SOCIAL_VK_CLIENT_SECRET:-}
+  SOCIAL_VK_REDIRECT_URI: ${SOCIAL_VK_REDIRECT_URI:-https://tennisfan.ru/users/social/vk/callback/}
   # Опционально: первый суперпользователь (создаётся только если суперпользователей ещё нет). Вход в админку — по email.
   DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-}
   DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}

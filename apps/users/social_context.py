@@ -78,10 +78,13 @@ def profile_completion(request: HttpRequest) -> dict[str, object]:
         missing.append("Подтверждение email")
     if not missing:
         return {}
+    optional = {"Пол", "Фото профиля"}
     return {
         "profile_completion_reminder": {
             "user_id": user.pk,
             "fields": missing,
+            "required_fields": [field for field in missing if field not in optional],
+            "optional_fields": [field for field in missing if field in optional],
             "interval_ms": 6 * 60 * 60 * 1000,
         }
     }

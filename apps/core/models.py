@@ -151,6 +151,10 @@ class LegalAcceptanceLog(models.Model):
         PRIVACY = "privacy", "Политика конфиденциальности"
         OFFER = "offer", "Публичная оферта"
         TERMS = "terms", "Пользовательское соглашение"
+        SOCIAL_PERSONAL_DATA = (
+            "social-personal-data",
+            "Согласие на обработку ПДн для соцвхода",
+        )
         CHAT_PERSONAL_DATA = "chat-personal-data", "Согласие на обработку ПДн для чата"
         CHAT_RULES = "chat-rules", "Правила городских чатов"
         CHAT_DISCLOSURE = "chat-disclosure", "Согласие на распространение данных в чате"

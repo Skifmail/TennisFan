@@ -26,12 +26,11 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from apps.core.consent_utils import record_platform_consent
 from apps.core.decorators import login_required_with_message
-from apps.core.models import LegalAcceptanceLog, UserConsent, UserTelegramLink
+from apps.core.models import LegalAcceptanceLog, UserTelegramLink
 from apps.core.redirects import append_next, get_safe_next_url
 from apps.core.sports import Sport
-from apps.legal.utils import get_legal_document_version
+from apps.legal.utils import LEGAL_DOCUMENT_PATHS, LEGAL_VERSION_LENGTH
 from apps.notifications.presentation import settings_context
 
 from .context_processors import invalidate_unread_notifications_cache
@@ -292,17 +291,30 @@ def _log_registration_rejected(
     )
 
 
-def _log_registration_legal_acceptances(request, user) -> None:
+def _log_registration_legal_acceptances(request: HttpRequest, user: User) -> None:
+    """Сохранить независимые подтверждения регистрации и предъявленную политику."""
     ip_address = _get_request_ip(request)
     user_agent = request.META.get("HTTP_USER_AGENT", "").strip()
-    for document_slug in ("personal-data", "privacy"):
+    for document_slug in ("personal-data", "terms", "privacy"):
+        text = LEGAL_DOCUMENT_PATHS[document_slug].read_text(encoding="utf-8")
+        digest = hashlib.sha256(text.encode()).hexdigest()
         LegalAcceptanceLog.objects.create(
             user=user,
             document_slug=document_slug,
-            document_version=get_legal_document_version(document_slug),
+            document_version=digest[:LEGAL_VERSION_LENGTH],
             source="registration",
             ip_address=ip_address,
             user_agent=user_agent,
+            metadata={
+                "document_text": text,
+                "document_sha256": digest,
+                "subject": {"id": user.pk},
+                "personal_data_checked": True,
+                "terms_checked": True,
+                "event": (
+                    "notice_presented" if document_slug == "privacy" else "acceptance"
+                ),
+            },
         )
 
 
@@ -632,23 +644,6 @@ def create_registration_profile(
             )
 
     _log_registration_legal_acceptances(request, user)
-    # record_platform_consent ожидает request.user,
-    # поэтому выставляем его явно до входа в сессию.
-    previous_user = request.user
-    request.user = user
-    try:
-        record_platform_consent(
-            request,
-            str(UserConsent.ConsentType.PLATFORM_OFFER),
-            get_legal_document_version("offer"),
-        )
-        record_platform_consent(
-            request,
-            str(UserConsent.ConsentType.PRIVACY_POLICY),
-            get_legal_document_version("privacy"),
-        )
-    finally:
-        request.user = previous_user
     return cast(Player, player)
 
 
@@ -750,6 +745,7 @@ def auth(request):
                     "password",
                     "password_confirm",
                     "agree_legal",
+                    "agree_terms",
                 )
                 has_step1_errors = any(
                     field_name in register_form.errors for field_name in step1_fields

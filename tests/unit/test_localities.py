@@ -391,6 +391,7 @@ class RegistrationAndCourtLocalityLabelsTestCase(TestCase):
                 "password": "securepass1",
                 "password_confirm": "securepass1",
                 "agree_legal": True,
+                "agree_terms": True,
             }
         )
         self.assertTrue(form.is_valid(), form.errors)

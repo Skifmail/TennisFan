@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Вход через {{ provider_label }}{% endblock %}
+{% block content %}
+<div class="container" style="max-width:650px; padding-top:2rem; padding-bottom:2rem;">
+    <h1>{% if connect %}Подключить{% else %}Войти через{% endif %} {{ provider_label }}</h1>
+    <p>Сервис передаст доступные данные: идентификатор аккаунта, имя, фамилию, email, телефон, фото, дату рождения и пол. При первом входе будет создан профиль. Пароль от внешнего аккаунта платформа не получает.</p>
+    <p>Данные используем для входа{% if connect %} и привязки аккаунта{% else %}, создания и заполнения профиля{% endif %}. Подробности — в <a href="{% url 'legal_privacy' %}" target="_blank" rel="noopener">политике конфиденциальности</a>. Соцвход доброволен: можно использовать вход или регистрацию по email.</p>
+    <form method="post" action="{% url 'social_start' provider=provider %}">
+        {% csrf_token %}
+        {{ form.token }}
+        {% if connect %}<input type="hidden" name="process" value="connect">{% endif %}
+        {% if external_provider %}<input type="hidden" name="external_provider" value="{{ external_provider }}">{% endif %}
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+        {% if form.non_field_errors %}<div class="alert alert-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="form-group">
+            <label class="consent-label" for="{{ form.personal_data.id_for_label }}">{{ form.personal_data }} <span class="consent-text">Даю <a href="{% url 'legal_social_personal_data' %}" target="_blank" rel="noopener">отдельное согласие на обработку данных для входа через внешний сервис</a>.</span></label>
+            {% for error in form.personal_data.errors %}<p class="text-error" role="alert">{{ error }}</p>{% endfor %}
+        </div>
+        <div class="form-group">
+            <label class="consent-label" for="{{ form.terms.id_for_label }}">{{ form.terms }} <span class="consent-text">Принимаю <a href="{% url 'legal_terms' %}" target="_blank" rel="noopener">пользовательское соглашение</a>.</span></label>
+            {% for error in form.terms.errors %}<p class="text-error" role="alert">{{ error }}</p>{% endfor %}
+        </div>
+        <p class="text-secondary">Этот шаг не оформляет подписку, оплату или согласие на рекламу. Внешний сервис отдельно предложит подтвердить доступ к данным.</p>
+        <button type="submit" class="btn btn-primary">Продолжить через {{ provider_label }}</button>
+        <a href="{% if connect %}{% url 'social_connections' %}{% else %}{% url 'login' %}{% endif %}" class="btn btn-ghost">Отмена</a>
+    </form>
+</div>
+{% endblock %}

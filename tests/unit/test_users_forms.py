@@ -25,6 +25,7 @@ class UserRegistrationFormCleanTestCase(TestCase):
             "password": "securepass1",
             "password_confirm": "securepass1",
             "agree_legal": True,
+            "agree_terms": True,
         }
         data.update(overrides)
         return data
@@ -73,6 +74,7 @@ class UserRegistrationPasswordTestCase(TestCase):
             "password": "StrongPass123",
             "password_confirm": "StrongPass123",
             "agree_legal": True,
+            "agree_terms": True,
         }
         data.update(overrides)
         return data
@@ -116,6 +118,7 @@ class UserRegistrationNtrpTestCase(TestCase):
             "password": "StrongPass123",
             "password_confirm": "StrongPass123",
             "agree_legal": True,
+            "agree_terms": True,
         }
 
     def test_comma_separator_accepted(self) -> None:
@@ -153,6 +156,7 @@ class UserRegistrationPhoneTestCase(TestCase):
             "password": "StrongPass123",
             "password_confirm": "StrongPass123",
             "agree_legal": True,
+            "agree_terms": True,
         }
 
     def test_ten_digits_get_country_code(self) -> None:

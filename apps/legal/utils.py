@@ -12,6 +12,7 @@ DOCS_ROOT: Final = Path(settings.BASE_DIR) / "static" / "documents"
 LEGAL_VERSION_LENGTH: Final = 12
 
 LEGAL_DOCUMENT_PATHS: Final[dict[str, Path]] = {
+    "social-personal-data": DOCS_ROOT / "social_personal_data.txt",
     "personal-data": DOCS_ROOT / "personal_data.txt",
     "privacy": DOCS_ROOT / "privacy.txt",
     "offer": DOCS_ROOT / "public_offer.txt",

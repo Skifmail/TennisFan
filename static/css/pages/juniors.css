@@ -1,0 +1,567 @@
+
+.jl {
+    --jl-bg: #f5f7f0;
+    --jl-surface: #fff;
+    --jl-ink: #173b2b;
+    --jl-muted: #546555;
+    --color-text: var(--jl-ink);
+    --color-text-muted: var(--jl-muted);
+    --jl-accent: #245e3d;
+    --jl-line: #dce5da;
+    --jl-radius: 20px;
+
+    color: var(--jl-ink);
+    background: var(--jl-bg);
+    border-radius: 24px;
+    padding: 32px 32px 72px;
+    max-width: 1200px;
+    margin-block: 24px;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.jl * {
+    box-sizing: border-box;
+}
+
+.jl a {
+    color: inherit;
+}
+
+.jl-nav {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--jl-line);
+}
+
+.jl-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: auto;
+    font-weight: 750;
+    text-decoration: none;
+}
+
+.jl-brand>span:last-child {
+    font-weight: 450;
+    color: var(--jl-muted);
+    border-left: 1px solid var(--jl-line);
+    padding-left: 12px;
+}
+
+.jl-mark {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #dfef97;
+    font-size: 24px;
+}
+
+.jl-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin: 48px 0 32px;
+}
+
+.jl h1 {
+    font-size: clamp(30px,4vw,48px);
+    line-height: 1.12;
+    letter-spacing: -.035em;
+    margin: 10px 0 16px;
+    color: var(--jl-ink);
+}
+
+.jl h2 {
+    font-size: 23px;
+    letter-spacing: -.02em;
+    line-height: 1.3;
+    margin: 16px 0;
+}
+
+.jl p {
+    line-height: 1.65;
+}
+
+.jl-eyebrow {
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: .16em;
+    color: var(--jl-accent);
+}
+
+.jl-muted,.jl-field small {
+    color: var(--jl-muted);
+}
+
+.jl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(min(100%,310px),1fr));
+    gap: 20px;
+}
+
+.jl-card {
+    padding: 28px;
+    background: var(--jl-surface);
+    border: 1px solid var(--jl-line);
+    border-radius: var(--jl-radius);
+    min-width: 0;
+}
+
+.jl-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.jl-avatar {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    background: #f0f4e9;
+    border-radius: 16px;
+    font-size: 24px;
+    font-weight: 650;
+}
+
+.jl-card hr {
+    border: 0;
+    border-top: 1px solid var(--jl-line);
+    margin: 24px 0;
+}
+
+.jl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--jl-line);
+    border-radius: 50px;
+    padding: 7px 12px;
+    font-size: 12px;
+    background: var(--jl-surface);
+}
+
+.jl-badge[class*="jl-ball-"]::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ball-color);
+}
+
+.jl-ball-red {
+    --ball-color: #d34c42;
+}
+
+.jl-ball-orange {
+    --ball-color: #e4821e;
+}
+
+.jl-ball-green {
+    --ball-color: #4f9b55;
+}
+
+.jl-ball-yellow {
+    --ball-color: #b2a900;
+}
+
+.jl-button {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    min-height: 46px;
+    padding: 12px 20px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--jl-accent);
+    color: #fff!important;
+    text-decoration: none;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 140ms cubic-bezier(.23,1,.32,1);
+}
+
+.jl-button:active {
+    transform: scale(.97);
+}
+
+.jl-button:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
+.jl :focus-visible {
+    outline: 3px solid var(--jl-accent);
+    outline-offset: 4px;
+}
+
+.jl-link {
+    font-weight: 650;
+    text-underline-offset: 4px;
+}
+
+.jl-empty {
+    padding: 48px;
+    border: 1px dashed var(--jl-line);
+    border-radius: var(--jl-radius);
+    max-width: 750px;
+}
+
+.jl-note {
+    padding: 20px 24px;
+    background: #f2f6eb;
+    border-radius: 14px;
+    margin-top: 28px;
+    line-height: 1.65;
+}
+
+.jl-form {
+    max-width: 800px;
+}
+
+.jl-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.jl-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.jl-field-wide {
+    grid-column: 1/-1;
+}
+
+.jl-field label {
+    font-weight: 600;
+}
+
+.jl-field input:not([type="checkbox"]),.jl-field select,.jl-field textarea,.jl-filter select,.jl-filter input {
+    width: 100%;
+    min-height: 46px;
+    border: 1px solid var(--jl-line);
+    border-radius: 10px;
+    padding: 11px 12px;
+    background: var(--jl-surface);
+    color: var(--jl-ink);
+    font: inherit;
+}
+
+.jl-field input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--jl-accent);
+}
+
+.jl-field input[aria-invalid="true"] {
+    border-color: #ba3535;
+}
+
+.jl-actions {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    margin-top: 32px;
+    flex-wrap: wrap;
+}
+
+.jl-error {
+    background: #fff0ed;
+    border: 1px solid #e8b8b1;
+    padding: 18px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    color: #922f27;
+}
+
+.jl-error-text {
+    color: #922f27!important;
+}
+
+.jl-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.jl-details dt {
+    color: var(--jl-muted);
+}
+
+.jl-details dd {
+    margin: 0;
+    text-align: right;
+}
+
+.jl-table-wrap {
+    overflow: auto;
+}
+
+.jl-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+
+.jl-table th,.jl-table td {
+    text-align: left;
+    padding: 16px 12px;
+    border-bottom: 1px solid var(--jl-line);
+    white-space: nowrap;
+}
+
+.jl-table th {
+    font-size: 12px;
+    color: var(--jl-muted);
+    font-weight: 550;
+}
+
+.jl-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 24px 0;
+}
+
+.jl-filter>label {
+    flex: 1;
+    min-width: 140px;
+    font-size: 12px;
+}
+
+.jl-filter select,.jl-filter input {
+    margin-top: 6px;
+}
+
+.jl-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px;
+    margin-block: 24px;
+}
+
+.jl-stat strong {
+    display: block;
+    font-size: 30px;
+    letter-spacing: -.04em;
+}
+
+.jl-stat span {
+    font-size: 12px;
+    color: var(--jl-muted);
+}
+
+@media(hover:hover) and (pointer:fine) {
+    .jl-button:hover {
+        background: #194b2e;
+    }
+
+    .jl-link:hover {
+        text-decoration-thickness: 2px;
+    }
+}
+
+@media(width <=640px) {
+    .jl {
+        padding-inline: 16px;
+    }
+
+    .jl-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        margin-top: 28px;
+    }
+
+    .jl-card {
+        padding: 22px;
+    }
+
+    .jl-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .jl-brand {
+        flex-wrap: wrap;
+    }
+
+    .jl-brand>span:last-child {
+        font-size: 13px;
+    }
+
+    .jl-nav {
+        gap: 16px;
+    }
+
+    .jl-empty {
+        padding: 28px;
+    }
+}
+
+@media(prefers-reduced-motion:reduce) {
+    .jl-button {
+        transition: none;
+    }
+
+    .jl-button:active {
+        transform: none;
+    }
+}
+
+.jl-hero {
+    padding: 28px 0 44px;
+}
+
+.jl-hero h1 {
+    font-size: clamp(38px,5vw,64px);
+}
+
+.jl-court {
+    position: relative;
+    flex: 0 0 35%;
+    aspect-ratio: 1.1;
+    background: #ddecaa;
+    border-radius: 32px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    transform: rotate(-3deg);
+}
+
+.jl-court>div {
+    width: 68%;
+    height: 72%;
+    border: 2px solid #789151;
+    background: linear-gradient(90deg,transparent 49.5%,#789151 49.5%,#789151 50.5%,transparent 50.5%),linear-gradient(0deg,transparent 49.5%,#789151 49.5%,#789151 50.5%,transparent 50.5%);
+    position: relative;
+}
+
+.jl-court>div::after {
+    content: "";
+    position: absolute;
+    left: 20%;
+    top: 20%;
+    width: 60%;
+    height: 60%;
+    border: 2px solid #789151;
+}
+
+.jl-court span {
+    position: absolute;
+    bottom: 16px;
+    font-size: 9px;
+    letter-spacing: .2em;
+    color: #435a2b;
+}
+
+.jl-balls {
+    grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr));
+}
+
+.jl-card li {
+    line-height: 1.8;
+    margin: 8px 0;
+}
+
+@media(width <=640px) {
+    .jl-court {
+        display: none;
+    }
+
+    .jl-hero {
+        padding-top: 12px;
+    }
+}
+
+.jl-check {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    cursor: pointer;
+}
+
+.jl-check input {
+    flex-shrink: 0;
+}
+
+.jl ol {
+    list-style: decimal;
+    padding-left: 20px;
+}
+
+.jl details {
+    margin-block: 16px;
+}
+
+.jl summary {
+    cursor: pointer;
+    min-height: 44px;
+    display: list-item;
+    align-content: center;
+    font-weight: 600;
+}
+
+.jl form>button:not(.jl-button) {
+    border: 1px solid var(--jl-line);
+    padding: 10px 14px;
+    border-radius: 10px;
+    min-height: 44px;
+}
+
+.jl-nav>a:not(.jl-brand) {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+}
+
+@media(width <=640px) {
+    .jl-nav .jl-brand {
+        flex-basis: 100%;
+    }
+
+    .jl-nav {
+        gap: 4px 18px;
+    }
+
+    .jl-nav>a:not(.jl-brand) {
+        font-size: 14px;
+    }
+
+    .jl-actions .jl-button {
+        max-width: 100%;
+    }
+}
+
+.jl input:not([type="checkbox"]), .jl select, .jl textarea {
+    font-size: 16px;
+}
+
+
+.jl-filter input[type="checkbox"] { width: 20px;
+    min-height: 20px;
+    height: 20px;
+    display: block;
+    accent-color: var(--jl-accent); }
+
+.jl .errorlist {
+    color: #922f27;
+    margin-block: 8px;
+    font-size: 14px;
+}
+.jl h1, .jl-card, .jl-note { overflow-wrap: anywhere; }
+.jl-button:focus-visible:active { transform: none; }

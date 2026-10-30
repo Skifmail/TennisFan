@@ -1,0 +1,9 @@
+{% extends 'juniors/base.html' %}
+{% block title %}Детский профиль{% endblock %}
+{% block junior_content %}
+<header class="jl-heading"><div><p class="jl-eyebrow">МОИ ДЕТИ</p><h1>{% if child %}Редактировать профиль{% else %}Добавить ребёнка{% endif %}</h1><p class="jl-muted">Профиль создаётся закрытым. Проверка представителя проходит отдельно.</p></div></header>
+<form method="post" class="jl-card jl-form" novalidate>{% csrf_token %}
+{% if form.errors %}<div class="jl-error" role="alert"><strong>Проверьте заполнение формы.</strong>{{ form.non_field_errors }}<ul>{% for field in form %}{% if field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ field.errors|striptags }}</a></li>{% endif %}{% endfor %}</ul></div>{% endif %}
+<div class="jl-form-grid">{% for field in form %}<div class="jl-field {% if field.field.widget.input_type == 'checkbox' %}jl-field-wide{% endif %}">{% if field.field.widget.input_type == 'checkbox' %}<label class="jl-check" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-label="обязательно">*</span>{% endif %}</label>{{ field }}{% endif %}{% if field.help_text %}<small id="{{ field.id_for_label }}_helptext">{{ field.help_text }}</small>{% endif %}{% if field.errors %}<div id="{{ field.id_for_label }}_error" class="jl-error-text">{{ field.errors }}</div>{% endif %}</div>{% endfor %}</div>
+<div class="jl-actions"><button class="jl-button" type="submit">Сохранить профиль</button><a href="{% url 'juniors:family' %}">Отмена</a></div></form>
+{% endblock %}

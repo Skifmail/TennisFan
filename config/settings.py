@@ -156,7 +156,16 @@ INSTALLED_APPS = [
     "apps.shop",
     "apps.telegram_bot",
     "apps.player_ratings",
+    "apps.juniors",
 ]
+
+# Детская лига открывается отдельно после миграций и проверки регламентов.
+JUNIOR_LEAGUE_ENABLED = (
+    os.environ.get("JUNIOR_LEAGUE_ENABLED", "False").lower() == "true"
+)
+JUNIOR_PAYMENTS_ENABLED = (
+    os.environ.get("JUNIOR_PAYMENTS_ENABLED", "False").lower() == "true"
+)
 
 if PROFILING and DEBUG:
     INSTALLED_APPS += [
@@ -230,6 +239,7 @@ TEMPLATES = [
                 "apps.core.web_push.web_push_context",
                 "apps.core.context_processors.platform_activity_unseen",
                 "apps.clubs.context_processors.club_context",
+                "apps.juniors.context_processors.junior_context",
             ],
         },
     },
@@ -542,6 +552,7 @@ CRONTAB_COMMAND_PREFIX = f"{sys.executable} {BASE_DIR / 'cron-run-wrapper.py'}"
 CRONTAB_COMMAND_SUFFIX = ">> /proc/1/fd/1 2>> /proc/1/fd/2"
 
 CRONJOBS = [
+    ("*/5 * * * *", "django.core.management.call_command", ["process_junior_league"]),
     ("* * * * *", "django.core.management.call_command", ["process_notifications"]),
     (
         "*/5 * * * *",

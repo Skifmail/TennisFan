@@ -188,6 +188,7 @@
                         {% for item in nav_menu_items %}
                         <a href="{{ item.url }}" class="btn btn-ghost nav-menu-desktop__link"{% if item.is_external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.title }}</a>
                         {% endfor %}
+                        {% if junior_league_visible %}<a href="{% url 'juniors:home' %}" class="btn btn-ghost nav-menu-desktop__link">Детская лига</a>{% endif %}
                     </div>
                     <div class="nav-more" id="nav-more" hidden>
                         <button type="button" class="btn btn-ghost nav-more__toggle" id="nav-more-toggle" aria-expanded="false" aria-haspopup="menu" aria-controls="nav-more-panel">
@@ -203,6 +204,7 @@
                     {% for item in nav_menu_items %}
                     <a href="{{ item.url }}" class="nav-menu-link"{% if item.is_external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.title }}</a>
                     {% endfor %}
+                    {% if junior_league_visible %}<a href="{% url 'juniors:home' %}" class="nav-menu-link">Детская лига</a>{% endif %}
                 </div>
                 
                 <!-- Auth Actions (Always visible - right side) -->
@@ -236,6 +238,7 @@
                             <li><a href="{% url 'my_matches' %}">Мои матчи</a></li>
                             <li><a href="{% url 'my_sparring_matches' %}">Личные встречи</a></li>
                             <li><a href="{% url 'my_trainings' %}">Мои тренировки</a></li>
+                            {% if junior_league_visible %}<li><a href="{% url 'juniors:home' %}">Детская лига</a></li><li><a href="{% url 'juniors:family' %}">Мои дети</a></li>{% endif %}
                             <li><a href="{% url 'clubs:invitations_list' %}">Приглашения в клубы</a></li>
                             {% if user_clubs %}
                             <li><a href="{% url 'clubs:my_clubs' %}">Мои клубы</a></li>

@@ -80,7 +80,13 @@ def test_catalog_when_seed_migration_loaded_should_cover_all_current_events() ->
     direct_migration = import_module(
         "apps.notifications.migrations.0008_direct_message_event"
     )
+    junior_migration = import_module("apps.juniors.migrations.0008_notification_policy")
     assert {
         row["key"]
-        for row in [*migration.ROWS, *stringer_migration.ROWS, *direct_migration.ROWS]
+        for row in [
+            *migration.ROWS,
+            *stringer_migration.ROWS,
+            *direct_migration.ROWS,
+            *junior_migration.ROWS,
+        ]
     } == set(EVENTS)

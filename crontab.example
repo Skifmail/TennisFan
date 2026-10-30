@@ -61,3 +61,6 @@
 #   python manage.py reset_season_points --force-season winter_2024
 #   python manage.py run_recurring_club_plan_payments
 #   python manage.py run_recurring_club_fee_payments
+
+#   */5 * * * * — сверка детских оплат, освобождение резервов, напоминания за сутки.
+#                   Команда: process_junior_league

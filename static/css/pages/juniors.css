@@ -1,17 +1,23 @@
 
 .jl {
-    --jl-bg: #f5f7f0;
-    --jl-surface: #fff;
-    --jl-ink: #173b2b;
-    --jl-muted: #546555;
+    --jl-bg: #013f4a;
+    --jl-surface: #064e50;
+    --jl-ink: #f0f7f3;
+    --jl-muted: #b4ceca;
     --color-text: var(--jl-ink);
     --color-text-muted: var(--jl-muted);
-    --jl-accent: #245e3d;
-    --jl-line: #dce5da;
+    --jl-accent: #e4c777;
+    --jl-gold-ink: #073f43;
+    --jl-line-strong: #c7ac68;
+    --jl-line: #36726f;
     --jl-radius: 20px;
 
+    color-scheme: dark;
     color: var(--jl-ink);
-    background: var(--jl-bg);
+    background: radial-gradient(ellipse at 100% 0%, #06856280, transparent 55%),
+        linear-gradient(155deg, #075c54, var(--jl-bg) 65%);
+    border: 1px solid #688b6b;
+    box-shadow: 0 24px 64px #001f2b40;
     border-radius: 24px;
     padding: 32px 32px 72px;
     max-width: 1200px;
@@ -80,7 +86,8 @@
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    background: #dfef97;
+    background: var(--jl-accent);
+    color: var(--jl-gold-ink);
     font-size: 24px;
 }
 
@@ -130,7 +137,8 @@
 
 .jl-card {
     padding: 28px;
-    background: var(--jl-surface);
+    background: linear-gradient(145deg, #086454, var(--jl-surface) 75%);
+    box-shadow: 0 8px 24px #002f3526;
     border: 1px solid var(--jl-line);
     border-radius: var(--jl-radius);
     min-width: 0;
@@ -148,7 +156,8 @@
     place-items: center;
     width: 52px;
     height: 52px;
-    background: #f0f4e9;
+    background: #08715f;
+    color: var(--jl-accent);
     border-radius: 16px;
     font-size: 24px;
     font-weight: 650;
@@ -205,12 +214,12 @@
     border: 0;
     border-radius: 12px;
     background: var(--jl-accent);
-    color: #fff!important;
+    color: var(--jl-gold-ink)!important;
     text-decoration: none;
     font: inherit;
     font-weight: 600;
     cursor: pointer;
-    transition: transform 140ms cubic-bezier(.23,1,.32,1);
+    transition: transform 140ms cubic-bezier(.23,1,.32,1), background-color 140ms ease-out;
 }
 
 .jl-button:active {
@@ -241,7 +250,8 @@
 
 .jl-note {
     padding: 20px 24px;
-    background: #f2f6eb;
+    background: #064c4d;
+    border: 1px solid var(--jl-line);
     border-radius: 14px;
     margin-top: 28px;
     line-height: 1.65;
@@ -302,16 +312,16 @@
 }
 
 .jl-error {
-    background: #fff0ed;
-    border: 1px solid #e8b8b1;
+    background: #572d32;
+    border: 1px solid #a65d61;
     padding: 18px;
     border-radius: 12px;
     margin-bottom: 24px;
-    color: #922f27;
+    color: #ffbdb5;
 }
 
 .jl-error-text {
-    color: #922f27!important;
+    color: #ffbdb5!important;
 }
 
 .jl-details {
@@ -389,7 +399,7 @@
 
 @media(hover:hover) and (pointer:fine) {
     .jl-button:hover {
-        background: #194b2e;
+        background: #f1d892;
     }
 
     .jl-link:hover {
@@ -455,7 +465,9 @@
     position: relative;
     flex: 0 0 35%;
     aspect-ratio: 1.1;
-    background: #ddecaa;
+    background: linear-gradient(145deg, #068562, #013f4a);
+    border: 1px solid var(--jl-line-strong);
+    box-shadow: 0 20px 48px #001f2b60, inset 0 1px 0 #ffffff14;
     border-radius: 32px;
     display: grid;
     place-items: center;
@@ -466,8 +478,8 @@
 .jl-court>div {
     width: 68%;
     height: 72%;
-    border: 2px solid #789151;
-    background: linear-gradient(90deg,transparent 49.5%,#789151 49.5%,#789151 50.5%,transparent 50.5%),linear-gradient(0deg,transparent 49.5%,#789151 49.5%,#789151 50.5%,transparent 50.5%);
+    border: 2px solid #d5bd7b;
+    background: linear-gradient(90deg,transparent 49.5%,#d5bd7b 49.5%,#d5bd7b 50.5%,transparent 50.5%),linear-gradient(0deg,transparent 49.5%,#d5bd7b 49.5%,#d5bd7b 50.5%,transparent 50.5%);
     position: relative;
 }
 
@@ -478,7 +490,7 @@
     top: 20%;
     width: 60%;
     height: 60%;
-    border: 2px solid #789151;
+    border: 2px solid #d5bd7b;
 }
 
 .jl-court span {
@@ -486,7 +498,7 @@
     bottom: 16px;
     font-size: 9px;
     letter-spacing: .2em;
-    color: #435a2b;
+    color: #e4c777;
 }
 
 .jl-balls {
@@ -538,6 +550,8 @@
 }
 
 .jl form>button:not(.jl-button) {
+    background: #075c54;
+    color: var(--jl-accent);
     border: 1px solid var(--jl-line);
     padding: 10px 14px;
     border-radius: 10px;
@@ -580,9 +594,33 @@
     accent-color: var(--jl-accent); }
 
 .jl .errorlist {
-    color: #922f27;
+    color: #ffbdb5;
     margin-block: 8px;
     font-size: 14px;
 }
 .jl h1, .jl-card, .jl-note { overflow-wrap: anywhere; }
 .jl-button:focus-visible:active { transform: none; }
+
+/* Тёмные поверхности и золотые акценты общей палитры платформы. */
+.jl h2, .jl h3, .jl summary, .jl-stat strong {
+    color: var(--jl-ink);
+}
+
+.jl-nav>a:not(.jl-brand), .jl-link {
+    color: var(--jl-accent);
+}
+
+
+.jl-table thead {
+    background: #013f4a;
+}
+
+.jl input::placeholder, .jl textarea::placeholder {
+    color: var(--jl-muted);
+    opacity: 1;
+}
+
+
+.jl-development strong, .jl-development p {
+    color: #fff;
+}

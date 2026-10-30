@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/pages/juniors.css' %}">{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<main class="jl container">
+    <nav class="jl-nav" aria-label="Детская лига">
+        <a class="jl-brand" href="{% url 'juniors:home' %}"><span class="jl-mark" aria-hidden="true">↗</span> TennisFan <span>Детская лига</span></a>
+        <a href="{% url 'juniors:tournaments' %}">Турниры</a>
+        <a href="{% url 'juniors:ratings' %}">Рейтинги</a>
+        <a href="{% url 'juniors:rules' %}">Правила и родителям</a>
+        <a href="{% url 'juniors:family' %}">Мои дети</a>
+        {% if user.is_authenticated %}<a href="{% url 'juniors:payments' %}">Оплаты</a>{% endif %}
+    </nav>
+    {% block junior_content %}{% endblock %}
+</main>
+{% endblock %}

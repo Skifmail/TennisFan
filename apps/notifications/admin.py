@@ -120,6 +120,10 @@ class EventPolicyAdmin(_PolicyAdmin):
     readonly_fields = ["key", "title", "group", "description"]
     actions = None
 
+    def get_queryset(self, request):
+        """Детские настройки находятся в единой группе «Детская лига»."""
+        return super().get_queryset(request).exclude(key__startswith="junior.")
+
     def has_add_permission(self, request: HttpRequest) -> bool:
         """Запрещает события, не подключённые кодом к реальным производителям.
 

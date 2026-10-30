@@ -1,0 +1,2 @@
+{% extends 'admin/base_site.html' %}
+{% block content %}<p><strong>Ребёнок:</strong> {{ object.child }} · {{ object.child.birth_date|date:'d.m.Y' }}</p><p><strong>Представитель:</strong> {{ object.user }} · {{ object.get_relation_display }}</p><p>Проверьте оригиналы документов при личном предъявлении. Проверка телефонного номера не подтверждает родство. Копии и номера документов в форму не вносятся.</p><form method="post">{% csrf_token %}{{ form.as_p }}<input type="submit" value="Сохранить решение"></form>{% endblock %}

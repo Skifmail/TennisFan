@@ -96,6 +96,7 @@ def create_payment(
     metadata: dict | None = None,
     customer_email: str | None = None,
     save_payment_method: bool | None = None,
+    idempotency_key: str | None = None,
 ) -> tuple[str, str]:
     """Создать платёж в ЮKassa и получить URL для редиректа пользователя.
 
@@ -157,7 +158,7 @@ def create_payment(
             "internet": "true",
         }
 
-    idempotence_key = str(uuid.uuid4())
+    idempotence_key = idempotency_key or str(uuid.uuid4())
     response = _post_yookassa_payment(
         auth=(shop_id, secret_key),
         headers={

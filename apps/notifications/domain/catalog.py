@@ -25,6 +25,9 @@ class EventDefinition:
 
 
 EVENTS: Final[dict[str, EventDefinition]] = {
+    "junior.updated": EventDefinition(
+        "Детская лига: изменение", "Детская лига", "inbox"
+    ),
     "stringer.application_submitted": EventDefinition(
         "Новая заявка стрингера", "Стрингеры", "inbox"
     ),
@@ -238,6 +241,8 @@ EVENTS: Final[dict[str, EventDefinition]] = {
 }
 
 PRODUCER_EVENTS: Final[dict[str, str]] = {
+    "apps.juniors.notifications:notify_representative": "junior.updated",
+    "apps.juniors.appeals:submit_appeal": "junior.updated",
     "apps.chat.direct:notify_direct_message": "chat.direct_message",
     "apps.content.stringer_services:notify_stringer_application": "stringer.application_submitted",
     "apps.notifications.auth_forms:send_mail": "account.password_reset",
@@ -352,6 +357,7 @@ PRODUCER_EVENTS: Final[dict[str, str]] = {
 # В этих событиях до центра не существовало почтового производителя.
 INBOX_ONLY_EVENTS: Final = frozenset(
     [
+        "junior.updated",
         "stringer.application_submitted",
         "chat.reply",
         "club.join_approved",

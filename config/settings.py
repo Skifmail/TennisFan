@@ -190,6 +190,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.juniors.middleware.JuniorDevelopmentMiddleware",
     "apps.notifications.middleware.PushDeviceLifetimeMiddleware",
     "apps.subscriptions.middleware.FreeSubscriptionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",

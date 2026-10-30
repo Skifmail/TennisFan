@@ -24,6 +24,27 @@
     box-sizing: border-box;
 }
 
+.jl-development {
+    padding: 20px 24px;
+    margin-block: 24px;
+    border: 1px solid #a32222;
+    border-radius: 16px;
+    background: #b42323;
+    color: #fff;
+    overflow-wrap: anywhere;
+}
+
+.jl-development strong {
+    display: block;
+    font-size: 20px;
+    line-height: 1.4;
+}
+
+.jl-development p {
+    margin: 6px 0 0;
+    color: #fff;
+}
+
 .jl a {
     color: inherit;
 }

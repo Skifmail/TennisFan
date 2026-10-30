@@ -1,0 +1,9 @@
+{% extends 'juniors/base.html' %}
+{% block title %}Детская лига в разработке{% endblock %}
+{% block junior_content %}
+<section class="jl-empty">
+    <h1>Действие пока недоступно</h1>
+    <p>Раздел находится в разработке. Вы можете просматривать информацию, а выполнять действия пока могут только администраторы.</p>
+    <a href="{% url 'juniors:home' %}">Вернуться в детскую лигу →</a>
+</section>
+{% endblock %}

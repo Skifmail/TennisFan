@@ -1,11 +1,11 @@
 {% extends 'juniors/base.html' %}
 {% block title %}Мои дети{% endblock %}
 {% block junior_content %}
-<header class="jl-heading"><div><p class="jl-eyebrow">СЕМЕЙНЫЙ КАБИНЕТ</p><h1>Их игра. Ваша поддержка.</h1><p class="jl-muted">Профили детей, заявки и спортивная история — в одном месте.</p></div><a class="jl-button" href="{% url 'juniors:add_child' %}">Добавить ребёнка <span aria-hidden="true">＋</span></a></header>
+<header class="jl-heading"><div><p class="jl-eyebrow">СЕМЕЙНЫЙ КАБИНЕТ</p><h1>Их игра. Ваша поддержка.</h1><p class="jl-muted">Профили детей, заявки и спортивная история — в одном месте.</p></div>{% if junior_actions_allowed %}<a class="jl-button" href="{% url 'juniors:add_child' %}">Добавить ребёнка <span aria-hidden="true">＋</span></a>{% endif %}</header>
 <div class="jl-grid">
 {% if adult_history %}<section class="jl-card"><h2>Ваша история детской лиги</h2><a href="{% url 'juniors:adult_history' %}">Посмотреть сохранённые результаты →</a></section>{% endif %}
 {% for link in links %}
 <article class="jl-card"><div class="jl-card-top"><span class="jl-avatar" aria-hidden="true">{{ link.child.first_name|first }}</span><span class="jl-badge jl-ball-{{ link.child.ball }}">{{ link.child.get_ball_display }}</span></div><h2><a href="{% url 'juniors:child' pk=link.child.pk %}">{{ link.child }}</a></h2><p class="jl-muted">{{ link.child.city }}</p><hr><p>{{ link.get_status_display }} · {{ link.child.get_status_display }}</p><a class="jl-link" href="{% url 'juniors:child' pk=link.child.pk %}">Открыть профиль →</a></article>
-{% empty %}<section class="jl-empty"><p class="jl-eyebrow">ПЕРВЫЙ ШАГ</p><h2>Начнём со знакомства</h2><p>Добавьте ребёнка. После проверки представителя сможете записывать его на турниры.</p><a class="jl-button" href="{% url 'juniors:add_child' %}">Создать детский профиль</a></section>{% endfor %}
+{% empty %}<section class="jl-empty"><p class="jl-eyebrow">ПЕРВЫЙ ШАГ</p><h2>Начнём со знакомства</h2>{% if junior_actions_allowed %}<p>Добавьте ребёнка. После проверки представителя сможете записывать его на турниры.</p>{% else %}<p>Профилей пока нет. Добавление детей станет доступно после завершения разработки раздела.</p>{% endif %}{% if junior_actions_allowed %}<a class="jl-button" href="{% url 'juniors:add_child' %}">Создать детский профиль</a>{% endif %}</section>{% endfor %}
 </div><aside class="jl-note"><strong>Данные под вашим контролем.</strong> Контакты и дата рождения ребёнка не отображаются в открытом доступе.</aside>
 {% endblock %}

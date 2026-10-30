@@ -12,6 +12,10 @@
         <a href="{% url 'juniors:family' %}">Мои дети</a>
         {% if user.is_authenticated %}<a href="{% url 'juniors:payments' %}">Оплаты</a>{% endif %}
     </nav>
+    <aside class="jl-development" role="status">
+        <strong>Детская лига находится в разработке</strong>
+        <p>Можно смотреть турниры, рейтинги, правила, профили детей и историю оплат. Все действия временно доступны только администраторам.</p>
+    </aside>
     {% block junior_content %}{% endblock %}
 </main>
 {% endblock %}

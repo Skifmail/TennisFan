@@ -6,6 +6,11 @@ from django.http import HttpRequest
 
 def junior_context(request: HttpRequest) -> dict[str, bool]:
     return {
+        "junior_actions_allowed": bool(
+            request.user.is_authenticated
+            and request.user.is_active
+            and request.user.is_staff
+        ),
         "junior_league_visible": settings.JUNIOR_LEAGUE_ENABLED
-        or bool(request.user.is_authenticated and request.user.is_staff)
+        or bool(request.user.is_authenticated and request.user.is_staff),
     }

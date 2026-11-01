@@ -79,7 +79,7 @@ def test_delete_subscription_when_accepted_should_delete_remotely(
 ) -> None:
     """Принятое удаление подтверждается кодом 202 и точным адресом подписки."""
     delete = mocker.patch(
-        "apps.notifications.infrastructure.push.requests.delete",
+        "apps.notifications.infrastructure.push.SESSION.delete",
         return_value=_response(202),
     )
     assert delete_subscription(SUBSCRIPTION)
@@ -93,7 +93,7 @@ def test_delete_subscription_when_already_gone_should_count_as_success(
 ) -> None:
     """404 означает, что цель достигнута: повтор не нужен."""
     mocker.patch(
-        "apps.notifications.infrastructure.push.requests.delete",
+        "apps.notifications.infrastructure.push.SESSION.delete",
         return_value=_response(404),
     )
     assert delete_subscription(SUBSCRIPTION)
@@ -104,7 +104,7 @@ def test_delete_subscription_when_provider_fails_should_not_raise(
 ) -> None:
     """Отказ провайдера не ломает отзыв устройства в базе."""
     mocker.patch(
-        "apps.notifications.infrastructure.push.requests.delete",
+        "apps.notifications.infrastructure.push.SESSION.delete",
         return_value=_response(500),
     )
     assert not delete_subscription(SUBSCRIPTION)
@@ -115,7 +115,7 @@ def test_delete_subscription_when_network_fails_should_not_raise(
 ) -> None:
     """Сетевой сбой отдаёт безопасный отказ без исключения."""
     mocker.patch(
-        "apps.notifications.infrastructure.push.requests.delete",
+        "apps.notifications.infrastructure.push.SESSION.delete",
         side_effect=requests.RequestException("boom"),
     )
     assert not delete_subscription(SUBSCRIPTION)
@@ -125,7 +125,7 @@ def test_delete_subscription_without_key_should_not_call_provider(
     mocker: MockerFixture,
 ) -> None:
     """Без REST-ключа команда не делает сетевых запросов."""
-    delete = mocker.patch("apps.notifications.infrastructure.push.requests.delete")
+    delete = mocker.patch("apps.notifications.infrastructure.push.SESSION.delete")
     with override_settings(ONESIGNAL_REST_API_KEY=""):
         assert not delete_subscription(SUBSCRIPTION)
     delete.assert_not_called()

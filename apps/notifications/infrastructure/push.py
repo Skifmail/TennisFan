@@ -6,6 +6,8 @@ import requests
 from django.conf import settings
 from loguru import logger
 
+from apps.core.http import provider_session
+
 from ..domain.rules import NotificationError
 
 API_ORIGIN: Final = "https://api.onesignal.com"
@@ -15,6 +17,9 @@ HTTP_TIMEOUT: Final = (3.0, 10.0)
 # показывает push только при следующем открытии. 12 часов переживают ночь и при
 # этом не показывают уведомление на следующий день; само задание живёт сутки.
 PUSH_TTL_SECONDS: Final = 43200
+# Один клиент на процесс: соединения не переиспользуются между запросами,
+# но TLS-контекст и адаптер создаются один раз.
+SESSION: Final = provider_session()
 PROVIDER_STAT_KEYS: Final = (
     "successful",
     "failed",
@@ -75,7 +80,7 @@ def send_push(
     ):
         raise PushRejectedError("push_not_configured_or_no_devices")
     try:
-        response = requests.post(
+        response = SESSION.post(
             API_URL,
             headers={
                 "Authorization": f"Key {settings.ONESIGNAL_REST_API_KEY}",
@@ -147,7 +152,7 @@ def fetch_delivery_stats(provider_id: str) -> dict[str, object]:
     if not settings.ONESIGNAL_REST_API_KEY or not settings.ONESIGNAL_APP_ID:
         return {"error": "not_configured"}
     try:
-        response = requests.get(
+        response = SESSION.get(
             f"{API_URL}/{provider_id}",
             params={"app_id": settings.ONESIGNAL_APP_ID},
             headers={"Authorization": f"Key {settings.ONESIGNAL_REST_API_KEY}"},
@@ -182,7 +187,7 @@ def delete_subscription(subscription_id: str) -> bool:
     if not settings.ONESIGNAL_REST_API_KEY or not settings.ONESIGNAL_APP_ID:
         return False
     try:
-        response = requests.delete(
+        response = SESSION.delete(
             f"{API_ORIGIN}/apps/{settings.ONESIGNAL_APP_ID}"
             f"/subscriptions/{subscription_id}",
             headers={"Authorization": f"Key {settings.ONESIGNAL_REST_API_KEY}"},

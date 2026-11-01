@@ -189,7 +189,7 @@ def test_push_transport_when_called_should_target_subscription_only(
     response = mocker.Mock(status_code=200)
     response.json.return_value = {"id": "accepted-id"}
     post = mocker.patch(
-        "apps.notifications.infrastructure.push.requests.post", return_value=response
+        "apps.notifications.infrastructure.push.SESSION.post", return_value=response
     )
     assert (
         send_push(
@@ -216,7 +216,7 @@ def test_push_transport_when_zero_recipients_should_reject(
     response = mocker.Mock(status_code=200)
     response.json.return_value = {"id": "accepted-id", "recipients": 0}
     mocker.patch(
-        "apps.notifications.infrastructure.push.requests.post", return_value=response
+        "apps.notifications.infrastructure.push.SESSION.post", return_value=response
     )
     with pytest.raises(PushRejectedError, match="push_no_recipients"):
         send_push(
@@ -237,7 +237,7 @@ def test_push_transport_when_id_empty_should_reject_as_no_recipients(
     response = mocker.Mock(status_code=200)
     response.json.return_value = {"id": ""}
     mocker.patch(
-        "apps.notifications.infrastructure.push.requests.post", return_value=response
+        "apps.notifications.infrastructure.push.SESSION.post", return_value=response
     )
     with pytest.raises(PushRejectedError, match="push_no_recipients"):
         send_push(
@@ -258,7 +258,7 @@ def test_push_transport_when_recipients_absent_should_accept_id(
     response = mocker.Mock(status_code=200)
     response.json.return_value = {"id": "accepted-id"}
     mocker.patch(
-        "apps.notifications.infrastructure.push.requests.post", return_value=response
+        "apps.notifications.infrastructure.push.SESSION.post", return_value=response
     )
     assert (
         send_push(

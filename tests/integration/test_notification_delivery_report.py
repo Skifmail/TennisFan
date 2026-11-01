@@ -108,7 +108,7 @@ def test_report_when_provider_checked_should_print_counts(
         "completed_at": 1761648000,
     }
     get = mocker.patch(
-        "apps.notifications.infrastructure.push.requests.get",
+        "apps.notifications.infrastructure.push.SESSION.get",
         return_value=response,
     )
     output = StringIO()
@@ -131,7 +131,7 @@ def test_report_when_provider_unavailable_should_stay_safe(
     user = _user()
     _delivery(user)
     mocker.patch(
-        "apps.notifications.infrastructure.push.requests.get",
+        "apps.notifications.infrastructure.push.SESSION.get",
         side_effect=requests.RequestException("boom"),
     )
     output = StringIO()
@@ -151,7 +151,7 @@ def test_report_when_key_missing_should_not_call_provider(
     """Без REST-ключа отчёт остаётся локальным и не делает запросов."""
     user = _user()
     _delivery(user)
-    get = mocker.patch("apps.notifications.infrastructure.push.requests.get")
+    get = mocker.patch("apps.notifications.infrastructure.push.SESSION.get")
     output = StringIO()
     with override_settings(ONESIGNAL_REST_API_KEY=""):
         call_command(

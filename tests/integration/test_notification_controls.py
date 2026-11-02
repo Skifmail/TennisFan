@@ -243,3 +243,12 @@ def test_invitation_when_verified_device_exists_should_match_signed_browser(
     assert (
         'id="notification-invitation"' in page.content.decode()
     ) is not current_device
+
+
+def test_invitation_should_offer_snooze_until_end_of_day() -> None:
+    """Окно даёт отказаться от напоминания до конца суток, а не навсегда."""
+    from django.template.loader import render_to_string
+
+    html = render_to_string("notifications/_invitation.html")
+    assert "Не напоминать сегодня" in html
+    assert "data-invitation-snooze" in html

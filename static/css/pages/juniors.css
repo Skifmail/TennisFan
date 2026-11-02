@@ -622,3 +622,76 @@
 .jl-development strong, .jl-development p {
     color: #fff;
 }
+
+.jl-rules-heading {
+    max-width: 850px;
+}
+
+.jl-rules-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.jl-rule-card {
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+}
+
+.jl-rule-number {
+    color: var(--jl-accent);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .12em;
+}
+
+.jl-rule-card h2 {
+    text-transform: none;
+}
+
+.jl-rule-card p + p, .jl-rules-heading p + p, .jl-rules-sources p + p {
+    margin-top: 16px;
+}
+
+.jl-rule-card .jl-rule-footer {
+    margin-top: auto;
+    padding-top: 20px;
+    font-size: 14px;
+    color: var(--jl-muted);
+}
+
+.jl-ball-guide {
+    margin-block: 16px 0;
+}
+
+.jl-ball-guide>div + div {
+    margin-top: 12px;
+}
+
+.jl-ball-guide dd {
+    margin: 6px 0 0;
+    font-size: 14px;
+}
+
+.jl-rules-sources a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.jl-rules-sources .jl-link {
+    display: inline-block;
+    margin-top: 16px;
+}
+
+@media(width <= 1000px) {
+    .jl-rules-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media(width <= 640px) {
+    .jl-rules-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

@@ -189,3 +189,45 @@ def test_invitation_when_later_selected_should_explain_location_and_reappear_on_
             expect(page.get_by_role("button", name="Позже", exact=True)).to_be_visible()
         finally:
             browser.close()
+
+
+def test_invitation_when_snoozed_should_stay_hidden_until_next_day() -> None:
+    """«Не напоминать сегодня» скрывает окно до конца суток и не отключает push.
+
+    Повторный вход в тот же день не показывает окно, а наступивший следующий
+    день возвращает приглашение: постоянного отказа нет.
+    """
+    html = render_to_string("notifications/_invitation.html")
+    script = (ROOT / "static/js/notification_invitation.js").read_text()
+    with sync_playwright() as driver:
+        browser = driver.chromium.launch(
+            executable_path=environ.get("CHAT_BROWSER_EXECUTABLE"), headless=True
+        )
+        try:
+            page = browser.new_page(viewport={"width": 390, "height": 844})
+            page.route(
+                "**/*",
+                lambda route: route.fulfill(
+                    content_type="text/html; charset=utf-8", body=html
+                ),
+            )
+            page.goto(SITE_ORIGIN)
+            page.add_script_tag(content=script)
+            dialog = page.locator("#notification-invitation")
+            expect(dialog).to_be_visible()
+            dialog.get_by_role("button", name="Позже", exact=True).click()
+            dialog.get_by_label("Не напоминать сегодня").check()
+            dialog.get_by_role("button", name="Понятно", exact=True).click()
+            expect(dialog).not_to_be_visible()
+            page.reload()
+            page.add_script_tag(content=script)
+            expect(page.locator("#notification-invitation")).not_to_be_visible()
+            page.evaluate(
+                "localStorage.setItem("
+                "'tennisfan:notification-invitation-snoozed', '2020-01-01')"
+            )
+            page.reload()
+            page.add_script_tag(content=script)
+            expect(page.locator("#notification-invitation")).to_be_visible()
+        finally:
+            browser.close()

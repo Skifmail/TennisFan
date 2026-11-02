@@ -24,14 +24,18 @@ def category_key(tournament: JuniorTournament) -> str:
     return f"{tournament.min_age}-{tournament.max_age}:{tournament.age_rule}:{tournament.gender}:singles"
 
 
-def category_label(category: str) -> str:
+def category_label(category: str, *, with_rule: bool = True) -> str:
     """Возвращает понятную подпись категории без внутренних кодов."""
     ages, rule, gender, _ = category.split(":")
     gender_name = {"open": "Все участники", "male": "Мальчики", "female": "Девочки"}[
         gender
     ]
     date_rule = "на 31 декабря" if rule == "year_end" else "на дату начала"
-    return f"{ages.replace('-', '–')} лет · {date_rule} · {gender_name}"
+    parts = [f"{ages.replace('-', '–')} лет"]
+    if with_rule:
+        parts.append(date_rule)
+    parts.append(gender_name)
+    return " · ".join(parts)
 
 
 def tournament_places(tournament: JuniorTournament) -> list[dict[str, Any]]:

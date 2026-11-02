@@ -1,7 +1,204 @@
 {% extends 'juniors/base.html' %}
 {% block title %}Детская лига TennisFan{% endblock %}
+{% block main_class %} jl--home{% endblock %}
 {% block junior_content %}
-<header class="jl-heading jl-hero"><div><p class="jl-eyebrow">БОЛЬШОЙ ТЕННИС НАЧИНАЕТСЯ С МАЛЕНЬКОГО ШАГА</p><h1>Первый мяч.<br>Своя большая игра.</h1><p class="jl-muted">Турниры, результаты и спортивный рост детей.<br>С поддержкой родителей на каждом этапе.</p><div class="jl-actions"><a class="jl-button" href="{% url 'juniors:family' %}">Перейти в семейный кабинет →</a><a href="{% url 'juniors:rules' %}">Как всё устроено</a></div></div><div class="jl-court" aria-hidden="true"><div></div><span>PLAY. GROW. ENJOY.</span></div></header>
-<section aria-labelledby="balls-title"><p class="jl-eyebrow">ЧЕТЫРЕ СТУПЕНИ ИГРЫ</p><h2 id="balls-title">Подходящий мяч — свой темп</h2><div class="jl-grid jl-balls">{% for item in ball_guide %}<article class="jl-card"><span class="jl-badge jl-ball-{{ item.code }}">{{ item.name }}</span><h2>{{ item.court }}</h2><p>{{ item.description }}</p><small class="jl-muted">{{ item.age }}</small></article>{% endfor %}</div><p class="jl-muted">Возрастные ориентиры не заменяют условия допуска конкретного турнира.</p></section>
-<section class="jl-note"><h2>Участник — ребёнок. Управление — у родителя.</h2><p>Добавьте профиль, подтвердите полномочия и выберите подходящее соревнование. Заявки и уведомления находятся в вашем кабинете, результаты сохраняются ребёнку.</p></section>
+<div class="jlh">
+
+    <header class="jlh-hero">
+        <div class="jlh-hero__copy">
+            <p class="jl-eyebrow">ДЕТСКАЯ ЛИГА TENNISFAN</p>
+            <h1>Турнир, к которому ребёнок готов</h1>
+            <p class="jlh-hero__lead">Мяч, корт и соперники подбираются по возрасту и подготовке. Заявку и оплату берёт на себя родитель. Ребёнку остаётся игра и собственный рейтинг.</p>
+            <div class="jlh-hero__actions">
+                <a class="jl-button" href="{% url 'juniors:family' %}">Семейный кабинет <span aria-hidden="true">→</span></a>
+                <a class="jl-button jl-button--ghost" href="{% url 'juniors:tournaments' %}">Календарь турниров</a>
+            </div>
+            <ul class="jlh-facts">
+                <li>4 ступени мяча</li>
+                <li>Рейтинг по категориям</li>
+                <li>Заявка от родителя</li>
+            </ul>
+        </div>
+
+        <aside class="jlh-panel" aria-labelledby="jlh-path-title">
+            <div class="jlh-panel__head">
+                <h2 id="jlh-path-title">Путь на корт</h2>
+                <span class="jlh-panel__meta">ITF Tennis10s</span>
+            </div>
+            <ol class="jlh-path">
+                {% for item in ball_guide %}
+                <li class="jlh-path__item jl-ball-{{ item.code }}">
+                    <span class="jlh-path__ball" aria-hidden="true"></span>
+                    <span class="jlh-path__name">{{ item.name }}</span>
+                    <span class="jlh-path__track" aria-hidden="true"><i></i></span>
+                    <span class="jlh-path__size">{{ item.court_size }}</span>
+                </li>
+                {% endfor %}
+            </ol>
+            <p class="jlh-panel__note">Корт и скорость мяча растут вместе с ребёнком. Точный допуск указан в регламенте турнира.</p>
+        </aside>
+    </header>
+
+    <section class="jlh-section" aria-labelledby="jlh-events-title">
+        <div class="jlh-head">
+            <div>
+                <p class="jl-eyebrow">КАЛЕНДАРЬ</p>
+                <h2 id="jlh-events-title">Ближайшие турниры</h2>
+                <p class="jlh-head__lead">Дата, город, мяч и свободные места — в карточке. Записаться можно из семейного кабинета.</p>
+            </div>
+            <a class="jlh-head__link" href="{% url 'juniors:tournaments' %}">Все турниры <span aria-hidden="true">→</span></a>
+        </div>
+
+        {% if upcoming %}
+        <div class="jlh-events">
+            {% for item in upcoming %}
+            <article class="jlh-event">
+                <div class="jlh-event__date">
+                    <span class="jlh-event__day">{{ item.tournament.starts_at|date:"j" }}</span>
+                    <span class="jlh-event__month">{{ item.tournament.starts_at|date:"M" }}</span>
+                    <span class="jlh-event__weekday">{{ item.tournament.starts_at|date:"D" }}</span>
+                </div>
+                <div class="jlh-event__body">
+                    <div class="jlh-event__top">
+                        <span class="jl-badge jl-ball-{{ item.tournament.ball }}">{{ item.tournament.get_ball_display }}</span>
+                        <span class="jlh-status jlh-status--{{ item.tournament.status }}">{{ item.tournament.get_status_display }}</span>
+                    </div>
+                    <h3><a href="{% url 'juniors:tournament' pk=item.tournament.pk %}">{{ item.tournament.name }}</a></h3>
+                    <p class="jlh-event__meta">{{ item.tournament.city }} · {{ item.tournament.venue }}</p>
+                    <p class="jlh-event__meta">{{ item.tournament.min_age }}–{{ item.tournament.max_age }} лет · {{ item.tournament.get_gender_display }} · {% if item.free_places %}свободно {{ item.free_places }} из {{ item.tournament.capacity }}{% else %}свободных мест нет{% endif %}</p>
+                </div>
+                <a class="jlh-event__go" href="{% url 'juniors:tournament' pk=item.tournament.pk %}" aria-label="Открыть турнир «{{ item.tournament.name }}»"><span aria-hidden="true">→</span></a>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="jlh-empty">
+            <div class="jlh-empty__copy">
+                <h3>Календарь сезона ещё собирается</h3>
+                <p>Организаторы готовят первые этапы. Опубликованный турнир появится здесь с датой, городом, мячом и числом свободных мест.</p>
+                <div class="jlh-empty__actions">
+                    <a class="jl-button" href="{% url 'juniors:family' %}">Семейный кабинет</a>
+                    <a class="jlh-head__link" href="{% url 'juniors:rules' %}">Правила и допуск <span aria-hidden="true">→</span></a>
+                </div>
+            </div>
+            <div class="jlh-empty__art jlh-empty__art--calendar" aria-hidden="true">
+                <span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="jlh-section" aria-labelledby="jlh-rating-title">
+        <div class="jlh-head">
+            <div>
+                <p class="jl-eyebrow">РЕЙТИНГ</p>
+                <h2 id="jlh-rating-title">Кто впереди</h2>
+                {% if rating %}
+                <p class="jlh-head__lead">{{ rating.ball_label }} · {{ rating.category_label }}{% if rating.season %} · {{ rating.season.name }}{% endif %}</p>
+                {% else %}
+                <p class="jlh-head__lead">Сезонный рейтинг TennisFan. Очки за разные мячи и возрастные категории не смешиваются.</p>
+                {% endif %}
+            </div>
+            <a class="jlh-head__link" href="{% url 'juniors:ratings' %}">Как считается рейтинг <span aria-hidden="true">→</span></a>
+        </div>
+
+        {% if rating %}
+        <div class="jlh-board">
+            <table class="jl-table jlh-board__table">
+                <caption class="jlh-sr">Пять лучших участников категории</caption>
+                <thead>
+                    <tr><th scope="col">Место</th><th scope="col">Участник</th><th scope="col">Очки</th><th scope="col" class="jlh-board__count-col">Турниров</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in rating.rows %}
+                    <tr>
+                        <td><span class="jlh-place jlh-place--{{ row.place }}">{{ row.place }}</span></td>
+                        <td>{{ row.label }}<span class="jlh-board__count">{{ row.count }} турн.</span></td>
+                        <td><strong>{{ row.points }}</strong></td>
+                        <td class="jlh-board__count-col">{{ row.count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a class="jlh-board__link" href="{% url 'juniors:ratings' %}?{{ rating.query }}">Вся таблица категории <span aria-hidden="true">→</span></a>
+        </div>
+        {% else %}
+        <div class="jlh-empty">
+            <div class="jlh-empty__copy">
+                <h3>Рейтинг начнётся с первых результатов</h3>
+                <p>Очки дают за место в рейтинговом турнире, но только если ребёнок провёл хотя бы один матч. Мяч и возрастная категория считаются отдельно: красный не смешивается с зелёным.</p>
+                <div class="jlh-empty__actions">
+                    <a class="jlh-head__link" href="{% url 'juniors:ratings' %}">Открыть рейтинги <span aria-hidden="true">→</span></a>
+                </div>
+            </div>
+            <div class="jlh-empty__art jlh-empty__art--podium" aria-hidden="true">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="jlh-section" aria-labelledby="jlh-balls-title">
+        <div class="jlh-head">
+            <div>
+                <p class="jl-eyebrow">СТУПЕНИ</p>
+                <h2 id="jlh-balls-title">Мяч и корт по возрасту</h2>
+                <p class="jlh-head__lead">Ребёнок переходит на следующий мяч, когда готов играть быстрее. Возраст в карточке — ориентир, допуск задаёт организатор.</p>
+            </div>
+        </div>
+        <ol class="jlh-steps">
+            {% for item in ball_guide %}
+            <li class="jlh-step jl-ball-{{ item.code }}">
+                <span class="jlh-step__ball" aria-hidden="true"></span>
+                <h3>{{ item.name }} мяч</h3>
+                <p class="jlh-step__court">{{ item.court }}</p>
+                <p class="jlh-step__text">{{ item.description }}</p>
+                <span class="jlh-step__age">{{ item.age }}</span>
+            </li>
+            {% endfor %}
+        </ol>
+        <p class="jlh-footnote">Возрастные ориентиры не заменяют условия допуска конкретного турнира.</p>
+    </section>
+
+    <section class="jlh-section jlh-parents" aria-labelledby="jlh-parents-title">
+        <div class="jlh-parents__intro">
+            <p class="jl-eyebrow">РОДИТЕЛЯМ</p>
+            <h2 id="jlh-parents-title">Родитель ведёт заявку, ребёнок играет матч</h2>
+            <p>Аккаунт нужен взрослому. Отдельный вход ребёнку не создаётся, а все действия остаются под вашим контролем.</p>
+            <a class="jlh-head__link" href="{% url 'juniors:rules' %}">Как всё устроено <span aria-hidden="true">→</span></a>
+            <p class="jlh-parents__note">Дата рождения и контакты не видны другим пользователям. В открытых списках ребёнок указан как «Участник №…», пока вы отдельно не разрешите публикацию имени.</p>
+        </div>
+        <ol class="jlh-flow">
+            <li>
+                <span class="jlh-flow__index">01</span>
+                <h3>Семейный кабинет</h3>
+                <p>Вы создаёте аккаунт и добавляете профиль ребёнка: имя, дату рождения, город и ступень подготовки.</p>
+            </li>
+            <li>
+                <span class="jlh-flow__index">02</span>
+                <h3>Проверка полномочий</h3>
+                <p>Поддержка проверяет возраст и ваше право представлять ребёнка. После этого вы подписываете согласие на обработку данных.</p>
+            </li>
+            <li>
+                <span class="jlh-flow__index">03</span>
+                <h3>Заявка и оплата</h3>
+                <p>Выбираете турнир по мячу, возрасту и городу. Заявка, оплата и уведомления — в кабинете, результаты сохраняются в профиле ребёнка.</p>
+            </li>
+        </ol>
+    </section>
+
+    <section class="jlh-cta" aria-labelledby="jlh-cta-title">
+        <div>
+            <h2 id="jlh-cta-title">Начните с профиля ребёнка</h2>
+            <p>Добавьте данные, подтвердите полномочия и выберите подходящий турнир, когда он появится в календаре.</p>
+        </div>
+        <div class="jlh-cta__actions">
+            <a class="jl-button" href="{% url 'juniors:family' %}">Перейти в кабинет <span aria-hidden="true">→</span></a>
+            <a class="jl-button jl-button--ghost" href="{% url 'juniors:rules' %}">Правила и допуск</a>
+        </div>
+    </section>
+
+</div>
 {% endblock %}

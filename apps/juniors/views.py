@@ -1,7 +1,9 @@
 """Страницы детской лиги и приватного семейного кабинета."""
 
 from collections.abc import Callable
+from datetime import datetime
 from functools import wraps
+from typing import Any
 
 from django.conf import settings
 from django.contrib import messages
@@ -14,6 +16,7 @@ from django.db.models import Count, F, Q
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.http import urlencode
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -71,10 +74,102 @@ def league_available(view: Callable[..., HttpResponse]) -> Callable[..., HttpRes
     return wrapped
 
 
+def upcoming_tournaments(*, now: datetime, limit: int = 3) -> list[dict[str, Any]]:
+    """Возвращает ближайшие турниры с числом свободных мест."""
+    queryset = (
+        JuniorTournament.objects.filter(
+            Q(starts_at__gte=now) | Q(status=JuniorTournament.Status.ACTIVE)
+        )
+        .exclude(
+            status__in=[
+                JuniorTournament.Status.DRAFT,
+                JuniorTournament.Status.CANCELLED,
+            ]
+        )
+        .select_related("season")
+        .annotate(
+            occupied=Count(
+                "entries",
+                filter=Q(entries__status=JuniorEntry.Status.CONFIRMED)
+                | Q(
+                    entries__status=JuniorEntry.Status.PAYMENT,
+                    entries__reserved_until__gt=now,
+                ),
+            )
+        )
+        .order_by("starts_at", "pk")[:limit]
+    )
+    return [
+        {
+            "tournament": tournament,
+            "free_places": max(tournament.capacity - tournament.occupied, 0),
+        }
+        for tournament in queryset
+    ]
+
+
+def current_season() -> JuniorSeason | None:
+    """Возвращает идущий сезон, а при его отсутствии — последний созданный."""
+    today = timezone.localdate()
+    season: JuniorSeason | None = JuniorSeason.objects.filter(
+        starts_on__lte=today, ends_on__gte=today
+    ).first()
+    if season is None:
+        season = JuniorSeason.objects.first()
+    return season
+
+
+def rating_preview(season: JuniorSeason | None) -> dict[str, Any] | None:
+    """Берёт самую наполненную категорию сезона для короткой таблицы на главной."""
+    if season is None:
+        return None
+    from .ranking import category_label, leaderboard
+
+    group = (
+        JuniorAward.objects.filter(
+            season=season, tournament__status=JuniorTournament.Status.COMPLETED
+        )
+        .values("ball", "category")
+        .annotate(scored=Count("pk"))
+        .order_by("-scored", "ball", "category")
+        .first()
+    )
+    if group is None:
+        return None
+    rows = leaderboard(season=season, ball=group["ball"], category=group["category"])[
+        :5
+    ]
+    if not rows:
+        return None
+    return {
+        "season": season,
+        "ball": group["ball"],
+        "ball_label": Ball(group["ball"]).label,
+        "category_label": category_label(group["category"], with_rule=False),
+        "rows": rows,
+        "query": urlencode(
+            {
+                "season": season.pk,
+                "ball": group["ball"],
+                "category": group["category"],
+            }
+        ),
+    }
+
+
 @league_available
 @never_cache
 def home(request: HttpRequest) -> HttpResponse:
-    return render(request, "juniors/home.html", {"ball_guide": BALL_GUIDE})
+    season = current_season()
+    return render(
+        request,
+        "juniors/home.html",
+        {
+            "ball_guide": BALL_GUIDE,
+            "upcoming": upcoming_tournaments(now=timezone.now()),
+            "rating": rating_preview(season),
+        },
+    )
 
 
 @league_available

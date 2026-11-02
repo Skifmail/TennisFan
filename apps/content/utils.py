@@ -22,7 +22,9 @@ def generate_unique_slug(
     name: str,
     slug: str | None = None,
     instance: TModel | None = None,
+    exclude_pk: int | None = None,
     fallback: str = "item",
+    suffix_start: int = 2,
 ) -> str:
     """Генерирует уникальный slug для модели с полем slug.
 
@@ -35,7 +37,9 @@ def generate_unique_slug(
         name: Название (используется, если slug пустой).
         slug: Текущее значение slug (может быть из prepopulated или ввода).
         instance: Редактируемый экземпляр (исключается из проверки уникальности).
+        exclude_pk: PK исключаемого объекта, если нет самого экземпляра.
         fallback: Значение по умолчанию, если name и slug пустые.
+        suffix_start: С какого числа начинать суффикс (по умолчанию -2).
 
     Returns:
         Уникальный slug, подходящий под ограничение max_length.
@@ -46,16 +50,18 @@ def generate_unique_slug(
         base = fallback
     base = base[: SLUG_MAX_LENGTH - SUFFIX_RESERVED].rstrip("-")
     candidate = base
-    n = 1
+    n = max(1, suffix_start)
     queryset = model.objects.all()
     if instance is not None and instance.pk is not None:
         queryset = queryset.exclude(pk=instance.pk)
+    elif exclude_pk is not None:
+        queryset = queryset.exclude(pk=exclude_pk)
     while queryset.filter(slug=candidate).exists():
-        n += 1
         suffix = f"-{n}"
         if len(base) + len(suffix) > SLUG_MAX_LENGTH:
             base = base[: SLUG_MAX_LENGTH - len(suffix)].rstrip("-") or fallback
         candidate = base + suffix
+        n += 1
     return candidate
 
 

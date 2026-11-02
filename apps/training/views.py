@@ -11,9 +11,9 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
+from apps.content.utils import generate_unique_slug
 from apps.core.decorators import login_required_with_message
 from apps.core.geo import GeoRegion
 from apps.core.metrika import (
@@ -507,13 +507,11 @@ def training_add(request):
         if form.is_valid():
             t = form.save(commit=False)
             t.coach = coach
-            base = slugify(t.title, allow_unicode=True) or "training"
-            slug = base
-            n = 0
-            while Training.objects.filter(slug=slug).exists():
-                n += 1
-                slug = f"{base}-{n}"
-            t.slug = slug
+            t.slug = generate_unique_slug(
+                model=Training,
+                name=t.title,
+                fallback="training",
+            )
             t.save()
             form.save_m2m()
             messages.success(request, f"Тренировка «{t.title}» создана.")

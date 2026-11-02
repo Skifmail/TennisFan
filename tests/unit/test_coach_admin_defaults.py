@@ -7,8 +7,10 @@ from django.urls import reverse
 from apps.training.coach_defaults import (
     apply_coach_defaults,
     coach_defaults_from_user,
+    unique_coach_slug,
 )
 from apps.training.forms import CoachAdminForm
+from apps.training.models import Coach
 from tests.support.factories import make_player
 
 User = get_user_model()
@@ -158,3 +160,23 @@ class CoachAdminUserDefaultsViewTestCase(TestCase):
         response = self.client.get(url, secure=True)
 
         self.assertEqual(response.status_code, 302)
+
+
+class UniqueCoachSlugTestCase(TestCase):
+    """Slug тренера укладывается в лимит SlugField и остаётся уникальным."""
+
+    LONG_NAME = "A" * 100
+
+    def test_long_latin_name_fits_limit(self) -> None:
+        slug = unique_coach_slug(self.LONG_NAME)
+
+        self.assertLessEqual(len(slug), 50)
+
+    def test_duplicate_long_name_gets_unique_slug(self) -> None:
+        first = unique_coach_slug(self.LONG_NAME)
+        Coach.objects.create(name=self.LONG_NAME, slug=first, city="Москва")
+
+        second = unique_coach_slug(self.LONG_NAME)
+
+        self.assertNotEqual(second, first)
+        self.assertLessEqual(len(second), 50)

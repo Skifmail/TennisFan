@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from django.utils.text import slugify
 
+from apps.content.utils import generate_unique_slug
 from apps.users.display import format_user_display_name
 from apps.users.models import Player
 
@@ -92,15 +93,14 @@ def unique_coach_slug(name: str, *, exclude_pk: int | None = None) -> str:
     from .models import Coach
 
     base = slugify(name) or "coach"
-    slug = base
-    index = 0
-    queryset = Coach.objects.all()
-    if exclude_pk is not None:
-        queryset = queryset.exclude(pk=exclude_pk)
-    while queryset.filter(slug=slug).exists():
-        index += 1
-        slug = f"{base}-{index}"
-    return slug
+    return generate_unique_slug(
+        model=Coach,
+        name=name,
+        slug=base,
+        exclude_pk=exclude_pk,
+        fallback="coach",
+        suffix_start=1,
+    )
 
 
 def apply_coach_defaults(

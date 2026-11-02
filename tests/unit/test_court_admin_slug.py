@@ -7,7 +7,7 @@ from django.test import TestCase
 
 from apps.core.sports import VenueSport
 from apps.courts.forms import CourtAdminForm, _normalize_website, _unique_court_slug
-from apps.courts.models import Court
+from apps.courts.models import Court, CourtApplication
 from apps.courts.surfaces import CourtSurface, PadelSurface
 
 
@@ -101,3 +101,52 @@ class CourtAdminSlugFormTestCase(TestCase):
 
     def test_unique_court_slug_helper(self) -> None:
         self.assertEqual(_unique_court_slug("Hello Club"), "hello-club")
+
+    def test_long_name_slug_fits_field_limit(self) -> None:
+        """Длинное название не переполняет slug (varchar(50))."""
+        long_name = (
+            "Очень длинное название теннисного клуба для проверки переполнения slug"
+        )
+        form = CourtAdminForm(data=self._base_data(name=long_name))
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertLessEqual(len(form.cleaned_data["slug"]), 50)
+
+    def test_duplicate_long_name_gets_unique_slug(self) -> None:
+        """Повторное длинное название получает уникальный slug в пределах лимита."""
+        long_name = (
+            "Очень длинное название теннисного клуба для проверки переполнения slug"
+        )
+        first = CourtAdminForm(data=self._base_data(name=long_name))
+        self.assertTrue(first.is_valid(), first.errors)
+        Court.objects.create(
+            name=long_name,
+            slug=first.cleaned_data["slug"],
+            city="Сочи",
+            address="ул. 1",
+        )
+
+        second = CourtAdminForm(data=self._base_data(name=long_name))
+        self.assertTrue(second.is_valid(), second.errors)
+        self.assertNotEqual(second.cleaned_data["slug"], first.cleaned_data["slug"])
+        self.assertLessEqual(len(second.cleaned_data["slug"]), 50)
+
+
+class CourtApplicationApproveSlugTestCase(TestCase):
+    """Одобрение заявки с длинным названием не переполняет slug корта."""
+
+    def test_approve_long_name_creates_valid_slug(self) -> None:
+        long_name = (
+            "Очень длинное название теннисного клуба для проверки переполнения slug"
+        )
+        application = CourtApplication.objects.create(
+            applicant_name="Заявитель",
+            applicant_email="applicant@test.local",
+            name=long_name,
+            city="Сочи",
+            address="Курортный проспект, 45",
+        )
+
+        court = application.approve_and_create_court()
+
+        self.assertLessEqual(len(court.slug), 50)
+        self.assertEqual(application.court_id, court.pk)

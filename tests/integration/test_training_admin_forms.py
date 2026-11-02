@@ -158,3 +158,95 @@ class CoachTrainingFormRedisplayTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="type_prices_price_group"')
         self.assertContains(response, 'value="1500.0"')
+
+
+class TrainingSlugLengthTests(TestCase):
+    """Длинное название тренировки не переполняет slug (varchar(50))."""
+
+    LONG_TITLE = "Очень длинное название тренировки для проверки переполнения поля slug"
+
+    def setUp(self) -> None:
+        self.coach_user = make_user(email="slug-coach@test.local")
+        Coach.objects.create(
+            user=self.coach_user, name="Тренер", slug="slug-coach", city="Москва"
+        )
+        self.client.force_login(self.coach_user)
+
+    def _post_training(self, title: str):
+        return self.client.post(
+            reverse("training_add"),
+            {
+                "title": title,
+                "description": "Описание",
+                "sports": ["tennis"],
+                "skill_levels": ["novice"],
+                "type_prices_checked_group": "on",
+                "type_prices_price_group": "1500",
+                "city": "Москва",
+                "duration_minutes": "60",
+                "max_participants": "1",
+            },
+            secure=True,
+        )
+
+    def test_long_title_creates_training_with_valid_slug(self) -> None:
+        response = self._post_training(self.LONG_TITLE)
+
+        self.assertEqual(response.status_code, 302)
+        training = Training.objects.get(title=self.LONG_TITLE)
+        self.assertLessEqual(len(training.slug), 50)
+
+    def test_duplicate_long_title_gets_unique_slug(self) -> None:
+        self._post_training(self.LONG_TITLE)
+        response = self._post_training(self.LONG_TITLE)
+
+        self.assertEqual(response.status_code, 302)
+        slugs = list(
+            Training.objects.filter(title=self.LONG_TITLE).values_list(
+                "slug", flat=True
+            )
+        )
+        self.assertEqual(len(slugs), 2)
+        self.assertEqual(len(set(slugs)), 2)
+        for slug in slugs:
+            self.assertLessEqual(len(slug), 50)
+
+    def test_edit_published_training_keeps_valid_slug(self) -> None:
+        self._post_training(self.LONG_TITLE)
+        training = Training.objects.get(title=self.LONG_TITLE)
+        old_slug = training.slug
+        new_title = f"{self.LONG_TITLE} (обновлено)"
+        response = self.client.post(
+            reverse("training_edit", args=[training.pk]),
+            {
+                "title": new_title,
+                "description": "Описание",
+                "sports": ["tennis"],
+                "skill_levels": ["novice"],
+                "type_prices_checked_group": "on",
+                "type_prices_price_group": "1500",
+                "city": "Москва",
+                "duration_minutes": "60",
+                "max_participants": "1",
+                "is_active": "on",
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        training.refresh_from_db()
+        self.assertEqual(training.title, new_title)
+        self.assertEqual(training.slug, old_slug)
+        self.assertLessEqual(len(training.slug), 50)
+
+    def test_model_save_truncates_overlong_slug(self) -> None:
+        training = Training(
+            title=self.LONG_TITLE,
+            slug="x" * 80,
+            description="Описание",
+            city="Москва",
+        )
+
+        training.save()
+
+        self.assertLessEqual(len(training.slug), 50)

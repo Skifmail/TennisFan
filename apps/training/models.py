@@ -7,6 +7,7 @@ from typing import cast
 
 from django.db import models
 
+from apps.content.utils import SLUG_MAX_LENGTH
 from apps.core.contact_utils import (
     build_max_url,
     build_telegram_url,
@@ -359,6 +360,20 @@ class Training(CompressImageFieldsMixin, models.Model):
 
     def __str__(self) -> str:
         return str(self.title)
+
+    def save(self, *args, **kwargs) -> None:
+        """Сгенерировать или обрезать slug, чтобы он помещался в varchar(50)."""
+        if not self.slug or len(self.slug) > SLUG_MAX_LENGTH:
+            from apps.content.utils import generate_unique_slug
+
+            self.slug = generate_unique_slug(
+                model=type(self),
+                name=self.title,
+                slug=self.slug,
+                instance=self,
+                fallback="training",
+            )
+        super().save(*args, **kwargs)
 
     @property
     def training_types(self) -> list[str]:

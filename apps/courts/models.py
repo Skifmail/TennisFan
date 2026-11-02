@@ -7,7 +7,6 @@ from typing import cast
 
 from django.conf import settings
 from django.db import models
-from django.utils.text import slugify
 
 from apps.core.geo import GeoRegion
 from apps.core.sports import VenueSport
@@ -392,12 +391,14 @@ class CourtApplication(CompressImageFieldsMixin, models.Model):
             raise ValueError(
                 "Можно одобрять только заявки со статусом «На рассмотрении»."
             )
-        base_slug = slugify(self.name, allow_unicode=True) or "court"
-        slug = base_slug
-        n = 0
-        while Court.objects.filter(slug=slug).exists():
-            n += 1
-            slug = f"{base_slug}-{n}"
+        from apps.content.utils import generate_unique_slug
+
+        slug = generate_unique_slug(
+            model=Court,
+            name=self.name,
+            fallback="court",
+            suffix_start=1,
+        )
         court = Court.objects.create(
             name=self.name,
             slug=slug,

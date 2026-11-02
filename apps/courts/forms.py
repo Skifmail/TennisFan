@@ -8,6 +8,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 
+from apps.content.utils import generate_unique_slug
 from apps.core.sports import VenueSport
 
 from .models import Court, CourtApplication, CourtRating
@@ -21,17 +22,13 @@ from .surfaces import (
 
 def _unique_court_slug(name: str, *, exclude_pk: int | None = None) -> str:
     """Собрать уникальный slug корта из названия (с поддержкой кириллицы)."""
-    base = slugify(name, allow_unicode=True) or "court"
-    candidate = base
-    suffix = 0
-    while True:
-        qs = Court.objects.filter(slug=candidate)
-        if exclude_pk is not None:
-            qs = qs.exclude(pk=exclude_pk)
-        if not qs.exists():
-            return candidate
-        suffix += 1
-        candidate = f"{base}-{suffix}"
+    return generate_unique_slug(
+        model=Court,
+        name=name,
+        exclude_pk=exclude_pk,
+        fallback="court",
+        suffix_start=1,
+    )
 
 
 def _normalize_website(value: str) -> str:
